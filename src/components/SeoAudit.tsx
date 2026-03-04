@@ -56,7 +56,7 @@ interface SeoAuditResult {
   siteWideIssues: SeoIssue[];
 }
 
-type SubTab = 'audit' | 'editor' | 'cms' | 'links' | 'redirects' | 'internal' | 'keywords' | 'schema' | 'competitor' | 'history' | 'strategy';
+type SubTab = 'dashboard' | 'audit' | 'editor' | 'cms' | 'links' | 'redirects' | 'internal' | 'keywords' | 'schema' | 'competitor' | 'history' | 'strategy';
 
 interface SnapshotSummary {
   id: string;
@@ -485,7 +485,7 @@ function AuditHistory({ siteId, history, onRefresh }: { siteId: string; history:
 }
 
 function SeoAudit({ siteId, workspaceId }: Props) {
-  const [subTab, setSubTab] = useState<SubTab>('audit');
+  const [subTab, setSubTab] = useState<SubTab>('dashboard');
   const [data, setData] = useState<SeoAuditResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasRun, setHasRun] = useState(false);
@@ -757,95 +757,180 @@ function SeoAudit({ siteId, workspaceId }: Props) {
     setReportView('csv');
   };
 
-  // Sub-tab navigation (always visible)
-  const subTabs: { id: SubTab; label: string; icon: typeof Globe }[] = [
-    { id: 'audit', label: 'Audit', icon: Globe },
-    { id: 'editor', label: 'Edit SEO', icon: Pencil },
-    { id: 'cms', label: 'CMS SEO', icon: ListChecks },
-    { id: 'links', label: 'Dead Links', icon: Link2Off },
-    { id: 'redirects', label: 'Redirects', icon: CornerDownRight },
-    { id: 'internal', label: 'Int. Links', icon: Share2 },
-    { id: 'strategy', label: 'Strategy', icon: Target },
-    { id: 'keywords', label: 'Keywords', icon: SearchIcon },
-    { id: 'schema', label: 'Schema', icon: Code2 },
-    { id: 'competitor', label: 'Competitor', icon: TrendingUp },
-    { id: 'history', label: 'History', icon: Clock },
+  // ── Sidebar navigation groups ──
+  const navGroups = [
+    { label: 'OVERVIEW', items: [
+      { id: 'dashboard' as SubTab, label: 'Dashboard', icon: Globe },
+    ]},
+    { label: 'ANALYZE', items: [
+      { id: 'audit' as SubTab, label: 'Site Audit', icon: SearchIcon },
+      { id: 'history' as SubTab, label: 'History', icon: Clock },
+    ]},
+    { label: 'EDIT', items: [
+      { id: 'editor' as SubTab, label: 'Page SEO', icon: Pencil },
+      { id: 'cms' as SubTab, label: 'CMS SEO', icon: ListChecks },
+    ]},
+    { label: 'LINKS', items: [
+      { id: 'links' as SubTab, label: 'Dead Links', icon: Link2Off },
+      { id: 'redirects' as SubTab, label: 'Redirects', icon: CornerDownRight },
+      { id: 'internal' as SubTab, label: 'Internal Links', icon: Share2 },
+    ]},
+    { label: 'STRATEGY', items: [
+      { id: 'strategy' as SubTab, label: 'Keyword Strategy', icon: Target },
+      { id: 'keywords' as SubTab, label: 'Page Keywords', icon: SearchIcon },
+      { id: 'schema' as SubTab, label: 'Schema', icon: Code2 },
+      { id: 'competitor' as SubTab, label: 'Competitors', icon: TrendingUp },
+    ]},
   ];
-  const tabNav = (
-    <div className="flex items-center gap-0.5 mb-4">
-      {subTabs.map(t => {
-        const Icon = t.icon;
-        const active = subTab === t.id;
-        return (
-          <button
-            key={t.id}
-            onClick={() => setSubTab(t.id)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium"
-            style={active ? {
-              backgroundColor: 'var(--brand-mint-dim)',
-              color: 'var(--brand-mint)',
-            } : {
-              color: 'var(--brand-text-muted)',
-            }}
-          >
-            <Icon className="w-3 h-3" /> {t.label}
-          </button>
-        );
-      })}
+
+  const sidebar = (
+    <aside className="w-[172px] flex-shrink-0 border-r border-zinc-800 pr-2 space-y-3 pt-1">
+      {navGroups.map(group => (
+        <div key={group.label}>
+          <div className="text-[9px] text-zinc-600 font-semibold tracking-widest px-2.5 mb-0.5">{group.label}</div>
+          {group.items.map(item => {
+            const Icon = item.icon;
+            const active = subTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setSubTab(item.id)}
+                className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
+                  active
+                    ? 'bg-violet-500/10 text-violet-300 border border-violet-500/20'
+                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 border border-transparent'
+                }`}
+              >
+                <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${active ? 'text-violet-400' : ''}`} />
+                <span className="truncate">{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      ))}
+    </aside>
+  );
+
+  const withLayout = (content: React.ReactNode) => (
+    <div className="flex gap-0 min-h-[500px]">
+      {sidebar}
+      <div className="flex-1 min-w-0 pl-5">{content}</div>
     </div>
   );
 
-  if (subTab === 'editor') return <>{tabNav}<SeoEditor siteId={siteId} workspaceId={workspaceId} /></>;
-  if (subTab === 'cms') return <>{tabNav}<CmsEditor siteId={siteId} workspaceId={workspaceId} /></>;
-  if (subTab === 'strategy') return <>{tabNav}<KeywordStrategyPanel workspaceId={workspaceId || ''} /></>;
-  if (subTab === 'links') return <>{tabNav}<LinkChecker siteId={siteId} /></>;
-  if (subTab === 'redirects') return <>{tabNav}<RedirectManager siteId={siteId} /></>;
-  if (subTab === 'internal') return <>{tabNav}<InternalLinks siteId={siteId} workspaceId={workspaceId} /></>;
-  if (subTab === 'keywords') return <>{tabNav}<KeywordAnalysis siteId={siteId} /></>;
-  if (subTab === 'schema') return <>{tabNav}<SchemaSuggester siteId={siteId} /></>;
-  if (subTab === 'competitor') return <>{tabNav}<CompetitorAnalysis siteId={siteId} /></>;
-  if (subTab === 'history') return <>{tabNav}<AuditHistory siteId={siteId} history={history} onRefresh={loadHistory} /></>;
-
-  // Audit tab
-  if (!hasRun) {
-    return (
-      <>
-        {tabNav}
-        <div className="flex flex-col items-center justify-center py-16 gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center">
-            <Globe className="w-8 h-8 text-zinc-600" />
-          </div>
-          <p className="text-zinc-400 text-sm">Comprehensive SEO audit for your Webflow site</p>
-          <p className="text-xs text-zinc-600 max-w-md text-center">
-            Checks titles, meta descriptions, headings, Open Graph, canonical tags, structured data, content length, and more
-          </p>
-          <button
-            onClick={runAudit}
-            className="px-5 py-2.5 bg-teal-600 hover:bg-teal-500 rounded-lg text-sm font-medium transition-colors"
-          >
-            Run SEO Audit
-          </button>
+  // ── Dashboard landing page ──
+  if (subTab === 'dashboard') {
+    const dashCards: Array<{ id: SubTab; title: string; desc: string; icon: typeof Globe; color: string }> = [
+      { id: 'audit', title: 'Site Audit', desc: data ? `Score: ${data.siteScore} · ${data.errors} errors, ${data.warnings} warnings` : 'Run a comprehensive SEO audit', icon: Globe, color: 'text-emerald-400' },
+      { id: 'editor', title: 'Page SEO Editor', desc: 'Edit titles, meta descriptions & Open Graph', icon: Pencil, color: 'text-violet-400' },
+      { id: 'cms', title: 'CMS SEO', desc: 'Edit SEO fields on collection items', icon: ListChecks, color: 'text-pink-400' },
+      { id: 'links', title: 'Dead Links', desc: 'Find broken links across your site', icon: Link2Off, color: 'text-red-400' },
+      { id: 'redirects', title: 'Redirects', desc: 'Detect redirect chains & 404s', icon: CornerDownRight, color: 'text-amber-400' },
+      { id: 'internal', title: 'Internal Links', desc: 'AI-powered linking suggestions', icon: Share2, color: 'text-sky-400' },
+      { id: 'strategy', title: 'Keyword Strategy', desc: 'AI keyword mapping for your site', icon: Target, color: 'text-violet-400' },
+      { id: 'schema', title: 'Schema Markup', desc: 'Structured data suggestions', icon: Code2, color: 'text-orange-400' },
+      { id: 'competitor', title: 'Competitors', desc: 'Compare SEO against competitors', icon: TrendingUp, color: 'text-emerald-400' },
+    ];
+    return withLayout(
+      <div className="space-y-5">
+        <div>
+          <h2 className="text-lg font-semibold text-zinc-200">SEO Tools</h2>
+          <p className="text-xs text-zinc-500 mt-0.5">Everything you need to optimize your Webflow site for search engines</p>
         </div>
-      </>
+        {data && (
+          <div className="grid grid-cols-4 gap-3">
+            <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
+              <div className={`text-3xl font-bold ${scoreColor(data.siteScore)}`}>{data.siteScore}</div>
+              <div className="text-xs text-zinc-500 mt-1">Site Score</div>
+              <div className="mt-2 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                <div className={`h-full rounded-full ${scoreBg(data.siteScore)}`} style={{ width: `${data.siteScore}%` }} />
+              </div>
+            </div>
+            <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
+              <div className="text-3xl font-bold text-zinc-200">{data.totalPages}</div>
+              <div className="text-xs text-zinc-500 mt-1">Pages</div>
+            </div>
+            <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
+              <div className="text-3xl font-bold text-red-400">{data.errors}</div>
+              <div className="text-xs text-zinc-500 mt-1">Errors</div>
+            </div>
+            <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
+              <div className="text-3xl font-bold text-amber-400">{data.warnings}</div>
+              <div className="text-xs text-zinc-500 mt-1">Warnings</div>
+            </div>
+          </div>
+        )}
+        <div className="grid grid-cols-3 gap-3">
+          {dashCards.map(card => {
+            const Icon = card.icon;
+            return (
+              <button
+                key={card.id}
+                onClick={() => setSubTab(card.id)}
+                className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 text-left hover:border-zinc-600 hover:bg-zinc-800/40 transition-all group"
+              >
+                <Icon className={`w-5 h-5 ${card.color} mb-2 group-hover:scale-110 transition-transform`} />
+                <div className="text-sm font-medium text-zinc-200">{card.title}</div>
+                <div className="text-[11px] text-zinc-500 mt-0.5">{card.desc}</div>
+              </button>
+            );
+          })}
+        </div>
+        {history.length > 0 && (
+          <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+            <div className="text-sm font-medium text-zinc-300 mb-3">Score Trend</div>
+            <ScoreTrendChart history={history} />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Sub-tool routing ──
+  if (subTab === 'editor') return withLayout(<SeoEditor siteId={siteId} workspaceId={workspaceId} />);
+  if (subTab === 'cms') return withLayout(<CmsEditor siteId={siteId} workspaceId={workspaceId} />);
+  if (subTab === 'strategy') return withLayout(<KeywordStrategyPanel workspaceId={workspaceId || ''} />);
+  if (subTab === 'links') return withLayout(<LinkChecker siteId={siteId} />);
+  if (subTab === 'redirects') return withLayout(<RedirectManager siteId={siteId} />);
+  if (subTab === 'internal') return withLayout(<InternalLinks siteId={siteId} workspaceId={workspaceId} />);
+  if (subTab === 'keywords') return withLayout(<KeywordAnalysis siteId={siteId} />);
+  if (subTab === 'schema') return withLayout(<SchemaSuggester siteId={siteId} />);
+  if (subTab === 'competitor') return withLayout(<CompetitorAnalysis siteId={siteId} />);
+  if (subTab === 'history') return withLayout(<AuditHistory siteId={siteId} history={history} onRefresh={loadHistory} />);
+
+  // ── Audit tab ──
+  if (!hasRun) {
+    return withLayout(
+      <div className="flex flex-col items-center justify-center py-16 gap-4">
+        <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center">
+          <Globe className="w-8 h-8 text-zinc-600" />
+        </div>
+        <p className="text-zinc-400 text-sm">Comprehensive SEO audit for your Webflow site</p>
+        <p className="text-xs text-zinc-600 max-w-md text-center">
+          Checks titles, meta descriptions, headings, Open Graph, canonical tags, structured data, content length, and more
+        </p>
+        <button
+          onClick={runAudit}
+          className="px-5 py-2.5 bg-teal-600 hover:bg-teal-500 rounded-lg text-sm font-medium transition-colors"
+        >
+          Run SEO Audit
+        </button>
+      </div>
     );
   }
 
   if (loading) {
-    return (
-      <>
-        {tabNav}
-        <div className="flex flex-col items-center justify-center py-16 gap-3 text-zinc-500">
-          <Loader2 className="w-6 h-6 animate-spin" />
-          <p className="text-sm">Scanning pages for SEO issues...</p>
-          <p className="text-xs text-zinc-600">Fetching metadata and published HTML for each page</p>
-        </div>
-      </>
+    return withLayout(
+      <div className="flex flex-col items-center justify-center py-16 gap-3 text-zinc-500">
+        <Loader2 className="w-6 h-6 animate-spin" />
+        <p className="text-sm">Scanning pages for SEO issues...</p>
+        <p className="text-xs text-zinc-600">Fetching metadata and published HTML for each page</p>
+      </div>
     );
   }
 
-  if (!data) return (
+  if (!data) return withLayout(
     <>
-      {tabNav}
       {auditError && (
         <div className="flex flex-col items-center justify-center py-16 gap-4">
           <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 max-w-md text-center">
@@ -876,9 +961,8 @@ function SeoAudit({ siteId, workspaceId }: Props) {
         p.issues.some(i => i.message.toLowerCase().includes(q) || i.check.toLowerCase().includes(q));
     });
 
-  return (
+  return withLayout(
     <div className="space-y-5">
-      {tabNav}
       {/* Summary cards */}
       <div className="grid grid-cols-5 gap-3">
         <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800 col-span-1">
@@ -1242,3 +1326,4 @@ function SeoAudit({ siteId, workspaceId }: Props) {
 }
 
 export { SeoAudit };
+
