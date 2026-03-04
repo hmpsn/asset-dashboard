@@ -43,6 +43,8 @@ import {
 } from './reports.js';
 import { runSiteSpeed, runSinglePageSpeed } from './pagespeed.js';
 import { generateSchemaSuggestions } from './schema-suggester.js';
+import { runSalesAudit } from './sales-audit.js';
+import { renderSalesReportHTML } from './sales-report-html.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -614,6 +616,78 @@ app.get('/api/webflow/seo-audit/:siteId', async (req, res) => {
     console.error('SEO audit error:', msg);
     res.status(500).json({ error: `SEO audit failed: ${msg}` });
   }
+});
+
+// --- Sales Report (URL-based, no Webflow API needed) ---
+app.post('/api/sales-report', async (req, res) => {
+  try {
+    const { url, maxPages } = req.body;
+    if (!url) return res.status(400).json({ error: 'URL is required' });
+    console.log(`[sales-report] Starting audit for ${url}`);
+    const result = await runSalesAudit(url, maxPages || 25);
+
+    // Save to disk
+    const reportsDir = path.join(
+      process.env.DATA_DIR || (IS_PROD ? '/tmp/asset-dashboard' : path.join(process.env.HOME || '', '.asset-dashboard')),
+      'sales-reports'
+    );
+    fs.mkdirSync(reportsDir, { recursive: true });
+    const id = `sr_${Date.now()}`;
+    const report = { id, ...result };
+    fs.writeFileSync(path.join(reportsDir, `${id}.json`), JSON.stringify(report, null, 2));
+
+    res.json(report);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('Sales report error:', msg);
+    res.status(500).json({ error: `Sales report failed: ${msg}` });
+  }
+});
+
+app.get('/api/sales-reports', (_req, res) => {
+  try {
+    const reportsDir = path.join(
+      process.env.DATA_DIR || (IS_PROD ? '/tmp/asset-dashboard' : path.join(process.env.HOME || '', '.asset-dashboard')),
+      'sales-reports'
+    );
+    if (!fs.existsSync(reportsDir)) return res.json([]);
+    const files = fs.readdirSync(reportsDir).filter(f => f.endsWith('.json')).sort().reverse();
+    const summaries = files.map(f => {
+      try {
+        const data = JSON.parse(fs.readFileSync(path.join(reportsDir, f), 'utf-8'));
+        return { id: data.id, url: data.url, siteName: data.siteName, siteScore: data.siteScore, totalPages: data.totalPages, errors: data.errors, warnings: data.warnings, generatedAt: data.generatedAt };
+      } catch { return null; }
+    }).filter(Boolean);
+    res.json(summaries);
+  } catch { res.json([]); }
+});
+
+app.get('/api/sales-report/:id', (req, res) => {
+  try {
+    const reportsDir = path.join(
+      process.env.DATA_DIR || (IS_PROD ? '/tmp/asset-dashboard' : path.join(process.env.HOME || '', '.asset-dashboard')),
+      'sales-reports'
+    );
+    const filePath = path.join(reportsDir, `${req.params.id}.json`);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Report not found' });
+    const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    res.json(data);
+  } catch { res.status(500).json({ error: 'Failed to load report' }); }
+});
+
+app.get('/api/sales-report/:id/html', (req, res) => {
+  try {
+    const reportsDir = path.join(
+      process.env.DATA_DIR || (IS_PROD ? '/tmp/asset-dashboard' : path.join(process.env.HOME || '', '.asset-dashboard')),
+      'sales-reports'
+    );
+    const filePath = path.join(reportsDir, `${req.params.id}.json`);
+    if (!fs.existsSync(filePath)) return res.status(404).send('Report not found');
+    const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    const html = renderSalesReportHTML(data);
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  } catch { res.status(500).send('Failed to render report'); }
 });
 
 // --- JSON-LD Schema Suggester (internal tool, not client-visible) ---

@@ -7,14 +7,15 @@ import { MediaTab } from './components/MediaTab';
 import { PageWeight } from './components/PageWeight';
 import { SeoAudit } from './components/SeoAudit';
 import { PageSpeedPanel } from './components/PageSpeedPanel';
+import { SalesReport } from './components/SalesReport';
 import { LoginScreen } from './components/LoginScreen';
 import { useAuth } from './hooks/useAuth';
 import { useWebSocket } from './hooks/useWebSocket';
 import {
-  Settings, Clipboard, BarChart3, Globe, Image, Gauge,
+  Settings, Clipboard, BarChart3, Globe, Image, Gauge, FileSearch,
 } from 'lucide-react';
 
-type Tab = 'media' | 'seo' | 'performance' | 'speed';
+type Tab = 'media' | 'seo' | 'performance' | 'speed' | 'prospect';
 
 function App() {
   const auth = useAuth();
@@ -175,6 +176,7 @@ function Dashboard() {
     { id: 'seo', label: 'SEO', icon: Globe },
     { id: 'performance', label: 'Performance', icon: BarChart3 },
     { id: 'speed', label: 'Speed', icon: Gauge },
+    { id: 'prospect', label: 'Prospect', icon: FileSearch },
   ];
 
   return (
@@ -212,7 +214,7 @@ function Dashboard() {
       </header>
 
       {/* Tab bar */}
-      {selected && (
+      {(selected || tab === 'prospect') && (
         <nav className="flex items-center gap-0.5 px-5 py-2" style={{ borderBottom: '1px solid var(--brand-border)' }}>
           {tabs.map(t => {
             const Icon = t.icon;
@@ -239,7 +241,11 @@ function Dashboard() {
 
       {/* Main content */}
       <main className="flex-1 overflow-auto p-5">
-        {!selected ? (
+        {tab === 'prospect' ? (
+          <div className="max-w-5xl mx-auto">
+            <SalesReport />
+          </div>
+        ) : !selected ? (
           <div className="flex flex-col items-center justify-center h-full gap-4">
             <img src="/logo.svg" alt="hmpsn.studio" className="h-8 opacity-40" />
             <div className="text-center">
