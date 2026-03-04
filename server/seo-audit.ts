@@ -469,7 +469,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string): Promi
   const allPages = await listPages(siteId, tokenOverride);
   // Filter published pages and exclude password-protected pages
   const pages = filterPublishedPages(allPages).filter(
-    (p: { title: string; slug: string }) => !p.title.toLowerCase().includes('password') && !p.slug.toLowerCase().includes('password')
+    (p: { title: string; slug: string }) => !(p.title || '').toLowerCase().includes('password') && !(p.slug || '').toLowerCase().includes('password')
   );
   console.log(`SEO audit: ${allPages.length} total pages, ${pages.length} published (excluded password + draft pages)`);
 
