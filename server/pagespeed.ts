@@ -1,4 +1,4 @@
-import { listPages, filterPublishedPages } from './webflow.js';
+import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from './webflow.js';
 
 const WEBFLOW_API = 'https://api.webflow.com/v2';
 const PSI_API = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed';
@@ -231,8 +231,15 @@ export async function runSiteSpeed(
     return a.slug.length - b.slug.length;
   });
 
-  const pagesToTest = sorted.slice(0, maxPages);
-  console.log(`PageSpeed: testing ${pagesToTest.length} pages on ${baseUrl} (${strategy})`);
+  // Reserve 1-2 slots for CMS pages if available
+  const cmsSlots = Math.min(2, Math.max(1, Math.floor(maxPages * 0.3)));
+  const staticSlots = maxPages - cmsSlots;
+  const pagesToTest = sorted.slice(0, staticSlots);
+
+  // Discover CMS pages and add a sample
+  const staticPaths = buildStaticPathSet(published);
+  const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, cmsSlots);
+  console.log(`PageSpeed: testing ${pagesToTest.length} static + ${cmsUrls.length} CMS pages on ${baseUrl} (${strategy})`);
 
   const results: PageSpeedResult[] = [];
 
@@ -247,6 +254,23 @@ export async function runSiteSpeed(
     results.push({
       url,
       page: page.title,
+      strategy,
+      score: extractScore(data),
+      vitals: extractVitals(data),
+      opportunities: extractOpportunities(data),
+      diagnostics: extractDiagnostics(data),
+      fetchedAt: new Date().toISOString(),
+    });
+  }
+
+  // Run CMS pages sequentially too
+  for (const cmsPage of cmsUrls) {
+    console.log(`PageSpeed: testing CMS page ${cmsPage.url}...`);
+    const data = await runPageSpeed(cmsPage.url, strategy);
+    if (!data) continue;
+    results.push({
+      url: cmsPage.url,
+      page: `${cmsPage.pageName} (CMS)`,
       strategy,
       score: extractScore(data),
       vitals: extractVitals(data),

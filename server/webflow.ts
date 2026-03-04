@@ -656,3 +656,74 @@ export async function uploadAsset(
     return { success: false, error: msg };
   }
 }
+
+// ── Shared CMS page discovery via sitemap ──
+
+export interface CmsPageUrl {
+  url: string;
+  path: string;
+  pageName: string;
+}
+
+/**
+ * Discover CMS/collection item URLs from sitemap.xml that aren't in the static pages list.
+ * @param sitemapBaseUrl - The published site URL to fetch sitemap from (e.g. https://site.webflow.io or https://custom.com)
+ * @param staticPaths - Set of lowercase paths already known from the Webflow Pages API
+ * @param limit - Max CMS URLs to return (default 50)
+ */
+export async function discoverCmsUrls(
+  sitemapBaseUrl: string,
+  staticPaths: Set<string>,
+  limit: number = 50,
+): Promise<{ cmsUrls: CmsPageUrl[]; totalFound: number }> {
+  try {
+    const sitemapRes = await fetch(`${sitemapBaseUrl}/sitemap.xml`, { redirect: 'follow' });
+    if (!sitemapRes.ok) return { cmsUrls: [], totalFound: 0 };
+
+    const sitemapText = await sitemapRes.text();
+    const isXml = sitemapText.trimStart().startsWith('<?xml') || sitemapText.trimStart().startsWith('<urlset') || sitemapText.trimStart().startsWith('<sitemapindex');
+    if (!isXml) return { cmsUrls: [], totalFound: 0 };
+
+    // Extract all <loc> URLs
+    const locRegex = /<loc>([^<]+)<\/loc>/gi;
+    const allUrls: string[] = [];
+    let m;
+    while ((m = locRegex.exec(sitemapText)) !== null) {
+      allUrls.push(m[1].trim());
+    }
+
+    // Find URLs not covered by static pages
+    const cmsAll: CmsPageUrl[] = [];
+    for (const sitemapUrl of allUrls) {
+      try {
+        const parsed = new URL(sitemapUrl);
+        const path = parsed.pathname.replace(/\/$/, '').toLowerCase();
+        if (!staticPaths.has(path)) {
+          const slug = parsed.pathname.replace(/^\//, '');
+          const lastSegment = slug.split('/').pop() || slug;
+          const pageName = lastSegment.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+          cmsAll.push({ url: sitemapUrl, path: parsed.pathname, pageName });
+        }
+      } catch { /* skip malformed URLs */ }
+    }
+
+    console.log(`[cms-discovery] sitemap: ${allUrls.length} URLs total, ${cmsAll.length} are CMS pages`);
+    return { cmsUrls: cmsAll.slice(0, limit), totalFound: cmsAll.length };
+  } catch (err) {
+    console.error('[cms-discovery] sitemap fetch failed:', err);
+    return { cmsUrls: [], totalFound: 0 };
+  }
+}
+
+/**
+ * Build the set of static page paths from Webflow API pages for use with discoverCmsUrls.
+ */
+export function buildStaticPathSet(pages: WebflowPage[]): Set<string> {
+  const paths = new Set<string>();
+  paths.add(''); // root
+  for (const p of pages) {
+    const path = (p.publishedPath || `/${p.slug || ''}`).replace(/\/$/, '').toLowerCase();
+    paths.add(path);
+  }
+  return paths;
+}

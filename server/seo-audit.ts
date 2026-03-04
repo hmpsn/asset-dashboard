@@ -1,4 +1,4 @@
-import { listPages, filterPublishedPages } from './webflow.js';
+import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from './webflow.js';
 
 const WEBFLOW_API = 'https://api.webflow.com/v2';
 
@@ -521,81 +521,41 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string): Promi
   const siteWideIssues: SeoIssue[] = [];
 
   // ── Discover & audit CMS collection pages via sitemap ──
-  const CMS_PAGE_LIMIT = 50; // cap to avoid very long audits on huge CMS sites
-  const staticPaths = new Set(pages.map(p => (p.publishedPath || `/${p.slug || ''}`).replace(/\/$/, '').toLowerCase()));
-  // Also add the root
-  staticPaths.add('');
+  const CMS_PAGE_LIMIT = 50;
   const scanUrl = siteWideUrl || baseUrl;
   if (scanUrl) {
-    try {
-      const sitemapRes = await fetch(`${scanUrl}/sitemap.xml`, { redirect: 'follow' });
-      if (sitemapRes.ok) {
-        const sitemapText = await sitemapRes.text();
-        const isXml = sitemapText.trimStart().startsWith('<?xml') || sitemapText.trimStart().startsWith('<urlset') || sitemapText.trimStart().startsWith('<sitemapindex');
-        if (isXml) {
-          // Extract all <loc> URLs from sitemap
-          const locRegex = /<loc>([^<]+)<\/loc>/gi;
-          const allSitemapUrls: string[] = [];
-          let locMatch;
-          while ((locMatch = locRegex.exec(sitemapText)) !== null) {
-            allSitemapUrls.push(locMatch[1].trim());
-          }
+    const staticPaths = buildStaticPathSet(pages);
+    const { cmsUrls, totalFound } = await discoverCmsUrls(scanUrl, staticPaths, CMS_PAGE_LIMIT);
 
-          // Find URLs in sitemap not covered by static pages
-          const cmsUrls: { url: string; path: string }[] = [];
-          for (const sitemapUrl of allSitemapUrls) {
-            try {
-              const parsed = new URL(sitemapUrl);
-              const path = parsed.pathname.replace(/\/$/, '').toLowerCase();
-              if (!staticPaths.has(path)) {
-                cmsUrls.push({ url: sitemapUrl, path: parsed.pathname });
-              }
-            } catch { /* skip malformed URLs */ }
-          }
-
-          console.log(`SEO audit: sitemap has ${allSitemapUrls.length} URLs, ${cmsUrls.length} are CMS/collection pages not in static pages`);
-
-          // Audit CMS pages (HTML-only, no Webflow API metadata)
-          const cmsToScan = cmsUrls.slice(0, CMS_PAGE_LIMIT);
-          if (cmsUrls.length > CMS_PAGE_LIMIT) {
-            console.log(`SEO audit: capping CMS page scan to ${CMS_PAGE_LIMIT} of ${cmsUrls.length} pages`);
-          }
-
-          for (let i = 0; i < cmsToScan.length; i += batch) {
-            const chunk = cmsToScan.slice(i, i + batch);
-            const chunkResults = await Promise.all(
-              chunk.map(async (item) => {
-                const html = await fetchPublishedHtml(item.url);
-                const slug = item.path.replace(/^\//, '');
-                // Derive a page name from the slug (e.g. "blog/my-post" → "My Post")
-                const lastSegment = slug.split('/').pop() || slug;
-                const pageName = lastSegment.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                // Extract title from HTML for duplicate checking
-                const htmlTitle = html ? (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || '') : '';
-                const htmlMetaDesc = html ? (extractMetaContent(html, 'description') || '') : '';
-                metaCache.push({
-                  title: htmlTitle.toLowerCase().trim(),
-                  desc: htmlMetaDesc.toLowerCase().trim(),
-                  page: pageName,
-                });
-                if (html) htmlCache.set(`cms-${slug}`, html);
-                return auditPage(`cms-${slug}`, pageName, slug, item.url, null, html);
-              })
-            );
-            results.push(...chunkResults);
-          }
-
-          if (cmsUrls.length > CMS_PAGE_LIMIT) {
-            siteWideIssues.push({
-              check: 'sitemap', severity: 'info', category: 'technical',
-              message: `${cmsUrls.length} CMS pages found, ${CMS_PAGE_LIMIT} sampled for audit`,
-              recommendation: `Your site has ${cmsUrls.length} collection pages. We audited a sample of ${CMS_PAGE_LIMIT}. Issues found likely apply across similar CMS pages.`,
+    if (cmsUrls.length > 0) {
+      console.log(`SEO audit: auditing ${cmsUrls.length} CMS pages (${totalFound} total found)`);
+      for (let i = 0; i < cmsUrls.length; i += batch) {
+        const chunk = cmsUrls.slice(i, i + batch);
+        const chunkResults = await Promise.all(
+          chunk.map(async (item) => {
+            const html = await fetchPublishedHtml(item.url);
+            const slug = item.path.replace(/^\//, '');
+            const htmlTitle = html ? (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || '') : '';
+            const htmlMetaDesc = html ? (extractMetaContent(html, 'description') || '') : '';
+            metaCache.push({
+              title: htmlTitle.toLowerCase().trim(),
+              desc: htmlMetaDesc.toLowerCase().trim(),
+              page: item.pageName,
             });
-          }
-        }
+            if (html) htmlCache.set(`cms-${slug}`, html);
+            return auditPage(`cms-${slug}`, item.pageName, slug, item.url, null, html);
+          })
+        );
+        results.push(...chunkResults);
       }
-    } catch (err) {
-      console.error(`SEO audit: sitemap CMS discovery failed:`, err);
+
+      if (totalFound > CMS_PAGE_LIMIT) {
+        siteWideIssues.push({
+          check: 'sitemap', severity: 'info', category: 'technical',
+          message: `${totalFound} CMS pages found, ${CMS_PAGE_LIMIT} sampled for audit`,
+          recommendation: `Your site has ${totalFound} collection pages. We audited a sample of ${CMS_PAGE_LIMIT}. Issues found likely apply across similar CMS pages.`,
+        });
+      }
     }
   }
 

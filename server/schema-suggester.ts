@@ -1,4 +1,4 @@
-import { listPages, filterPublishedPages } from './webflow.js';
+import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from './webflow.js';
 
 const WEBFLOW_API = 'https://api.webflow.com/v2';
 
@@ -564,6 +564,57 @@ export async function generateSchemaSuggestions(siteId: string, tokenOverride?: 
       })
     );
     results.push(...chunkResults.filter(Boolean) as SchemaPageSuggestion[]);
+  }
+
+  // ── Also analyze CMS/collection pages discovered via sitemap ──
+  const staticPaths = buildStaticPathSet(pages);
+  const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, 20);
+  if (cmsUrls.length > 0) {
+    console.log(`[schema] Also analyzing ${cmsUrls.length} CMS pages`);
+    for (let i = 0; i < cmsUrls.length; i += batch) {
+      const chunk = cmsUrls.slice(i, i + batch);
+      const chunkResults = await Promise.all(
+        chunk.map(async (item) => {
+          const slug = item.path.replace(/^\//, '');
+          const isHomepage = false;
+          const html = await fetchPublishedHtml(item.url);
+          const htmlTitle = html ? (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || '') : '';
+          const existingSchemas = html ? extractExistingSchemas(html) : [];
+          console.log(`[schema] CMS "${item.pageName}" [${slug}] → url=${item.url}, html=${html ? html.length + ' chars' : 'FAILED'}, existing=${existingSchemas.join(',') || 'none'}`);
+
+          let suggestedSchemas: SchemaSuggestion[];
+          if (useAI) {
+            suggestedSchemas = await aiGenerateSchema(
+              item.pageName, slug, htmlTitle, '',
+              html, existingSchemas, isHomepage, baseUrl,
+            );
+            if (suggestedSchemas.length === 0) {
+              suggestedSchemas = suggestSchemas(
+                item.pageName, slug, htmlTitle, '',
+                html, existingSchemas, isHomepage,
+              );
+            }
+          } else {
+            suggestedSchemas = suggestSchemas(
+              item.pageName, slug, htmlTitle, '',
+              html, existingSchemas, isHomepage,
+            );
+          }
+
+          if (suggestedSchemas.length === 0 && existingSchemas.length === 0) return null;
+
+          return {
+            pageId: `cms-${slug}`,
+            pageTitle: item.pageName,
+            slug,
+            url: item.url,
+            existingSchemas,
+            suggestedSchemas,
+          } as SchemaPageSuggestion;
+        })
+      );
+      results.push(...chunkResults.filter(Boolean) as SchemaPageSuggestion[]);
+    }
   }
 
   // Sort: pages with high-priority suggestions first, then by number of suggestions

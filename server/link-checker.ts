@@ -1,4 +1,4 @@
-import { listPages, filterPublishedPages } from './webflow.js';
+import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from './webflow.js';
 
 const WEBFLOW_API = 'https://api.webflow.com/v2';
 
@@ -137,6 +137,32 @@ export async function checkSiteLinks(siteId: string, tokenOverride?: string): Pr
     const existing = urlMap.get(absoluteUrl) || [];
     existing.push({ page: link.page, pageSlug: link.pageSlug, text: link.text });
     urlMap.set(absoluteUrl, existing);
+  }
+
+  // ── Also scan CMS/collection pages discovered via sitemap ──
+  const staticPaths = buildStaticPathSet(pages);
+  const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, 30);
+  if (cmsUrls.length > 0) {
+    console.log(`Link checker: also scanning ${cmsUrls.length} CMS pages for links`);
+    for (let i = 0; i < cmsUrls.length; i += batch) {
+      const chunk = cmsUrls.slice(i, i + batch);
+      const htmls = await Promise.all(chunk.map(item => fetchPublishedHtml(item.url)));
+      for (let j = 0; j < chunk.length; j++) {
+        if (!htmls[j]) continue;
+        const links = extractLinks(htmls[j]!);
+        for (const link of links) {
+          const cmsPageSlug = chunk[j].path.replace(/^\//, '');
+          allLinks.push({ href: link.href, text: link.text, page: chunk[j].pageName, pageSlug: cmsPageSlug });
+          // Add to urlMap for deduplication
+          let absoluteUrl = link.href;
+          if (absoluteUrl.startsWith('/')) absoluteUrl = `${baseUrl}${absoluteUrl}`;
+          else if (!absoluteUrl.startsWith('http')) absoluteUrl = `${baseUrl}/${absoluteUrl}`;
+          const existing = urlMap.get(absoluteUrl) || [];
+          existing.push({ page: chunk[j].pageName, pageSlug: cmsPageSlug, text: link.text });
+          urlMap.set(absoluteUrl, existing);
+        }
+      }
+    }
   }
 
   console.log(`Link checker: found ${urlMap.size} unique URLs from ${allLinks.length} total links`);
