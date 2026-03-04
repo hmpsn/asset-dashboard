@@ -73,9 +73,9 @@ function AssetBrowser({ siteId }: Props) {
     return () => { cancelled = true; };
   }, [siteId]);
 
-  // Lazy-load unused data when filter is selected
+  // Load unused asset IDs in background after assets load
   useEffect(() => {
-    if (filter !== 'unused' || unusedIds || unusedLoadingRef.current) return;
+    if (assets.length === 0 || unusedIds || unusedLoadingRef.current) return;
     unusedLoadingRef.current = true;
     fetch(`/api/webflow/audit/${siteId}`)
       .then(r => r.json())
@@ -87,7 +87,7 @@ function AssetBrowser({ siteId }: Props) {
       })
       .catch(() => {})
       .finally(() => { unusedLoadingRef.current = false; });
-  }, [filter, unusedIds, siteId]);
+  }, [assets.length, unusedIds, siteId]);
 
   const filtered = assets
     .filter(a => {
@@ -476,6 +476,7 @@ function AssetBrowser({ siteId }: Props) {
 
   const missingAltCount = assets.filter(a => !a.altText || a.altText.trim() === '').length;
   const oversizedCount = assets.filter(a => a.size > 500 * 1024).length;
+  const unusedCount = unusedIds ? assets.filter(a => unusedIds.has(a.id)).length : 0;
 
   if (loading) {
     return (
@@ -499,6 +500,11 @@ function AssetBrowser({ siteId }: Props) {
         {oversizedCount > 0 && (
           <span className="text-orange-400 flex items-center gap-1">
             <Image className="w-3.5 h-3.5" /> {oversizedCount} oversized
+          </span>
+        )}
+        {unusedCount > 0 && (
+          <span className="text-red-400 flex items-center gap-1">
+            <Trash2 className="w-3.5 h-3.5" /> {unusedCount} unused
           </span>
         )}
         <button
@@ -855,6 +861,15 @@ function AssetBrowser({ siteId }: Props) {
                   <span className="truncate" title={asset.displayName || asset.originalFileName}>
                     {asset.displayName || asset.originalFileName}
                   </span>
+                  {(!asset.altText || asset.altText.trim() === '') && (
+                    <span className="shrink-0 px-1 py-0.5 rounded text-[9px] font-semibold bg-amber-900/40 text-amber-400 leading-none">No Alt</span>
+                  )}
+                  {asset.size > 500 * 1024 && (
+                    <span className="shrink-0 px-1 py-0.5 rounded text-[9px] font-semibold bg-orange-900/40 text-orange-400 leading-none">Oversized</span>
+                  )}
+                  {unusedIds?.has(asset.id) && (
+                    <span className="shrink-0 px-1 py-0.5 rounded text-[9px] font-semibold bg-red-900/40 text-red-400 leading-none">Unused</span>
+                  )}
                   <button
                     onClick={() => handleSmartRename(asset)}
                     disabled={renameLoading.has(asset.id)}
