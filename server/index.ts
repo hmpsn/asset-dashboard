@@ -363,7 +363,7 @@ app.get('/api/webflow/assets/:siteId', async (req, res) => {
     const token = getTokenForSite(req.params.siteId);
     const assets = await listAssets(req.params.siteId, token || undefined);
     res.json(assets);
-  } catch (e) {
+  } catch {
     res.status(500).json({ error: 'Failed to list assets' });
   }
 });

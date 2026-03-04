@@ -65,6 +65,99 @@ export function renderSalesReportHTML(report: SalesAuditResult & { id?: string }
       return (sev[a.issue.severity] || 2) - (sev[b.issue.severity] || 2);
     });
 
+  // --- DATA ANALYST ENHANCEMENTS (pre-computed) ---
+
+  // Score context
+  const scoreContext = report.siteScore >= 90
+    ? 'This site is well-optimized for search engines. Focus on maintaining this standard and addressing any remaining minor issues.'
+    : report.siteScore >= 80
+    ? 'This site has a solid SEO foundation with room for targeted improvements that could further boost visibility.'
+    : report.siteScore >= 60
+    ? 'This site has several SEO gaps that are likely costing search visibility. Addressing the issues below could significantly increase organic traffic.'
+    : report.siteScore >= 40
+    ? 'This site has critical SEO deficiencies that are severely limiting search engine visibility. Immediate action is recommended.'
+    : 'This site has fundamental SEO issues that are preventing search engines from properly indexing and ranking its content.';
+
+  // Visibility risk assessment
+  const pagesWithIssues = report.pages.filter(p => p.issues.length > 0).length;
+  const pctWithIssues = report.totalPages > 0 ? Math.round((pagesWithIssues / report.totalPages) * 100) : 0;
+  const missingTitles = report.pages.filter(p => p.issues.some(i => i.check === 'title' && i.severity === 'error')).length;
+  const missingDesc = report.pages.filter(p => p.issues.some(i => i.check === 'meta-description')).length;
+  const missingOG = report.pages.filter(p => p.issues.some(i => i.check === 'og-tags' || i.check === 'og-image')).length;
+  const missingH1 = report.pages.filter(p => p.issues.some(i => i.check === 'h1' && i.severity === 'error')).length;
+  const missingAlt = report.pages.filter(p => p.issues.some(i => i.check === 'img-alt')).length;
+  const riskCards = [
+    missingTitles > 0 ? `<div style="padding:14px;border-radius:8px;background:#fef2f2;border:1px solid #fecaca;text-align:center"><div style="font-size:28px;font-weight:700;color:#dc2626">${missingTitles}</div><div style="font-size:11px;color:#991b1b;margin-top:2px">Missing titles</div><div style="font-size:10px;color:#9ca3af;margin-top:4px">Invisible to search</div></div>` : '',
+    missingDesc > 0 ? `<div style="padding:14px;border-radius:8px;background:#fffbeb;border:1px solid #fde68a;text-align:center"><div style="font-size:28px;font-weight:700;color:#d97706">${missingDesc}</div><div style="font-size:11px;color:#92400e;margin-top:2px">Missing descriptions</div><div style="font-size:10px;color:#9ca3af;margin-top:4px">Lower click-through</div></div>` : '',
+    missingOG > 0 ? `<div style="padding:14px;border-radius:8px;background:#fdf2f8;border:1px solid #fbcfe8;text-align:center"><div style="font-size:28px;font-weight:700;color:#db2777">${missingOG}</div><div style="font-size:11px;color:#9d174d;margin-top:2px">Missing OG tags</div><div style="font-size:10px;color:#9ca3af;margin-top:4px">Poor social sharing</div></div>` : '',
+    missingH1 > 0 ? `<div style="padding:14px;border-radius:8px;background:#fff7ed;border:1px solid #fed7aa;text-align:center"><div style="font-size:28px;font-weight:700;color:#ea580c">${missingH1}</div><div style="font-size:11px;color:#9a3412;margin-top:2px">Missing H1 tags</div><div style="font-size:10px;color:#9ca3af;margin-top:4px">Weak content signals</div></div>` : '',
+    missingAlt > 0 ? `<div style="padding:14px;border-radius:8px;background:#eff6ff;border:1px solid #bfdbfe;text-align:center"><div style="font-size:28px;font-weight:700;color:#2563eb">${missingAlt}</div><div style="font-size:11px;color:#1e40af;margin-top:2px">Missing alt text</div><div style="font-size:10px;color:#9ca3af;margin-top:4px">Accessibility gap</div></div>` : '',
+  ].filter(Boolean);
+  const visibilityRiskHTML = `<div class="section">
+    <h2>Search Visibility Risk Assessment</h2>
+    <p style="font-size:13px;color:#6b7280;margin-bottom:16px">${pctWithIssues}% of pages have at least one SEO issue impacting search performance.</p>
+    ${riskCards.length > 0 ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px">${riskCards.join('')}</div>` : ''}
+  </div>`;
+
+  // What's Working Well
+  const positiveSignals: string[] = [];
+  const perfectPages = report.pages.filter(p => p.score >= 95);
+  const goodPages = report.pages.filter(p => p.score >= 80 && p.score < 95);
+  const pagesWithStructuredData = report.pages.filter(p => !p.issues.some(i => i.check === 'structured-data')).length;
+  const pagesWithCanonical = report.pages.filter(p => !p.issues.some(i => i.check === 'canonical')).length;
+  if (perfectPages.length > 0) positiveSignals.push(`${perfectPages.length} page${perfectPages.length > 1 ? 's' : ''} with near-perfect SEO scores`);
+  if (goodPages.length > 0) positiveSignals.push(`${goodPages.length} additional page${goodPages.length > 1 ? 's' : ''} scoring 80+`);
+  if (pagesWithStructuredData > 0) positiveSignals.push(`${pagesWithStructuredData} page${pagesWithStructuredData > 1 ? 's' : ''} with structured data (JSON-LD)`);
+  if (pagesWithCanonical > report.totalPages / 2) positiveSignals.push('Canonical tags present on most pages');
+  if (!report.siteWideIssues.some(i => i.check === 'ssl')) positiveSignals.push('SSL certificate is properly configured');
+  if (!report.siteWideIssues.some(i => i.check === 'robots-txt' && i.severity === 'error')) positiveSignals.push('robots.txt is properly configured');
+  if (!report.siteWideIssues.some(i => i.check === 'sitemap' && i.severity === 'error')) positiveSignals.push('XML sitemap is present and accessible');
+  const workingWellHTML = positiveSignals.length > 0
+    ? `<div class="section">
+        <h2>What&rsquo;s Working Well</h2>
+        ${positiveSignals.map(s => `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;margin:4px 0;border-radius:6px;background:#f0fdf4;border:1px solid #bbf7d0">
+          <span style="color:#22c55e;font-size:16px">✓</span>
+          <span style="font-size:13px;color:#374151">${s}</span>
+        </div>`).join('')}
+      </div>`
+    : '';
+
+  // Recommended Next Steps
+  const nextSteps: string[] = [];
+  if (errorCount > 0) nextSteps.push(`Fix the ${errorCount} critical errors that are actively hurting search visibility`);
+  if (report.quickWins.length > 0) nextSteps.push(`Implement the ${report.quickWins.length} quick wins above — highest ROI for the least effort`);
+  nextSteps.push('Ensure every page has a unique title, meta description, and H1 tag');
+  nextSteps.push('Add JSON-LD structured data for rich snippets in search results (can increase CTR by 20-30%)');
+  if (report.siteScore < 80) nextSteps.push('Schedule a follow-up audit in 30 days to track improvement');
+  nextSteps.push('Re-run this audit monthly to catch new issues and monitor progress');
+  const nextStepsHTML = `<div class="section">
+    <div style="padding:28px;border-radius:12px;background:linear-gradient(135deg,#f0fdf4,#eff6ff);border:1px solid #bbf7d0">
+      <h2 style="border:none;padding:0;margin-bottom:4px">Recommended Next Steps</h2>
+      <p style="font-size:12px;color:#6b7280;margin-bottom:20px">Prioritized actions to improve search visibility</p>
+      ${nextSteps.map((step, idx) => `<div style="display:flex;gap:12px;padding:10px 0;${idx < nextSteps.length - 1 ? 'border-bottom:1px solid #e5e7eb' : ''}">
+        <div style="width:28px;height:28px;border-radius:50%;background:#dcfce7;color:#16a34a;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0">${idx + 1}</div>
+        <div style="font-size:13px;color:#374151;padding-top:4px">${step}</div>
+      </div>`).join('')}
+    </div>
+  </div>`;
+
+  // Quick wins with impact percentages
+  const quickWinsHTML = report.quickWins.length > 0
+    ? `<div class="section">
+        <h2>Quick Wins</h2>
+        <p style="font-size:13px; color:#6b7280; margin-bottom:12px;">High-impact fixes that can be implemented quickly.</p>
+        ${report.quickWins.map(w => {
+          const affectedPages = report.pages.filter(p => p.issues.some(i => i.check === w.check)).length;
+          const impactPct = report.totalPages > 0 ? Math.round((affectedPages / report.totalPages) * 100) : 0;
+          return `<div class="win-card">
+            <div class="win-title">${escHtml(w.message)}</div>
+            <div class="win-fix">${escHtml(w.recommendation)}</div>
+            ${affectedPages > 1 ? `<div style="font-size:12px;color:#059669;margin-top:4px;font-weight:500">Affects ${impactPct}% of your site (${affectedPages} pages)</div>` : ''}
+          </div>`;
+        }).join('')}
+      </div>`
+    : '';
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -156,47 +249,33 @@ export function renderSalesReportHTML(report: SalesAuditResult & { id?: string }
     <div class="stat"><div class="num" style="color:#ef4444">${errorCount}</div><div class="label">Errors</div></div>
     <div class="stat"><div class="num" style="color:#eab308">${warningCount}</div><div class="label">Warnings</div></div>
   </div>
+
+  <div style="margin-top:16px; font-size:14px; font-weight:600; color:${sc}">${sl}</div>
+  <div style="margin-top:6px; font-size:13px; color:#6b7280; max-width:600px; margin-left:auto; margin-right:auto; line-height:1.6;">${scoreContext}</div>
 </div>
 
-${report.siteScore < 80 ? `
-<div class="section">
-  <h2>⚠️ Search Visibility Risk</h2>
-  <p style="font-size:14px; color:#4b5563; margin-bottom:16px;">
-    With a score of <strong>${report.siteScore}/100</strong>, this site is leaving significant search traffic on the table.
-    ${report.siteScore < 60 ? 'Competitors with better-optimized sites are likely capturing your potential customers.' : 'Addressing the issues below could meaningfully improve search rankings and organic traffic.'}
-  </p>
-</div>
-` : ''}
+${visibilityRiskHTML}
 
 ${report.topRisks.length > 0 ? `
 <div class="section">
-  <h2>🔴 Top Risks</h2>
-  <p style="font-size:13px; color:#6b7280; margin-bottom:12px;">Critical issues that may be hurting your search rankings right now.</p>
+  <h2>Top Risks</h2>
+  <p style="font-size:13px; color:#6b7280; margin-bottom:12px;">Critical issues that may be hurting search rankings right now.</p>
   ${report.topRisks.map(r => `
   <div class="risk-card">
     <div class="risk-title">${severityIcon(r.severity)} ${escHtml(r.message)}</div>
     ${r.opportunityCost ? `<div class="risk-cost">${escHtml(r.opportunityCost)}</div>` : ''}
-    <div class="risk-fix">💡 ${escHtml(r.recommendation)}</div>
+    <div class="risk-fix">${escHtml(r.recommendation)}</div>
   </div>
   `).join('')}
 </div>
 ` : ''}
 
-${report.quickWins.length > 0 ? `
-<div class="section">
-  <h2>⚡ Quick Wins</h2>
-  <p style="font-size:13px; color:#6b7280; margin-bottom:12px;">High-impact fixes that can be implemented quickly.</p>
-  ${report.quickWins.map(w => `
-  <div class="win-card">
-    <div class="win-title">✅ ${escHtml(w.message)}</div>
-    <div class="win-fix">${escHtml(w.recommendation)}</div>
-  </div>
-  `).join('')}
-</div>
-` : ''}
+${quickWinsHTML}
+
+${workingWellHTML}
 
 <div class="section">
-  <h2>📋 All Issues Found</h2>
+  <h2>All Issues Found</h2>
   <table class="issue-table">
     <thead><tr><th class="sev"></th><th>Issue</th><th>Category</th><th>Count</th></tr></thead>
     <tbody>
@@ -212,8 +291,24 @@ ${report.quickWins.length > 0 ? `
   </table>
 </div>
 
+${report.siteWideIssues.length > 0 ? `
+<div class="section">
+  <h2>Site-Wide Issues</h2>
+  <table class="issue-table">
+    <tbody>
+    ${report.siteWideIssues.map(i => `
+      <tr>
+        <td class="sev">${severityIcon(i.severity)}</td>
+        <td>${escHtml(i.message)}<br><span style="font-size:12px;color:#9ca3af">${escHtml(i.recommendation)}</span></td>
+      </tr>
+    `).join('')}
+    </tbody>
+  </table>
+</div>
+` : ''}
+
 <div class="section" style="page-break-before: always;">
-  <h2>📄 Page-by-Page Breakdown</h2>
+  <h2>Page-by-Page Breakdown</h2>
   ${report.pages.map((p: SalesPageResult) => `
   <div style="margin-bottom:24px;">
     <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
@@ -234,32 +329,7 @@ ${report.quickWins.length > 0 ? `
   `).join('')}
 </div>
 
-${report.siteWideIssues.length > 0 ? `
-<div class="section">
-  <h2>🌐 Site-Wide Issues</h2>
-  <table class="issue-table">
-    <tbody>
-    ${report.siteWideIssues.map(i => `
-      <tr>
-        <td class="sev">${severityIcon(i.severity)}</td>
-        <td>${escHtml(i.message)}<br><span style="font-size:12px;color:#9ca3af">${escHtml(i.recommendation)}</span></td>
-      </tr>
-    `).join('')}
-    </tbody>
-  </table>
-</div>
-` : ''}
-
-<div class="section">
-  <h2>📌 Recommended Next Steps</h2>
-  <ol style="font-size:14px; color:#374151; padding-left:20px;">
-    <li style="margin-bottom:8px;"><strong>Fix critical errors first</strong> — Address the ${errorCount} errors that are actively hurting your search visibility.</li>
-    <li style="margin-bottom:8px;"><strong>Implement quick wins</strong> — The ${report.quickWins.length} quick wins above can be done in a few hours and will have immediate impact.</li>
-    <li style="margin-bottom:8px;"><strong>Optimize content</strong> — Ensure every page has a unique title, meta description, and H1 tag.</li>
-    <li style="margin-bottom:8px;"><strong>Add structured data</strong> — JSON-LD markup enables rich snippets in search results, increasing click-through rates.</li>
-    <li style="margin-bottom:8px;"><strong>Monitor & iterate</strong> — Re-run this audit monthly to track progress and catch new issues.</li>
-  </ol>
-</div>
+${nextStepsHTML}
 
 <div class="footer">
   <div style="margin-bottom:12px;">

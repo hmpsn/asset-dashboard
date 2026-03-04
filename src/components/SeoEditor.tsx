@@ -47,11 +47,18 @@ export function SeoEditor({ siteId }: Props) {
       setPages(data);
       const editMap: Record<string, EditState> = {};
       for (const p of data) {
+        // When OG fields are set to "copy from SEO" in Webflow, title/description
+        // may be empty but titleCopied/descriptionCopied will be true.
+        // Show the effective value so users see OG as populated.
+        const ogTitle = p.openGraph?.title
+          || (p.openGraph?.titleCopied ? (p.seo?.title || p.title || '') : '');
+        const ogDesc = p.openGraph?.description
+          || (p.openGraph?.descriptionCopied ? (p.seo?.description || '') : '');
         editMap[p.id] = {
           seoTitle: p.seo?.title || '',
           seoDescription: p.seo?.description || '',
-          ogTitle: p.openGraph?.title || '',
-          ogDescription: p.openGraph?.description || '',
+          ogTitle,
+          ogDescription: ogDesc,
           dirty: false,
         };
       }
@@ -81,7 +88,7 @@ export function SeoEditor({ siteId }: Props) {
     if (!edit) return;
     setSaving(prev => new Set(prev).add(pageId));
     try {
-      await fetch(`/api/webflow/pages/${pageId}/seo`, {
+      const res = await fetch(`/api/webflow/pages/${pageId}/seo`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -90,11 +97,18 @@ export function SeoEditor({ siteId }: Props) {
           openGraph: { title: edit.ogTitle, description: edit.ogDescription },
         }),
       });
+      const data = await res.json();
+      if (data.success === false) {
+        console.error('Save failed:', data.error);
+        alert(`Failed to save SEO: ${data.error || 'Unknown error'}`);
+        return;
+      }
       setEdits(prev => ({ ...prev, [pageId]: { ...prev[pageId], dirty: false } }));
       setSaved(prev => new Set(prev).add(pageId));
       setTimeout(() => setSaved(prev => { const n = new Set(prev); n.delete(pageId); return n; }), 2000);
     } catch (err) {
       console.error('Save failed:', err);
+      alert('Network error saving SEO fields');
     } finally {
       setSaving(prev => { const n = new Set(prev); n.delete(pageId); return n; });
     }

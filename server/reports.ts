@@ -291,12 +291,7 @@ export function renderReportHTML(snapshot: AuditSnapshot): string {
 
   const scoreColor = audit.siteScore >= 80 ? '#22c55e' : audit.siteScore >= 60 ? '#eab308' : audit.siteScore >= 40 ? '#f97316' : '#ef4444';
 
-  const catColors: Record<string, string> = {
-    content: '#34d399', technical: '#a78bfa', social: '#f472b6',
-    performance: '#fb923c', accessibility: '#38bdf8',
-  };
-
-  // Score delta
+  // Score delta (if previous score exists)
   const scoreDelta = previousScore !== undefined ? audit.siteScore - previousScore : null;
   const deltaHTML = scoreDelta !== null
     ? `<div style="font-size:14px;margin-top:8px;color:${scoreDelta > 0 ? '#22c55e' : scoreDelta < 0 ? '#ef4444' : '#64748b'}">
@@ -319,58 +314,7 @@ export function renderReportHTML(snapshot: AuditSnapshot): string {
   const clientInfos = clientPages.reduce((s, p) => s + p.issues.filter(i => i.severity === 'info').length, 0)
     + clientSiteWide.filter(i => i.severity === 'info').length;
 
-  // Category breakdown (excluding performance)
-  const catCounts: Record<string, number> = {};
-  for (const p of clientPages) {
-    for (const i of p.issues) {
-      catCounts[i.category || 'technical'] = (catCounts[i.category || 'technical'] || 0) + 1;
-    }
-  }
-  for (const i of clientSiteWide) {
-    catCounts[i.category || 'technical'] = (catCounts[i.category || 'technical'] || 0) + 1;
-  }
-
-  // Executive summary: top 3 most impactful issues (using client-filtered data)
-  const allErrors = [
-    ...clientSiteWide.filter(i => i.severity === 'error'),
-    ...clientPages.flatMap(p => p.issues.filter(i => i.severity === 'error')),
-  ];
-  const allWarnings = [
-    ...clientSiteWide.filter(i => i.severity === 'warning'),
-    ...clientPages.flatMap(p => p.issues.filter(i => i.severity === 'warning')),
-  ];
-  // Deduplicate by check name and count occurrences
-  const issueCounts = new Map<string, { check: string; message: string; recommendation: string; count: number; severity: string }>();
-  for (const issue of [...allErrors, ...allWarnings]) {
-    const existing = issueCounts.get(issue.check);
-    if (existing) {
-      existing.count++;
-    } else {
-      issueCounts.set(issue.check, { check: issue.check, message: issue.message, recommendation: issue.recommendation, count: 1, severity: issue.severity });
-    }
-  }
-  const topIssues = [...issueCounts.values()]
-    .sort((a, b) => {
-      if (a.severity !== b.severity) return a.severity === 'error' ? -1 : 1;
-      return b.count - a.count;
-    })
-    .slice(0, 3);
-
-  const executiveSummaryHTML = topIssues.length > 0
-    ? `<div style="margin:32px 0">
-        <div class="section-title">Top Priorities</div>
-        ${topIssues.map((issue, idx) => {
-          const color = issue.severity === 'error' ? '#ef4444' : '#eab308';
-          return `<div style="display:flex;gap:12px;padding:14px 16px;margin:8px 0;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06)">
-            <div style="width:28px;height:28px;border-radius:50%;background:${color}15;color:${color};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0">${idx + 1}</div>
-            <div>
-              <div style="font-size:14px;font-weight:500;color:#f1f5f9">${issue.message}${issue.count > 1 ? ` <span style="color:#64748b;font-weight:400">(${issue.count} pages)</span>` : ''}</div>
-              <div style="font-size:12px;color:#94a3b8;margin-top:4px">${issue.recommendation}</div>
-            </div>
-          </div>`;
-        }).join('')}
-      </div>`
-    : '';
+  // (No category breakdown or executive summary — clean technical audit)
 
   // Action items section
   const actions = actionItems || [];
@@ -417,33 +361,26 @@ export function renderReportHTML(snapshot: AuditSnapshot): string {
       </div>`
     : '';
 
-  // Category breakdown
-  const catSummaryHTML = Object.entries(catCounts).length > 0
-    ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;justify-content:center">${
-        Object.entries(catCounts).map(([cat, count]) => {
-          const color = catColors[cat] || '#94a3b8';
-          const label = cat.charAt(0).toUpperCase() + cat.slice(1);
-          return `<div style="padding:6px 14px;border-radius:6px;background:${color}11;border:1px solid ${color}22;text-align:center">
-            <div style="font-size:16px;font-weight:600;color:${color}">${count}</div>
-            <div style="font-size:10px;color:${color};text-transform:uppercase;letter-spacing:0.5px">${label}</div>
-          </div>`;
-        }).join('')
-      }</div>`
-    : '';
+  // (No category summary — clean technical audit)
 
-  // Page rows (using client-filtered data — no performance issues)
+  // Page rows — structured "Problem → Fix" format for technical audit
   const pageRows = clientPages.map(p => {
     const pColor = p.score >= 80 ? '#22c55e' : p.score >= 60 ? '#eab308' : p.score >= 40 ? '#f97316' : '#ef4444';
+    const sevIcon = (s: string) => s === 'error' ? '✗' : s === 'warning' ? '⚠' : 'ℹ';
+    const sevColor = (s: string) => s === 'error' ? '#ef4444' : s === 'warning' ? '#eab308' : '#60a5fa';
+    const sevBg = (s: string) => s === 'error' ? 'rgba(239,68,68,0.08)' : s === 'warning' ? 'rgba(234,179,8,0.06)' : 'rgba(96,165,250,0.06)';
+    const sevBorder = (s: string) => s === 'error' ? 'rgba(239,68,68,0.2)' : s === 'warning' ? 'rgba(234,179,8,0.15)' : 'rgba(96,165,250,0.15)';
+
     const issueList = p.issues.map(i => {
-      const iColor = i.severity === 'error' ? '#ef4444' : i.severity === 'warning' ? '#eab308' : '#60a5fa';
-      const cColor = catColors[i.category || 'technical'] || '#94a3b8';
-      const cLabel = (i.category || 'technical').charAt(0).toUpperCase() + (i.category || 'technical').slice(1);
-      return `<div style="padding:8px 12px;margin:4px 0;border-radius:6px;background:${i.severity === 'error' ? 'rgba(239,68,68,0.08)' : i.severity === 'warning' ? 'rgba(234,179,8,0.08)' : 'rgba(96,165,250,0.08)'};border:1px solid ${i.severity === 'error' ? 'rgba(239,68,68,0.2)' : i.severity === 'warning' ? 'rgba(234,179,8,0.2)' : 'rgba(96,165,250,0.2)'}">
-        <div style="display:flex;align-items:center;gap:8px">
-          <div style="font-size:13px;color:${iColor};font-weight:500;flex:1">${i.severity.toUpperCase()}: ${i.message}</div>
-          <span class="badge" style="color:${cColor};border:1px solid ${cColor}33;background:${cColor}11">${cLabel}</span>
+      return `<div style="padding:10px 14px;margin:6px 0;border-radius:6px;background:${sevBg(i.severity)};border:1px solid ${sevBorder(i.severity)}">
+        <div style="display:flex;align-items:flex-start;gap:8px">
+          <span style="color:${sevColor(i.severity)};font-size:14px;line-height:1;flex-shrink:0;margin-top:1px">${sevIcon(i.severity)}</span>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600;color:${sevColor(i.severity)};margin-bottom:4px">Problem: ${i.message}</div>
+            <div style="font-size:12px;color:#e2e8f0;line-height:1.5"><strong style="color:#2ed9c3">Fix:</strong> ${i.recommendation}</div>
+            ${i.value ? `<div style="font-size:11px;color:#64748b;margin-top:4px;font-family:monospace;word-break:break-all">Current: ${i.value}</div>` : ''}
+          </div>
         </div>
-        <div style="font-size:12px;color:#94a3b8;margin-top:2px">${i.recommendation}</div>
       </div>`;
     }).join('');
 
@@ -459,141 +396,24 @@ export function renderReportHTML(snapshot: AuditSnapshot): string {
     </div>`;
   }).join('');
 
-  // Site-wide rows (using client-filtered data — no performance issues)
+  // Site-wide rows — structured "Problem → Fix" format
   const siteWideRows = clientSiteWide.map(i => {
     const iColor = i.severity === 'error' ? '#ef4444' : i.severity === 'warning' ? '#eab308' : '#60a5fa';
-    const cColor = catColors[i.category || 'technical'] || '#94a3b8';
-    const cLabel = (i.category || 'technical').charAt(0).toUpperCase() + (i.category || 'technical').slice(1);
-    return `<div style="padding:10px 14px;margin:6px 0;border-radius:6px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06)">
-      <div style="display:flex;align-items:center;gap:8px">
-        <div style="font-size:13px;color:${iColor};font-weight:500;flex:1">${i.severity.toUpperCase()}: ${i.message}</div>
-        <span class="badge" style="color:${cColor};border:1px solid ${cColor}33;background:${cColor}11">${cLabel}</span>
+    const iIcon = i.severity === 'error' ? '✗' : i.severity === 'warning' ? '⚠' : 'ℹ';
+    const iBg = i.severity === 'error' ? 'rgba(239,68,68,0.08)' : i.severity === 'warning' ? 'rgba(234,179,8,0.06)' : 'rgba(96,165,250,0.06)';
+    const iBorder = i.severity === 'error' ? 'rgba(239,68,68,0.2)' : i.severity === 'warning' ? 'rgba(234,179,8,0.15)' : 'rgba(96,165,250,0.15)';
+    return `<div style="padding:10px 14px;margin:6px 0;border-radius:6px;background:${iBg};border:1px solid ${iBorder}">
+      <div style="display:flex;align-items:flex-start;gap:8px">
+        <span style="color:${iColor};font-size:14px;line-height:1;flex-shrink:0;margin-top:1px">${iIcon}</span>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600;color:${iColor};margin-bottom:4px">Problem: ${i.message}</div>
+          <div style="font-size:12px;color:#e2e8f0;line-height:1.5"><strong style="color:#2ed9c3">Fix:</strong> ${i.recommendation}</div>
+        </div>
       </div>
-      <div style="font-size:12px;color:#94a3b8;margin-top:2px">${i.recommendation}</div>
     </div>`;
   }).join('');
 
-  // --- DATA ANALYST ENHANCEMENTS ---
-
-  // Score context: plain-English interpretation
-  const scoreGrade = audit.siteScore >= 90 ? 'Excellent' : audit.siteScore >= 80 ? 'Good' : audit.siteScore >= 60 ? 'Needs Improvement' : audit.siteScore >= 40 ? 'Poor' : 'Critical';
-  const scoreContext = audit.siteScore >= 90
-    ? 'Your site is well-optimized for search engines. Focus on maintaining this standard and addressing any remaining minor issues.'
-    : audit.siteScore >= 80
-    ? 'Your site has a solid SEO foundation with room for targeted improvements that could further boost your visibility.'
-    : audit.siteScore >= 60
-    ? 'Your site has several SEO gaps that are likely costing you search visibility. Addressing the issues below could significantly increase your organic traffic.'
-    : audit.siteScore >= 40
-    ? 'Your site has critical SEO deficiencies that are severely limiting your search engine visibility. Immediate action is recommended.'
-    : 'Your site has fundamental SEO issues that are preventing search engines from properly indexing and ranking your content.';
-
-  // Search visibility risk: pages missing critical elements
-  const missingTitles = clientPages.filter(p => p.issues.some(i => i.check === 'title' && i.severity === 'error')).length;
-  const missingDescriptions = clientPages.filter(p => p.issues.some(i => i.check === 'meta-description' && (i.severity === 'error' || i.severity === 'warning'))).length;
-  const missingOG = clientPages.filter(p => p.issues.some(i => i.check === 'og-tags')).length;
-  const missingH1 = clientPages.filter(p => p.issues.some(i => i.check === 'h1' && i.severity === 'error')).length;
-  const missingAlt = clientPages.filter(p => p.issues.some(i => i.check === 'img-alt')).length;
-  const totalPages = clientPages.length;
-  const pctWithIssues = totalPages > 0 ? Math.round((clientPages.filter(p => p.issues.length > 0).length / totalPages) * 100) : 0;
-
-  const visibilityRiskHTML = `<div style="margin:32px 0">
-    <div class="section-title">Search Visibility Risk Assessment</div>
-    <div style="font-size:13px;color:#94a3b8;margin-bottom:16px">${pctWithIssues}% of your pages have at least one SEO issue that could impact their search performance.</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px">
-      ${missingTitles > 0 ? `<div style="padding:12px 16px;border-radius:8px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.15)">
-        <div style="font-size:24px;font-weight:700;color:#ef4444">${missingTitles}</div>
-        <div style="font-size:11px;color:#ef4444;margin-top:2px">Pages without title tags</div>
-        <div style="font-size:10px;color:#94a3b8;margin-top:4px">Invisible to search engines</div>
-      </div>` : ''}
-      ${missingDescriptions > 0 ? `<div style="padding:12px 16px;border-radius:8px;background:rgba(234,179,8,0.06);border:1px solid rgba(234,179,8,0.15)">
-        <div style="font-size:24px;font-weight:700;color:#eab308">${missingDescriptions}</div>
-        <div style="font-size:11px;color:#eab308;margin-top:2px">Missing meta descriptions</div>
-        <div style="font-size:10px;color:#94a3b8;margin-top:4px">Lower click-through rates</div>
-      </div>` : ''}
-      ${missingOG > 0 ? `<div style="padding:12px 16px;border-radius:8px;background:rgba(244,114,182,0.06);border:1px solid rgba(244,114,182,0.15)">
-        <div style="font-size:24px;font-weight:700;color:#f472b6">${missingOG}</div>
-        <div style="font-size:11px;color:#f472b6;margin-top:2px">Missing Open Graph tags</div>
-        <div style="font-size:10px;color:#94a3b8;margin-top:4px">Poor social sharing appearance</div>
-      </div>` : ''}
-      ${missingH1 > 0 ? `<div style="padding:12px 16px;border-radius:8px;background:rgba(251,146,60,0.06);border:1px solid rgba(251,146,60,0.15)">
-        <div style="font-size:24px;font-weight:700;color:#fb923c">${missingH1}</div>
-        <div style="font-size:11px;color:#fb923c;margin-top:2px">Missing H1 headings</div>
-        <div style="font-size:10px;color:#94a3b8;margin-top:4px">Weakened content relevance</div>
-      </div>` : ''}
-      ${missingAlt > 0 ? `<div style="padding:12px 16px;border-radius:8px;background:rgba(56,189,248,0.06);border:1px solid rgba(56,189,248,0.15)">
-        <div style="font-size:24px;font-weight:700;color:#38bdf8">${missingAlt}</div>
-        <div style="font-size:11px;color:#38bdf8;margin-top:2px">Pages with missing alt text</div>
-        <div style="font-size:10px;color:#94a3b8;margin-top:4px">Accessibility &amp; image SEO gap</div>
-      </div>` : ''}
-    </div>
-  </div>`;
-
-  // Quick Wins: single-fix issues that affect many pages
-  const quickWinChecks = [...issueCounts.values()]
-    .filter(i => i.count >= 2 && ['meta-description', 'og-tags', 'og-image', 'twitter-card', 'img-alt', 'canonical'].includes(i.check))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 4);
-
-  const quickWinsHTML = quickWinChecks.length > 0
-    ? `<div style="margin:32px 0">
-        <div class="section-title">Quick Wins</div>
-        <div style="font-size:13px;color:#94a3b8;margin-bottom:12px">These fixes can be applied in bulk and will improve your SEO across multiple pages at once.</div>
-        ${quickWinChecks.map(qw => {
-          const impactPct = totalPages > 0 ? Math.round((qw.count / totalPages) * 100) : 0;
-          return `<div style="display:flex;gap:12px;padding:14px 16px;margin:8px 0;border-radius:8px;background:rgba(46,217,195,0.04);border:1px solid rgba(46,217,195,0.12)">
-            <div style="width:48px;height:48px;border-radius:8px;background:rgba(46,217,195,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-              <span style="font-size:18px;font-weight:700;color:#2ed9c3">${qw.count}</span>
-            </div>
-            <div style="flex:1">
-              <div style="font-size:14px;font-weight:500;color:#f1f5f9">${qw.message}</div>
-              <div style="font-size:12px;color:#94a3b8;margin-top:4px">${qw.recommendation}</div>
-              <div style="font-size:11px;color:#2ed9c3;margin-top:4px">Affects ${impactPct}% of your site (${qw.count} pages)</div>
-            </div>
-          </div>`;
-        }).join('')}
-      </div>`
-    : '';
-
-  // What's Working Well: pages with high scores + positive signals
-  const perfectPages = clientPages.filter(p => p.score >= 95);
-  const goodPages = clientPages.filter(p => p.score >= 80 && p.score < 95);
-  const hasStructuredData = clientPages.filter(p => !p.issues.some(i => i.check === 'structured-data')).length;
-
-  const positiveSignals: string[] = [];
-  if (perfectPages.length > 0) positiveSignals.push(`${perfectPages.length} page${perfectPages.length > 1 ? 's' : ''} with near-perfect SEO scores`);
-  if (goodPages.length > 0) positiveSignals.push(`${goodPages.length} additional page${goodPages.length > 1 ? 's' : ''} scoring 80+`);
-  if (hasStructuredData > 0) positiveSignals.push(`${hasStructuredData} page${hasStructuredData > 1 ? 's' : ''} with structured data (JSON-LD)`);
-  if (!clientSiteWide.some(i => i.check === 'ssl')) positiveSignals.push('SSL certificate is properly configured');
-  if (!clientSiteWide.some(i => i.check === 'robots-txt' && i.severity === 'error')) positiveSignals.push('robots.txt is properly configured');
-  if (!clientSiteWide.some(i => i.check === 'sitemap' && i.severity === 'error')) positiveSignals.push('XML sitemap is present and accessible');
-
-  const workingWellHTML = positiveSignals.length > 0
-    ? `<div style="margin:32px 0">
-        <div class="section-title">What's Working Well</div>
-        ${positiveSignals.map(signal => `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;margin:4px 0;border-radius:6px;background:rgba(34,197,94,0.05);border:1px solid rgba(34,197,94,0.12)">
-          <span style="color:#22c55e;font-size:14px">✓</span>
-          <span style="font-size:13px;color:#94a3b8">${signal}</span>
-        </div>`).join('')}
-      </div>`
-    : '';
-
-  // Recommended Next Steps (CTA section)
-  const nextSteps: string[] = [];
-  if (missingTitles > 0) nextSteps.push('Add unique, keyword-rich title tags to all pages — this is the #1 ranking factor you can control');
-  if (missingDescriptions > 0) nextSteps.push('Write compelling meta descriptions for all pages to improve click-through rates from search results');
-  if (missingOG > 0) nextSteps.push('Add Open Graph tags so your pages look professional when shared on social media');
-  if (quickWinChecks.length > 0) nextSteps.push('Implement the Quick Wins above — they provide the highest ROI for the least effort');
-  if (audit.siteScore < 80) nextSteps.push('Schedule a follow-up audit in 30 days to track improvement and identify new opportunities');
-  if (nextSteps.length === 0) nextSteps.push('Continue monitoring your SEO health with regular audits to maintain your strong position');
-
-  const nextStepsHTML = `<div style="margin:40px 0;padding:24px;border-radius:12px;background:linear-gradient(135deg,rgba(46,217,195,0.06),rgba(99,102,241,0.06));border:1px solid rgba(46,217,195,0.15)">
-    <div style="font-size:16px;font-weight:600;color:#f1f5f9;margin-bottom:4px">Recommended Next Steps</div>
-    <div style="font-size:12px;color:#64748b;margin-bottom:16px">Prioritized actions to improve your search visibility</div>
-    ${nextSteps.map((step, idx) => `<div style="display:flex;gap:12px;padding:10px 0;${idx < nextSteps.length - 1 ? 'border-bottom:1px solid rgba(255,255,255,0.04)' : ''}">
-      <div style="width:24px;height:24px;border-radius:50%;background:rgba(46,217,195,0.12);color:#2ed9c3;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0">${idx + 1}</div>
-      <div style="font-size:13px;color:#cbd5e1;padding-top:2px">${step}</div>
-    </div>`).join('')}
-  </div>`;
+  // (Data analyst enhancements removed — this is a clean technical audit)
 
   // Client logo
   const logoHTML = logoUrl
@@ -650,8 +470,6 @@ export function renderReportHTML(snapshot: AuditSnapshot): string {
         <div class="score-number" style="color:${scoreColor}">${audit.siteScore}</div>
       </div>
       ${deltaHTML}
-      <div style="margin-top:8px;font-size:14px;font-weight:600;color:${scoreColor}">${scoreGrade}</div>
-      <div style="margin-top:6px;font-size:12px;color:#94a3b8;max-width:500px;margin-left:auto;margin-right:auto;line-height:1.5">${scoreContext}</div>
       
       <div class="stats">
         <div class="stat">
@@ -671,22 +489,15 @@ export function renderReportHTML(snapshot: AuditSnapshot): string {
           <div class="stat-label">Info</div>
         </div>
       </div>
-      ${catSummaryHTML}
     </div>
 
-    ${executiveSummaryHTML}
-    ${visibilityRiskHTML}
-    ${quickWinsHTML}
     ${actionItemsHTML}
-    ${workingWellHTML}
 
     ${clientSiteWide.length > 0 ? `<div class="section-title">Site-Wide Issues</div>${siteWideRows}` : ''}
     
     <div class="section-title">Page-by-Page Results</div>
     ${pageRows}
 
-    ${nextStepsHTML}
-    
     <div class="footer">
       <div style="margin-bottom:12px">
         <svg xmlns="http://www.w3.org/2000/svg" width="100" height="32" viewBox="0 0 1000 320" style="opacity:0.4">

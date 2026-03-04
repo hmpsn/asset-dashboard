@@ -56,24 +56,58 @@ export async function listAssets(siteId: string, tokenOverride?: string): Promis
   return allAssets;
 }
 
+// --- Get single asset ---
+export async function getAsset(
+  assetId: string,
+  tokenOverride?: string
+): Promise<WebflowAsset | null> {
+  try {
+    const res = await webflowFetch(`/assets/${assetId}`, {}, tokenOverride);
+    if (!res.ok) return null;
+    return await res.json() as WebflowAsset;
+  } catch {
+    return null;
+  }
+}
+
 // --- Update asset (alt text, displayName) ---
+// Webflow v2 PATCH /assets/{id} requires displayName. This function
+// fetches the current asset first to merge fields so partial updates work.
 export async function updateAsset(
   assetId: string,
   updates: { altText?: string; displayName?: string },
   tokenOverride?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    // Fetch current asset to get existing displayName/altText so we can merge
+    const current = await getAsset(assetId, tokenOverride);
+    const body: Record<string, string> = {};
+    // Always include displayName (required by Webflow API)
+    body.displayName = updates.displayName ?? current?.displayName ?? `asset-${assetId}`;
+    // Always include altText to avoid wiping it
+    if (updates.altText !== undefined) {
+      body.altText = updates.altText;
+    } else if (current?.altText) {
+      body.altText = current.altText;
+    }
+
+    console.log(`PATCH /assets/${assetId}:`, JSON.stringify(body));
     const res = await webflowFetch(`/assets/${assetId}`, {
       method: 'PATCH',
-      body: JSON.stringify(updates),
+      body: JSON.stringify(body),
     }, tokenOverride);
     if (!res.ok) {
       const err = await res.text();
+      console.error(`Asset PATCH failed (${res.status}):`, err);
       return { success: false, error: `${res.status}: ${err}` };
     }
+    const result = await res.json();
+    console.log(`Asset PATCH success:`, JSON.stringify(result));
     return { success: true };
   } catch (err: unknown) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('Asset update error:', msg);
+    return { success: false, error: msg };
   }
 }
 
@@ -522,16 +556,19 @@ export async function uploadAsset(
     }
 
     // Step 3: Set alt text via PATCH (not supported in initial create)
+    // Must include displayName (required by Webflow v2 API)
     if (altText && assetId) {
       try {
+        const patchBody: Record<string, string> = { displayName: fileName, altText };
         const patchRes = await webflowFetch(`/assets/${assetId}`, {
           method: 'PATCH',
-          body: JSON.stringify({ altText }),
+          body: JSON.stringify(patchBody),
         }, token);
         if (patchRes.ok) {
           console.log(`Set alt text for ${fileName}: "${altText}"`);
         } else {
-          console.error(`Failed to set alt text for ${fileName}: ${patchRes.status}`);
+          const errText = await patchRes.text();
+          console.error(`Failed to set alt text for ${fileName} (${patchRes.status}):`, errText);
         }
       } catch (e) {
         console.error(`Alt text PATCH error for ${fileName}:`, e);

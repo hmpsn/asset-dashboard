@@ -49,6 +49,7 @@ function AssetBrowser({ siteId }: Props) {
   const [renameLoading, setRenameLoading] = useState<Set<string>>(new Set());
   const [bulkRenameProgress, setBulkRenameProgress] = useState<{ done: number; total: number } | null>(null);
   const [unusedIds, setUnusedIds] = useState<Set<string> | null>(null);
+  const [altError, setAltError] = useState<string | null>(null);
   const unusedLoadingRef = useRef(false);
 
   useEffect(() => {
@@ -114,19 +115,30 @@ function AssetBrowser({ siteId }: Props) {
   };
 
   const handleSaveAlt = async (assetId: string) => {
-    await fetch(`/api/webflow/assets/${assetId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ altText: altDraft, siteId }),
-    });
-    setAssets(prev => prev.map(a => a.id === assetId ? { ...a, altText: altDraft } : a));
-    setEditingAlt(null);
+    setAltError(null);
+    try {
+      const res = await fetch(`/api/webflow/assets/${assetId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ altText: altDraft, siteId }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        setAltError(`Failed to save alt text: ${data.error || 'Unknown error'}`);
+        return;
+      }
+      setAssets(prev => prev.map(a => a.id === assetId ? { ...a, altText: altDraft } : a));
+      setEditingAlt(null);
+    } catch {
+      setAltError('Network error saving alt text');
+    }
   };
 
   const handleGenerateAlt = async (asset: Asset) => {
     const url = asset.hostedUrl || asset.url;
     if (!url) return;
 
+    setAltError(null);
     setGeneratingAlt(prev => new Set(prev).add(asset.id));
     try {
       const res = await fetch(`/api/webflow/generate-alt/${asset.id}`, {
@@ -135,12 +147,16 @@ function AssetBrowser({ siteId }: Props) {
         body: JSON.stringify({ imageUrl: url, siteId }),
       });
       const data = await res.json();
-      if (data.altText) {
+      if (data.error) {
+        setAltError(`Alt text generation failed: ${data.error}`);
+      } else if (data.altText) {
         setAssets(prev => prev.map(a => a.id === asset.id ? { ...a, altText: data.altText } : a));
         setLastGenerated(data.altText);
         setTimeout(() => setLastGenerated(null), 3000);
       }
-    } catch { /* ignore */ }
+    } catch {
+      setAltError('Network error generating alt text');
+    }
     setGeneratingAlt(prev => { const n = new Set(prev); n.delete(asset.id); return n; });
   };
 
@@ -212,14 +228,22 @@ function AssetBrowser({ siteId }: Props) {
 
   const handleSaveRename = async (assetId: string) => {
     if (!renameDraft.trim()) return;
+    setAltError(null);
     try {
-      await fetch(`/api/webflow/rename/${assetId}`, {
+      const res = await fetch(`/api/webflow/rename/${assetId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ displayName: renameDraft.trim(), siteId }),
       });
+      const data = await res.json();
+      if (!data.success) {
+        setAltError(`Rename failed: ${data.error || 'Unknown error'}`);
+        return;
+      }
       setAssets(prev => prev.map(a => a.id === assetId ? { ...a, displayName: renameDraft.trim() } : a));
-    } catch { /* ignore */ }
+    } catch {
+      setAltError('Network error renaming asset');
+    }
     setRenamingId(null);
     setRenameDraft('');
   };
@@ -245,7 +269,7 @@ function AssetBrowser({ siteId }: Props) {
           await fetch(`/api/webflow/rename/${asset.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ displayName: data.fullName }),
+            body: JSON.stringify({ displayName: data.fullName, siteId }),
           });
           setAssets(prev => prev.map(a => a.id === asset.id ? { ...a, displayName: data.fullName } : a));
         }
@@ -297,6 +321,15 @@ function AssetBrowser({ siteId }: Props) {
           </span>
         )}
       </div>
+
+      {/* Alt text error banner */}
+      {altError && (
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-red-950/50 border border-red-800/50 rounded-lg text-sm text-red-300">
+          <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+          <span className="flex-1">{altError}</span>
+          <button onClick={() => setAltError(null)} className="text-red-400 hover:text-red-300"><X className="w-3.5 h-3.5" /></button>
+        </div>
+      )}
 
       {/* Progress banner */}
       {bulkProgress && (
