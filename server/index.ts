@@ -102,6 +102,37 @@ app.get('/api/auth/check', (req, res) => {
   res.json({ required: true, authenticated: token === APP_PASSWORD });
 });
 
+// Diagnostic endpoint - test Webflow API connection
+app.get('/api/health/diag', async (_req, res) => {
+  const envToken = process.env.WEBFLOW_API_TOKEN;
+  const diag: Record<string, unknown> = {
+    dataDir: process.env.DATA_DIR || (IS_PROD ? '/tmp/asset-dashboard' : 'local'),
+    envTokenSet: !!envToken,
+    envTokenPrefix: envToken ? envToken.slice(0, 8) + '...' : null,
+    workspaceCount: listWorkspaces().length,
+  };
+  // Test Webflow API with the env token
+  if (envToken) {
+    try {
+      const r = await fetch('https://api.webflow.com/v2/sites', {
+        headers: { Authorization: `Bearer ${envToken}`, 'Content-Type': 'application/json' },
+      });
+      diag.webflowStatus = r.status;
+      diag.webflowOk = r.ok;
+      if (!r.ok) {
+        const body = await r.text();
+        diag.webflowError = body.slice(0, 200);
+      } else {
+        const data = await r.json() as { sites?: { id: string; displayName?: string }[] };
+        diag.webflowSites = (data.sites || []).map(s => ({ id: s.id, name: s.displayName }));
+      }
+    } catch (err) {
+      diag.webflowError = err instanceof Error ? err.message : String(err);
+    }
+  }
+  res.json(diag);
+});
+
 // Serve optimized files for preview
 app.use('/files', express.static(getOptRoot()));
 
