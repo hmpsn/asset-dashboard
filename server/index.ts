@@ -36,6 +36,7 @@ import {
   listAssetFolders,
   createAssetFolder,
   moveAssetToFolder,
+  getSiteSubdomain,
 } from './webflow.js';
 import { generateAltText } from './alttext.js';
 import { runSeoAudit } from './seo-audit.js';
@@ -1500,31 +1501,55 @@ app.get('/api/webflow/organize-preview/:siteId', async (req, res) => {
     ]);
 
     // 2. Scan usage: which assets appear on which pages
-    // scanAssetUsage returns Map<assetId, string[]> where strings are refs like "page:Title", "css:styles", "cms:Collection"
     const usage = await scanAssetUsage(siteId, token);
 
-    // Build assetId → page titles mapping (extract page names from "page:Title" refs)
-    const assetPageMap = new Map<string, string[]>(); // assetId → page titles
-
+    // Build assetId → page titles mapping
+    const assetPageMap = new Map<string, string[]>();
     for (const [assetId, refs] of usage.entries()) {
-      const pageTitles = refs
-        .filter(r => r.startsWith('page:'))
-        .map(r => r.slice(5)); // strip "page:" prefix
-      if (pageTitles.length > 0) {
-        assetPageMap.set(assetId, pageTitles);
-      }
+      const pageTitles = refs.filter(r => r.startsWith('page:')).map(r => r.slice(5));
+      if (pageTitles.length > 0) assetPageMap.set(assetId, pageTitles);
     }
+
+    // 2b. Detect OG/meta image assets from published HTML
+    const ogAssetIds = new Set<string>();
+    const allAssetIds = new Set(assets.map(a => a.id));
+    try {
+      const subdomain = await getSiteSubdomain(siteId, token);
+      if (subdomain) {
+        const baseUrl = `https://${subdomain}.webflow.io`;
+        const pages = await listPages(siteId, token);
+        const pageUrls = [
+          baseUrl,
+          ...pages.filter(p => p.slug && p.slug !== 'index' && !p.draft && !p.archived).map(p => `${baseUrl}/${p.slug}`),
+        ];
+        for (let i = 0; i < pageUrls.length; i += 10) {
+          await Promise.allSettled(pageUrls.slice(i, i + 10).map(async (url) => {
+            try {
+              const r = await fetch(url, { redirect: 'follow' });
+              if (!r.ok) return;
+              const html = await r.text();
+              const ogMatches = html.match(/<meta\s+(?:property|name)=["'](?:og:image|twitter:image)["']\s+content=["']([^"']+)["']/gi) || [];
+              for (const tag of ogMatches) {
+                const m = tag.match(/content=["']([^"']+)["']/i);
+                if (!m) continue;
+                for (const id of allAssetIds) { if (m[1].includes(id)) ogAssetIds.add(id); }
+              }
+            } catch { /* skip */ }
+          }));
+        }
+      }
+    } catch { /* proceed without OG detection */ }
 
     // 3. Build the organization plan
     const existingFolderNames = new Set(existingFolders.map(f => f.displayName));
     const plan: {
       foldersToCreate: string[];
       moves: Array<{ assetId: string; assetName: string; targetFolder: string; currentFolder?: string }>;
-      summary: { totalAssets: number; assetsToMove: number; foldersToCreate: number; alreadyOrganized: number; unused: number; shared: number };
+      summary: { totalAssets: number; assetsToMove: number; foldersToCreate: number; alreadyOrganized: number; unused: number; shared: number; ogImages: number };
     } = {
       foldersToCreate: [],
       moves: [],
-      summary: { totalAssets: assets.length, assetsToMove: 0, foldersToCreate: 0, alreadyOrganized: 0, unused: 0, shared: 0 },
+      summary: { totalAssets: assets.length, assetsToMove: 0, foldersToCreate: 0, alreadyOrganized: 0, unused: 0, shared: 0, ogImages: 0 },
     };
 
     const foldersNeeded = new Set<string>();
@@ -1532,14 +1557,16 @@ app.get('/api/webflow/organize-preview/:siteId', async (req, res) => {
     for (const asset of assets) {
       const pageTitles = assetPageMap.get(asset.id);
 
-      // Skip assets that already have a folder
       if (asset.parentFolder) {
         plan.summary.alreadyOrganized++;
         continue;
       }
 
       let targetFolder: string;
-      if (!pageTitles || pageTitles.length === 0) {
+      if (ogAssetIds.has(asset.id)) {
+        targetFolder = '_Social / OG Images';
+        plan.summary.ogImages++;
+      } else if (!pageTitles || pageTitles.length === 0) {
         targetFolder = '_Unused Assets';
         plan.summary.unused++;
       } else if (pageTitles.length > 1) {

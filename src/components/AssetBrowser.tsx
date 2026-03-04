@@ -57,7 +57,7 @@ function AssetBrowser({ siteId }: Props) {
   const [organizePreview, setOrganizePreview] = useState<{
     foldersToCreate: string[];
     moves: Array<{ assetId: string; assetName: string; targetFolder: string }>;
-    summary: { totalAssets: number; assetsToMove: number; foldersToCreate: number; alreadyOrganized: number; unused: number; shared: number };
+    summary: { totalAssets: number; assetsToMove: number; foldersToCreate: number; alreadyOrganized: number; unused: number; shared: number; ogImages: number };
   } | null>(null);
   const [organizeLoading, setOrganizeLoading] = useState(false);
   const [organizeExecuting, setOrganizeExecuting] = useState(false);
@@ -661,8 +661,14 @@ function AssetBrowser({ siteId }: Props) {
             >
               Cancel
             </button>
-            {organizePreview.summary.unused > 0 && (
-              <span className="ml-auto text-[10px] text-zinc-600">{organizePreview.summary.unused} unused → _Unused Assets, {organizePreview.summary.shared} shared → _Shared Assets</span>
+            {(organizePreview.summary.unused > 0 || organizePreview.summary.ogImages > 0) && (
+              <span className="ml-auto text-[10px] text-zinc-600">
+                {organizePreview.summary.ogImages > 0 && <>{organizePreview.summary.ogImages} OG images → _Social / OG Images</>}
+                {organizePreview.summary.ogImages > 0 && organizePreview.summary.unused > 0 && ' · '}
+                {organizePreview.summary.unused > 0 && <>{organizePreview.summary.unused} unused → _Unused Assets</>}
+                {(organizePreview.summary.unused > 0 || organizePreview.summary.ogImages > 0) && organizePreview.summary.shared > 0 && ' · '}
+                {organizePreview.summary.shared > 0 && <>{organizePreview.summary.shared} shared → _Shared Assets</>}
+              </span>
             )}
           </div>
         </div>

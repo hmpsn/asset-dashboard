@@ -305,7 +305,7 @@ export async function updateCollectionItem(
 }
 
 // --- Get site subdomain for published HTML scanning ---
-async function getSiteSubdomain(siteId: string, tokenOverride?: string): Promise<string | null> {
+export async function getSiteSubdomain(siteId: string, tokenOverride?: string): Promise<string | null> {
   const res = await webflowFetch(`/sites/${siteId}`, {}, tokenOverride);
   if (!res.ok) return null;
   const data = await res.json() as { shortName?: string };
