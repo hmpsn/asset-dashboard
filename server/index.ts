@@ -2259,6 +2259,23 @@ app.get('/api/public/audit-summary/:workspaceId', (req, res) => {
   });
 });
 
+app.get('/api/public/audit-detail/:workspaceId', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws?.webflowSiteId) return res.status(400).json({ error: 'No site linked' });
+  const latest = getLatestSnapshot(ws.webflowSiteId);
+  if (!latest) return res.json(null);
+  const history = listSnapshots(ws.webflowSiteId);
+  res.json({
+    id: latest.id,
+    createdAt: latest.createdAt,
+    siteName: latest.siteName,
+    logoUrl: latest.logoUrl,
+    previousScore: latest.previousScore,
+    audit: latest.audit,
+    scoreHistory: history.map(h => ({ id: h.id, createdAt: h.createdAt, siteScore: h.siteScore })),
+  });
+});
+
 app.post('/api/public/search-chat/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.webflowSiteId) return res.status(400).json({ error: 'Workspace not configured' });
