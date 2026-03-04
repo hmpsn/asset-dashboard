@@ -304,20 +304,44 @@ function auditPage(
       issues.push({ check: 'internal-links', severity: 'info', message: 'No internal links found', recommendation: 'Add internal links to help search engines discover other pages and distribute page authority.' });
     }
 
-    // Check for empty link text
-    const emptyLinks = links.filter(l => !l.text && !l.href.startsWith('#'));
-    if (emptyLinks.length > 0) {
-      issues.push({ check: 'link-text', severity: 'warning', message: `${emptyLinks.length} link${emptyLinks.length > 1 ? 's' : ''} with empty anchor text`, recommendation: 'Add descriptive anchor text to all links for better accessibility and SEO.' });
+    // Check for empty link text (exclude links containing images, icons, SVGs, or aria-labels)
+    const linkRegex2 = /<a\s+([^>]*)>([\s\S]*?)<\/a>/gi;
+    let emptyLinkCount = 0;
+    let lm2;
+    while ((lm2 = linkRegex2.exec(html)) !== null) {
+      const innerContent = lm2[2];
+      const linkAttrs = lm2[1];
+      const hrefAttr = linkAttrs.match(/href=["']([^"']*)['"]/);
+      if (!hrefAttr || hrefAttr[1].startsWith('#')) continue;
+      const textOnly = innerContent.replace(/<[^>]+>/g, '').trim();
+      const hasImage = /<img\b/i.test(innerContent);
+      const hasSvg = /<svg\b/i.test(innerContent);
+      const hasAriaLabel = /aria-label/i.test(linkAttrs);
+      if (!textOnly && !hasImage && !hasSvg && !hasAriaLabel) {
+        emptyLinkCount++;
+      }
+    }
+    if (emptyLinkCount > 0) {
+      issues.push({ check: 'link-text', severity: 'warning', message: `${emptyLinkCount} link${emptyLinkCount > 1 ? 's' : ''} with empty anchor text`, recommendation: 'Add descriptive anchor text to all links for better accessibility and SEO.' });
     }
 
     // --- NEW TIER 1 CHECKS ---
 
     // 1. Mixed content (HTTP resources on HTTPS page)
+    // Only flag actual resource loads, NOT regular <a> links
     if (url.startsWith('https://')) {
-      const httpRefs = html.match(/(?:src|href|action)=["']http:\/\/[^"']+["']/gi) || [];
-      const filtered = httpRefs.filter(r => !r.includes('http://schemas') && !r.includes('http://www.w3.org'));
-      if (filtered.length > 0) {
-        issues.push({ check: 'mixed-content', severity: 'error', message: `${filtered.length} mixed content resource${filtered.length > 1 ? 's' : ''} (HTTP on HTTPS)`, recommendation: 'Update all resource URLs to use HTTPS. Mixed content can trigger browser security warnings and hurt trust.' });
+      const resourcePatterns = [
+        /<(?:img|script|iframe|source|embed|video|audio)[^>]*src=["']http:\/\/[^"']+["']/gi,
+        /<link[^>]*href=["']http:\/\/[^"']+["'][^>]*rel=["']stylesheet["']/gi,
+        /<link[^>]*rel=["']stylesheet["'][^>]*href=["']http:\/\/[^"']+["']/gi,
+      ];
+      let mixedCount = 0;
+      for (const pattern of resourcePatterns) {
+        const matches = html.match(pattern) || [];
+        mixedCount += matches.filter(r => !r.includes('http://schemas') && !r.includes('http://www.w3.org') && !r.includes('http://xmlns')).length;
+      }
+      if (mixedCount > 0) {
+        issues.push({ check: 'mixed-content', severity: 'error', message: `${mixedCount} mixed content resource${mixedCount > 1 ? 's' : ''} (HTTP on HTTPS)`, recommendation: 'Update all resource URLs to use HTTPS. Mixed content can trigger browser security warnings and hurt trust.' });
       }
     }
 
@@ -339,17 +363,21 @@ function auditPage(
       issues.push({ check: 'favicon', severity: 'info', message: 'No favicon detected', recommendation: 'Add a favicon for better brand recognition in browser tabs and bookmarks.' });
     }
 
-    // 5. Image lazy loading
-    const imgsWithoutLazy = imgs.filter(i => !i.loading || i.loading !== 'lazy');
-    // Only flag if there are several images — first 1-2 might be above the fold
-    if (imgs.length > 3 && imgsWithoutLazy.length > 2) {
-      issues.push({ check: 'lazy-loading', severity: 'info', message: `${imgsWithoutLazy.length} of ${imgs.length} images without lazy loading`, recommendation: 'Add loading="lazy" to below-the-fold images to improve initial page load performance.' });
+    // 5. Image lazy loading (account for Webflow's JS-based lazy loading via data-src)
+    const hasWebflowLazy = /data-src=/i.test(html) || /class="[^"]*w-lazy/i.test(html) || /Webflow/i.test(html.slice(0, 2000));
+    if (!hasWebflowLazy) {
+      const imgsWithoutLazy = imgs.filter(i => !i.loading || i.loading !== 'lazy');
+      // Only flag if there are several images — first 1-2 might be above the fold
+      if (imgs.length > 3 && imgsWithoutLazy.length > 2) {
+        issues.push({ check: 'lazy-loading', severity: 'info', message: `${imgsWithoutLazy.length} of ${imgs.length} images without native lazy loading`, recommendation: 'Consider adding loading="lazy" to below-the-fold images to improve initial page load performance.' });
+      }
     }
 
     // 6. Image dimensions (CLS prevention)
+    // Only flag when a significant portion lack dimensions; Webflow often handles sizing via CSS
     const noDimensions = imgs.filter(i => !i.hasWidth || !i.hasHeight);
-    if (noDimensions.length > 0) {
-      issues.push({ check: 'img-dimensions', severity: 'warning', message: `${noDimensions.length} image${noDimensions.length > 1 ? 's' : ''} missing width/height attributes`, recommendation: 'Set explicit width and height on images to prevent Cumulative Layout Shift (CLS), a Core Web Vital.' });
+    if (noDimensions.length > 3 && noDimensions.length > imgs.length * 0.5) {
+      issues.push({ check: 'img-dimensions', severity: 'info', message: `${noDimensions.length} of ${imgs.length} images missing width/height attributes`, recommendation: 'Consider adding explicit width and height on images to help prevent Cumulative Layout Shift (CLS). If CSS handles sizing, this may not apply.' });
     }
 
     // 7. Inline CSS size
@@ -451,15 +479,37 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string): Promi
         siteWideIssues.push({ check: 'robots-txt', severity: 'warning', message: 'Missing robots.txt file', recommendation: 'Create a robots.txt file to guide search engine crawlers on which pages to index.' });
       } else {
         const robotsTxt = await robotsRes.text();
-        if (robotsTxt.includes('Disallow: /')) {
-          const lines = robotsTxt.split('\n').filter(l => l.trim().startsWith('Disallow:'));
-          const blockAll = lines.some(l => l.trim() === 'Disallow: /');
-          if (blockAll) {
-            siteWideIssues.push({ check: 'robots-txt', severity: 'error', message: 'robots.txt blocks all crawlers', recommendation: 'Your robots.txt contains "Disallow: /" which prevents all search engines from indexing your site. Remove this line unless intentional.', value: 'Disallow: /' });
+        // Verify it's actually robots.txt, not a custom 404 HTML page
+        const looksLikeHtml = robotsTxt.trimStart().startsWith('<!') || robotsTxt.trimStart().startsWith('<html');
+        if (looksLikeHtml) {
+          siteWideIssues.push({ check: 'robots-txt', severity: 'warning', message: 'Missing robots.txt file', recommendation: 'Create a robots.txt file to guide search engine crawlers on which pages to index.' });
+        } else {
+        // Parse robots.txt into user-agent blocks
+        const lines = robotsTxt.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+        let currentUA = '';
+        const blocks: { ua: string; disallow: string[]; allow: string[] }[] = [];
+        for (const line of lines) {
+          if (line.toLowerCase().startsWith('user-agent:')) {
+            currentUA = line.split(':')[1]?.trim() || '';
+            blocks.push({ ua: currentUA, disallow: [], allow: [] });
+          } else if (line.toLowerCase().startsWith('disallow:') && blocks.length > 0) {
+            blocks[blocks.length - 1].disallow.push(line.split(':').slice(1).join(':').trim());
+          } else if (line.toLowerCase().startsWith('allow:') && blocks.length > 0) {
+            blocks[blocks.length - 1].allow.push(line.split(':').slice(1).join(':').trim());
+          }
+        }
+        // Only flag if the wildcard (*) block disallows / without a corresponding Allow: /
+        const wildcardBlock = blocks.find(b => b.ua === '*');
+        if (wildcardBlock) {
+          const disallowsAll = wildcardBlock.disallow.includes('/');
+          const allowsRoot = wildcardBlock.allow.some(a => a === '/' || a === '/*');
+          if (disallowsAll && !allowsRoot) {
+            siteWideIssues.push({ check: 'robots-txt', severity: 'error', message: 'robots.txt blocks all crawlers', recommendation: 'Your robots.txt has "Disallow: /" for all user-agents without an Allow override. This prevents search engines from indexing your site.', value: 'User-agent: * / Disallow: /' });
           }
         }
         if (!robotsTxt.toLowerCase().includes('sitemap:')) {
           siteWideIssues.push({ check: 'robots-txt', severity: 'info', message: 'robots.txt does not reference a sitemap', recommendation: 'Add a Sitemap: directive to your robots.txt to help search engines discover your XML sitemap.' });
+        }
         }
       }
     } catch { /* skip if fetch fails */ }
@@ -471,11 +521,17 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string): Promi
         siteWideIssues.push({ check: 'sitemap', severity: 'warning', message: 'Missing XML sitemap', recommendation: 'Create a sitemap.xml to help search engines discover and index all your pages efficiently.' });
       } else {
         const sitemapText = await sitemapRes.text();
-        const sitemapUrls = (sitemapText.match(/<loc>([^<]+)<\/loc>/gi) || []).length;
-        if (sitemapUrls === 0) {
-          siteWideIssues.push({ check: 'sitemap', severity: 'warning', message: 'XML sitemap is empty', recommendation: 'Your sitemap.xml exists but contains no URLs. Ensure it lists all indexable pages.' });
-        } else if (sitemapUrls < pages.length * 0.5) {
-          siteWideIssues.push({ check: 'sitemap', severity: 'warning', message: `Sitemap has ${sitemapUrls} URLs but site has ${pages.length} published pages`, recommendation: 'Your sitemap may be missing pages. Ensure all important pages are included.' });
+        // Verify it's actually XML, not a custom 404 HTML page served as 200
+        const isXml = sitemapText.trimStart().startsWith('<?xml') || sitemapText.trimStart().startsWith('<urlset') || sitemapText.trimStart().startsWith('<sitemapindex');
+        if (!isXml) {
+          siteWideIssues.push({ check: 'sitemap', severity: 'warning', message: 'Missing XML sitemap', recommendation: 'Create a sitemap.xml to help search engines discover and index all your pages efficiently.' });
+        } else {
+          const sitemapUrls = (sitemapText.match(/<loc>([^<]+)<\/loc>/gi) || []).length;
+          if (sitemapUrls === 0) {
+            siteWideIssues.push({ check: 'sitemap', severity: 'warning', message: 'XML sitemap is empty', recommendation: 'Your sitemap.xml exists but contains no URLs. Ensure it lists all indexable pages.' });
+          } else if (sitemapUrls < pages.length * 0.5) {
+            siteWideIssues.push({ check: 'sitemap', severity: 'warning', message: `Sitemap has ${sitemapUrls} URLs but site has ${pages.length} published pages`, recommendation: 'Your sitemap may be missing pages. Ensure all important pages are included.' });
+          }
         }
       }
     } catch { /* skip if fetch fails */ }
