@@ -3,7 +3,15 @@ import { useToast } from './Toast';
 import {
   Check, Globe, ExternalLink, Search, Loader2, Copy, CheckCircle,
   LogIn, LogOut, ChevronRight, Users, Unplug, Lock, KeyRound, X, BarChart3,
+  Pin, PinOff, Pencil, Save, RefreshCw,
 } from 'lucide-react';
+
+interface EventDisplayConfig {
+  eventName: string;
+  displayName: string;
+  pinned: boolean;
+  group?: string;
+}
 
 interface Workspace {
   id: string;
@@ -13,6 +21,7 @@ interface Workspace {
   gscPropertyUrl?: string;
   ga4PropertyId?: string;
   hasPassword?: boolean;
+  eventConfig?: EventDisplayConfig[];
 }
 
 interface GscSite {
@@ -40,6 +49,13 @@ export function SettingsPanel() {
   const [editingPassword, setEditingPassword] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [savingPassword, setSavingPassword] = useState(false);
+  const [eventConfigWs, setEventConfigWs] = useState<string | null>(null);
+  const [availableEvents, setAvailableEvents] = useState<{eventName: string; eventCount: number; users: number}[]>([]);
+  const [localEventConfig, setLocalEventConfig] = useState<EventDisplayConfig[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(false);
+  const [savingEvents, setSavingEvents] = useState(false);
+  const [editingEventName, setEditingEventName] = useState<string | null>(null);
+  const [editingDisplayName, setEditingDisplayName] = useState('');
 
   useEffect(() => {
     fetch('/api/workspaces').then(r => r.json()).then(setWorkspaces).catch(() => {});
@@ -145,6 +161,61 @@ export function SettingsPanel() {
       setWorkspaces(prev => prev.map(w => w.id === workspaceId ? { ...w, ga4PropertyId: updated.ga4PropertyId } : w));
       toast('GA4 property saved');
     } catch { toast('Failed to save GA4 property', 'error'); }
+  };
+
+  const loadEventsForWorkspace = async (wsId: string) => {
+    setEventConfigWs(wsId);
+    setLoadingEvents(true);
+    try {
+      const res = await fetch(`/api/public/analytics-events/${wsId}?days=28`);
+      const events = await res.json();
+      if (Array.isArray(events)) setAvailableEvents(events);
+      const ws = workspaces.find(w => w.id === wsId);
+      setLocalEventConfig(ws?.eventConfig || []);
+    } catch { setAvailableEvents([]); }
+    finally { setLoadingEvents(false); }
+  };
+
+  const getEventDisplayName = (eventName: string): string => {
+    const cfg = localEventConfig.find(c => c.eventName === eventName);
+    return cfg?.displayName || eventName;
+  };
+
+  const isEventPinned = (eventName: string): boolean => {
+    return localEventConfig.find(c => c.eventName === eventName)?.pinned || false;
+  };
+
+  const toggleEventPin = (eventName: string) => {
+    setLocalEventConfig(prev => {
+      const existing = prev.find(c => c.eventName === eventName);
+      if (existing) return prev.map(c => c.eventName === eventName ? { ...c, pinned: !c.pinned } : c);
+      return [...prev, { eventName, displayName: eventName, pinned: true }];
+    });
+  };
+
+  const updateEventDisplayName = (eventName: string, displayName: string) => {
+    setLocalEventConfig(prev => {
+      const existing = prev.find(c => c.eventName === eventName);
+      if (existing) return prev.map(c => c.eventName === eventName ? { ...c, displayName } : c);
+      return [...prev, { eventName, displayName, pinned: false }];
+    });
+    setEditingEventName(null);
+    setEditingDisplayName('');
+  };
+
+  const saveEventConfig = async () => {
+    if (!eventConfigWs) return;
+    setSavingEvents(true);
+    try {
+      const res = await fetch(`/api/workspaces/${eventConfigWs}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventConfig: localEventConfig }),
+      });
+      const updated = await res.json();
+      setWorkspaces(prev => prev.map(w => w.id === eventConfigWs ? { ...w, eventConfig: updated.eventConfig } : w));
+      toast('Event configuration saved');
+    } catch { toast('Failed to save event config', 'error'); }
+    finally { setSavingEvents(false); }
   };
 
   const linked = workspaces.filter(w => w.webflowSiteId);
@@ -333,6 +404,95 @@ export function SettingsPanel() {
           </div>
         </section>
       ) : null}
+
+      {/* Event Display Configuration */}
+      {linked.filter(w => w.ga4PropertyId).length > 0 && (
+        <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
+          <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--brand-border)' }}>
+            <div className="flex items-center gap-2">
+              <Pin className="w-4 h-4 text-violet-400" />
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Event Display Names & Pinning</h3>
+            </div>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--brand-text-muted)' }}>Rename events for client-facing dashboards and pin key metrics to the top.</p>
+          </div>
+          <div className="divide-y" style={{ borderColor: 'var(--brand-border)' }}>
+            {linked.filter(w => w.ga4PropertyId).map(ws => (
+              <div key={ws.id} className="px-5 py-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium" style={{ color: 'var(--brand-text-bright)' }}>{ws.name}</span>
+                    {eventConfigWs === ws.id && localEventConfig.filter(c => c.pinned).length > 0 && (
+                      <span className="text-[10px] text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded">{localEventConfig.filter(c => c.pinned).length} pinned</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {eventConfigWs === ws.id && (
+                      <button onClick={saveEventConfig} disabled={savingEvents}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition-colors disabled:opacity-50">
+                        {savingEvents ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save
+                      </button>
+                    )}
+                    <button onClick={() => eventConfigWs === ws.id ? setEventConfigWs(null) : loadEventsForWorkspace(ws.id)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                      style={{ backgroundColor: 'var(--brand-bg-card)', color: 'var(--brand-text)' }}>
+                      {eventConfigWs === ws.id ? 'Close' : <><RefreshCw className="w-3 h-3" /> Configure</>}
+                    </button>
+                  </div>
+                </div>
+                {eventConfigWs === ws.id && (
+                  <div className="mt-3">
+                    {loadingEvents ? (
+                      <div className="flex items-center gap-2 text-xs py-4 justify-center" style={{ color: 'var(--brand-text-muted)' }}>
+                        <Loader2 className="w-3 h-3 animate-spin" /> Loading events from GA4...
+                      </div>
+                    ) : availableEvents.length === 0 ? (
+                      <p className="text-xs py-4 text-center" style={{ color: 'var(--brand-text-muted)' }}>No events found. Make sure GA4 is tracking events on this site.</p>
+                    ) : (
+                      <div className="space-y-1 max-h-[400px] overflow-y-auto">
+                        {availableEvents.map((ev) => {
+                          const pinned = isEventPinned(ev.eventName);
+                          const displayName = getEventDisplayName(ev.eventName);
+                          const isEditing = editingEventName === ev.eventName;
+                          return (
+                            <div key={ev.eventName} className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${pinned ? 'bg-violet-500/10 border border-violet-500/20' : 'hover:bg-white/5'}`}>
+                              <button onClick={() => toggleEventPin(ev.eventName)} className="shrink-0" title={pinned ? 'Unpin' : 'Pin to dashboard'}>
+                                {pinned ? <Pin className="w-3.5 h-3.5 text-violet-400" /> : <PinOff className="w-3.5 h-3.5 text-zinc-600 hover:text-zinc-400" />}
+                              </button>
+                              <div className="flex-1 min-w-0">
+                                {isEditing ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <input autoFocus value={editingDisplayName} onChange={e => setEditingDisplayName(e.target.value)}
+                                      onKeyDown={e => { if (e.key === 'Enter') updateEventDisplayName(ev.eventName, editingDisplayName); if (e.key === 'Escape') setEditingEventName(null); }}
+                                      className="flex-1 px-2 py-1 bg-zinc-800 border border-zinc-600 rounded text-xs text-zinc-200 focus:outline-none focus:border-violet-500" />
+                                    <button onClick={() => updateEventDisplayName(ev.eventName, editingDisplayName)} className="text-emerald-400 hover:text-emerald-300"><Check className="w-3.5 h-3.5" /></button>
+                                    <button onClick={() => setEditingEventName(null)} className="text-zinc-500 hover:text-zinc-300"><X className="w-3.5 h-3.5" /></button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-xs font-medium truncate" style={{ color: displayName !== ev.eventName ? 'var(--brand-text-bright)' : 'var(--brand-text)' }}>
+                                      {displayName !== ev.eventName ? displayName : ev.eventName.replace(/_/g, ' ')}
+                                    </span>
+                                    {displayName !== ev.eventName && <span className="text-[10px] text-zinc-600 font-mono">{ev.eventName}</span>}
+                                    <button onClick={() => { setEditingEventName(ev.eventName); setEditingDisplayName(displayName !== ev.eventName ? displayName : ''); }}
+                                      className="opacity-0 group-hover:opacity-100 ml-1"><Pencil className="w-3 h-3 text-zinc-600 hover:text-zinc-400" /></button>
+                                  </div>
+                                )}
+                              </div>
+                              <span className="text-[10px] text-zinc-500 tabular-nums shrink-0">{ev.eventCount.toLocaleString()}</span>
+                              <button onClick={() => { setEditingEventName(ev.eventName); setEditingDisplayName(getEventDisplayName(ev.eventName) !== ev.eventName ? getEventDisplayName(ev.eventName) : ''); }}
+                                className="shrink-0" title="Rename"><Pencil className="w-3 h-3 text-zinc-600 hover:text-zinc-400" /></button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       </>)}
 
       {/* ═══ DASHBOARDS TAB ═══ */}

@@ -15,7 +15,8 @@ interface SearchOverview {
   dateRange: { start: string; end: string };
 }
 interface PerformanceTrend { date: string; clicks: number; impressions: number; ctr: number; position: number; }
-interface WorkspaceInfo { id: string; name: string; webflowSiteId?: string; webflowSiteName?: string; gscPropertyUrl?: string; ga4PropertyId?: string; liveDomain?: string; requiresPassword?: boolean; }
+interface EventDisplayConfig { eventName: string; displayName: string; pinned: boolean; group?: string; }
+interface WorkspaceInfo { id: string; name: string; webflowSiteId?: string; webflowSiteName?: string; gscPropertyUrl?: string; ga4PropertyId?: string; liveDomain?: string; eventConfig?: EventDisplayConfig[]; requiresPassword?: boolean; }
 interface AuditSummary { id: string; createdAt: string; siteScore: number; totalPages: number; errors: number; warnings: number; previousScore?: number; }
 interface SeoIssue { check: string; severity: 'error' | 'warning' | 'info'; category?: string; message: string; recommendation: string; value?: string; }
 interface PageAuditResult { pageId: string; page: string; slug: string; url: string; score: number; issues: SeoIssue[]; }
@@ -240,6 +241,21 @@ export function ClientDashboard({ workspaceId }: Props) {
       console.error('GA4 data load error:', err);
     }
   };
+
+  const eventDisplayName = (eventName: string): string => {
+    const cfg = ws?.eventConfig?.find(c => c.eventName === eventName);
+    return cfg?.displayName && cfg.displayName !== eventName ? cfg.displayName : eventName.replace(/_/g, ' ');
+  };
+
+  const isEventPinned = (eventName: string): boolean => {
+    return ws?.eventConfig?.find(c => c.eventName === eventName)?.pinned || false;
+  };
+
+  const sortedConversions = [...ga4Conversions].sort((a, b) => {
+    const ap = isEventPinned(a.eventName) ? 1 : 0;
+    const bp = isEventPinned(b.eventName) ? 1 : 0;
+    return bp - ap;
+  });
 
   const loadEventTrend = async (eventName: string) => {
     if (!ws) return;
@@ -1107,19 +1123,23 @@ export function ClientDashboard({ workspaceId }: Props) {
             {(ga4Conversions.length > 0 || ga4Events.length > 0) && (
               <div className="space-y-6 mt-6">
                 {/* Conversion / Custom Events */}
-                {ga4Conversions.length > 0 && (
+                {sortedConversions.length > 0 && (
                   <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
                     <h3 className="text-sm font-semibold text-zinc-300 mb-1">Key Events</h3>
                     <p className="text-[10px] text-zinc-600 mb-4">Custom and conversion events tracked on your site (excludes default GA4 events)</p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {ga4Conversions.slice(0, 9).map((c, i) => {
+                      {sortedConversions.slice(0, 9).map((c, i) => {
                         const isSelected = ga4SelectedEvent === c.eventName;
+                        const pinned = isEventPinned(c.eventName);
                         return (
                           <button key={i} onClick={() => loadEventTrend(c.eventName)}
-                            className={`text-left rounded-xl border p-4 transition-colors ${isSelected ? 'bg-violet-500/10 border-violet-500/30' : 'bg-zinc-800/30 border-zinc-800 hover:border-zinc-700'}`}>
+                            className={`text-left rounded-xl border p-4 transition-colors ${isSelected ? 'bg-violet-500/10 border-violet-500/30' : pinned ? 'bg-violet-500/5 border-violet-500/15 hover:border-violet-500/30' : 'bg-zinc-800/30 border-zinc-800 hover:border-zinc-700'}`}>
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-[10px] text-zinc-500 font-mono truncate max-w-[140px]">{c.eventName.replace(/_/g, ' ')}</span>
-                              {c.rate > 0 && <span className="text-[10px] font-medium text-emerald-400">{c.rate}%</span>}
+                              <span className="text-[10px] text-zinc-400 truncate max-w-[140px]">{eventDisplayName(c.eventName)}</span>
+                              <div className="flex items-center gap-1.5">
+                                {pinned && <span className="w-1.5 h-1.5 rounded-full bg-violet-400" title="Pinned" />}
+                                {c.rate > 0 && <span className="text-[10px] font-medium text-emerald-400">{c.rate}%</span>}
+                              </div>
                             </div>
                             <div className="text-xl font-bold text-zinc-200">{c.conversions.toLocaleString()}</div>
                             <div className="text-[10px] text-zinc-600 mt-0.5">{c.users.toLocaleString()} users</div>
@@ -1135,7 +1155,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                   <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
                     <div className="flex items-center justify-between mb-3">
                       <div>
-                        <h3 className="text-sm font-semibold text-zinc-300">{ga4SelectedEvent.replace(/_/g, ' ')}</h3>
+                        <h3 className="text-sm font-semibold text-zinc-300">{eventDisplayName(ga4SelectedEvent)}</h3>
                         <p className="text-[10px] text-zinc-600">Daily event count over the selected period</p>
                       </div>
                       <button onClick={() => { setGa4SelectedEvent(null); setGa4EventTrend([]); }} className="text-[10px] text-zinc-500 hover:text-zinc-300">Clear</button>
@@ -1187,7 +1207,8 @@ export function ClientDashboard({ workspaceId }: Props) {
                               <tr key={i} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
                                 <td className="py-2 pr-4">
                                   <div className="flex items-center gap-2">
-                                    <span className="text-xs text-zinc-300 font-mono">{ev.eventName}</span>
+                                    <span className="text-xs text-zinc-300">{eventDisplayName(ev.eventName)}</span>
+                                    {eventDisplayName(ev.eventName) !== ev.eventName.replace(/_/g, ' ') && <span className="text-[10px] text-zinc-600 font-mono ml-1">{ev.eventName}</span>}
                                   </div>
                                   <div className="h-1 rounded-full bg-zinc-800 mt-1 max-w-[200px]">
                                     <div className="h-full rounded-full bg-violet-500/40" style={{ width: `${pct}%` }} />

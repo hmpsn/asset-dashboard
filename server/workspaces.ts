@@ -11,6 +11,13 @@ const OPT_ROOT = DATA_BASE
   : path.join(process.env.HOME || '', 'Optimized');
 const CONFIG_FILE = path.join(UPLOAD_ROOT, '.workspaces.json');
 
+export interface EventDisplayConfig {
+  eventName: string;
+  displayName: string;
+  pinned: boolean;
+  group?: string;
+}
+
 export interface Workspace {
   id: string;
   name: string;
@@ -21,6 +28,7 @@ export interface Workspace {
   ga4PropertyId?: string;
   clientPassword?: string;
   liveDomain?: string;
+  eventConfig?: EventDisplayConfig[];
   folder: string;
   createdAt: string;
 }
@@ -78,7 +86,7 @@ export function createWorkspace(name: string, webflowSiteId?: string, webflowSit
   return workspace;
 }
 
-export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'liveDomain'>>): Workspace | null {
+export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'liveDomain' | 'eventConfig'>>): Workspace | null {
   const workspaces = readConfig();
   const idx = workspaces.findIndex(w => w.id === id);
   if (idx === -1) return null;

@@ -2247,6 +2247,7 @@ app.get('/api/public/workspace/:id', (req, res) => {
     gscPropertyUrl: ws.gscPropertyUrl,
     ga4PropertyId: ws.ga4PropertyId,
     liveDomain: ws.liveDomain,
+    eventConfig: ws.eventConfig || [],
     requiresPassword: !!ws.clientPassword,
   });
 });
