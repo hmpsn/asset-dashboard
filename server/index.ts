@@ -52,7 +52,7 @@ import { runSalesAudit } from './sales-audit.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
 import { listGscSites, getSearchOverview, getPerformanceTrend } from './search-console.js';
-import { listGA4Properties, getGA4Overview, getGA4DailyTrend, getGA4TopPages, getGA4TopSources, getGA4DeviceBreakdown, getGA4Countries, getGA4KeyEvents, getGA4EventTrend, getGA4Conversions } from './google-analytics.js';
+import { listGA4Properties, getGA4Overview, getGA4DailyTrend, getGA4TopPages, getGA4TopSources, getGA4DeviceBreakdown, getGA4Countries, getGA4KeyEvents, getGA4EventTrend, getGA4Conversions, getGA4EventsByPage } from './google-analytics.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -2323,21 +2323,36 @@ app.get('/api/public/audit-detail/:workspaceId', (req, res) => {
 
 app.post('/api/public/search-chat/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
-  if (!ws?.webflowSiteId) return res.status(400).json({ error: 'Workspace not configured' });
+  if (!ws) return res.status(400).json({ error: 'Workspace not configured' });
   const { question, context } = req.body;
   if (!question) return res.status(400).json({ error: 'question required' });
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) return res.status(400).json({ error: 'AI not configured' });
 
   try {
-    const systemPrompt = `You are a search analytics assistant embedded in a client dashboard. Your role is to help the client UNDERSTAND their Google Search Console data — trends, patterns, and what the numbers mean.
+    const hasSearch = !!(context?.search);
+    const hasGA4 = !!(context?.ga4);
+
+    const systemPrompt = `You are an analytics assistant embedded in a client dashboard. Your role is to help the client UNDERSTAND their website data — trends, patterns, and what the numbers mean.
+
+${hasSearch ? 'You have access to their Google Search Console data (search queries, clicks, impressions, CTR, positions).' : ''}
+${hasGA4 ? `You have access to their Google Analytics 4 data including:
+- Site overview (users, sessions, pageviews, bounce rate, session duration)
+- Top pages by pageviews
+- Traffic sources and mediums
+- Device breakdown (desktop, mobile, tablet)
+- Tracked events (form submissions, button clicks, custom events, etc.) with event counts and user numbers
+- Conversion/key events with conversion rates
+- Top countries by users` : ''}
 
 CRITICAL RULES:
 - ONLY provide data analysis, insights, and explanations of what the metrics mean
 - DO NOT give implementation advice, technical SEO instructions, or step-by-step guides on how to fix things
 - DO NOT suggest specific code changes, meta tag edits, content rewrites, or technical optimizations
 - If asked "how do I fix this?" or similar, say something like "I can see the opportunity here — I'd recommend discussing this with your web team for the best approach to capitalize on it."
-- You may identify WHAT areas have opportunities (e.g. "these queries have high impressions but low CTR") but NOT HOW to fix them
+- You may identify WHAT areas have opportunities but NOT HOW to fix them
+- When asked about events, reference actual event names, counts, and user numbers from the data
+- When analyzing traffic, cross-reference sources, devices, and page performance
 - Be friendly, professional, and reference actual numbers from their data
 - Use markdown formatting
 - Frame insights as observations, not instructions
@@ -2345,7 +2360,8 @@ CRITICAL RULES:
 You are an analytics tool, not a consultant. The client's web team handles implementation.
 
 Site: ${ws.webflowSiteName || ws.name}
-Current search data context:
+Date range: last ${context?.days || 28} days
+Current data context:
 ${JSON.stringify(context, null, 2)}`;
 
     const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -2489,6 +2505,22 @@ app.get('/api/public/analytics-conversions/:workspaceId', async (req, res) => {
   try {
     const conversions = await getGA4Conversions(ws.ga4PropertyId, days);
     res.json(conversions);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: msg });
+  }
+});
+
+// --- GA4 Event Explorer ---
+app.get('/api/public/analytics-event-explorer/:workspaceId', async (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
+  const days = parseInt(req.query.days as string) || 28;
+  const eventName = req.query.event as string | undefined;
+  const pagePath = req.query.page as string | undefined;
+  try {
+    const data = await getGA4EventsByPage(ws.ga4PropertyId, days, { eventName, pagePath });
+    res.json(data);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: msg });

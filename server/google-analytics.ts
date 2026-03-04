@@ -429,6 +429,67 @@ export async function getGA4Conversions(propertyId: string, days: number = 28): 
     .slice(0, 15);
 }
 
+export interface GA4EventPageBreakdown {
+  eventName: string;
+  pagePath: string;
+  eventCount: number;
+  users: number;
+}
+
+/**
+ * Get event breakdown by page path, optionally filtered by event name or page path.
+ */
+export async function getGA4EventsByPage(
+  propertyId: string,
+  days: number = 28,
+  options: { eventName?: string; pagePath?: string; limit?: number } = {},
+): Promise<GA4EventPageBreakdown[]> {
+  const startDate = dateStr(days);
+  const endDate = dateStr(1);
+  const limit = options.limit || 50;
+
+  // Build dimension filters
+  const filters: Array<{ filter: { fieldName: string; stringFilter: { matchType: string; value: string } } }> = [];
+  if (options.eventName) {
+    filters.push({ filter: { fieldName: 'eventName', stringFilter: { matchType: 'EXACT', value: options.eventName } } });
+  }
+  if (options.pagePath) {
+    filters.push({ filter: { fieldName: 'pagePath', stringFilter: { matchType: 'CONTAINS', value: options.pagePath } } });
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const body: Record<string, any> = {
+    dateRanges: [{ startDate, endDate }],
+    dimensions: [{ name: 'eventName' }, { name: 'pagePath' }],
+    metrics: [
+      { name: 'eventCount' },
+      { name: 'totalUsers' },
+    ],
+    orderBys: [{ metric: { metricName: 'eventCount' }, desc: true }],
+    limit,
+  };
+
+  if (filters.length === 1) {
+    body.dimensionFilter = filters[0];
+  } else if (filters.length > 1) {
+    body.dimensionFilter = { andGroup: { expressions: filters } };
+  }
+
+  const data = await runReport(propertyId, body) as {
+    rows?: Array<{
+      dimensionValues: Array<{ value: string }>;
+      metricValues: Array<{ value: string }>;
+    }>;
+  };
+
+  return (data.rows || []).map(r => ({
+    eventName: r.dimensionValues[0].value,
+    pagePath: r.dimensionValues[1].value,
+    eventCount: parseInt(r.metricValues[0].value),
+    users: parseInt(r.metricValues[1].value),
+  }));
+}
+
 export async function getGA4Countries(propertyId: string, days: number = 28, limit: number = 10): Promise<GA4CountryBreakdown[]> {
   const startDate = dateStr(days);
   const endDate = dateStr(1);

@@ -4,7 +4,7 @@ import {
   BarChart3, ArrowUpDown, Sparkles, Send, AlertTriangle,
   Target, Zap, Shield, MessageSquare, X, ChevronDown,
   CheckCircle2, Info, LayoutDashboard, LineChart, Lock,
-  Users, Globe, Activity,
+  Users, Globe, Activity, Filter,
 } from 'lucide-react';
 
 interface SearchQuery { query: string; clicks: number; impressions: number; ctr: number; position: number; }
@@ -39,6 +39,7 @@ interface GA4CountryBreakdown { country: string; users: number; sessions: number
 interface GA4Event { eventName: string; eventCount: number; users: number; }
 interface GA4EventTrend { date: string; eventCount: number; }
 interface GA4ConversionSummary { eventName: string; conversions: number; users: number; rate: number; }
+interface GA4EventPageBreakdown { eventName: string; pagePath: string; eventCount: number; users: number; }
 interface Props { workspaceId: string; }
 
 type SortKey = 'clicks' | 'impressions' | 'ctr' | 'position';
@@ -178,6 +179,10 @@ export function ClientDashboard({ workspaceId }: Props) {
   const [ga4Conversions, setGa4Conversions] = useState<GA4ConversionSummary[]>([]);
   const [ga4SelectedEvent, setGa4SelectedEvent] = useState<string | null>(null);
   const [ga4EventTrend, setGa4EventTrend] = useState<GA4EventTrend[]>([]);
+  const [explorerData, setExplorerData] = useState<GA4EventPageBreakdown[]>([]);
+  const [explorerEvent, setExplorerEvent] = useState('');
+  const [explorerPage, setExplorerPage] = useState('');
+  const [explorerLoading, setExplorerLoading] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [authError, setAuthError] = useState('');
@@ -257,6 +262,20 @@ export function ClientDashboard({ workspaceId }: Props) {
     return bp - ap;
   });
 
+  const runExplorer = async (event?: string, page?: string) => {
+    if (!ws) return;
+    setExplorerLoading(true);
+    try {
+      const params = new URLSearchParams({ days: String(days) });
+      if (event) params.set('event', event);
+      if (page) params.set('page', page);
+      const res = await fetch(`/api/public/analytics-event-explorer/${ws.id}?${params}`);
+      const data = await res.json();
+      if (Array.isArray(data)) setExplorerData(data);
+    } catch { setExplorerData([]); }
+    finally { setExplorerLoading(false); }
+  };
+
   const loadEventTrend = async (eventName: string) => {
     if (!ws) return;
     setGa4SelectedEvent(eventName);
@@ -304,19 +323,40 @@ export function ClientDashboard({ workspaceId }: Props) {
     }
   };
 
-  const changeDays = (d: number) => { setDays(d); if (ws) loadSearchData(ws.id, d); };
+  const changeDays = (d: number) => {
+    setDays(d);
+    if (ws) {
+      loadSearchData(ws.id, d);
+      if (ws.ga4PropertyId) loadGA4Data(ws.id, d);
+    }
+  };
 
   const askAi = async (question: string) => {
-    if (!question.trim() || !overview || !ws) return;
+    if (!question.trim() || !ws) return;
+    if (!overview && !ga4Overview) return;
     setChatMessages(prev => [...prev, { role: 'user', content: question.trim() }]);
     setChatInput('');
     setChatLoading(true);
     try {
-      const context = {
-        dateRange: overview.dateRange, days, totalClicks: overview.totalClicks,
-        totalImpressions: overview.totalImpressions, avgCtr: overview.avgCtr,
-        avgPosition: overview.avgPosition, topQueries: overview.topQueries, topPages: overview.topPages,
-      };
+      const context: Record<string, unknown> = { days };
+      if (overview) {
+        context.search = {
+          dateRange: overview.dateRange, totalClicks: overview.totalClicks,
+          totalImpressions: overview.totalImpressions, avgCtr: overview.avgCtr,
+          avgPosition: overview.avgPosition, topQueries: overview.topQueries.slice(0, 15), topPages: overview.topPages.slice(0, 10),
+        };
+      }
+      if (ga4Overview) {
+        context.ga4 = {
+          overview: ga4Overview,
+          topPages: ga4Pages.slice(0, 10),
+          sources: ga4Sources.slice(0, 8),
+          devices: ga4Devices,
+          events: ga4Events.slice(0, 15),
+          conversions: ga4Conversions.slice(0, 10),
+          countries: ga4Countries.slice(0, 8),
+        };
+      }
       const res = await fetch(`/api/public/search-chat/${ws.id}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: question.trim(), context }),
@@ -1229,6 +1269,84 @@ export function ClientDashboard({ workspaceId }: Props) {
                 )}
               </div>
             )}
+
+            {/* ── Event Explorer ── */}
+            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5 mt-6">
+              <div className="flex items-center gap-2 mb-1">
+                <Filter className="w-4 h-4 text-violet-400" />
+                <h3 className="text-sm font-semibold text-zinc-300">Event Explorer</h3>
+              </div>
+              <p className="text-[10px] text-zinc-600 mb-4">Break down events by page, or see which events fire on a specific page.</p>
+              <div className="flex flex-wrap items-end gap-3 mb-4">
+                <div className="flex-1 min-w-[180px]">
+                  <label className="text-[10px] text-zinc-500 mb-1 block">Event Name</label>
+                  <select value={explorerEvent} onChange={e => setExplorerEvent(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-500">
+                    <option value="">All events</option>
+                    {ga4Events.map(ev => (
+                      <option key={ev.eventName} value={ev.eventName}>{eventDisplayName(ev.eventName)}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex-1 min-w-[180px]">
+                  <label className="text-[10px] text-zinc-500 mb-1 block">Page Path (contains)</label>
+                  <input value={explorerPage} onChange={e => setExplorerPage(e.target.value)}
+                    placeholder="/contact, /blog, etc."
+                    onKeyDown={e => e.key === 'Enter' && runExplorer(explorerEvent || undefined, explorerPage || undefined)}
+                    className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-500 placeholder:text-zinc-600" />
+                </div>
+                <button onClick={() => runExplorer(explorerEvent || undefined, explorerPage || undefined)}
+                  className="px-4 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium transition-colors flex items-center gap-1.5">
+                  {explorerLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />} Explore
+                </button>
+                {explorerData.length > 0 && (
+                  <button onClick={() => { setExplorerData([]); setExplorerEvent(''); setExplorerPage(''); }}
+                    className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Clear</button>
+                )}
+              </div>
+              {explorerData.length > 0 && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="border-b border-zinc-800">
+                        <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 pr-3">Event</th>
+                        <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 pr-3">Page</th>
+                        <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 pr-3 text-right">Count</th>
+                        <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 text-right">Users</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {explorerData.map((row, i) => {
+                        const maxCount = explorerData[0]?.eventCount || 1;
+                        const pct = (row.eventCount / maxCount) * 100;
+                        return (
+                          <tr key={i} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                            <td className="py-2 pr-3">
+                              <button onClick={() => { setExplorerEvent(row.eventName); runExplorer(row.eventName, explorerPage || undefined); }}
+                                className="text-xs text-violet-400 hover:text-violet-300">{eventDisplayName(row.eventName)}</button>
+                            </td>
+                            <td className="py-2 pr-3">
+                              <button onClick={() => { setExplorerPage(row.pagePath); runExplorer(explorerEvent || undefined, row.pagePath); }}
+                                className="text-xs text-zinc-300 hover:text-zinc-100 font-mono truncate max-w-[250px] block">{row.pagePath}</button>
+                            </td>
+                            <td className="py-2 pr-3 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <div className="w-16 h-1 rounded-full bg-zinc-800 overflow-hidden">
+                                  <div className="h-full rounded-full bg-violet-500/40" style={{ width: `${pct}%` }} />
+                                </div>
+                                <span className="text-xs text-zinc-200 tabular-nums font-medium">{row.eventCount.toLocaleString()}</span>
+                              </div>
+                            </td>
+                            <td className="py-2 text-right text-xs text-zinc-500 tabular-nums">{row.users.toLocaleString()}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  <div className="text-[10px] text-zinc-600 mt-2 text-right">{explorerData.length} results</div>
+                </div>
+              )}
+            </div>
           </>)}
         </>)}
       </main>
