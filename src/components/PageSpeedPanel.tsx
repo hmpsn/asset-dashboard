@@ -136,16 +136,25 @@ export function PageSpeedPanel({ siteId }: Props) {
   const [strategy, setStrategy] = useState<'mobile' | 'desktop'>('mobile');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [expandedPage, setExpandedPage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const runTest = (strat: 'mobile' | 'desktop') => {
     setLoading(true);
     setHasRun(true);
     setStrategy(strat);
     setData(null);
-    fetch(`/api/webflow/pagespeed/${siteId}?strategy=${strat}&maxPages=5`)
-      .then(r => r.json())
-      .then(d => setData(d))
-      .catch(() => {})
+    setError(null);
+    fetch(`/api/webflow/pagespeed/${siteId}?strategy=${strat}&maxPages=3`)
+      .then(r => {
+        if (!r.ok) throw new Error(`Server error: ${r.status}`);
+        return r.json();
+      })
+      .then(d => {
+        if (d.error) { setError(d.error); return; }
+        if (d.pages?.length === 0) { setError('No pages could be tested. The Google PageSpeed API may be rate-limited. Add a GOOGLE_PSI_KEY env variable for higher limits.'); return; }
+        setData(d);
+      })
+      .catch(e => setError(e.message || 'PageSpeed analysis failed'))
       .finally(() => setLoading(false));
   };
 
@@ -192,16 +201,23 @@ export function PageSpeedPanel({ siteId }: Props) {
       <div className="flex flex-col items-center justify-center py-20 gap-3">
         <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--brand-mint)' }} />
         <p className="text-sm text-zinc-400">Running PageSpeed analysis...</p>
-        <p className="text-xs text-zinc-600">Testing up to 5 pages via Google PageSpeed Insights API</p>
+        <p className="text-xs text-zinc-600">Testing up to 3 pages via Google PageSpeed Insights API</p>
         <p className="text-xs text-zinc-700">This may take 30-60 seconds</p>
       </div>
     );
   }
 
-  if (!data || data.pages.length === 0) {
+  if (error || !data || data.pages.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
-        <p className="text-zinc-400 text-sm">No results available</p>
+        {error ? (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 max-w-md text-center">
+            <p className="text-red-400 text-sm font-medium mb-1">PageSpeed Analysis Failed</p>
+            <p className="text-xs text-red-400/70">{error}</p>
+          </div>
+        ) : (
+          <p className="text-zinc-400 text-sm">No results available</p>
+        )}
         <button
           onClick={() => runTest(strategy)}
           className="px-4 py-2 rounded-lg text-sm font-medium"

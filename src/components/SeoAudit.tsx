@@ -3,7 +3,7 @@ import {
   Loader2, Search as SearchIcon, ChevronDown, ChevronRight, Download,
   AlertTriangle, AlertCircle, Info, CheckCircle, Globe, FileText,
   RefreshCw, X, Pencil, Link2Off, Clock, Share2, Copy, ExternalLink,
-  TrendingUp, TrendingDown, Minus,
+  TrendingUp, TrendingDown, Minus, Plus, ListChecks, Trash2, Circle,
 } from 'lucide-react';
 import { SeoEditor } from './SeoEditor';
 import { LinkChecker } from './LinkChecker';
@@ -139,6 +139,187 @@ function ScoreTrendChart({ history }: { history: SnapshotSummary[] }) {
   );
 }
 
+interface ActionItem {
+  id: string;
+  snapshotId: string;
+  title: string;
+  description: string;
+  status: 'planned' | 'in-progress' | 'completed';
+  priority: 'high' | 'medium' | 'low';
+  category?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const STATUS_CONFIG = {
+  planned: { label: 'Planned', color: 'text-zinc-400', bg: 'bg-zinc-500/10 border-zinc-500/30', icon: Circle },
+  'in-progress': { label: 'In Progress', color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/30', icon: Loader2 },
+  completed: { label: 'Done', color: 'text-green-400', bg: 'bg-green-500/10 border-green-500/30', icon: CheckCircle },
+} as const;
+
+const PRIORITY_CONFIG = {
+  high: { label: 'High', dot: 'bg-red-400' },
+  medium: { label: 'Med', dot: 'bg-amber-400' },
+  low: { label: 'Low', dot: 'bg-green-400' },
+} as const;
+
+function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
+  const [items, setItems] = useState<ActionItem[]>([]);
+  const [adding, setAdding] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newDesc, setNewDesc] = useState('');
+  const [newPriority, setNewPriority] = useState<'high' | 'medium' | 'low'>('medium');
+
+  const load = useCallback(() => {
+    fetch(`/api/reports/snapshot/${snapshotId}/actions`)
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d)) setItems(d); })
+      .catch(() => {});
+  }, [snapshotId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const addItem = async () => {
+    if (!newTitle.trim()) return;
+    await fetch(`/api/reports/snapshot/${snapshotId}/actions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: newTitle.trim(), description: newDesc.trim(), priority: newPriority }),
+    });
+    setNewTitle('');
+    setNewDesc('');
+    setAdding(false);
+    load();
+  };
+
+  const cycleStatus = async (item: ActionItem) => {
+    const next = item.status === 'planned' ? 'in-progress' : item.status === 'in-progress' ? 'completed' : 'planned';
+    await fetch(`/api/reports/snapshot/${snapshotId}/actions/${item.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: next }),
+    });
+    load();
+  };
+
+  const deleteItem = async (id: string) => {
+    await fetch(`/api/reports/snapshot/${snapshotId}/actions/${id}`, { method: 'DELETE' });
+    load();
+  };
+
+  const sorted = [...items].sort((a, b) => {
+    const order = { 'in-progress': 0, planned: 1, completed: 2 };
+    return (order[a.status] ?? 1) - (order[b.status] ?? 1);
+  });
+
+  const counts = {
+    completed: items.filter(i => i.status === 'completed').length,
+    'in-progress': items.filter(i => i.status === 'in-progress').length,
+    planned: items.filter(i => i.status === 'planned').length,
+  };
+
+  return (
+    <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+        <div className="flex items-center gap-2">
+          <ListChecks className="w-4 h-4" style={{ color: 'var(--brand-mint)' }} />
+          <span className="text-sm font-medium text-zinc-300">Action Items</span>
+          {items.length > 0 && (
+            <span className="text-xs text-zinc-500">
+              {counts.completed}/{items.length} done
+            </span>
+          )}
+        </div>
+        <button
+          onClick={() => setAdding(!adding)}
+          className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium hover:bg-zinc-800 transition-colors"
+          style={{ color: 'var(--brand-mint)' }}
+        >
+          <Plus className="w-3 h-3" /> Add
+        </button>
+      </div>
+
+      {/* Progress bar */}
+      {items.length > 0 && (
+        <div className="px-4 pt-3">
+          <div className="flex gap-1 h-1.5 rounded-full overflow-hidden bg-zinc-800">
+            {counts.completed > 0 && <div className="bg-green-500 rounded-full" style={{ width: `${(counts.completed / items.length) * 100}%` }} />}
+            {counts['in-progress'] > 0 && <div className="bg-blue-500 rounded-full" style={{ width: `${(counts['in-progress'] / items.length) * 100}%` }} />}
+          </div>
+        </div>
+      )}
+
+      {/* Add form */}
+      {adding && (
+        <div className="px-4 py-3 border-b border-zinc-800 space-y-2">
+          <input
+            value={newTitle}
+            onChange={e => setNewTitle(e.target.value)}
+            placeholder="What needs to be done?"
+            className="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-zinc-600"
+            onKeyDown={e => e.key === 'Enter' && addItem()}
+            autoFocus
+          />
+          <input
+            value={newDesc}
+            onChange={e => setNewDesc(e.target.value)}
+            placeholder="Description (optional)"
+            className="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-zinc-600"
+          />
+          <div className="flex items-center justify-between">
+            <div className="flex gap-1">
+              {(['high', 'medium', 'low'] as const).map(p => (
+                <button
+                  key={p}
+                  onClick={() => setNewPriority(p)}
+                  className={`px-2 py-1 rounded text-xs font-medium border ${newPriority === p ? 'border-zinc-600 bg-zinc-800 text-zinc-200' : 'border-transparent text-zinc-500'}`}
+                >
+                  <span className={`inline-block w-1.5 h-1.5 rounded-full ${PRIORITY_CONFIG[p].dot} mr-1`} />
+                  {PRIORITY_CONFIG[p].label}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setAdding(false)} className="px-3 py-1.5 rounded-md text-xs text-zinc-400 hover:text-zinc-200">Cancel</button>
+              <button onClick={addItem} className="px-3 py-1.5 rounded-md text-xs font-medium" style={{ background: 'var(--brand-mint)', color: '#0f1219' }}>Add</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Items list */}
+      <div className="divide-y divide-zinc-800/50">
+        {sorted.map(item => {
+          const cfg = STATUS_CONFIG[item.status];
+          const Icon = cfg.icon;
+          return (
+            <div key={item.id} className="flex items-start gap-3 px-4 py-3 group">
+              <button onClick={() => cycleStatus(item)} className={`mt-0.5 ${cfg.color}`} title={`Click to change status (${cfg.label})`}>
+                <Icon className={`w-4 h-4 ${item.status === 'in-progress' ? 'animate-spin' : ''}`} />
+              </button>
+              <div className="flex-1 min-w-0">
+                <div className={`text-sm ${item.status === 'completed' ? 'line-through text-zinc-500' : 'text-zinc-200'}`}>{item.title}</div>
+                {item.description && <div className="text-xs text-zinc-500 mt-0.5">{item.description}</div>}
+              </div>
+              <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <span className={`w-1.5 h-1.5 rounded-full ${PRIORITY_CONFIG[item.priority]?.dot || 'bg-zinc-500'}`} title={item.priority} />
+                <button onClick={() => deleteItem(item.id)} className="text-zinc-600 hover:text-red-400">
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+        {items.length === 0 && !adding && (
+          <div className="px-4 py-6 text-center text-xs text-zinc-600">
+            No action items yet. Click "Add" to track work for this report.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function AuditHistory({ siteId, history, onRefresh }: { siteId: string; history: SnapshotSummary[]; onRefresh: () => void }) {
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
@@ -215,6 +396,9 @@ function AuditHistory({ siteId, history, onRefresh }: { siteId: string; history:
           <ScoreTrendChart history={history} />
         </div>
       )}
+
+      {/* Action items for latest snapshot */}
+      {history.length > 0 && <ActionItemsPanel snapshotId={history[0].id} />}
 
       {/* Client dashboard link */}
       <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-zinc-900 border border-zinc-800">

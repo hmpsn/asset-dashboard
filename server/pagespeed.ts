@@ -64,10 +64,20 @@ async function runPageSpeed(url: string, strategy: 'mobile' | 'desktop'): Promis
     category: 'performance',
   });
 
+  // Use API key if available (25k/day vs 25/day without)
+  const apiKey = process.env.GOOGLE_PSI_KEY || process.env.GOOGLE_API_KEY || '';
+  if (apiKey) params.set('key', apiKey);
+
   try {
-    const res = await fetch(`${PSI_API}?${params}`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60000); // 60s timeout per page
+
+    const res = await fetch(`${PSI_API}?${params}`, { signal: controller.signal });
+    clearTimeout(timeout);
+
     if (!res.ok) {
-      console.error(`PageSpeed API error for ${url}: ${res.status} ${res.statusText}`);
+      const body = await res.text().catch(() => '');
+      console.error(`PageSpeed API error for ${url}: ${res.status} ${res.statusText}`, body.slice(0, 200));
       return null;
     }
     return await res.json() as Record<string, unknown>;

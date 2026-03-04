@@ -37,7 +37,10 @@ import {
 import { generateAltText } from './alttext.js';
 import { runSeoAudit } from './seo-audit.js';
 import { checkSiteLinks } from './link-checker.js';
-import { saveSnapshot, getSnapshot, listSnapshots, getLatestSnapshot, renderReportHTML } from './reports.js';
+import {
+  saveSnapshot, getSnapshot, listSnapshots, getLatestSnapshot, renderReportHTML,
+  addActionItem, updateActionItem, deleteActionItem, getActionItems, extractSiteLogo,
+} from './reports.js';
 import { runSiteSpeed } from './pagespeed.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -553,15 +556,32 @@ app.get('/api/webflow/pagespeed/:siteId', async (req, res) => {
 });
 
 // --- Reports & Snapshots ---
-// Save audit as snapshot (run audit + save)
+// Save audit as snapshot (run audit + save + extract logo)
 app.post('/api/reports/:siteId/save', async (req, res) => {
   try {
     const { siteId } = req.params;
     const { siteName } = req.body;
     const token = getTokenForSite(siteId) || undefined;
     const audit = await runSeoAudit(siteId, token);
-    const snapshot = saveSnapshot(siteId, siteName || siteId, audit);
-    res.json({ id: snapshot.id, createdAt: snapshot.createdAt, siteScore: audit.siteScore });
+
+    // Extract client logo from their site
+    let logoUrl: string | undefined;
+    if (audit.totalPages > 0) {
+      try {
+        const siteRes = await fetch(`https://api.webflow.com/v2/sites/${siteId}`, {
+          headers: { Authorization: `Bearer ${token || process.env.WEBFLOW_API_TOKEN}`, 'Content-Type': 'application/json' },
+        });
+        if (siteRes.ok) {
+          const siteData = await siteRes.json() as { shortName?: string };
+          if (siteData.shortName) {
+            logoUrl = (await extractSiteLogo(`https://${siteData.shortName}.webflow.io`)) || undefined;
+          }
+        }
+      } catch { /* logo extraction is best-effort */ }
+    }
+
+    const snapshot = saveSnapshot(siteId, siteName || siteId, audit, logoUrl);
+    res.json({ id: snapshot.id, createdAt: snapshot.createdAt, siteScore: audit.siteScore, previousScore: snapshot.previousScore });
   } catch (err) {
     console.error('Report save error:', err);
     res.status(500).json({ error: 'Failed to save report' });
@@ -593,6 +613,36 @@ app.get('/api/reports/snapshot/:id', (req, res) => {
   const snapshot = getSnapshot(req.params.id);
   if (!snapshot) return res.status(404).json({ error: 'Report not found' });
   res.json(snapshot);
+});
+
+// --- Action Items ---
+app.get('/api/reports/snapshot/:id/actions', (req, res) => {
+  res.json(getActionItems(req.params.id));
+});
+
+app.post('/api/reports/snapshot/:id/actions', (req, res) => {
+  const { title, description, priority, category } = req.body;
+  if (!title) return res.status(400).json({ error: 'Title is required' });
+  const item = addActionItem(req.params.id, {
+    title,
+    description: description || '',
+    priority: priority || 'medium',
+    category,
+  });
+  if (!item) return res.status(404).json({ error: 'Snapshot not found' });
+  res.json(item);
+});
+
+app.patch('/api/reports/snapshot/:id/actions/:actionId', (req, res) => {
+  const item = updateActionItem(req.params.id, req.params.actionId, req.body);
+  if (!item) return res.status(404).json({ error: 'Action item not found' });
+  res.json(item);
+});
+
+app.delete('/api/reports/snapshot/:id/actions/:actionId', (req, res) => {
+  const ok = deleteActionItem(req.params.id, req.params.actionId);
+  if (!ok) return res.status(404).json({ error: 'Action item not found' });
+  res.json({ success: true });
 });
 
 // Public: HTML report page (no auth required)
