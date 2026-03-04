@@ -492,13 +492,22 @@ function SeoAudit({ siteId }: Props) {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const [auditError, setAuditError] = useState<string | null>(null);
+
   const runAudit = () => {
     setLoading(true);
     setHasRun(true);
+    setAuditError(null);
     fetch(`/api/webflow/seo-audit/${siteId}`)
-      .then(r => r.json())
-      .then(d => setData(d))
-      .catch(() => {})
+      .then(r => {
+        if (!r.ok) throw new Error(`Server error: ${r.status}`);
+        return r.json();
+      })
+      .then(d => {
+        if (!d || !Array.isArray(d.pages)) throw new Error(d?.error || 'Invalid audit response');
+        setData(d);
+      })
+      .catch((e) => { setAuditError(e.message || 'Audit failed'); })
       .finally(() => setLoading(false));
   };
 
@@ -513,6 +522,7 @@ function SeoAudit({ siteId }: Props) {
     setData(null);
     setHasRun(false);
     setSubTab('audit');
+    setAuditError(null);
     loadHistory();
   }, [siteId, loadHistory]);
 
@@ -754,7 +764,22 @@ function SeoAudit({ siteId }: Props) {
     );
   }
 
-  if (!data) return <>{tabNav}</>;
+  if (!data) return (
+    <>
+      {tabNav}
+      {auditError && (
+        <div className="flex flex-col items-center justify-center py-16 gap-4">
+          <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 max-w-md text-center">
+            <p className="text-red-400 text-sm font-medium mb-1">SEO Audit Failed</p>
+            <p className="text-xs text-red-400/70">{auditError}</p>
+          </div>
+          <button onClick={runAudit} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--brand-mint)', color: '#0f1219' }}>
+            Try Again
+          </button>
+        </div>
+      )}
+    </>
+  );
 
   const filteredPages = data.pages
     .filter(p => {
