@@ -1220,15 +1220,107 @@ app.post('/api/webflow/generate-alt/:assetId', async (req, res) => {
     if (altText) {
       // Also update in Webflow
       const altToken = siteId ? (getTokenForSite(siteId) || undefined) : undefined;
-      await updateAsset(req.params.assetId, { altText }, altToken);
-      res.json({ altText, updated: true });
+      const writeResult = await updateAsset(req.params.assetId, { altText }, altToken);
+      if (!writeResult.success) {
+        console.error(`Alt text generated but Webflow write-back failed for ${req.params.assetId}:`, writeResult.error);
+        res.json({ altText, updated: false, writeError: writeResult.error });
+      } else {
+        console.log(`Alt text generated and saved for ${req.params.assetId}: "${altText}"`);
+        res.json({ altText, updated: true });
+      }
     } else {
+      console.warn(`Alt text generation returned null for ${req.params.assetId}`);
       res.json({ altText: null, updated: false });
     }
   } catch (e) {
     console.error('Generate alt error:', e);
     res.status(500).json({ error: 'Failed to generate alt text' });
   }
+});
+
+// --- Bulk AI Alt Text Generation (fetches context once) ---
+app.post('/api/webflow/bulk-generate-alt', async (req, res) => {
+  const { assets, siteId } = req.body as {
+    assets: Array<{ assetId: string; imageUrl: string }>;
+    siteId?: string;
+  };
+  if (!assets?.length) return res.status(400).json({ error: 'assets required' });
+
+  const token = siteId ? (getTokenForSite(siteId) || undefined) : undefined;
+
+  // Fetch site context ONCE for all images
+  let siteContext = '';
+  if (siteId) {
+    try {
+      const sites = await listSites(token);
+      const site = sites.find(s => s.id === siteId);
+      if (site) siteContext = `Website: ${site.displayName}`;
+    } catch { /* proceed without context */ }
+  }
+
+  // Build a mapping of assetId → page context by scanning pages once
+  const assetContextMap = new Map<string, string>();
+  if (siteId) {
+    try {
+      const pages = await listPages(siteId, token);
+      for (const page of pages.slice(0, 15)) {
+        try {
+          const dom = await getPageDom(page.id, token);
+          const plainText = dom.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+          for (const asset of assets) {
+            if (assetContextMap.has(asset.assetId)) continue; // already have context
+            if (dom.includes(asset.assetId) || dom.includes(asset.imageUrl)) {
+              const idx = plainText.indexOf(asset.assetId) !== -1
+                ? plainText.indexOf(asset.assetId)
+                : plainText.indexOf(asset.imageUrl.split('/').pop() || '');
+              const start = Math.max(0, idx - 100);
+              const snippet = plainText.slice(start, start + 200).trim();
+              assetContextMap.set(asset.assetId, `Page "${page.title}": ${snippet}`);
+            }
+          }
+        } catch { /* skip page */ }
+      }
+    } catch { /* proceed without page context */ }
+  }
+
+  // Process images sequentially (rate limit friendly)
+  const results: Array<{ assetId: string; altText: string | null; updated: boolean; error?: string }> = [];
+  for (const asset of assets) {
+    try {
+      // Download image
+      const response = await fetch(asset.imageUrl);
+      if (!response.ok) {
+        results.push({ assetId: asset.assetId, altText: null, updated: false, error: `Download failed: ${response.status}` });
+        continue;
+      }
+      const buffer = Buffer.from(await response.arrayBuffer());
+      const ext = path.extname(asset.imageUrl).split('?')[0] || '.jpg';
+      const tmpPath = `/tmp/bulk_alt_${Date.now()}${ext}`;
+      fs.writeFileSync(tmpPath, buffer);
+
+      const context = assetContextMap.get(asset.assetId) || siteContext || undefined;
+      const altText = await generateAltText(tmpPath, context);
+      try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+
+      if (altText) {
+        const writeResult = await updateAsset(asset.assetId, { altText }, token);
+        if (!writeResult.success) {
+          console.error(`Bulk alt: generated but write-back failed for ${asset.assetId}:`, writeResult.error);
+          results.push({ assetId: asset.assetId, altText, updated: false, error: writeResult.error });
+        } else {
+          results.push({ assetId: asset.assetId, altText, updated: true });
+        }
+      } else {
+        results.push({ assetId: asset.assetId, altText: null, updated: false, error: 'Generation returned null' });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`Bulk alt error for ${asset.assetId}:`, msg);
+      results.push({ assetId: asset.assetId, altText: null, updated: false, error: msg });
+    }
+  }
+
+  res.json({ results });
 });
 
 // --- Image Compression ---
@@ -1376,9 +1468,9 @@ app.post('/api/webflow/compress/:assetId', async (req, res) => {
   }
 });
 
-// --- Smart Naming ---
+// --- Smart Naming (AI Vision Enhanced) ---
 app.post('/api/smart-name', async (req, res) => {
-  const { originalName, altText, pageTitle, contentType } = req.body;
+  const { originalName, altText, pageTitle, contentType, imageUrl, siteId, assetId } = req.body;
   if (!originalName) return res.status(400).json({ error: 'originalName required' });
 
   try {
@@ -1391,21 +1483,104 @@ app.post('/api/smart-name', async (req, res) => {
     if (pageTitle) contextParts.push(`Used on page: "${pageTitle}"`);
     if (contentType) contextParts.push(`Type: ${contentType}`);
 
-    const response = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
-      max_tokens: 60,
-      messages: [{
-        role: 'user',
-        content: `Suggest an SEO-friendly filename for a web image.
+    // Fetch site name + scan pages for usage context
+    if (siteId) {
+      try {
+        const tkn = getTokenForSite(siteId) || undefined;
+        const sites = await listSites(tkn);
+        const site = sites.find(s => s.id === siteId);
+        if (site) contextParts.push(`Website: "${site.displayName}"`);
+
+        // Scan pages to find where this asset is used
+        if (assetId || imageUrl) {
+          const pages = await listPages(siteId, tkn);
+          const usedOnPages: string[] = [];
+          for (const page of pages.slice(0, 15)) {
+            try {
+              const dom = await getPageDom(page.id, tkn);
+              const matchId = assetId && dom.includes(assetId);
+              const matchUrl = imageUrl && dom.includes(imageUrl);
+              if (matchId || matchUrl) {
+                // Extract surrounding text for context
+                const plainText = dom.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                const needle = assetId || imageUrl.split('/').pop() || '';
+                const idx = plainText.indexOf(needle);
+                if (idx !== -1) {
+                  const start = Math.max(0, idx - 120);
+                  const snippet = plainText.slice(start, start + 250).trim();
+                  usedOnPages.push(`Page "${page.title}": ...${snippet}...`);
+                } else {
+                  usedOnPages.push(`Page "${page.title}"`);
+                }
+                if (usedOnPages.length >= 3) break;
+              }
+            } catch { /* skip page */ }
+          }
+          if (usedOnPages.length > 0) {
+            contextParts.push(`Used on these pages:\n${usedOnPages.join('\n')}`);
+          }
+        }
+      } catch { /* skip context fetch */ }
+    }
+
+    const promptText = `Suggest an SEO-friendly filename for this web image.
 Current name: "${originalName}"
 ${contextParts.length > 0 ? contextParts.join('\n') : ''}
 
-Rules: lowercase, hyphens between words, no special chars, descriptive, 3-5 words max, do NOT include the file extension. Just output the filename slug, nothing else.`,
-      }],
-    });
-    let suggestion = response.choices[0]?.message?.content?.trim() || originalName.replace(/\.[^.]+$/, '');
+Rules:
+- lowercase, hyphens between words, no special chars
+- Descriptive and specific to what the image shows
+- 3-5 words max, do NOT include the file extension
+- Prioritize what the image actually depicts over generic terms
+- Include brand/business name if visible in the image
+Just output the filename slug, nothing else.`;
+
+    // Try vision-enhanced naming if we have an image URL
+    let suggestion: string | null = null;
+    if (imageUrl && !contentType?.includes('svg')) {
+      try {
+        // Download and prepare image for vision
+        const sharp = (await import('sharp')).default;
+        const imgRes = await fetch(imageUrl);
+        if (imgRes.ok) {
+          const imgBuf = Buffer.from(await imgRes.arrayBuffer());
+          const smallBuf = await sharp(imgBuf)
+            .resize(256, 256, { fit: 'inside', withoutEnlargement: true })
+            .jpeg({ quality: 50 })
+            .toBuffer();
+          const base64 = smallBuf.toString('base64');
+
+          const visionRes = await client.chat.completions.create({
+            model: 'gpt-4o-mini',
+            max_tokens: 60,
+            messages: [{
+              role: 'user',
+              content: [
+                { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}`, detail: 'low' } },
+                { type: 'text', text: promptText },
+              ],
+            }],
+          });
+          suggestion = visionRes.choices[0]?.message?.content?.trim() || null;
+        }
+      } catch (vErr) {
+        console.log('Vision naming fallback to text-only:', vErr instanceof Error ? vErr.message : vErr);
+      }
+    }
+
+    // Fallback to text-only if vision didn't work
+    if (!suggestion) {
+      const response = await client.chat.completions.create({
+        model: 'gpt-4o-mini',
+        max_tokens: 60,
+        messages: [{ role: 'user', content: promptText }],
+      });
+      suggestion = response.choices[0]?.message?.content?.trim() || originalName.replace(/\.[^.]+$/, '');
+    }
+
     // Clean up: remove quotes, extension if accidentally included, ensure valid slug
-    suggestion = suggestion.replace(/['"]/g, '').replace(/\.[a-z]+$/i, '').replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    const raw = suggestion || originalName.replace(/\.[^.]+$/, '');
+    suggestion = raw.replace(/['"]/g, '').replace(/\.[a-z]+$/i, '').replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
     res.json({ suggestion, extension: ext, fullName: `${suggestion}.${ext}` });
   } catch (e) {
     console.error('Smart name error:', e);

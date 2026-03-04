@@ -1,5 +1,4 @@
 import OpenAI from 'openai';
-import { execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
@@ -44,31 +43,14 @@ async function callWithRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T
   throw new Error('Max retries exceeded');
 }
 
-type MimeType = 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
-
-function getMimeType(ext: string): MimeType {
-  const map: Record<string, MimeType> = {
-    jpg: 'image/jpeg', jpeg: 'image/jpeg',
-    png: 'image/png', webp: 'image/webp', gif: 'image/gif',
-  };
-  return map[ext] || 'image/jpeg';
-}
-
-function convertToJpeg(filePath: string): string {
-  const tmp = `/tmp/alttext_${Date.now()}.jpg`;
-  execFileSync('sips', ['-s', 'format', 'jpeg', filePath, '--out', tmp], { stdio: 'pipe' });
-  return tmp;
-}
-
-function downsizeForApi(filePath: string): string {
+// Use sharp for cross-platform image conversion (works on Linux/Render + handles AVIF/HEIC)
+async function prepareImageForApi(filePath: string): Promise<string> {
+  const sharp = (await import('sharp')).default;
   const tmp = `/tmp/alttext_small_${Date.now()}.jpg`;
-  // Resize to max 512px on longest side, convert to JPEG for smaller payload
-  execFileSync('sips', [
-    '-s', 'format', 'jpeg',
-    '-s', 'formatOptions', '70',
-    '--resampleHeightWidthMax', '512',
-    filePath, '--out', tmp,
-  ], { stdio: 'pipe' });
+  await sharp(filePath)
+    .resize(512, 512, { fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 70 })
+    .toFile(tmp);
   return tmp;
 }
 
@@ -108,25 +90,19 @@ export async function generateAltText(filePath: string, context?: string): Promi
   }
 
   // Downsize image to 512px max and convert to JPEG for API efficiency
+  // Uses sharp which supports AVIF, HEIC, WebP, PNG, etc. on all platforms
   let tmpFile: string | null = null;
   try {
-    tmpFile = downsizeForApi(filePath);
-  } catch {
-    // If downsizing fails (e.g. AVIF/HEIC), try converting first
-    try {
-      const converted = convertToJpeg(filePath);
-      tmpFile = downsizeForApi(converted);
-      fs.unlinkSync(converted);
-    } catch (err) {
-      console.error(`Failed to prepare image for alt text:`, err);
-      return null;
-    }
+    tmpFile = await prepareImageForApi(filePath);
+  } catch (err) {
+    console.error(`Failed to prepare image for alt text:`, err);
+    return null;
   }
 
   try {
     const data = fs.readFileSync(tmpFile);
     const base64 = data.toString('base64');
-    const mimeType: MimeType = 'image/jpeg';
+    const mimeType = 'image/jpeg' as const;
 
     const response = await callWithRetry(() => openai.chat.completions.create({
       model: 'gpt-4o-mini',

@@ -151,8 +151,12 @@ function AssetBrowser({ siteId }: Props) {
         setAltError(`Alt text generation failed: ${data.error}`);
       } else if (data.altText) {
         setAssets(prev => prev.map(a => a.id === asset.id ? { ...a, altText: data.altText } : a));
-        setLastGenerated(data.altText);
-        setTimeout(() => setLastGenerated(null), 3000);
+        if (data.writeError) {
+          setAltError(`Alt text generated but failed to save to Webflow: ${data.writeError}`);
+        } else {
+          setLastGenerated(data.altText);
+          setTimeout(() => setLastGenerated(null), 3000);
+        }
       }
     } catch {
       setAltError('Network error generating alt text');
@@ -162,10 +166,52 @@ function AssetBrowser({ siteId }: Props) {
 
   const handleBulkGenerateAlt = async () => {
     const toGenerate = filtered.filter(a => selected.has(a.id) && (!a.altText || a.altText.trim() === ''));
+    if (!toGenerate.length) return;
     setBulkProgress({ done: 0, total: toGenerate.length });
-    for (let i = 0; i < toGenerate.length; i++) {
-      await handleGenerateAlt(toGenerate[i]);
-      setBulkProgress({ done: i + 1, total: toGenerate.length });
+    setAltError(null);
+
+    try {
+      const res = await fetch('/api/webflow/bulk-generate-alt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          siteId,
+          assets: toGenerate.map(a => ({
+            assetId: a.id,
+            imageUrl: a.hostedUrl || a.url,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setAltError(`Bulk alt text failed: ${data.error}`);
+        setBulkProgress(null);
+        return;
+      }
+
+      // Apply results
+      let successCount = 0;
+      let failCount = 0;
+      const updatedAssets = new Map<string, string>();
+      for (const r of data.results || []) {
+        if (r.altText) {
+          updatedAssets.set(r.assetId, r.altText);
+          if (r.updated) successCount++;
+          else failCount++;
+        } else {
+          failCount++;
+        }
+      }
+
+      setAssets(prev => prev.map(a =>
+        updatedAssets.has(a.id) ? { ...a, altText: updatedAssets.get(a.id)! } : a
+      ));
+
+      if (failCount > 0) {
+        setAltError(`${successCount} saved to Webflow, ${failCount} failed`);
+      }
+    } catch {
+      setAltError('Network error during bulk alt text generation');
     }
     setBulkProgress(null);
   };
@@ -215,6 +261,9 @@ function AssetBrowser({ siteId }: Props) {
           originalName: asset.displayName || asset.originalFileName || '',
           altText: asset.altText,
           contentType: asset.contentType,
+          imageUrl: asset.hostedUrl || asset.url,
+          siteId,
+          assetId: asset.id,
         }),
       });
       const data = await res.json();
@@ -262,6 +311,9 @@ function AssetBrowser({ siteId }: Props) {
             originalName: asset.displayName || asset.originalFileName || '',
             altText: asset.altText,
             contentType: asset.contentType,
+            imageUrl: asset.hostedUrl || asset.url,
+            siteId,
+            assetId: asset.id,
           }),
         });
         const data = await res.json();
