@@ -2093,6 +2093,59 @@ app.get('/api/google/gsc-sites/:siteId', async (req, res) => {
   }
 });
 
+app.post('/api/google/search-chat/:siteId', async (req, res) => {
+  const { question, context } = req.body;
+  if (!question) return res.status(400).json({ error: 'question required' });
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (!openaiKey) return res.status(400).json({ error: 'OPENAI_API_KEY not configured' });
+
+  try {
+    const systemPrompt = `You are an expert SEO analyst embedded in a search analytics dashboard. The user is a website owner or client asking about their Google Search Console data.
+
+You have access to their real search data which is provided as context. Give specific, actionable, data-driven answers. Reference actual queries, pages, and numbers from their data. Be concise but thorough. Use markdown formatting.
+
+When giving recommendations:
+- Be specific about which queries/pages to optimize
+- Explain the "why" behind recommendations
+- Prioritize by potential impact
+- Suggest concrete next steps
+
+Current search data context:
+${JSON.stringify(context, null, 2)}`;
+
+    const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${openaiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: question },
+        ],
+        temperature: 0.7,
+        max_tokens: 1500,
+      }),
+    });
+
+    if (!aiRes.ok) {
+      const err = await aiRes.text();
+      throw new Error(`OpenAI error: ${err}`);
+    }
+
+    const aiData = await aiRes.json() as {
+      choices: Array<{ message: { content: string } }>;
+    };
+    const answer = aiData.choices?.[0]?.message?.content || 'No response generated.';
+    res.json({ answer });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: msg });
+  }
+});
+
 app.get('/api/google/search-overview/:siteId', async (req, res) => {
   const gscSiteUrl = req.query.gscSiteUrl as string;
   const days = parseInt(req.query.days as string) || 28;
