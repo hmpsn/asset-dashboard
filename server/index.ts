@@ -77,6 +77,8 @@ if (APP_PASSWORD) {
     // Allow auth endpoints through
     if (req.path === '/api/auth/login' && req.method === 'POST') return next();
     if (req.path === '/api/auth/check') return next();
+    // Allow Google OAuth callback (Google redirects here without our auth token)
+    if (req.path === '/api/google/callback') return next();
     // Allow public report and client routes
     if (req.path.startsWith('/report/') || req.path.startsWith('/client/')) return next();
     if (req.path.startsWith('/api/public/')) return next();
