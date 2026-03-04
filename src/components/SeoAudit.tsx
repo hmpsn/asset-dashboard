@@ -3,11 +3,12 @@ import {
   Loader2, Search as SearchIcon, ChevronDown, ChevronRight, Download,
   AlertTriangle, AlertCircle, Info, CheckCircle, Globe, FileText,
   RefreshCw, X, Pencil, Link2Off, Clock, Share2, Copy, ExternalLink,
-  TrendingUp, TrendingDown, Minus, Plus, ListChecks, Trash2, Circle,
+  TrendingUp, TrendingDown, Minus, Plus, ListChecks, Trash2, Circle, Code2,
 } from 'lucide-react';
 import { SeoEditor } from './SeoEditor';
 import { LinkChecker } from './LinkChecker';
 import { KeywordAnalysis } from './KeywordAnalysis';
+import { SchemaSuggester } from './SchemaSuggester';
 
 type Severity = 'error' | 'warning' | 'info';
 
@@ -48,7 +49,7 @@ interface SeoAuditResult {
   siteWideIssues: SeoIssue[];
 }
 
-type SubTab = 'audit' | 'editor' | 'links' | 'keywords' | 'history';
+type SubTab = 'audit' | 'editor' | 'links' | 'keywords' | 'schema' | 'history';
 
 interface SnapshotSummary {
   id: string;
@@ -683,6 +684,7 @@ function SeoAudit({ siteId }: Props) {
     { id: 'editor', label: 'Edit SEO', icon: Pencil },
     { id: 'links', label: 'Dead Links', icon: Link2Off },
     { id: 'keywords', label: 'Keywords', icon: SearchIcon },
+    { id: 'schema', label: 'Schema', icon: Code2 },
     { id: 'history', label: 'History', icon: Clock },
   ];
   const tabNav = (
@@ -712,6 +714,7 @@ function SeoAudit({ siteId }: Props) {
   if (subTab === 'editor') return <>{tabNav}<SeoEditor siteId={siteId} /></>;
   if (subTab === 'links') return <>{tabNav}<LinkChecker siteId={siteId} /></>;
   if (subTab === 'keywords') return <>{tabNav}<KeywordAnalysis siteId={siteId} /></>;
+  if (subTab === 'schema') return <>{tabNav}<SchemaSuggester siteId={siteId} /></>;
   if (subTab === 'history') return <>{tabNav}<AuditHistory siteId={siteId} history={history} onRefresh={loadHistory} /></>;
 
   // Audit tab

@@ -275,25 +275,40 @@ export function renderReportHTML(snapshot: AuditSnapshot): string {
       </div>`
     : '';
 
-  // Category summary
+  // For client-facing report, filter out performance category issues (PageSpeed-type flags)
+  const clientPages = audit.pages.map(p => ({
+    ...p,
+    issues: p.issues.filter(i => (i.category || 'technical') !== 'performance'),
+  }));
+  const clientSiteWide = audit.siteWideIssues.filter(i => (i.category || 'technical') !== 'performance');
+
+  // Recalculate counts without performance issues
+  const clientErrors = clientPages.reduce((s, p) => s + p.issues.filter(i => i.severity === 'error').length, 0)
+    + clientSiteWide.filter(i => i.severity === 'error').length;
+  const clientWarnings = clientPages.reduce((s, p) => s + p.issues.filter(i => i.severity === 'warning').length, 0)
+    + clientSiteWide.filter(i => i.severity === 'warning').length;
+  const clientInfos = clientPages.reduce((s, p) => s + p.issues.filter(i => i.severity === 'info').length, 0)
+    + clientSiteWide.filter(i => i.severity === 'info').length;
+
+  // Category breakdown (excluding performance)
   const catCounts: Record<string, number> = {};
-  for (const p of audit.pages) {
+  for (const p of clientPages) {
     for (const i of p.issues) {
       catCounts[i.category || 'technical'] = (catCounts[i.category || 'technical'] || 0) + 1;
     }
   }
-  for (const i of audit.siteWideIssues) {
+  for (const i of clientSiteWide) {
     catCounts[i.category || 'technical'] = (catCounts[i.category || 'technical'] || 0) + 1;
   }
 
-  // Executive summary: top 3 most impactful issues
+  // Executive summary: top 3 most impactful issues (using client-filtered data)
   const allErrors = [
-    ...audit.siteWideIssues.filter(i => i.severity === 'error'),
-    ...audit.pages.flatMap(p => p.issues.filter(i => i.severity === 'error')),
+    ...clientSiteWide.filter(i => i.severity === 'error'),
+    ...clientPages.flatMap(p => p.issues.filter(i => i.severity === 'error')),
   ];
   const allWarnings = [
-    ...audit.siteWideIssues.filter(i => i.severity === 'warning'),
-    ...audit.pages.flatMap(p => p.issues.filter(i => i.severity === 'warning')),
+    ...clientSiteWide.filter(i => i.severity === 'warning'),
+    ...clientPages.flatMap(p => p.issues.filter(i => i.severity === 'warning')),
   ];
   // Deduplicate by check name and count occurrences
   const issueCounts = new Map<string, { check: string; message: string; recommendation: string; count: number; severity: string }>();
@@ -387,8 +402,8 @@ export function renderReportHTML(snapshot: AuditSnapshot): string {
       }</div>`
     : '';
 
-  // Page rows
-  const pageRows = audit.pages.map(p => {
+  // Page rows (using client-filtered data — no performance issues)
+  const pageRows = clientPages.map(p => {
     const pColor = p.score >= 80 ? '#22c55e' : p.score >= 60 ? '#eab308' : p.score >= 40 ? '#f97316' : '#ef4444';
     const issueList = p.issues.map(i => {
       const iColor = i.severity === 'error' ? '#ef4444' : i.severity === 'warning' ? '#eab308' : '#60a5fa';
@@ -415,8 +430,8 @@ export function renderReportHTML(snapshot: AuditSnapshot): string {
     </div>`;
   }).join('');
 
-  // Site-wide rows
-  const siteWideRows = audit.siteWideIssues.map(i => {
+  // Site-wide rows (using client-filtered data — no performance issues)
+  const siteWideRows = clientSiteWide.map(i => {
     const iColor = i.severity === 'error' ? '#ef4444' : i.severity === 'warning' ? '#eab308' : '#60a5fa';
     const cColor = catColors[i.category || 'technical'] || '#94a3b8';
     const cLabel = (i.category || 'technical').charAt(0).toUpperCase() + (i.category || 'technical').slice(1);
@@ -485,15 +500,15 @@ export function renderReportHTML(snapshot: AuditSnapshot): string {
           <div class="stat-label">Pages</div>
         </div>
         <div class="stat">
-          <div class="stat-value" style="color:#ef4444">${audit.errors}</div>
+          <div class="stat-value" style="color:#ef4444">${clientErrors}</div>
           <div class="stat-label">Errors</div>
         </div>
         <div class="stat">
-          <div class="stat-value" style="color:#eab308">${audit.warnings}</div>
+          <div class="stat-value" style="color:#eab308">${clientWarnings}</div>
           <div class="stat-label">Warnings</div>
         </div>
         <div class="stat">
-          <div class="stat-value" style="color:#60a5fa">${audit.infos}</div>
+          <div class="stat-value" style="color:#60a5fa">${clientInfos}</div>
           <div class="stat-label">Info</div>
         </div>
       </div>
@@ -503,7 +518,7 @@ export function renderReportHTML(snapshot: AuditSnapshot): string {
     ${executiveSummaryHTML}
     ${actionItemsHTML}
 
-    ${audit.siteWideIssues.length > 0 ? `<div class="section-title">Site-Wide Issues</div>${siteWideRows}` : ''}
+    ${clientSiteWide.length > 0 ? `<div class="section-title">Site-Wide Issues</div>${siteWideRows}` : ''}
     
     <div class="section-title">Page-by-Page Results</div>
     ${pageRows}

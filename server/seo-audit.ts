@@ -85,15 +85,42 @@ async function fetchPublishedHtml(url: string): Promise<string | null> {
   } catch { return null; }
 }
 
-async function getSiteSubdomain(siteId: string, tokenOverride?: string): Promise<string | null> {
+interface SiteInfo {
+  subdomain: string | null;
+  customDomain: string | null;
+}
+
+async function getSiteInfo(siteId: string, tokenOverride?: string): Promise<SiteInfo> {
   const token = getToken(tokenOverride);
-  if (!token) return null;
-  const res = await fetch(`${WEBFLOW_API}/sites/${siteId}`, {
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-  });
-  if (!res.ok) return null;
-  const data = await res.json() as { shortName?: string };
-  return data.shortName || null;
+  if (!token) return { subdomain: null, customDomain: null };
+  try {
+    // Fetch site info for subdomain
+    const siteRes = await fetch(`${WEBFLOW_API}/sites/${siteId}`, {
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    });
+    let subdomain: string | null = null;
+    if (siteRes.ok) {
+      const siteData = await siteRes.json() as { shortName?: string };
+      subdomain = siteData.shortName || null;
+    }
+
+    // Fetch custom domains from dedicated endpoint
+    let customDomain: string | null = null;
+    try {
+      const domainRes = await fetch(`${WEBFLOW_API}/sites/${siteId}/custom_domains`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      });
+      if (domainRes.ok) {
+        const domainData = await domainRes.json() as { customDomains?: { url?: string }[] };
+        const domains = domainData.customDomains || [];
+        if (domains.length > 0 && domains[0].url) {
+          customDomain = domains[0].url;
+        }
+      }
+    } catch { /* custom domains fetch is best-effort */ }
+
+    return { subdomain, customDomain };
+  } catch { return { subdomain: null, customDomain: null }; }
 }
 
 function extractTag(html: string, tag: string): string[] {
@@ -432,12 +459,19 @@ function auditPage(
 }
 
 export async function runSeoAudit(siteId: string, tokenOverride?: string): Promise<SeoAuditResult> {
-  const subdomain = await getSiteSubdomain(siteId, tokenOverride);
-  const baseUrl = subdomain ? `https://${subdomain}.webflow.io` : '';
-  console.log(`SEO audit: subdomain=${subdomain}, baseUrl=${baseUrl}`);
+  const siteInfo = await getSiteInfo(siteId, tokenOverride);
+  const baseUrl = siteInfo.subdomain ? `https://${siteInfo.subdomain}.webflow.io` : '';
+  // Use custom domain for site-wide checks (robots.txt, sitemap) since webflow.io blocks crawlers by design
+  const siteWideUrl = siteInfo.customDomain
+    ? (siteInfo.customDomain.startsWith('http') ? siteInfo.customDomain : `https://${siteInfo.customDomain}`)
+    : baseUrl;
+  console.log(`SEO audit: subdomain=${siteInfo.subdomain}, baseUrl=${baseUrl}, siteWideUrl=${siteWideUrl}`);
   const allPages = await listPages(siteId, tokenOverride);
-  const pages = filterPublishedPages(allPages);
-  console.log(`SEO audit: ${allPages.length} total pages, ${pages.length} published (filtered out ${allPages.length - pages.length})`);
+  // Filter published pages and exclude password-protected pages
+  const pages = filterPublishedPages(allPages).filter(
+    (p: { title: string; slug: string }) => !p.title.toLowerCase().includes('password') && !p.slug.toLowerCase().includes('password')
+  );
+  console.log(`SEO audit: ${allPages.length} total pages, ${pages.length} published (excluded password + draft pages)`);
 
   // Fetch metadata and HTML in parallel (batch of 5), cache meta for site-wide checks
   const results: PageSeoResult[] = [];
@@ -471,10 +505,12 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string): Promi
   const siteWideIssues: SeoIssue[] = [];
 
   // --- TIER 2: Site-wide technical checks ---
-  if (baseUrl) {
+  // Use siteWideUrl (custom domain) for robots.txt/sitemap since webflow.io blocks crawlers by design
+  const checkUrl = siteWideUrl || baseUrl;
+  if (checkUrl) {
     // Robots.txt
     try {
-      const robotsRes = await fetch(`${baseUrl}/robots.txt`, { redirect: 'follow' });
+      const robotsRes = await fetch(`${checkUrl}/robots.txt`, { redirect: 'follow' });
       if (!robotsRes.ok) {
         siteWideIssues.push({ check: 'robots-txt', severity: 'warning', message: 'Missing robots.txt file', recommendation: 'Create a robots.txt file to guide search engine crawlers on which pages to index.' });
       } else {
@@ -484,39 +520,39 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string): Promi
         if (looksLikeHtml) {
           siteWideIssues.push({ check: 'robots-txt', severity: 'warning', message: 'Missing robots.txt file', recommendation: 'Create a robots.txt file to guide search engine crawlers on which pages to index.' });
         } else {
-        // Parse robots.txt into user-agent blocks
-        const lines = robotsTxt.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
-        let currentUA = '';
-        const blocks: { ua: string; disallow: string[]; allow: string[] }[] = [];
-        for (const line of lines) {
-          if (line.toLowerCase().startsWith('user-agent:')) {
-            currentUA = line.split(':')[1]?.trim() || '';
-            blocks.push({ ua: currentUA, disallow: [], allow: [] });
-          } else if (line.toLowerCase().startsWith('disallow:') && blocks.length > 0) {
-            blocks[blocks.length - 1].disallow.push(line.split(':').slice(1).join(':').trim());
-          } else if (line.toLowerCase().startsWith('allow:') && blocks.length > 0) {
-            blocks[blocks.length - 1].allow.push(line.split(':').slice(1).join(':').trim());
+          // Parse robots.txt into user-agent blocks
+          const lines = robotsTxt.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+          let currentUA = '';
+          const blocks: { ua: string; disallow: string[]; allow: string[] }[] = [];
+          for (const line of lines) {
+            if (line.toLowerCase().startsWith('user-agent:')) {
+              currentUA = line.split(':')[1]?.trim() || '';
+              blocks.push({ ua: currentUA, disallow: [], allow: [] });
+            } else if (line.toLowerCase().startsWith('disallow:') && blocks.length > 0) {
+              blocks[blocks.length - 1].disallow.push(line.split(':').slice(1).join(':').trim());
+            } else if (line.toLowerCase().startsWith('allow:') && blocks.length > 0) {
+              blocks[blocks.length - 1].allow.push(line.split(':').slice(1).join(':').trim());
+            }
           }
-        }
-        // Only flag if the wildcard (*) block disallows / without a corresponding Allow: /
-        const wildcardBlock = blocks.find(b => b.ua === '*');
-        if (wildcardBlock) {
-          const disallowsAll = wildcardBlock.disallow.includes('/');
-          const allowsRoot = wildcardBlock.allow.some(a => a === '/' || a === '/*');
-          if (disallowsAll && !allowsRoot) {
-            siteWideIssues.push({ check: 'robots-txt', severity: 'error', message: 'robots.txt blocks all crawlers', recommendation: 'Your robots.txt has "Disallow: /" for all user-agents without an Allow override. This prevents search engines from indexing your site.', value: 'User-agent: * / Disallow: /' });
+          // Only flag if the wildcard (*) block disallows / without a corresponding Allow: /
+          const wildcardBlock = blocks.find(b => b.ua === '*');
+          if (wildcardBlock) {
+            const disallowsAll = wildcardBlock.disallow.includes('/');
+            const allowsRoot = wildcardBlock.allow.some(a => a === '/' || a === '/*');
+            if (disallowsAll && !allowsRoot) {
+              siteWideIssues.push({ check: 'robots-txt', severity: 'error', message: 'robots.txt blocks all crawlers', recommendation: 'Your robots.txt has "Disallow: /" for all user-agents without an Allow override. This prevents search engines from indexing your site.', value: 'User-agent: * / Disallow: /' });
+            }
           }
-        }
-        if (!robotsTxt.toLowerCase().includes('sitemap:')) {
-          siteWideIssues.push({ check: 'robots-txt', severity: 'info', message: 'robots.txt does not reference a sitemap', recommendation: 'Add a Sitemap: directive to your robots.txt to help search engines discover your XML sitemap.' });
-        }
+          if (!robotsTxt.toLowerCase().includes('sitemap:')) {
+            siteWideIssues.push({ check: 'robots-txt', severity: 'info', message: 'robots.txt does not reference a sitemap', recommendation: 'Add a Sitemap: directive to your robots.txt to help search engines discover your XML sitemap.' });
+          }
         }
       }
     } catch { /* skip if fetch fails */ }
 
     // XML Sitemap
     try {
-      const sitemapRes = await fetch(`${baseUrl}/sitemap.xml`, { redirect: 'follow' });
+      const sitemapRes = await fetch(`${checkUrl}/sitemap.xml`, { redirect: 'follow' });
       if (!sitemapRes.ok) {
         siteWideIssues.push({ check: 'sitemap', severity: 'warning', message: 'Missing XML sitemap', recommendation: 'Create a sitemap.xml to help search engines discover and index all your pages efficiently.' });
       } else {
@@ -539,7 +575,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string): Promi
     // Page response time (sample the homepage)
     try {
       const startTime = Date.now();
-      await fetch(baseUrl, { redirect: 'follow' });
+      await fetch(checkUrl, { redirect: 'follow' });
       const responseTime = Date.now() - startTime;
       if (responseTime > 3000) {
         siteWideIssues.push({ check: 'response-time', severity: 'error', message: `Slow server response (${(responseTime / 1000).toFixed(1)}s)`, recommendation: 'Server response time should be under 600ms. Slow response times hurt both user experience and SEO rankings.', value: `${responseTime}ms` });
@@ -549,7 +585,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string): Promi
     } catch { /* skip */ }
 
     // SSL / HTTPS check
-    if (!baseUrl.startsWith('https://')) {
+    if (!checkUrl.startsWith('https://')) {
       siteWideIssues.push({ check: 'ssl', severity: 'error', message: 'Site is not using HTTPS', recommendation: 'Enable SSL/HTTPS for your site. HTTPS is a ranking signal and required for user trust.' });
     }
   }
@@ -596,7 +632,8 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string): Promi
     issue.category = CHECK_CATEGORY[issue.check] || 'technical';
   }
 
-  results.sort((a, b) => a.score - b.score);
+  // Sort pages best-to-worst (highest score first) for client presentation
+  results.sort((a, b) => b.score - a.score);
 
   let totalErrors = 0, totalWarnings = 0, totalInfos = 0;
   for (const r of results) {

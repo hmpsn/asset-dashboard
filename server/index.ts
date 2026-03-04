@@ -42,6 +42,7 @@ import {
   addActionItem, updateActionItem, deleteActionItem, getActionItems, extractSiteLogo,
 } from './reports.js';
 import { runSiteSpeed } from './pagespeed.js';
+import { generateSchemaSuggestions } from './schema-suggester.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -538,6 +539,18 @@ app.get('/api/webflow/seo-audit/:siteId', async (req, res) => {
   } catch (err) {
     console.error('SEO audit error:', err);
     res.status(500).json({ error: 'SEO audit failed' });
+  }
+});
+
+// --- JSON-LD Schema Suggester (internal tool, not client-visible) ---
+app.get('/api/webflow/schema-suggestions/:siteId', async (req, res) => {
+  try {
+    const token = getTokenForSite(req.params.siteId) || undefined;
+    const result = await generateSchemaSuggestions(req.params.siteId, token);
+    res.json(result);
+  } catch (err) {
+    console.error('Schema suggester error:', err);
+    res.status(500).json({ error: 'Schema suggestion failed' });
   }
 });
 
