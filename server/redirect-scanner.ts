@@ -1,0 +1,284 @@
+/**
+ * Redirect Scanner — detects redirect chains, 404s needing redirects,
+ * and provides a comprehensive redirect audit for a Webflow site.
+ */
+
+import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from './webflow.js';
+
+const WEBFLOW_API = 'https://api.webflow.com/v2';
+
+export interface RedirectHop {
+  url: string;
+  status: number;
+}
+
+export interface RedirectChain {
+  originalUrl: string;
+  hops: RedirectHop[];
+  finalUrl: string;
+  totalHops: number;
+  isLoop: boolean;
+  foundOn: string[];         // pages linking to this URL
+  type: 'internal' | 'external';
+}
+
+export interface OrphanRedirect {
+  fromUrl: string;
+  toUrl: string;
+  status: number;
+  issue: string;             // e.g. "destination 404", "chain", "self-redirect"
+}
+
+export interface PageStatus {
+  url: string;
+  path: string;
+  title: string;
+  status: number | 'error';
+  statusText: string;
+  redirectsTo?: string;
+  source: 'static' | 'cms';
+}
+
+export interface RedirectScanResult {
+  chains: RedirectChain[];
+  pageStatuses: PageStatus[];
+  summary: {
+    totalPages: number;
+    healthy: number;
+    redirecting: number;
+    notFound: number;
+    errors: number;
+    chainsDetected: number;
+    longestChain: number;
+  };
+  scannedAt: string;
+}
+
+async function getSiteSubdomain(siteId: string, token: string): Promise<string | null> {
+  const res = await fetch(`${WEBFLOW_API}/sites/${siteId}`, {
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) return null;
+  const data = await res.json() as { shortName?: string };
+  return data.shortName || null;
+}
+
+async function traceRedirects(url: string, maxHops = 10): Promise<{ hops: RedirectHop[]; finalUrl: string; finalStatus: number; isLoop: boolean }> {
+  const hops: RedirectHop[] = [];
+  const visited = new Set<string>();
+  let currentUrl = url;
+  let isLoop = false;
+
+  for (let i = 0; i < maxHops; i++) {
+    if (visited.has(currentUrl)) {
+      isLoop = true;
+      break;
+    }
+    visited.add(currentUrl);
+
+    try {
+      const res = await fetch(currentUrl, {
+        method: 'GET',
+        redirect: 'manual',
+        headers: { 'User-Agent': 'AssetDashboard-RedirectScanner/1.0' },
+        signal: AbortSignal.timeout(10000),
+      });
+
+      const status = res.status;
+      hops.push({ url: currentUrl, status });
+
+      if (status >= 300 && status < 400) {
+        const location = res.headers.get('location');
+        if (!location) break;
+        // Resolve relative redirects
+        try {
+          currentUrl = new URL(location, currentUrl).toString();
+        } catch {
+          break;
+        }
+      } else {
+        // Not a redirect — we've reached the final destination
+        break;
+      }
+    } catch {
+      hops.push({ url: currentUrl, status: 0 });
+      break;
+    }
+  }
+
+  const finalHop = hops[hops.length - 1];
+  return {
+    hops,
+    finalUrl: finalHop?.url || url,
+    finalStatus: finalHop?.status || 0,
+    isLoop,
+  };
+}
+
+async function checkPageStatus(url: string): Promise<{ status: number | 'error'; statusText: string; redirectsTo?: string }> {
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      redirect: 'manual',
+      headers: { 'User-Agent': 'AssetDashboard-RedirectScanner/1.0' },
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get('location');
+      let resolvedLocation = location || undefined;
+      if (location) {
+        try { resolvedLocation = new URL(location, url).toString(); } catch { /* keep as-is */ }
+      }
+      return { status: res.status, statusText: res.statusText, redirectsTo: resolvedLocation };
+    }
+
+    return { status: res.status, statusText: res.statusText };
+  } catch (err) {
+    return { status: 'error', statusText: err instanceof Error ? err.message : 'Unknown error' };
+  }
+}
+
+export async function scanRedirects(siteId: string, tokenOverride?: string): Promise<RedirectScanResult> {
+  const token = tokenOverride || process.env.WEBFLOW_API_TOKEN || '';
+  const subdomain = await getSiteSubdomain(siteId, token);
+  const baseUrl = subdomain ? `https://${subdomain}.webflow.io` : '';
+  if (!baseUrl) {
+    return {
+      chains: [],
+      pageStatuses: [],
+      summary: { totalPages: 0, healthy: 0, redirecting: 0, notFound: 0, errors: 0, chainsDetected: 0, longestChain: 0 },
+      scannedAt: new Date().toISOString(),
+    };
+  }
+
+  // 1. Gather all known pages
+  const allPages = await listPages(siteId, tokenOverride);
+  const published = filterPublishedPages(allPages);
+  console.log(`Redirect scanner: checking ${published.length} static pages on ${baseUrl}`);
+
+  const pageUrls: Array<{ url: string; path: string; title: string; source: 'static' | 'cms' }> = published.map(p => ({
+    url: p.slug ? `${baseUrl}/${p.slug}` : baseUrl,
+    path: p.slug ? `/${p.slug}` : '/',
+    title: p.title || p.slug || 'Home',
+    source: 'static' as const,
+  }));
+
+  // Also discover CMS pages
+  const staticPaths = buildStaticPathSet(published);
+  try {
+    const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, 50);
+    for (const cms of cmsUrls) {
+      pageUrls.push({
+        url: cms.url,
+        path: cms.path,
+        title: cms.pageName,
+        source: 'cms',
+      });
+    }
+    if (cmsUrls.length > 0) {
+      console.log(`Redirect scanner: also checking ${cmsUrls.length} CMS pages`);
+    }
+  } catch {
+    console.log('Redirect scanner: CMS discovery skipped');
+  }
+
+  // 2. Check each page's status
+  const pageStatuses: PageStatus[] = [];
+  const redirectingUrls: string[] = [];
+  const batchSize = 8;
+
+  for (let i = 0; i < pageUrls.length; i += batchSize) {
+    const chunk = pageUrls.slice(i, i + batchSize);
+    const results = await Promise.all(chunk.map(p => checkPageStatus(p.url)));
+    for (let j = 0; j < chunk.length; j++) {
+      const r = results[j];
+      pageStatuses.push({
+        url: chunk[j].url,
+        path: chunk[j].path,
+        title: chunk[j].title,
+        status: r.status,
+        statusText: r.statusText,
+        redirectsTo: r.redirectsTo,
+        source: chunk[j].source,
+      });
+      if (typeof r.status === 'number' && r.status >= 300 && r.status < 400) {
+        redirectingUrls.push(chunk[j].url);
+      }
+    }
+  }
+
+  // 3. Trace redirect chains for any redirecting pages
+  const chains: RedirectChain[] = [];
+
+  for (let i = 0; i < redirectingUrls.length; i += batchSize) {
+    const chunk = redirectingUrls.slice(i, i + batchSize);
+    const traces = await Promise.all(chunk.map(url => traceRedirects(url)));
+    for (let j = 0; j < chunk.length; j++) {
+      const trace = traces[j];
+      if (trace.hops.length > 1) {
+        const isInternal = chunk[j].startsWith(baseUrl);
+        chains.push({
+          originalUrl: chunk[j],
+          hops: trace.hops,
+          finalUrl: trace.finalUrl,
+          totalHops: trace.hops.length - 1,  // don't count the final destination as a hop
+          isLoop: trace.isLoop,
+          foundOn: [pageStatuses.find(p => p.url === chunk[j])?.title || ''],
+          type: isInternal ? 'internal' : 'external',
+        });
+      }
+    }
+  }
+
+  // 4. Also scan common paths that might 404 and need redirects
+  const commonPaths = ['/blog', '/about', '/contact', '/services', '/portfolio', '/work', '/team', '/faq', '/pricing'];
+  const extraChecks = commonPaths
+    .filter(p => !pageUrls.some(pu => pu.path === p))
+    .map(p => ({ url: `${baseUrl}${p}`, path: p }));
+
+  for (const extra of extraChecks) {
+    const r = await checkPageStatus(extra.url);
+    // Only include if it's a redirect (suggesting it once existed) or soft 404
+    if (typeof r.status === 'number' && (r.status >= 300 && r.status < 400)) {
+      pageStatuses.push({
+        url: extra.url,
+        path: extra.path,
+        title: `(unlinked) ${extra.path}`,
+        status: r.status,
+        statusText: r.statusText,
+        redirectsTo: r.redirectsTo,
+        source: 'static',
+      });
+    }
+  }
+
+  // 5. Compute summary
+  let healthy = 0, redirecting = 0, notFound = 0, errors = 0;
+  for (const ps of pageStatuses) {
+    if (ps.status === 'error') errors++;
+    else if (ps.status >= 400 && ps.status < 500) notFound++;
+    else if (ps.status >= 300 && ps.status < 400) redirecting++;
+    else if (ps.status >= 200 && ps.status < 300) healthy++;
+    else errors++;
+  }
+
+  const longestChain = chains.reduce((max, c) => Math.max(max, c.totalHops), 0);
+
+  console.log(`Redirect scanner: ${healthy} healthy, ${redirecting} redirecting, ${notFound} not found, ${chains.length} chains`);
+
+  return {
+    chains,
+    pageStatuses,
+    summary: {
+      totalPages: pageStatuses.length,
+      healthy,
+      redirecting,
+      notFound,
+      errors,
+      chainsDetected: chains.length,
+      longestChain,
+    },
+    scannedAt: new Date().toISOString(),
+  };
+}

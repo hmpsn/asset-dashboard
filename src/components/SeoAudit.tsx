@@ -3,7 +3,7 @@ import {
   Loader2, Search as SearchIcon, ChevronDown, ChevronRight, Download,
   AlertTriangle, AlertCircle, Info, CheckCircle, Globe, FileText,
   RefreshCw, X, Pencil, Link2Off, Clock, Share2, Copy, ExternalLink,
-  TrendingUp, TrendingDown, Minus, Plus, ListChecks, Trash2, Circle, Code2, Target,
+  TrendingUp, TrendingDown, Minus, Plus, ListChecks, Trash2, Circle, Code2, Target, CornerDownRight,
 } from 'lucide-react';
 import { SeoEditor } from './SeoEditor';
 import { LinkChecker } from './LinkChecker';
@@ -12,6 +12,7 @@ import { SchemaSuggester } from './SchemaSuggester';
 import { CompetitorAnalysis } from './CompetitorAnalysis';
 import { CmsEditor } from './CmsEditor';
 import { KeywordStrategyPanel } from './KeywordStrategy';
+import { RedirectManager } from './RedirectManager';
 
 type Severity = 'error' | 'warning' | 'info';
 
@@ -54,7 +55,7 @@ interface SeoAuditResult {
   siteWideIssues: SeoIssue[];
 }
 
-type SubTab = 'audit' | 'editor' | 'cms' | 'links' | 'keywords' | 'schema' | 'competitor' | 'history' | 'strategy';
+type SubTab = 'audit' | 'editor' | 'cms' | 'links' | 'redirects' | 'keywords' | 'schema' | 'competitor' | 'history' | 'strategy';
 
 interface SnapshotSummary {
   id: string;
@@ -761,6 +762,7 @@ function SeoAudit({ siteId, workspaceId }: Props) {
     { id: 'editor', label: 'Edit SEO', icon: Pencil },
     { id: 'cms', label: 'CMS SEO', icon: ListChecks },
     { id: 'links', label: 'Dead Links', icon: Link2Off },
+    { id: 'redirects', label: 'Redirects', icon: CornerDownRight },
     { id: 'strategy', label: 'Strategy', icon: Target },
     { id: 'keywords', label: 'Keywords', icon: SearchIcon },
     { id: 'schema', label: 'Schema', icon: Code2 },
@@ -795,6 +797,7 @@ function SeoAudit({ siteId, workspaceId }: Props) {
   if (subTab === 'cms') return <>{tabNav}<CmsEditor siteId={siteId} workspaceId={workspaceId} /></>;
   if (subTab === 'strategy') return <>{tabNav}<KeywordStrategyPanel workspaceId={workspaceId || ''} /></>;
   if (subTab === 'links') return <>{tabNav}<LinkChecker siteId={siteId} /></>;
+  if (subTab === 'redirects') return <>{tabNav}<RedirectManager siteId={siteId} /></>;
   if (subTab === 'keywords') return <>{tabNav}<KeywordAnalysis siteId={siteId} /></>;
   if (subTab === 'schema') return <>{tabNav}<SchemaSuggester siteId={siteId} /></>;
   if (subTab === 'competitor') return <>{tabNav}<CompetitorAnalysis siteId={siteId} /></>;
