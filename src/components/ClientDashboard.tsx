@@ -3,7 +3,7 @@ import {
   Loader2, Search, TrendingUp, TrendingDown, Eye, MousePointer,
   BarChart3, ArrowUpDown, Sparkles, Send, AlertTriangle,
   Target, Zap, Shield, MessageSquare, X, ChevronDown,
-  CheckCircle2, Info, LayoutDashboard, LineChart,
+  CheckCircle2, Info, LayoutDashboard, LineChart, Lock,
 } from 'lucide-react';
 
 interface SearchQuery { query: string; clicks: number; impressions: number; ctr: number; position: number; }
@@ -14,7 +14,7 @@ interface SearchOverview {
   dateRange: { start: string; end: string };
 }
 interface PerformanceTrend { date: string; clicks: number; impressions: number; ctr: number; position: number; }
-interface WorkspaceInfo { id: string; name: string; webflowSiteId?: string; webflowSiteName?: string; gscPropertyUrl?: string; }
+interface WorkspaceInfo { id: string; name: string; webflowSiteId?: string; webflowSiteName?: string; gscPropertyUrl?: string; ga4PropertyId?: string; liveDomain?: string; requiresPassword?: boolean; }
 interface AuditSummary { id: string; createdAt: string; siteScore: number; totalPages: number; errors: number; warnings: number; previousScore?: number; }
 interface SeoIssue { check: string; severity: 'error' | 'warning' | 'info'; category?: string; message: string; recommendation: string; value?: string; }
 interface PageAuditResult { pageId: string; page: string; slug: string; url: string; score: number; issues: SeoIssue[]; }
@@ -24,6 +24,16 @@ interface AuditDetail {
   scoreHistory: Array<{ id: string; createdAt: string; siteScore: number }>;
 }
 interface ChatMessage { role: 'user' | 'assistant'; content: string; }
+interface GA4Overview {
+  totalUsers: number; totalSessions: number; totalPageviews: number;
+  avgSessionDuration: number; bounceRate: number; newUserPercentage: number;
+  dateRange: { start: string; end: string };
+}
+interface GA4DailyTrend { date: string; users: number; sessions: number; pageviews: number; }
+interface GA4TopPage { path: string; pageviews: number; users: number; avgEngagementTime: number; }
+interface GA4TopSource { source: string; medium: string; users: number; sessions: number; }
+interface GA4DeviceBreakdown { device: string; users: number; sessions: number; percentage: number; }
+interface GA4CountryBreakdown { country: string; users: number; sessions: number; }
 interface Props { workspaceId: string; }
 
 type SortKey = 'clicks' | 'impressions' | 'ctr' | 'position';
@@ -127,6 +137,12 @@ function RenderMarkdown({ text }: { text: string }) {
   );
 }
 
+/** Rewrite webflow.io URLs to live domain */
+function toLiveUrl(url: string, liveDomain?: string): string {
+  if (!liveDomain || !url) return url;
+  return url.replace(/https?:\/\/[^/]+\.webflow\.io/, liveDomain.replace(/\/$/, ''));
+}
+
 export function ClientDashboard({ workspaceId }: Props) {
   const [ws, setWs] = useState<WorkspaceInfo | null>(null);
   const [overview, setOverview] = useState<SearchOverview | null>(null);
@@ -147,9 +163,20 @@ export function ClientDashboard({ workspaceId }: Props) {
   const [severityFilter, setSeverityFilter] = useState<'all' | 'error' | 'warning' | 'info'>('all');
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
   const [auditSearch, setAuditSearch] = useState('');
+  const [ga4Overview, setGa4Overview] = useState<GA4Overview | null>(null);
+  const [ga4Trend, setGa4Trend] = useState<GA4DailyTrend[]>([]);
+  const [ga4Pages, setGa4Pages] = useState<GA4TopPage[]>([]);
+  const [ga4Sources, setGa4Sources] = useState<GA4TopSource[]>([]);
+  const [ga4Devices, setGa4Devices] = useState<GA4DeviceBreakdown[]>([]);
+  const [ga4Countries, setGa4Countries] = useState<GA4CountryBreakdown[]>([]);
+  const [authenticated, setAuthenticated] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
 
+  // Load workspace info first (includes requiresPassword flag)
   useEffect(() => {
     setLoading(true);
     fetch(`/api/public/workspace/${workspaceId}`)
@@ -157,13 +184,72 @@ export function ClientDashboard({ workspaceId }: Props) {
       .then((data: WorkspaceInfo) => {
         if (!data.id) { setError('Workspace not found'); setLoading(false); return; }
         setWs(data);
-        if (data.gscPropertyUrl) loadSearchData(data.id, 28);
-        fetch(`/api/public/audit-summary/${data.id}`).then(r => r.json()).then(a => { if (a?.id) setAudit(a); }).catch(() => {});
-        fetch(`/api/public/audit-detail/${data.id}`).then(r => r.json()).then(d => { if (d?.id) setAuditDetail(d); }).catch(() => {});
+        // Check if already authenticated via sessionStorage
+        if (data.requiresPassword) {
+          const stored = sessionStorage.getItem(`dash_auth_${workspaceId}`);
+          if (stored === 'true') {
+            setAuthenticated(true);
+            loadDashboardData(data);
+          }
+        } else {
+          setAuthenticated(true);
+          loadDashboardData(data);
+        }
         setLoading(false);
       })
       .catch(() => { setError('Failed to load dashboard'); setLoading(false); });
   }, [workspaceId]);
+
+  const loadDashboardData = (data: WorkspaceInfo) => {
+    if (data.gscPropertyUrl) loadSearchData(data.id, 28);
+    fetch(`/api/public/audit-summary/${data.id}`).then(r => r.json()).then(a => { if (a?.id) setAudit(a); }).catch(() => {});
+    fetch(`/api/public/audit-detail/${data.id}`).then(r => r.json()).then(d => { if (d?.id) setAuditDetail(d); }).catch(() => {});
+    if (data.ga4PropertyId) loadGA4Data(data.id, 28);
+  };
+
+  const loadGA4Data = async (wsId: string, numDays: number) => {
+    try {
+      const [ovRes, trRes, pgRes, srcRes, devRes, ctryRes] = await Promise.all([
+        fetch(`/api/public/analytics-overview/${wsId}?days=${numDays}`),
+        fetch(`/api/public/analytics-trend/${wsId}?days=${numDays}`),
+        fetch(`/api/public/analytics-top-pages/${wsId}?days=${numDays}`),
+        fetch(`/api/public/analytics-sources/${wsId}?days=${numDays}`),
+        fetch(`/api/public/analytics-devices/${wsId}?days=${numDays}`),
+        fetch(`/api/public/analytics-countries/${wsId}?days=${numDays}`),
+      ]);
+      const [ov, tr, pg, src, dev, ctry] = await Promise.all([ovRes.json(), trRes.json(), pgRes.json(), srcRes.json(), devRes.json(), ctryRes.json()]);
+      if (!ov.error) setGa4Overview(ov);
+      if (Array.isArray(tr)) setGa4Trend(tr);
+      if (Array.isArray(pg)) setGa4Pages(pg);
+      if (Array.isArray(src)) setGa4Sources(src);
+      if (Array.isArray(dev)) setGa4Devices(dev);
+      if (Array.isArray(ctry)) setGa4Countries(ctry);
+    } catch (err) {
+      console.error('GA4 data load error:', err);
+    }
+  };
+
+  const handlePasswordSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!passwordInput.trim()) return;
+    setAuthLoading(true);
+    setAuthError('');
+    try {
+      const res = await fetch(`/api/public/auth/${workspaceId}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: passwordInput }),
+      });
+      if (res.ok) {
+        setAuthenticated(true);
+        sessionStorage.setItem(`dash_auth_${workspaceId}`, 'true');
+        if (ws) loadDashboardData(ws);
+      } else {
+        setAuthError('Incorrect password');
+      }
+    } catch {
+      setAuthError('Authentication failed');
+    } finally { setAuthLoading(false); }
+  };
 
   const loadSearchData = async (wsId: string, numDays: number) => {
     try {
@@ -234,11 +320,48 @@ export function ClientDashboard({ workspaceId }: Props) {
     </div>
   );
 
+  // Password gate
+  if (ws.requiresPassword && !authenticated) return (
+    <div className="min-h-screen bg-[#0a0a1a] flex items-center justify-center">
+      <div className="w-full max-w-sm">
+        <div className="bg-zinc-900 rounded-2xl border border-zinc-800 p-8 shadow-2xl shadow-black/40">
+          <div className="flex flex-col items-center mb-6">
+            <div className="w-12 h-12 rounded-2xl bg-violet-500/10 flex items-center justify-center mb-4">
+              <Lock className="w-6 h-6 text-violet-400" />
+            </div>
+            <h2 className="text-lg font-semibold text-zinc-200">{ws.name}</h2>
+            <p className="text-xs text-zinc-500 mt-1">Enter the password to access this dashboard</p>
+          </div>
+          <form onSubmit={handlePasswordSubmit} className="space-y-4">
+            <div>
+              <input
+                type="password"
+                value={passwordInput}
+                onChange={e => { setPasswordInput(e.target.value); setAuthError(''); }}
+                placeholder="Dashboard password"
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-violet-500 transition-colors"
+                autoFocus
+              />
+              {authError && <p className="text-xs text-red-400 mt-2">{authError}</p>}
+            </div>
+            <button
+              type="submit"
+              disabled={authLoading || !passwordInput.trim()}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 disabled:opacity-50 text-white text-sm font-medium transition-all flex items-center justify-center gap-2"
+            >
+              {authLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Access Dashboard'}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+
   const insights = getInsights();
   const togglePage = (id: string) => setExpandedPages(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   const filteredPages = auditDetail?.audit.pages.filter(p => {
-    if (auditSearch && !p.page.toLowerCase().includes(auditSearch.toLowerCase()) && !p.url.toLowerCase().includes(auditSearch.toLowerCase())) return false;
+    if (auditSearch && !p.page.toLowerCase().includes(auditSearch.toLowerCase()) && !toLiveUrl(p.url, ws?.liveDomain).toLowerCase().includes(auditSearch.toLowerCase())) return false;
     if (severityFilter === 'all') return true;
     return p.issues.some(i => i.severity === severityFilter);
   }) || [];
@@ -265,9 +388,13 @@ export function ClientDashboard({ workspaceId }: Props) {
       {/* Header */}
       <header className="border-b border-zinc-800">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold">{ws.webflowSiteName || ws.name}</h1>
-            <p className="text-xs text-zinc-500 mt-0.5">Performance Dashboard</p>
+          <div className="flex items-center gap-4">
+            <img src="/logo.svg" alt="hmpsn studio" className="h-6 opacity-80" />
+            <div className="w-px h-8 bg-zinc-800" />
+            <div>
+              <h1 className="text-lg font-semibold">{ws.name}</h1>
+              <p className="text-xs text-zinc-500 mt-0.5">Performance Dashboard</p>
+            </div>
           </div>
           {overview && (
             <div className="flex items-center gap-1 bg-zinc-900 rounded-lg border border-zinc-800 p-0.5">
@@ -284,7 +411,7 @@ export function ClientDashboard({ workspaceId }: Props) {
             {NAV.map(t => {
               const Icon = t.icon;
               const active = tab === t.id;
-              const disabled = t.id === 'analytics';
+              const disabled = false;
               return (
                 <button key={t.id} onClick={() => !disabled && setTab(t.id)} disabled={disabled}
                   className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium border-b-2 transition-colors ${
@@ -375,7 +502,7 @@ export function ClientDashboard({ workspaceId }: Props) {
               {!overview && !audit && (
                 <div className="bg-gradient-to-br from-violet-500/10 via-zinc-900 to-fuchsia-500/10 rounded-xl border border-zinc-800 p-8 text-center">
                   <div className="w-12 h-12 rounded-2xl bg-violet-500/10 flex items-center justify-center mx-auto mb-4"><BarChart3 className="w-6 h-6 text-violet-400" /></div>
-                  <h2 className="text-lg font-semibold text-zinc-200 mb-2">{ws.webflowSiteName || ws.name}</h2>
+                  <h2 className="text-lg font-semibold text-zinc-200 mb-2">{ws.name}</h2>
                   <p className="text-sm text-zinc-400">Your dashboard is being configured. Data will appear here once set up by your web team.</p>
                 </div>
               )}
@@ -643,7 +770,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                           <ChevronDown className={`w-3.5 h-3.5 text-zinc-600 transition-transform ${isExp ? '' : '-rotate-90'}`} />
                           <div className="flex-1 min-w-0">
                             <div className="text-xs font-medium text-zinc-300 truncate">{page.page}</div>
-                            <div className="text-[10px] text-zinc-600 truncate">{page.url}</div>
+                            <div className="text-[10px] text-zinc-600 truncate">{toLiveUrl(page.url, ws.liveDomain)}</div>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
                             {errs > 0 && <span className="text-[10px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">{errs} err</span>}
@@ -698,13 +825,149 @@ export function ClientDashboard({ workspaceId }: Props) {
         </>)}
 
         {/* ════════════ ANALYTICS TAB ════════════ */}
-        {tab === 'analytics' && (
-          <div className="text-center py-16">
-            <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4"><LineChart className="w-8 h-8 text-zinc-700" /></div>
-            <h3 className="text-sm font-medium text-zinc-400">Analytics Coming Soon</h3>
-            <p className="text-xs text-zinc-600 mt-1 max-w-sm mx-auto">Google Analytics integration is on the way. Track traffic, user behavior, and conversions.</p>
-          </div>
-        )}
+        {tab === 'analytics' && (<>
+          {!ga4Overview ? (
+            <div className="text-center py-16">
+              <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4"><LineChart className="w-8 h-8 text-zinc-700" /></div>
+              <h3 className="text-sm font-medium text-zinc-400">Analytics Not Configured</h3>
+              <p className="text-xs text-zinc-600 mt-1 max-w-sm mx-auto">Google Analytics 4 has not been linked to this workspace yet. Contact your web team to enable it.</p>
+            </div>
+          ) : (<>
+            {/* GA4 Overview Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+              {[
+                { label: 'Users', value: ga4Overview.totalUsers.toLocaleString(), color: 'text-violet-400' },
+                { label: 'Sessions', value: ga4Overview.totalSessions.toLocaleString(), color: 'text-blue-400' },
+                { label: 'Page Views', value: ga4Overview.totalPageviews.toLocaleString(), color: 'text-teal-400' },
+                { label: 'Avg Duration', value: `${Math.floor(ga4Overview.avgSessionDuration / 60)}m ${Math.floor(ga4Overview.avgSessionDuration % 60)}s`, color: 'text-amber-400' },
+                { label: 'Bounce Rate', value: `${ga4Overview.bounceRate}%`, color: ga4Overview.bounceRate > 60 ? 'text-red-400' : 'text-emerald-400' },
+                { label: 'New Users', value: `${ga4Overview.newUserPercentage}%`, color: 'text-fuchsia-400' },
+              ].map(c => (
+                <div key={c.label} className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+                  <div className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1">{c.label}</div>
+                  <div className={`text-xl font-bold ${c.color}`}>{c.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Traffic Trend Chart */}
+            {ga4Trend.length > 0 && (
+              <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5 mb-6">
+                <h3 className="text-sm font-semibold text-zinc-300 mb-4">Traffic Trend</h3>
+                <svg viewBox={`0 0 800 200`} className="w-full h-48">
+                  {(() => {
+                    const maxV = Math.max(...ga4Trend.map(d => d.users), 1);
+                    const maxS = Math.max(...ga4Trend.map(d => d.sessions), 1);
+                    const maxP = Math.max(...ga4Trend.map(d => d.pageviews), 1);
+                    const xStep = 800 / Math.max(ga4Trend.length - 1, 1);
+                    const mkPath = (vals: number[], max: number) => vals.map((v, i) => `${i === 0 ? 'M' : 'L'}${i * xStep},${190 - (v / max) * 170}`).join(' ');
+                    return (<>
+                      <path d={mkPath(ga4Trend.map(d => d.pageviews), maxP)} fill="none" stroke="rgba(45,212,191,0.3)" strokeWidth="1.5" />
+                      <path d={mkPath(ga4Trend.map(d => d.sessions), maxS)} fill="none" stroke="rgba(96,165,250,0.5)" strokeWidth="1.5" />
+                      <path d={mkPath(ga4Trend.map(d => d.users), maxV)} fill="none" stroke="rgba(167,139,250,0.9)" strokeWidth="2" />
+                      <path d={`${mkPath(ga4Trend.map(d => d.users), maxV)} L${(ga4Trend.length - 1) * xStep},190 L0,190 Z`} fill="url(#ga4grad)" opacity="0.15" />
+                      <defs><linearGradient id="ga4grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#a78bfa" /><stop offset="100%" stopColor="transparent" /></linearGradient></defs>
+                    </>);
+                  })()}
+                </svg>
+                <div className="flex items-center justify-center gap-6 mt-2">
+                  <span className="flex items-center gap-1.5 text-[10px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-violet-400 inline-block" /> Users</span>
+                  <span className="flex items-center gap-1.5 text-[10px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-blue-400 inline-block" /> Sessions</span>
+                  <span className="flex items-center gap-1.5 text-[10px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-teal-400/40 inline-block" /> Pageviews</span>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              {/* Top Pages */}
+              <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+                <h3 className="text-sm font-semibold text-zinc-300 mb-3">Top Pages</h3>
+                <div className="space-y-1 max-h-[350px] overflow-y-auto">
+                  {ga4Pages.slice(0, 15).map((p, i) => (
+                    <div key={i} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-zinc-800/50">
+                      <span className="text-[10px] text-zinc-600 w-5 text-right">{i + 1}</span>
+                      <span className="text-xs text-zinc-300 flex-1 truncate font-mono">{p.path}</span>
+                      <span className="text-xs text-violet-400 font-medium tabular-nums">{p.pageviews.toLocaleString()}</span>
+                      <span className="text-[10px] text-zinc-500 w-14 text-right">{p.users.toLocaleString()} u</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Traffic Sources */}
+              <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+                <h3 className="text-sm font-semibold text-zinc-300 mb-3">Traffic Sources</h3>
+                <div className="space-y-2">
+                  {ga4Sources.slice(0, 10).map((s, i) => {
+                    const totalSessions = ga4Sources.reduce((sum, x) => sum + x.sessions, 0);
+                    const pct = totalSessions > 0 ? (s.sessions / totalSessions) * 100 : 0;
+                    return (
+                      <div key={i} className="relative">
+                        <div className="flex items-center gap-2 py-1.5 px-2 rounded-lg relative z-10">
+                          <span className="text-xs text-zinc-300 flex-1 truncate">{s.source}{s.medium !== '(none)' ? ` / ${s.medium}` : ''}</span>
+                          <span className="text-xs text-blue-400 font-medium tabular-nums">{s.sessions.toLocaleString()}</span>
+                          <span className="text-[10px] text-zinc-500 w-12 text-right">{pct.toFixed(1)}%</span>
+                        </div>
+                        <div className="absolute inset-0 rounded-lg bg-blue-500/5" style={{ width: `${pct}%` }} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Device Breakdown */}
+              {ga4Devices.length > 0 && (
+                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+                  <h3 className="text-sm font-semibold text-zinc-300 mb-4">Devices</h3>
+                  <div className="flex items-center gap-6">
+                    {/* Donut-like bars */}
+                    <div className="flex-1 space-y-3">
+                      {ga4Devices.map((d, i) => {
+                        const colors = ['bg-violet-500', 'bg-blue-500', 'bg-teal-500', 'bg-amber-500'];
+                        const textColors = ['text-violet-400', 'text-blue-400', 'text-teal-400', 'text-amber-400'];
+                        return (
+                          <div key={i}>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs text-zinc-300 capitalize">{d.device}</span>
+                              <span className={`text-xs font-medium ${textColors[i % textColors.length]}`}>{d.percentage}%</span>
+                            </div>
+                            <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
+                              <div className={`h-full rounded-full ${colors[i % colors.length]}`} style={{ width: `${d.percentage}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Top Countries */}
+              {ga4Countries.length > 0 && (
+                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+                  <h3 className="text-sm font-semibold text-zinc-300 mb-3">Top Countries</h3>
+                  <div className="space-y-1">
+                    {ga4Countries.slice(0, 10).map((c, i) => {
+                      const maxUsers = ga4Countries[0]?.users || 1;
+                      return (
+                        <div key={i} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-zinc-800/50">
+                          <span className="text-[10px] text-zinc-600 w-5 text-right">{i + 1}</span>
+                          <span className="text-xs text-zinc-300 flex-1">{c.country}</span>
+                          <div className="w-20 h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+                            <div className="h-full rounded-full bg-emerald-500" style={{ width: `${(c.users / maxUsers) * 100}%` }} />
+                          </div>
+                          <span className="text-xs text-emerald-400 font-medium tabular-nums w-12 text-right">{c.users.toLocaleString()}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </>)}
+        </>)}
       </main>
 
       {/* Floating AI Chat */}

@@ -18,6 +18,9 @@ export interface Workspace {
   webflowSiteName?: string;
   webflowToken?: string;
   gscPropertyUrl?: string;
+  ga4PropertyId?: string;
+  clientPassword?: string;
+  liveDomain?: string;
   folder: string;
   createdAt: string;
 }
@@ -75,7 +78,7 @@ export function createWorkspace(name: string, webflowSiteId?: string, webflowSit
   return workspace;
 }
 
-export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl'>>): Workspace | null {
+export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'liveDomain'>>): Workspace | null {
   const workspaces = readConfig();
   const idx = workspaces.findIndex(w => w.id === id);
   if (idx === -1) return null;

@@ -52,6 +52,7 @@ import { runSalesAudit } from './sales-audit.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
 import { listGscSites, getSearchOverview, getPerformanceTrend } from './search-console.js';
+import { listGA4Properties, getGA4Overview, getGA4DailyTrend, getGA4TopPages, getGA4TopSources, getGA4DeviceBreakdown, getGA4Countries } from './google-analytics.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -238,7 +239,7 @@ function moveUploadedFiles(
 
 // Workspaces
 app.get('/api/workspaces', (_req, res) => {
-  const workspaces = listWorkspaces().map(ws => ({ ...ws, webflowToken: undefined }));
+  const workspaces = listWorkspaces().map(ws => ({ ...ws, webflowToken: undefined, clientPassword: undefined, hasPassword: !!ws.clientPassword }));
   res.json(workspaces);
 });
 
@@ -250,16 +251,36 @@ app.post('/api/workspaces', (req, res) => {
   res.json(ws);
 });
 
-app.patch('/api/workspaces/:id', (req, res) => {
+app.patch('/api/workspaces/:id', async (req, res) => {
   const updates = { ...req.body };
   // When unlinking, clear the token too
   if (updates.webflowSiteId === null || updates.webflowSiteId === '') {
     updates.webflowToken = '';
+    updates.liveDomain = '';
+  }
+  // Auto-resolve live domain when linking a site
+  if (updates.webflowSiteId && updates.webflowSiteId !== '') {
+    try {
+      const token = updates.webflowToken || getTokenForSite(updates.webflowSiteId) || process.env.WEBFLOW_API_TOKEN || '';
+      if (token) {
+        const domRes = await fetch(`https://api.webflow.com/v2/sites/${updates.webflowSiteId}/custom_domains`, {
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        });
+        if (domRes.ok) {
+          const domData = await domRes.json() as { customDomains?: { url?: string }[] };
+          const domains = domData.customDomains || [];
+          if (domains.length > 0 && domains[0].url) {
+            const d = domains[0].url;
+            updates.liveDomain = d.startsWith('http') ? d : `https://${d}`;
+          }
+        }
+      }
+    } catch { /* best-effort live domain resolution */ }
   }
   const ws = updateWorkspace(req.params.id, updates);
   if (!ws) return res.status(404).json({ error: 'Not found' });
   // Strip token from response to avoid leaking to frontend
-  const safe = { ...ws, webflowToken: undefined };
+  const safe = { ...ws, webflowToken: undefined, clientPassword: undefined, hasPassword: !!ws.clientPassword };
   broadcast('workspace:updated', safe);
   res.json(safe);
 });
@@ -2113,6 +2134,17 @@ app.post('/api/google/disconnect/:siteId', (req, res) => {
   res.json({ success: true });
 });
 
+// GA4 Analytics
+app.get('/api/google/ga4-properties', async (_req, res) => {
+  try {
+    const properties = await listGA4Properties();
+    res.json(properties);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: msg });
+  }
+});
+
 app.get('/api/google/gsc-sites/:siteId', async (req, res) => {
   try {
     const sites = await listGscSites(req.params.siteId);
@@ -2213,7 +2245,19 @@ app.get('/api/public/workspace/:id', (req, res) => {
     webflowSiteId: ws.webflowSiteId,
     webflowSiteName: ws.webflowSiteName,
     gscPropertyUrl: ws.gscPropertyUrl,
+    ga4PropertyId: ws.ga4PropertyId,
+    liveDomain: ws.liveDomain,
+    requiresPassword: !!ws.clientPassword,
   });
+});
+
+app.post('/api/public/auth/:id', (req, res) => {
+  const ws = getWorkspace(req.params.id);
+  if (!ws) return res.status(404).json({ error: 'Not found' });
+  if (!ws.clientPassword) return res.json({ ok: true });
+  const { password } = req.body;
+  if (password === ws.clientPassword) return res.json({ ok: true });
+  return res.status(401).json({ error: 'Incorrect password' });
 });
 
 app.get('/api/public/search-overview/:workspaceId', async (req, res) => {
@@ -2323,6 +2367,85 @@ ${JSON.stringify(context, null, 2)}`;
     if (!aiRes.ok) throw new Error('AI request failed');
     const aiData = await aiRes.json() as { choices: Array<{ message: { content: string } }> };
     res.json({ answer: aiData.choices?.[0]?.message?.content || 'No response generated.' });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: msg });
+  }
+});
+
+// --- Public GA4 Analytics API ---
+app.get('/api/public/analytics-overview/:workspaceId', async (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured for this workspace' });
+  const days = parseInt(req.query.days as string) || 28;
+  try {
+    const overview = await getGA4Overview(ws.ga4PropertyId, days);
+    res.json(overview);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: msg });
+  }
+});
+
+app.get('/api/public/analytics-trend/:workspaceId', async (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
+  const days = parseInt(req.query.days as string) || 28;
+  try {
+    const trend = await getGA4DailyTrend(ws.ga4PropertyId, days);
+    res.json(trend);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: msg });
+  }
+});
+
+app.get('/api/public/analytics-top-pages/:workspaceId', async (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
+  const days = parseInt(req.query.days as string) || 28;
+  try {
+    const pages = await getGA4TopPages(ws.ga4PropertyId, days);
+    res.json(pages);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: msg });
+  }
+});
+
+app.get('/api/public/analytics-sources/:workspaceId', async (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
+  const days = parseInt(req.query.days as string) || 28;
+  try {
+    const sources = await getGA4TopSources(ws.ga4PropertyId, days);
+    res.json(sources);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: msg });
+  }
+});
+
+app.get('/api/public/analytics-devices/:workspaceId', async (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
+  const days = parseInt(req.query.days as string) || 28;
+  try {
+    const devices = await getGA4DeviceBreakdown(ws.ga4PropertyId, days);
+    res.json(devices);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: msg });
+  }
+});
+
+app.get('/api/public/analytics-countries/:workspaceId', async (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
+  const days = parseInt(req.query.days as string) || 28;
+  try {
+    const countries = await getGA4Countries(ws.ga4PropertyId, days);
+    res.json(countries);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: msg });

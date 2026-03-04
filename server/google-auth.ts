@@ -53,6 +53,7 @@ export function getAuthUrl(siteId: string): string | null {
 
   const scopes = [
     'https://www.googleapis.com/auth/webmasters.readonly',
+    'https://www.googleapis.com/auth/analytics.readonly',
   ].join(' ');
 
   const params = new URLSearchParams({
