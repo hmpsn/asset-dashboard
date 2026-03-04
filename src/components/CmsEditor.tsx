@@ -140,14 +140,15 @@ export function CmsEditor({ siteId }: Props) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          current: currentValue,
           pageTitle: itemName,
-          type: isTitle ? 'title' : 'description',
+          currentSeoTitle: isTitle ? currentValue : undefined,
+          currentDescription: !isTitle ? currentValue : undefined,
+          field: isTitle ? 'title' : 'description',
         }),
       });
       const data = await res.json();
-      if (data.rewritten) {
-        updateField(itemId, fieldSlug, data.rewritten);
+      if (data.text) {
+        updateField(itemId, fieldSlug, data.text);
       }
     } catch { /* ignore */ } finally {
       setAiLoading(prev => { const n = { ...prev }; delete n[key]; return n; });

@@ -1127,7 +1127,17 @@ Return ONLY the title tag text, nothing else.`;
     }
 
     const aiData = await aiRes.json() as { choices?: Array<{ message?: { content?: string } }> };
-    const text = aiData.choices?.[0]?.message?.content?.trim() || '';
+    let text = aiData.choices?.[0]?.message?.content?.trim() || '';
+    // Strip surrounding quotes if the model wrapped its output
+    text = text.replace(/^["']|["']$/g, '');
+    // Enforce hard character limits
+    const maxLen = field === 'description' ? 160 : 60;
+    if (text.length > maxLen) {
+      // Truncate at last word boundary before the limit
+      const truncated = text.slice(0, maxLen);
+      const lastSpace = truncated.lastIndexOf(' ');
+      text = lastSpace > maxLen * 0.6 ? truncated.slice(0, lastSpace) : truncated;
+    }
     res.json({ text, field });
   } catch (err) {
     console.error('SEO rewrite error:', err);
@@ -1164,7 +1174,15 @@ app.post('/api/webflow/seo-bulk-fix/:siteId', async (req, res) => {
         }),
       });
       const aiData = await aiRes.json() as { choices?: Array<{ message?: { content?: string } }> };
-      const text = aiData.choices?.[0]?.message?.content?.trim() || '';
+      let text = aiData.choices?.[0]?.message?.content?.trim() || '';
+      // Strip surrounding quotes and enforce character limits
+      text = text.replace(/^["']|["']$/g, '');
+      const maxLen = field === 'description' ? 160 : 60;
+      if (text.length > maxLen) {
+        const truncated = text.slice(0, maxLen);
+        const lastSpace = truncated.lastIndexOf(' ');
+        text = lastSpace > maxLen * 0.6 ? truncated.slice(0, lastSpace) : truncated;
+      }
 
       if (text) {
         const seoFields = field === 'description'
