@@ -1,0 +1,256 @@
+import { useState, useEffect, useRef } from 'react';
+import { Plus, ChevronDown, Link, Link2Off, Trash2, Globe, Eye, EyeOff, ExternalLink } from 'lucide-react';
+import { cn } from '../lib/utils';
+
+export interface Workspace {
+  id: string;
+  name: string;
+  webflowSiteId?: string;
+  webflowSiteName?: string;
+  folder: string;
+  createdAt: string;
+}
+
+interface WebflowSite {
+  id: string;
+  displayName: string;
+  shortName: string;
+}
+
+interface Props {
+  workspaces: Workspace[];
+  selected: Workspace | null;
+  onSelect: (ws: Workspace) => void;
+  onCreate: (name: string, siteId?: string, siteName?: string) => void;
+  onDelete: (id: string) => void;
+  onLinkSite: (workspaceId: string, siteId: string, siteName: string, token: string) => void;
+  onUnlinkSite: (workspaceId: string) => void;
+}
+
+export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, onDelete, onLinkSite, onUnlinkSite }: Props) {
+  const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [linkingId, setLinkingId] = useState<string | null>(null);
+  const [linkToken, setLinkToken] = useState('');
+  const [showToken, setShowToken] = useState(false);
+  const [sites, setSites] = useState<WebflowSite[]>([]);
+  const [loadingSites, setLoadingSites] = useState(false);
+  const [tokenError, setTokenError] = useState('');
+  const tokenInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCreate = () => {
+    if (!newName.trim()) return;
+    onCreate(newName.trim());
+    setNewName('');
+    setCreating(false);
+  };
+
+  const fetchSitesForToken = async (token: string) => {
+    if (!token.trim()) return;
+    setLoadingSites(true);
+    setTokenError('');
+    setSites([]);
+    try {
+      const res = await fetch(`/api/webflow/sites?token=${encodeURIComponent(token.trim())}`);
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        setSites(data);
+      } else {
+        setTokenError('No sites found. Check token permissions.');
+      }
+    } catch {
+      setTokenError('Failed to fetch sites.');
+    } finally {
+      setLoadingSites(false);
+    }
+  };
+
+  // Reset state when closing link panel
+  useEffect(() => {
+    if (!linkingId) {
+      setLinkToken('');
+      setSites([]);
+      setTokenError('');
+      setShowToken(false);
+    } else {
+      setTimeout(() => tokenInputRef.current?.focus(), 100);
+    }
+  }, [linkingId]);
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className={cn(
+          'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+          'hover:bg-zinc-700 border',
+          'bg-[#0c0c3a] border-[rgba(165,186,201,0.15)]',
+          open && 'bg-zinc-700'
+        )}
+      >
+        <div className={cn(
+          'w-2 h-2 rounded-full',
+          selected ? 'bg-emerald-400' : 'bg-zinc-500'
+        )} />
+        <span>{selected?.name || 'Select workspace'}</span>
+        <ChevronDown className={cn('w-4 h-4 text-zinc-400 transition-transform', open && 'rotate-180')} />
+      </button>
+
+      {open && (
+        <div className="absolute top-full right-0 mt-2 w-80 rounded-xl shadow-2xl z-50 overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border-hover)' }}>
+          {workspaces.length > 0 && (
+            <div className="p-1">
+              {workspaces.map(ws => (
+                <div key={ws.id}>
+                  <div
+                    className={cn(
+                      'flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-colors group',
+                      selected?.id === ws.id ? 'bg-zinc-700' : 'hover:bg-zinc-700/50'
+                    )}
+                    onClick={() => { onSelect(ws); setOpen(false); setLinkingId(null); }}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className={cn(
+                        'w-2 h-2 rounded-full shrink-0',
+                        ws.webflowSiteId ? 'bg-emerald-400' : 'bg-zinc-500'
+                      )} />
+                      <span className="text-sm truncate">{ws.name}</span>
+                      {ws.webflowSiteName && (
+                        <span className="flex items-center gap-1 text-xs text-zinc-500">
+                          <Link className="w-3 h-3" />
+                          {ws.webflowSiteName}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-0.5">
+                      {ws.webflowSiteId ? (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onUnlinkSite(ws.id); }}
+                          className="p-1 hover:bg-zinc-600 rounded"
+                          title="Unlink site"
+                        >
+                          <Link2Off className="w-3 h-3 text-zinc-400" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setLinkingId(linkingId === ws.id ? null : ws.id); }}
+                          className="p-1 hover:bg-zinc-600 rounded"
+                          title="Link Webflow site"
+                        >
+                          <Globe className="w-3 h-3 text-zinc-400" />
+                        </button>
+                      )}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onDelete(ws.id); }}
+                        className="p-1 hover:bg-zinc-600 rounded"
+                      >
+                        <Trash2 className="w-3 h-3 text-zinc-400" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Site linking dropdown */}
+                  {linkingId === ws.id && (
+                    <div className="mx-2 mb-1 p-2 rounded-lg" style={{ backgroundColor: 'var(--brand-bg-surface)', border: '1px solid var(--brand-border)' }}>
+                      <p className="text-xs text-zinc-500 mb-1">Paste a Webflow API token for this workspace:</p>
+                      <p className="text-[10px] text-zinc-600 mb-2">
+                        Get one at{' '}
+                        <a href="https://webflow.com/dashboard/account/integrations" target="_blank" rel="noopener noreferrer" className="text-teal-400 hover:text-teal-300 inline-flex items-center gap-0.5">
+                          webflow.com <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                      </p>
+                      <div className="flex gap-1.5 mb-2">
+                        <div className="relative flex-1">
+                          <input
+                            ref={tokenInputRef}
+                            type={showToken ? 'text' : 'password'}
+                            value={linkToken}
+                            onChange={(e) => setLinkToken(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && fetchSitesForToken(linkToken)}
+                            onClick={(e) => e.stopPropagation()}
+                            placeholder="Paste API token..."
+                            className="w-full px-2 py-1 pr-7 bg-zinc-800 border border-zinc-700 rounded text-xs focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                          />
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setShowToken(!showToken); }}
+                            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                          >
+                            {showToken ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                          </button>
+                        </div>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); fetchSitesForToken(linkToken); }}
+                          disabled={!linkToken.trim() || loadingSites}
+                          className="px-2 py-1 text-xs font-medium bg-white text-black rounded hover:bg-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                          {loadingSites ? '...' : 'Go'}
+                        </button>
+                      </div>
+                      {tokenError && <p className="text-xs text-red-400 mb-1">{tokenError}</p>}
+                      {loadingSites && (
+                        <div className="flex items-center gap-2 text-xs text-zinc-500 py-1">
+                          <div className="w-3 h-3 border border-zinc-600 border-t-zinc-400 rounded-full animate-spin" />
+                          Loading sites...
+                        </div>
+                      )}
+                      {sites.length > 0 && (
+                        <div className="space-y-0.5 max-h-32 overflow-auto">
+                          <p className="text-[10px] text-zinc-500 mb-1">Select a site:</p>
+                          {sites.map(site => (
+                            <button
+                              key={site.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onLinkSite(ws.id, site.id, site.displayName, linkToken.trim());
+                                setLinkingId(null);
+                              }}
+                              className="flex items-center gap-2 w-full px-2 py-1.5 text-left text-xs hover:bg-zinc-800 rounded transition-colors"
+                            >
+                              <Globe className="w-3 h-3 text-teal-400 shrink-0" />
+                              <span className="truncate">{site.displayName}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="p-2" style={{ borderTop: '1px solid var(--brand-border)' }}>
+            {creating ? (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+                  placeholder="Workspace name..."
+                  autoFocus
+                  className="flex-1 px-3 py-1.5 bg-zinc-900 border border-zinc-600 rounded-lg text-sm focus:outline-none focus:border-zinc-500"
+                />
+                <button
+                  onClick={handleCreate}
+                  className="px-3 py-1.5 bg-white text-black text-sm font-medium rounded-lg hover:bg-zinc-200 transition-colors"
+                >
+                  Add
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setCreating(true)}
+                className="flex items-center gap-2 w-full px-3 py-2 text-sm text-zinc-400 hover:text-white hover:bg-zinc-700/50 rounded-lg transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                New workspace
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

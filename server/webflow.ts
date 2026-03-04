@@ -1,0 +1,548 @@
+import fs from 'fs';
+import path from 'path';
+
+const WEBFLOW_API = 'https://api.webflow.com/v2';
+
+function getToken(): string | null {
+  return process.env.WEBFLOW_API_TOKEN || null;
+}
+
+async function webflowFetch(endpoint: string, options: RequestInit = {}, tokenOverride?: string): Promise<Response> {
+  const token = tokenOverride || getToken();
+  if (!token) throw new Error('WEBFLOW_API_TOKEN not configured');
+
+  return fetch(`${WEBFLOW_API}${endpoint}`, {
+    ...options,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+}
+
+// --- Asset types ---
+export interface WebflowAsset {
+  id: string;
+  displayName?: string;
+  originalFileName?: string;
+  size: number;
+  contentType: string;
+  url?: string;
+  hostedUrl?: string;
+  altText?: string;
+  createdOn?: string;
+  lastUpdated?: string;
+}
+
+// --- List all assets (paginated) ---
+export async function listAssets(siteId: string, tokenOverride?: string): Promise<WebflowAsset[]> {
+  const token = tokenOverride || getToken();
+  if (!token) return [];
+
+  const allAssets: WebflowAsset[] = [];
+  let offset = 0;
+  const limit = 100;
+
+  while (true) {
+    const res = await webflowFetch(`/sites/${siteId}/assets?limit=${limit}&offset=${offset}`, {}, token);
+    if (!res.ok) break;
+    const data = await res.json() as { assets?: WebflowAsset[] };
+    const assets = data.assets || [];
+    allAssets.push(...assets);
+    if (assets.length < limit) break;
+    offset += limit;
+  }
+  return allAssets;
+}
+
+// --- Update asset (alt text, displayName) ---
+export async function updateAsset(
+  assetId: string,
+  updates: { altText?: string; displayName?: string },
+  tokenOverride?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await webflowFetch(`/assets/${assetId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    }, tokenOverride);
+    if (!res.ok) {
+      const err = await res.text();
+      return { success: false, error: `${res.status}: ${err}` };
+    }
+    return { success: true };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+// --- Delete asset ---
+export async function deleteAsset(assetId: string, tokenOverride?: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await webflowFetch(`/assets/${assetId}`, { method: 'DELETE' }, tokenOverride);
+    if (!res.ok && res.status !== 204) {
+      const err = await res.text();
+      return { success: false, error: `${res.status}: ${err}` };
+    }
+    return { success: true };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+// --- List pages ---
+export interface WebflowPage {
+  id: string;
+  title: string;
+  slug: string;
+  draft?: boolean;
+  archived?: boolean;
+  collectionId?: string | null;
+  publishedPath?: string | null;
+  seo?: { title?: string | null; description?: string | null };
+  openGraph?: { title?: string | null; description?: string | null; titleCopied?: boolean; descriptionCopied?: boolean };
+  [key: string]: unknown;
+}
+
+export async function listPages(siteId: string, tokenOverride?: string): Promise<WebflowPage[]> {
+  const res = await webflowFetch(`/sites/${siteId}/pages?limit=100`, {}, tokenOverride);
+  if (!res.ok) return [];
+  const data = await res.json() as { pages?: WebflowPage[] };
+  return data.pages || [];
+}
+
+// Filter to only published, non-collection, non-draft pages
+export function filterPublishedPages(pages: WebflowPage[]): WebflowPage[] {
+  return pages.filter(p =>
+    p.draft !== true &&
+    !p.collectionId &&
+    !p.archived &&
+    p.publishedPath
+  );
+}
+
+// --- Get page DOM nodes (paginated) ---
+interface DomNode {
+  id: string;
+  type: string;
+  image?: { assetId?: string; alt?: string };
+  attributes?: Record<string, unknown>;
+  componentId?: string;
+  propertyOverrides?: Array<{ propertyId: string; value?: unknown }>;
+  [key: string]: unknown;
+}
+
+export async function getPageDomNodes(pageId: string, tokenOverride?: string): Promise<DomNode[]> {
+  const allNodes: DomNode[] = [];
+  let offset = 0;
+  while (true) {
+    const res = await webflowFetch(`/pages/${pageId}/dom?limit=100&offset=${offset}`, {}, tokenOverride);
+    if (!res.ok) break;
+    const data = await res.json() as { nodes?: DomNode[]; pagination?: { total?: number } };
+    const nodes = data.nodes || [];
+    allNodes.push(...nodes);
+    const total = data.pagination?.total || 0;
+    offset += nodes.length;
+    if (offset >= total || nodes.length === 0) break;
+  }
+  return allNodes;
+}
+
+// Legacy wrapper for alt-text context (returns stringified DOM)
+export async function getPageDom(pageId: string, tokenOverride?: string): Promise<string> {
+  const res = await webflowFetch(`/pages/${pageId}/dom`, {}, tokenOverride);
+  if (!res.ok) return '';
+  return await res.text();
+}
+
+// --- List CMS collections ---
+export async function listCollections(siteId: string, tokenOverride?: string): Promise<Array<{ id: string; displayName: string; slug: string }>> {
+  const res = await webflowFetch(`/sites/${siteId}/collections`, {}, tokenOverride);
+  if (!res.ok) return [];
+  const data = await res.json() as { collections?: Array<{ id: string; displayName: string; slug: string }> };
+  return data.collections || [];
+}
+
+// --- List CMS collection items ---
+export async function listCollectionItems(collectionId: string, limit = 100, offset = 0, tokenOverride?: string): Promise<{ items: Array<Record<string, unknown>>; total: number }> {
+  const res = await webflowFetch(`/collections/${collectionId}/items?limit=${limit}&offset=${offset}`, {}, tokenOverride);
+  if (!res.ok) return { items: [], total: 0 };
+  const data = await res.json() as { items?: Array<Record<string, unknown>>; pagination?: { total?: number } };
+  return { items: data.items || [], total: data.pagination?.total || 0 };
+}
+
+// --- Get collection schema ---
+export async function getCollectionSchema(collectionId: string, tokenOverride?: string): Promise<{ fields: Array<{ id: string; displayName: string; type: string; slug: string }> }> {
+  const res = await webflowFetch(`/collections/${collectionId}`, {}, tokenOverride);
+  if (!res.ok) return { fields: [] };
+  const data = await res.json() as { fields?: Array<{ id: string; displayName: string; type: string; slug: string }> };
+  return { fields: data.fields || [] };
+}
+
+// --- Update CMS item ---
+export async function updateCollectionItem(
+  collectionId: string,
+  itemId: string,
+  fieldData: Record<string, unknown>,
+  tokenOverride?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await webflowFetch(`/collections/${collectionId}/items/${itemId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ fieldData }),
+    }, tokenOverride);
+    if (!res.ok) {
+      const err = await res.text();
+      return { success: false, error: `${res.status}: ${err}` };
+    }
+    return { success: true };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+// --- Get site subdomain for published HTML scanning ---
+async function getSiteSubdomain(siteId: string, tokenOverride?: string): Promise<string | null> {
+  const res = await webflowFetch(`/sites/${siteId}`, {}, tokenOverride);
+  if (!res.ok) return null;
+  const data = await res.json() as { shortName?: string };
+  return data.shortName || null;
+}
+
+// --- Scan site for asset usage across published HTML and CMS ---
+export async function scanAssetUsage(siteId: string, tokenOverride?: string): Promise<Map<string, string[]>> {
+  const usageMap = new Map<string, string[]>();
+
+  const addUsage = (key: string, ref: string) => {
+    if (!key) return;
+    const refs = usageMap.get(key) || [];
+    if (!refs.includes(ref)) refs.push(ref);
+    usageMap.set(key, refs);
+  };
+
+  // Get all assets first so we know which IDs to look for
+  const assets = await listAssets(siteId, tokenOverride);
+  const assetIds = new Set(assets.map(a => a.id));
+
+  // Strategy 1: Scan published HTML pages — catches everything including component images
+  const subdomain = await getSiteSubdomain(siteId, tokenOverride);
+  if (subdomain) {
+    const baseUrl = `https://${subdomain}.webflow.io`;
+    const pages = await listPages(siteId, tokenOverride);
+    // Build page URL list: home + all slugs
+    const pageUrls: { url: string; title: string }[] = [
+      { url: baseUrl, title: 'Home' },
+    ];
+    for (const page of pages) {
+      if (page.slug && page.slug !== 'index') {
+        pageUrls.push({ url: `${baseUrl}/${page.slug}`, title: page.title });
+      }
+    }
+
+    // Add CMS template page instances (e.g. /blog/post-slug)
+    // Use the collection slug (not the template page slug) for the URL prefix
+    const collections = await listCollections(siteId, tokenOverride);
+    const collSlugMap = new Map(collections.map(c => [c.id, c.slug]));
+    for (const page of pages) {
+      const collId = (page as Record<string, unknown>).collectionId as string;
+      if (!collId) continue;
+      const collSlug = collSlugMap.get(collId);
+      if (!collSlug) continue;
+      try {
+        let offset = 0;
+        while (true) {
+          const { items, total } = await listCollectionItems(collId, 100, offset, tokenOverride);
+          for (const item of items) {
+            const fd = (item.fieldData || item) as Record<string, unknown>;
+            const slug = fd.slug as string;
+            if (slug) {
+              pageUrls.push({
+                url: `${baseUrl}/${collSlug}/${slug}`,
+                title: `${page.title}: ${fd.name || slug}`,
+              });
+            }
+          }
+          offset += items.length;
+          if (offset >= total || items.length === 0) break;
+        }
+      } catch { /* skip */ }
+    }
+
+    // Also scan the site's CSS files for background-image asset references
+    try {
+      const homeRes = await fetch(baseUrl, { redirect: 'follow' });
+      if (homeRes.ok) {
+        const homeHtml = await homeRes.text();
+        const cssUrls = homeHtml.match(/https:\/\/cdn\.prod\.website-files\.com\/[^"]*\.css[^"]*/g) || [];
+        for (const cssUrl of cssUrls) {
+          try {
+            const cssRes = await fetch(cssUrl);
+            if (cssRes.ok) {
+              const css = await cssRes.text();
+              for (const id of assetIds) {
+                if (css.includes(id)) {
+                  addUsage(id, 'css:styles');
+                }
+              }
+            }
+          } catch { /* skip */ }
+        }
+      }
+    } catch { /* skip */ }
+
+    // Fetch pages in parallel batches of 10
+    const batchSize = 10;
+    for (let i = 0; i < pageUrls.length; i += batchSize) {
+      const batch = pageUrls.slice(i, i + batchSize);
+      const results = await Promise.allSettled(
+        batch.map(async ({ url, title }) => {
+          try {
+            const res = await fetch(url, { redirect: 'follow' });
+            if (!res.ok) return;
+            const html = await res.text();
+            const ref = `page:${title}`;
+            // Scan for asset IDs in the HTML (they appear in CDN URLs)
+            for (const id of assetIds) {
+              if (html.includes(id)) {
+                addUsage(id, ref);
+              }
+            }
+          } catch { /* skip */ }
+        })
+      );
+      void results; // suppress unused warning
+    }
+  }
+
+  // Strategy 2: Scan CMS collections for image/rich-text fields
+  const collections2 = await listCollections(siteId, tokenOverride);
+  for (const coll of collections2) {
+    try {
+      const schema = await getCollectionSchema(coll.id, tokenOverride);
+      const imageFields = schema.fields.filter(f =>
+        f.type === 'Image' || f.type === 'MultiImage' || f.type === 'RichText'
+      );
+      if (imageFields.length === 0) continue;
+
+      let offset = 0;
+      while (true) {
+        const { items, total } = await listCollectionItems(coll.id, 100, offset, tokenOverride);
+        for (const item of items) {
+          const fieldData = (item.fieldData || item) as Record<string, unknown>;
+          const ref = `cms:${coll.displayName}`;
+          for (const field of imageFields) {
+            const val = fieldData[field.slug];
+            if (!val) continue;
+
+            if (typeof val === 'string') {
+              // Check if any asset ID appears in the string value
+              for (const id of assetIds) {
+                if (val.includes(id)) addUsage(id, ref);
+              }
+            } else if (typeof val === 'object') {
+              const obj = val as Record<string, unknown>;
+              if (obj.fileId && assetIds.has(obj.fileId as string)) {
+                addUsage(obj.fileId as string, ref);
+              }
+              if (obj.url && typeof obj.url === 'string') {
+                for (const id of assetIds) {
+                  if ((obj.url as string).includes(id)) addUsage(id, ref);
+                }
+              }
+              // MultiImage: array of image objects
+              if (Array.isArray(val)) {
+                for (const img of val) {
+                  if (typeof img === 'object' && img) {
+                    const imgObj = img as Record<string, unknown>;
+                    if (imgObj.fileId && assetIds.has(imgObj.fileId as string)) {
+                      addUsage(imgObj.fileId as string, ref);
+                    }
+                    if (imgObj.url && typeof imgObj.url === 'string') {
+                      for (const id of assetIds) {
+                        if ((imgObj.url as string).includes(id)) addUsage(id, ref);
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        offset += items.length;
+        if (offset >= total || items.length === 0) break;
+      }
+    } catch { /* skip failed collections */ }
+  }
+
+  return usageMap;
+}
+
+// --- Update page SEO fields ---
+export async function updatePageSeo(
+  pageId: string,
+  fields: {
+    title?: string;
+    slug?: string;
+    seo?: { title?: string; description?: string };
+    openGraph?: { title?: string; description?: string; titleCopied?: boolean; descriptionCopied?: boolean };
+  },
+  tokenOverride?: string,
+): Promise<{ success: boolean; error?: string }> {
+  const body: Record<string, unknown> = {};
+  if (fields.title !== undefined) body.title = fields.title;
+  if (fields.slug !== undefined) body.slug = fields.slug;
+  if (fields.seo) body.seo = fields.seo;
+  if (fields.openGraph) body.openGraph = fields.openGraph;
+
+  const res = await webflowFetch(`/pages/${pageId}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  }, tokenOverride);
+  if (!res.ok) {
+    const text = await res.text();
+    return { success: false, error: `${res.status}: ${text}` };
+  }
+  return { success: true };
+}
+
+// --- Get full page metadata ---
+export async function getPageMeta(
+  pageId: string,
+  tokenOverride?: string,
+): Promise<Record<string, unknown> | null> {
+  const res = await webflowFetch(`/pages/${pageId}`, {}, tokenOverride);
+  if (!res.ok) return null;
+  return await res.json() as Record<string, unknown>;
+}
+
+// --- Publish site ---
+export async function publishSite(
+  siteId: string,
+  tokenOverride?: string,
+): Promise<{ success: boolean; error?: string }> {
+  const res = await webflowFetch(`/sites/${siteId}/publish`, {
+    method: 'POST',
+    body: JSON.stringify({ publishToWebflowSubdomain: true }),
+  }, tokenOverride);
+  if (!res.ok) {
+    const text = await res.text();
+    return { success: false, error: `${res.status}: ${text}` };
+  }
+  return { success: true };
+}
+
+export async function listSites(tokenOverride?: string): Promise<Array<{ id: string; displayName: string; shortName: string }>> {
+  const token = tokenOverride || getToken();
+  if (!token) return [];
+
+  const res = await webflowFetch('/sites', {}, token);
+  if (!res.ok) return [];
+  const data = await res.json() as { sites?: Array<{ id: string; displayName?: string; shortName: string }> };
+  return (data.sites || []).map((s) => ({
+    id: s.id,
+    displayName: s.displayName || s.shortName,
+    shortName: s.shortName,
+  }));
+}
+
+export async function uploadAsset(
+  siteId: string,
+  filePath: string,
+  fileName: string,
+  altText?: string,
+  tokenOverride?: string
+): Promise<{ success: boolean; assetId?: string; hostedUrl?: string; error?: string }> {
+  const token = tokenOverride || getToken();
+  if (!token) return { success: false, error: 'WEBFLOW_API_TOKEN not configured' };
+
+  const fileBuffer = fs.readFileSync(filePath);
+  const fileSize = fileBuffer.length;
+  const ext = path.extname(fileName).slice(1).toLowerCase();
+
+  const mimeMap: Record<string, string> = {
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+    webp: 'image/webp', gif: 'image/gif', svg: 'image/svg+xml',
+    avif: 'image/avif',
+  };
+  const mimeType = mimeMap[ext] || 'application/octet-stream';
+
+  // Generate a simple hash from file content
+  const { createHash } = await import('crypto');
+  const fileHash = createHash('md5').update(fileBuffer).digest('hex');
+
+  try {
+    // Step 1: Create asset metadata and get presigned upload URL
+    const createBody: Record<string, unknown> = {
+      fileName,
+      fileSize,
+      fileHash,
+      mimeType,
+    };
+    const createRes = await webflowFetch(`/sites/${siteId}/assets`, {
+      method: 'POST',
+      body: JSON.stringify(createBody),
+    }, token);
+
+    if (!createRes.ok) {
+      const errText = await createRes.text();
+      return { success: false, error: `Failed to create asset (${createRes.status}): ${errText}` };
+    }
+
+    const createData = await createRes.json() as {
+      uploadDetails?: Record<string, string>;
+      uploadUrl?: string;
+      asset?: { id: string };
+      id?: string;
+    };
+    const uploadUrl = createData.uploadUrl;
+    const uploadDetails = createData.uploadDetails;
+    const assetId = createData.asset?.id || createData.id;
+
+    if (!uploadUrl || !uploadDetails) {
+      console.error('Webflow create response:', JSON.stringify(createData, null, 2));
+      return { success: false, error: 'No uploadUrl or uploadDetails in response' };
+    }
+
+    // Step 2: Upload file via S3 presigned POST (multipart form)
+    const formData = new FormData();
+    for (const [key, value] of Object.entries(uploadDetails)) {
+      formData.append(key, value);
+    }
+    formData.append('file', new Blob([fileBuffer], { type: mimeType }), fileName);
+
+    const uploadRes = await fetch(uploadUrl, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!uploadRes.ok && uploadRes.status !== 201) {
+      const errBody = await uploadRes.text();
+      return { success: false, error: `Upload to S3 failed (${uploadRes.status}): ${errBody.slice(0, 300)}` };
+    }
+
+    // Step 3: Set alt text via PATCH (not supported in initial create)
+    if (altText && assetId) {
+      try {
+        const patchRes = await webflowFetch(`/assets/${assetId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ altText }),
+        }, token);
+        if (patchRes.ok) {
+          console.log(`Set alt text for ${fileName}: "${altText}"`);
+        } else {
+          console.error(`Failed to set alt text for ${fileName}: ${patchRes.status}`);
+        }
+      } catch (e) {
+        console.error(`Alt text PATCH error for ${fileName}:`, e);
+      }
+    }
+
+    const hostedUrl = (createData as Record<string, unknown>).hostedUrl as string | undefined;
+    console.log(`Uploaded ${fileName} to Webflow (asset: ${assetId})`);
+    return { success: true, assetId, hostedUrl };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg };
+  }
+}
