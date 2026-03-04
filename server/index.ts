@@ -6,6 +6,7 @@ import multer from 'multer';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 import {
   listWorkspaces,
   createWorkspace,
@@ -37,6 +38,8 @@ import { generateAltText } from './alttext.js';
 import { runSeoAudit } from './seo-audit.js';
 import { checkSiteLinks } from './link-checker.js';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 const app = express();
 const server = createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
@@ -55,7 +58,7 @@ if (APP_PASSWORD) {
     // Allow health check without auth
     if (req.path === '/api/health') return next();
     // Check cookie or header
-    const token = req.cookies?.token || req.headers['x-auth-token'];
+    const token = req.headers['x-auth-token'];
     if (token === APP_PASSWORD) return next();
     // Check if this is the login endpoint
     if (req.path === '/api/auth/login' && req.method === 'POST') return next();
@@ -1192,7 +1195,7 @@ app.get('/api/health', (_req, res) => {
 
 // --- Serve frontend in production ---
 if (IS_PROD) {
-  const distPath = path.join(import.meta.dirname, '..', 'dist');
+  const distPath = path.join(__dirname, '..', 'dist');
   app.use(express.static(distPath));
   app.get('*', (_req, res) => {
     res.sendFile(path.join(distPath, 'index.html'));
