@@ -155,6 +155,53 @@ export async function getSearchOverview(
   };
 }
 
+export interface QueryPageRow {
+  query: string;
+  page: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+}
+
+export async function getQueryPageData(
+  siteId: string,
+  gscSiteUrl: string,
+  days: number = 90
+): Promise<QueryPageRow[]> {
+  const token = await getValidToken(siteId);
+  if (!token) throw new Error('Not connected to Google');
+
+  const endDate = new Date();
+  endDate.setDate(endDate.getDate() - 3);
+  const startDate = new Date(endDate);
+  startDate.setDate(startDate.getDate() - days);
+
+  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
+
+  const data = await gscFetch(
+    `${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`,
+    token,
+    {
+      startDate: fmt(startDate),
+      endDate: fmt(endDate),
+      dimensions: ['query', 'page'],
+      rowLimit: 500,
+      type: 'web',
+    }
+  ) as { rows?: SearchAnalyticsRow[] };
+
+  return (data.rows || []).map(r => ({
+    query: r.keys[0],
+    page: r.keys[1],
+    clicks: r.clicks,
+    impressions: r.impressions,
+    ctr: +(r.ctr * 100).toFixed(1),
+    position: +r.position.toFixed(1),
+  }));
+}
+
 export async function getPerformanceTrend(
   siteId: string,
   gscSiteUrl: string,

@@ -25,6 +25,23 @@ export interface EventDisplayConfig {
   group?: string;
 }
 
+export interface PageKeywordMap {
+  pagePath: string;
+  pageTitle: string;
+  primaryKeyword: string;
+  secondaryKeywords: string[];
+  currentPosition?: number;
+  impressions?: number;
+  clicks?: number;
+}
+
+export interface KeywordStrategy {
+  siteKeywords: string[];        // top-level target keywords for the whole site
+  pageMap: PageKeywordMap[];     // keyword assignments per page
+  opportunities: string[];       // keyword gaps / untapped opportunities
+  generatedAt: string;
+}
+
 export interface Workspace {
   id: string;
   name: string;
@@ -37,6 +54,7 @@ export interface Workspace {
   liveDomain?: string;
   eventConfig?: EventDisplayConfig[];
   eventGroups?: EventGroup[];
+  keywordStrategy?: KeywordStrategy;
   folder: string;
   createdAt: string;
 }
@@ -94,7 +112,7 @@ export function createWorkspace(name: string, webflowSiteId?: string, webflowSit
   return workspace;
 }
 
-export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'liveDomain' | 'eventConfig' | 'eventGroups'>>): Workspace | null {
+export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy'>>): Workspace | null {
   const workspaces = readConfig();
   const idx = workspaces.findIndex(w => w.id === id);
   if (idx === -1) return null;

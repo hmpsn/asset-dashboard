@@ -22,9 +22,10 @@ interface EditState {
 
 interface Props {
   siteId: string;
+  workspaceId?: string;
 }
 
-export function SeoEditor({ siteId }: Props) {
+export function SeoEditor({ siteId, workspaceId }: Props) {
   const [pages, setPages] = useState<PageMeta[]>([]);
   const [loading, setLoading] = useState(false);
   const [edits, setEdits] = useState<Record<string, EditState>>({});
@@ -128,6 +129,8 @@ export function SeoEditor({ siteId }: Props) {
           currentSeoTitle: edit?.seoTitle || page.seo?.title,
           currentDescription: edit?.seoDescription || page.seo?.description,
           field,
+          workspaceId,
+          pagePath: `/${page.slug || ''}`,
         }),
       });
       const data = await res.json();

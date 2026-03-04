@@ -52,7 +52,7 @@ import { generateSchemaSuggestions, generateSchemaForPage } from './schema-sugge
 import { runSalesAudit } from './sales-audit.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
-import { listGscSites, getSearchOverview, getPerformanceTrend } from './search-console.js';
+import { listGscSites, getSearchOverview, getPerformanceTrend, getQueryPageData } from './search-console.js';
 import { listGA4Properties, getGA4Overview, getGA4DailyTrend, getGA4TopPages, getGA4TopSources, getGA4DeviceBreakdown, getGA4Countries, getGA4KeyEvents, getGA4EventTrend, getGA4Conversions, getGA4EventsByPage } from './google-analytics.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -1066,11 +1066,36 @@ app.get('/api/webflow/link-check/:siteId', async (req, res) => {
 
 // --- AI SEO Rewrite ---
 app.post('/api/webflow/seo-rewrite', async (req, res) => {
-  const { pageTitle, currentSeoTitle, currentDescription, pageContent, siteContext, field } = req.body;
+  const { pageTitle, currentSeoTitle, currentDescription, pageContent, siteContext, field, workspaceId, pagePath } = req.body;
   if (!pageTitle) return res.status(400).json({ error: 'pageTitle required' });
 
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
+
+  // Look up keyword strategy if workspaceId provided
+  let keywordContext = '';
+  if (workspaceId) {
+    const ws = getWorkspace(workspaceId);
+    const strategy = ws?.keywordStrategy;
+    if (strategy) {
+      const siteKw = strategy.siteKeywords?.slice(0, 5).join(', ');
+      if (siteKw) keywordContext += `\nSite target keywords: ${siteKw}`;
+      if (pagePath) {
+        const pageKw = strategy.pageMap?.find(
+          (p: { pagePath: string }) => p.pagePath === pagePath || pagePath.includes(p.pagePath)
+        );
+        if (pageKw) {
+          keywordContext += `\nThis page's primary keyword: "${pageKw.primaryKeyword}"`;
+          if (pageKw.secondaryKeywords?.length) {
+            keywordContext += `\nSecondary keywords: ${pageKw.secondaryKeywords.join(', ')}`;
+          }
+        }
+      }
+      if (keywordContext) {
+        keywordContext = `\n\nKEYWORD STRATEGY (incorporate these naturally):${keywordContext}`;
+      }
+    }
+  }
 
   try {
     let prompt: string;
@@ -1080,13 +1105,14 @@ app.post('/api/webflow/seo-rewrite', async (req, res) => {
 Page title: ${pageTitle}
 Current meta description: ${currentDescription || '(none)'}
 Site context: ${siteContext || 'N/A'}
-Page content excerpt: ${pageContent ? pageContent.slice(0, 1500) : 'N/A'}
+Page content excerpt: ${pageContent ? pageContent.slice(0, 1500) : 'N/A'}${keywordContext}
 
 Requirements:
 - Between 150-160 characters (hard limit: 160)
 - Include a clear call to action or value proposition
 - Natural, not keyword-stuffed
 - Compelling enough to increase click-through rate from search results
+- If keyword strategy is provided, naturally incorporate the primary keyword
 
 Return ONLY the meta description text, nothing else.`;
     } else {
@@ -1096,13 +1122,14 @@ Page title: ${pageTitle}
 Current SEO title: ${currentSeoTitle || '(none)'}
 Current meta description: ${currentDescription || '(none)'}
 Site context: ${siteContext || 'N/A'}
-Page content excerpt: ${pageContent ? pageContent.slice(0, 1500) : 'N/A'}
+Page content excerpt: ${pageContent ? pageContent.slice(0, 1500) : 'N/A'}${keywordContext}
 
 Requirements:
 - Between 50-60 characters (hard limit: 60)
 - Front-load the most important keywords
 - Include brand name at end if appropriate (use pipe separator: |)
 - Compelling and descriptive
+- If keyword strategy is provided, front-load the primary keyword
 
 Return ONLY the title tag text, nothing else.`;
     }
@@ -2333,6 +2360,157 @@ app.get('/api/google/performance-trend/:siteId', async (req, res) => {
     const msg = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: msg });
   }
+});
+
+// --- Keyword Strategy Generation ---
+app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
+
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
+
+  const token = getTokenForSite(ws.webflowSiteId) || undefined;
+
+  try {
+    // 1. Gather page data from Webflow
+    const allPages = await listPages(ws.webflowSiteId, token);
+    const published = filterPublishedPages(allPages);
+    const pageInfo = published.map(p => ({
+      path: p.publishedPath || `/${p.slug || ''}`,
+      title: p.title || p.slug || '',
+      seoTitle: p.seo?.title || '',
+      seoDesc: p.seo?.description || '',
+    }));
+
+    // 2. Try to gather GSC data if connected
+    let gscData: Array<{ query: string; page: string; clicks: number; impressions: number; position: number }> = [];
+    if (ws.gscPropertyUrl) {
+      try {
+        gscData = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90);
+      } catch {
+        console.log('Keyword strategy: GSC data unavailable, proceeding without it');
+      }
+    }
+
+    // 3. Build context for AI
+    const pageList = pageInfo.map(p => `- ${p.path}: "${p.title}" | SEO: "${p.seoTitle}" | Desc: "${p.seoDesc}"`).join('\n');
+
+    let gscContext = '';
+    if (gscData.length > 0) {
+      // Top 50 query-page combos by impressions
+      const sorted = [...gscData].sort((a, b) => b.impressions - a.impressions).slice(0, 50);
+      gscContext = `\n\nGoogle Search Console data (last 90 days, top queries by impressions):\n` +
+        sorted.map(r => `- "${r.query}" → ${r.page} (pos: ${r.position}, clicks: ${r.clicks}, impressions: ${r.impressions})`).join('\n');
+    }
+
+    const prompt = `You are an expert SEO strategist. Analyze this website and create a keyword strategy.
+
+Site pages:
+${pageList}
+${gscContext}
+
+Create a comprehensive keyword strategy as a JSON object with this exact structure:
+{
+  "siteKeywords": ["top 5-10 primary keywords this entire site should target"],
+  "pageMap": [
+    {
+      "pagePath": "/exact-path",
+      "pageTitle": "Page Title",
+      "primaryKeyword": "main keyword for this page",
+      "secondaryKeywords": ["2-4 supporting keywords"]
+    }
+  ],
+  "opportunities": ["3-5 keyword opportunities or gaps the site isn't covering well"]
+}
+
+Rules:
+- Each page should target a UNIQUE primary keyword (no cannibalization)
+- Use GSC data to identify what's already working and what has potential (high impressions but low position = opportunity)
+- Primary keywords should be specific, not generic
+- Include long-tail keywords in secondaryKeywords
+- Opportunities should be actionable and specific
+- Cover ALL pages in the pageMap
+- Return ONLY valid JSON, no markdown or explanation`;
+
+    const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 4000,
+        temperature: 0.4,
+      }),
+    });
+
+    if (!aiRes.ok) {
+      const errText = await aiRes.text();
+      return res.status(500).json({ error: `OpenAI error: ${errText.slice(0, 200)}` });
+    }
+
+    const aiData = await aiRes.json() as { choices?: Array<{ message?: { content?: string } }> };
+    let raw = aiData.choices?.[0]?.message?.content?.trim() || '';
+    // Strip markdown code fences if present
+    raw = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+
+    let strategy;
+    try {
+      strategy = JSON.parse(raw);
+    } catch {
+      return res.status(500).json({ error: 'AI returned invalid JSON', raw: raw.slice(0, 500) });
+    }
+
+    // Enrich pageMap with GSC metrics if available
+    if (gscData.length > 0) {
+      for (const pm of strategy.pageMap) {
+        const matchingRows = gscData.filter(r => {
+          try { return new URL(r.page).pathname === pm.pagePath; } catch { return false; }
+        });
+        if (matchingRows.length > 0) {
+          // Find the row matching the primary keyword, or the best one
+          const kwMatch = matchingRows.find(r => r.query.toLowerCase().includes(pm.primaryKeyword.toLowerCase()));
+          const best = kwMatch || matchingRows.sort((a, b) => b.impressions - a.impressions)[0];
+          pm.currentPosition = best.position;
+          pm.impressions = matchingRows.reduce((s, r) => s + r.impressions, 0);
+          pm.clicks = matchingRows.reduce((s, r) => s + r.clicks, 0);
+        }
+      }
+    }
+
+    // 4. Save to workspace
+    const keywordStrategy = {
+      ...strategy,
+      generatedAt: new Date().toISOString(),
+    };
+    updateWorkspace(ws.id, { keywordStrategy });
+
+    res.json(keywordStrategy);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('Keyword strategy error:', msg);
+    res.status(500).json({ error: msg });
+  }
+});
+
+// Get stored keyword strategy
+app.get('/api/webflow/keyword-strategy/:workspaceId', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  res.json(ws.keywordStrategy || null);
+});
+
+// Update keyword strategy (manual edits)
+app.patch('/api/webflow/keyword-strategy/:workspaceId', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const updated = { ...(ws.keywordStrategy || {}), ...req.body, generatedAt: new Date().toISOString() };
+  updateWorkspace(ws.id, { keywordStrategy: updated });
+  res.json(updated);
 });
 
 // --- Public Client Dashboard API (no auth required) ---

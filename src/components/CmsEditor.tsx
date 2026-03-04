@@ -27,9 +27,10 @@ interface CmsCollection {
 
 interface Props {
   siteId: string;
+  workspaceId?: string;
 }
 
-export function CmsEditor({ siteId }: Props) {
+export function CmsEditor({ siteId, workspaceId }: Props) {
   const [collections, setCollections] = useState<CmsCollection[]>([]);
   const [loading, setLoading] = useState(false);
   const [expandedCollections, setExpandedCollections] = useState<Set<string>>(new Set());
@@ -144,6 +145,7 @@ export function CmsEditor({ siteId }: Props) {
           currentSeoTitle: isTitle ? currentValue : undefined,
           currentDescription: !isTitle ? currentValue : undefined,
           field: isTitle ? 'title' : 'description',
+          workspaceId,
         }),
       });
       const data = await res.json();

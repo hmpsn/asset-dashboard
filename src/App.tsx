@@ -324,7 +324,7 @@ function Dashboard() {
             )}
 
             {tab === 'seo' && selected.webflowSiteId && (
-              <SeoAudit key={`seo-${selected.webflowSiteId}`} siteId={selected.webflowSiteId} />
+              <SeoAudit key={`seo-${selected.webflowSiteId}`} siteId={selected.webflowSiteId} workspaceId={selected.id} />
             )}
             {tab === 'seo' && !selected.webflowSiteId && (
               <div className="flex flex-col items-center justify-center py-24 gap-3">

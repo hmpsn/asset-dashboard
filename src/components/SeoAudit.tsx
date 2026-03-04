@@ -3,7 +3,7 @@ import {
   Loader2, Search as SearchIcon, ChevronDown, ChevronRight, Download,
   AlertTriangle, AlertCircle, Info, CheckCircle, Globe, FileText,
   RefreshCw, X, Pencil, Link2Off, Clock, Share2, Copy, ExternalLink,
-  TrendingUp, TrendingDown, Minus, Plus, ListChecks, Trash2, Circle, Code2,
+  TrendingUp, TrendingDown, Minus, Plus, ListChecks, Trash2, Circle, Code2, Target,
 } from 'lucide-react';
 import { SeoEditor } from './SeoEditor';
 import { LinkChecker } from './LinkChecker';
@@ -11,6 +11,7 @@ import { KeywordAnalysis } from './KeywordAnalysis';
 import { SchemaSuggester } from './SchemaSuggester';
 import { CompetitorAnalysis } from './CompetitorAnalysis';
 import { CmsEditor } from './CmsEditor';
+import { KeywordStrategyPanel } from './KeywordStrategy';
 
 type Severity = 'error' | 'warning' | 'info';
 
@@ -53,7 +54,7 @@ interface SeoAuditResult {
   siteWideIssues: SeoIssue[];
 }
 
-type SubTab = 'audit' | 'editor' | 'cms' | 'links' | 'keywords' | 'schema' | 'competitor' | 'history';
+type SubTab = 'audit' | 'editor' | 'cms' | 'links' | 'keywords' | 'schema' | 'competitor' | 'history' | 'strategy';
 
 interface SnapshotSummary {
   id: string;
@@ -67,6 +68,7 @@ interface SnapshotSummary {
 
 interface Props {
   siteId: string;
+  workspaceId?: string;
 }
 
 const SEVERITY_CONFIG: Record<Severity, { label: string; color: string; bg: string; icon: typeof AlertTriangle }> = {
@@ -480,7 +482,7 @@ function AuditHistory({ siteId, history, onRefresh }: { siteId: string; history:
   );
 }
 
-function SeoAudit({ siteId }: Props) {
+function SeoAudit({ siteId, workspaceId }: Props) {
   const [subTab, setSubTab] = useState<SubTab>('audit');
   const [data, setData] = useState<SeoAuditResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -759,6 +761,7 @@ function SeoAudit({ siteId }: Props) {
     { id: 'editor', label: 'Edit SEO', icon: Pencil },
     { id: 'cms', label: 'CMS SEO', icon: ListChecks },
     { id: 'links', label: 'Dead Links', icon: Link2Off },
+    { id: 'strategy', label: 'Strategy', icon: Target },
     { id: 'keywords', label: 'Keywords', icon: SearchIcon },
     { id: 'schema', label: 'Schema', icon: Code2 },
     { id: 'competitor', label: 'Competitor', icon: TrendingUp },
@@ -788,8 +791,9 @@ function SeoAudit({ siteId }: Props) {
     </div>
   );
 
-  if (subTab === 'editor') return <>{tabNav}<SeoEditor siteId={siteId} /></>;
-  if (subTab === 'cms') return <>{tabNav}<CmsEditor siteId={siteId} /></>;
+  if (subTab === 'editor') return <>{tabNav}<SeoEditor siteId={siteId} workspaceId={workspaceId} /></>;
+  if (subTab === 'cms') return <>{tabNav}<CmsEditor siteId={siteId} workspaceId={workspaceId} /></>;
+  if (subTab === 'strategy') return <>{tabNav}<KeywordStrategyPanel workspaceId={workspaceId || ''} /></>;
   if (subTab === 'links') return <>{tabNav}<LinkChecker siteId={siteId} /></>;
   if (subTab === 'keywords') return <>{tabNav}<KeywordAnalysis siteId={siteId} /></>;
   if (subTab === 'schema') return <>{tabNav}<SchemaSuggester siteId={siteId} /></>;
