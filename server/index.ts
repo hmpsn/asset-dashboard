@@ -38,6 +38,7 @@ import { generateAltText } from './alttext.js';
 import { runSeoAudit } from './seo-audit.js';
 import { checkSiteLinks } from './link-checker.js';
 import { saveSnapshot, getSnapshot, listSnapshots, getLatestSnapshot, renderReportHTML } from './reports.js';
+import { runSiteSpeed } from './pagespeed.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -534,6 +535,20 @@ app.get('/api/webflow/seo-audit/:siteId', async (req, res) => {
   } catch (err) {
     console.error('SEO audit error:', err);
     res.status(500).json({ error: 'SEO audit failed' });
+  }
+});
+
+// --- PageSpeed / Core Web Vitals ---
+app.get('/api/webflow/pagespeed/:siteId', async (req, res) => {
+  try {
+    const token = getTokenForSite(req.params.siteId) || undefined;
+    const strategy = (req.query.strategy as 'mobile' | 'desktop') || 'mobile';
+    const maxPages = parseInt(req.query.maxPages as string) || 5;
+    const result = await runSiteSpeed(req.params.siteId, strategy, maxPages, token);
+    res.json(result);
+  } catch (err) {
+    console.error('PageSpeed error:', err);
+    res.status(500).json({ error: 'PageSpeed analysis failed' });
   }
 });
 

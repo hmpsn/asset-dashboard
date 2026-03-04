@@ -6,14 +6,15 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { MediaTab } from './components/MediaTab';
 import { PageWeight } from './components/PageWeight';
 import { SeoAudit } from './components/SeoAudit';
+import { PageSpeedPanel } from './components/PageSpeedPanel';
 import { LoginScreen } from './components/LoginScreen';
 import { useAuth } from './hooks/useAuth';
 import { useWebSocket } from './hooks/useWebSocket';
 import {
-  Settings, Clipboard, BarChart3, Globe, Image,
+  Settings, Clipboard, BarChart3, Globe, Image, Gauge,
 } from 'lucide-react';
 
-type Tab = 'media' | 'seo' | 'performance';
+type Tab = 'media' | 'seo' | 'performance' | 'speed';
 
 function App() {
   const auth = useAuth();
@@ -173,6 +174,7 @@ function Dashboard() {
     { id: 'media', label: 'Media', icon: Image },
     { id: 'seo', label: 'SEO', icon: Globe },
     { id: 'performance', label: 'Performance', icon: BarChart3 },
+    { id: 'speed', label: 'Speed', icon: Gauge },
   ];
 
   return (
@@ -277,6 +279,18 @@ function Dashboard() {
                   <BarChart3 className="w-5 h-5" style={{ color: 'var(--brand-text-muted)' }} />
                 </div>
                 <p className="text-sm" style={{ color: 'var(--brand-text-muted)' }}>Link a Webflow site to analyze performance</p>
+              </div>
+            )}
+
+            {tab === 'speed' && selected.webflowSiteId && (
+              <PageSpeedPanel key={`speed-${selected.webflowSiteId}`} siteId={selected.webflowSiteId} />
+            )}
+            {tab === 'speed' && !selected.webflowSiteId && (
+              <div className="flex flex-col items-center justify-center py-24 gap-3">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'var(--brand-bg-elevated)' }}>
+                  <Gauge className="w-5 h-5" style={{ color: 'var(--brand-text-muted)' }} />
+                </div>
+                <p className="text-sm" style={{ color: 'var(--brand-text-muted)' }}>Link a Webflow site to test page speed</p>
               </div>
             )}
           </div>

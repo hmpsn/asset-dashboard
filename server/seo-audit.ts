@@ -8,13 +8,36 @@ function getToken(tokenOverride?: string): string | null {
 
 export type Severity = 'error' | 'warning' | 'info';
 
+export type CheckCategory = 'content' | 'technical' | 'social' | 'performance' | 'accessibility';
+
 export interface SeoIssue {
   check: string;
   severity: Severity;
+  category?: CheckCategory;
   message: string;
   recommendation: string;
   value?: string;
 }
+
+const CHECK_CATEGORY: Record<string, CheckCategory> = {
+  // Content
+  'title': 'content', 'meta-description': 'content', 'h1': 'content', 'heading-hierarchy': 'content',
+  'content-length': 'content', 'internal-links': 'content', 'link-text': 'content',
+  'meta-keywords': 'content', 'h1-title-match': 'content', 'url': 'content',
+  'duplicate-title': 'content', 'duplicate-description': 'content',
+  // Technical
+  'canonical': 'technical', 'viewport': 'technical', 'robots': 'technical', 'lang': 'technical',
+  'favicon': 'technical', 'mixed-content': 'technical', 'ssl': 'technical',
+  'robots-txt': 'technical', 'sitemap': 'technical', 'response-time': 'technical',
+  'structured-data': 'technical',
+  // Social
+  'og-tags': 'social', 'og-image': 'social', 'twitter-card': 'social',
+  // Performance
+  'lazy-loading': 'performance', 'img-dimensions': 'performance',
+  'inline-css': 'performance', 'inline-js': 'performance', 'render-blocking': 'performance',
+  // Accessibility
+  'img-alt': 'accessibility',
+};
 
 export interface PageSeoResult {
   page: string;
@@ -113,17 +136,50 @@ function extractLinks(html: string): { href: string; text: string; rel?: string 
   return links;
 }
 
-function extractImgTags(html: string): { src: string; alt: string }[] {
-  const imgs: { src: string; alt: string }[] = [];
+function extractImgTags(html: string): { src: string; alt: string; loading?: string; hasWidth: boolean; hasHeight: boolean }[] {
+  const imgs: { src: string; alt: string; loading?: string; hasWidth: boolean; hasHeight: boolean }[] = [];
   const regex = /<img\s+([^>]*)>/gi;
   let m;
   while ((m = regex.exec(html)) !== null) {
     const attrs = m[1];
     const src = attrs.match(/src=["']([^"']*)["']/)?.[1] || '';
     const alt = attrs.match(/alt=["']([^"']*)["']/)?.[1] || '';
-    imgs.push({ src, alt });
+    const loading = attrs.match(/loading=["']([^"']*)["']/)?.[1];
+    const hasWidth = /width\s*=/.test(attrs);
+    const hasHeight = /height\s*=/.test(attrs);
+    imgs.push({ src, alt, loading, hasWidth, hasHeight });
   }
   return imgs;
+}
+
+function extractStyleBlocks(html: string): number {
+  const regex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
+  let total = 0;
+  let m;
+  while ((m = regex.exec(html)) !== null) total += m[1].length;
+  return total;
+}
+
+function extractInlineScripts(html: string): number {
+  // Count inline scripts (not external src ones)
+  const regex = /<script(?![^>]*\bsrc\b)[^>]*>([\s\S]*?)<\/script>/gi;
+  let total = 0;
+  let m;
+  while ((m = regex.exec(html)) !== null) {
+    // Exclude JSON-LD structured data
+    if (m[0].includes('application/ld+json')) continue;
+    total += m[1].length;
+  }
+  return total;
+}
+
+function countExternalResources(html: string): { stylesheets: number; scripts: number } {
+  const cssRegex = /<link[^>]*rel=["']stylesheet["'][^>]*>/gi;
+  const jsRegex = /<script[^>]*src=["'][^"']+["'][^>]*>/gi;
+  let stylesheets = 0, scripts = 0;
+  while (cssRegex.exec(html)) stylesheets++;
+  while (jsRegex.exec(html)) scripts++;
+  return { stylesheets, scripts };
 }
 
 function auditPage(
@@ -253,6 +309,86 @@ function auditPage(
     if (emptyLinks.length > 0) {
       issues.push({ check: 'link-text', severity: 'warning', message: `${emptyLinks.length} link${emptyLinks.length > 1 ? 's' : ''} with empty anchor text`, recommendation: 'Add descriptive anchor text to all links for better accessibility and SEO.' });
     }
+
+    // --- NEW TIER 1 CHECKS ---
+
+    // 1. Mixed content (HTTP resources on HTTPS page)
+    if (url.startsWith('https://')) {
+      const httpRefs = html.match(/(?:src|href|action)=["']http:\/\/[^"']+["']/gi) || [];
+      const filtered = httpRefs.filter(r => !r.includes('http://schemas') && !r.includes('http://www.w3.org'));
+      if (filtered.length > 0) {
+        issues.push({ check: 'mixed-content', severity: 'error', message: `${filtered.length} mixed content resource${filtered.length > 1 ? 's' : ''} (HTTP on HTTPS)`, recommendation: 'Update all resource URLs to use HTTPS. Mixed content can trigger browser security warnings and hurt trust.' });
+      }
+    }
+
+    // 2. Twitter Card tags
+    const twitterCard = extractMetaContent(html, 'twitter:card');
+    if (!twitterCard) {
+      issues.push({ check: 'twitter-card', severity: 'info', message: 'Missing Twitter Card tags', recommendation: 'Add twitter:card, twitter:title, and twitter:description meta tags for better Twitter/X sharing previews.' });
+    }
+
+    // 3. Language attribute
+    const htmlLang = html.match(/<html[^>]*\blang=["']([^"']*)["']/i);
+    if (!htmlLang) {
+      issues.push({ check: 'lang', severity: 'warning', message: 'Missing lang attribute on <html>', recommendation: 'Add a lang attribute (e.g., lang="en") to help search engines and assistive technology understand the page language.' });
+    }
+
+    // 4. Favicon
+    const favicon = html.match(/<link[^>]*rel=["'](?:icon|shortcut icon|apple-touch-icon)["'][^>]*>/i);
+    if (!favicon) {
+      issues.push({ check: 'favicon', severity: 'info', message: 'No favicon detected', recommendation: 'Add a favicon for better brand recognition in browser tabs and bookmarks.' });
+    }
+
+    // 5. Image lazy loading
+    const imgsWithoutLazy = imgs.filter(i => !i.loading || i.loading !== 'lazy');
+    // Only flag if there are several images — first 1-2 might be above the fold
+    if (imgs.length > 3 && imgsWithoutLazy.length > 2) {
+      issues.push({ check: 'lazy-loading', severity: 'info', message: `${imgsWithoutLazy.length} of ${imgs.length} images without lazy loading`, recommendation: 'Add loading="lazy" to below-the-fold images to improve initial page load performance.' });
+    }
+
+    // 6. Image dimensions (CLS prevention)
+    const noDimensions = imgs.filter(i => !i.hasWidth || !i.hasHeight);
+    if (noDimensions.length > 0) {
+      issues.push({ check: 'img-dimensions', severity: 'warning', message: `${noDimensions.length} image${noDimensions.length > 1 ? 's' : ''} missing width/height attributes`, recommendation: 'Set explicit width and height on images to prevent Cumulative Layout Shift (CLS), a Core Web Vital.' });
+    }
+
+    // 7. Inline CSS size
+    const inlineCSSSize = extractStyleBlocks(html);
+    if (inlineCSSSize > 15000) {
+      issues.push({ check: 'inline-css', severity: 'warning', message: `Large inline CSS (${Math.round(inlineCSSSize / 1024)}KB)`, recommendation: 'Move large CSS blocks to external stylesheets for better caching and reduced HTML size.' });
+    }
+
+    // 8. Inline JS size
+    const inlineJSSize = extractInlineScripts(html);
+    if (inlineJSSize > 10000) {
+      issues.push({ check: 'inline-js', severity: 'warning', message: `Large inline JavaScript (${Math.round(inlineJSSize / 1024)}KB)`, recommendation: 'Move large script blocks to external files for better caching and performance.' });
+    }
+
+    // 9. Render-blocking resources
+    const resources = countExternalResources(html);
+    if (resources.stylesheets + resources.scripts > 15) {
+      issues.push({ check: 'render-blocking', severity: 'warning', message: `${resources.stylesheets} CSS + ${resources.scripts} JS files (${resources.stylesheets + resources.scripts} total)`, recommendation: 'Too many external resources can slow page rendering. Combine files, defer non-critical scripts, and lazy-load CSS where possible.' });
+    }
+
+    // 10. Meta keywords (deprecated)
+    const metaKeywords = extractMetaContent(html, 'keywords');
+    if (metaKeywords) {
+      issues.push({ check: 'meta-keywords', severity: 'info', message: 'Using deprecated meta keywords tag', recommendation: 'The meta keywords tag is ignored by Google and most search engines. Focus on content quality instead.' });
+    }
+
+    // 11. H1 matches title exactly (missed optimization)
+    if (h1s.length === 1 && seoTitle) {
+      const h1Clean = h1s[0].replace(/<[^>]+>/g, '').trim().toLowerCase();
+      const titleClean = seoTitle.trim().toLowerCase();
+      if (h1Clean === titleClean && h1Clean.length > 0) {
+        issues.push({ check: 'h1-title-match', severity: 'info', message: 'H1 and title tag are identical', recommendation: 'Differentiate your H1 from the title tag slightly. The title targets search engines while H1 targets readers on the page.' });
+      }
+    }
+  }
+
+  // Auto-assign categories
+  for (const issue of issues) {
+    issue.category = CHECK_CATEGORY[issue.check] || 'technical';
   }
 
   // Score: start at 100, deduct per issue
@@ -303,8 +439,64 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string): Promi
     results.push(...chunkResults);
   }
 
-  // Site-wide checks: duplicate titles, duplicate descriptions
+  // Site-wide checks
   const siteWideIssues: SeoIssue[] = [];
+
+  // --- TIER 2: Site-wide technical checks ---
+  if (baseUrl) {
+    // Robots.txt
+    try {
+      const robotsRes = await fetch(`${baseUrl}/robots.txt`, { redirect: 'follow' });
+      if (!robotsRes.ok) {
+        siteWideIssues.push({ check: 'robots-txt', severity: 'warning', message: 'Missing robots.txt file', recommendation: 'Create a robots.txt file to guide search engine crawlers on which pages to index.' });
+      } else {
+        const robotsTxt = await robotsRes.text();
+        if (robotsTxt.includes('Disallow: /')) {
+          const lines = robotsTxt.split('\n').filter(l => l.trim().startsWith('Disallow:'));
+          const blockAll = lines.some(l => l.trim() === 'Disallow: /');
+          if (blockAll) {
+            siteWideIssues.push({ check: 'robots-txt', severity: 'error', message: 'robots.txt blocks all crawlers', recommendation: 'Your robots.txt contains "Disallow: /" which prevents all search engines from indexing your site. Remove this line unless intentional.', value: 'Disallow: /' });
+          }
+        }
+        if (!robotsTxt.toLowerCase().includes('sitemap:')) {
+          siteWideIssues.push({ check: 'robots-txt', severity: 'info', message: 'robots.txt does not reference a sitemap', recommendation: 'Add a Sitemap: directive to your robots.txt to help search engines discover your XML sitemap.' });
+        }
+      }
+    } catch { /* skip if fetch fails */ }
+
+    // XML Sitemap
+    try {
+      const sitemapRes = await fetch(`${baseUrl}/sitemap.xml`, { redirect: 'follow' });
+      if (!sitemapRes.ok) {
+        siteWideIssues.push({ check: 'sitemap', severity: 'warning', message: 'Missing XML sitemap', recommendation: 'Create a sitemap.xml to help search engines discover and index all your pages efficiently.' });
+      } else {
+        const sitemapText = await sitemapRes.text();
+        const sitemapUrls = (sitemapText.match(/<loc>([^<]+)<\/loc>/gi) || []).length;
+        if (sitemapUrls === 0) {
+          siteWideIssues.push({ check: 'sitemap', severity: 'warning', message: 'XML sitemap is empty', recommendation: 'Your sitemap.xml exists but contains no URLs. Ensure it lists all indexable pages.' });
+        } else if (sitemapUrls < pages.length * 0.5) {
+          siteWideIssues.push({ check: 'sitemap', severity: 'warning', message: `Sitemap has ${sitemapUrls} URLs but site has ${pages.length} published pages`, recommendation: 'Your sitemap may be missing pages. Ensure all important pages are included.' });
+        }
+      }
+    } catch { /* skip if fetch fails */ }
+
+    // Page response time (sample the homepage)
+    try {
+      const startTime = Date.now();
+      await fetch(baseUrl, { redirect: 'follow' });
+      const responseTime = Date.now() - startTime;
+      if (responseTime > 3000) {
+        siteWideIssues.push({ check: 'response-time', severity: 'error', message: `Slow server response (${(responseTime / 1000).toFixed(1)}s)`, recommendation: 'Server response time should be under 600ms. Slow response times hurt both user experience and SEO rankings.', value: `${responseTime}ms` });
+      } else if (responseTime > 1000) {
+        siteWideIssues.push({ check: 'response-time', severity: 'warning', message: `Server response time ${(responseTime / 1000).toFixed(1)}s`, recommendation: 'Aim for server response under 600ms. Consider caching, CDN, or server optimization.', value: `${responseTime}ms` });
+      }
+    } catch { /* skip */ }
+
+    // SSL / HTTPS check
+    if (!baseUrl.startsWith('https://')) {
+      siteWideIssues.push({ check: 'ssl', severity: 'error', message: 'Site is not using HTTPS', recommendation: 'Enable SSL/HTTPS for your site. HTTPS is a ranking signal and required for user trust.' });
+    }
+  }
 
   const titleMap = new Map<string, string[]>();
   const descMap = new Map<string, string[]>();
@@ -341,6 +533,11 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string): Promi
         value: desc.slice(0, 80) + (desc.length > 80 ? '...' : ''),
       });
     }
+  }
+
+  // Auto-assign categories to site-wide issues
+  for (const issue of siteWideIssues) {
+    issue.category = CHECK_CATEGORY[issue.check] || 'technical';
   }
 
   results.sort((a, b) => a.score - b.score);

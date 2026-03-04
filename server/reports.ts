@@ -99,12 +99,35 @@ export function renderReportHTML(snapshot: AuditSnapshot): string {
 
   const scoreColor = audit.siteScore >= 80 ? '#22c55e' : audit.siteScore >= 60 ? '#eab308' : audit.siteScore >= 40 ? '#f97316' : '#ef4444';
 
+  const catColors: Record<string, string> = {
+    content: '#34d399', technical: '#a78bfa', social: '#f472b6',
+    performance: '#fb923c', accessibility: '#38bdf8',
+  };
+
+  // Category summary
+  const catCounts: Record<string, number> = {};
+  for (const p of audit.pages) {
+    for (const i of p.issues) {
+      const cat = i.category || 'technical';
+      catCounts[cat] = (catCounts[cat] || 0) + 1;
+    }
+  }
+  for (const i of audit.siteWideIssues) {
+    const cat = i.category || 'technical';
+    catCounts[cat] = (catCounts[cat] || 0) + 1;
+  }
+
   const pageRows = audit.pages.map(p => {
     const pColor = p.score >= 80 ? '#22c55e' : p.score >= 60 ? '#eab308' : p.score >= 40 ? '#f97316' : '#ef4444';
     const issueList = p.issues.map(i => {
       const iColor = i.severity === 'error' ? '#ef4444' : i.severity === 'warning' ? '#eab308' : '#60a5fa';
+      const cColor = catColors[i.category || 'technical'] || '#94a3b8';
+      const cLabel = (i.category || 'technical').charAt(0).toUpperCase() + (i.category || 'technical').slice(1);
       return `<div style="padding:8px 12px;margin:4px 0;border-radius:6px;background:${i.severity === 'error' ? 'rgba(239,68,68,0.08)' : i.severity === 'warning' ? 'rgba(234,179,8,0.08)' : 'rgba(96,165,250,0.08)'};border:1px solid ${i.severity === 'error' ? 'rgba(239,68,68,0.2)' : i.severity === 'warning' ? 'rgba(234,179,8,0.2)' : 'rgba(96,165,250,0.2)'}">
-        <div style="font-size:13px;color:${iColor};font-weight:500">${i.severity.toUpperCase()}: ${i.message}</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="font-size:13px;color:${iColor};font-weight:500;flex:1">${i.severity.toUpperCase()}: ${i.message}</div>
+          <span class="badge" style="color:${cColor};border:1px solid ${cColor}33;background:${cColor}11">${cLabel}</span>
+        </div>
         <div style="font-size:12px;color:#94a3b8;margin-top:2px">${i.recommendation}</div>
       </div>`;
     }).join('');
@@ -123,11 +146,29 @@ export function renderReportHTML(snapshot: AuditSnapshot): string {
 
   const siteWideRows = audit.siteWideIssues.map(i => {
     const iColor = i.severity === 'error' ? '#ef4444' : i.severity === 'warning' ? '#eab308' : '#60a5fa';
+    const cColor = catColors[i.category || 'technical'] || '#94a3b8';
+    const cLabel = (i.category || 'technical').charAt(0).toUpperCase() + (i.category || 'technical').slice(1);
     return `<div style="padding:10px 14px;margin:6px 0;border-radius:6px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06)">
-      <div style="font-size:13px;color:${iColor};font-weight:500">${i.severity.toUpperCase()}: ${i.message}</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="font-size:13px;color:${iColor};font-weight:500;flex:1">${i.severity.toUpperCase()}: ${i.message}</div>
+        <span class="badge" style="color:${cColor};border:1px solid ${cColor}33;background:${cColor}11">${cLabel}</span>
+      </div>
       <div style="font-size:12px;color:#94a3b8;margin-top:2px">${i.recommendation}</div>
     </div>`;
   }).join('');
+
+  const catSummaryHTML = Object.entries(catCounts).length > 0
+    ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;justify-content:center">${
+        Object.entries(catCounts).map(([cat, count]) => {
+          const color = catColors[cat] || '#94a3b8';
+          const label = cat.charAt(0).toUpperCase() + cat.slice(1);
+          return `<div style="padding:6px 14px;border-radius:6px;background:${color}11;border:1px solid ${color}22;text-align:center">
+            <div style="font-size:16px;font-weight:600;color:${color}">${count}</div>
+            <div style="font-size:10px;color:${color};text-transform:uppercase;letter-spacing:0.5px">${label}</div>
+          </div>`;
+        }).join('')
+      }</div>`
+    : '';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -188,6 +229,7 @@ export function renderReportHTML(snapshot: AuditSnapshot): string {
           <div class="stat-label">Info</div>
         </div>
       </div>
+      ${catSummaryHTML}
     </div>
 
     ${audit.siteWideIssues.length > 0 ? `<div class="section-title">Site-Wide Issues</div>${siteWideRows}` : ''}

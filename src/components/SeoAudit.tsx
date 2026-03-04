@@ -11,13 +11,24 @@ import { KeywordAnalysis } from './KeywordAnalysis';
 
 type Severity = 'error' | 'warning' | 'info';
 
+type CheckCategory = 'content' | 'technical' | 'social' | 'performance' | 'accessibility';
+
 interface SeoIssue {
   check: string;
   severity: Severity;
+  category?: CheckCategory;
   message: string;
   recommendation: string;
   value?: string;
 }
+
+const CATEGORY_CONFIG: Record<CheckCategory, { label: string; color: string }> = {
+  content: { label: 'Content', color: 'text-emerald-400' },
+  technical: { label: 'Technical', color: 'text-violet-400' },
+  social: { label: 'Social', color: 'text-pink-400' },
+  performance: { label: 'Performance', color: 'text-orange-400' },
+  accessibility: { label: 'Accessibility', color: 'text-sky-400' },
+};
 
 interface PageSeoResult {
   page: string;
@@ -288,6 +299,7 @@ function SeoAudit({ siteId }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const [severityFilter, setSeverityFilter] = useState<Severity | 'all'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<CheckCategory | 'all'>('all');
   const [reportModal, setReportModal] = useState(false);
   const [reportView, setReportView] = useState<'html' | 'csv' | null>(null);
   const [history, setHistory] = useState<SnapshotSummary[]>([]);
@@ -563,6 +575,10 @@ function SeoAudit({ siteId }: Props) {
       return p.issues.some(i => i.severity === severityFilter);
     })
     .filter(p => {
+      if (categoryFilter === 'all') return true;
+      return p.issues.some(i => i.category === categoryFilter);
+    })
+    .filter(p => {
       if (!search) return true;
       const q = search.toLowerCase();
       return p.page.toLowerCase().includes(q) || p.slug.toLowerCase().includes(q) ||
@@ -688,12 +704,34 @@ function SeoAudit({ siteId }: Props) {
         </div>
       )}
 
+      {/* Category filter pills */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="text-[10px] text-zinc-600 uppercase tracking-wider mr-1">Category:</span>
+        {(['all', ...Object.keys(CATEGORY_CONFIG)] as (CheckCategory | 'all')[]).map(cat => {
+          const active = categoryFilter === cat;
+          const cfg = cat !== 'all' ? CATEGORY_CONFIG[cat] : null;
+          return (
+            <button
+              key={cat}
+              onClick={() => setCategoryFilter(active ? 'all' : cat)}
+              className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors border ${
+                active
+                  ? 'border-zinc-500 bg-zinc-800 text-zinc-200'
+                  : 'border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-400'
+              }`}
+            >
+              {cat === 'all' ? 'All' : cfg?.label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Showing count */}
       <div className="text-xs text-zinc-600 px-1">
         Showing {filteredPages.length} of {data.pages.length} pages
-        {severityFilter !== 'all' && (
-          <button onClick={() => setSeverityFilter('all')} className="ml-2 text-zinc-500 hover:text-zinc-300 underline">
-            Clear filter
+        {(severityFilter !== 'all' || categoryFilter !== 'all') && (
+          <button onClick={() => { setSeverityFilter('all'); setCategoryFilter('all'); }} className="ml-2 text-zinc-500 hover:text-zinc-300 underline">
+            Clear filters
           </button>
         )}
       </div>
@@ -735,8 +773,10 @@ function SeoAudit({ siteId }: Props) {
                   ) : (
                     page.issues
                       .filter(i => severityFilter === 'all' || i.severity === severityFilter)
+                      .filter(i => categoryFilter === 'all' || i.category === categoryFilter)
                       .map((issue, idx) => {
                         const cfg = SEVERITY_CONFIG[issue.severity];
+                        const catCfg = issue.category ? CATEGORY_CONFIG[issue.category] : null;
                         const Icon = cfg.icon;
                         return (
                           <div key={idx} className="flex items-start gap-3 px-4 py-2 rounded-lg hover:bg-zinc-900/30 transition-colors">
@@ -746,9 +786,16 @@ function SeoAudit({ siteId }: Props) {
                               <div className="text-[11px] text-zinc-500 mt-0.5">{issue.recommendation}</div>
                               {issue.value && <div className="text-[10px] text-zinc-600 mt-0.5 italic truncate">{issue.value}</div>}
                             </div>
-                            <span className={`text-[9px] px-1 py-0.5 rounded border flex-shrink-0 ${cfg.bg} ${cfg.color}`}>
-                              {issue.check}
-                            </span>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {catCfg && (
+                                <span className={`text-[9px] px-1 py-0.5 rounded border border-zinc-800 ${catCfg.color}`}>
+                                  {catCfg.label}
+                                </span>
+                              )}
+                              <span className={`text-[9px] px-1 py-0.5 rounded border ${cfg.bg} ${cfg.color}`}>
+                                {issue.check}
+                              </span>
+                            </div>
                           </div>
                         );
                       })
