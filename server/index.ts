@@ -60,8 +60,9 @@ if (APP_PASSWORD) {
     // Check cookie or header
     const token = req.headers['x-auth-token'];
     if (token === APP_PASSWORD) return next();
-    // Check if this is the login endpoint
+    // Allow auth endpoints through
     if (req.path === '/api/auth/login' && req.method === 'POST') return next();
+    if (req.path === '/api/auth/check') return next();
     // In production, serve the frontend without auth (it handles login UI)
     if (IS_PROD && !req.path.startsWith('/api') && !req.path.startsWith('/ws')) return next();
     // Reject API calls without auth

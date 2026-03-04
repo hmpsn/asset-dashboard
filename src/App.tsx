@@ -10,7 +10,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { useAuth } from './hooks/useAuth';
 import { useWebSocket } from './hooks/useWebSocket';
 import {
-  Zap, Settings, Clipboard, BarChart3, Globe, Image,
+  Settings, Clipboard, BarChart3, Globe, Image,
 } from 'lucide-react';
 
 type Tab = 'media' | 'seo' | 'performance';
@@ -179,16 +179,8 @@ function Dashboard() {
     <div className="flex flex-col h-screen" style={{ backgroundColor: 'var(--brand-bg)', color: 'var(--brand-text-bright)' }}>
       {/* Header */}
       <header className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid var(--brand-border)' }}>
-        <div className="flex items-center gap-2.5">
-          <div
-            className="w-7 h-7 rounded-md flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, var(--brand-mint), #1a9e8f)' }}
-          >
-            <Zap className="w-3.5 h-3.5 text-white" />
-          </div>
-          <span className="text-sm font-semibold tracking-tight" style={{ color: 'var(--brand-text-bright)' }}>
-            hmpsn<span style={{ color: 'var(--brand-mint)' }}>.studio</span>
-          </span>
+        <div className="flex items-center">
+          <img src="/logo.svg" alt="hmpsn.studio" className="h-5" />
         </div>
 
         <div className="flex items-center gap-2">
@@ -246,13 +238,8 @@ function Dashboard() {
       {/* Main content */}
       <main className="flex-1 overflow-auto p-5">
         {!selected ? (
-          <div className="flex flex-col items-center justify-center h-full gap-3">
-            <div
-              className="w-14 h-14 rounded-xl flex items-center justify-center"
-              style={{ backgroundColor: 'var(--brand-mint-dim)' }}
-            >
-              <Zap className="w-6 h-6" style={{ color: 'var(--brand-mint)' }} />
-            </div>
+          <div className="flex flex-col items-center justify-center h-full gap-4">
+            <img src="/logo.svg" alt="hmpsn.studio" className="h-8 opacity-40" />
             <div className="text-center">
               <p className="text-sm font-medium" style={{ color: 'var(--brand-text-bright)' }}>Select or create a workspace</p>
               <p className="text-xs mt-1" style={{ color: 'var(--brand-text-muted)' }}>Each workspace maps to a Webflow site</p>

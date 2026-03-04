@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Zap, Lock } from 'lucide-react';
+import { Lock } from 'lucide-react';
 
 interface Props {
   onLogin: (password: string) => Promise<boolean>;
@@ -25,19 +25,9 @@ export function LoginScreen({ onLogin }: Props) {
   return (
     <div className="flex items-center justify-center h-screen" style={{ backgroundColor: 'var(--brand-bg)' }}>
       <div className="w-full max-w-sm px-6">
-        <div className="flex flex-col items-center gap-4 mb-8">
-          <div
-            className="w-12 h-12 rounded-xl flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, var(--brand-mint), #1a9e8f)' }}
-          >
-            <Zap className="w-6 h-6 text-white" />
-          </div>
-          <div className="text-center">
-            <h1 className="text-lg font-semibold" style={{ color: 'var(--brand-text-bright)' }}>
-              hmpsn<span style={{ color: 'var(--brand-mint)' }}>.studio</span>
-            </h1>
-            <p className="text-xs mt-1" style={{ color: 'var(--brand-text-muted)' }}>Asset Dashboard</p>
-          </div>
+        <div className="flex flex-col items-center gap-3 mb-8">
+          <img src="/logo.svg" alt="hmpsn.studio" className="h-7" />
+          <p className="text-xs" style={{ color: 'var(--brand-text-muted)' }}>Asset Dashboard</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
