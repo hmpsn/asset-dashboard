@@ -232,7 +232,7 @@ function Dashboard() {
           <WorkspaceSelector
             workspaces={workspaces}
             selected={selected}
-            onSelect={setSelected}
+            onSelect={(ws) => { setSelected(ws); if (tab === 'prospect' || tab === 'settings') setTab('media'); }}
             onCreate={handleCreate}
             onDelete={handleDelete}
             onLinkSite={handleLinkSite}

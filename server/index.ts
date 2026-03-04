@@ -986,8 +986,8 @@ app.get('/api/public/client/:siteId', (req, res) => {
   res.json({ latest: latest.audit, siteName: latest.siteName, history });
 });
 
-// Client dashboard HTML page (no auth required)
-app.get('/client/:siteId', (req, res) => {
+// Audit report HTML page (renamed from /client/ to avoid conflict with SPA client dashboard)
+app.get('/report/audit/:siteId', (req, res) => {
   const latest = getLatestSnapshot(req.params.siteId);
   if (!latest) return res.status(404).send('<h1>No audits found</h1>');
   res.type('html').send(renderReportHTML(latest));

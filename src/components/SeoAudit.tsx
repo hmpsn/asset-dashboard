@@ -404,22 +404,22 @@ function AuditHistory({ siteId, history, onRefresh }: { siteId: string; history:
       {/* Action items for latest snapshot */}
       {history.length > 0 && <ActionItemsPanel snapshotId={history[0].id} />}
 
-      {/* Client dashboard link */}
+      {/* Audit report link */}
       <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-zinc-900 border border-zinc-800">
         <Globe className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--brand-mint)' }} />
         <div className="flex-1 min-w-0">
-          <div className="text-xs font-medium text-zinc-300">Client Dashboard</div>
-          <div className="text-xs text-zinc-500 truncate font-mono">{window.location.origin}/client/{siteId}</div>
+          <div className="text-xs font-medium text-zinc-300">Audit Report</div>
+          <div className="text-xs text-zinc-500 truncate font-mono">{window.location.origin}/report/audit/{siteId}</div>
         </div>
         <button
           onClick={() => {
-            navigator.clipboard.writeText(`${window.location.origin}/client/${siteId}`);
+            navigator.clipboard.writeText(`${window.location.origin}/report/audit/${siteId}`);
           }}
           className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium bg-zinc-800 hover:bg-zinc-700 transition-colors"
         >
           <Copy className="w-3 h-3" /> Copy
         </button>
-        <a href={`/client/${siteId}`} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md hover:bg-zinc-800" style={{ color: 'var(--brand-mint)' }}>
+        <a href={`/report/audit/${siteId}`} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md hover:bg-zinc-800" style={{ color: 'var(--brand-mint)' }}>
           <ExternalLink className="w-3.5 h-3.5" />
         </a>
       </div>
