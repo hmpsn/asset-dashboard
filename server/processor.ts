@@ -212,7 +212,7 @@ async function handleOptimizedFile(
 
   if (ws?.webflowSiteId) {
     try {
-      const result = await uploadAsset(ws.webflowSiteId, optimizedPath, fileName, altText || undefined);
+      const result = await uploadAsset(ws.webflowSiteId, optimizedPath, fileName, altText || undefined, ws.webflowToken || undefined);
       if (result.success) {
         updateQueueItem(id, { status: 'done' }, broadcast);
         saveMetadataEntry(key, {

@@ -1415,11 +1415,12 @@ Rules: lowercase, hyphens between words, no special chars, descriptive, 3-5 word
 
 // --- Rename Asset ---
 app.patch('/api/webflow/rename/:assetId', async (req, res) => {
-  const { displayName } = req.body;
+  const { displayName, siteId } = req.body;
   if (!displayName) return res.status(400).json({ error: 'displayName required' });
 
   try {
-    const result = await updateAsset(req.params.assetId, { displayName });
+    const token = siteId ? getTokenForSite(siteId) : null;
+    const result = await updateAsset(req.params.assetId, { displayName }, token || undefined);
     res.json(result);
   } catch (e) {
     console.error('Rename error:', e);

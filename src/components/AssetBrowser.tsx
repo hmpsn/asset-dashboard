@@ -117,7 +117,7 @@ function AssetBrowser({ siteId }: Props) {
     await fetch(`/api/webflow/assets/${assetId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ altText: altDraft }),
+      body: JSON.stringify({ altText: altDraft, siteId }),
     });
     setAssets(prev => prev.map(a => a.id === assetId ? { ...a, altText: altDraft } : a));
     setEditingAlt(null);
@@ -216,7 +216,7 @@ function AssetBrowser({ siteId }: Props) {
       await fetch(`/api/webflow/rename/${assetId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ displayName: renameDraft.trim() }),
+        body: JSON.stringify({ displayName: renameDraft.trim(), siteId }),
       });
       setAssets(prev => prev.map(a => a.id === assetId ? { ...a, displayName: renameDraft.trim() } : a));
     } catch { /* ignore */ }
