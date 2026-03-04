@@ -41,7 +41,7 @@ import {
   saveSnapshot, getSnapshot, listSnapshots, getLatestSnapshot, renderReportHTML,
   addActionItem, updateActionItem, deleteActionItem, getActionItems, extractSiteLogo,
 } from './reports.js';
-import { runSiteSpeed } from './pagespeed.js';
+import { runSiteSpeed, runSinglePageSpeed } from './pagespeed.js';
 import { generateSchemaSuggestions } from './schema-suggester.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -546,7 +546,8 @@ app.get('/api/webflow/seo-audit/:siteId', async (req, res) => {
 app.get('/api/webflow/schema-suggestions/:siteId', async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
-    const result = await generateSchemaSuggestions(req.params.siteId, token);
+    const useAI = req.query.ai === 'true';
+    const result = await generateSchemaSuggestions(req.params.siteId, token, useAI);
     res.json(result);
   } catch (err) {
     console.error('Schema suggester error:', err);
@@ -564,6 +565,32 @@ app.get('/api/webflow/pagespeed/:siteId', async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error('PageSpeed error:', err);
+    res.status(500).json({ error: 'PageSpeed analysis failed' });
+  }
+});
+
+// Single-page PageSpeed test (resolves URL from siteId + slug)
+app.post('/api/webflow/pagespeed-single/:siteId', async (req, res) => {
+  try {
+    const { siteId } = req.params;
+    const { pageSlug, strategy, pageTitle } = req.body;
+    const token = getTokenForSite(siteId) || process.env.WEBFLOW_API_TOKEN || '';
+
+    // Resolve subdomain to build full URL
+    const siteRes = await fetch(`https://api.webflow.com/v2/sites/${siteId}`, {
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    });
+    if (!siteRes.ok) return res.status(400).json({ error: 'Could not resolve site URL' });
+    const siteData = await siteRes.json() as { shortName?: string };
+    const subdomain = siteData.shortName;
+    if (!subdomain) return res.status(400).json({ error: 'Site has no subdomain' });
+
+    const url = pageSlug ? `https://${subdomain}.webflow.io/${pageSlug}` : `https://${subdomain}.webflow.io`;
+    const result = await runSinglePageSpeed(url, strategy || 'mobile', pageTitle || '');
+    if (!result) return res.status(502).json({ error: 'PageSpeed API returned no data. It may be rate-limited.' });
+    res.json(result);
+  } catch (err) {
+    console.error('Single PageSpeed error:', err);
     res.status(500).json({ error: 'PageSpeed analysis failed' });
   }
 });

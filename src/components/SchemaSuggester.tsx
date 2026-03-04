@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import {
   Loader2, Code2, ChevronDown, ChevronRight, Copy, CheckCircle,
-  AlertCircle, Info, Sparkles,
+  AlertCircle, Info, Sparkles, Zap, Brain,
 } from 'lucide-react';
 
 interface SchemaSuggestion {
@@ -35,10 +35,13 @@ export function SchemaSuggester({ siteId }: Props) {
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [aiMode, setAiMode] = useState(false);
 
-  const run = useCallback(() => {
+  const run = useCallback((ai: boolean = false) => {
     setLoading(true);
-    fetch(`/api/webflow/schema-suggestions/${siteId}`)
+    setAiMode(ai);
+    setData(null);
+    fetch(`/api/webflow/schema-suggestions/${siteId}${ai ? '?ai=true' : ''}`)
       .then(r => r.json())
       .then(d => setData(Array.isArray(d) ? d : []))
       .catch(() => setData([]))
@@ -71,12 +74,21 @@ export function SchemaSuggester({ siteId }: Props) {
         <p className="text-xs text-zinc-600 max-w-md text-center">
           Analyzes each page and suggests appropriate structured data schemas (Organization, Article, FAQ, etc.) to improve search result appearance
         </p>
-        <button
-          onClick={run}
-          className="px-5 py-2.5 bg-teal-600 hover:bg-teal-500 rounded-lg text-sm font-medium transition-colors"
-        >
-          Analyze Pages
-        </button>
+        <div className="flex gap-2 mt-2">
+          <button
+            onClick={() => run(false)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-500 rounded-lg text-sm font-medium transition-colors"
+          >
+            <Zap className="w-4 h-4" /> Quick Scan
+          </button>
+          <button
+            onClick={() => run(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500"
+          >
+            <Brain className="w-4 h-4" /> AI-Powered
+          </button>
+        </div>
+        <p className="text-[11px] text-zinc-700 mt-1">AI mode uses GPT-4o to generate production-ready, pre-filled schemas</p>
       </div>
     );
   }
@@ -85,8 +97,9 @@ export function SchemaSuggester({ siteId }: Props) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3 text-zinc-500">
         <Loader2 className="w-6 h-6 animate-spin" />
-        <p className="text-sm">Scanning pages for schema opportunities...</p>
-        <p className="text-xs text-zinc-600">Checking existing JSON-LD and suggesting improvements</p>
+        <p className="text-sm">{aiMode ? 'AI is analyzing page content and generating schemas...' : 'Scanning pages for schema opportunities...'}</p>
+        <p className="text-xs text-zinc-600">{aiMode ? 'GPT-4o is reading each page and crafting production-ready JSON-LD' : 'Checking existing JSON-LD and suggesting improvements'}</p>
+        {aiMode && <p className="text-xs text-zinc-700">This may take 30–60 seconds for AI analysis</p>}
       </div>
     );
   }
@@ -106,6 +119,32 @@ export function SchemaSuggester({ siteId }: Props) {
 
   return (
     <div className="space-y-4">
+      {/* Mode toggle + re-run */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {aiMode && (
+            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 border border-violet-500/20 text-violet-400">
+              <Brain className="w-3 h-3" /> AI-Generated
+            </span>
+          )}
+          <span className="text-xs text-zinc-500">{data.length} pages · {totalSuggestions} suggestions</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => run(false)}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${!aiMode ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+          >
+            <Zap className="w-3 h-3" /> Quick
+          </button>
+          <button
+            onClick={() => run(true)}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${aiMode ? 'bg-violet-600 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+          >
+            <Brain className="w-3 h-3" /> AI
+          </button>
+        </div>
+      </div>
+
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">

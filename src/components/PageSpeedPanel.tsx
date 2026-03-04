@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Loader2, Gauge, Smartphone, Monitor, ChevronDown, ChevronRight,
   Zap, AlertTriangle, Info,
@@ -129,6 +129,12 @@ function VitalCard({ label, value, formatted, vitalKey }: { label: string; value
   );
 }
 
+interface WebflowPage {
+  id: string;
+  title: string;
+  slug: string;
+}
+
 export function PageSpeedPanel({ siteId }: Props) {
   const [data, setData] = useState<SiteSpeedResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -137,12 +143,28 @@ export function PageSpeedPanel({ siteId }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [expandedPage, setExpandedPage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pages, setPages] = useState<WebflowPage[]>([]);
+  const [selectedPage, setSelectedPage] = useState<string>('');
+  const [singleResult, setSingleResult] = useState<PageSpeedResult | null>(null);
+  const [mode, setMode] = useState<'single' | 'bulk'>('single');
 
-  const runTest = (strat: 'mobile' | 'desktop') => {
+  useEffect(() => {
+    fetch(`/api/webflow/pages/${siteId}`)
+      .then(r => r.json())
+      .then(d => {
+        const list = (Array.isArray(d) ? d : []).filter((p: WebflowPage) => !p.title.toLowerCase().includes('password'));
+        setPages(list);
+        if (list.length > 0) setSelectedPage(list[0].id);
+      })
+      .catch(() => {});
+  }, [siteId]);
+
+  const runBulkTest = (strat: 'mobile' | 'desktop') => {
     setLoading(true);
     setHasRun(true);
     setStrategy(strat);
     setData(null);
+    setSingleResult(null);
     setError(null);
     fetch(`/api/webflow/pagespeed/${siteId}?strategy=${strat}&maxPages=3`)
       .then(r => {
@@ -158,6 +180,32 @@ export function PageSpeedPanel({ siteId }: Props) {
       .finally(() => setLoading(false));
   };
 
+  const runSingleTest = (strat: 'mobile' | 'desktop') => {
+    if (!selectedPage) return;
+    const page = pages.find(p => p.id === selectedPage);
+    if (!page) return;
+
+    setLoading(true);
+    setHasRun(true);
+    setStrategy(strat);
+    setData(null);
+    setSingleResult(null);
+    setError(null);
+
+    fetch(`/api/webflow/pagespeed-single/${siteId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pageSlug: page.slug, strategy: strat, pageTitle: page.title }),
+    })
+      .then(async r => {
+        const d = await r.json();
+        if (!r.ok || d.error) { setError(d.error || 'Test failed'); return; }
+        setSingleResult(d);
+      })
+      .catch(e => setError(e.message || 'PageSpeed analysis failed'))
+      .finally(() => setLoading(false));
+  };
+
   const toggleExpand = (id: string) => {
     setExpanded(prev => {
       const next = new Set(prev);
@@ -166,32 +214,172 @@ export function PageSpeedPanel({ siteId }: Props) {
     });
   };
 
+  // Single result view (re-uses same VitalCard / opportunity / diagnostic rendering)
+  const renderSingleResult = (result: PageSpeedResult) => (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="px-2 py-0.5 rounded text-xs bg-teal-500/10 border border-teal-500/20 text-teal-400">Single Page</span>
+          <span className="text-xs text-zinc-500">{result.page}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => runSingleTest(strategy === 'mobile' ? 'desktop' : 'mobile')}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs text-zinc-500 hover:text-zinc-300"
+          >
+            {strategy === 'mobile' ? <Monitor className="w-3 h-3" /> : <Smartphone className="w-3 h-3" />}
+            Test {strategy === 'mobile' ? 'Desktop' : 'Mobile'}
+          </button>
+          <button
+            onClick={() => { setHasRun(false); setSingleResult(null); setData(null); }}
+            className="text-xs text-zinc-500 hover:text-zinc-300 px-2 py-1"
+          >
+            ← Back
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-[auto_1fr] gap-6 bg-zinc-900 rounded-xl p-6 border border-zinc-800">
+        <div className="flex flex-col items-center gap-2">
+          <ScoreRing score={result.score} size={100} />
+          <div className="text-xs text-zinc-500">{strategy === 'mobile' ? 'Mobile' : 'Desktop'}</div>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <VitalCard label="LCP" value={result.vitals.LCP} formatted={formatMs(result.vitals.LCP)} vitalKey="LCP" />
+          <VitalCard label="FCP" value={result.vitals.FCP} formatted={formatMs(result.vitals.FCP)} vitalKey="FCP" />
+          <VitalCard label="CLS" value={result.vitals.CLS} formatted={formatCLS(result.vitals.CLS)} vitalKey="CLS" />
+          <VitalCard label="TBT" value={result.vitals.TBT} formatted={formatMs(result.vitals.TBT)} vitalKey="TBT" />
+          <VitalCard label="Speed Index" value={result.vitals.SI} formatted={formatMs(result.vitals.SI)} vitalKey="SI" />
+          <VitalCard label="TTI" value={result.vitals.TTI} formatted={formatMs(result.vitals.TTI)} vitalKey="TTI" />
+        </div>
+      </div>
+
+      {result.opportunities.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 text-xs font-medium text-zinc-400 mb-2">
+            <Zap className="w-3 h-3 text-amber-400" /> Opportunities ({result.opportunities.length})
+          </div>
+          <div className="space-y-1">
+            {result.opportunities.map(opp => (
+              <div key={opp.id} className="flex items-start gap-3 px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-800">
+                <AlertTriangle className="w-3 h-3 mt-0.5 text-amber-400 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs text-zinc-300">{opp.title}</div>
+                  <div className="text-[11px] text-zinc-500 mt-0.5 line-clamp-2">{opp.description}</div>
+                </div>
+                {opp.savings && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 flex-shrink-0">
+                    Save {opp.savings}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {result.diagnostics.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 text-xs font-medium text-zinc-400 mb-2">
+            <Info className="w-3 h-3 text-blue-400" /> Diagnostics ({result.diagnostics.length})
+          </div>
+          <div className="space-y-1">
+            {result.diagnostics.map(diag => (
+              <div key={diag.id} className="flex items-start gap-3 px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-800">
+                <Info className="w-3 h-3 mt-0.5 text-blue-400 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs text-zinc-300">{diag.title}</div>
+                  <div className="text-[11px] text-zinc-500 mt-0.5 line-clamp-2">{diag.description}</div>
+                </div>
+                {diag.displayValue && (
+                  <span className="text-[10px] text-zinc-500 flex-shrink-0">{diag.displayValue}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   if (!hasRun) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-4">
+      <div className="flex flex-col items-center justify-center py-12 gap-5">
         <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center">
           <Gauge className="w-8 h-8 text-zinc-600" />
         </div>
         <p className="text-zinc-400 text-sm">Core Web Vitals & Performance</p>
-        <p className="text-xs text-zinc-600 max-w-md text-center">
-          Test your site's performance using Google PageSpeed Insights.
-          Analyzes up to 5 key pages for Core Web Vitals, load speed, and optimization opportunities.
-        </p>
-        <div className="flex gap-2 mt-2">
+
+        {/* Mode toggle */}
+        <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-zinc-900 border border-zinc-800">
           <button
-            onClick={() => runTest('mobile')}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors"
-            style={{ background: 'var(--brand-mint)', color: '#0f1219' }}
+            onClick={() => setMode('single')}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${mode === 'single' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
           >
-            <Smartphone className="w-4 h-4" /> Test Mobile
+            Single Page
           </button>
           <button
-            onClick={() => runTest('desktop')}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors"
+            onClick={() => setMode('bulk')}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${mode === 'bulk' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
           >
-            <Monitor className="w-4 h-4" /> Test Desktop
+            Bulk Test (Top 3)
           </button>
         </div>
+
+        {mode === 'single' ? (
+          <div className="w-full max-w-md space-y-3">
+            <select
+              value={selectedPage}
+              onChange={e => setSelectedPage(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-800 text-sm text-zinc-200 focus:outline-none focus:border-zinc-600"
+            >
+              <option value="" disabled>Select a page to test...</option>
+              {pages.map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.title} {p.slug ? `(/${p.slug})` : '(Home)'}
+                </option>
+              ))}
+            </select>
+            <div className="flex gap-2 justify-center">
+              <button
+                onClick={() => runSingleTest('mobile')}
+                disabled={!selectedPage}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors disabled:opacity-40"
+                style={{ background: 'var(--brand-mint)', color: '#0f1219' }}
+              >
+                <Smartphone className="w-4 h-4" /> Test Mobile
+              </button>
+              <button
+                onClick={() => runSingleTest('desktop')}
+                disabled={!selectedPage}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors disabled:opacity-40"
+              >
+                <Monitor className="w-4 h-4" /> Test Desktop
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2 text-center">
+            <p className="text-xs text-zinc-600 max-w-md">
+              Tests the top 3 most important pages automatically (homepage + key pages).
+            </p>
+            <div className="flex gap-2 justify-center">
+              <button
+                onClick={() => runBulkTest('mobile')}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors"
+                style={{ background: 'var(--brand-mint)', color: '#0f1219' }}
+              >
+                <Smartphone className="w-4 h-4" /> Test Mobile
+              </button>
+              <button
+                onClick={() => runBulkTest('desktop')}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors"
+              >
+                <Monitor className="w-4 h-4" /> Test Desktop
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -201,10 +389,15 @@ export function PageSpeedPanel({ siteId }: Props) {
       <div className="flex flex-col items-center justify-center py-20 gap-3">
         <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--brand-mint)' }} />
         <p className="text-sm text-zinc-400">Running PageSpeed analysis...</p>
-        <p className="text-xs text-zinc-600">Testing up to 3 pages via Google PageSpeed Insights API</p>
+        <p className="text-xs text-zinc-600">{singleResult === null && !data ? 'Testing via Google PageSpeed Insights API' : ''}</p>
         <p className="text-xs text-zinc-700">This may take 30-60 seconds</p>
       </div>
     );
+  }
+
+  // Single page result
+  if (singleResult) {
+    return renderSingleResult(singleResult);
   }
 
   if (error || !data || data.pages.length === 0) {
@@ -219,7 +412,7 @@ export function PageSpeedPanel({ siteId }: Props) {
           <p className="text-zinc-400 text-sm">No results available</p>
         )}
         <button
-          onClick={() => runTest(strategy)}
+          onClick={() => { setHasRun(false); setError(null); }}
           className="px-4 py-2 rounded-lg text-sm font-medium"
           style={{ background: 'var(--brand-mint)', color: '#0f1219' }}
         >
@@ -237,7 +430,7 @@ export function PageSpeedPanel({ siteId }: Props) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1 p-0.5 rounded-lg bg-zinc-900 border border-zinc-800">
           <button
-            onClick={() => { if (strategy !== 'mobile') runTest('mobile'); }}
+            onClick={() => { if (strategy !== 'mobile') runBulkTest('mobile'); }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
               strategy === 'mobile' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'
             }`}
@@ -245,7 +438,7 @@ export function PageSpeedPanel({ siteId }: Props) {
             <Smartphone className="w-3 h-3" /> Mobile
           </button>
           <button
-            onClick={() => { if (strategy !== 'desktop') runTest('desktop'); }}
+            onClick={() => { if (strategy !== 'desktop') runBulkTest('desktop'); }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
               strategy === 'desktop' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'
             }`}

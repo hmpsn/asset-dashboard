@@ -340,7 +340,114 @@ function suggestSchemas(
   return suggestions;
 }
 
-export async function generateSchemaSuggestions(siteId: string, tokenOverride?: string): Promise<SchemaPageSuggestion[]> {
+// --- AI-Powered Schema Generation ---
+
+async function aiGenerateSchema(
+  pageTitle: string,
+  slug: string,
+  seoTitle: string,
+  seoDesc: string,
+  html: string | null,
+  existingSchemas: string[],
+  isHomepage: boolean,
+  baseUrl: string,
+): Promise<SchemaSuggestion[]> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return []; // Fall back to rule-based if no API key
+
+  // Extract meaningful content from HTML (strip tags, limit length)
+  let pageContent = '';
+  if (html) {
+    // Get body content only
+    const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+    const body = bodyMatch ? bodyMatch[1] : html;
+    // Remove scripts, styles, nav, footer
+    pageContent = body
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+      .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 3000); // Limit to ~3k chars for token efficiency
+  }
+
+  // Extract any structured info from the page
+  const emails = html ? (html.match(/[\w.-]+@[\w.-]+\.\w+/g) || []).slice(0, 3) : [];
+  const phones = html ? (html.match(/(?:\+1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g) || []).slice(0, 2) : [];
+  const images = html ? (html.match(/src=["']([^"']*(?:jpg|jpeg|png|webp|svg)[^"']*)["']/gi) || []).slice(0, 5).map(m => {
+    const s = m.match(/src=["']([^"']+)["']/i);
+    return s ? s[1] : '';
+  }).filter(Boolean) : [];
+
+  const prompt = `You are an expert SEO structured data consultant. Analyze this webpage and generate production-ready JSON-LD schema(s) that would maximize this page's rich snippet potential in Google Search.
+
+PAGE INFO:
+- URL: ${baseUrl}/${slug}
+- Title: ${seoTitle || pageTitle}
+- Meta Description: ${seoDesc || '(none)'}
+- Is Homepage: ${isHomepage}
+- Existing Schemas: ${existingSchemas.length > 0 ? existingSchemas.join(', ') : 'None'}
+- Emails found: ${emails.join(', ') || 'none'}
+- Phone numbers found: ${phones.join(', ') || 'none'}
+- Images found: ${images.slice(0, 3).join(', ') || 'none'}
+
+PAGE CONTENT (excerpt):
+${pageContent.slice(0, 2000)}
+
+INSTRUCTIONS:
+1. Generate 1-3 JSON-LD schemas that are MOST impactful for this specific page
+2. Fill in ALL values using actual content from the page - NO placeholders
+3. Each schema must be valid, complete, and ready to paste into the page's <head>
+4. Prioritize schemas that enable rich snippets (FAQ, HowTo, Article, Organization, Product, BreadcrumbList, etc.)
+5. Don't suggest schemas that already exist on the page
+6. For Organization schema, use the site URL as the homepage, and extract company name from the page content
+7. Be specific — use actual content, dates, descriptions from the page
+
+Respond with a JSON array of objects, each with:
+- "type": the @type value
+- "reason": 1-2 sentence explanation of SEO impact
+- "priority": "high" | "medium" | "low"
+- "template": the complete JSON-LD object (with @context)
+
+Return ONLY valid JSON array, no markdown or explanation.`;
+
+  try {
+    const OpenAI = (await import('openai')).default;
+    const client = new OpenAI({ apiKey });
+
+    const response = await client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      max_tokens: 2000,
+      temperature: 0.3,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const content = response.choices[0]?.message?.content?.trim();
+    if (!content) return [];
+
+    // Parse the response - handle both raw JSON and markdown-wrapped JSON
+    let jsonStr = content;
+    const mdMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (mdMatch) jsonStr = mdMatch[1].trim();
+
+    const parsed = JSON.parse(jsonStr);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.map((item: { type?: string; reason?: string; priority?: string; template?: Record<string, unknown> }) => ({
+      type: item.type || 'Unknown',
+      reason: item.reason || '',
+      priority: (item.priority === 'high' || item.priority === 'medium' || item.priority === 'low') ? item.priority : 'medium',
+      template: item.template || {},
+    })).filter((s: { template: Record<string, unknown> }) => s.template['@type']) as SchemaSuggestion[];
+  } catch (err) {
+    console.error('AI schema generation error:', err);
+    return [];
+  }
+}
+
+export async function generateSchemaSuggestions(siteId: string, tokenOverride?: string, useAI: boolean = false): Promise<SchemaPageSuggestion[]> {
   const subdomain = await getSiteSubdomain(siteId, tokenOverride);
   const baseUrl = subdomain ? `https://${subdomain}.webflow.io` : '';
   if (!baseUrl) return [];
@@ -351,7 +458,8 @@ export async function generateSchemaSuggestions(siteId: string, tokenOverride?: 
   );
 
   const results: SchemaPageSuggestion[] = [];
-  const batch = 5;
+  // AI mode: smaller batches (API calls are slower), rule-based: larger batches
+  const batch = useAI ? 2 : 5;
 
   for (let i = 0; i < pages.length; i += batch) {
     const chunk = pages.slice(i, i + batch);
@@ -364,16 +472,31 @@ export async function generateSchemaSuggestions(siteId: string, tokenOverride?: 
           fetchPublishedHtml(url),
         ]);
 
+        const seoTitle = meta?.seo?.title || page.title || '';
+        const seoDesc = meta?.seo?.description || '';
         const existingSchemas = html ? extractExistingSchemas(html) : [];
-        const suggestedSchemas = suggestSchemas(
-          page.title,
-          page.slug,
-          meta?.seo?.title || page.title || '',
-          meta?.seo?.description || '',
-          html,
-          existingSchemas,
-          isHomepage,
-        );
+
+        let suggestedSchemas: SchemaSuggestion[];
+
+        if (useAI) {
+          // AI-powered: generates pre-filled, production-ready schemas
+          suggestedSchemas = await aiGenerateSchema(
+            page.title, page.slug, seoTitle, seoDesc,
+            html, existingSchemas, isHomepage, baseUrl,
+          );
+          // If AI fails or returns nothing, fall back to rule-based
+          if (suggestedSchemas.length === 0) {
+            suggestedSchemas = suggestSchemas(
+              page.title, page.slug, seoTitle, seoDesc,
+              html, existingSchemas, isHomepage,
+            );
+          }
+        } else {
+          suggestedSchemas = suggestSchemas(
+            page.title, page.slug, seoTitle, seoDesc,
+            html, existingSchemas, isHomepage,
+          );
+        }
 
         // Only include pages that have suggestions or existing schemas
         if (suggestedSchemas.length === 0 && existingSchemas.length === 0) return null;

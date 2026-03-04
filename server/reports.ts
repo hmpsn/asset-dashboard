@@ -159,39 +159,68 @@ export async function extractSiteLogo(baseUrl: string): Promise<string | null> {
     const res = await fetch(baseUrl, { redirect: 'follow' });
     if (!res.ok) return null;
     const html = await res.text();
-
-    // Strategy 1: Find <img> inside <nav> or <header>
-    const navHeaderRegex = /<(?:nav|header)[^>]*>([\s\S]*?)<\/(?:nav|header)>/gi;
     let match;
+
+    // Helper: extract src (or data-src for lazy-loaded) from an element string
+    const extractSrc = (el: string): string | null => {
+      const src = el.match(/src=["']([^"']+)["']/i);
+      if (src && src[1] && !src[1].startsWith('data:')) return src[1];
+      const dataSrc = el.match(/data-src=["']([^"']+)["']/i);
+      if (dataSrc && dataSrc[1]) return dataSrc[1];
+      return null;
+    };
+
+    // Strategy 1: Webflow navbar brand (w-nav-brand class) — most Webflow sites use this
+    const navBrandRegex = /<a[^>]*class=["'][^"']*w-nav-brand[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi;
+    while ((match = navBrandRegex.exec(html)) !== null) {
+      const inner = match[1];
+      const imgMatch = inner.match(/<img[^>]*/i);
+      if (imgMatch) {
+        const src = extractSrc(inner);
+        if (src) return resolveUrl(baseUrl, src);
+      }
+    }
+
+    // Strategy 2: Find <img> inside <nav> or <header>
+    const navHeaderRegex = /<(?:nav|header)[^>]*>([\s\S]*?)<\/(?:nav|header)>/gi;
     while ((match = navHeaderRegex.exec(html)) !== null) {
       const inner = match[1];
-      const imgMatch = inner.match(/<img[^>]*src=["']([^"']+)["']/i);
-      if (imgMatch && imgMatch[1]) {
-        return resolveUrl(baseUrl, imgMatch[1]);
-      }
+      const src = extractSrc(inner);
+      if (src) return resolveUrl(baseUrl, src);
       // Also check for SVG with an image/src
       const svgImg = inner.match(/<image[^>]*href=["']([^"']+)["']/i);
-      if (svgImg && svgImg[1]) {
-        return resolveUrl(baseUrl, svgImg[1]);
-      }
+      if (svgImg && svgImg[1]) return resolveUrl(baseUrl, svgImg[1]);
     }
 
-    // Strategy 2: Look for elements with class containing "logo", "brand", or "navbar"
-    const logoClassRegex = /<(?:img|a)[^>]*class=["'][^"']*(?:logo|brand|navbar-brand)[^"']*["'][^>]*>/gi;
+    // Strategy 3: Look for elements with class containing "logo", "brand"
+    const logoClassRegex = /<(?:img|a|div|span)[^>]*class=["'][^"']*(?:logo|brand|navbar-brand)[^"']*["'][^>]*>(?:[\s\S]*?<\/(?:a|div|span)>)?/gi;
     while ((match = logoClassRegex.exec(html)) !== null) {
-      const srcMatch = match[0].match(/src=["']([^"']+)["']/i);
-      if (srcMatch && srcMatch[1]) {
-        return resolveUrl(baseUrl, srcMatch[1]);
+      const src = extractSrc(match[0]);
+      if (src) return resolveUrl(baseUrl, src);
+      // Check for nested img
+      const nestedImg = match[0].match(/<img[^>]*/i);
+      if (nestedImg) {
+        const nestedSrc = extractSrc(nestedImg[0]);
+        if (nestedSrc) return resolveUrl(baseUrl, nestedSrc);
       }
     }
 
-    // Strategy 3: Look for img with "logo" in the src or alt
-    const logoImgRegex = /<img[^>]*(?:src|alt)=["'][^"']*logo[^"']*["'][^>]*>/gi;
+    // Strategy 4: Look for img with "logo" in the src, alt, or id
+    const logoImgRegex = /<img[^>]*(?:src|alt|id)=["'][^"']*logo[^"']*["'][^>]*>/gi;
     while ((match = logoImgRegex.exec(html)) !== null) {
-      const srcMatch = match[0].match(/src=["']([^"']+)["']/i);
-      if (srcMatch && srcMatch[1]) {
-        return resolveUrl(baseUrl, srcMatch[1]);
-      }
+      const src = extractSrc(match[0]);
+      if (src) return resolveUrl(baseUrl, src);
+    }
+
+    // Strategy 5: OG image — many sites use their logo or branded image
+    const ogImage = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i)
+      || html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+    if (ogImage && ogImage[1]) return resolveUrl(baseUrl, ogImage[1]);
+
+    // Strategy 6: Favicon as last resort
+    const favicon = html.match(/<link[^>]*rel=["'](?:icon|shortcut icon|apple-touch-icon)["'][^>]*href=["']([^"']+)["']/i);
+    if (favicon && favicon[1] && !favicon[1].includes('favicon.ico')) {
+      return resolveUrl(baseUrl, favicon[1]);
     }
 
     return null;
@@ -444,6 +473,128 @@ export function renderReportHTML(snapshot: AuditSnapshot): string {
     </div>`;
   }).join('');
 
+  // --- DATA ANALYST ENHANCEMENTS ---
+
+  // Score context: plain-English interpretation
+  const scoreGrade = audit.siteScore >= 90 ? 'Excellent' : audit.siteScore >= 80 ? 'Good' : audit.siteScore >= 60 ? 'Needs Improvement' : audit.siteScore >= 40 ? 'Poor' : 'Critical';
+  const scoreContext = audit.siteScore >= 90
+    ? 'Your site is well-optimized for search engines. Focus on maintaining this standard and addressing any remaining minor issues.'
+    : audit.siteScore >= 80
+    ? 'Your site has a solid SEO foundation with room for targeted improvements that could further boost your visibility.'
+    : audit.siteScore >= 60
+    ? 'Your site has several SEO gaps that are likely costing you search visibility. Addressing the issues below could significantly increase your organic traffic.'
+    : audit.siteScore >= 40
+    ? 'Your site has critical SEO deficiencies that are severely limiting your search engine visibility. Immediate action is recommended.'
+    : 'Your site has fundamental SEO issues that are preventing search engines from properly indexing and ranking your content.';
+
+  // Search visibility risk: pages missing critical elements
+  const missingTitles = clientPages.filter(p => p.issues.some(i => i.check === 'title' && i.severity === 'error')).length;
+  const missingDescriptions = clientPages.filter(p => p.issues.some(i => i.check === 'meta-description' && (i.severity === 'error' || i.severity === 'warning'))).length;
+  const missingOG = clientPages.filter(p => p.issues.some(i => i.check === 'og-tags')).length;
+  const missingH1 = clientPages.filter(p => p.issues.some(i => i.check === 'h1' && i.severity === 'error')).length;
+  const missingAlt = clientPages.filter(p => p.issues.some(i => i.check === 'img-alt')).length;
+  const totalPages = clientPages.length;
+  const pctWithIssues = totalPages > 0 ? Math.round((clientPages.filter(p => p.issues.length > 0).length / totalPages) * 100) : 0;
+
+  const visibilityRiskHTML = `<div style="margin:32px 0">
+    <div class="section-title">Search Visibility Risk Assessment</div>
+    <div style="font-size:13px;color:#94a3b8;margin-bottom:16px">${pctWithIssues}% of your pages have at least one SEO issue that could impact their search performance.</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px">
+      ${missingTitles > 0 ? `<div style="padding:12px 16px;border-radius:8px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.15)">
+        <div style="font-size:24px;font-weight:700;color:#ef4444">${missingTitles}</div>
+        <div style="font-size:11px;color:#ef4444;margin-top:2px">Pages without title tags</div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:4px">Invisible to search engines</div>
+      </div>` : ''}
+      ${missingDescriptions > 0 ? `<div style="padding:12px 16px;border-radius:8px;background:rgba(234,179,8,0.06);border:1px solid rgba(234,179,8,0.15)">
+        <div style="font-size:24px;font-weight:700;color:#eab308">${missingDescriptions}</div>
+        <div style="font-size:11px;color:#eab308;margin-top:2px">Missing meta descriptions</div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:4px">Lower click-through rates</div>
+      </div>` : ''}
+      ${missingOG > 0 ? `<div style="padding:12px 16px;border-radius:8px;background:rgba(244,114,182,0.06);border:1px solid rgba(244,114,182,0.15)">
+        <div style="font-size:24px;font-weight:700;color:#f472b6">${missingOG}</div>
+        <div style="font-size:11px;color:#f472b6;margin-top:2px">Missing Open Graph tags</div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:4px">Poor social sharing appearance</div>
+      </div>` : ''}
+      ${missingH1 > 0 ? `<div style="padding:12px 16px;border-radius:8px;background:rgba(251,146,60,0.06);border:1px solid rgba(251,146,60,0.15)">
+        <div style="font-size:24px;font-weight:700;color:#fb923c">${missingH1}</div>
+        <div style="font-size:11px;color:#fb923c;margin-top:2px">Missing H1 headings</div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:4px">Weakened content relevance</div>
+      </div>` : ''}
+      ${missingAlt > 0 ? `<div style="padding:12px 16px;border-radius:8px;background:rgba(56,189,248,0.06);border:1px solid rgba(56,189,248,0.15)">
+        <div style="font-size:24px;font-weight:700;color:#38bdf8">${missingAlt}</div>
+        <div style="font-size:11px;color:#38bdf8;margin-top:2px">Pages with missing alt text</div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:4px">Accessibility &amp; image SEO gap</div>
+      </div>` : ''}
+    </div>
+  </div>`;
+
+  // Quick Wins: single-fix issues that affect many pages
+  const quickWinChecks = [...issueCounts.values()]
+    .filter(i => i.count >= 2 && ['meta-description', 'og-tags', 'og-image', 'twitter-card', 'img-alt', 'canonical'].includes(i.check))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 4);
+
+  const quickWinsHTML = quickWinChecks.length > 0
+    ? `<div style="margin:32px 0">
+        <div class="section-title">Quick Wins</div>
+        <div style="font-size:13px;color:#94a3b8;margin-bottom:12px">These fixes can be applied in bulk and will improve your SEO across multiple pages at once.</div>
+        ${quickWinChecks.map(qw => {
+          const impactPct = totalPages > 0 ? Math.round((qw.count / totalPages) * 100) : 0;
+          return `<div style="display:flex;gap:12px;padding:14px 16px;margin:8px 0;border-radius:8px;background:rgba(46,217,195,0.04);border:1px solid rgba(46,217,195,0.12)">
+            <div style="width:48px;height:48px;border-radius:8px;background:rgba(46,217,195,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <span style="font-size:18px;font-weight:700;color:#2ed9c3">${qw.count}</span>
+            </div>
+            <div style="flex:1">
+              <div style="font-size:14px;font-weight:500;color:#f1f5f9">${qw.message}</div>
+              <div style="font-size:12px;color:#94a3b8;margin-top:4px">${qw.recommendation}</div>
+              <div style="font-size:11px;color:#2ed9c3;margin-top:4px">Affects ${impactPct}% of your site (${qw.count} pages)</div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`
+    : '';
+
+  // What's Working Well: pages with high scores + positive signals
+  const perfectPages = clientPages.filter(p => p.score >= 95);
+  const goodPages = clientPages.filter(p => p.score >= 80 && p.score < 95);
+  const hasStructuredData = clientPages.filter(p => !p.issues.some(i => i.check === 'structured-data')).length;
+
+  const positiveSignals: string[] = [];
+  if (perfectPages.length > 0) positiveSignals.push(`${perfectPages.length} page${perfectPages.length > 1 ? 's' : ''} with near-perfect SEO scores`);
+  if (goodPages.length > 0) positiveSignals.push(`${goodPages.length} additional page${goodPages.length > 1 ? 's' : ''} scoring 80+`);
+  if (hasStructuredData > 0) positiveSignals.push(`${hasStructuredData} page${hasStructuredData > 1 ? 's' : ''} with structured data (JSON-LD)`);
+  if (!clientSiteWide.some(i => i.check === 'ssl')) positiveSignals.push('SSL certificate is properly configured');
+  if (!clientSiteWide.some(i => i.check === 'robots-txt' && i.severity === 'error')) positiveSignals.push('robots.txt is properly configured');
+  if (!clientSiteWide.some(i => i.check === 'sitemap' && i.severity === 'error')) positiveSignals.push('XML sitemap is present and accessible');
+
+  const workingWellHTML = positiveSignals.length > 0
+    ? `<div style="margin:32px 0">
+        <div class="section-title">What's Working Well</div>
+        ${positiveSignals.map(signal => `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;margin:4px 0;border-radius:6px;background:rgba(34,197,94,0.05);border:1px solid rgba(34,197,94,0.12)">
+          <span style="color:#22c55e;font-size:14px">✓</span>
+          <span style="font-size:13px;color:#94a3b8">${signal}</span>
+        </div>`).join('')}
+      </div>`
+    : '';
+
+  // Recommended Next Steps (CTA section)
+  const nextSteps: string[] = [];
+  if (missingTitles > 0) nextSteps.push('Add unique, keyword-rich title tags to all pages — this is the #1 ranking factor you can control');
+  if (missingDescriptions > 0) nextSteps.push('Write compelling meta descriptions for all pages to improve click-through rates from search results');
+  if (missingOG > 0) nextSteps.push('Add Open Graph tags so your pages look professional when shared on social media');
+  if (quickWinChecks.length > 0) nextSteps.push('Implement the Quick Wins above — they provide the highest ROI for the least effort');
+  if (audit.siteScore < 80) nextSteps.push('Schedule a follow-up audit in 30 days to track improvement and identify new opportunities');
+  if (nextSteps.length === 0) nextSteps.push('Continue monitoring your SEO health with regular audits to maintain your strong position');
+
+  const nextStepsHTML = `<div style="margin:40px 0;padding:24px;border-radius:12px;background:linear-gradient(135deg,rgba(46,217,195,0.06),rgba(99,102,241,0.06));border:1px solid rgba(46,217,195,0.15)">
+    <div style="font-size:16px;font-weight:600;color:#f1f5f9;margin-bottom:4px">Recommended Next Steps</div>
+    <div style="font-size:12px;color:#64748b;margin-bottom:16px">Prioritized actions to improve your search visibility</div>
+    ${nextSteps.map((step, idx) => `<div style="display:flex;gap:12px;padding:10px 0;${idx < nextSteps.length - 1 ? 'border-bottom:1px solid rgba(255,255,255,0.04)' : ''}">
+      <div style="width:24px;height:24px;border-radius:50%;background:rgba(46,217,195,0.12);color:#2ed9c3;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0">${idx + 1}</div>
+      <div style="font-size:13px;color:#cbd5e1;padding-top:2px">${step}</div>
+    </div>`).join('')}
+  </div>`;
+
   // Client logo
   const logoHTML = logoUrl
     ? `<img src="${logoUrl}" alt="${siteName}" style="max-height:40px;max-width:200px;margin-bottom:16px;opacity:0.9" />`
@@ -493,6 +644,8 @@ export function renderReportHTML(snapshot: AuditSnapshot): string {
         <div class="score-number" style="color:${scoreColor}">${audit.siteScore}</div>
       </div>
       ${deltaHTML}
+      <div style="margin-top:8px;font-size:14px;font-weight:600;color:${scoreColor}">${scoreGrade}</div>
+      <div style="margin-top:6px;font-size:12px;color:#94a3b8;max-width:500px;margin-left:auto;margin-right:auto;line-height:1.5">${scoreContext}</div>
       
       <div class="stats">
         <div class="stat">
@@ -516,12 +669,17 @@ export function renderReportHTML(snapshot: AuditSnapshot): string {
     </div>
 
     ${executiveSummaryHTML}
+    ${visibilityRiskHTML}
+    ${quickWinsHTML}
     ${actionItemsHTML}
+    ${workingWellHTML}
 
     ${clientSiteWide.length > 0 ? `<div class="section-title">Site-Wide Issues</div>${siteWideRows}` : ''}
     
     <div class="section-title">Page-by-Page Results</div>
     ${pageRows}
+
+    ${nextStepsHTML}
     
     <div class="footer">
       <div style="font-size:12px;color:#64748b;margin-bottom:4px">Prepared by <a href="#">hmpsn.studio</a></div>

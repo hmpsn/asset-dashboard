@@ -185,6 +185,28 @@ function extractDiagnostics(data: Record<string, unknown>): Diagnostic[] {
   return diags;
 }
 
+// Single page speed test — user picks the page
+export async function runSinglePageSpeed(
+  url: string,
+  strategy: 'mobile' | 'desktop' = 'mobile',
+  pageTitle: string = '',
+): Promise<PageSpeedResult | null> {
+  console.log(`PageSpeed: testing single page ${url} (${strategy})`);
+  const data = await runPageSpeed(url, strategy);
+  if (!data) return null;
+
+  return {
+    url,
+    page: pageTitle || url.replace(/https?:\/\/[^/]+\/?/, '/') || '/',
+    strategy,
+    score: extractScore(data),
+    vitals: extractVitals(data),
+    opportunities: extractOpportunities(data),
+    diagnostics: extractDiagnostics(data),
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
 export async function runSiteSpeed(
   siteId: string,
   strategy: 'mobile' | 'desktop' = 'mobile',
