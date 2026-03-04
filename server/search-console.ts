@@ -6,7 +6,6 @@
 import { getValidToken } from './google-auth.js';
 
 const GSC_API = 'https://www.googleapis.com/webmasters/v3';
-const GSC_API_V2 = 'https://searchconsole.googleapis.com/v1';
 
 interface SearchAnalyticsRow {
   keys: string[];
@@ -94,12 +93,13 @@ export async function getSearchOverview(
 
   const fmt = (d: Date) => d.toISOString().split('T')[0];
 
+  const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
+
   // Fetch top queries
   const queryData = await gscFetch(
-    `${GSC_API_V2}/searchanalytics/query`,
+    `${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`,
     token,
     {
-      siteUrl: gscSiteUrl,
       startDate: fmt(startDate),
       endDate: fmt(endDate),
       dimensions: ['query'],
@@ -110,10 +110,9 @@ export async function getSearchOverview(
 
   // Fetch top pages
   const pageData = await gscFetch(
-    `${GSC_API_V2}/searchanalytics/query`,
+    `${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`,
     token,
     {
-      siteUrl: gscSiteUrl,
       startDate: fmt(startDate),
       endDate: fmt(endDate),
       dimensions: ['page'],
@@ -171,11 +170,12 @@ export async function getPerformanceTrend(
 
   const fmt = (d: Date) => d.toISOString().split('T')[0];
 
+  const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
+
   const data = await gscFetch(
-    `${GSC_API_V2}/searchanalytics/query`,
+    `${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`,
     token,
     {
-      siteUrl: gscSiteUrl,
       startDate: fmt(startDate),
       endDate: fmt(endDate),
       dimensions: ['date'],
