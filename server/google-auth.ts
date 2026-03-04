@@ -51,7 +51,6 @@ export function getAuthUrl(siteId: string): string | null {
 
   const scopes = [
     'https://www.googleapis.com/auth/webmasters.readonly',
-    'https://www.googleapis.com/auth/analytics.readonly',
   ].join(' ');
 
   const params = new URLSearchParams({
@@ -64,7 +63,9 @@ export function getAuthUrl(siteId: string): string | null {
     state: siteId,
   });
 
-  return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+  const url = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+  console.log(`[google-auth] Auth URL generated, redirect_uri=${creds.redirectUri}`);
+  return url;
 }
 
 export async function exchangeCode(code: string, siteId: string): Promise<{ success: boolean; error?: string }> {
