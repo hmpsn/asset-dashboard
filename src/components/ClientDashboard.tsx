@@ -4,6 +4,7 @@ import {
   BarChart3, ArrowUpDown, Sparkles, Send, AlertTriangle,
   Target, Zap, Shield, MessageSquare, X, ChevronDown,
   CheckCircle2, Info, LayoutDashboard, LineChart, Lock,
+  Users, Globe, Activity,
 } from 'lucide-react';
 
 interface SearchQuery { query: string; clicks: number; impressions: number; ctr: number; position: number; }
@@ -498,6 +499,24 @@ export function ClientDashboard({ workspaceId }: Props) {
             )}
           </div>
 
+          {/* GA4 Analytics cards row */}
+          {ga4Overview && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {[
+                { icon: Users, label: 'Users', value: ga4Overview.totalUsers.toLocaleString(), color: '#a78bfa', td: ga4Trend.map(d => d.users) },
+                { icon: Globe, label: 'Sessions', value: ga4Overview.totalSessions.toLocaleString(), color: '#60a5fa', td: ga4Trend.map(d => d.sessions) },
+                { icon: Eye, label: 'Page Views', value: ga4Overview.totalPageviews.toLocaleString(), color: '#2dd4bf', td: ga4Trend.map(d => d.pageviews) },
+                { icon: Activity, label: 'Bounce Rate', value: `${ga4Overview.bounceRate}%`, color: ga4Overview.bounceRate > 60 ? '#f87171' : '#34d399', td: [] },
+              ].map((card, i) => { const Icon = card.icon; return (
+                <button key={i} onClick={() => setTab('analytics')} className="bg-zinc-900 rounded-xl p-4 border border-zinc-800 hover:border-zinc-700 transition-colors text-left">
+                  <div className="flex items-center justify-between mb-1"><Icon className="w-4 h-4" style={{ color: card.color }} />{card.td.length > 2 && <MiniSparkline data={card.td} color={card.color} />}</div>
+                  <div className="text-2xl font-bold text-zinc-200">{card.value}</div>
+                  <div className="text-[10px] text-zinc-500 mt-0.5">{card.label}</div>
+                </button>
+              ); })}
+            </div>
+          )}
+
           {/* Two-column layout */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <div className="space-y-5">
@@ -513,13 +532,39 @@ export function ClientDashboard({ workspaceId }: Props) {
                   </div>
                 </div>
               )}
+              {ga4Trend.length > 2 && (
+                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-medium text-zinc-400">Traffic Trend</span>
+                    {ga4Overview && <span className="text-[10px] text-zinc-600">{ga4Overview.dateRange.start} — {ga4Overview.dateRange.end}</span>}
+                  </div>
+                  <svg viewBox="0 0 400 100" className="w-full h-20" preserveAspectRatio="none">
+                    {(() => {
+                      const maxU = Math.max(...ga4Trend.map(d => d.users), 1);
+                      const maxS = Math.max(...ga4Trend.map(d => d.sessions), 1);
+                      const xStep = 400 / Math.max(ga4Trend.length - 1, 1);
+                      const mkPath = (vals: number[], max: number) => vals.map((v, i) => `${i === 0 ? 'M' : 'L'}${i * xStep},${95 - (v / max) * 85}`).join(' ');
+                      return (<>
+                        <path d={mkPath(ga4Trend.map(d => d.sessions), maxS)} fill="none" stroke="rgba(96,165,250,0.4)" strokeWidth="1.5" />
+                        <path d={mkPath(ga4Trend.map(d => d.users), maxU)} fill="none" stroke="#a78bfa" strokeWidth="2" />
+                        <path d={`${mkPath(ga4Trend.map(d => d.users), maxU)} L${(ga4Trend.length - 1) * xStep},95 L0,95 Z`} fill="url(#overviewGa4)" opacity="0.12" />
+                        <defs><linearGradient id="overviewGa4" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#a78bfa" /><stop offset="100%" stopColor="transparent" /></linearGradient></defs>
+                      </>);
+                    })()}
+                  </svg>
+                  <div className="flex items-center gap-4 mt-2">
+                    <span className="flex items-center gap-1.5 text-[10px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-violet-400 inline-block" /> Users</span>
+                    <span className="flex items-center gap-1.5 text-[10px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-blue-400/40 inline-block" /> Sessions</span>
+                  </div>
+                </div>
+              )}
               {auditDetail && auditDetail.scoreHistory.length >= 2 && (
                 <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                   <div className="text-xs font-medium text-zinc-400 mb-3">Health Score Trend</div>
                   <ScoreHistoryChart history={auditDetail.scoreHistory} />
                 </div>
               )}
-              {!overview && !audit && (
+              {!overview && !audit && !ga4Overview && (
                 <div className="bg-gradient-to-br from-violet-500/10 via-zinc-900 to-fuchsia-500/10 rounded-xl border border-zinc-800 p-8 text-center">
                   <div className="w-12 h-12 rounded-2xl bg-violet-500/10 flex items-center justify-center mx-auto mb-4"><BarChart3 className="w-6 h-6 text-violet-400" /></div>
                   <h2 className="text-lg font-semibold text-zinc-200 mb-2">{ws.name}</h2>
@@ -589,6 +634,56 @@ export function ClientDashboard({ workspaceId }: Props) {
                         <div className="flex items-center gap-2 flex-shrink-0"><span className="text-zinc-500">{q.clicks} clicks</span><span className="text-green-400 font-medium">#{q.position}</span></div>
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+              {/* GA4 Traffic Sources (compact) */}
+              {ga4Sources.length > 0 && (
+                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2"><Globe className="w-4 h-4 text-blue-400" /><span className="text-xs font-medium text-zinc-300">Traffic Sources</span></div>
+                    <button onClick={() => setTab('analytics')} className="text-[10px] text-violet-400 hover:text-violet-300">View all →</button>
+                  </div>
+                  <div className="space-y-1.5">
+                    {ga4Sources.slice(0, 5).map((s, i) => {
+                      const totalSessions = ga4Sources.reduce((sum, x) => sum + x.sessions, 0);
+                      const pct = totalSessions > 0 ? (s.sessions / totalSessions) * 100 : 0;
+                      return (
+                        <div key={i} className="relative">
+                          <div className="flex items-center justify-between text-[11px] py-1.5 px-2.5 rounded-lg relative z-10">
+                            <span className="text-zinc-300 truncate mr-2">{s.source}{s.medium !== '(none)' ? ` / ${s.medium}` : ''}</span>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <span className="text-blue-400 font-medium tabular-nums">{s.sessions.toLocaleString()}</span>
+                              <span className="text-zinc-600 w-10 text-right">{pct.toFixed(0)}%</span>
+                            </div>
+                          </div>
+                          <div className="absolute inset-0 rounded-lg bg-blue-500/5" style={{ width: `${pct}%` }} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {/* GA4 Device Breakdown (compact) */}
+              {ga4Devices.length > 0 && (
+                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+                  <div className="flex items-center gap-2 mb-3"><Activity className="w-4 h-4 text-teal-400" /><span className="text-xs font-medium text-zinc-300">Devices</span></div>
+                  <div className="space-y-2.5">
+                    {ga4Devices.map((d, i) => {
+                      const colors = ['bg-violet-500', 'bg-blue-500', 'bg-teal-500'];
+                      const textColors = ['text-violet-400', 'text-blue-400', 'text-teal-400'];
+                      return (
+                        <div key={i}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[11px] text-zinc-400 capitalize">{d.device}</span>
+                            <span className={`text-[11px] font-medium ${textColors[i % textColors.length]}`}>{d.percentage}%</span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+                            <div className={`h-full rounded-full ${colors[i % colors.length]}`} style={{ width: `${d.percentage}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
