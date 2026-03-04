@@ -521,7 +521,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string): Promi
   const siteWideIssues: SeoIssue[] = [];
 
   // ── Discover & audit CMS collection pages via sitemap ──
-  const CMS_PAGE_LIMIT = 50;
+  const CMS_PAGE_LIMIT = 9999; // No practical limit — audit all CMS pages
   const scanUrl = siteWideUrl || baseUrl;
   if (scanUrl) {
     const staticPaths = buildStaticPathSet(pages);

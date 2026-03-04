@@ -1601,20 +1601,22 @@ app.post('/api/webflow/compress/:assetId', async (req, res) => {
     const baseName = (fileName || 'image').replace(/\.[^.]+$/, '');
 
     if (ext === 'svg') {
-      // Use SVGO to optimize SVG
-      const { execFileSync } = await import('child_process');
-      const tmpIn = `/tmp/svgo_in_${Date.now()}.svg`;
-      const tmpOut = `/tmp/svgo_out_${Date.now()}.svg`;
-      fs.writeFileSync(tmpIn, originalBuffer);
+      // Use SVGO library to optimize SVG
+      const svgo = await import('svgo');
+      let compressedSvg: Buffer;
       try {
-        execFileSync('svgo', ['-i', tmpIn, '-o', tmpOut, '--quiet'], { stdio: 'pipe' });
-      } catch {
-        fs.unlinkSync(tmpIn);
-        return res.json({ skipped: true, reason: 'SVGO optimization failed' });
+        const svgString = originalBuffer.toString('utf-8');
+        const result = svgo.optimize(svgString, {
+          multipass: true,
+          plugins: [
+            'preset-default',
+          ],
+        } as Parameters<typeof svgo.optimize>[1]);
+        compressedSvg = Buffer.from(result.data, 'utf-8');
+      } catch (svgoErr) {
+        console.error('SVGO error:', svgoErr);
+        return res.json({ skipped: true, reason: 'SVGO optimization failed: ' + (svgoErr instanceof Error ? svgoErr.message : String(svgoErr)) });
       }
-      const compressedSvg = fs.readFileSync(tmpOut);
-      fs.unlinkSync(tmpIn);
-      fs.unlinkSync(tmpOut);
 
       const svgNewSize = compressedSvg.length;
       const svgSavings = originalSize - svgNewSize;
@@ -2384,20 +2386,61 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
+  const businessContext = (req.body?.businessContext as string) || ws.keywordStrategy?.businessContext || '';
   const token = getTokenForSite(ws.webflowSiteId) || undefined;
 
   try {
     // 1. Gather page data from Webflow
     const allPages = await listPages(ws.webflowSiteId, token);
     const published = filterPublishedPages(allPages);
-    const pageInfo = published.map(p => ({
-      path: p.publishedPath || `/${p.slug || ''}`,
-      title: p.title || p.slug || '',
-      seoTitle: p.seo?.title || '',
-      seoDesc: p.seo?.description || '',
-    }));
 
-    // 2. Try to gather GSC data if connected
+    // 2. Resolve site base URL for content fetching
+    const subdomain = await getSiteSubdomain(ws.webflowSiteId, token);
+    const baseUrl = ws.liveDomain
+      ? `https://${ws.liveDomain}`
+      : subdomain ? `https://${subdomain}.webflow.io` : '';
+
+    // 3. Fetch actual page content for richer context (parallel, batched)
+    const pageInfo: Array<{ path: string; title: string; seoTitle: string; seoDesc: string; contentSnippet: string }> = [];
+    const contentBatch = 5;
+    for (let i = 0; i < published.length; i += contentBatch) {
+      const chunk = published.slice(i, i + contentBatch);
+      const contents = await Promise.all(chunk.map(async (p) => {
+        const pagePath = p.publishedPath || `/${p.slug || ''}`;
+        const url = baseUrl ? `${baseUrl}${pagePath === '/' ? '' : pagePath}` : '';
+        let contentSnippet = '';
+        if (url) {
+          try {
+            const htmlRes = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(8000) });
+            if (htmlRes.ok) {
+              const html = await htmlRes.text();
+              const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+              const body = bodyMatch ? bodyMatch[1] : html;
+              contentSnippet = body
+                .replace(/<script[\s\S]*?<\/script>/gi, '')
+                .replace(/<style[\s\S]*?<\/style>/gi, '')
+                .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+                .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+                .replace(/<[^>]+>/g, ' ')
+                .replace(/&[a-z]+;/gi, ' ')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .slice(0, 800);
+            }
+          } catch { /* skip content fetch failures */ }
+        }
+        return {
+          path: pagePath,
+          title: p.title || p.slug || '',
+          seoTitle: p.seo?.title || '',
+          seoDesc: p.seo?.description || '',
+          contentSnippet,
+        };
+      }));
+      pageInfo.push(...contents);
+    }
+
+    // 4. Try to gather GSC data if connected
     let gscData: Array<{ query: string; page: string; clicks: number; impressions: number; position: number }> = [];
     if (ws.gscPropertyUrl) {
       try {
@@ -2407,45 +2450,58 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
       }
     }
 
-    // 3. Build context for AI
-    const pageList = pageInfo.map(p => `- ${p.path}: "${p.title}" | SEO: "${p.seoTitle}" | Desc: "${p.seoDesc}"`).join('\n');
+    // 5. Build rich context for AI
+    const pageList = pageInfo.map(p => {
+      let entry = `- ${p.path}: "${p.title}"`;
+      if (p.seoTitle) entry += ` | SEO title: "${p.seoTitle}"`;
+      if (p.seoDesc) entry += ` | Meta desc: "${p.seoDesc}"`;
+      if (p.contentSnippet) entry += `\n  Content: ${p.contentSnippet}`;
+      return entry;
+    }).join('\n');
 
     let gscContext = '';
     if (gscData.length > 0) {
-      // Top 50 query-page combos by impressions
-      const sorted = [...gscData].sort((a, b) => b.impressions - a.impressions).slice(0, 50);
-      gscContext = `\n\nGoogle Search Console data (last 90 days, top queries by impressions):\n` +
-        sorted.map(r => `- "${r.query}" → ${r.page} (pos: ${r.position}, clicks: ${r.clicks}, impressions: ${r.impressions})`).join('\n');
+      const sorted = [...gscData].sort((a, b) => b.impressions - a.impressions).slice(0, 100);
+      gscContext = `\n\nGoogle Search Console data (last 90 days, top 100 query-page combos by impressions):\n` +
+        sorted.map(r => `- "${r.query}" → ${r.page} (pos: ${r.position}, clicks: ${r.clicks}, imp: ${r.impressions})`).join('\n');
     }
 
-    const prompt = `You are an expert SEO strategist. Analyze this website and create a keyword strategy.
+    let businessSection = '';
+    if (businessContext) {
+      businessSection = `\n\nBUSINESS CONTEXT (critical — use this to shape the entire strategy):\n${businessContext}\n`;
+    }
 
-Site pages:
+    const prompt = `You are a senior SEO strategist with 15+ years of experience. Analyze this website deeply and create a comprehensive keyword strategy.
+${businessSection}
+Site pages (with actual content excerpts):
 ${pageList}
 ${gscContext}
 
-Create a comprehensive keyword strategy as a JSON object with this exact structure:
+Create a keyword strategy as a JSON object with this exact structure:
 {
-  "siteKeywords": ["top 5-10 primary keywords this entire site should target"],
+  "siteKeywords": ["8-15 primary keywords this entire site should target, including location-specific variants if the business serves multiple areas"],
   "pageMap": [
     {
       "pagePath": "/exact-path",
       "pageTitle": "Page Title",
-      "primaryKeyword": "main keyword for this page",
-      "secondaryKeywords": ["2-4 supporting keywords"]
+      "primaryKeyword": "specific, high-intent keyword for this page",
+      "secondaryKeywords": ["4-6 supporting keywords including long-tail and location variants"]
     }
   ],
-  "opportunities": ["3-5 keyword opportunities or gaps the site isn't covering well"]
+  "opportunities": ["5-8 specific, actionable keyword opportunities the site is missing"]
 }
 
-Rules:
-- Each page should target a UNIQUE primary keyword (no cannibalization)
-- Use GSC data to identify what's already working and what has potential (high impressions but low position = opportunity)
-- Primary keywords should be specific, not generic
-- Include long-tail keywords in secondaryKeywords
-- Opportunities should be actionable and specific
-- Cover ALL pages in the pageMap
-- Return ONLY valid JSON, no markdown or explanation`;
+Critical rules:
+- READ THE BUSINESS CONTEXT CAREFULLY. If the business operates in multiple locations, EVERY service page needs location-specific keyword variants (e.g. "plumbing services Austin", "plumbing services Houston", "plumbing services San Antonio")
+- Each page's primaryKeyword must be UNIQUE — no keyword cannibalization
+- Use GSC data to identify what's already ranking and what has untapped potential (high impressions but poor position = huge opportunity)
+- Primary keywords should be specific and high-intent, NOT generic (e.g. "commercial janitorial services Austin TX" not "cleaning services")
+- Secondary keywords must include: long-tail variants, question-based queries ("how much does X cost in Y"), location modifiers, and related terms
+- Opportunities should identify GAPS: missing location pages, unaddressed service combinations, missing comparison/vs content, missing FAQ content, etc.
+- If the site has location pages, each location needs its own keyword cluster
+- Consider searcher intent: informational, navigational, commercial, transactional
+- Cover ALL pages in the pageMap — do not skip any
+- Return ONLY valid JSON, no markdown fences, no explanation`;
 
     const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -2454,10 +2510,13 @@ Rules:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 4000,
-        temperature: 0.4,
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: 'You are an expert SEO strategist. You always return valid JSON only, no markdown, no explanation.' },
+          { role: 'user', content: prompt },
+        ],
+        max_tokens: 8000,
+        temperature: 0.3,
       }),
     });
 
@@ -2468,7 +2527,6 @@ Rules:
 
     const aiData = await aiRes.json() as { choices?: Array<{ message?: { content?: string } }> };
     let raw = aiData.choices?.[0]?.message?.content?.trim() || '';
-    // Strip markdown code fences if present
     raw = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
 
     let strategy;
@@ -2485,7 +2543,6 @@ Rules:
           try { return new URL(r.page).pathname === pm.pagePath; } catch { return false; }
         });
         if (matchingRows.length > 0) {
-          // Find the row matching the primary keyword, or the best one
           const kwMatch = matchingRows.find(r => r.query.toLowerCase().includes(pm.primaryKeyword.toLowerCase()));
           const best = kwMatch || matchingRows.sort((a, b) => b.impressions - a.impressions)[0];
           pm.currentPosition = best.position;
@@ -2495,9 +2552,10 @@ Rules:
       }
     }
 
-    // 4. Save to workspace
+    // 6. Save to workspace (preserve business context)
     const keywordStrategy = {
       ...strategy,
+      businessContext: businessContext || undefined,
       generatedAt: new Date().toISOString(),
     };
     updateWorkspace(ws.id, { keywordStrategy });

@@ -39,6 +39,7 @@ export interface KeywordStrategy {
   siteKeywords: string[];        // top-level target keywords for the whole site
   pageMap: PageKeywordMap[];     // keyword assignments per page
   opportunities: string[];       // keyword gaps / untapped opportunities
+  businessContext?: string;      // user-provided context (locations, services, industry)
   generatedAt: string;
 }
 
