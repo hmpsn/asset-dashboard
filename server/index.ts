@@ -702,8 +702,9 @@ app.get('/api/webflow/schema-suggestions/:siteId', async (req, res) => {
     const result = await generateSchemaSuggestions(req.params.siteId, token, useAI);
     res.json(result);
   } catch (err) {
-    console.error('Schema suggester error:', err);
-    res.status(500).json({ error: 'Schema suggestion failed' });
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('Schema suggester error:', msg, err);
+    res.status(500).json({ error: `Schema suggestion failed: ${msg}` });
   }
 });
 

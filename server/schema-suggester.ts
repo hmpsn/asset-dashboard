@@ -92,8 +92,8 @@ function suggestSchemas(
   isHomepage: boolean,
 ): SchemaSuggestion[] {
   const suggestions: SchemaSuggestion[] = [];
-  const titleLower = (seoTitle || pageTitle).toLowerCase();
-  const slugLower = slug.toLowerCase();
+  const titleLower = (seoTitle || pageTitle || '').toLowerCase();
+  const slugLower = (slug || '').toLowerCase();
   const bodyText = html ? html.replace(/<[^>]+>/g, ' ').toLowerCase() : '';
 
   const has = (type: string) => existingSchemas.some(s => s.toLowerCase() === type.toLowerCase());
@@ -355,6 +355,9 @@ async function aiGenerateSchema(
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return []; // Fall back to rule-based if no API key
 
+  const safeSlug = slug || '';
+  const safeSeoTitle = seoTitle || pageTitle || '';
+  const safeSeoDesc = seoDesc || '';
   // Extract meaningful content from HTML (strip tags, limit length)
   let pageContent = '';
   if (html) {
@@ -384,9 +387,9 @@ async function aiGenerateSchema(
   const prompt = `You are an expert SEO structured data consultant. Analyze this webpage and generate production-ready JSON-LD schema(s) that would maximize this page's rich snippet potential in Google Search.
 
 PAGE INFO:
-- URL: ${baseUrl}/${slug}
-- Title: ${seoTitle || pageTitle}
-- Meta Description: ${seoDesc || '(none)'}
+- URL: ${baseUrl}/${safeSlug}
+- Title: ${safeSeoTitle}
+- Meta Description: ${safeSeoDesc || '(none)'}
 - Is Homepage: ${isHomepage}
 - Existing Schemas: ${existingSchemas.length > 0 ? existingSchemas.join(', ') : 'None'}
 - Emails found: ${emails.join(', ') || 'none'}
@@ -450,12 +453,18 @@ Return ONLY valid JSON array, no markdown or explanation.`;
 export async function generateSchemaSuggestions(siteId: string, tokenOverride?: string, useAI: boolean = false): Promise<SchemaPageSuggestion[]> {
   const subdomain = await getSiteSubdomain(siteId, tokenOverride);
   const baseUrl = subdomain ? `https://${subdomain}.webflow.io` : '';
-  if (!baseUrl) return [];
+  console.log(`[schema] subdomain=${subdomain}, baseUrl=${baseUrl}`);
+  if (!baseUrl) {
+    console.error('[schema] No subdomain found for site', siteId);
+    return [];
+  }
 
   const allPages = await listPages(siteId, tokenOverride);
+  console.log(`[schema] Total pages: ${allPages.length}`);
   const pages = filterPublishedPages(allPages).filter(
-    (p: { title: string; slug: string }) => !p.title.toLowerCase().includes('password') && !p.slug.toLowerCase().includes('password')
+    (p: { title: string; slug: string }) => !(p.title || '').toLowerCase().includes('password') && !(p.slug || '').toLowerCase().includes('password')
   );
+  console.log(`[schema] Published (non-password) pages: ${pages.length}`, pages.map(p => `${p.title} [${p.slug}]`));
 
   const results: SchemaPageSuggestion[] = [];
   // AI mode: smaller batches (API calls are slower), rule-based: larger batches
@@ -465,8 +474,8 @@ export async function generateSchemaSuggestions(siteId: string, tokenOverride?: 
     const chunk = pages.slice(i, i + batch);
     const chunkResults = await Promise.all(
       chunk.map(async (page) => {
-        const url = page.slug ? `${baseUrl}/${page.slug}` : baseUrl;
-        const isHomepage = !page.slug || page.slug === '' || page.slug === 'home';
+        const url = (!page.slug || page.slug === 'index') ? baseUrl : `${baseUrl}/${page.slug}`;
+        const isHomepage = !page.slug || page.slug === '' || page.slug === 'home' || page.slug === 'index';
         const [meta, html] = await Promise.all([
           fetchPageMeta(page.id, tokenOverride),
           fetchPublishedHtml(url),
@@ -475,6 +484,7 @@ export async function generateSchemaSuggestions(siteId: string, tokenOverride?: 
         const seoTitle = meta?.seo?.title || page.title || '';
         const seoDesc = meta?.seo?.description || '';
         const existingSchemas = html ? extractExistingSchemas(html) : [];
+        console.log(`[schema] Page "${page.title}" [${page.slug}] → url=${url}, isHome=${isHomepage}, html=${html ? html.length + ' chars' : 'FAILED'}, existing=${existingSchemas.join(',') || 'none'}`);
 
         let suggestedSchemas: SchemaSuggestion[];
 
