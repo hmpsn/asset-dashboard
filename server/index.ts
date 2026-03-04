@@ -33,6 +33,9 @@ import {
   updatePageSeo,
   publishSite,
   uploadAsset,
+  listAssetFolders,
+  createAssetFolder,
+  moveAssetToFolder,
 } from './webflow.js';
 import { generateAltText } from './alttext.js';
 import { runSeoAudit } from './seo-audit.js';
@@ -1283,14 +1286,24 @@ app.post('/api/webflow/bulk-generate-alt', async (req, res) => {
     } catch { /* proceed without page context */ }
   }
 
-  // Process images sequentially (rate limit friendly)
-  const results: Array<{ assetId: string; altText: string | null; updated: boolean; error?: string }> = [];
+  // Stream NDJSON progress events as each image is processed
+  res.setHeader('Content-Type', 'application/x-ndjson');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  const send = (data: Record<string, unknown>) => {
+    res.write(JSON.stringify(data) + '\n');
+  };
+
+  send({ type: 'status', message: 'Processing images...', done: 0, total: assets.length });
+
+  let done = 0;
   for (const asset of assets) {
     try {
-      // Download image
       const response = await fetch(asset.imageUrl);
       if (!response.ok) {
-        results.push({ assetId: asset.assetId, altText: null, updated: false, error: `Download failed: ${response.status}` });
+        done++;
+        send({ type: 'result', assetId: asset.assetId, altText: null, updated: false, error: `Download failed: ${response.status}`, done, total: assets.length });
         continue;
       }
       const buffer = Buffer.from(await response.arrayBuffer());
@@ -1302,25 +1315,28 @@ app.post('/api/webflow/bulk-generate-alt', async (req, res) => {
       const altText = await generateAltText(tmpPath, context);
       try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
 
+      done++;
       if (altText) {
         const writeResult = await updateAsset(asset.assetId, { altText }, token);
         if (!writeResult.success) {
           console.error(`Bulk alt: generated but write-back failed for ${asset.assetId}:`, writeResult.error);
-          results.push({ assetId: asset.assetId, altText, updated: false, error: writeResult.error });
+          send({ type: 'result', assetId: asset.assetId, altText, updated: false, error: writeResult.error, done, total: assets.length });
         } else {
-          results.push({ assetId: asset.assetId, altText, updated: true });
+          send({ type: 'result', assetId: asset.assetId, altText, updated: true, done, total: assets.length });
         }
       } else {
-        results.push({ assetId: asset.assetId, altText: null, updated: false, error: 'Generation returned null' });
+        send({ type: 'result', assetId: asset.assetId, altText: null, updated: false, error: 'Generation returned null', done, total: assets.length });
       }
     } catch (err) {
+      done++;
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`Bulk alt error for ${asset.assetId}:`, msg);
-      results.push({ assetId: asset.assetId, altText: null, updated: false, error: msg });
+      send({ type: 'result', assetId: asset.assetId, altText: null, updated: false, error: msg, done, total: assets.length });
     }
   }
 
-  res.json({ results });
+  send({ type: 'done', done, total: assets.length });
+  res.end();
 });
 
 // --- Image Compression ---
@@ -1465,6 +1481,156 @@ app.post('/api/webflow/compress/:assetId', async (req, res) => {
   } catch (e) {
     console.error('Compress error:', e);
     res.status(500).json({ error: 'Compression failed' });
+  }
+});
+
+// --- Organize Assets into Folders ---
+
+// Preview: builds a plan of which assets go into which folders
+app.get('/api/webflow/organize-preview/:siteId', async (req, res) => {
+  const { siteId } = req.params;
+  const token = getTokenForSite(siteId) || undefined;
+  if (!token) return res.status(400).json({ error: 'No token for site' });
+
+  try {
+    // 1. Fetch assets and existing folders
+    const [assets, existingFolders] = await Promise.all([
+      listAssets(siteId, token),
+      listAssetFolders(siteId, token),
+    ]);
+
+    // 2. Scan usage: which assets appear on which pages
+    // scanAssetUsage returns Map<assetId, string[]> where strings are refs like "page:Title", "css:styles", "cms:Collection"
+    const usage = await scanAssetUsage(siteId, token);
+
+    // Build assetId → page titles mapping (extract page names from "page:Title" refs)
+    const assetPageMap = new Map<string, string[]>(); // assetId → page titles
+
+    for (const [assetId, refs] of usage.entries()) {
+      const pageTitles = refs
+        .filter(r => r.startsWith('page:'))
+        .map(r => r.slice(5)); // strip "page:" prefix
+      if (pageTitles.length > 0) {
+        assetPageMap.set(assetId, pageTitles);
+      }
+    }
+
+    // 3. Build the organization plan
+    const existingFolderNames = new Set(existingFolders.map(f => f.displayName));
+    const plan: {
+      foldersToCreate: string[];
+      moves: Array<{ assetId: string; assetName: string; targetFolder: string; currentFolder?: string }>;
+      summary: { totalAssets: number; assetsToMove: number; foldersToCreate: number; alreadyOrganized: number; unused: number; shared: number };
+    } = {
+      foldersToCreate: [],
+      moves: [],
+      summary: { totalAssets: assets.length, assetsToMove: 0, foldersToCreate: 0, alreadyOrganized: 0, unused: 0, shared: 0 },
+    };
+
+    const foldersNeeded = new Set<string>();
+
+    for (const asset of assets) {
+      const pageTitles = assetPageMap.get(asset.id);
+
+      // Skip assets that already have a folder
+      if (asset.parentFolder) {
+        plan.summary.alreadyOrganized++;
+        continue;
+      }
+
+      let targetFolder: string;
+      if (!pageTitles || pageTitles.length === 0) {
+        targetFolder = '_Unused Assets';
+        plan.summary.unused++;
+      } else if (pageTitles.length > 1) {
+        targetFolder = '_Shared Assets';
+        plan.summary.shared++;
+      } else {
+        targetFolder = pageTitles[0];
+      }
+
+      foldersNeeded.add(targetFolder);
+      plan.moves.push({
+        assetId: asset.id,
+        assetName: asset.displayName || asset.originalFileName || asset.id,
+        targetFolder,
+        currentFolder: undefined,
+      });
+    }
+
+    // Determine which folders need to be created
+    for (const folder of foldersNeeded) {
+      if (!existingFolderNames.has(folder)) {
+        plan.foldersToCreate.push(folder);
+      }
+    }
+
+    plan.summary.assetsToMove = plan.moves.length;
+    plan.summary.foldersToCreate = plan.foldersToCreate.length;
+
+    res.json(plan);
+  } catch (err) {
+    console.error('Organize preview error:', err);
+    res.status(500).json({ error: 'Failed to build organization plan' });
+  }
+});
+
+// Execute: creates folders and moves assets according to a plan
+app.post('/api/webflow/organize-execute/:siteId', async (req, res) => {
+  const { siteId } = req.params;
+  const { moves, foldersToCreate } = req.body as {
+    moves: Array<{ assetId: string; assetName: string; targetFolder: string }>;
+    foldersToCreate: string[];
+  };
+  const token = getTokenForSite(siteId) || undefined;
+  if (!token) return res.status(400).json({ error: 'No token for site' });
+  if (!moves?.length) return res.status(400).json({ error: 'No moves to execute' });
+
+  try {
+    // 1. Get existing folders to avoid duplicates
+    const existingFolders = await listAssetFolders(siteId, token);
+    const folderNameToId = new Map(existingFolders.map(f => [f.displayName, f.id]));
+
+    // 2. Create any new folders needed
+    const createResults: Array<{ folder: string; success: boolean; error?: string }> = [];
+    for (const folderName of (foldersToCreate || [])) {
+      if (folderNameToId.has(folderName)) {
+        createResults.push({ folder: folderName, success: true });
+        continue;
+      }
+      const result = await createAssetFolder(siteId, folderName, undefined, token);
+      if (result.success && result.folderId) {
+        folderNameToId.set(folderName, result.folderId);
+        createResults.push({ folder: folderName, success: true });
+      } else {
+        createResults.push({ folder: folderName, success: false, error: result.error });
+      }
+    }
+
+    // 3. Move assets into their target folders
+    const moveResults: Array<{ assetId: string; assetName: string; targetFolder: string; success: boolean; error?: string }> = [];
+    for (const move of moves) {
+      const folderId = folderNameToId.get(move.targetFolder);
+      if (!folderId) {
+        moveResults.push({ ...move, success: false, error: `Folder "${move.targetFolder}" not found` });
+        continue;
+      }
+      const result = await moveAssetToFolder(move.assetId, folderId, token);
+      moveResults.push({ ...move, success: result.success, error: result.error });
+    }
+
+    const successCount = moveResults.filter(r => r.success).length;
+    const failCount = moveResults.filter(r => !r.success).length;
+
+    res.json({
+      success: true,
+      foldersCreated: createResults,
+      moveResults,
+      summary: { moved: successCount, failed: failCount, total: moves.length },
+    });
+  } catch (err) {
+    console.error('Organize execute error:', err);
+    res.status(500).json({ error: 'Failed to execute organization plan' });
   }
 });
 

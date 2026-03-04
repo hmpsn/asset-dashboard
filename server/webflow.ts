@@ -31,6 +31,7 @@ export interface WebflowAsset {
   url?: string;
   hostedUrl?: string;
   altText?: string;
+  parentFolder?: string | null;
   createdOn?: string;
   lastUpdated?: string;
 }
@@ -109,6 +110,73 @@ export async function updateAsset(
     console.error('Asset update error:', msg);
     return { success: false, error: msg };
   }
+}
+
+// --- Asset Folders ---
+export interface AssetFolder {
+  id: string;
+  displayName: string;
+  parentFolderId?: string | null;
+  createdOn?: string;
+  lastUpdated?: string;
+}
+
+export async function listAssetFolders(
+  siteId: string,
+  tokenOverride?: string,
+): Promise<AssetFolder[]> {
+  const res = await webflowFetch(`/sites/${siteId}/asset_folders`, {}, tokenOverride);
+  if (!res.ok) return [];
+  const data = await res.json() as { assetFolders?: AssetFolder[] };
+  return data.assetFolders || [];
+}
+
+export async function createAssetFolder(
+  siteId: string,
+  displayName: string,
+  parentFolderId?: string,
+  tokenOverride?: string,
+): Promise<{ success: boolean; folderId?: string; error?: string }> {
+  try {
+    const body: Record<string, string> = { displayName };
+    if (parentFolderId) body.parentFolderId = parentFolderId;
+    const res = await webflowFetch(`/sites/${siteId}/asset_folders`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }, tokenOverride);
+    if (!res.ok) {
+      const err = await res.text();
+      return { success: false, error: `${res.status}: ${err}` };
+    }
+    const data = await res.json() as { id?: string };
+    return { success: true, folderId: data.id };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function moveAssetToFolder(
+  assetId: string,
+  parentFolderId: string,
+  tokenOverride?: string,
+): Promise<{ success: boolean; error?: string }> {
+  // The PATCH /assets/{id} endpoint accepts parentFolder to move an asset
+  const current = await getAsset(assetId, tokenOverride);
+  const body: Record<string, string> = {
+    displayName: current?.displayName ?? `asset-${assetId}`,
+    parentFolder: parentFolderId,
+  };
+  if (current?.altText) body.altText = current.altText;
+
+  const res = await webflowFetch(`/assets/${assetId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  }, tokenOverride);
+  if (!res.ok) {
+    const err = await res.text();
+    return { success: false, error: `${res.status}: ${err}` };
+  }
+  return { success: true };
 }
 
 // --- Delete asset ---

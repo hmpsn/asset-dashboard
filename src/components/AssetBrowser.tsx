@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Search, Image, AlertTriangle, Trash2, Sparkles, Check, X,
-  FileText, ExternalLink, ChevronDown, Loader2, Minimize2, Wand2,
+  FileText, ExternalLink, ChevronDown, Loader2, Minimize2, Wand2, FolderOpen,
 } from 'lucide-react';
 
 interface Asset {
@@ -48,9 +48,20 @@ function AssetBrowser({ siteId }: Props) {
   const [renameDraft, setRenameDraft] = useState('');
   const [renameLoading, setRenameLoading] = useState<Set<string>>(new Set());
   const [bulkRenameProgress, setBulkRenameProgress] = useState<{ done: number; total: number } | null>(null);
+  const [bulkCompressProgress, setBulkCompressProgress] = useState<{ done: number; total: number; saved: number } | null>(null);
   const [unusedIds, setUnusedIds] = useState<Set<string> | null>(null);
   const [altError, setAltError] = useState<string | null>(null);
   const unusedLoadingRef = useRef(false);
+
+  // Organize state
+  const [organizePreview, setOrganizePreview] = useState<{
+    foldersToCreate: string[];
+    moves: Array<{ assetId: string; assetName: string; targetFolder: string }>;
+    summary: { totalAssets: number; assetsToMove: number; foldersToCreate: number; alreadyOrganized: number; unused: number; shared: number };
+  } | null>(null);
+  const [organizeLoading, setOrganizeLoading] = useState(false);
+  const [organizeExecuting, setOrganizeExecuting] = useState(false);
+  const [organizeResult, setOrganizeResult] = useState<{ moved: number; failed: number; total: number } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -182,30 +193,55 @@ function AssetBrowser({ siteId }: Props) {
           })),
         }),
       });
-      const data = await res.json();
-      if (data.error) {
-        setAltError(`Bulk alt text failed: ${data.error}`);
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: 'Unknown error' }));
+        setAltError(`Bulk alt text failed: ${data.error || res.statusText}`);
         setBulkProgress(null);
         return;
       }
 
-      // Apply results
+      // Stream NDJSON: read line-by-line as server processes each image
+      const reader = res.body?.getReader();
+      if (!reader) { setAltError('Streaming not supported'); setBulkProgress(null); return; }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
       let successCount = 0;
       let failCount = 0;
-      const updatedAssets = new Map<string, string>();
-      for (const r of data.results || []) {
-        if (r.altText) {
-          updatedAssets.set(r.assetId, r.altText);
-          if (r.updated) successCount++;
-          else failCount++;
-        } else {
-          failCount++;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        // Process complete lines
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // keep incomplete last line in buffer
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const event = JSON.parse(line);
+            if (event.type === 'result') {
+              // Update progress bar
+              setBulkProgress({ done: event.done, total: event.total });
+              // Apply alt text immediately as each image completes
+              if (event.altText) {
+                setAssets(prev => prev.map(a =>
+                  a.id === event.assetId ? { ...a, altText: event.altText } : a
+                ));
+                if (event.updated) successCount++;
+                else failCount++;
+              } else {
+                failCount++;
+              }
+            } else if (event.type === 'status') {
+              setBulkProgress({ done: event.done, total: event.total });
+            }
+          } catch { /* skip malformed line */ }
         }
       }
-
-      setAssets(prev => prev.map(a =>
-        updatedAssets.has(a.id) ? { ...a, altText: updatedAssets.get(a.id)! } : a
-      ));
 
       if (failCount > 0) {
         setAltError(`${successCount} saved to Webflow, ${failCount} failed`);
@@ -332,6 +368,99 @@ function AssetBrowser({ siteId }: Props) {
     setBulkRenameProgress(null);
   };
 
+  const handleBulkCompress = async () => {
+    const toCompress = filtered.filter(a => selected.has(a.id) && a.size > 50 * 1024 && !a.contentType.includes('svg'));
+    if (!toCompress.length) return;
+    setBulkCompressProgress({ done: 0, total: toCompress.length, saved: 0 });
+    setAltError(null);
+    let totalSaved = 0;
+    for (let i = 0; i < toCompress.length; i++) {
+      const asset = toCompress[i];
+      const url = asset.hostedUrl || asset.url;
+      if (!url) { setBulkCompressProgress({ done: i + 1, total: toCompress.length, saved: totalSaved }); continue; }
+      setCompressing(prev => new Set(prev).add(asset.id));
+      try {
+        const res = await fetch(`/api/webflow/compress/${asset.id}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageUrl: url,
+            siteId,
+            altText: asset.altText,
+            fileName: asset.displayName || asset.originalFileName,
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          totalSaved += data.savings || 0;
+          setAssets(prev => prev.map(a => a.id === asset.id ? {
+            ...a,
+            id: data.newAssetId,
+            size: data.newSize,
+            hostedUrl: data.newHostedUrl,
+            displayName: data.newFileName,
+          } : a));
+          // Update selected set with new asset ID
+          setSelected(prev => {
+            const n = new Set(prev);
+            n.delete(asset.id);
+            n.add(data.newAssetId);
+            return n;
+          });
+        }
+      } catch { /* ignore */ }
+      setCompressing(prev => { const n = new Set(prev); n.delete(asset.id); return n; });
+      setBulkCompressProgress({ done: i + 1, total: toCompress.length, saved: totalSaved });
+    }
+    if (totalSaved > 0) {
+      setCompressResult(`Bulk compressed: saved ${formatSize(totalSaved)} total`);
+      setTimeout(() => setCompressResult(null), 5000);
+    }
+    setBulkCompressProgress(null);
+  };
+
+  const handleOrganizePreview = async () => {
+    setOrganizeLoading(true);
+    setOrganizePreview(null);
+    setOrganizeResult(null);
+    try {
+      const res = await fetch(`/api/webflow/organize-preview/${siteId}`);
+      const data = await res.json();
+      if (data.error) {
+        setAltError(`Organize failed: ${data.error}`);
+      } else {
+        setOrganizePreview(data);
+      }
+    } catch {
+      setAltError('Failed to load organization preview');
+    }
+    setOrganizeLoading(false);
+  };
+
+  const handleOrganizeExecute = async () => {
+    if (!organizePreview) return;
+    setOrganizeExecuting(true);
+    try {
+      const res = await fetch(`/api/webflow/organize-execute/${siteId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          moves: organizePreview.moves,
+          foldersToCreate: organizePreview.foldersToCreate,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setAltError(`Organize failed: ${data.error}`);
+      } else {
+        setOrganizeResult(data.summary);
+      }
+    } catch {
+      setAltError('Failed to execute organization');
+    }
+    setOrganizeExecuting(false);
+  };
+
   const handleBulkDelete = async () => {
     if (!confirm(`Delete ${selected.size} assets permanently from Webflow?`)) return;
     setDeleting(true);
@@ -372,6 +501,14 @@ function AssetBrowser({ siteId }: Props) {
             <Image className="w-3.5 h-3.5" /> {oversizedCount} oversized
           </span>
         )}
+        <button
+          onClick={handleOrganizePreview}
+          disabled={organizeLoading}
+          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-violet-700/60 hover:bg-violet-600/70 disabled:opacity-50 rounded-lg text-xs font-medium transition-colors"
+        >
+          {organizeLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <FolderOpen className="w-3 h-3" />}
+          Organize into Folders
+        </button>
       </div>
 
       {/* Alt text error banner */}
@@ -432,6 +569,113 @@ function AssetBrowser({ siteId }: Props) {
               />
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Bulk compress progress */}
+      {bulkCompressProgress && (
+        <div className="flex items-center gap-3 px-4 py-3 bg-orange-950/50 border border-orange-800/50 rounded-lg">
+          <Loader2 className="w-4 h-4 animate-spin text-orange-400" />
+          <div className="flex-1">
+            <div className="text-sm text-orange-200">
+              Compressing assets... {bulkCompressProgress.done}/{bulkCompressProgress.total}
+              {bulkCompressProgress.saved > 0 && <span className="text-orange-400 ml-2">({formatSize(bulkCompressProgress.saved)} saved)</span>}
+            </div>
+            <div className="mt-1.5 h-1.5 bg-orange-950 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-orange-500 rounded-full transition-all duration-300"
+                style={{ width: `${(bulkCompressProgress.done / bulkCompressProgress.total) * 100}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Organize into Folders modal */}
+      {organizePreview && !organizeResult && (
+        <div className="p-4 bg-violet-950/40 border border-violet-800/50 rounded-lg space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-violet-200 flex items-center gap-2">
+              <FolderOpen className="w-4 h-4" /> Organization Plan
+            </h3>
+            <button onClick={() => setOrganizePreview(null)} className="text-zinc-500 hover:text-zinc-300">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Summary */}
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="bg-zinc-900/60 rounded-lg p-2">
+              <div className="text-lg font-bold text-violet-300">{organizePreview.summary.assetsToMove}</div>
+              <div className="text-[10px] text-zinc-500">Assets to move</div>
+            </div>
+            <div className="bg-zinc-900/60 rounded-lg p-2">
+              <div className="text-lg font-bold text-cyan-300">{organizePreview.summary.foldersToCreate}</div>
+              <div className="text-[10px] text-zinc-500">New folders</div>
+            </div>
+            <div className="bg-zinc-900/60 rounded-lg p-2">
+              <div className="text-lg font-bold text-zinc-400">{organizePreview.summary.alreadyOrganized}</div>
+              <div className="text-[10px] text-zinc-500">Already organized</div>
+            </div>
+          </div>
+
+          {/* Folder breakdown */}
+          <div className="max-h-48 overflow-y-auto space-y-1 text-xs">
+            {(() => {
+              const byFolder = new Map<string, string[]>();
+              for (const m of organizePreview.moves) {
+                const list = byFolder.get(m.targetFolder) || [];
+                list.push(m.assetName);
+                byFolder.set(m.targetFolder, list);
+              }
+              return [...byFolder.entries()].sort((a, b) => b[1].length - a[1].length).map(([folder, assetNames]) => (
+                <details key={folder} className="group">
+                  <summary className="cursor-pointer flex items-center gap-2 px-2 py-1.5 bg-zinc-900/40 rounded hover:bg-zinc-900/60 transition-colors">
+                    <FolderOpen className="w-3 h-3 text-violet-400 shrink-0" />
+                    <span className="text-zinc-200 font-medium truncate">{folder}</span>
+                    <span className="ml-auto text-zinc-500 shrink-0">{assetNames.length} assets</span>
+                  </summary>
+                  <div className="ml-7 mt-1 space-y-0.5 text-zinc-500">
+                    {assetNames.slice(0, 10).map((name, i) => (
+                      <div key={i} className="truncate">{name}</div>
+                    ))}
+                    {assetNames.length > 10 && <div className="text-zinc-600">...and {assetNames.length - 10} more</div>}
+                  </div>
+                </details>
+              ));
+            })()}
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              onClick={handleOrganizeExecute}
+              disabled={organizeExecuting}
+              className="flex items-center gap-1.5 px-4 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 rounded-lg text-xs font-semibold transition-colors"
+            >
+              {organizeExecuting ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Organizing...</> : <><FolderOpen className="w-3.5 h-3.5" /> Apply Organization</>}
+            </button>
+            <button
+              onClick={() => setOrganizePreview(null)}
+              className="px-4 py-2 text-zinc-400 hover:text-zinc-200 text-xs transition-colors"
+            >
+              Cancel
+            </button>
+            {organizePreview.summary.unused > 0 && (
+              <span className="ml-auto text-[10px] text-zinc-600">{organizePreview.summary.unused} unused → _Unused Assets, {organizePreview.summary.shared} shared → _Shared Assets</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Organize result */}
+      {organizeResult && (
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-violet-950/50 border border-violet-800/50 rounded-lg text-sm text-violet-300">
+          <FolderOpen className="w-4 h-4 text-violet-400 shrink-0" />
+          <span>Organized: {organizeResult.moved} moved{organizeResult.failed > 0 ? `, ${organizeResult.failed} failed` : ''} of {organizeResult.total} assets</span>
+          <button onClick={() => { setOrganizeResult(null); setOrganizePreview(null); }} className="ml-auto text-violet-400 hover:text-violet-300">
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 
@@ -502,6 +746,17 @@ function AssetBrowser({ siteId }: Props) {
               <><Loader2 className="w-3 h-3 animate-spin" /> {bulkRenameProgress.done}/{bulkRenameProgress.total}</>
             ) : (
               <><Wand2 className="w-3 h-3" /> Smart Rename</>
+            )}
+          </button>
+          <button
+            onClick={handleBulkCompress}
+            disabled={!!bulkCompressProgress}
+            className="flex items-center gap-1.5 px-3 py-1 bg-orange-700 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs font-medium transition-colors"
+          >
+            {bulkCompressProgress ? (
+              <><Loader2 className="w-3 h-3 animate-spin" /> {bulkCompressProgress.done}/{bulkCompressProgress.total}</>
+            ) : (
+              <><Minimize2 className="w-3 h-3" /> Compress</>
             )}
           </button>
           <button
