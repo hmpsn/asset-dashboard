@@ -105,29 +105,67 @@ app.get('/api/auth/check', (req, res) => {
 // Diagnostic endpoint - test Webflow API connection
 app.get('/api/health/diag', async (_req, res) => {
   const envToken = process.env.WEBFLOW_API_TOKEN;
+  const workspaces = listWorkspaces();
   const diag: Record<string, unknown> = {
     dataDir: process.env.DATA_DIR || (IS_PROD ? '/tmp/asset-dashboard' : 'local'),
+    configFile: path.join(getUploadRoot(), '.workspaces.json'),
+    configExists: fs.existsSync(path.join(getUploadRoot(), '.workspaces.json')),
     envTokenSet: !!envToken,
     envTokenPrefix: envToken ? envToken.slice(0, 8) + '...' : null,
-    workspaceCount: listWorkspaces().length,
+    workspaceCount: workspaces.length,
+    workspaces: workspaces.map(ws => ({
+      id: ws.id,
+      name: ws.name,
+      siteId: ws.webflowSiteId || null,
+      hasToken: !!ws.webflowToken,
+      tokenPrefix: ws.webflowToken ? ws.webflowToken.slice(0, 8) + '...' : null,
+    })),
   };
-  // Test Webflow API with the env token
+
+  // Test token resolution for each workspace's siteId
+  const tokenTests: Record<string, unknown>[] = [];
+  for (const ws of workspaces) {
+    if (ws.webflowSiteId) {
+      const resolved = getTokenForSite(ws.webflowSiteId);
+      const test: Record<string, unknown> = {
+        workspace: ws.name,
+        siteId: ws.webflowSiteId,
+        resolvedTokenPrefix: resolved ? resolved.slice(0, 8) + '...' : null,
+        source: ws.webflowToken ? 'workspace' : (envToken ? 'env' : 'none'),
+      };
+      // Actually test the Webflow API with the resolved token
+      if (resolved) {
+        try {
+          const r = await fetch(`https://api.webflow.com/v2/sites/${ws.webflowSiteId}`, {
+            headers: { Authorization: `Bearer ${resolved}`, 'Content-Type': 'application/json' },
+          });
+          test.apiStatus = r.status;
+          test.apiOk = r.ok;
+          if (!r.ok) test.apiError = (await r.text()).slice(0, 200);
+          else test.siteName = ((await r.json()) as { displayName?: string }).displayName;
+        } catch (err) {
+          test.apiError = err instanceof Error ? err.message : String(err);
+        }
+      }
+      tokenTests.push(test);
+    }
+  }
+  diag.tokenTests = tokenTests;
+
+  // Also test env token directly
   if (envToken) {
     try {
       const r = await fetch('https://api.webflow.com/v2/sites', {
         headers: { Authorization: `Bearer ${envToken}`, 'Content-Type': 'application/json' },
       });
-      diag.webflowStatus = r.status;
-      diag.webflowOk = r.ok;
-      if (!r.ok) {
-        const body = await r.text();
-        diag.webflowError = body.slice(0, 200);
-      } else {
+      diag.envTokenStatus = r.status;
+      diag.envTokenOk = r.ok;
+      if (r.ok) {
         const data = await r.json() as { sites?: { id: string; displayName?: string }[] };
-        diag.webflowSites = (data.sites || []).map(s => ({ id: s.id, name: s.displayName }));
+        diag.envTokenSites = (data.sites || []).map(s => ({ id: s.id, name: s.displayName }));
       }
     } catch (err) {
-      diag.webflowError = err instanceof Error ? err.message : String(err);
+      diag.envTokenError = err instanceof Error ? err.message : String(err);
     }
   }
   res.json(diag);
