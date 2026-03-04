@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  Loader2, Search, TrendingUp, TrendingDown, Eye, MousePointer,
+  Loader2, Search, TrendingDown, Eye, MousePointer,
   BarChart3, ArrowUpDown, Sparkles, Send, AlertTriangle,
-  Target, Zap, Shield, MessageSquare, X, ChevronDown,
+  Target, Zap, Shield, MessageSquare, X, ChevronDown, ChevronUp,
   CheckCircle2, Info, LayoutDashboard, LineChart, Lock,
   Users, Globe, Activity, Filter,
 } from 'lucide-react';
@@ -15,8 +15,9 @@ interface SearchOverview {
   dateRange: { start: string; end: string };
 }
 interface PerformanceTrend { date: string; clicks: number; impressions: number; ctr: number; position: number; }
+interface EventGroup { id: string; name: string; order: number; color: string; }
 interface EventDisplayConfig { eventName: string; displayName: string; pinned: boolean; group?: string; }
-interface WorkspaceInfo { id: string; name: string; webflowSiteId?: string; webflowSiteName?: string; gscPropertyUrl?: string; ga4PropertyId?: string; liveDomain?: string; eventConfig?: EventDisplayConfig[]; requiresPassword?: boolean; }
+interface WorkspaceInfo { id: string; name: string; webflowSiteId?: string; webflowSiteName?: string; gscPropertyUrl?: string; ga4PropertyId?: string; liveDomain?: string; eventConfig?: EventDisplayConfig[]; eventGroups?: EventGroup[]; requiresPassword?: boolean; }
 interface AuditSummary { id: string; createdAt: string; siteScore: number; totalPages: number; errors: number; warnings: number; previousScore?: number; }
 interface SeoIssue { check: string; severity: 'error' | 'warning' | 'info'; category?: string; message: string; recommendation: string; value?: string; }
 interface PageAuditResult { pageId: string; page: string; slug: string; url: string; score: number; issues: SeoIssue[]; }
@@ -58,9 +59,10 @@ const CAT_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 const QUICK_QUESTIONS = [
-  'What are my biggest SEO opportunities right now?',
-  'Which pages should I optimize first for more traffic?',
-  'Why is my CTR low and how can I improve it?',
+  'What are my biggest opportunities right now?',
+  'Which pages drive the most conversions?',
+  'Summarize my traffic and event trends this month',
+  'What should I focus on to improve performance?',
   'What content should I create next based on search data?',
 ];
 
@@ -183,6 +185,8 @@ export function ClientDashboard({ workspaceId }: Props) {
   const [explorerEvent, setExplorerEvent] = useState('');
   const [explorerPage, setExplorerPage] = useState('');
   const [explorerLoading, setExplorerLoading] = useState(false);
+  const [showAllEvents, setShowAllEvents] = useState(false);
+  const [showExplorer, setShowExplorer] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [authError, setAuthError] = useState('');
@@ -530,92 +534,44 @@ export function ClientDashboard({ workspaceId }: Props) {
 
         {/* ════════════ OVERVIEW TAB ════════════ */}
         {tab === 'overview' && (<>
-          {/* Score cards row */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {audit ? (
-              <button onClick={() => setTab('health')} className="bg-zinc-900 rounded-xl p-4 border border-zinc-800 hover:border-zinc-700 transition-colors text-left">
-                <div className="flex items-center justify-between mb-1">
-                  <Shield className="w-4 h-4" style={{ color: audit.siteScore >= 80 ? '#34d399' : audit.siteScore >= 60 ? '#fbbf24' : '#f87171' }} />
-                  {audit.previousScore != null && (
-                    <span className={`text-[10px] font-medium ${audit.siteScore > audit.previousScore ? 'text-green-400' : audit.siteScore < audit.previousScore ? 'text-red-400' : 'text-zinc-500'}`}>
-                      {audit.siteScore > audit.previousScore ? '↑' : '↓'}{Math.abs(audit.siteScore - audit.previousScore)}
-                    </span>
-                  )}
-                </div>
-                <div className="text-2xl font-bold" style={{ color: audit.siteScore >= 80 ? '#34d399' : audit.siteScore >= 60 ? '#fbbf24' : '#f87171' }}>{audit.siteScore}</div>
-                <div className="text-[10px] text-zinc-500 mt-0.5">Site Health</div>
-              </button>
-            ) : (
-              <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
-                <Shield className="w-4 h-4 text-zinc-700 mb-1" />
-                <div className="text-2xl font-bold text-zinc-700">—</div>
-                <div className="text-[10px] text-zinc-600 mt-0.5">Site Health</div>
+          {/* Adaptive key metrics row */}
+          {(() => {
+            const cards: { icon: typeof Users; label: string; value: string; color: string; td: number[]; onClick: () => void }[] = [];
+            if (audit) cards.push({ icon: Shield, label: 'Site Health', value: String(audit.siteScore), color: audit.siteScore >= 80 ? '#34d399' : audit.siteScore >= 60 ? '#fbbf24' : '#f87171', td: [], onClick: () => setTab('health') });
+            if (ga4Overview) {
+              cards.push({ icon: Users, label: 'Users', value: ga4Overview.totalUsers.toLocaleString(), color: '#a78bfa', td: ga4Trend.map(d => d.users), onClick: () => setTab('analytics') });
+              cards.push({ icon: Globe, label: 'Sessions', value: ga4Overview.totalSessions.toLocaleString(), color: '#60a5fa', td: ga4Trend.map(d => d.sessions), onClick: () => setTab('analytics') });
+            }
+            if (overview) {
+              cards.push({ icon: MousePointer, label: 'Clicks', value: overview.totalClicks.toLocaleString(), color: '#60a5fa', td: trend.map(t => t.clicks), onClick: () => setTab('search') });
+              cards.push({ icon: Eye, label: 'Impressions', value: overview.totalImpressions.toLocaleString(), color: '#a78bfa', td: trend.map(t => t.impressions), onClick: () => setTab('search') });
+            }
+            if (ga4Overview && !overview) cards.push({ icon: Activity, label: 'Bounce Rate', value: `${ga4Overview.bounceRate}%`, color: ga4Overview.bounceRate > 60 ? '#f87171' : '#34d399', td: [], onClick: () => setTab('analytics') });
+            if (cards.length === 0) return null;
+            return (
+              <div className={`grid gap-3 ${cards.length <= 3 ? 'grid-cols-' + cards.length : cards.length === 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'}`}>
+                {cards.map((card, i) => { const Icon = card.icon; return (
+                  <button key={i} onClick={card.onClick} className="bg-zinc-900 rounded-xl p-4 border border-zinc-800 hover:border-zinc-700 transition-colors text-left">
+                    <div className="flex items-center justify-between mb-1"><Icon className="w-4 h-4" style={{ color: card.color }} />{card.td.length > 2 && <MiniSparkline data={card.td} color={card.color} />}</div>
+                    <div className="text-2xl font-bold" style={{ color: card.label === 'Site Health' ? card.color : undefined }}>{card.value}</div>
+                    <div className="text-[10px] text-zinc-500 mt-0.5">{card.label}</div>
+                  </button>
+                ); })}
               </div>
-            )}
-            {overview ? (
-              [
-                { icon: MousePointer, label: 'Total Clicks', value: overview.totalClicks.toLocaleString(), color: '#60a5fa', td: trend.map(t => t.clicks) },
-                { icon: Eye, label: 'Impressions', value: overview.totalImpressions.toLocaleString(), color: '#a78bfa', td: trend.map(t => t.impressions) },
-                { icon: TrendingUp, label: 'Avg CTR', value: `${overview.avgCtr}%`, color: '#34d399', td: trend.map(t => t.ctr) },
-                { icon: BarChart3, label: 'Avg Position', value: String(overview.avgPosition), color: '#fbbf24', td: trend.map(t => t.position) },
-              ].map((card, i) => { const Icon = card.icon; return (
-                <button key={i} onClick={() => setTab('search')} className="bg-zinc-900 rounded-xl p-4 border border-zinc-800 hover:border-zinc-700 transition-colors text-left">
-                  <div className="flex items-center justify-between mb-1"><Icon className="w-4 h-4" style={{ color: card.color }} /><MiniSparkline data={card.td} color={card.color} /></div>
-                  <div className="text-2xl font-bold text-zinc-200">{card.value}</div>
-                  <div className="text-[10px] text-zinc-500 mt-0.5">{card.label}</div>
-                </button>
-              ); })
-            ) : (
-              Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
-                  <div className="w-4 h-4 rounded bg-zinc-800 mb-1" />
-                  <div className="text-2xl font-bold text-zinc-700">—</div>
-                  <div className="text-[10px] text-zinc-600 mt-0.5">{['Clicks', 'Impressions', 'CTR', 'Position'][i]}</div>
-                </div>
-              ))
-            )}
-          </div>
+            );
+          })()}
 
-          {/* GA4 Analytics cards row */}
-          {ga4Overview && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              {[
-                { icon: Users, label: 'Users', value: ga4Overview.totalUsers.toLocaleString(), color: '#a78bfa', td: ga4Trend.map(d => d.users) },
-                { icon: Globe, label: 'Sessions', value: ga4Overview.totalSessions.toLocaleString(), color: '#60a5fa', td: ga4Trend.map(d => d.sessions) },
-                { icon: Eye, label: 'Page Views', value: ga4Overview.totalPageviews.toLocaleString(), color: '#2dd4bf', td: ga4Trend.map(d => d.pageviews) },
-                { icon: Activity, label: 'Bounce Rate', value: `${ga4Overview.bounceRate}%`, color: ga4Overview.bounceRate > 60 ? '#f87171' : '#34d399', td: [] },
-              ].map((card, i) => { const Icon = card.icon; return (
-                <button key={i} onClick={() => setTab('analytics')} className="bg-zinc-900 rounded-xl p-4 border border-zinc-800 hover:border-zinc-700 transition-colors text-left">
-                  <div className="flex items-center justify-between mb-1"><Icon className="w-4 h-4" style={{ color: card.color }} />{card.td.length > 2 && <MiniSparkline data={card.td} color={card.color} />}</div>
-                  <div className="text-2xl font-bold text-zinc-200">{card.value}</div>
-                  <div className="text-[10px] text-zinc-500 mt-0.5">{card.label}</div>
-                </button>
-              ); })}
-            </div>
-          )}
-
-          {/* Two-column layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <div className="space-y-5">
-              {trend.length > 2 && (
-                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-medium text-zinc-400">Performance Trend</span>
-                    {overview && <span className="text-[10px] text-zinc-600">{overview.dateRange.start} — {overview.dateRange.end}</span>}
-                  </div>
-                  <div className="space-y-3">
-                    <div><div className="text-[10px] text-blue-400 mb-1">Clicks</div><TrendChart data={trend} metric="clicks" color="#60a5fa" /></div>
-                    <div><div className="text-[10px] text-purple-400 mb-1">Impressions</div><TrendChart data={trend} metric="impressions" color="#a78bfa" /></div>
-                  </div>
-                </div>
-              )}
+          {/* Unified trend + highlights */}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+            {/* Left: single trend chart (3/5 width) */}
+            <div className="lg:col-span-3 space-y-5">
               {ga4Trend.length > 2 && (
                 <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-xs font-medium text-zinc-400">Traffic Trend</span>
                     {ga4Overview && <span className="text-[10px] text-zinc-600">{ga4Overview.dateRange.start} — {ga4Overview.dateRange.end}</span>}
                   </div>
-                  <svg viewBox="0 0 400 100" className="w-full h-20" preserveAspectRatio="none">
+                  <svg viewBox="0 0 400 100" className="w-full h-24" preserveAspectRatio="none">
                     {(() => {
                       const maxU = Math.max(...ga4Trend.map(d => d.users), 1);
                       const maxS = Math.max(...ga4Trend.map(d => d.sessions), 1);
@@ -635,10 +591,34 @@ export function ClientDashboard({ workspaceId }: Props) {
                   </div>
                 </div>
               )}
-              {auditDetail && auditDetail.scoreHistory.length >= 2 && (
+              {!ga4Trend.length && trend.length > 2 && (
                 <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                  <div className="text-xs font-medium text-zinc-400 mb-3">Health Score Trend</div>
-                  <ScoreHistoryChart history={auditDetail.scoreHistory} />
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-medium text-zinc-400">Search Performance</span>
+                    {overview && <span className="text-[10px] text-zinc-600">{overview.dateRange.start} — {overview.dateRange.end}</span>}
+                  </div>
+                  <div className="space-y-3">
+                    <div><div className="text-[10px] text-blue-400 mb-1">Clicks</div><TrendChart data={trend} metric="clicks" color="#60a5fa" /></div>
+                    <div><div className="text-[10px] text-purple-400 mb-1">Impressions</div><TrendChart data={trend} metric="impressions" color="#a78bfa" /></div>
+                  </div>
+                </div>
+              )}
+              {/* Pinned key events on overview */}
+              {sortedConversions.filter(c => isEventPinned(c.eventName)).length > 0 && (
+                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2"><Zap className="w-4 h-4 text-violet-400" /><span className="text-xs font-medium text-zinc-300">Key Events</span></div>
+                    <button onClick={() => setTab('analytics')} className="text-[10px] text-violet-400 hover:text-violet-300">View all →</button>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {sortedConversions.filter(c => isEventPinned(c.eventName)).slice(0, 6).map((c, i) => (
+                      <div key={i} className="bg-zinc-800/30 rounded-lg p-3">
+                        <div className="text-[10px] text-zinc-400 truncate mb-1">{eventDisplayName(c.eventName)}</div>
+                        <div className="text-lg font-bold text-zinc-200">{c.conversions.toLocaleString()}</div>
+                        {c.rate > 0 && <div className="text-[10px] text-emerald-400">{c.rate}% rate</div>}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
               {!overview && !audit && !ga4Overview && (
@@ -650,41 +630,37 @@ export function ClientDashboard({ workspaceId }: Props) {
               )}
             </div>
 
-            <div className="space-y-5">
+            {/* Right: highlights (2/5 width) */}
+            <div className="lg:col-span-2 space-y-4">
               {insights && insights.lowHanging.length > 0 && (
                 <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                  <div className="flex items-center gap-2 mb-3">
+                  <div className="flex items-center gap-2 mb-2">
                     <Target className="w-4 h-4 text-amber-400" />
                     <span className="text-xs font-medium text-zinc-300">Top Opportunities</span>
-                    <span className="text-[10px] text-zinc-600 ml-auto">{insights.lowHanging.length} queries</span>
                   </div>
-                  <p className="text-[10px] text-zinc-500 mb-2">Queries ranking 5-20 with good impressions — potential to reach page 1</p>
                   <div className="space-y-1.5">
-                    {insights.lowHanging.slice(0, 5).map((q, i) => (
+                    {insights.lowHanging.slice(0, 3).map((q, i) => (
                       <div key={i} className="flex items-center justify-between text-[11px] py-1.5 px-2.5 rounded-lg bg-zinc-800/30">
                         <span className="text-zinc-300 truncate mr-2">{q.query}</span>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="text-zinc-500">{q.impressions} imp</span>
-                          <span className="text-amber-400 font-medium">#{q.position}</span>
-                        </div>
+                        <span className="text-amber-400 font-medium flex-shrink-0">#{q.position}</span>
                       </div>
                     ))}
                   </div>
-                  {insights.lowHanging.length > 5 && <button onClick={() => setTab('search')} className="text-[10px] text-violet-400 hover:text-violet-300 mt-2">View all {insights.lowHanging.length} →</button>}
+                  {insights.lowHanging.length > 3 && <button onClick={() => setTab('search')} className="text-[10px] text-violet-400 hover:text-violet-300 mt-2">+{insights.lowHanging.length - 3} more →</button>}
                 </div>
               )}
               {auditDetail && auditDetail.audit.errors > 0 && (
                 <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                  <div className="flex items-center gap-2 mb-3">
+                  <div className="flex items-center gap-2 mb-2">
                     <AlertTriangle className="w-4 h-4 text-red-400" />
                     <span className="text-xs font-medium text-zinc-300">Critical Issues</span>
-                    <span className="text-[10px] text-red-400/70 ml-auto">{auditDetail.audit.errors} errors</span>
+                    <span className="text-[10px] text-red-400/70 ml-auto">{auditDetail.audit.errors}</span>
                   </div>
                   <div className="space-y-1.5">
-                    {auditDetail.audit.pages.flatMap(p => p.issues.filter(i => i.severity === 'error').map(i => ({ ...i, pageName: p.page }))).slice(0, 5).map((issue, i) => (
+                    {auditDetail.audit.pages.flatMap(p => p.issues.filter(i => i.severity === 'error').map(i => ({ ...i, pageName: p.page }))).slice(0, 3).map((issue, i) => (
                       <div key={i} className="text-[11px] py-1.5 px-2.5 rounded-lg bg-red-500/5 border border-red-500/10">
                         <div className="text-red-400 font-medium">{issue.message}</div>
-                        <div className="text-zinc-600 mt-0.5">{issue.pageName}</div>
+                        <div className="text-zinc-600 mt-0.5 truncate">{issue.pageName}</div>
                       </div>
                     ))}
                   </div>
@@ -693,74 +669,24 @@ export function ClientDashboard({ workspaceId }: Props) {
               )}
               {audit && !(auditDetail?.audit.errors) && (
                 <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                  <div className="flex items-center gap-2 mb-3"><CheckCircle2 className="w-4 h-4 text-green-400" /><span className="text-xs font-medium text-zinc-300">Site Health</span></div>
+                  <div className="flex items-center gap-2 mb-2"><CheckCircle2 className="w-4 h-4 text-green-400" /><span className="text-xs font-medium text-zinc-300">Site Health</span></div>
                   <div className="flex items-center gap-3">
-                    <div className={`text-3xl font-bold ${audit.siteScore >= 80 ? 'text-green-400' : audit.siteScore >= 60 ? 'text-amber-400' : 'text-red-400'}`}>{audit.siteScore}</div>
-                    <div><div className="text-xs text-zinc-400">{audit.totalPages} pages scanned</div><div className="text-[10px] text-zinc-600">{new Date(audit.createdAt).toLocaleDateString()}</div></div>
+                    <div className={`text-2xl font-bold ${audit.siteScore >= 80 ? 'text-green-400' : audit.siteScore >= 60 ? 'text-amber-400' : 'text-red-400'}`}>{audit.siteScore}</div>
+                    <div><div className="text-[10px] text-zinc-400">{audit.totalPages} pages</div><div className="text-[10px] text-zinc-600">{new Date(audit.createdAt).toLocaleDateString()}</div></div>
                   </div>
-                  <button onClick={() => setTab('health')} className="text-[10px] text-violet-400 hover:text-violet-300 mt-2">View details →</button>
+                  <button onClick={() => setTab('health')} className="text-[10px] text-violet-400 hover:text-violet-300 mt-1.5">Details →</button>
                 </div>
               )}
               {insights && insights.topPerformers.length > 0 && (
                 <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                  <div className="flex items-center gap-2 mb-3"><Zap className="w-4 h-4 text-green-400" /><span className="text-xs font-medium text-zinc-300">Top Performers</span></div>
+                  <div className="flex items-center gap-2 mb-2"><Zap className="w-4 h-4 text-green-400" /><span className="text-xs font-medium text-zinc-300">Top Performers</span></div>
                   <div className="space-y-1.5">
-                    {insights.topPerformers.slice(0, 5).map((q, i) => (
+                    {insights.topPerformers.slice(0, 3).map((q, i) => (
                       <div key={i} className="flex items-center justify-between text-[11px] py-1.5 px-2.5 rounded-lg bg-zinc-800/30">
                         <span className="text-zinc-300 truncate mr-2">{q.query}</span>
-                        <div className="flex items-center gap-2 flex-shrink-0"><span className="text-zinc-500">{q.clicks} clicks</span><span className="text-green-400 font-medium">#{q.position}</span></div>
+                        <span className="text-green-400 font-medium flex-shrink-0">#{q.position}</span>
                       </div>
                     ))}
-                  </div>
-                </div>
-              )}
-              {/* GA4 Traffic Sources (compact) */}
-              {ga4Sources.length > 0 && (
-                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2"><Globe className="w-4 h-4 text-blue-400" /><span className="text-xs font-medium text-zinc-300">Traffic Sources</span></div>
-                    <button onClick={() => setTab('analytics')} className="text-[10px] text-violet-400 hover:text-violet-300">View all →</button>
-                  </div>
-                  <div className="space-y-1.5">
-                    {ga4Sources.slice(0, 5).map((s, i) => {
-                      const totalSessions = ga4Sources.reduce((sum, x) => sum + x.sessions, 0);
-                      const pct = totalSessions > 0 ? (s.sessions / totalSessions) * 100 : 0;
-                      return (
-                        <div key={i} className="relative">
-                          <div className="flex items-center justify-between text-[11px] py-1.5 px-2.5 rounded-lg relative z-10">
-                            <span className="text-zinc-300 truncate mr-2">{s.source}{s.medium !== '(none)' ? ` / ${s.medium}` : ''}</span>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <span className="text-blue-400 font-medium tabular-nums">{s.sessions.toLocaleString()}</span>
-                              <span className="text-zinc-600 w-10 text-right">{pct.toFixed(0)}%</span>
-                            </div>
-                          </div>
-                          <div className="absolute inset-0 rounded-lg bg-blue-500/5" style={{ width: `${pct}%` }} />
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-              {/* GA4 Device Breakdown (compact) */}
-              {ga4Devices.length > 0 && (
-                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                  <div className="flex items-center gap-2 mb-3"><Activity className="w-4 h-4 text-teal-400" /><span className="text-xs font-medium text-zinc-300">Devices</span></div>
-                  <div className="space-y-2.5">
-                    {ga4Devices.map((d, i) => {
-                      const colors = ['bg-violet-500', 'bg-blue-500', 'bg-teal-500'];
-                      const textColors = ['text-violet-400', 'text-blue-400', 'text-teal-400'];
-                      return (
-                        <div key={i}>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-[11px] text-zinc-400 capitalize">{d.device}</span>
-                            <span className={`text-[11px] font-medium ${textColors[i % textColors.length]}`}>{d.percentage}%</span>
-                          </div>
-                          <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
-                            <div className={`h-full rounded-full ${colors[i % colors.length]}`} style={{ width: `${d.percentage}%` }} />
-                          </div>
-                        </div>
-                      );
-                    })}
                   </div>
                 </div>
               )}
@@ -771,19 +697,19 @@ export function ClientDashboard({ workspaceId }: Props) {
         {/* ════════════ SEARCH TAB ════════════ */}
         {tab === 'search' && (<>
           {overview ? (<>
-            <div className="grid grid-cols-4 gap-3">
+            {/* Compact metrics bar */}
+            <div className="bg-zinc-900 rounded-xl border border-zinc-800 px-5 py-3 flex items-center justify-between flex-wrap gap-3">
               {[
-                { icon: MousePointer, label: 'Total Clicks', value: overview.totalClicks.toLocaleString(), color: '#60a5fa', td: trend.map(t => t.clicks) },
-                { icon: Eye, label: 'Total Impressions', value: overview.totalImpressions.toLocaleString(), color: '#a78bfa', td: trend.map(t => t.impressions) },
-                { icon: TrendingUp, label: 'Avg CTR', value: `${overview.avgCtr}%`, color: '#34d399', td: trend.map(t => t.ctr) },
-                { icon: BarChart3, label: 'Avg Position', value: String(overview.avgPosition), color: '#fbbf24', td: trend.map(t => t.position) },
-              ].map((card, i) => { const Icon = card.icon; return (
-                <div key={i} className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
-                  <div className="flex items-center justify-between mb-1"><Icon className="w-4 h-4" style={{ color: card.color }} /><MiniSparkline data={card.td} color={card.color} /></div>
-                  <div className="text-2xl font-bold text-zinc-200">{card.value}</div>
-                  <div className="text-[10px] text-zinc-500 mt-0.5">{card.label}</div>
+                { label: 'Clicks', value: overview.totalClicks.toLocaleString(), color: 'text-blue-400' },
+                { label: 'Impressions', value: overview.totalImpressions.toLocaleString(), color: 'text-violet-400' },
+                { label: 'CTR', value: `${overview.avgCtr}%`, color: 'text-emerald-400' },
+                { label: 'Avg Position', value: String(overview.avgPosition), color: 'text-amber-400' },
+              ].map(m => (
+                <div key={m.label} className="flex items-center gap-2">
+                  <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{m.label}</span>
+                  <span className={`text-sm font-bold ${m.color}`}>{m.value}</span>
                 </div>
-              ); })}
+              ))}
             </div>
 
             {trend.length > 2 && (
@@ -1159,191 +1085,237 @@ export function ClientDashboard({ workspaceId }: Props) {
               )}
             </div>
 
-            {/* ── Key Metrics & Events ── */}
-            {(ga4Conversions.length > 0 || ga4Events.length > 0) && (
-              <div className="space-y-6 mt-6">
-                {/* Conversion / Custom Events */}
-                {sortedConversions.length > 0 && (
-                  <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
-                    <h3 className="text-sm font-semibold text-zinc-300 mb-1">Key Events</h3>
-                    <p className="text-[10px] text-zinc-600 mb-4">Custom and conversion events tracked on your site (excludes default GA4 events)</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {sortedConversions.slice(0, 9).map((c, i) => {
-                        const isSelected = ga4SelectedEvent === c.eventName;
-                        const pinned = isEventPinned(c.eventName);
-                        return (
-                          <button key={i} onClick={() => loadEventTrend(c.eventName)}
-                            className={`text-left rounded-xl border p-4 transition-colors ${isSelected ? 'bg-violet-500/10 border-violet-500/30' : pinned ? 'bg-violet-500/5 border-violet-500/15 hover:border-violet-500/30' : 'bg-zinc-800/30 border-zinc-800 hover:border-zinc-700'}`}>
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-[10px] text-zinc-400 truncate max-w-[140px]">{eventDisplayName(c.eventName)}</span>
-                              <div className="flex items-center gap-1.5">
-                                {pinned && <span className="w-1.5 h-1.5 rounded-full bg-violet-400" title="Pinned" />}
-                                {c.rate > 0 && <span className="text-[10px] font-medium text-emerald-400">{c.rate}%</span>}
-                              </div>
-                            </div>
-                            <div className="text-xl font-bold text-zinc-200">{c.conversions.toLocaleString()}</div>
-                            <div className="text-[10px] text-zinc-600 mt-0.5">{c.users.toLocaleString()} users</div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Event Trend (shown when an event is selected) */}
-                {ga4SelectedEvent && ga4EventTrend.length > 2 && (
-                  <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <h3 className="text-sm font-semibold text-zinc-300">{eventDisplayName(ga4SelectedEvent)}</h3>
-                        <p className="text-[10px] text-zinc-600">Daily event count over the selected period</p>
+            {/* ── Event Modules (Grouped) ── */}
+            {(ga4Conversions.length > 0 || ga4Events.length > 0) && (() => {
+              const groups = (ws.eventGroups || []).slice().sort((a, b) => a.order - b.order);
+              const getGroupEvents = (groupId: string) => sortedConversions.filter(c => {
+                const cfg = ws.eventConfig?.find(ec => ec.eventName === c.eventName);
+                return cfg?.group === groupId;
+              });
+              const ungroupedEvents = sortedConversions.filter(c => {
+                const cfg = ws.eventConfig?.find(ec => ec.eventName === c.eventName);
+                return !cfg?.group || !groups.find(g => g.id === cfg.group);
+              });
+              const renderEventCard = (c: GA4ConversionSummary, i: number) => {
+                const isSelected = ga4SelectedEvent === c.eventName;
+                const pinned = isEventPinned(c.eventName);
+                return (
+                  <button key={i} onClick={() => loadEventTrend(c.eventName)}
+                    className={`text-left rounded-xl border p-4 transition-colors ${isSelected ? 'bg-violet-500/10 border-violet-500/30' : pinned ? 'bg-violet-500/5 border-violet-500/15 hover:border-violet-500/30' : 'bg-zinc-800/30 border-zinc-800 hover:border-zinc-700'}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[10px] text-zinc-400 truncate max-w-[140px]">{eventDisplayName(c.eventName)}</span>
+                      <div className="flex items-center gap-1.5">
+                        {pinned && <span className="w-1.5 h-1.5 rounded-full bg-violet-400" title="Pinned" />}
+                        {c.rate > 0 && <span className="text-[10px] font-medium text-emerald-400">{c.rate}%</span>}
                       </div>
-                      <button onClick={() => { setGa4SelectedEvent(null); setGa4EventTrend([]); }} className="text-[10px] text-zinc-500 hover:text-zinc-300">Clear</button>
                     </div>
-                    <svg viewBox="0 0 800 120" className="w-full h-28" preserveAspectRatio="none">
-                      {(() => {
-                        const maxV = Math.max(...ga4EventTrend.map(d => d.eventCount), 1);
-                        const xStep = 800 / Math.max(ga4EventTrend.length - 1, 1);
-                        const points = ga4EventTrend.map((d, i) => `${i * xStep},${110 - (d.eventCount / maxV) * 100}`);
-                        const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p}`).join(' ');
-                        return (<>
-                          <path d={linePath} fill="none" stroke="#a78bfa" strokeWidth="2" />
-                          <path d={`${linePath} L${(ga4EventTrend.length - 1) * xStep},110 L0,110 Z`} fill="url(#evtGrad)" opacity="0.15" />
-                          {ga4EventTrend.map((d, i) => (
-                            <circle key={i} cx={i * xStep} cy={110 - (d.eventCount / maxV) * 100} r="2.5" fill="#a78bfa" opacity="0.6" />
-                          ))}
-                          <defs><linearGradient id="evtGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#a78bfa" /><stop offset="100%" stopColor="transparent" /></linearGradient></defs>
-                        </>);
-                      })()}
-                    </svg>
-                    <div className="flex items-center justify-between mt-2 text-[10px] text-zinc-600">
-                      <span>{ga4EventTrend[0]?.date}</span>
-                      <span>Total: {ga4EventTrend.reduce((s, d) => s + d.eventCount, 0).toLocaleString()}</span>
-                      <span>{ga4EventTrend[ga4EventTrend.length - 1]?.date}</span>
+                    <div className="text-xl font-bold text-zinc-200">{c.conversions.toLocaleString()}</div>
+                    <div className="text-[10px] text-zinc-600 mt-0.5">{c.users.toLocaleString()} users</div>
+                  </button>
+                );
+              };
+              return (
+                <div className="space-y-6 mt-6">
+                  {/* Render each group as a module */}
+                  {groups.map(group => {
+                    const groupEvents = getGroupEvents(group.id);
+                    if (groupEvents.length === 0) return null;
+                    return (
+                      <div key={group.id} className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+                        <div className="flex items-center gap-2 mb-4">
+                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: group.color }} />
+                          <h3 className="text-sm font-semibold text-zinc-300">{group.name}</h3>
+                          <span className="text-[10px] text-zinc-600 ml-auto">{groupEvents.length} events</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {groupEvents.map(renderEventCard)}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {/* Ungrouped events */}
+                  {ungroupedEvents.length > 0 && (
+                    <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+                      <h3 className="text-sm font-semibold text-zinc-300 mb-1">{groups.length > 0 ? 'Other Events' : 'Key Events'}</h3>
+                      <p className="text-[10px] text-zinc-600 mb-4">{groups.length > 0 ? 'Events not assigned to a group' : 'Custom and conversion events tracked on your site'}</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {ungroupedEvents.slice(0, 9).map(renderEventCard)}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* All Events Table */}
-                {ga4Events.length > 0 && (
-                  <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
-                    <h3 className="text-sm font-semibold text-zinc-300 mb-1">All Tracked Events</h3>
-                    <p className="text-[10px] text-zinc-600 mb-3">Every event tracked by Google Analytics on your site</p>
+                  {/* Event Trend (shown when an event is selected) */}
+                  {ga4SelectedEvent && ga4EventTrend.length > 2 && (
+                    <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <h3 className="text-sm font-semibold text-zinc-300">{eventDisplayName(ga4SelectedEvent)}</h3>
+                          <p className="text-[10px] text-zinc-600">Daily event count over the selected period</p>
+                        </div>
+                        <button onClick={() => { setGa4SelectedEvent(null); setGa4EventTrend([]); }} className="text-[10px] text-zinc-500 hover:text-zinc-300">Clear</button>
+                      </div>
+                      <svg viewBox="0 0 800 120" className="w-full h-28" preserveAspectRatio="none">
+                        {(() => {
+                          const maxV = Math.max(...ga4EventTrend.map(d => d.eventCount), 1);
+                          const xStep = 800 / Math.max(ga4EventTrend.length - 1, 1);
+                          const points = ga4EventTrend.map((d, i) => `${i * xStep},${110 - (d.eventCount / maxV) * 100}`);
+                          const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p}`).join(' ');
+                          return (<>
+                            <path d={linePath} fill="none" stroke="#a78bfa" strokeWidth="2" />
+                            <path d={`${linePath} L${(ga4EventTrend.length - 1) * xStep},110 L0,110 Z`} fill="url(#evtGrad)" opacity="0.15" />
+                            {ga4EventTrend.map((d, i) => (
+                              <circle key={i} cx={i * xStep} cy={110 - (d.eventCount / maxV) * 100} r="2.5" fill="#a78bfa" opacity="0.6" />
+                            ))}
+                            <defs><linearGradient id="evtGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#a78bfa" /><stop offset="100%" stopColor="transparent" /></linearGradient></defs>
+                          </>);
+                        })()}
+                      </svg>
+                      <div className="flex items-center justify-between mt-2 text-[10px] text-zinc-600">
+                        <span>{ga4EventTrend[0]?.date}</span>
+                        <span>Total: {ga4EventTrend.reduce((s, d) => s + d.eventCount, 0).toLocaleString()}</span>
+                        <span>{ga4EventTrend[ga4EventTrend.length - 1]?.date}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Collapsible: All Tracked Events */}
+                  {ga4Events.length > 0 && (
+                    <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+                      <button onClick={() => setShowAllEvents(!showAllEvents)} className="w-full flex items-center justify-between px-5 py-3 hover:bg-zinc-800/30 transition-colors">
+                        <div className="flex items-center gap-2">
+                          <BarChart3 className="w-4 h-4 text-zinc-500" />
+                          <span className="text-sm font-medium text-zinc-400">All Tracked Events</span>
+                          <span className="text-[10px] text-zinc-600">{ga4Events.length} events</span>
+                        </div>
+                        {showAllEvents ? <ChevronUp className="w-4 h-4 text-zinc-500" /> : <ChevronDown className="w-4 h-4 text-zinc-500" />}
+                      </button>
+                      {showAllEvents && (
+                        <div className="px-5 pb-5">
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                              <thead>
+                                <tr className="border-b border-zinc-800">
+                                  <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 pr-4">Event</th>
+                                  <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 pr-4 text-right">Count</th>
+                                  <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 text-right">Users</th>
+                                  <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 w-8" />
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {ga4Events.map((ev, i) => {
+                                  const maxCount = ga4Events[0]?.eventCount || 1;
+                                  const pct = (ev.eventCount / maxCount) * 100;
+                                  return (
+                                    <tr key={i} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                                      <td className="py-2 pr-4">
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-xs text-zinc-300">{eventDisplayName(ev.eventName)}</span>
+                                          {eventDisplayName(ev.eventName) !== ev.eventName.replace(/_/g, ' ') && <span className="text-[10px] text-zinc-600 font-mono ml-1">{ev.eventName}</span>}
+                                        </div>
+                                        <div className="h-1 rounded-full bg-zinc-800 mt-1 max-w-[200px]">
+                                          <div className="h-full rounded-full bg-violet-500/40" style={{ width: `${pct}%` }} />
+                                        </div>
+                                      </td>
+                                      <td className="py-2 pr-4 text-right text-xs text-zinc-200 tabular-nums font-medium">{ev.eventCount.toLocaleString()}</td>
+                                      <td className="py-2 text-right text-xs text-zinc-500 tabular-nums">{ev.users.toLocaleString()}</td>
+                                      <td className="py-2 text-right">
+                                        <button onClick={() => loadEventTrend(ev.eventName)} className="text-[10px] text-violet-400 hover:text-violet-300" title="View trend">↗</button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* ── Collapsible Event Explorer ── */}
+            <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden mt-6">
+              <button onClick={() => setShowExplorer(!showExplorer)} className="w-full flex items-center justify-between px-5 py-3 hover:bg-zinc-800/30 transition-colors">
+                <div className="flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-violet-400" />
+                  <span className="text-sm font-medium text-zinc-400">Event Explorer</span>
+                </div>
+                {showExplorer ? <ChevronUp className="w-4 h-4 text-zinc-500" /> : <ChevronDown className="w-4 h-4 text-zinc-500" />}
+              </button>
+              {showExplorer && (
+                <div className="px-5 pb-5">
+                  <p className="text-[10px] text-zinc-600 mb-4">Break down events by page, or see which events fire on a specific page.</p>
+                  <div className="flex flex-wrap items-end gap-3 mb-4">
+                    <div className="flex-1 min-w-[180px]">
+                      <label className="text-[10px] text-zinc-500 mb-1 block">Event Name</label>
+                      <select value={explorerEvent} onChange={e => setExplorerEvent(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-500">
+                        <option value="">All events</option>
+                        {ga4Events.map(ev => (
+                          <option key={ev.eventName} value={ev.eventName}>{eventDisplayName(ev.eventName)}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex-1 min-w-[180px]">
+                      <label className="text-[10px] text-zinc-500 mb-1 block">Page Path (contains)</label>
+                      <input value={explorerPage} onChange={e => setExplorerPage(e.target.value)}
+                        placeholder="/contact, /blog, etc."
+                        onKeyDown={e => e.key === 'Enter' && runExplorer(explorerEvent || undefined, explorerPage || undefined)}
+                        className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-500 placeholder:text-zinc-600" />
+                    </div>
+                    <button onClick={() => runExplorer(explorerEvent || undefined, explorerPage || undefined)}
+                      className="px-4 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium transition-colors flex items-center gap-1.5">
+                      {explorerLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />} Explore
+                    </button>
+                    {explorerData.length > 0 && (
+                      <button onClick={() => { setExplorerData([]); setExplorerEvent(''); setExplorerPage(''); }}
+                        className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Clear</button>
+                    )}
+                  </div>
+                  {explorerData.length > 0 && (
                     <div className="overflow-x-auto">
                       <table className="w-full text-left">
                         <thead>
                           <tr className="border-b border-zinc-800">
-                            <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 pr-4">Event</th>
-                            <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 pr-4 text-right">Count</th>
+                            <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 pr-3">Event</th>
+                            <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 pr-3">Page</th>
+                            <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 pr-3 text-right">Count</th>
                             <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 text-right">Users</th>
-                            <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 w-8" />
                           </tr>
                         </thead>
                         <tbody>
-                          {ga4Events.map((ev, i) => {
-                            const maxCount = ga4Events[0]?.eventCount || 1;
-                            const pct = (ev.eventCount / maxCount) * 100;
+                          {explorerData.map((row, i) => {
+                            const maxCount = explorerData[0]?.eventCount || 1;
+                            const pct = (row.eventCount / maxCount) * 100;
                             return (
                               <tr key={i} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                                <td className="py-2 pr-4">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs text-zinc-300">{eventDisplayName(ev.eventName)}</span>
-                                    {eventDisplayName(ev.eventName) !== ev.eventName.replace(/_/g, ' ') && <span className="text-[10px] text-zinc-600 font-mono ml-1">{ev.eventName}</span>}
-                                  </div>
-                                  <div className="h-1 rounded-full bg-zinc-800 mt-1 max-w-[200px]">
-                                    <div className="h-full rounded-full bg-violet-500/40" style={{ width: `${pct}%` }} />
+                                <td className="py-2 pr-3">
+                                  <button onClick={() => { setExplorerEvent(row.eventName); runExplorer(row.eventName, explorerPage || undefined); }}
+                                    className="text-xs text-violet-400 hover:text-violet-300">{eventDisplayName(row.eventName)}</button>
+                                </td>
+                                <td className="py-2 pr-3">
+                                  <button onClick={() => { setExplorerPage(row.pagePath); runExplorer(explorerEvent || undefined, row.pagePath); }}
+                                    className="text-xs text-zinc-300 hover:text-zinc-100 font-mono truncate max-w-[250px] block">{row.pagePath}</button>
+                                </td>
+                                <td className="py-2 pr-3 text-right">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <div className="w-16 h-1 rounded-full bg-zinc-800 overflow-hidden">
+                                      <div className="h-full rounded-full bg-violet-500/40" style={{ width: `${pct}%` }} />
+                                    </div>
+                                    <span className="text-xs text-zinc-200 tabular-nums font-medium">{row.eventCount.toLocaleString()}</span>
                                   </div>
                                 </td>
-                                <td className="py-2 pr-4 text-right text-xs text-zinc-200 tabular-nums font-medium">{ev.eventCount.toLocaleString()}</td>
-                                <td className="py-2 text-right text-xs text-zinc-500 tabular-nums">{ev.users.toLocaleString()}</td>
-                                <td className="py-2 text-right">
-                                  <button onClick={() => loadEventTrend(ev.eventName)} className="text-[10px] text-violet-400 hover:text-violet-300" title="View trend">↗</button>
-                                </td>
+                                <td className="py-2 text-right text-xs text-zinc-500 tabular-nums">{row.users.toLocaleString()}</td>
                               </tr>
                             );
                           })}
                         </tbody>
                       </table>
+                      <div className="text-[10px] text-zinc-600 mt-2 text-right">{explorerData.length} results</div>
                     </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ── Event Explorer ── */}
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5 mt-6">
-              <div className="flex items-center gap-2 mb-1">
-                <Filter className="w-4 h-4 text-violet-400" />
-                <h3 className="text-sm font-semibold text-zinc-300">Event Explorer</h3>
-              </div>
-              <p className="text-[10px] text-zinc-600 mb-4">Break down events by page, or see which events fire on a specific page.</p>
-              <div className="flex flex-wrap items-end gap-3 mb-4">
-                <div className="flex-1 min-w-[180px]">
-                  <label className="text-[10px] text-zinc-500 mb-1 block">Event Name</label>
-                  <select value={explorerEvent} onChange={e => setExplorerEvent(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-500">
-                    <option value="">All events</option>
-                    {ga4Events.map(ev => (
-                      <option key={ev.eventName} value={ev.eventName}>{eventDisplayName(ev.eventName)}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex-1 min-w-[180px]">
-                  <label className="text-[10px] text-zinc-500 mb-1 block">Page Path (contains)</label>
-                  <input value={explorerPage} onChange={e => setExplorerPage(e.target.value)}
-                    placeholder="/contact, /blog, etc."
-                    onKeyDown={e => e.key === 'Enter' && runExplorer(explorerEvent || undefined, explorerPage || undefined)}
-                    className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-500 placeholder:text-zinc-600" />
-                </div>
-                <button onClick={() => runExplorer(explorerEvent || undefined, explorerPage || undefined)}
-                  className="px-4 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium transition-colors flex items-center gap-1.5">
-                  {explorerLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />} Explore
-                </button>
-                {explorerData.length > 0 && (
-                  <button onClick={() => { setExplorerData([]); setExplorerEvent(''); setExplorerPage(''); }}
-                    className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Clear</button>
-                )}
-              </div>
-              {explorerData.length > 0 && (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="border-b border-zinc-800">
-                        <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 pr-3">Event</th>
-                        <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 pr-3">Page</th>
-                        <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 pr-3 text-right">Count</th>
-                        <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 text-right">Users</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {explorerData.map((row, i) => {
-                        const maxCount = explorerData[0]?.eventCount || 1;
-                        const pct = (row.eventCount / maxCount) * 100;
-                        return (
-                          <tr key={i} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                            <td className="py-2 pr-3">
-                              <button onClick={() => { setExplorerEvent(row.eventName); runExplorer(row.eventName, explorerPage || undefined); }}
-                                className="text-xs text-violet-400 hover:text-violet-300">{eventDisplayName(row.eventName)}</button>
-                            </td>
-                            <td className="py-2 pr-3">
-                              <button onClick={() => { setExplorerPage(row.pagePath); runExplorer(explorerEvent || undefined, row.pagePath); }}
-                                className="text-xs text-zinc-300 hover:text-zinc-100 font-mono truncate max-w-[250px] block">{row.pagePath}</button>
-                            </td>
-                            <td className="py-2 pr-3 text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                <div className="w-16 h-1 rounded-full bg-zinc-800 overflow-hidden">
-                                  <div className="h-full rounded-full bg-violet-500/40" style={{ width: `${pct}%` }} />
-                                </div>
-                                <span className="text-xs text-zinc-200 tabular-nums font-medium">{row.eventCount.toLocaleString()}</span>
-                              </div>
-                            </td>
-                            <td className="py-2 text-right text-xs text-zinc-500 tabular-nums">{row.users.toLocaleString()}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                  <div className="text-[10px] text-zinc-600 mt-2 text-right">{explorerData.length} results</div>
+                  )}
                 </div>
               )}
             </div>
@@ -1368,7 +1340,7 @@ export function ClientDashboard({ workspaceId }: Props) {
             <div className="flex-1 overflow-y-auto">
               {chatMessages.length === 0 && (
                 <div className="p-4 space-y-3">
-                  <p className="text-xs text-zinc-500">Ask anything about your search performance:</p>
+                  <p className="text-xs text-zinc-500">Ask anything about your site performance:</p>
                   <div className="grid grid-cols-1 gap-2">
                     {QUICK_QUESTIONS.map((q, i) => (
                       <button key={i} onClick={() => askAi(q)} className="text-left px-3 py-2.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-800 text-[11px] text-zinc-300 transition-colors">
@@ -1399,7 +1371,7 @@ export function ClientDashboard({ workspaceId }: Props) {
             </div>
             <div className="px-4 py-3 border-t border-zinc-800 flex gap-2 flex-shrink-0">
               <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && askAi(chatInput)}
-                placeholder="Ask about your search data..." className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-violet-500" disabled={chatLoading} />
+                placeholder="Ask about your site data..." className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-violet-500" disabled={chatLoading} />
               <button onClick={() => askAi(chatInput)} disabled={chatLoading || !chatInput.trim()} className="px-3 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 rounded-lg transition-colors"><Send className="w-3.5 h-3.5" /></button>
             </div>
           </div>

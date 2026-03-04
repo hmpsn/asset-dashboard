@@ -2248,6 +2248,7 @@ app.get('/api/public/workspace/:id', (req, res) => {
     ga4PropertyId: ws.ga4PropertyId,
     liveDomain: ws.liveDomain,
     eventConfig: ws.eventConfig || [],
+    eventGroups: ws.eventGroups || [],
     requiresPassword: !!ws.clientPassword,
   });
 });

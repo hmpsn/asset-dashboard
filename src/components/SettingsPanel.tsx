@@ -3,8 +3,15 @@ import { useToast } from './Toast';
 import {
   Check, Globe, ExternalLink, Search, Loader2, Copy, CheckCircle,
   LogIn, LogOut, ChevronRight, Users, Unplug, Lock, KeyRound, X, BarChart3,
-  Pin, PinOff, Pencil, Save, RefreshCw,
+  Pin, PinOff, Pencil, Save, RefreshCw, Plus, Trash2, ArrowUp, ArrowDown, Palette,
 } from 'lucide-react';
+
+interface EventGroup {
+  id: string;
+  name: string;
+  order: number;
+  color: string;
+}
 
 interface EventDisplayConfig {
   eventName: string;
@@ -22,6 +29,7 @@ interface Workspace {
   ga4PropertyId?: string;
   hasPassword?: boolean;
   eventConfig?: EventDisplayConfig[];
+  eventGroups?: EventGroup[];
 }
 
 interface GscSite {
@@ -56,6 +64,9 @@ export function SettingsPanel() {
   const [savingEvents, setSavingEvents] = useState(false);
   const [editingEventName, setEditingEventName] = useState<string | null>(null);
   const [editingDisplayName, setEditingDisplayName] = useState('');
+  const [localGroups, setLocalGroups] = useState<EventGroup[]>([]);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupColor, setNewGroupColor] = useState('#a78bfa');
 
   useEffect(() => {
     fetch('/api/workspaces').then(r => r.json()).then(setWorkspaces).catch(() => {});
@@ -163,6 +174,8 @@ export function SettingsPanel() {
     } catch { toast('Failed to save GA4 property', 'error'); }
   };
 
+  const GROUP_COLORS = ['#a78bfa', '#60a5fa', '#34d399', '#fbbf24', '#f472b6', '#fb923c', '#2dd4bf', '#e879f9'];
+
   const loadEventsForWorkspace = async (wsId: string) => {
     setEventConfigWs(wsId);
     setLoadingEvents(true);
@@ -172,6 +185,7 @@ export function SettingsPanel() {
       if (Array.isArray(events)) setAvailableEvents(events);
       const ws = workspaces.find(w => w.id === wsId);
       setLocalEventConfig(ws?.eventConfig || []);
+      setLocalGroups(ws?.eventGroups || []);
     } catch { setAvailableEvents([]); }
     finally { setLoadingEvents(false); }
   };
@@ -193,6 +207,41 @@ export function SettingsPanel() {
     });
   };
 
+  const addGroup = () => {
+    if (!newGroupName.trim()) return;
+    const id = `grp_${Date.now()}`;
+    const order = localGroups.length;
+    const color = GROUP_COLORS[order % GROUP_COLORS.length];
+    setLocalGroups(prev => [...prev, { id, name: newGroupName.trim(), order, color: newGroupColor || color }]);
+    setNewGroupName('');
+    setNewGroupColor(GROUP_COLORS[(order + 1) % GROUP_COLORS.length]);
+  };
+
+  const removeGroup = (groupId: string) => {
+    setLocalGroups(prev => prev.filter(g => g.id !== groupId).map((g, i) => ({ ...g, order: i })));
+    setLocalEventConfig(prev => prev.map(c => c.group === groupId ? { ...c, group: undefined } : c));
+  };
+
+  const moveGroup = (groupId: string, direction: -1 | 1) => {
+    setLocalGroups(prev => {
+      const idx = prev.findIndex(g => g.id === groupId);
+      if (idx === -1) return prev;
+      const newIdx = idx + direction;
+      if (newIdx < 0 || newIdx >= prev.length) return prev;
+      const copy = [...prev];
+      [copy[idx], copy[newIdx]] = [copy[newIdx], copy[idx]];
+      return copy.map((g, i) => ({ ...g, order: i }));
+    });
+  };
+
+  const assignEventToGroup = (eventName: string, groupId: string | undefined) => {
+    setLocalEventConfig(prev => {
+      const existing = prev.find(c => c.eventName === eventName);
+      if (existing) return prev.map(c => c.eventName === eventName ? { ...c, group: groupId } : c);
+      return [...prev, { eventName, displayName: eventName, pinned: false, group: groupId }];
+    });
+  };
+
   const updateEventDisplayName = (eventName: string, displayName: string) => {
     setLocalEventConfig(prev => {
       const existing = prev.find(c => c.eventName === eventName);
@@ -209,10 +258,10 @@ export function SettingsPanel() {
     try {
       const res = await fetch(`/api/workspaces/${eventConfigWs}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventConfig: localEventConfig }),
+        body: JSON.stringify({ eventConfig: localEventConfig, eventGroups: localGroups }),
       });
       const updated = await res.json();
-      setWorkspaces(prev => prev.map(w => w.id === eventConfigWs ? { ...w, eventConfig: updated.eventConfig } : w));
+      setWorkspaces(prev => prev.map(w => w.id === eventConfigWs ? { ...w, eventConfig: updated.eventConfig, eventGroups: updated.eventGroups } : w));
       toast('Event configuration saved');
     } catch { toast('Failed to save event config', 'error'); }
     finally { setSavingEvents(false); }
@@ -440,19 +489,53 @@ export function SettingsPanel() {
                   </div>
                 </div>
                 {eventConfigWs === ws.id && (
-                  <div className="mt-3">
+                  <div className="mt-3 space-y-4">
                     {loadingEvents ? (
                       <div className="flex items-center gap-2 text-xs py-4 justify-center" style={{ color: 'var(--brand-text-muted)' }}>
                         <Loader2 className="w-3 h-3 animate-spin" /> Loading events from GA4...
                       </div>
                     ) : availableEvents.length === 0 ? (
                       <p className="text-xs py-4 text-center" style={{ color: 'var(--brand-text-muted)' }}>No events found. Make sure GA4 is tracking events on this site.</p>
-                    ) : (
+                    ) : (<>
+                      {/* ── Event Groups ── */}
+                      <div className="rounded-lg border border-zinc-700/50 p-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Palette className="w-3.5 h-3.5 text-violet-400" />
+                          <span className="text-xs font-medium" style={{ color: 'var(--brand-text-bright)' }}>Event Groups</span>
+                          <span className="text-[10px] text-zinc-600 ml-auto">{localGroups.length} groups</span>
+                        </div>
+                        <p className="text-[10px] mb-3" style={{ color: 'var(--brand-text-muted)' }}>Group related events together as modules on the dashboard. Drag to reorder.</p>
+                        {localGroups.sort((a, b) => a.order - b.order).map((g, idx) => (
+                          <div key={g.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 mb-1">
+                            <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: g.color }} />
+                            <span className="text-xs flex-1" style={{ color: 'var(--brand-text)' }}>{g.name}</span>
+                            <span className="text-[10px] text-zinc-600">
+                              {localEventConfig.filter(c => c.group === g.id).length} events
+                            </span>
+                            <button onClick={() => moveGroup(g.id, -1)} disabled={idx === 0} className="p-0.5 text-zinc-600 hover:text-zinc-400 disabled:opacity-30"><ArrowUp className="w-3 h-3" /></button>
+                            <button onClick={() => moveGroup(g.id, 1)} disabled={idx === localGroups.length - 1} className="p-0.5 text-zinc-600 hover:text-zinc-400 disabled:opacity-30"><ArrowDown className="w-3 h-3" /></button>
+                            <button onClick={() => removeGroup(g.id)} className="p-0.5 text-red-400/50 hover:text-red-400"><Trash2 className="w-3 h-3" /></button>
+                          </div>
+                        ))}
+                        <div className="flex items-center gap-2 mt-2">
+                          <input type="color" value={newGroupColor} onChange={e => setNewGroupColor(e.target.value)} className="w-6 h-6 rounded cursor-pointer bg-transparent border-0" />
+                          <input value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="New group name..."
+                            onKeyDown={e => e.key === 'Enter' && addGroup()}
+                            className="flex-1 px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-violet-500" />
+                          <button onClick={addGroup} disabled={!newGroupName.trim()}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-[10px] font-medium transition-colors">
+                            <Plus className="w-3 h-3" /> Add
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* ── Events List ── */}
                       <div className="space-y-1 max-h-[400px] overflow-y-auto">
                         {availableEvents.map((ev) => {
                           const pinned = isEventPinned(ev.eventName);
                           const displayName = getEventDisplayName(ev.eventName);
                           const isEditing = editingEventName === ev.eventName;
+                          const evtGroup = localEventConfig.find(c => c.eventName === ev.eventName)?.group;
                           return (
                             <div key={ev.eventName} className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${pinned ? 'bg-violet-500/10 border border-violet-500/20' : 'hover:bg-white/5'}`}>
                               <button onClick={() => toggleEventPin(ev.eventName)} className="shrink-0" title={pinned ? 'Unpin' : 'Pin to dashboard'}>
@@ -473,11 +556,18 @@ export function SettingsPanel() {
                                       {displayName !== ev.eventName ? displayName : ev.eventName.replace(/_/g, ' ')}
                                     </span>
                                     {displayName !== ev.eventName && <span className="text-[10px] text-zinc-600 font-mono">{ev.eventName}</span>}
-                                    <button onClick={() => { setEditingEventName(ev.eventName); setEditingDisplayName(displayName !== ev.eventName ? displayName : ''); }}
-                                      className="opacity-0 group-hover:opacity-100 ml-1"><Pencil className="w-3 h-3 text-zinc-600 hover:text-zinc-400" /></button>
                                   </div>
                                 )}
                               </div>
+                              {localGroups.length > 0 && (
+                                <select value={evtGroup || ''} onChange={e => assignEventToGroup(ev.eventName, e.target.value || undefined)}
+                                  className="px-1.5 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-400 focus:outline-none focus:border-violet-500 max-w-[100px]">
+                                  <option value="">No group</option>
+                                  {localGroups.sort((a, b) => a.order - b.order).map(g => (
+                                    <option key={g.id} value={g.id}>{g.name}</option>
+                                  ))}
+                                </select>
+                              )}
                               <span className="text-[10px] text-zinc-500 tabular-nums shrink-0">{ev.eventCount.toLocaleString()}</span>
                               <button onClick={() => { setEditingEventName(ev.eventName); setEditingDisplayName(getEventDisplayName(ev.eventName) !== ev.eventName ? getEventDisplayName(ev.eventName) : ''); }}
                                 className="shrink-0" title="Rename"><Pencil className="w-3 h-3 text-zinc-600 hover:text-zinc-400" /></button>
@@ -485,7 +575,7 @@ export function SettingsPanel() {
                           );
                         })}
                       </div>
-                    )}
+                    </>)}
                   </div>
                 )}
               </div>
