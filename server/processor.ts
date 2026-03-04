@@ -7,8 +7,10 @@ import { generateAltText } from './alttext.js';
 import { uploadAsset } from './webflow.js';
 
 // --- Persistent metadata ---
-const METADATA_DIR = process.env.DATA_DIR
-  ? path.join(process.env.DATA_DIR, 'metadata')
+const DATA_BASE = process.env.DATA_DIR
+  || (process.env.NODE_ENV === 'production' ? '/tmp/asset-dashboard' : '');
+const METADATA_DIR = DATA_BASE
+  ? path.join(DATA_BASE, 'metadata')
   : path.join(process.env.HOME || '', '.asset-dashboard');
 const METADATA_FILE = path.join(METADATA_DIR, 'metadata.json');
 
