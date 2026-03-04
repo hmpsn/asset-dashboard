@@ -487,7 +487,10 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string): Promi
     const chunk = pages.slice(i, i + batch);
     const chunkResults = await Promise.all(
       chunk.map(async (page) => {
-        const url = page.slug ? `${baseUrl}/${page.slug}` : baseUrl;
+        // Use publishedPath for full URL (handles nested pages like /services/veneers)
+        const pagePath = page.publishedPath || (page.slug ? `/${page.slug}` : '');
+        const url = pagePath ? `${baseUrl}${pagePath}` : baseUrl;
+        const displaySlug = pagePath ? pagePath.replace(/^\//, '') : (page.slug || '');
         const [meta, html] = await Promise.all([
           fetchPageMeta(page.id, tokenOverride),
           baseUrl ? fetchPublishedHtml(url) : Promise.resolve(null),
@@ -500,7 +503,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string): Promi
             page: page.title,
           });
         }
-        return auditPage(page.title, page.slug, url, meta, html);
+        return auditPage(page.title, displaySlug, url, meta, html);
       })
     );
     results.push(...chunkResults);
