@@ -37,6 +37,7 @@ import {
 import { generateAltText } from './alttext.js';
 import { runSeoAudit } from './seo-audit.js';
 import { checkSiteLinks } from './link-checker.js';
+import { saveSnapshot, getSnapshot, listSnapshots, getLatestSnapshot, renderReportHTML } from './reports.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -63,6 +64,9 @@ if (APP_PASSWORD) {
     // Allow auth endpoints through
     if (req.path === '/api/auth/login' && req.method === 'POST') return next();
     if (req.path === '/api/auth/check') return next();
+    // Allow public report and client routes
+    if (req.path.startsWith('/report/') || req.path.startsWith('/client/')) return next();
+    if (req.path.startsWith('/api/public/')) return next();
     // In production, serve the frontend without auth (it handles login UI)
     if (IS_PROD && !req.path.startsWith('/api') && !req.path.startsWith('/ws')) return next();
     // Reject API calls without auth
@@ -531,6 +535,78 @@ app.get('/api/webflow/seo-audit/:siteId', async (req, res) => {
     console.error('SEO audit error:', err);
     res.status(500).json({ error: 'SEO audit failed' });
   }
+});
+
+// --- Reports & Snapshots ---
+// Save audit as snapshot (run audit + save)
+app.post('/api/reports/:siteId/save', async (req, res) => {
+  try {
+    const { siteId } = req.params;
+    const { siteName } = req.body;
+    const token = getTokenForSite(siteId) || undefined;
+    const audit = await runSeoAudit(siteId, token);
+    const snapshot = saveSnapshot(siteId, siteName || siteId, audit);
+    res.json({ id: snapshot.id, createdAt: snapshot.createdAt, siteScore: audit.siteScore });
+  } catch (err) {
+    console.error('Report save error:', err);
+    res.status(500).json({ error: 'Failed to save report' });
+  }
+});
+
+// Save existing audit data as snapshot (no re-run)
+app.post('/api/reports/:siteId/snapshot', (req, res) => {
+  try {
+    const { siteId } = req.params;
+    const { siteName, audit } = req.body;
+    if (!audit) return res.status(400).json({ error: 'Missing audit data' });
+    const snapshot = saveSnapshot(siteId, siteName || siteId, audit);
+    res.json({ id: snapshot.id, createdAt: snapshot.createdAt, siteScore: audit.siteScore });
+  } catch (err) {
+    console.error('Snapshot save error:', err);
+    res.status(500).json({ error: 'Failed to save snapshot' });
+  }
+});
+
+// List snapshots for a site
+app.get('/api/reports/:siteId/history', (req, res) => {
+  const history = listSnapshots(req.params.siteId);
+  res.json(history);
+});
+
+// Get a specific snapshot
+app.get('/api/reports/snapshot/:id', (req, res) => {
+  const snapshot = getSnapshot(req.params.id);
+  if (!snapshot) return res.status(404).json({ error: 'Report not found' });
+  res.json(snapshot);
+});
+
+// Public: HTML report page (no auth required)
+app.get('/report/:id', (req, res) => {
+  const snapshot = getSnapshot(req.params.id);
+  if (!snapshot) return res.status(404).send('<h1>Report not found</h1>');
+  res.type('html').send(renderReportHTML(snapshot));
+});
+
+// Public: JSON report data (no auth required)
+app.get('/api/public/report/:id', (req, res) => {
+  const snapshot = getSnapshot(req.params.id);
+  if (!snapshot) return res.status(404).json({ error: 'Report not found' });
+  res.json(snapshot);
+});
+
+// Public: Latest audit for a site (client dashboard)
+app.get('/api/public/client/:siteId', (req, res) => {
+  const latest = getLatestSnapshot(req.params.siteId);
+  if (!latest) return res.status(404).json({ error: 'No audits found for this site' });
+  const history = listSnapshots(req.params.siteId);
+  res.json({ latest: latest.audit, siteName: latest.siteName, history });
+});
+
+// Client dashboard HTML page (no auth required)
+app.get('/client/:siteId', (req, res) => {
+  const latest = getLatestSnapshot(req.params.siteId);
+  if (!latest) return res.status(404).send('<h1>No audits found</h1>');
+  res.type('html').send(renderReportHTML(latest));
 });
 
 // --- Page SEO Editing ---

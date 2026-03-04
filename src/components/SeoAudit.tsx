@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Loader2, Search as SearchIcon, ChevronDown, ChevronRight, Download,
   AlertTriangle, AlertCircle, Info, CheckCircle, Globe, FileText,
-  RefreshCw, X, Pencil, Link2Off,
+  RefreshCw, X, Pencil, Link2Off, Clock, Share2, Copy, ExternalLink,
+  TrendingUp, TrendingDown, Minus,
 } from 'lucide-react';
 import { SeoEditor } from './SeoEditor';
 import { LinkChecker } from './LinkChecker';
@@ -36,7 +37,17 @@ interface SeoAuditResult {
   siteWideIssues: SeoIssue[];
 }
 
-type SubTab = 'audit' | 'editor' | 'links' | 'keywords';
+type SubTab = 'audit' | 'editor' | 'links' | 'keywords' | 'history';
+
+interface SnapshotSummary {
+  id: string;
+  createdAt: string;
+  siteScore: number;
+  totalPages: number;
+  errors: number;
+  warnings: number;
+  infos: number;
+}
 
 interface Props {
   siteId: string;
@@ -62,6 +73,213 @@ function scoreBg(score: number): string {
   return 'bg-red-500';
 }
 
+function ScoreTrendChart({ history }: { history: SnapshotSummary[] }) {
+  const points = [...history].reverse().slice(-12); // last 12, chronological
+  if (points.length < 2) return null;
+
+  const W = 600, H = 160, PAD = 32;
+  const scores = points.map(p => p.siteScore);
+  const minS = Math.max(0, Math.min(...scores) - 10);
+  const maxS = Math.min(100, Math.max(...scores) + 10);
+  const range = maxS - minS || 1;
+
+  const coords = points.map((p, i) => ({
+    x: PAD + (i / (points.length - 1)) * (W - PAD * 2),
+    y: PAD + (1 - (p.siteScore - minS) / range) * (H - PAD * 2),
+    score: p.siteScore,
+    date: new Date(p.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+  }));
+
+  const pathD = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x},${c.y}`).join(' ');
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 180 }}>
+      {/* Grid lines */}
+      {[0, 0.25, 0.5, 0.75, 1].map(f => {
+        const y = PAD + (1 - f) * (H - PAD * 2);
+        const label = Math.round(minS + f * range);
+        return (
+          <g key={f}>
+            <line x1={PAD} y1={y} x2={W - PAD} y2={y} stroke="rgba(255,255,255,0.04)" />
+            <text x={PAD - 6} y={y + 3} textAnchor="end" fill="#64748b" fontSize="9">{label}</text>
+          </g>
+        );
+      })}
+      {/* Line */}
+      <path d={pathD} fill="none" stroke="#2ed9c3" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      {/* Area fill */}
+      <path d={`${pathD} L${coords[coords.length - 1].x},${H - PAD} L${coords[0].x},${H - PAD} Z`} fill="url(#trendGrad)" />
+      <defs>
+        <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#2ed9c3" stopOpacity="0.15" />
+          <stop offset="100%" stopColor="#2ed9c3" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {/* Points + labels */}
+      {coords.map((c, i) => (
+        <g key={i}>
+          <circle cx={c.x} cy={c.y} r="3.5" fill="#0f1219" stroke="#2ed9c3" strokeWidth="2" />
+          {(i === 0 || i === coords.length - 1 || points.length <= 6) && (
+            <text x={c.x} y={H - 6} textAnchor="middle" fill="#64748b" fontSize="8">{c.date}</text>
+          )}
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+function AuditHistory({ siteId, history, onRefresh }: { siteId: string; history: SnapshotSummary[]; onRefresh: () => void }) {
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+
+  const openReport = (id: string) => {
+    window.open(`/report/${id}`, '_blank');
+  };
+
+  const copyLink = (id: string) => {
+    setLoadingId(id);
+    navigator.clipboard.writeText(`${window.location.origin}/report/${id}`);
+    setTimeout(() => setLoadingId(null), 1500);
+  };
+
+  if (history.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 gap-4">
+        <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center">
+          <Clock className="w-8 h-8 text-zinc-600" />
+        </div>
+        <p className="text-zinc-400 text-sm">No audit history yet</p>
+        <p className="text-xs text-zinc-600 max-w-md text-center">
+          Run an SEO audit and click "Save & Share" to start tracking changes over time
+        </p>
+      </div>
+    );
+  }
+
+  // Score change indicators
+  const latest = history[0];
+  const previous = history.length > 1 ? history[1] : null;
+  const scoreDelta = previous ? latest.siteScore - previous.siteScore : 0;
+  const errorDelta = previous ? latest.errors - previous.errors : 0;
+
+  return (
+    <div className="space-y-5">
+      {/* Summary */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
+          <div className="text-xs text-zinc-500 mb-1">Latest Score</div>
+          <div className="flex items-end gap-2">
+            <span className={`text-3xl font-bold ${scoreColor(latest.siteScore)}`}>{latest.siteScore}</span>
+            {scoreDelta !== 0 && (
+              <span className={`flex items-center gap-0.5 text-xs font-medium pb-1 ${scoreDelta > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {scoreDelta > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                {scoreDelta > 0 ? '+' : ''}{scoreDelta}
+              </span>
+            )}
+            {scoreDelta === 0 && previous && (
+              <span className="flex items-center gap-0.5 text-xs text-zinc-500 pb-1"><Minus className="w-3 h-3" /> No change</span>
+            )}
+          </div>
+        </div>
+        <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
+          <div className="text-xs text-zinc-500 mb-1">Total Audits</div>
+          <div className="text-3xl font-bold text-zinc-200">{history.length}</div>
+        </div>
+        <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
+          <div className="text-xs text-zinc-500 mb-1">Error Trend</div>
+          <div className="flex items-end gap-2">
+            <span className="text-3xl font-bold text-red-400">{latest.errors}</span>
+            {errorDelta !== 0 && previous && (
+              <span className={`text-xs font-medium pb-1 ${errorDelta < 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {errorDelta > 0 ? '+' : ''}{errorDelta}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Score trend chart */}
+      {history.length >= 2 && (
+        <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
+          <div className="text-sm font-medium text-zinc-300 mb-3">Score Trend</div>
+          <ScoreTrendChart history={history} />
+        </div>
+      )}
+
+      {/* Client dashboard link */}
+      <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-zinc-900 border border-zinc-800">
+        <Globe className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--brand-mint)' }} />
+        <div className="flex-1 min-w-0">
+          <div className="text-xs font-medium text-zinc-300">Client Dashboard</div>
+          <div className="text-xs text-zinc-500 truncate font-mono">{window.location.origin}/client/{siteId}</div>
+        </div>
+        <button
+          onClick={() => {
+            navigator.clipboard.writeText(`${window.location.origin}/client/${siteId}`);
+          }}
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium bg-zinc-800 hover:bg-zinc-700 transition-colors"
+        >
+          <Copy className="w-3 h-3" /> Copy
+        </button>
+        <a href={`/client/${siteId}`} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md hover:bg-zinc-800" style={{ color: 'var(--brand-mint)' }}>
+          <ExternalLink className="w-3.5 h-3.5" />
+        </a>
+      </div>
+
+      {/* Snapshot list */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-sm font-medium text-zinc-300">Audit History</div>
+          <button onClick={onRefresh} className="text-xs text-zinc-500 hover:text-zinc-300 flex items-center gap-1">
+            <RefreshCw className="w-3 h-3" /> Refresh
+          </button>
+        </div>
+        <div className="space-y-1">
+          {history.map((snap, i) => {
+            const date = new Date(snap.createdAt);
+            const prev = history[i + 1];
+            const delta = prev ? snap.siteScore - prev.siteScore : 0;
+            return (
+              <div key={snap.id} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-zinc-900/50 transition-colors group">
+                <div className={`text-lg font-bold tabular-nums w-10 ${scoreColor(snap.siteScore)}`}>{snap.siteScore}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-zinc-300">
+                    {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    <span className="text-zinc-600 ml-2">{date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                  <div className="text-xs text-zinc-500">
+                    {snap.totalPages} pages · {snap.errors} errors · {snap.warnings} warnings
+                    {delta !== 0 && (
+                      <span className={`ml-2 ${delta > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        ({delta > 0 ? '+' : ''}{delta} pts)
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={() => copyLink(snap.id)}
+                    className="p-1.5 rounded-md hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300"
+                    title="Copy share link"
+                  >
+                    {loadingId === snap.id ? <CheckCircle className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                  <button
+                    onClick={() => openReport(snap.id)}
+                    className="p-1.5 rounded-md hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300"
+                    title="View report"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SeoAudit({ siteId }: Props) {
   const [subTab, setSubTab] = useState<SubTab>('audit');
   const [data, setData] = useState<SeoAuditResult | null>(null);
@@ -72,6 +290,10 @@ function SeoAudit({ siteId }: Props) {
   const [severityFilter, setSeverityFilter] = useState<Severity | 'all'>('all');
   const [reportModal, setReportModal] = useState(false);
   const [reportView, setReportView] = useState<'html' | 'csv' | null>(null);
+  const [history, setHistory] = useState<SnapshotSummary[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const runAudit = () => {
     setLoading(true);
@@ -83,11 +305,44 @@ function SeoAudit({ siteId }: Props) {
       .finally(() => setLoading(false));
   };
 
+  const loadHistory = useCallback(() => {
+    fetch(`/api/reports/${siteId}/history`)
+      .then(r => r.json())
+      .then(h => setHistory(Array.isArray(h) ? h : []))
+      .catch(() => {});
+  }, [siteId]);
+
   useEffect(() => {
     setData(null);
     setHasRun(false);
     setSubTab('audit');
-  }, [siteId]);
+    loadHistory();
+  }, [siteId, loadHistory]);
+
+  const handleSaveAndShare = async () => {
+    if (!data) return;
+    setSaving(true);
+    setShareUrl(null);
+    try {
+      const res = await fetch(`/api/reports/${siteId}/snapshot`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ siteName: siteId, audit: data }),
+      });
+      const result = await res.json();
+      const url = `${window.location.origin}/report/${result.id}`;
+      setShareUrl(url);
+      loadHistory();
+    } catch { /* ignore */ }
+    setSaving(false);
+  };
+
+  const copyShareUrl = () => {
+    if (!shareUrl) return;
+    navigator.clipboard.writeText(shareUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const toggleExpand = (page: string) => {
     setExpanded(prev => {
@@ -232,6 +487,7 @@ function SeoAudit({ siteId }: Props) {
     { id: 'editor', label: 'Edit SEO', icon: Pencil },
     { id: 'links', label: 'Dead Links', icon: Link2Off },
     { id: 'keywords', label: 'Keywords', icon: SearchIcon },
+    { id: 'history', label: 'History', icon: Clock },
   ];
   const tabNav = (
     <div className="flex items-center gap-0.5 mb-4">
@@ -260,6 +516,7 @@ function SeoAudit({ siteId }: Props) {
   if (subTab === 'editor') return <>{tabNav}<SeoEditor siteId={siteId} /></>;
   if (subTab === 'links') return <>{tabNav}<LinkChecker siteId={siteId} /></>;
   if (subTab === 'keywords') return <>{tabNav}<KeywordAnalysis siteId={siteId} /></>;
+  if (subTab === 'history') return <>{tabNav}<AuditHistory siteId={siteId} history={history} onRefresh={loadHistory} /></>;
 
   // Audit tab
   if (!hasRun) {
@@ -389,10 +646,18 @@ function SeoAudit({ siteId }: Props) {
             />
           </div>
           <button
-            onClick={() => setReportModal(true)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-teal-600 hover:bg-teal-500 rounded-lg text-xs font-medium transition-colors"
+            onClick={handleSaveAndShare}
+            disabled={saving}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors"
+            style={{ backgroundColor: 'var(--brand-mint)', color: '#0f1219' }}
           >
-            <FileText className="w-3.5 h-3.5" /> Generate Report
+            <Share2 className="w-3.5 h-3.5" /> {saving ? 'Saving...' : 'Save & Share'}
+          </button>
+          <button
+            onClick={() => setReportModal(true)}
+            className="flex items-center gap-1.5 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-medium transition-colors"
+          >
+            <FileText className="w-3.5 h-3.5" /> Export
           </button>
           <button
             onClick={runAudit}
@@ -402,6 +667,26 @@ function SeoAudit({ siteId }: Props) {
           </button>
         </div>
       </div>
+
+      {/* Share URL banner */}
+      {shareUrl && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-lg" style={{ backgroundColor: 'var(--brand-mint-dim)', border: '1px solid rgba(46,217,195,0.2)' }}>
+          <Share2 className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--brand-mint)' }} />
+          <div className="flex-1 min-w-0">
+            <div className="text-xs font-medium" style={{ color: 'var(--brand-mint)' }}>Report saved! Share this link with clients:</div>
+            <div className="text-xs text-zinc-300 truncate mt-0.5 font-mono">{shareUrl}</div>
+          </div>
+          <button onClick={copyShareUrl} className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors" style={{ backgroundColor: 'var(--brand-mint)', color: '#0f1219' }}>
+            <Copy className="w-3 h-3" /> {copied ? 'Copied!' : 'Copy'}
+          </button>
+          <a href={shareUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md hover:bg-white/10" style={{ color: 'var(--brand-mint)' }}>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+          <button onClick={() => setShareUrl(null)} className="p-1 rounded hover:bg-white/10">
+            <X className="w-3.5 h-3.5 text-zinc-400" />
+          </button>
+        </div>
+      )}
 
       {/* Showing count */}
       <div className="text-xs text-zinc-600 px-1">
