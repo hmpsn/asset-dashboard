@@ -218,8 +218,15 @@ function auditPage(
 ): PageSeoResult {
   const issues: SeoIssue[] = [];
 
-  // --- Title tag ---
-  const seoTitle = meta?.seo?.title || meta?.title || '';
+  // --- Extract HTML-based values as fallback (Webflow API often returns empty OG/SEO data) ---
+  const htmlTitle = html ? (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || '') : '';
+  const htmlMetaDesc = html ? (extractMetaContent(html, 'description') || '') : '';
+  const htmlOgTitle = html ? (extractMetaContent(html, 'og:title') || '') : '';
+  const htmlOgDesc = html ? (extractMetaContent(html, 'og:description') || '') : '';
+  const htmlOgImage = html ? (extractMetaContent(html, 'og:image') || '') : '';
+
+  // --- Title tag (API → HTML fallback) ---
+  const seoTitle = meta?.seo?.title || meta?.title || htmlTitle;
   if (!seoTitle) {
     issues.push({ check: 'title', severity: 'error', message: 'Missing page title', recommendation: 'Add a unique, descriptive title tag between 30-60 characters.' });
   } else if (seoTitle.length < 30) {
@@ -228,8 +235,8 @@ function auditPage(
     issues.push({ check: 'title', severity: 'warning', message: `Title too long (${seoTitle.length} chars)`, recommendation: 'Shorten the title to under 60 characters to prevent truncation in search results.', value: seoTitle });
   }
 
-  // --- Meta description ---
-  const metaDesc = meta?.seo?.description || '';
+  // --- Meta description (API → HTML fallback) ---
+  const metaDesc = meta?.seo?.description || htmlMetaDesc;
   if (!metaDesc) {
     issues.push({ check: 'meta-description', severity: 'error', message: 'Missing meta description', recommendation: 'Add a compelling meta description between 50-160 characters that summarizes the page content.' });
   } else if (metaDesc.length < 50) {
@@ -238,14 +245,18 @@ function auditPage(
     issues.push({ check: 'meta-description', severity: 'warning', message: `Meta description too long (${metaDesc.length} chars)`, recommendation: 'Shorten to under 160 characters to avoid truncation in search results.', value: metaDesc });
   }
 
-  // --- Open Graph ---
-  const ogTitle = meta?.openGraph?.title || '';
-  const ogDesc = meta?.openGraph?.description || '';
+  // --- Open Graph (API → HTML fallback; HTML is the source of truth) ---
+  const ogTitle = meta?.openGraph?.title || htmlOgTitle;
+  const ogDesc = meta?.openGraph?.description || htmlOgDesc;
+  const ogImage = htmlOgImage;
   if (!ogTitle && !meta?.openGraph?.titleCopied) {
     issues.push({ check: 'og-tags', severity: 'warning', message: 'Missing Open Graph title', recommendation: 'Add an og:title for better social media sharing previews.' });
   }
   if (!ogDesc && !meta?.openGraph?.descriptionCopied) {
     issues.push({ check: 'og-tags', severity: 'warning', message: 'Missing Open Graph description', recommendation: 'Add an og:description for better social media sharing previews.' });
+  }
+  if (!ogImage) {
+    issues.push({ check: 'og-image', severity: 'warning', message: 'Missing Open Graph image', recommendation: 'Add an og:image for social media sharing previews. Recommended size: 1200x630px.' });
   }
 
   // --- URL structure ---
@@ -310,12 +321,6 @@ function auditPage(
     const robotsMeta = extractMetaContent(html, 'robots');
     if (robotsMeta && robotsMeta.includes('noindex')) {
       issues.push({ check: 'robots', severity: 'warning', message: 'Page is set to noindex', recommendation: 'This page will not appear in search results. Remove noindex if this page should be indexed.', value: robotsMeta });
-    }
-
-    // OG image from HTML
-    const ogImage = extractMetaContent(html, 'og:image');
-    if (!ogImage) {
-      issues.push({ check: 'og-image', severity: 'warning', message: 'Missing Open Graph image', recommendation: 'Add an og:image for social media sharing previews. Recommended size: 1200x630px.' });
     }
 
     // Content length
