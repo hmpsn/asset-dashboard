@@ -188,7 +188,7 @@ function AssetAudit({ siteId }: Props) {
   const handleDeleteAsset = async (issue: AuditIssue) => {
     setDeletingIds(prev => new Set(prev).add(issue.assetId));
     try {
-      await fetch(`/api/webflow/assets/${issue.assetId}`, { method: 'DELETE' });
+      await fetch(`/api/webflow/assets/${issue.assetId}?siteId=${siteId}`, { method: 'DELETE' });
       if (audit) {
         const wasUnused = issue.issues.includes('unused');
         setAudit({
@@ -210,7 +210,7 @@ function AssetAudit({ siteId }: Props) {
     setDeletingUnused(true);
     for (const issue of unused) {
       try {
-        await fetch(`/api/webflow/assets/${issue.assetId}`, { method: 'DELETE' });
+        await fetch(`/api/webflow/assets/${issue.assetId}?siteId=${siteId}`, { method: 'DELETE' });
       } catch { /* ignore */ }
     }
     setAudit({

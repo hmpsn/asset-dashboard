@@ -33,6 +33,7 @@ const CATEGORY_CONFIG: Record<CheckCategory, { label: string; color: string }> =
 };
 
 interface PageSeoResult {
+  pageId: string;
   page: string;
   slug: string;
   url: string;
@@ -494,6 +495,39 @@ function SeoAudit({ siteId }: Props) {
   const [copied, setCopied] = useState(false);
 
   const [auditError, setAuditError] = useState<string | null>(null);
+  const [applyingFix, setApplyingFix] = useState<string | null>(null);
+  const [appliedFixes, setAppliedFixes] = useState<Set<string>>(new Set());
+
+  const acceptSuggestion = async (pageId: string, issue: SeoIssue) => {
+    if (!issue.suggestedFix) return;
+    const fixKey = `${pageId}-${issue.check}`;
+    setApplyingFix(fixKey);
+    try {
+      const fields: Record<string, unknown> = {};
+      if (issue.check === 'title') {
+        fields.seo = { title: issue.suggestedFix };
+      } else if (issue.check === 'meta-description') {
+        fields.seo = { description: issue.suggestedFix };
+      } else if (issue.check === 'og-tags' && issue.message.includes('title')) {
+        fields.openGraph = { title: issue.suggestedFix };
+      } else if (issue.check === 'og-tags' && issue.message.includes('description')) {
+        fields.openGraph = { description: issue.suggestedFix };
+      }
+      const res = await fetch(`/api/webflow/pages/${pageId}/seo`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ siteId, ...fields }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        setAppliedFixes(prev => new Set(prev).add(fixKey));
+      }
+    } catch (err) {
+      console.error('Failed to apply fix:', err);
+    } finally {
+      setApplyingFix(null);
+    }
+  };
 
   const runAudit = () => {
     setLoading(true);
@@ -1006,12 +1040,33 @@ function SeoAudit({ siteId }: Props) {
                               <div className="text-xs text-zinc-300">{issue.message}</div>
                               <div className="text-[11px] text-zinc-500 mt-0.5">{issue.recommendation}</div>
                               {issue.value && <div className="text-[10px] text-zinc-600 mt-0.5 italic truncate">{issue.value}</div>}
-                              {issue.suggestedFix && (
-                                <div className="mt-1.5 px-2 py-1.5 rounded bg-emerald-950/40 border border-emerald-800/30">
-                                  <div className="text-[9px] text-emerald-500 font-semibold uppercase tracking-wider mb-0.5">AI Suggestion</div>
-                                  <div className="text-[11px] text-emerald-300">{issue.suggestedFix}</div>
-                                </div>
-                              )}
+                              {issue.suggestedFix && (() => {
+                                const fixKey = `${page.pageId}-${issue.check}`;
+                                const isApplying = applyingFix === fixKey;
+                                const isApplied = appliedFixes.has(fixKey);
+                                return (
+                                  <div className="mt-1.5 px-2 py-1.5 rounded bg-emerald-950/40 border border-emerald-800/30">
+                                    <div className="flex items-center justify-between mb-0.5">
+                                      <div className="text-[9px] text-emerald-500 font-semibold uppercase tracking-wider">AI Suggestion</div>
+                                      {isApplied ? (
+                                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-medium flex items-center gap-1">
+                                          <CheckCircle className="w-2.5 h-2.5" /> Applied
+                                        </span>
+                                      ) : (
+                                        <button
+                                          onClick={() => acceptSuggestion(page.pageId, issue)}
+                                          disabled={isApplying}
+                                          className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
+                                        >
+                                          {isApplying ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <CheckCircle className="w-2.5 h-2.5" />}
+                                          {isApplying ? 'Applying...' : 'Accept & Push to Webflow'}
+                                        </button>
+                                      )}
+                                    </div>
+                                    <div className="text-[11px] text-emerald-300">{issue.suggestedFix}</div>
+                                  </div>
+                                );
+                              })()}
                             </div>
                             <div className="flex items-center gap-1 flex-shrink-0">
                               {catCfg && (

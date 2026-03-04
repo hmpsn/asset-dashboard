@@ -467,7 +467,7 @@ function AssetBrowser({ siteId }: Props) {
     await fetch('/api/webflow/assets/bulk-delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ assetIds: [...selected] }),
+      body: JSON.stringify({ assetIds: [...selected], siteId }),
     });
     setAssets(prev => prev.filter(a => !selected.has(a.id)));
     setSelected(new Set());

@@ -331,14 +331,17 @@ export async function scanAssetUsage(siteId: string, tokenOverride?: string): Pr
   const subdomain = await getSiteSubdomain(siteId, tokenOverride);
   if (subdomain) {
     const baseUrl = `https://${subdomain}.webflow.io`;
-    const pages = await listPages(siteId, tokenOverride);
-    // Build page URL list: home + all slugs
+    const allPages = await listPages(siteId, tokenOverride);
+    const pages = filterPublishedPages(allPages);
+    // Build page URL list: home + all published pages using publishedPath (handles nested pages)
     const pageUrls: { url: string; title: string }[] = [
       { url: baseUrl, title: 'Home' },
     ];
     for (const page of pages) {
-      if (page.slug && page.slug !== 'index') {
-        pageUrls.push({ url: `${baseUrl}/${page.slug}`, title: page.title });
+      // Use publishedPath for full URL (handles nested pages like /about/team)
+      const pagePath = page.publishedPath || (page.slug ? `/${page.slug}` : '');
+      if (pagePath && pagePath !== '/' && page.slug !== 'index') {
+        pageUrls.push({ url: `${baseUrl}${pagePath}`, title: page.title });
       }
     }
 
@@ -346,7 +349,7 @@ export async function scanAssetUsage(siteId: string, tokenOverride?: string): Pr
     // Use the collection slug (not the template page slug) for the URL prefix
     const collections = await listCollections(siteId, tokenOverride);
     const collSlugMap = new Map(collections.map(c => [c.id, c.slug]));
-    for (const page of pages) {
+    for (const page of allPages) {
       const collId = (page as Record<string, unknown>).collectionId as string;
       if (!collId) continue;
       const collSlug = collSlugMap.get(collId);
@@ -370,6 +373,8 @@ export async function scanAssetUsage(siteId: string, tokenOverride?: string): Pr
         }
       } catch { /* skip */ }
     }
+
+    console.log(`[asset-usage] Scanning ${pageUrls.length} page URLs for asset references (${assetIds.size} assets)`);
 
     // Also scan the site's CSS files for background-image asset references
     try {

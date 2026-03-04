@@ -41,6 +41,7 @@ const CHECK_CATEGORY: Record<string, CheckCategory> = {
 };
 
 export interface PageSeoResult {
+  pageId: string;
   page: string;
   slug: string;
   url: string;
@@ -164,18 +165,20 @@ function extractLinks(html: string): { href: string; text: string; rel?: string 
   return links;
 }
 
-function extractImgTags(html: string): { src: string; alt: string; loading?: string; hasWidth: boolean; hasHeight: boolean }[] {
-  const imgs: { src: string; alt: string; loading?: string; hasWidth: boolean; hasHeight: boolean }[] = [];
+function extractImgTags(html: string): { src: string; alt: string; hasAlt: boolean; loading?: string; hasWidth: boolean; hasHeight: boolean }[] {
+  const imgs: { src: string; alt: string; hasAlt: boolean; loading?: string; hasWidth: boolean; hasHeight: boolean }[] = [];
   const regex = /<img\s+([^>]*)>/gi;
   let m;
   while ((m = regex.exec(html)) !== null) {
     const attrs = m[1];
     const src = attrs.match(/src=["']([^"']*)["']/)?.[1] || '';
-    const alt = attrs.match(/alt=["']([^"']*)["']/)?.[1] || '';
+    const altMatch = attrs.match(/alt=["']([^"']*)["']/);
+    const hasAlt = altMatch !== null;
+    const alt = altMatch?.[1] || '';
     const loading = attrs.match(/loading=["']([^"']*)["']/)?.[1];
     const hasWidth = /width\s*=/.test(attrs);
     const hasHeight = /height\s*=/.test(attrs);
-    imgs.push({ src, alt, loading, hasWidth, hasHeight });
+    imgs.push({ src, alt, hasAlt, loading, hasWidth, hasHeight });
   }
   return imgs;
 }
@@ -211,6 +214,7 @@ function countExternalResources(html: string): { stylesheets: number; scripts: n
 }
 
 function auditPage(
+  pageId: string,
   pageName: string,
   slug: string,
   url: string,
@@ -293,9 +297,9 @@ function auditPage(
       }
     }
 
-    // Images without alt text
+    // Images without alt text (only flag images truly missing the alt attribute, not decorative alt="")
     const imgs = extractImgTags(html);
-    const noAlt = imgs.filter(i => !i.alt || i.alt.trim() === '');
+    const noAlt = imgs.filter(i => !i.hasAlt);
     if (noAlt.length > 0) {
       issues.push({ check: 'img-alt', severity: 'warning', message: `${noAlt.length} image${noAlt.length > 1 ? 's' : ''} missing alt text`, recommendation: 'Add descriptive alt text to all meaningful images for accessibility and SEO.' });
     }
@@ -461,7 +465,7 @@ function auditPage(
   }
   score = Math.max(0, Math.min(100, score));
 
-  return { page: pageName, slug, url, score, issues };
+  return { pageId, page: pageName, slug, url, score, issues };
 }
 
 export async function runSeoAudit(siteId: string, tokenOverride?: string): Promise<SeoAuditResult> {
@@ -482,6 +486,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string): Promi
   // Fetch metadata and HTML in parallel (batch of 5), cache meta for site-wide checks
   const results: PageSeoResult[] = [];
   const metaCache: { title: string; desc: string; page: string }[] = [];
+  const htmlCache = new Map<string, string>();
   const batch = 5;
 
   for (let i = 0; i < pages.length; i += batch) {
@@ -504,7 +509,9 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string): Promi
             page: page.title,
           });
         }
-        return auditPage(page.title, displaySlug, url, meta, html);
+        // Store HTML for AI recommendations later
+        if (html) htmlCache.set(page.id, html);
+        return auditPage(page.id, page.title, displaySlug, url, meta, html);
       })
     );
     results.push(...chunkResults);
@@ -642,13 +649,36 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string): Promi
   }
 
   // --- AI-Powered Recommendations ---
-  // Generate keyword-optimized title/meta description suggestions for pages with content issues
+  // Generate keyword-optimized title/meta description suggestions using actual page content
   const apiKey = process.env.OPENAI_API_KEY;
   if (apiKey) {
     const pagesNeedingFixes = results.filter(r =>
       r.issues.some(i => ['title', 'meta-description', 'og-tags'].includes(i.check))
     );
     console.log(`[seo-audit] Generating AI recommendations for ${pagesNeedingFixes.length} pages...`);
+
+    // Helper: extract readable body text from HTML for context
+    const extractBodyText = (html: string): string => {
+      // Remove script/style/nav/footer/header blocks
+      let text = html
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/<style[\s\S]*?<\/style>/gi, '')
+        .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+        .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+        .replace(/<header[\s\S]*?<\/header>/gi, '');
+      // Extract headings separately for emphasis
+      const headings: string[] = [];
+      const hRegex = /<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi;
+      let hm;
+      while ((hm = hRegex.exec(text)) !== null) {
+        headings.push(hm[1].replace(/<[^>]+>/g, '').trim());
+      }
+      // Strip tags and normalize whitespace
+      text = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      // Return headings + body excerpt (capped at 2000 chars for token efficiency)
+      const headingStr = headings.length > 0 ? `KEY HEADINGS: ${headings.slice(0, 8).join(' | ')}\n` : '';
+      return headingStr + text.slice(0, 2000);
+    };
 
     const aiBatch = 5;
     for (let i = 0; i < pagesNeedingFixes.length; i += aiBatch) {
@@ -665,24 +695,30 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string): Promi
           const currentTitle = titleIssue?.value || pageResult.page || '';
           const currentDesc = descIssue?.value || '';
 
-          const prompt = `You are an expert SEO copywriter. Generate optimized meta tags for this webpage.
+          // Get actual page content for on-brand suggestions
+          const cachedHtml = htmlCache.get(pageResult.pageId);
+          const pageContent = cachedHtml ? extractBodyText(cachedHtml) : '';
+
+          const prompt = `You are an expert SEO copywriter. Generate optimized meta tags for this webpage that match the brand voice and existing content.
 
 PAGE: ${pageResult.page}
 URL: ${pageResult.url}
 CURRENT TITLE: ${currentTitle || '(missing)'}
 CURRENT META DESCRIPTION: ${currentDesc || '(missing)'}
 
+${pageContent ? `PAGE CONTENT:\n${pageContent}\n` : ''}
 ISSUES TO FIX:
 ${titleIssue ? `- Title: ${titleIssue.message}` : ''}
 ${descIssue ? `- Meta Description: ${descIssue.message}` : ''}
 ${ogTitleIssue ? `- OG Title: ${ogTitleIssue.message}` : ''}
 
 RULES:
+- Match the brand's existing tone and voice as shown in the page content above
 - Title: 30-60 chars, include primary keyword near the start, compelling for clicks
 - Meta Description: 120-155 chars, include primary + secondary keywords naturally, include a call-to-action
-- OG Title: Can be slightly different from SEO title, optimized for social sharing clicks
-- Use natural language, avoid keyword stuffing
-- Infer the page's topic and target keywords from the URL, title, and page name
+- OG Title: Can match the SEO title or be slightly more conversational for social sharing
+- Use natural language that sounds like it belongs on this specific website
+- Pull specific terminology, services, or value props directly from the page content
 
 Respond in this exact JSON format (only include fields that need fixing):
 {"title":"...","metaDescription":"...","ogTitle":"..."}`;
@@ -691,10 +727,10 @@ Respond in this exact JSON format (only include fields that need fixing):
             method: 'POST',
             headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              model: 'gpt-4o-mini',
+              model: 'gpt-4o',
               messages: [{ role: 'user', content: prompt }],
-              temperature: 0.7,
-              max_tokens: 300,
+              temperature: 0.6,
+              max_tokens: 400,
             }),
           });
 
@@ -725,6 +761,8 @@ Respond in this exact JSON format (only include fields that need fixing):
       }));
     }
   }
+  // Free HTML cache
+  htmlCache.clear();
 
   // Sort pages best-to-worst (highest score first) for client presentation
   results.sort((a, b) => b.score - a.score);
