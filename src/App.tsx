@@ -8,6 +8,7 @@ import { PageWeight } from './components/PageWeight';
 import { SeoAudit } from './components/SeoAudit';
 import { PageSpeedPanel } from './components/PageSpeedPanel';
 import { SalesReport } from './components/SalesReport';
+import { GoogleAnalytics } from './components/GoogleAnalytics';
 import { SearchConsole } from './components/SearchConsole';
 import { ClientDashboard } from './components/ClientDashboard';
 import { LoginScreen } from './components/LoginScreen';
@@ -16,9 +17,18 @@ import { useWebSocket } from './hooks/useWebSocket';
 import { ToastProvider } from './components/Toast';
 import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, FileSearch, Search,
+  Pencil, ListChecks, Link2Off, CornerDownRight, Share2, Target, Code2, TrendingUp, Clock,
 } from 'lucide-react';
 
-type Tab = 'media' | 'seo' | 'search' | 'performance' | 'speed' | 'prospect' | 'settings';
+type Page =
+  | 'media'
+  | 'seo-audit' | 'seo-history' | 'seo-editor' | 'seo-cms'
+  | 'seo-links' | 'seo-redirects' | 'seo-internal'
+  | 'seo-strategy' | 'seo-keywords' | 'seo-schema' | 'seo-competitor'
+  | 'search' | 'analytics'
+  | 'page-weight' | 'page-speed'
+  | 'prospect'
+  | 'settings';
 
 function App() {
   // Client dashboard route: /client/:workspaceId (public, no auth)
@@ -48,7 +58,7 @@ function Dashboard() {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [health, setHealth] = useState({ hasOpenAIKey: false, hasWebflowToken: false });
   const [connected, setConnected] = useState(false);
-  const [tab, setTab] = useState<Tab>('media');
+  const [tab, setTab] = useState<Page>('media');
   const [clipboardStatus, setClipboardStatus] = useState<string | null>(null);
 
   const refreshHealth = useCallback(() => {
@@ -70,7 +80,7 @@ function Dashboard() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!e.metaKey && !e.ctrlKey) return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
-      const tabMap: Record<string, Tab> = { '1': 'media', '2': 'seo', '3': 'search', '4': 'performance', '5': 'speed' };
+      const tabMap: Record<string, Page> = { '1': 'media', '2': 'seo-audit', '3': 'search', '4': 'page-speed' };
       if (tabMap[e.key] && selected) { e.preventDefault(); setTab(tabMap[e.key]); }
       if (e.key === ',') { e.preventDefault(); setTab('settings'); }
     };
@@ -195,54 +205,102 @@ function Dashboard() {
     ? queue.filter(q => q.workspace === selected.folder)
     : queue;
 
-  const tabs: { id: Tab; label: string; icon: typeof Image }[] = [
-    { id: 'media', label: 'Media', icon: Image },
-    { id: 'seo', label: 'SEO', icon: Globe },
-    { id: 'search', label: 'Search', icon: Search },
-    { id: 'performance', label: 'Page Weight', icon: BarChart3 },
-    { id: 'speed', label: 'Speed', icon: Gauge },
+  // ── Sidebar navigation groups ──
+  const navGroups: Array<{ label: string; items: Array<{ id: Page; label: string; icon: typeof Globe; needsSite?: boolean }> }> = [
+    { label: 'MEDIA', items: [
+      { id: 'media', label: 'Assets', icon: Image },
+    ]},
+    { label: 'SITE HEALTH', items: [
+      { id: 'seo-audit', label: 'Site Audit', icon: Globe, needsSite: true },
+      { id: 'seo-links', label: 'Dead Links', icon: Link2Off, needsSite: true },
+      { id: 'seo-redirects', label: 'Redirects', icon: CornerDownRight, needsSite: true },
+      { id: 'page-weight', label: 'Page Weight', icon: BarChart3, needsSite: true },
+      { id: 'page-speed', label: 'Page Speed', icon: Gauge, needsSite: true },
+      { id: 'seo-history', label: 'History', icon: Clock, needsSite: true },
+    ]},
+    { label: 'SEO', items: [
+      { id: 'seo-editor', label: 'Page SEO', icon: Pencil, needsSite: true },
+      { id: 'seo-cms', label: 'CMS SEO', icon: ListChecks, needsSite: true },
+      { id: 'seo-internal', label: 'Internal Links', icon: Share2, needsSite: true },
+      { id: 'seo-strategy', label: 'Keywords', icon: Target, needsSite: true },
+      { id: 'seo-keywords', label: 'Page Analysis', icon: Search, needsSite: true },
+      { id: 'seo-schema', label: 'Schema', icon: Code2, needsSite: true },
+      { id: 'seo-competitor', label: 'Competitors', icon: TrendingUp, needsSite: true },
+    ]},
+    { label: 'ANALYTICS', items: [
+      { id: 'search', label: 'Search Console', icon: Search, needsSite: true },
+      { id: 'analytics', label: 'Google Analytics', icon: BarChart3, needsSite: true },
+    ]},
   ];
 
+  // ── Content renderer ──
+  const seoView = tab.startsWith('seo-') ? tab.replace('seo-', '') : null;
+  const needsSite = !!(seoView || tab === 'search' || tab === 'analytics' || tab === 'page-weight' || tab === 'page-speed');
+
+  const renderContent = () => {
+    if (tab === 'settings') return <SettingsPanel />;
+    if (tab === 'prospect') return <SalesReport />;
+
+    if (!selected) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full gap-6">
+          <img src="/logo.svg" alt="hmpsn.studio" className="h-8 opacity-40" />
+          <div className="text-center max-w-sm">
+            <p className="text-base font-semibold mb-1" style={{ color: 'var(--brand-text-bright)' }}>Welcome to hmpsn studio</p>
+            <p className="text-xs leading-relaxed" style={{ color: 'var(--brand-text-muted)' }}>Get started in 3 steps:</p>
+          </div>
+          <div className="flex flex-col gap-3 w-full max-w-xs">
+            {[
+              { step: '1', text: 'Create a workspace', desc: 'Use the workspace selector in the sidebar' },
+              { step: '2', text: 'Link a Webflow site', desc: 'Paste your API token to connect' },
+              { step: '3', text: 'Connect Google', desc: 'Go to Settings for Search Console & GA4' },
+            ].map(s => (
+              <div key={s.step} className="flex items-start gap-3 px-4 py-3 rounded-lg" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
+                <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-xs font-bold" style={{ backgroundColor: 'var(--brand-mint-dim)', color: 'var(--brand-mint)' }}>{s.step}</div>
+                <div>
+                  <div className="text-xs font-medium" style={{ color: 'var(--brand-text-bright)' }}>{s.text}</div>
+                  <div className="text-[11px] mt-0.5" style={{ color: 'var(--brand-text-muted)' }}>{s.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    if (needsSite && !selected.webflowSiteId) {
+      return (
+        <div className="flex flex-col items-center justify-center py-24 gap-3">
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'var(--brand-bg-elevated)' }}>
+            <Globe className="w-5 h-5" style={{ color: 'var(--brand-text-muted)' }} />
+          </div>
+          <p className="text-sm" style={{ color: 'var(--brand-text-muted)' }}>Link a Webflow site to use this tool</p>
+          <button onClick={() => setTab('settings')} className="mt-3 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors" style={{ backgroundColor: 'var(--brand-mint-dim)', color: 'var(--brand-mint)' }}>Go to Settings</button>
+        </div>
+      );
+    }
+
+    if (tab === 'media') return <MediaTab key={selected.folder} siteId={selected.webflowSiteId} workspaceFolder={selected.folder} queue={workspaceQueue} />;
+    if (seoView) return <SeoAudit key={`seo-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} view={seoView} />;
+    if (tab === 'search') return <SearchConsole key={`search-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
+    if (tab === 'page-weight') return <PageWeight key={`weight-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
+    if (tab === 'page-speed') return <PageSpeedPanel key={`speed-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
+    if (tab === 'analytics') return <GoogleAnalytics key={`ga4-${selected.id}`} workspaceId={selected.id} ga4PropertyId={selected.ga4PropertyId} />;
+
+    return null;
+  };
+
   return (
-    <div className="flex flex-col h-screen" style={{ backgroundColor: 'var(--brand-bg)', color: 'var(--brand-text-bright)' }}>
-      {/* Header */}
-      <header className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid var(--brand-border)' }}>
-        <div className="flex items-center gap-4">
+    <div className="flex h-screen" style={{ backgroundColor: 'var(--brand-bg)', color: 'var(--brand-text-bright)' }}>
+      {/* ── Global sidebar ── */}
+      <aside className="w-[200px] flex-shrink-0 flex flex-col" style={{ borderRight: '1px solid var(--brand-border)' }}>
+        {/* Logo */}
+        <div className="px-4 pt-4 pb-3">
           <img src="/logo.svg" alt="hmpsn.studio" className="h-5" />
-          <button
-            onClick={() => setTab('prospect')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors"
-            style={tab === 'prospect' ? {
-              backgroundColor: 'var(--brand-mint-dim)',
-              color: 'var(--brand-mint)',
-            } : {
-              color: 'var(--brand-text-muted)',
-            }}
-          >
-            <FileSearch className="w-3.5 h-3.5" />
-            Prospect
-          </button>
-          <button
-            onClick={() => setTab('settings')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors"
-            style={tab === 'settings' ? {
-              backgroundColor: 'var(--brand-mint-dim)',
-              color: 'var(--brand-mint)',
-            } : {
-              color: 'var(--brand-text-muted)',
-            }}
-          >
-            <Settings className="w-3.5 h-3.5" />
-            Settings
-          </button>
         </div>
 
-        <div className="flex items-center gap-2">
-          {clipboardStatus && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium" style={{ backgroundColor: 'var(--brand-mint-dim)', color: 'var(--brand-mint)' }}>
-              <Clipboard className="w-3 h-3" /> {clipboardStatus}
-            </div>
-          )}
+        {/* Workspace selector */}
+        <div className="px-3 pb-2" style={{ borderBottom: '1px solid var(--brand-border)' }}>
           <WorkspaceSelector
             workspaces={workspaces}
             selected={selected}
@@ -252,140 +310,88 @@ function Dashboard() {
             onLinkSite={handleLinkSite}
             onUnlinkSite={handleUnlinkSite}
           />
+          {selected?.webflowSiteName && (
+            <div className="mt-1.5 px-1">
+              <div className="text-[10px] text-zinc-500 truncate">{selected.webflowSiteName}</div>
+            </div>
+          )}
         </div>
-      </header>
 
-      {/* Tab bar */}
-      {selected && tab !== 'prospect' && tab !== 'settings' && (
-        <nav className="flex items-center gap-0.5 px-5 py-2" style={{ borderBottom: '1px solid var(--brand-border)' }}>
-          {tabs.map(t => {
-            const Icon = t.icon;
-            const isActive = tab === t.id;
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
+          {navGroups.map(group => (
+            <div key={group.label}>
+              <div className="text-[9px] text-zinc-600 font-semibold tracking-widest px-2.5 mb-1">{group.label}</div>
+              {group.items.map(item => {
+                const Icon = item.icon;
+                const active = tab === item.id;
+                const disabled = !selected || (item.needsSite && !selected.webflowSiteId);
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => !disabled && setTab(item.id)}
+                    className={`w-full flex items-center gap-2.5 px-2.5 py-[5px] rounded-lg text-[12px] font-medium transition-all ${
+                      active
+                        ? 'bg-violet-500/10 text-violet-300'
+                        : disabled
+                          ? 'text-zinc-700 cursor-not-allowed'
+                          : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
+                    }`}
+                  >
+                    <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${active ? 'text-violet-400' : ''}`} />
+                    <span className="truncate">{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </nav>
+
+        {/* Bottom: Prospect + Settings */}
+        <div className="px-2 py-2 space-y-0.5" style={{ borderTop: '1px solid var(--brand-border)' }}>
+          {([
+            { id: 'prospect' as Page, label: 'Prospect', icon: FileSearch },
+            { id: 'settings' as Page, label: 'Settings', icon: Settings },
+          ]).map(item => {
+            const Icon = item.icon;
+            const active = tab === item.id;
             return (
               <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-medium"
-                style={isActive ? {
-                  backgroundColor: 'var(--brand-mint-dim)',
-                  color: 'var(--brand-mint)',
-                } : {
-                  color: 'var(--brand-text-muted)',
-                }}
+                key={item.id}
+                onClick={() => setTab(item.id)}
+                className={`w-full flex items-center gap-2.5 px-2.5 py-[5px] rounded-lg text-[12px] font-medium transition-all ${
+                  active
+                    ? 'bg-violet-500/10 text-violet-300'
+                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
+                }`}
               >
-                <Icon className="w-3.5 h-3.5" />
-                {t.label}
+                <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${active ? 'text-violet-400' : ''}`} />
+                <span className="truncate">{item.label}</span>
               </button>
             );
           })}
-        </nav>
-      )}
+        </div>
+      </aside>
 
-      {/* Main content */}
-      <main className="flex-1 overflow-auto p-5">
-        {tab === 'settings' ? (
-          <SettingsPanel />
-        ) : tab === 'prospect' ? (
-          <div className="max-w-5xl mx-auto">
-            <SalesReport />
-          </div>
-        ) : !selected ? (
-          <div className="flex flex-col items-center justify-center h-full gap-6">
-            <img src="/logo.svg" alt="hmpsn.studio" className="h-8 opacity-40" />
-            <div className="text-center max-w-sm">
-              <p className="text-base font-semibold mb-1" style={{ color: 'var(--brand-text-bright)' }}>Welcome to hmpsn studio</p>
-              <p className="text-xs leading-relaxed" style={{ color: 'var(--brand-text-muted)' }}>Get started in 3 steps:</p>
-            </div>
-            <div className="flex flex-col gap-3 w-full max-w-xs">
-              {[
-                { step: '1', text: 'Create a workspace', desc: 'Use the selector in the top right' },
-                { step: '2', text: 'Link a Webflow site', desc: 'Paste your API token to connect' },
-                { step: '3', text: 'Connect Google', desc: 'Go to Settings for Search Console & GA4' },
-              ].map(s => (
-                <div key={s.step} className="flex items-start gap-3 px-4 py-3 rounded-lg" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
-                  <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-xs font-bold" style={{ backgroundColor: 'var(--brand-mint-dim)', color: 'var(--brand-mint)' }}>{s.step}</div>
-                  <div>
-                    <div className="text-xs font-medium" style={{ color: 'var(--brand-text-bright)' }}>{s.text}</div>
-                    <div className="text-[11px] mt-0.5" style={{ color: 'var(--brand-text-muted)' }}>{s.desc}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="max-w-5xl mx-auto">
-            {tab === 'media' && (
-              <MediaTab
-                key={selected.folder}
-                siteId={selected.webflowSiteId}
-                workspaceFolder={selected.folder}
-                queue={workspaceQueue}
-              />
-            )}
-
-            {tab === 'seo' && selected.webflowSiteId && (
-              <SeoAudit key={`seo-${selected.webflowSiteId}`} siteId={selected.webflowSiteId} workspaceId={selected.id} />
-            )}
-            {tab === 'seo' && !selected.webflowSiteId && (
-              <div className="flex flex-col items-center justify-center py-24 gap-3">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'var(--brand-bg-elevated)' }}>
-                  <Globe className="w-5 h-5" style={{ color: 'var(--brand-text-muted)' }} />
-                </div>
-                <p className="text-sm" style={{ color: 'var(--brand-text-muted)' }}>Link a Webflow site for SEO tools</p>
-                <button onClick={() => setTab('settings')} className="mt-3 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors" style={{ backgroundColor: 'var(--brand-mint-dim)', color: 'var(--brand-mint)' }}>Go to Settings</button>
-              </div>
-            )}
-
-            {tab === 'search' && selected.webflowSiteId && (
-              <SearchConsole key={`search-${selected.webflowSiteId}`} siteId={selected.webflowSiteId} />
-            )}
-            {tab === 'search' && !selected.webflowSiteId && (
-              <div className="flex flex-col items-center justify-center py-24 gap-3">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'var(--brand-bg-elevated)' }}>
-                  <Search className="w-5 h-5" style={{ color: 'var(--brand-text-muted)' }} />
-                </div>
-                <p className="text-sm" style={{ color: 'var(--brand-text-muted)' }}>Link a Webflow site for Search Console data</p>
-                <button onClick={() => setTab('settings')} className="mt-3 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors" style={{ backgroundColor: 'var(--brand-mint-dim)', color: 'var(--brand-mint)' }}>Go to Settings</button>
-              </div>
-            )}
-
-            {tab === 'performance' && selected.webflowSiteId && (
-              <PageWeight key={`weight-${selected.webflowSiteId}`} siteId={selected.webflowSiteId} />
-            )}
-            {tab === 'performance' && !selected.webflowSiteId && (
-              <div className="flex flex-col items-center justify-center py-24 gap-3">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'var(--brand-bg-elevated)' }}>
-                  <BarChart3 className="w-5 h-5" style={{ color: 'var(--brand-text-muted)' }} />
-                </div>
-                <p className="text-sm" style={{ color: 'var(--brand-text-muted)' }}>Link a Webflow site to analyze performance</p>
-                <button onClick={() => setTab('settings')} className="mt-3 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors" style={{ backgroundColor: 'var(--brand-mint-dim)', color: 'var(--brand-mint)' }}>Go to Settings</button>
-              </div>
-            )}
-
-            {tab === 'speed' && selected.webflowSiteId && (
-              <PageSpeedPanel key={`speed-${selected.webflowSiteId}`} siteId={selected.webflowSiteId} />
-            )}
-            {tab === 'speed' && !selected.webflowSiteId && (
-              <div className="flex flex-col items-center justify-center py-24 gap-3">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'var(--brand-bg-elevated)' }}>
-                  <Gauge className="w-5 h-5" style={{ color: 'var(--brand-text-muted)' }} />
-                </div>
-                <p className="text-sm" style={{ color: 'var(--brand-text-muted)' }}>Link a Webflow site to test page speed</p>
-                <button onClick={() => setTab('settings')} className="mt-3 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors" style={{ backgroundColor: 'var(--brand-mint-dim)', color: 'var(--brand-mint)' }}>Go to Settings</button>
-              </div>
-            )}
+      {/* ── Main content area ── */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {clipboardStatus && (
+          <div className="flex items-center gap-1.5 px-5 py-1.5 text-[11px] font-medium" style={{ backgroundColor: 'var(--brand-mint-dim)', color: 'var(--brand-mint)', borderBottom: '1px solid var(--brand-border)' }}>
+            <Clipboard className="w-3 h-3" /> {clipboardStatus}
           </div>
         )}
-      </main>
-
-      {/* Status bar */}
-      <StatusBar
-        hasOpenAIKey={health.hasOpenAIKey}
-        hasWebflowToken={health.hasWebflowToken}
-        connected={connected}
-        workspaceCount={workspaces.length}
-      />
-
+        <main className="flex-1 overflow-auto p-6">
+          <div className="max-w-5xl mx-auto">
+            {renderContent()}
+          </div>
+        </main>
+        <StatusBar
+          hasOpenAIKey={health.hasOpenAIKey}
+          hasWebflowToken={health.hasWebflowToken}
+          connected={connected}
+          workspaceCount={workspaces.length}
+        />
+      </div>
     </div>
   );
 }

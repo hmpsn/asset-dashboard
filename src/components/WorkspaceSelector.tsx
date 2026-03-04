@@ -7,6 +7,7 @@ export interface Workspace {
   name: string;
   webflowSiteId?: string;
   webflowSiteName?: string;
+  ga4PropertyId?: string;
   folder: string;
   createdAt: string;
 }
