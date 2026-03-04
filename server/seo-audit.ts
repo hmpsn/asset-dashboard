@@ -17,6 +17,7 @@ export interface SeoIssue {
   message: string;
   recommendation: string;
   value?: string;
+  suggestedFix?: string;
 }
 
 const CHECK_CATEGORY: Record<string, CheckCategory> = {
@@ -638,6 +639,91 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string): Promi
   // Auto-assign categories to site-wide issues
   for (const issue of siteWideIssues) {
     issue.category = CHECK_CATEGORY[issue.check] || 'technical';
+  }
+
+  // --- AI-Powered Recommendations ---
+  // Generate keyword-optimized title/meta description suggestions for pages with content issues
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (apiKey) {
+    const pagesNeedingFixes = results.filter(r =>
+      r.issues.some(i => ['title', 'meta-description', 'og-tags'].includes(i.check))
+    );
+    console.log(`[seo-audit] Generating AI recommendations for ${pagesNeedingFixes.length} pages...`);
+
+    const aiBatch = 5;
+    for (let i = 0; i < pagesNeedingFixes.length; i += aiBatch) {
+      const batch = pagesNeedingFixes.slice(i, i + aiBatch);
+      await Promise.all(batch.map(async (pageResult) => {
+        try {
+          const titleIssue = pageResult.issues.find(i => i.check === 'title');
+          const descIssue = pageResult.issues.find(i => i.check === 'meta-description');
+          const ogTitleIssue = pageResult.issues.find(i => i.check === 'og-tags' && i.message.includes('title'));
+          const ogDescIssue = pageResult.issues.find(i => i.check === 'og-tags' && i.message.includes('description'));
+
+          if (!titleIssue && !descIssue && !ogTitleIssue && !ogDescIssue) return;
+
+          const currentTitle = titleIssue?.value || pageResult.page || '';
+          const currentDesc = descIssue?.value || '';
+
+          const prompt = `You are an expert SEO copywriter. Generate optimized meta tags for this webpage.
+
+PAGE: ${pageResult.page}
+URL: ${pageResult.url}
+CURRENT TITLE: ${currentTitle || '(missing)'}
+CURRENT META DESCRIPTION: ${currentDesc || '(missing)'}
+
+ISSUES TO FIX:
+${titleIssue ? `- Title: ${titleIssue.message}` : ''}
+${descIssue ? `- Meta Description: ${descIssue.message}` : ''}
+${ogTitleIssue ? `- OG Title: ${ogTitleIssue.message}` : ''}
+
+RULES:
+- Title: 30-60 chars, include primary keyword near the start, compelling for clicks
+- Meta Description: 120-155 chars, include primary + secondary keywords naturally, include a call-to-action
+- OG Title: Can be slightly different from SEO title, optimized for social sharing clicks
+- Use natural language, avoid keyword stuffing
+- Infer the page's topic and target keywords from the URL, title, and page name
+
+Respond in this exact JSON format (only include fields that need fixing):
+{"title":"...","metaDescription":"...","ogTitle":"..."}`;
+
+          const res = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: [{ role: 'user', content: prompt }],
+              temperature: 0.7,
+              max_tokens: 300,
+            }),
+          });
+
+          if (!res.ok) return;
+          const data = await res.json() as { choices: Array<{ message: { content: string } }> };
+          const content = data.choices?.[0]?.message?.content || '';
+          const jsonMatch = content.match(/\{[\s\S]*\}/);
+          if (!jsonMatch) return;
+
+          const suggestions = JSON.parse(jsonMatch[0]) as { title?: string; metaDescription?: string; ogTitle?: string };
+
+          if (suggestions.title && titleIssue) {
+            titleIssue.suggestedFix = suggestions.title;
+          }
+          if (suggestions.metaDescription && descIssue) {
+            descIssue.suggestedFix = suggestions.metaDescription;
+          }
+          if (suggestions.ogTitle && ogTitleIssue) {
+            ogTitleIssue.suggestedFix = suggestions.ogTitle;
+          }
+          // If OG desc is missing but we have a meta desc suggestion, use it
+          if (ogDescIssue && suggestions.metaDescription) {
+            ogDescIssue.suggestedFix = suggestions.metaDescription;
+          }
+        } catch (err) {
+          console.error(`[seo-audit] AI recommendation failed for ${pageResult.page}:`, err);
+        }
+      }));
+    }
   }
 
   // Sort pages best-to-worst (highest score first) for client presentation

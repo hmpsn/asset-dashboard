@@ -174,7 +174,7 @@ function normalizeUrl(base: string, href: string): string | null {
   } catch { return null; }
 }
 
-async function discoverPages(baseUrl: string, maxPages: number = 25): Promise<string[]> {
+async function discoverPages(baseUrl: string, maxPages: number = 50): Promise<string[]> {
   const found = new Set<string>();
   found.add(baseUrl);
 
@@ -543,7 +543,7 @@ async function siteWideChecks(baseUrl: string): Promise<SalesIssue[]> {
 
 // --- Main entry point ---
 
-export async function runSalesAudit(inputUrl: string, maxPages: number = 25): Promise<SalesAuditResult> {
+export async function runSalesAudit(inputUrl: string, maxPages: number = 50): Promise<SalesAuditResult> {
   // Normalize URL
   let baseUrl = inputUrl.trim();
   if (!baseUrl.startsWith('http')) baseUrl = `https://${baseUrl}`;

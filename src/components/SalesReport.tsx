@@ -103,7 +103,7 @@ export function SalesReport() {
       const res = await fetch('/api/sales-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url.trim(), maxPages: 25 }),
+        body: JSON.stringify({ url: url.trim(), maxPages: 50 }),
       });
 
       if (!res.ok) {

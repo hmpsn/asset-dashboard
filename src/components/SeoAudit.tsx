@@ -21,6 +21,7 @@ interface SeoIssue {
   message: string;
   recommendation: string;
   value?: string;
+  suggestedFix?: string;
 }
 
 const CATEGORY_CONFIG: Record<CheckCategory, { label: string; color: string }> = {
@@ -561,13 +562,13 @@ function SeoAudit({ siteId }: Props) {
 
   const getCSV = (): string => {
     if (!data) return '';
-    const rows = [['Page', 'Slug', 'Score', 'Severity', 'Check', 'Message', 'Recommendation', 'Value']];
+    const rows = [['Page', 'Slug', 'Score', 'Severity', 'Check', 'Message', 'Recommendation', 'Value', 'AI Suggestion']];
     for (const issue of data.siteWideIssues) {
-      rows.push(['[Site-Wide]', '', '', issue.severity, issue.check, issue.message, issue.recommendation, issue.value || '']);
+      rows.push(['[Site-Wide]', '', '', issue.severity, issue.check, issue.message, issue.recommendation, issue.value || '', issue.suggestedFix || '']);
     }
     for (const page of data.pages) {
       for (const issue of page.issues) {
-        rows.push([page.page, page.slug, String(page.score), issue.severity, issue.check, issue.message, issue.recommendation, issue.value || '']);
+        rows.push([page.page, page.slug, String(page.score), issue.severity, issue.check, issue.message, issue.recommendation, issue.value || '', issue.suggestedFix || '']);
       }
     }
     return rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -649,6 +650,7 @@ function SeoAudit({ siteId }: Props) {
       <div class="issue-msg">${i.message}</div>
       <div class="issue-rec">${i.recommendation}</div>
       ${i.value ? `<div class="issue-val">${i.value}</div>` : ''}
+      ${i.suggestedFix ? `<div style="margin-top:6px;padding:6px 10px;background:#064e3b20;border:1px solid #06533830;border-radius:6px"><div style="font-size:9px;color:#10b981;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px">AI Suggestion</div><div style="font-size:12px;color:#34d399">${i.suggestedFix}</div></div>` : ''}
     </div>
   </div>`).join('')}` : ''}
 
@@ -666,6 +668,7 @@ function SeoAudit({ siteId }: Props) {
         <div class="issue-msg">${i.message}</div>
         <div class="issue-rec">${i.recommendation}</div>
         ${i.value ? `<div class="issue-val">${i.value}</div>` : ''}
+        ${i.suggestedFix ? `<div style="margin-top:6px;padding:6px 10px;background:#064e3b20;border:1px solid #06533830;border-radius:6px"><div style="font-size:9px;color:#10b981;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px">AI Suggestion</div><div style="font-size:12px;color:#34d399">${i.suggestedFix}</div></div>` : ''}
       </div>
     </div>`).join('')}
   </div>`).join('')}
@@ -850,6 +853,12 @@ function SeoAudit({ siteId }: Props) {
                   <div className="text-sm text-zinc-300">{issue.message}</div>
                   <div className="text-xs text-zinc-500 mt-0.5">{issue.recommendation}</div>
                   {issue.value && <div className="text-xs text-zinc-600 mt-0.5 italic truncate">{issue.value}</div>}
+                  {issue.suggestedFix && (
+                    <div className="mt-1.5 px-2 py-1.5 rounded bg-emerald-950/40 border border-emerald-800/30">
+                      <div className="text-[9px] text-emerald-500 font-semibold uppercase tracking-wider mb-0.5">AI Suggestion</div>
+                      <div className="text-xs text-emerald-300">{issue.suggestedFix}</div>
+                    </div>
+                  )}
                 </div>
                 <span className={`text-[10px] px-1.5 py-0.5 rounded border flex-shrink-0 ${cfg.bg} ${cfg.color}`}>
                   {cfg.label}
@@ -997,6 +1006,12 @@ function SeoAudit({ siteId }: Props) {
                               <div className="text-xs text-zinc-300">{issue.message}</div>
                               <div className="text-[11px] text-zinc-500 mt-0.5">{issue.recommendation}</div>
                               {issue.value && <div className="text-[10px] text-zinc-600 mt-0.5 italic truncate">{issue.value}</div>}
+                              {issue.suggestedFix && (
+                                <div className="mt-1.5 px-2 py-1.5 rounded bg-emerald-950/40 border border-emerald-800/30">
+                                  <div className="text-[9px] text-emerald-500 font-semibold uppercase tracking-wider mb-0.5">AI Suggestion</div>
+                                  <div className="text-[11px] text-emerald-300">{issue.suggestedFix}</div>
+                                </div>
+                              )}
                             </div>
                             <div className="flex items-center gap-1 flex-shrink-0">
                               {catCfg && (
