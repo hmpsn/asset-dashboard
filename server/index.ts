@@ -12,6 +12,7 @@ import {
   createWorkspace,
   updateWorkspace,
   deleteWorkspace,
+  getWorkspace,
   getUploadRoot,
   getOptRoot,
   getTokenForSite,
@@ -2166,6 +2167,116 @@ app.get('/api/google/performance-trend/:siteId', async (req, res) => {
   try {
     const trend = await getPerformanceTrend(req.params.siteId, gscSiteUrl, days);
     res.json(trend);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: msg });
+  }
+});
+
+// --- Public Client Dashboard API (no auth required) ---
+app.get('/api/public/workspace/:id', (req, res) => {
+  const ws = getWorkspace(req.params.id);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  // Only expose safe fields for client view
+  res.json({
+    id: ws.id,
+    name: ws.name,
+    webflowSiteId: ws.webflowSiteId,
+    webflowSiteName: ws.webflowSiteName,
+    gscPropertyUrl: ws.gscPropertyUrl,
+  });
+});
+
+app.get('/api/public/search-overview/:workspaceId', async (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws?.webflowSiteId || !ws.gscPropertyUrl) return res.status(400).json({ error: 'Search Console not configured for this workspace' });
+  const days = parseInt(req.query.days as string) || 28;
+  try {
+    const overview = await getSearchOverview(ws.webflowSiteId, ws.gscPropertyUrl, days);
+    res.json(overview);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: msg });
+  }
+});
+
+app.get('/api/public/performance-trend/:workspaceId', async (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws?.webflowSiteId || !ws.gscPropertyUrl) return res.status(400).json({ error: 'Search Console not configured' });
+  const days = parseInt(req.query.days as string) || 28;
+  try {
+    const trend = await getPerformanceTrend(ws.webflowSiteId, ws.gscPropertyUrl, days);
+    res.json(trend);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: msg });
+  }
+});
+
+app.get('/api/public/audit-summary/:workspaceId', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws?.webflowSiteId) return res.status(400).json({ error: 'No site linked' });
+  const latest = getLatestSnapshot(ws.webflowSiteId);
+  if (!latest) return res.json(null);
+  // Return a safe summary
+  res.json({
+    id: latest.id,
+    createdAt: latest.createdAt,
+    siteScore: latest.audit.siteScore,
+    totalPages: latest.audit.totalPages,
+    errors: latest.audit.errors,
+    warnings: latest.audit.warnings,
+    previousScore: latest.previousScore,
+  });
+});
+
+app.post('/api/public/search-chat/:workspaceId', async (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws?.webflowSiteId) return res.status(400).json({ error: 'Workspace not configured' });
+  const { question, context } = req.body;
+  if (!question) return res.status(400).json({ error: 'question required' });
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (!openaiKey) return res.status(400).json({ error: 'AI not configured' });
+
+  try {
+    const systemPrompt = `You are a search analytics assistant embedded in a client dashboard. Your role is to help the client UNDERSTAND their Google Search Console data — trends, patterns, and what the numbers mean.
+
+CRITICAL RULES:
+- ONLY provide data analysis, insights, and explanations of what the metrics mean
+- DO NOT give implementation advice, technical SEO instructions, or step-by-step guides on how to fix things
+- DO NOT suggest specific code changes, meta tag edits, content rewrites, or technical optimizations
+- If asked "how do I fix this?" or similar, say something like "I can see the opportunity here — I'd recommend discussing this with your web team for the best approach to capitalize on it."
+- You may identify WHAT areas have opportunities (e.g. "these queries have high impressions but low CTR") but NOT HOW to fix them
+- Be friendly, professional, and reference actual numbers from their data
+- Use markdown formatting
+- Frame insights as observations, not instructions
+
+You are an analytics tool, not a consultant. The client's web team handles implementation.
+
+Site: ${ws.webflowSiteName || ws.name}
+Current search data context:
+${JSON.stringify(context, null, 2)}`;
+
+    const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${openaiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: question },
+        ],
+        temperature: 0.7,
+        max_tokens: 1500,
+      }),
+    });
+
+    if (!aiRes.ok) throw new Error('AI request failed');
+    const aiData = await aiRes.json() as { choices: Array<{ message: { content: string } }> };
+    res.json({ answer: aiData.choices?.[0]?.message?.content || 'No response generated.' });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: msg });

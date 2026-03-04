@@ -9,6 +9,7 @@ import { SeoAudit } from './components/SeoAudit';
 import { PageSpeedPanel } from './components/PageSpeedPanel';
 import { SalesReport } from './components/SalesReport';
 import { SearchConsole } from './components/SearchConsole';
+import { ClientDashboard } from './components/ClientDashboard';
 import { LoginScreen } from './components/LoginScreen';
 import { useAuth } from './hooks/useAuth';
 import { useWebSocket } from './hooks/useWebSocket';
@@ -19,6 +20,15 @@ import {
 type Tab = 'media' | 'seo' | 'search' | 'performance' | 'speed' | 'prospect';
 
 function App() {
+  // Client dashboard route: /client/:workspaceId (public, no auth)
+  const clientMatch = window.location.pathname.match(/^\/client\/([\w_]+)/);
+  if (clientMatch) {
+    return <ClientDashboard workspaceId={clientMatch[1]} />;
+  }
+  return <AdminApp />;
+}
+
+function AdminApp() {
   const auth = useAuth();
 
   if (auth.checking) {
@@ -178,15 +188,27 @@ function Dashboard() {
     { id: 'search', label: 'Search', icon: Search },
     { id: 'performance', label: 'Performance', icon: BarChart3 },
     { id: 'speed', label: 'Speed', icon: Gauge },
-    { id: 'prospect', label: 'Prospect', icon: FileSearch },
   ];
 
   return (
     <div className="flex flex-col h-screen" style={{ backgroundColor: 'var(--brand-bg)', color: 'var(--brand-text-bright)' }}>
       {/* Header */}
       <header className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid var(--brand-border)' }}>
-        <div className="flex items-center">
+        <div className="flex items-center gap-4">
           <img src="/logo.svg" alt="hmpsn.studio" className="h-5" />
+          <button
+            onClick={() => setTab('prospect')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors"
+            style={tab === 'prospect' ? {
+              backgroundColor: 'var(--brand-mint-dim)',
+              color: 'var(--brand-mint)',
+            } : {
+              color: 'var(--brand-text-muted)',
+            }}
+          >
+            <FileSearch className="w-3.5 h-3.5" />
+            Prospect
+          </button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -216,7 +238,7 @@ function Dashboard() {
       </header>
 
       {/* Tab bar */}
-      {(selected || tab === 'prospect') && (
+      {selected && tab !== 'prospect' && (
         <nav className="flex items-center gap-0.5 px-5 py-2" style={{ borderBottom: '1px solid var(--brand-border)' }}>
           {tabs.map(t => {
             const Icon = t.icon;

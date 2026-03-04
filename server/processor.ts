@@ -238,6 +238,9 @@ async function handleOptimizedFile(
   }
 }
 
+// Stored reference so triggerOptimize can update queue items on failure
+let _broadcast: BroadcastFn | null = null;
+
 export function startWatcher(broadcast: BroadcastFn) {
   const uploadRoot = getUploadRoot();
   const optRoot = getOptRoot();
@@ -288,6 +291,8 @@ export function startWatcher(broadcast: BroadcastFn) {
     handleOptimizedFile(filePath, workspaceFolder, type, broadcast);
   });
 
+  _broadcast = broadcast;
+
   console.log(`Watching ${uploadRoot} for originals (alt text)...`);
   console.log(`Watching ${optRoot} for optimized files (upload)...`);
   return { uploadWatcher, optWatcher };
@@ -295,9 +300,26 @@ export function startWatcher(broadcast: BroadcastFn) {
 
 export function triggerOptimize(filePath: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    execFile(PROCESSOR, [filePath], (err) => {
-      if (err) reject(err);
-      else resolve();
+    const child = execFile(PROCESSOR, [filePath], { timeout: 120000 }, (err, _stdout, stderr) => {
+      if (err) {
+        console.error(`[optimize] Script failed for ${path.basename(filePath)}:`, err.message);
+        if (stderr) console.error(`[optimize] stderr:`, stderr);
+        // Update queue item status to 'error' so it doesn't stay stuck
+        const workspaceFolder = path.relative(getUploadRoot(), path.dirname(filePath)).split(path.sep)[0];
+        const key = cacheKey(workspaceFolder, path.basename(filePath));
+        const queueId = queueIdCache.get(key);
+        if (queueId && _broadcast) {
+          updateQueueItem(queueId, { status: 'error', error: `Optimization failed: ${err.message}` }, _broadcast);
+          queueIdCache.delete(key);
+        }
+        reject(err);
+      } else {
+        resolve();
+      }
+    });
+    child.on('error', (err) => {
+      console.error(`[optimize] Failed to start script:`, err.message);
+      reject(err);
     });
   });
 }
