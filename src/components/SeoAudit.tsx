@@ -9,6 +9,7 @@ import { SeoEditor } from './SeoEditor';
 import { LinkChecker } from './LinkChecker';
 import { KeywordAnalysis } from './KeywordAnalysis';
 import { SchemaSuggester } from './SchemaSuggester';
+import { CompetitorAnalysis } from './CompetitorAnalysis';
 
 type Severity = 'error' | 'warning' | 'info';
 
@@ -51,7 +52,7 @@ interface SeoAuditResult {
   siteWideIssues: SeoIssue[];
 }
 
-type SubTab = 'audit' | 'editor' | 'links' | 'keywords' | 'schema' | 'history';
+type SubTab = 'audit' | 'editor' | 'links' | 'keywords' | 'schema' | 'competitor' | 'history';
 
 interface SnapshotSummary {
   id: string;
@@ -529,6 +530,32 @@ function SeoAudit({ siteId }: Props) {
     }
   };
 
+  const [bulkApplying, setBulkApplying] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
+
+  const acceptAllSuggestions = async () => {
+    if (!data) return;
+    // Collect all fixable issues across all pages
+    const fixes: { pageId: string; issue: SeoIssue }[] = [];
+    for (const page of data.pages) {
+      for (const issue of page.issues) {
+        const fixKey = `${page.pageId}-${issue.check}`;
+        if (issue.suggestedFix && !appliedFixes.has(fixKey)) {
+          fixes.push({ pageId: page.pageId, issue });
+        }
+      }
+    }
+    if (fixes.length === 0) return;
+    setBulkApplying(true);
+    setBulkProgress({ done: 0, total: fixes.length });
+    for (let i = 0; i < fixes.length; i++) {
+      await acceptSuggestion(fixes[i].pageId, fixes[i].issue);
+      setBulkProgress({ done: i + 1, total: fixes.length });
+    }
+    setBulkApplying(false);
+    setBulkProgress(null);
+  };
+
   const runAudit = () => {
     setLoading(true);
     setHasRun(true);
@@ -732,6 +759,7 @@ function SeoAudit({ siteId }: Props) {
     { id: 'links', label: 'Dead Links', icon: Link2Off },
     { id: 'keywords', label: 'Keywords', icon: SearchIcon },
     { id: 'schema', label: 'Schema', icon: Code2 },
+    { id: 'competitor', label: 'Competitor', icon: TrendingUp },
     { id: 'history', label: 'History', icon: Clock },
   ];
   const tabNav = (
@@ -762,6 +790,7 @@ function SeoAudit({ siteId }: Props) {
   if (subTab === 'links') return <>{tabNav}<LinkChecker siteId={siteId} /></>;
   if (subTab === 'keywords') return <>{tabNav}<KeywordAnalysis siteId={siteId} /></>;
   if (subTab === 'schema') return <>{tabNav}<SchemaSuggester siteId={siteId} /></>;
+  if (subTab === 'competitor') return <>{tabNav}<CompetitorAnalysis siteId={siteId} /></>;
   if (subTab === 'history') return <>{tabNav}<AuditHistory siteId={siteId} history={history} onRefresh={loadHistory} /></>;
 
   // Audit tab
@@ -930,6 +959,24 @@ function SeoAudit({ siteId }: Props) {
           >
             <FileText className="w-3.5 h-3.5" /> Export
           </button>
+          {(() => {
+            const pendingFixes = data.pages.reduce((count, page) =>
+              count + page.issues.filter(i => i.suggestedFix && !appliedFixes.has(`${page.pageId}-${i.check}`)).length, 0);
+            if (pendingFixes === 0) return null;
+            return (
+              <button
+                onClick={acceptAllSuggestions}
+                disabled={bulkApplying}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+                style={{ backgroundColor: 'rgba(16,185,129,0.15)', color: '#6ee7b7', border: '1px solid rgba(16,185,129,0.3)' }}
+              >
+                <CheckCircle className="w-3.5 h-3.5" />
+                {bulkApplying && bulkProgress
+                  ? `Applying ${bulkProgress.done}/${bulkProgress.total}...`
+                  : `Accept All (${pendingFixes})`}
+              </button>
+            );
+          })()}
           <button
             onClick={runAudit}
             className="flex items-center gap-1.5 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-medium transition-colors"

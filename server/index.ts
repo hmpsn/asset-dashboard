@@ -49,6 +49,8 @@ import { runSiteSpeed, runSinglePageSpeed } from './pagespeed.js';
 import { generateSchemaSuggestions } from './schema-suggester.js';
 import { runSalesAudit } from './sales-audit.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
+import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials } from './google-auth.js';
+import { listGscSites, getSearchOverview, getPerformanceTrend } from './search-console.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -694,6 +696,112 @@ app.get('/api/sales-report/:id/html', (req, res) => {
   } catch { res.status(500).send('Failed to render report'); }
 });
 
+// --- Competitor SEO Comparison ---
+app.post('/api/competitor-compare', async (req, res) => {
+  const { myUrl, competitorUrl, maxPages } = req.body as { myUrl: string; competitorUrl: string; maxPages?: number };
+  if (!myUrl || !competitorUrl) return res.status(400).json({ error: 'myUrl and competitorUrl required' });
+  const limit = Math.min(maxPages || 20, 30);
+  try {
+    console.log(`[competitor] Comparing ${myUrl} vs ${competitorUrl} (max ${limit} pages each)`);
+    const [myAudit, theirAudit] = await Promise.all([
+      runSalesAudit(myUrl, limit),
+      runSalesAudit(competitorUrl, limit),
+    ]);
+
+    // Build comparison metrics
+    const buildMetrics = (audit: typeof myAudit) => {
+      const allIssues = [...audit.siteWideIssues, ...audit.pages.flatMap(p => p.issues)];
+      const checks = new Map<string, number>();
+      for (const i of allIssues) checks.set(i.check, (checks.get(i.check) || 0) + 1);
+
+      // Compute averages
+      const titles = audit.pages.map(p => {
+        const titleIssue = p.issues.find(i => i.check === 'title');
+        return titleIssue?.value?.length || 0;
+      });
+      const descs = audit.pages.map(p => {
+        const descIssue = p.issues.find(i => i.check === 'meta-description');
+        return descIssue?.value?.length || 0;
+      });
+      const pagesWithOG = audit.pages.filter(p => !p.issues.some(i => i.check === 'og-tags' && i.severity === 'error')).length;
+      const pagesWithSchema = audit.pages.filter(p => !p.issues.some(i => i.check === 'structured-data')).length;
+      const pagesWithH1 = audit.pages.filter(p => !p.issues.some(i => i.check === 'h1' && i.severity === 'error')).length;
+
+      return {
+        score: audit.siteScore,
+        totalPages: audit.totalPages,
+        errors: audit.errors,
+        warnings: audit.warnings,
+        infos: audit.infos,
+        avgTitleLen: titles.length ? Math.round(titles.reduce((a, b) => a + b, 0) / titles.length) : 0,
+        avgDescLen: descs.length ? Math.round(descs.reduce((a, b) => a + b, 0) / descs.length) : 0,
+        ogCoverage: audit.totalPages ? Math.round((pagesWithOG / audit.totalPages) * 100) : 0,
+        schemaCoverage: audit.totalPages ? Math.round((pagesWithSchema / audit.totalPages) * 100) : 0,
+        h1Coverage: audit.totalPages ? Math.round((pagesWithH1 / audit.totalPages) * 100) : 0,
+        issueCounts: Object.fromEntries(checks),
+      };
+    };
+
+    const myMetrics = buildMetrics(myAudit);
+    const theirMetrics = buildMetrics(theirAudit);
+
+    // Identify advantages and disadvantages
+    const advantages: string[] = [];
+    const disadvantages: string[] = [];
+    const opportunities: string[] = [];
+
+    if (myMetrics.score > theirMetrics.score) advantages.push(`Higher overall SEO score (${myMetrics.score} vs ${theirMetrics.score})`);
+    else if (myMetrics.score < theirMetrics.score) disadvantages.push(`Lower overall SEO score (${myMetrics.score} vs ${theirMetrics.score})`);
+
+    if (myMetrics.errors < theirMetrics.errors) advantages.push(`Fewer SEO errors (${myMetrics.errors} vs ${theirMetrics.errors})`);
+    else if (myMetrics.errors > theirMetrics.errors) disadvantages.push(`More SEO errors (${myMetrics.errors} vs ${theirMetrics.errors})`);
+
+    if (myMetrics.ogCoverage > theirMetrics.ogCoverage) advantages.push(`Better Open Graph coverage (${myMetrics.ogCoverage}% vs ${theirMetrics.ogCoverage}%)`);
+    else if (myMetrics.ogCoverage < theirMetrics.ogCoverage) {
+      disadvantages.push(`Lower Open Graph coverage (${myMetrics.ogCoverage}% vs ${theirMetrics.ogCoverage}%)`);
+      opportunities.push('Add Open Graph tags to improve social media sharing previews');
+    }
+
+    if (myMetrics.schemaCoverage > theirMetrics.schemaCoverage) advantages.push(`Better structured data coverage (${myMetrics.schemaCoverage}% vs ${theirMetrics.schemaCoverage}%)`);
+    else if (myMetrics.schemaCoverage < theirMetrics.schemaCoverage) {
+      disadvantages.push(`Lower structured data coverage (${myMetrics.schemaCoverage}% vs ${theirMetrics.schemaCoverage}%)`);
+      opportunities.push('Add JSON-LD structured data to earn rich snippets in search results');
+    }
+
+    if (myMetrics.h1Coverage > theirMetrics.h1Coverage) advantages.push(`Better H1 tag coverage (${myMetrics.h1Coverage}% vs ${theirMetrics.h1Coverage}%)`);
+    else if (myMetrics.h1Coverage < theirMetrics.h1Coverage) {
+      disadvantages.push(`Lower H1 tag coverage (${myMetrics.h1Coverage}% vs ${theirMetrics.h1Coverage}%)`);
+      opportunities.push('Ensure every page has a unique H1 heading');
+    }
+
+    if (myMetrics.totalPages > theirMetrics.totalPages * 1.5) advantages.push(`More indexed content (${myMetrics.totalPages} vs ${theirMetrics.totalPages} pages)`);
+    else if (theirMetrics.totalPages > myMetrics.totalPages * 1.5) {
+      disadvantages.push(`Less indexed content (${myMetrics.totalPages} vs ${theirMetrics.totalPages} pages)`);
+      opportunities.push('Expand content strategy — competitor has significantly more pages');
+    }
+
+    // Check for issues competitor doesn't have
+    for (const [check, count] of Object.entries(myMetrics.issueCounts)) {
+      const theirCount = theirMetrics.issueCounts[check] || 0;
+      if (count > 0 && theirCount === 0) {
+        opportunities.push(`Fix "${check}" issues — competitor has none (you have ${count})`);
+      }
+    }
+
+    res.json({
+      mySite: { url: myAudit.url, name: myAudit.siteName, metrics: myMetrics, quickWins: myAudit.quickWins },
+      competitor: { url: theirAudit.url, name: theirAudit.siteName, metrics: theirMetrics, quickWins: theirAudit.quickWins },
+      advantages: advantages.slice(0, 8),
+      disadvantages: disadvantages.slice(0, 8),
+      opportunities: opportunities.slice(0, 8),
+      comparedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('Competitor compare error:', err);
+    res.status(500).json({ error: 'Comparison failed' });
+  }
+});
+
 // --- JSON-LD Schema Suggester (internal tool, not client-visible) ---
 app.get('/api/webflow/schema-suggestions/:siteId', async (req, res) => {
   try {
@@ -1033,6 +1141,39 @@ app.post('/api/webflow/seo-bulk-fix/:siteId', async (req, res) => {
   }
 
   res.json({ results, field });
+});
+
+// --- Fetch page HTML body text (for keyword analysis) ---
+app.get('/api/webflow/page-html/:siteId', async (req, res) => {
+  const { siteId } = req.params;
+  const pagePath = req.query.path as string;
+  if (!pagePath) return res.status(400).json({ error: 'path query param required' });
+  const token = getTokenForSite(siteId) || undefined;
+  try {
+    const subdomain = await getSiteSubdomain(siteId, token);
+    if (!subdomain) return res.status(400).json({ error: 'Could not resolve site subdomain' });
+    const url = `https://${subdomain}.webflow.io${pagePath}`;
+    const htmlRes = await fetch(url, { redirect: 'follow' });
+    if (!htmlRes.ok) return res.status(htmlRes.status).json({ error: `Failed to fetch page: ${htmlRes.status}` });
+    const html = await htmlRes.text();
+    // Extract body text: strip tags, scripts, styles
+    const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    const body = bodyMatch ? bodyMatch[1] : html;
+    const text = body
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+      .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&[a-z]+;/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 8000);
+    res.json({ text });
+  } catch (e) {
+    console.error('Page HTML fetch error:', e);
+    res.status(500).json({ error: 'Failed to fetch page content' });
+  }
 });
 
 // --- AI Keyword Analysis ---
@@ -1884,12 +2025,83 @@ app.get('/api/metadata', (_req, res) => {
   res.json(getMetadata());
 });
 
+// --- Google Search Console / GA4 ---
+app.get('/api/google/status/:siteId', (req, res) => {
+  const creds = getGoogleCredentials();
+  res.json({
+    configured: !!creds,
+    connected: isConnected(req.params.siteId),
+  });
+});
+
+app.get('/api/google/auth-url/:siteId', (req, res) => {
+  const url = getAuthUrl(req.params.siteId);
+  if (!url) return res.status(400).json({ error: 'Google OAuth not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.' });
+  res.json({ url });
+});
+
+app.get('/api/google/callback', async (req, res) => {
+  const code = req.query.code as string;
+  const siteId = req.query.state as string;
+  if (!code || !siteId) return res.status(400).send('Missing code or state');
+  const result = await exchangeCode(code, siteId);
+  if (result.success) {
+    // Redirect back to the app
+    const redirectUrl = IS_PROD ? '/' : 'http://localhost:5173/';
+    res.redirect(`${redirectUrl}?google=connected&siteId=${siteId}`);
+  } else {
+    res.status(500).send(`Google auth failed: ${result.error}`);
+  }
+});
+
+app.post('/api/google/disconnect/:siteId', (req, res) => {
+  disconnect(req.params.siteId);
+  res.json({ success: true });
+});
+
+app.get('/api/google/gsc-sites/:siteId', async (req, res) => {
+  try {
+    const sites = await listGscSites(req.params.siteId);
+    res.json(sites);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: msg });
+  }
+});
+
+app.get('/api/google/search-overview/:siteId', async (req, res) => {
+  const gscSiteUrl = req.query.gscSiteUrl as string;
+  const days = parseInt(req.query.days as string) || 28;
+  if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
+  try {
+    const overview = await getSearchOverview(req.params.siteId, gscSiteUrl, days);
+    res.json(overview);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: msg });
+  }
+});
+
+app.get('/api/google/performance-trend/:siteId', async (req, res) => {
+  const gscSiteUrl = req.query.gscSiteUrl as string;
+  const days = parseInt(req.query.days as string) || 28;
+  if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
+  try {
+    const trend = await getPerformanceTrend(req.params.siteId, gscSiteUrl, days);
+    res.json(trend);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: msg });
+  }
+});
+
 // Health check
 app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
     hasOpenAIKey: !!process.env.OPENAI_API_KEY,
     hasWebflowToken: !!process.env.WEBFLOW_API_TOKEN,
+    hasGoogleAuth: !!getGoogleCredentials(),
   });
 });
 

@@ -103,7 +103,19 @@ export function KeywordAnalysis({ siteId }: Props) {
     setAnalyzing(prev => new Set(prev).add(page.id));
     try {
       const slug = page.slug || '';
-      const pageContent = '';
+
+      // Fetch actual published page HTML for content analysis
+      let pageContent = '';
+      try {
+        const pagePath = page.publishedPath || (page.slug ? `/${page.slug}` : '');
+        if (pagePath) {
+          const htmlRes = await fetch(`/api/webflow/page-html/${siteId}?path=${encodeURIComponent(pagePath)}`);
+          if (htmlRes.ok) {
+            const { text } = await htmlRes.json();
+            pageContent = text || '';
+          }
+        }
+      } catch { /* fall back to empty content */ }
 
       // Run keyword analysis and content score in parallel
       const [kwRes, csRes] = await Promise.all([

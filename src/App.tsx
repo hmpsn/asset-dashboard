@@ -8,14 +8,15 @@ import { PageWeight } from './components/PageWeight';
 import { SeoAudit } from './components/SeoAudit';
 import { PageSpeedPanel } from './components/PageSpeedPanel';
 import { SalesReport } from './components/SalesReport';
+import { SearchConsole } from './components/SearchConsole';
 import { LoginScreen } from './components/LoginScreen';
 import { useAuth } from './hooks/useAuth';
 import { useWebSocket } from './hooks/useWebSocket';
 import {
-  Settings, Clipboard, BarChart3, Globe, Image, Gauge, FileSearch,
+  Settings, Clipboard, BarChart3, Globe, Image, Gauge, FileSearch, Search,
 } from 'lucide-react';
 
-type Tab = 'media' | 'seo' | 'performance' | 'speed' | 'prospect';
+type Tab = 'media' | 'seo' | 'search' | 'performance' | 'speed' | 'prospect';
 
 function App() {
   const auth = useAuth();
@@ -174,6 +175,7 @@ function Dashboard() {
   const tabs: { id: Tab; label: string; icon: typeof Image }[] = [
     { id: 'media', label: 'Media', icon: Image },
     { id: 'seo', label: 'SEO', icon: Globe },
+    { id: 'search', label: 'Search', icon: Search },
     { id: 'performance', label: 'Performance', icon: BarChart3 },
     { id: 'speed', label: 'Speed', icon: Gauge },
     { id: 'prospect', label: 'Prospect', icon: FileSearch },
@@ -273,6 +275,18 @@ function Dashboard() {
                   <Globe className="w-5 h-5" style={{ color: 'var(--brand-text-muted)' }} />
                 </div>
                 <p className="text-sm" style={{ color: 'var(--brand-text-muted)' }}>Link a Webflow site for SEO tools</p>
+              </div>
+            )}
+
+            {tab === 'search' && selected.webflowSiteId && (
+              <SearchConsole key={`search-${selected.webflowSiteId}`} siteId={selected.webflowSiteId} />
+            )}
+            {tab === 'search' && !selected.webflowSiteId && (
+              <div className="flex flex-col items-center justify-center py-24 gap-3">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'var(--brand-bg-elevated)' }}>
+                  <Search className="w-5 h-5" style={{ color: 'var(--brand-text-muted)' }} />
+                </div>
+                <p className="text-sm" style={{ color: 'var(--brand-text-muted)' }}>Link a Webflow site for Search Console data</p>
               </div>
             )}
 
