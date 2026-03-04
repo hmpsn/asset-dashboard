@@ -296,6 +296,139 @@ export async function getGA4DeviceBreakdown(propertyId: string, days: number = 2
 /**
  * Get top countries by users.
  */
+// ─── Key Events & Conversions ───
+
+export interface GA4Event {
+  eventName: string;
+  eventCount: number;
+  users: number;
+}
+
+export interface GA4EventTrend {
+  date: string;
+  eventCount: number;
+}
+
+export interface GA4ConversionSummary {
+  eventName: string;
+  conversions: number;
+  users: number;
+  rate: number; // conversion rate as percentage
+}
+
+/**
+ * Get top events by count.
+ */
+export async function getGA4KeyEvents(propertyId: string, days: number = 28, limit: number = 20): Promise<GA4Event[]> {
+  const startDate = dateStr(days);
+  const endDate = dateStr(1);
+
+  const data = await runReport(propertyId, {
+    dateRanges: [{ startDate, endDate }],
+    dimensions: [{ name: 'eventName' }],
+    metrics: [
+      { name: 'eventCount' },
+      { name: 'totalUsers' },
+    ],
+    orderBys: [{ metric: { metricName: 'eventCount' }, desc: true }],
+    limit,
+  }) as {
+    rows?: Array<{
+      dimensionValues: Array<{ value: string }>;
+      metricValues: Array<{ value: string }>;
+    }>;
+  };
+
+  return (data.rows || []).map(r => ({
+    eventName: r.dimensionValues[0].value,
+    eventCount: parseInt(r.metricValues[0].value),
+    users: parseInt(r.metricValues[1].value),
+  }));
+}
+
+/**
+ * Get daily trend for a specific event.
+ */
+export async function getGA4EventTrend(propertyId: string, eventName: string, days: number = 28): Promise<GA4EventTrend[]> {
+  const startDate = dateStr(days);
+  const endDate = dateStr(1);
+
+  const data = await runReport(propertyId, {
+    dateRanges: [{ startDate, endDate }],
+    dimensions: [{ name: 'date' }],
+    metrics: [{ name: 'eventCount' }],
+    dimensionFilter: {
+      filter: {
+        fieldName: 'eventName',
+        stringFilter: { matchType: 'EXACT', value: eventName },
+      },
+    },
+    orderBys: [{ dimension: { dimensionName: 'date' } }],
+  }) as {
+    rows?: Array<{
+      dimensionValues: Array<{ value: string }>;
+      metricValues: Array<{ value: string }>;
+    }>;
+  };
+
+  return (data.rows || []).map(r => ({
+    date: r.dimensionValues[0].value.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'),
+    eventCount: parseInt(r.metricValues[0].value),
+  }));
+}
+
+/**
+ * Get conversion/key events with rates.
+ * GA4 marks certain events as "key events" (formerly conversions).
+ * We calculate rate as: users who triggered event / total users.
+ */
+export async function getGA4Conversions(propertyId: string, days: number = 28): Promise<GA4ConversionSummary[]> {
+  const startDate = dateStr(days);
+  const endDate = dateStr(1);
+
+  // First get total users for the period
+  const overviewData = await runReport(propertyId, {
+    dateRanges: [{ startDate, endDate }],
+    metrics: [{ name: 'totalUsers' }],
+  }) as { rows?: Array<{ metricValues: Array<{ value: string }> }> };
+  const totalUsers = parseInt(overviewData.rows?.[0]?.metricValues[0]?.value || '0');
+
+  // Get key events — filter out generic GA4 auto-events to focus on meaningful ones
+  const autoEvents = new Set([
+    'session_start', 'first_visit', 'page_view', 'scroll',
+    'user_engagement', 'click', 'file_download',
+  ]);
+
+  const data = await runReport(propertyId, {
+    dateRanges: [{ startDate, endDate }],
+    dimensions: [{ name: 'eventName' }],
+    metrics: [
+      { name: 'eventCount' },
+      { name: 'totalUsers' },
+    ],
+    orderBys: [{ metric: { metricName: 'eventCount' }, desc: true }],
+    limit: 50,
+  }) as {
+    rows?: Array<{
+      dimensionValues: Array<{ value: string }>;
+      metricValues: Array<{ value: string }>;
+    }>;
+  };
+
+  return (data.rows || [])
+    .filter(r => !autoEvents.has(r.dimensionValues[0].value))
+    .map(r => {
+      const users = parseInt(r.metricValues[1].value);
+      return {
+        eventName: r.dimensionValues[0].value,
+        conversions: parseInt(r.metricValues[0].value),
+        users,
+        rate: totalUsers > 0 ? parseFloat(((users / totalUsers) * 100).toFixed(2)) : 0,
+      };
+    })
+    .slice(0, 15);
+}
+
 export async function getGA4Countries(propertyId: string, days: number = 28, limit: number = 10): Promise<GA4CountryBreakdown[]> {
   const startDate = dateStr(days);
   const endDate = dateStr(1);

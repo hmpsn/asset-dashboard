@@ -35,6 +35,9 @@ interface GA4TopPage { path: string; pageviews: number; users: number; avgEngage
 interface GA4TopSource { source: string; medium: string; users: number; sessions: number; }
 interface GA4DeviceBreakdown { device: string; users: number; sessions: number; percentage: number; }
 interface GA4CountryBreakdown { country: string; users: number; sessions: number; }
+interface GA4Event { eventName: string; eventCount: number; users: number; }
+interface GA4EventTrend { date: string; eventCount: number; }
+interface GA4ConversionSummary { eventName: string; conversions: number; users: number; rate: number; }
 interface Props { workspaceId: string; }
 
 type SortKey = 'clicks' | 'impressions' | 'ctr' | 'position';
@@ -170,6 +173,10 @@ export function ClientDashboard({ workspaceId }: Props) {
   const [ga4Sources, setGa4Sources] = useState<GA4TopSource[]>([]);
   const [ga4Devices, setGa4Devices] = useState<GA4DeviceBreakdown[]>([]);
   const [ga4Countries, setGa4Countries] = useState<GA4CountryBreakdown[]>([]);
+  const [ga4Events, setGa4Events] = useState<GA4Event[]>([]);
+  const [ga4Conversions, setGa4Conversions] = useState<GA4ConversionSummary[]>([]);
+  const [ga4SelectedEvent, setGa4SelectedEvent] = useState<string | null>(null);
+  const [ga4EventTrend, setGa4EventTrend] = useState<GA4EventTrend[]>([]);
   const [authenticated, setAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [authError, setAuthError] = useState('');
@@ -210,24 +217,38 @@ export function ClientDashboard({ workspaceId }: Props) {
 
   const loadGA4Data = async (wsId: string, numDays: number) => {
     try {
-      const [ovRes, trRes, pgRes, srcRes, devRes, ctryRes] = await Promise.all([
+      const [ovRes, trRes, pgRes, srcRes, devRes, ctryRes, evtRes, convRes] = await Promise.all([
         fetch(`/api/public/analytics-overview/${wsId}?days=${numDays}`),
         fetch(`/api/public/analytics-trend/${wsId}?days=${numDays}`),
         fetch(`/api/public/analytics-top-pages/${wsId}?days=${numDays}`),
         fetch(`/api/public/analytics-sources/${wsId}?days=${numDays}`),
         fetch(`/api/public/analytics-devices/${wsId}?days=${numDays}`),
         fetch(`/api/public/analytics-countries/${wsId}?days=${numDays}`),
+        fetch(`/api/public/analytics-events/${wsId}?days=${numDays}`),
+        fetch(`/api/public/analytics-conversions/${wsId}?days=${numDays}`),
       ]);
-      const [ov, tr, pg, src, dev, ctry] = await Promise.all([ovRes.json(), trRes.json(), pgRes.json(), srcRes.json(), devRes.json(), ctryRes.json()]);
+      const [ov, tr, pg, src, dev, ctry, evt, conv] = await Promise.all([ovRes.json(), trRes.json(), pgRes.json(), srcRes.json(), devRes.json(), ctryRes.json(), evtRes.json(), convRes.json()]);
       if (!ov.error) setGa4Overview(ov);
       if (Array.isArray(tr)) setGa4Trend(tr);
       if (Array.isArray(pg)) setGa4Pages(pg);
       if (Array.isArray(src)) setGa4Sources(src);
       if (Array.isArray(dev)) setGa4Devices(dev);
       if (Array.isArray(ctry)) setGa4Countries(ctry);
+      if (Array.isArray(evt)) setGa4Events(evt);
+      if (Array.isArray(conv)) setGa4Conversions(conv);
     } catch (err) {
       console.error('GA4 data load error:', err);
     }
+  };
+
+  const loadEventTrend = async (eventName: string) => {
+    if (!ws) return;
+    setGa4SelectedEvent(eventName);
+    try {
+      const res = await fetch(`/api/public/analytics-event-trend/${ws.id}?days=${days}&event=${encodeURIComponent(eventName)}`);
+      const data = await res.json();
+      if (Array.isArray(data)) setGa4EventTrend(data);
+    } catch { setGa4EventTrend([]); }
   };
 
   const handlePasswordSubmit = async (e?: React.FormEvent) => {
@@ -1081,6 +1102,112 @@ export function ClientDashboard({ workspaceId }: Props) {
                 </div>
               )}
             </div>
+
+            {/* ── Key Metrics & Events ── */}
+            {(ga4Conversions.length > 0 || ga4Events.length > 0) && (
+              <div className="space-y-6 mt-6">
+                {/* Conversion / Custom Events */}
+                {ga4Conversions.length > 0 && (
+                  <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+                    <h3 className="text-sm font-semibold text-zinc-300 mb-1">Key Events</h3>
+                    <p className="text-[10px] text-zinc-600 mb-4">Custom and conversion events tracked on your site (excludes default GA4 events)</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {ga4Conversions.slice(0, 9).map((c, i) => {
+                        const isSelected = ga4SelectedEvent === c.eventName;
+                        return (
+                          <button key={i} onClick={() => loadEventTrend(c.eventName)}
+                            className={`text-left rounded-xl border p-4 transition-colors ${isSelected ? 'bg-violet-500/10 border-violet-500/30' : 'bg-zinc-800/30 border-zinc-800 hover:border-zinc-700'}`}>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-[10px] text-zinc-500 font-mono truncate max-w-[140px]">{c.eventName.replace(/_/g, ' ')}</span>
+                              {c.rate > 0 && <span className="text-[10px] font-medium text-emerald-400">{c.rate}%</span>}
+                            </div>
+                            <div className="text-xl font-bold text-zinc-200">{c.conversions.toLocaleString()}</div>
+                            <div className="text-[10px] text-zinc-600 mt-0.5">{c.users.toLocaleString()} users</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Event Trend (shown when an event is selected) */}
+                {ga4SelectedEvent && ga4EventTrend.length > 2 && (
+                  <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <h3 className="text-sm font-semibold text-zinc-300">{ga4SelectedEvent.replace(/_/g, ' ')}</h3>
+                        <p className="text-[10px] text-zinc-600">Daily event count over the selected period</p>
+                      </div>
+                      <button onClick={() => { setGa4SelectedEvent(null); setGa4EventTrend([]); }} className="text-[10px] text-zinc-500 hover:text-zinc-300">Clear</button>
+                    </div>
+                    <svg viewBox="0 0 800 120" className="w-full h-28" preserveAspectRatio="none">
+                      {(() => {
+                        const maxV = Math.max(...ga4EventTrend.map(d => d.eventCount), 1);
+                        const xStep = 800 / Math.max(ga4EventTrend.length - 1, 1);
+                        const points = ga4EventTrend.map((d, i) => `${i * xStep},${110 - (d.eventCount / maxV) * 100}`);
+                        const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p}`).join(' ');
+                        return (<>
+                          <path d={linePath} fill="none" stroke="#a78bfa" strokeWidth="2" />
+                          <path d={`${linePath} L${(ga4EventTrend.length - 1) * xStep},110 L0,110 Z`} fill="url(#evtGrad)" opacity="0.15" />
+                          {ga4EventTrend.map((d, i) => (
+                            <circle key={i} cx={i * xStep} cy={110 - (d.eventCount / maxV) * 100} r="2.5" fill="#a78bfa" opacity="0.6" />
+                          ))}
+                          <defs><linearGradient id="evtGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#a78bfa" /><stop offset="100%" stopColor="transparent" /></linearGradient></defs>
+                        </>);
+                      })()}
+                    </svg>
+                    <div className="flex items-center justify-between mt-2 text-[10px] text-zinc-600">
+                      <span>{ga4EventTrend[0]?.date}</span>
+                      <span>Total: {ga4EventTrend.reduce((s, d) => s + d.eventCount, 0).toLocaleString()}</span>
+                      <span>{ga4EventTrend[ga4EventTrend.length - 1]?.date}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* All Events Table */}
+                {ga4Events.length > 0 && (
+                  <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+                    <h3 className="text-sm font-semibold text-zinc-300 mb-1">All Tracked Events</h3>
+                    <p className="text-[10px] text-zinc-600 mb-3">Every event tracked by Google Analytics on your site</p>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="border-b border-zinc-800">
+                            <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 pr-4">Event</th>
+                            <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 pr-4 text-right">Count</th>
+                            <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 text-right">Users</th>
+                            <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 w-8" />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {ga4Events.map((ev, i) => {
+                            const maxCount = ga4Events[0]?.eventCount || 1;
+                            const pct = (ev.eventCount / maxCount) * 100;
+                            return (
+                              <tr key={i} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                                <td className="py-2 pr-4">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs text-zinc-300 font-mono">{ev.eventName}</span>
+                                  </div>
+                                  <div className="h-1 rounded-full bg-zinc-800 mt-1 max-w-[200px]">
+                                    <div className="h-full rounded-full bg-violet-500/40" style={{ width: `${pct}%` }} />
+                                  </div>
+                                </td>
+                                <td className="py-2 pr-4 text-right text-xs text-zinc-200 tabular-nums font-medium">{ev.eventCount.toLocaleString()}</td>
+                                <td className="py-2 text-right text-xs text-zinc-500 tabular-nums">{ev.users.toLocaleString()}</td>
+                                <td className="py-2 text-right">
+                                  <button onClick={() => loadEventTrend(ev.eventName)} className="text-[10px] text-violet-400 hover:text-violet-300" title="View trend">↗</button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </>)}
         </>)}
       </main>
