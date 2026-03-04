@@ -62,7 +62,7 @@ const APP_PASSWORD = process.env.APP_PASSWORD;
 if (APP_PASSWORD) {
   app.use((req, res, next) => {
     // Allow health check without auth
-    if (req.path === '/api/health') return next();
+    if (req.path === '/api/health' || req.path === '/api/health/diag') return next();
     // Check cookie or header
     const token = req.headers['x-auth-token'];
     if (token === APP_PASSWORD) return next();
