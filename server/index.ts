@@ -534,11 +534,16 @@ app.get('/api/webflow/page-weight/:siteId', async (req, res) => {
 app.get('/api/webflow/seo-audit/:siteId', async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
+    if (!token) {
+      console.error('SEO audit: No token available for site', req.params.siteId);
+      return res.status(500).json({ error: 'No Webflow API token configured. Please link a workspace to this site in Settings, or set WEBFLOW_API_TOKEN environment variable.' });
+    }
     const result = await runSeoAudit(req.params.siteId, token);
     res.json(result);
   } catch (err) {
-    console.error('SEO audit error:', err);
-    res.status(500).json({ error: 'SEO audit failed' });
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('SEO audit error:', msg);
+    res.status(500).json({ error: `SEO audit failed: ${msg}` });
   }
 });
 
@@ -1389,4 +1394,16 @@ const PORT = parseInt(process.env.PORT || '3001', 10);
 startWatcher(broadcast);
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Asset Dashboard running on http://localhost:${PORT} [${IS_PROD ? 'production' : 'development'}]`);
+  // Startup diagnostics
+  const workspaces = listWorkspaces();
+  const hasEnvToken = !!process.env.WEBFLOW_API_TOKEN;
+  const dataDir = process.env.DATA_DIR || (IS_PROD ? '/tmp/asset-dashboard' : 'local');
+  console.log(`[startup] DATA_DIR=${dataDir}`);
+  console.log(`[startup] WEBFLOW_API_TOKEN env: ${hasEnvToken ? 'SET' : 'NOT SET'}`);
+  console.log(`[startup] OPENAI_API_KEY env: ${process.env.OPENAI_API_KEY ? 'SET' : 'NOT SET'}`);
+  console.log(`[startup] GOOGLE_PSI_KEY env: ${process.env.GOOGLE_PSI_KEY ? 'SET' : 'NOT SET'}`);
+  console.log(`[startup] Workspaces loaded: ${workspaces.length}`);
+  for (const ws of workspaces) {
+    console.log(`[startup]   - ${ws.name}: siteId=${ws.webflowSiteId || 'none'}, hasToken=${!!ws.webflowToken}`);
+  }
 });
