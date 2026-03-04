@@ -13,6 +13,7 @@ import { CompetitorAnalysis } from './CompetitorAnalysis';
 import { CmsEditor } from './CmsEditor';
 import { KeywordStrategyPanel } from './KeywordStrategy';
 import { RedirectManager } from './RedirectManager';
+import { InternalLinks } from './InternalLinks';
 
 type Severity = 'error' | 'warning' | 'info';
 
@@ -55,7 +56,7 @@ interface SeoAuditResult {
   siteWideIssues: SeoIssue[];
 }
 
-type SubTab = 'audit' | 'editor' | 'cms' | 'links' | 'redirects' | 'keywords' | 'schema' | 'competitor' | 'history' | 'strategy';
+type SubTab = 'audit' | 'editor' | 'cms' | 'links' | 'redirects' | 'internal' | 'keywords' | 'schema' | 'competitor' | 'history' | 'strategy';
 
 interface SnapshotSummary {
   id: string;
@@ -763,6 +764,7 @@ function SeoAudit({ siteId, workspaceId }: Props) {
     { id: 'cms', label: 'CMS SEO', icon: ListChecks },
     { id: 'links', label: 'Dead Links', icon: Link2Off },
     { id: 'redirects', label: 'Redirects', icon: CornerDownRight },
+    { id: 'internal', label: 'Int. Links', icon: Share2 },
     { id: 'strategy', label: 'Strategy', icon: Target },
     { id: 'keywords', label: 'Keywords', icon: SearchIcon },
     { id: 'schema', label: 'Schema', icon: Code2 },
@@ -798,6 +800,7 @@ function SeoAudit({ siteId, workspaceId }: Props) {
   if (subTab === 'strategy') return <>{tabNav}<KeywordStrategyPanel workspaceId={workspaceId || ''} /></>;
   if (subTab === 'links') return <>{tabNav}<LinkChecker siteId={siteId} /></>;
   if (subTab === 'redirects') return <>{tabNav}<RedirectManager siteId={siteId} /></>;
+  if (subTab === 'internal') return <>{tabNav}<InternalLinks siteId={siteId} workspaceId={workspaceId} /></>;
   if (subTab === 'keywords') return <>{tabNav}<KeywordAnalysis siteId={siteId} /></>;
   if (subTab === 'schema') return <>{tabNav}<SchemaSuggester siteId={siteId} /></>;
   if (subTab === 'competitor') return <>{tabNav}<CompetitorAnalysis siteId={siteId} /></>;

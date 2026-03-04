@@ -44,6 +44,7 @@ import { generateAltText } from './alttext.js';
 import { runSeoAudit } from './seo-audit.js';
 import { checkSiteLinks } from './link-checker.js';
 import { scanRedirects } from './redirect-scanner.js';
+import { analyzeInternalLinks } from './internal-links.js';
 import {
   saveSnapshot, getSnapshot, listSnapshots, getLatestSnapshot, renderReportHTML,
   addActionItem, updateActionItem, deleteActionItem, getActionItems, extractSiteLogo,
@@ -1074,6 +1075,19 @@ app.get('/api/webflow/redirect-scan/:siteId', async (req, res) => {
   } catch (err) {
     console.error('Redirect scan error:', err);
     res.status(500).json({ error: 'Redirect scan failed' });
+  }
+});
+
+// --- Internal Linking Suggestions ---
+app.get('/api/webflow/internal-links/:siteId', async (req, res) => {
+  try {
+    const token = getTokenForSite(req.params.siteId) || undefined;
+    const workspaceId = req.query.workspaceId as string | undefined;
+    const result = await analyzeInternalLinks(req.params.siteId, workspaceId, token);
+    res.json(result);
+  } catch (err) {
+    console.error('Internal links error:', err);
+    res.status(500).json({ error: 'Internal link analysis failed' });
   }
 });
 
