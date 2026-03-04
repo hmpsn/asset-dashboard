@@ -332,13 +332,13 @@ function Dashboard() {
                     onClick={() => !disabled && setTab(item.id)}
                     className={`w-full flex items-center gap-2.5 px-2.5 py-[5px] rounded-lg text-[12px] font-medium transition-all ${
                       active
-                        ? 'bg-violet-500/10 text-violet-300'
+                        ? 'bg-teal-500/10 text-teal-300'
                         : disabled
                           ? 'text-zinc-700 cursor-not-allowed'
                           : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
                     }`}
                   >
-                    <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${active ? 'text-violet-400' : ''}`} />
+                    <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${active ? 'text-teal-400' : ''}`} />
                     <span className="truncate">{item.label}</span>
                   </button>
                 );
@@ -361,11 +361,11 @@ function Dashboard() {
                 onClick={() => setTab(item.id)}
                 className={`w-full flex items-center gap-2.5 px-2.5 py-[5px] rounded-lg text-[12px] font-medium transition-all ${
                   active
-                    ? 'bg-violet-500/10 text-violet-300'
+                    ? 'bg-teal-500/10 text-teal-300'
                     : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
                 }`}
               >
-                <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${active ? 'text-violet-400' : ''}`} />
+                <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${active ? 'text-teal-400' : ''}`} />
                 <span className="truncate">{item.label}</span>
               </button>
             );

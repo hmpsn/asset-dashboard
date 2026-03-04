@@ -101,7 +101,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
       </button>
 
       {open && (
-        <div className="absolute top-full right-0 mt-2 w-80 rounded-xl shadow-2xl z-50 overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border-hover)' }}>
+        <div className="absolute top-full left-0 mt-2 w-80 rounded-xl shadow-2xl z-50 overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border-hover)' }}>
           {workspaces.length > 0 && (
             <div className="p-1">
               {workspaces.map(ws => (

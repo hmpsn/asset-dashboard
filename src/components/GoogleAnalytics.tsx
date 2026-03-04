@@ -185,7 +185,7 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
           <p className="text-red-400 text-sm font-medium mb-1">Failed to Load Analytics</p>
           <p className="text-xs text-red-400/70">{error}</p>
         </div>
-        <button onClick={() => loadData(days)} className="px-4 py-2 rounded-lg text-sm font-medium bg-violet-600 hover:bg-violet-500 transition-colors">
+        <button onClick={() => loadData(days)} className="px-4 py-2 rounded-lg text-sm font-medium bg-teal-600 hover:bg-teal-500 transition-colors">
           Retry
         </button>
       </div>
@@ -195,7 +195,7 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
   if (!overview) return null;
 
   const metrics = [
-    { label: 'Users', value: formatNumber(overview.totalUsers), icon: Users, color: 'text-violet-400' },
+    { label: 'Users', value: formatNumber(overview.totalUsers), icon: Users, color: 'text-teal-400' },
     { label: 'Sessions', value: formatNumber(overview.totalSessions), icon: ArrowUpDown, color: 'text-blue-400' },
     { label: 'Pageviews', value: formatNumber(overview.totalPageviews), icon: Eye, color: 'text-emerald-400' },
     { label: 'Avg. Duration', value: formatDuration(overview.avgSessionDuration), icon: Clock, color: 'text-amber-400' },
@@ -203,7 +203,7 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
     { label: 'New Users', value: `${overview.newUserPercentage}%`, icon: Users, color: 'text-pink-400' },
   ];
 
-  const trendColors: Record<string, string> = { users: '#8b5cf6', sessions: '#3b82f6', pageviews: '#10b981' };
+  const trendColors: Record<string, string> = { users: '#14b8a6', sessions: '#3b82f6', pageviews: '#10b981' };
 
   return (
     <div className="space-y-5">
@@ -223,7 +223,7 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
                 key={d}
                 onClick={() => setDays(d)}
                 className={`px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                  days === d ? 'bg-violet-600 text-white' : 'bg-zinc-800 text-zinc-500 hover:text-zinc-300'
+                  days === d ? 'bg-teal-600 text-white' : 'bg-zinc-800 text-zinc-500 hover:text-zinc-300'
                 }`}
               >
                 {d}d
@@ -306,7 +306,7 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
                     </div>
                     <div className="mt-0.5 h-1 bg-zinc-800 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-violet-500/40 rounded-full"
+                        className="h-full bg-teal-500/40 rounded-full"
                         style={{ width: `${(src.sessions / maxSessions) * 100}%` }}
                       />
                     </div>
@@ -336,7 +336,7 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
                   </div>
                   <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-violet-500 rounded-full transition-all"
+                      className="h-full bg-teal-500 rounded-full transition-all"
                       style={{ width: `${d.percentage}%` }}
                     />
                   </div>
