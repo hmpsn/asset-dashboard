@@ -137,6 +137,7 @@ export function ClientDashboard({ workspaceId }: Props) {
   const [audit, setAudit] = useState<AuditSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [tab, setTab] = useState<ClientTab>('search');
   const [days, setDays] = useState(28);
   const [sortKey, setSortKey] = useState<SortKey>('clicks');
@@ -174,7 +175,8 @@ export function ClientDashboard({ workspaceId }: Props) {
       setOverview(ovData);
       setTrend(Array.isArray(trData) ? trData : []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load search data');
+      console.error('Search data load error:', err);
+      setSearchError(err instanceof Error ? err.message : 'Failed to load search data');
     }
   };
 
@@ -472,12 +474,49 @@ export function ClientDashboard({ workspaceId }: Props) {
           </div>
         )}
 
-        {/* No search data state */}
+        {/* No search data — show splash with whatever we have */}
         {!overview && !loading && (
-          <div className="text-center py-16">
-            <Search className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
-            <p className="text-sm text-zinc-500">Search data is not yet available</p>
-            <p className="text-xs text-zinc-600 mt-1">Search Console may not be configured for this workspace yet.</p>
+          <div className="space-y-5">
+            {/* Welcome / status splash */}
+            <div className="bg-gradient-to-br from-violet-500/10 via-zinc-900 to-fuchsia-500/10 rounded-xl border border-zinc-800 p-8 text-center">
+              <div className="w-12 h-12 rounded-2xl bg-violet-500/10 flex items-center justify-center mx-auto mb-4">
+                <BarChart3 className="w-6 h-6 text-violet-400" />
+              </div>
+              <h2 className="text-lg font-semibold text-zinc-200 mb-2">
+                {ws.webflowSiteName || ws.name}
+              </h2>
+              {ws.gscPropertyUrl ? (
+                <>
+                  <p className="text-sm text-zinc-400 mb-1">Your search performance dashboard is being set up.</p>
+                  {searchError && <p className="text-xs text-amber-400/70 mt-2">Search Console data is loading — check back shortly.</p>}
+                </>
+              ) : (
+                <p className="text-sm text-zinc-400">Your dashboard is ready. Search performance data will appear here once configured by your web team.</p>
+              )}
+            </div>
+
+            {/* Show audit card even when no search data */}
+            {audit && (
+              <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
+                <div className="flex items-center gap-4">
+                  <div className={`text-4xl font-bold ${audit.siteScore >= 80 ? 'text-green-400' : audit.siteScore >= 60 ? 'text-amber-400' : 'text-red-400'}`}>{audit.siteScore}</div>
+                  <div>
+                    <div className="text-sm font-medium text-zinc-200">Site Health Score</div>
+                    <div className="text-xs text-zinc-500">{audit.totalPages} pages scanned • {new Date(audit.createdAt).toLocaleDateString()}</div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 mt-4">
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
+                    <div className="text-2xl font-bold text-red-400">{audit.errors}</div>
+                    <div className="text-xs text-red-400/70">Errors</div>
+                  </div>
+                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-4 py-3">
+                    <div className="text-2xl font-bold text-amber-400">{audit.warnings}</div>
+                    <div className="text-xs text-amber-400/70">Warnings</div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>

@@ -17,7 +17,7 @@ import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, FileSearch, Search,
 } from 'lucide-react';
 
-type Tab = 'media' | 'seo' | 'search' | 'performance' | 'speed' | 'prospect';
+type Tab = 'media' | 'seo' | 'search' | 'performance' | 'speed' | 'prospect' | 'settings';
 
 function App() {
   // Client dashboard route: /client/:workspaceId (public, no auth)
@@ -47,7 +47,6 @@ function Dashboard() {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [health, setHealth] = useState({ hasOpenAIKey: false, hasWebflowToken: false });
   const [connected, setConnected] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('media');
   const [clipboardStatus, setClipboardStatus] = useState<string | null>(null);
 
@@ -209,6 +208,19 @@ function Dashboard() {
             <FileSearch className="w-3.5 h-3.5" />
             Prospect
           </button>
+          <button
+            onClick={() => setTab('settings')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors"
+            style={tab === 'settings' ? {
+              backgroundColor: 'var(--brand-mint-dim)',
+              color: 'var(--brand-mint)',
+            } : {
+              color: 'var(--brand-text-muted)',
+            }}
+          >
+            <Settings className="w-3.5 h-3.5" />
+            Settings
+          </button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -217,14 +229,6 @@ function Dashboard() {
               <Clipboard className="w-3 h-3" /> {clipboardStatus}
             </div>
           )}
-          <button
-            onClick={() => setSettingsOpen(true)}
-            className="p-1.5 rounded-md hover:bg-white/5"
-            style={{ color: 'var(--brand-text-muted)' }}
-            title="Settings"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
           <WorkspaceSelector
             workspaces={workspaces}
             selected={selected}
@@ -238,7 +242,7 @@ function Dashboard() {
       </header>
 
       {/* Tab bar */}
-      {selected && tab !== 'prospect' && (
+      {selected && tab !== 'prospect' && tab !== 'settings' && (
         <nav className="flex items-center gap-0.5 px-5 py-2" style={{ borderBottom: '1px solid var(--brand-border)' }}>
           {tabs.map(t => {
             const Icon = t.icon;
@@ -265,7 +269,9 @@ function Dashboard() {
 
       {/* Main content */}
       <main className="flex-1 overflow-auto p-5">
-        {tab === 'prospect' ? (
+        {tab === 'settings' ? (
+          <SettingsPanel />
+        ) : tab === 'prospect' ? (
           <div className="max-w-5xl mx-auto">
             <SalesReport />
           </div>
@@ -346,12 +352,6 @@ function Dashboard() {
         connected={connected}
       />
 
-      {/* Settings modal */}
-      <SettingsPanel
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        onTokenSaved={refreshHealth}
-      />
     </div>
   );
 }

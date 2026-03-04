@@ -45,6 +45,8 @@ export function getGoogleCredentials(): { clientId: string; clientSecret: string
   return { clientId, clientSecret, redirectUri };
 }
 
+const GLOBAL_KEY = '_global';
+
 export function getAuthUrl(siteId: string): string | null {
   const creds = getGoogleCredentials();
   if (!creds) return null;
@@ -66,6 +68,10 @@ export function getAuthUrl(siteId: string): string | null {
   const url = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
   console.log(`[google-auth] Auth URL generated, redirect_uri=${creds.redirectUri}`);
   return url;
+}
+
+export function getGlobalAuthUrl(): string | null {
+  return getAuthUrl(GLOBAL_KEY);
 }
 
 export async function exchangeCode(code: string, siteId: string): Promise<{ success: boolean; error?: string }> {
@@ -171,3 +177,17 @@ export function disconnect(siteId: string): void {
   delete store[siteId];
   saveTokens(store);
 }
+
+export function isGlobalConnected(): boolean {
+  return isConnected(GLOBAL_KEY);
+}
+
+export function disconnectGlobal(): void {
+  disconnect(GLOBAL_KEY);
+}
+
+export async function getGlobalToken(): Promise<string | null> {
+  return getValidToken(GLOBAL_KEY);
+}
+
+export { GLOBAL_KEY };

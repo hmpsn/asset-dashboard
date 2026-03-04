@@ -50,7 +50,7 @@ import { runSiteSpeed, runSinglePageSpeed } from './pagespeed.js';
 import { generateSchemaSuggestions, generateSchemaForPage } from './schema-suggester.js';
 import { runSalesAudit } from './sales-audit.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
-import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials } from './google-auth.js';
+import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
 import { listGscSites, getSearchOverview, getPerformanceTrend } from './search-console.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -2052,6 +2052,35 @@ app.get('/api/google/status/:siteId', (req, res) => {
   });
 });
 
+// --- Global Google Auth (configure once, use everywhere) ---
+app.get('/api/google/auth-url', (_req, res) => {
+  const url = getGlobalAuthUrl();
+  if (!url) return res.status(400).json({ error: 'Google OAuth not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.' });
+  res.json({ url });
+});
+
+app.get('/api/google/status', (_req, res) => {
+  res.json({ connected: isGlobalConnected(), configured: !!getGoogleCredentials() });
+});
+
+app.post('/api/google/disconnect', (_req, res) => {
+  disconnectGlobal();
+  res.json({ success: true });
+});
+
+app.get('/api/google/gsc-sites', async (_req, res) => {
+  try {
+    const token = await getGlobalToken();
+    if (!token) return res.status(401).json({ error: 'Google not connected' });
+    const sites = await listGscSites(GLOBAL_KEY);
+    res.json(sites);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: msg });
+  }
+});
+
+// Legacy per-site auth (kept for backward compat)
 app.get('/api/google/auth-url/:siteId', (req, res) => {
   const url = getAuthUrl(req.params.siteId);
   if (!url) return res.status(400).json({ error: 'Google OAuth not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.' });
