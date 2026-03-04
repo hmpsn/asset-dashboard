@@ -1,0 +1,435 @@
+import { useState, useEffect } from 'react';
+import {
+  Loader2, Save, ChevronDown, ChevronRight, Check, AlertCircle,
+  Search, Sparkles, Wand2, Upload,
+} from 'lucide-react';
+
+interface SeoField {
+  id: string;
+  slug: string;
+  displayName: string;
+  type: string;
+}
+
+interface CmsItem {
+  id: string;
+  fieldData: Record<string, unknown>;
+}
+
+interface CmsCollection {
+  collectionId: string;
+  collectionName: string;
+  collectionSlug: string;
+  seoFields: SeoField[];
+  items: CmsItem[];
+  total: number;
+}
+
+interface Props {
+  siteId: string;
+}
+
+export function CmsEditor({ siteId }: Props) {
+  const [collections, setCollections] = useState<CmsCollection[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [expandedCollections, setExpandedCollections] = useState<Set<string>>(new Set());
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [edits, setEdits] = useState<Record<string, Record<string, string>>>({});
+  const [dirty, setDirty] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState<Set<string>>(new Set());
+  const [saved, setSaved] = useState<Set<string>>(new Set());
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [publishing, setPublishing] = useState<Set<string>>(new Set());
+  const [published, setPublished] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState('');
+  const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/webflow/cms-seo/${siteId}`);
+      const data = await res.json() as CmsCollection[];
+      setCollections(data);
+      // Initialize edit state
+      const editMap: Record<string, Record<string, string>> = {};
+      for (const coll of data) {
+        for (const item of coll.items) {
+          const fields: Record<string, string> = {};
+          for (const sf of coll.seoFields) {
+            fields[sf.slug] = String(item.fieldData[sf.slug] || '');
+          }
+          editMap[item.id] = fields;
+        }
+      }
+      setEdits(editMap);
+      setDirty(new Set());
+      setSaved(new Set());
+      setErrors({});
+    } catch (err) {
+      console.error('CMS SEO fetch failed:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchData(); }, [siteId]);
+
+  const updateField = (itemId: string, fieldSlug: string, value: string) => {
+    setEdits(prev => ({
+      ...prev,
+      [itemId]: { ...prev[itemId], [fieldSlug]: value },
+    }));
+    setDirty(prev => new Set(prev).add(itemId));
+    setSaved(prev => { const n = new Set(prev); n.delete(itemId); return n; });
+  };
+
+  const saveItem = async (collectionId: string, itemId: string) => {
+    const fields = edits[itemId];
+    if (!fields) return;
+    setSaving(prev => new Set(prev).add(itemId));
+    setErrors(prev => { const n = { ...prev }; delete n[itemId]; return n; });
+    try {
+      const res = await fetch(`/api/webflow/collections/${collectionId}/items/${itemId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fieldData: fields }),
+      });
+      const result = await res.json();
+      if (!result.success) {
+        setErrors(prev => ({ ...prev, [itemId]: result.error || 'Save failed' }));
+      } else {
+        setDirty(prev => { const n = new Set(prev); n.delete(itemId); return n; });
+        setSaved(prev => new Set(prev).add(itemId));
+      }
+    } catch {
+      setErrors(prev => ({ ...prev, [itemId]: 'Network error' }));
+    } finally {
+      setSaving(prev => { const n = new Set(prev); n.delete(itemId); return n; });
+    }
+  };
+
+  const publishCollection = async (collectionId: string) => {
+    const collItems = collections.find(c => c.collectionId === collectionId)?.items || [];
+    const savedItemIds = collItems.filter(i => saved.has(i.id)).map(i => i.id);
+    if (savedItemIds.length === 0) return;
+    setPublishing(prev => new Set(prev).add(collectionId));
+    try {
+      const res = await fetch(`/api/webflow/collections/${collectionId}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemIds: savedItemIds }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        setPublished(prev => new Set(prev).add(collectionId));
+        setTimeout(() => setPublished(prev => { const n = new Set(prev); n.delete(collectionId); return n; }), 3000);
+      }
+    } catch { /* ignore */ } finally {
+      setPublishing(prev => { const n = new Set(prev); n.delete(collectionId); return n; });
+    }
+  };
+
+  const aiRewrite = async (_collectionId: string, itemId: string, fieldSlug: string) => {
+    const key = `${itemId}-${fieldSlug}`;
+    setAiLoading(prev => ({ ...prev, [key]: true }));
+    try {
+      const currentValue = edits[itemId]?.[fieldSlug] || '';
+      const itemName = edits[itemId]?.['name'] || '';
+      const isTitle = fieldSlug.includes('title') || fieldSlug === 'name';
+      const res = await fetch('/api/webflow/seo-rewrite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          current: currentValue,
+          pageTitle: itemName,
+          type: isTitle ? 'title' : 'description',
+        }),
+      });
+      const data = await res.json();
+      if (data.rewritten) {
+        updateField(itemId, fieldSlug, data.rewritten);
+      }
+    } catch { /* ignore */ } finally {
+      setAiLoading(prev => { const n = { ...prev }; delete n[key]; return n; });
+    }
+  };
+
+  const toggleCollection = (id: string) => {
+    setExpandedCollections(prev => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+
+  const toggleItem = (id: string) => {
+    setExpandedItems(prev => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-violet-400" />
+        <span className="ml-3 text-sm text-zinc-400">Loading CMS collections...</span>
+      </div>
+    );
+  }
+
+  if (collections.length === 0) {
+    return (
+      <div className="text-center py-16 text-zinc-500 text-sm">
+        No CMS collections with items found for this site.
+      </div>
+    );
+  }
+
+  const totalItems = collections.reduce((s, c) => s + c.items.length, 0);
+  const dirtyCount = dirty.size;
+  const savedCount = saved.size;
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-zinc-200">CMS Collection SEO</h3>
+          <p className="text-[11px] text-zinc-500 mt-0.5">
+            Edit SEO-relevant fields on collection items &middot; {collections.length} collections &middot; {totalItems} items
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {dirtyCount > 0 && (
+            <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">
+              {dirtyCount} unsaved
+            </span>
+          )}
+          {savedCount > 0 && (
+            <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
+              {savedCount} saved (draft)
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search items..."
+          className="w-full pl-9 pr-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-violet-500"
+        />
+      </div>
+
+      {/* Collections */}
+      {collections.map(coll => {
+        const filteredItems = coll.items.filter(item => {
+          if (!search) return true;
+          const q = search.toLowerCase();
+          const name = String(item.fieldData['name'] || '').toLowerCase();
+          const slug = String(item.fieldData['slug'] || '').toLowerCase();
+          return name.includes(q) || slug.includes(q);
+        });
+        if (filteredItems.length === 0 && search) return null;
+        const isExpanded = expandedCollections.has(coll.collectionId);
+        const collSavedIds = coll.items.filter(i => saved.has(i.id)).map(i => i.id);
+        const extraSeoFields = coll.seoFields.filter(f => f.slug !== 'name' && f.slug !== 'slug');
+
+        return (
+          <div key={coll.collectionId} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+            {/* Collection header */}
+            <button
+              onClick={() => toggleCollection(coll.collectionId)}
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/30 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                {isExpanded ? <ChevronDown className="w-4 h-4 text-zinc-500" /> : <ChevronRight className="w-4 h-4 text-zinc-500" />}
+                <span className="text-sm font-medium text-zinc-200">{coll.collectionName}</span>
+                <span className="text-[10px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">/{coll.collectionSlug}</span>
+                <span className="text-[10px] text-zinc-600">{coll.total} items</span>
+                {extraSeoFields.length > 0 && (
+                  <span className="text-[10px] text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded">
+                    {extraSeoFields.map(f => f.displayName).join(', ')}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {collSavedIds.length > 0 && (
+                  <span
+                    onClick={e => { e.stopPropagation(); publishCollection(coll.collectionId); }}
+                    className="flex items-center gap-1 text-[10px] text-emerald-400 hover:text-emerald-300 cursor-pointer"
+                  >
+                    {publishing.has(coll.collectionId) ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : published.has(coll.collectionId) ? (
+                      <Check className="w-3 h-3" />
+                    ) : (
+                      <Upload className="w-3 h-3" />
+                    )}
+                    {published.has(coll.collectionId) ? 'Published!' : `Publish ${collSavedIds.length}`}
+                  </span>
+                )}
+              </div>
+            </button>
+
+            {/* Items */}
+            {isExpanded && (
+              <div className="border-t border-zinc-800">
+                {(search ? filteredItems : coll.items).map(item => {
+                  const itemName = String(item.fieldData['name'] || '');
+                  const itemSlug = String(item.fieldData['slug'] || '');
+                  const isItemExpanded = expandedItems.has(item.id);
+                  const isDirty = dirty.has(item.id);
+                  const isSaved = saved.has(item.id);
+                  const isSaving = saving.has(item.id);
+                  const error = errors[item.id];
+
+                  return (
+                    <div key={item.id} className="border-b border-zinc-800/50 last:border-b-0">
+                      <button
+                        onClick={() => toggleItem(item.id)}
+                        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-zinc-800/20 transition-colors"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          {isItemExpanded ? <ChevronDown className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" />}
+                          <span className="text-xs text-zinc-300 truncate">{itemName || '(untitled)'}</span>
+                          <span className="text-[10px] text-zinc-600 font-mono flex-shrink-0">/{itemSlug}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
+                          {isSaved && <Check className="w-3 h-3 text-emerald-400" />}
+                          {error && <AlertCircle className="w-3 h-3 text-red-400" />}
+                        </div>
+                      </button>
+
+                      {isItemExpanded && (
+                        <div className="px-4 pb-4 space-y-3">
+                          {/* Name field */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Name (Title)</label>
+                              <div className="flex items-center gap-1">
+                                <span className="text-[10px] text-zinc-600">{(edits[item.id]?.['name'] || '').length} chars</span>
+                                <button
+                                  onClick={() => aiRewrite(coll.collectionId, item.id, 'name')}
+                                  disabled={!!aiLoading[`${item.id}-name`]}
+                                  className="p-0.5 text-violet-400 hover:text-violet-300 disabled:opacity-50"
+                                  title="AI rewrite"
+                                >
+                                  {aiLoading[`${item.id}-name`] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+                                </button>
+                              </div>
+                            </div>
+                            <input
+                              type="text"
+                              value={edits[item.id]?.['name'] || ''}
+                              onChange={e => updateField(item.id, 'name', e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-500"
+                            />
+                          </div>
+
+                          {/* Slug field */}
+                          <div>
+                            <label className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-1 block">Slug</label>
+                            <input
+                              type="text"
+                              value={edits[item.id]?.['slug'] || ''}
+                              onChange={e => updateField(item.id, 'slug', e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 font-mono focus:outline-none focus:border-violet-500"
+                            />
+                          </div>
+
+                          {/* Extra SEO fields */}
+                          {extraSeoFields.map(field => {
+                            const val = edits[item.id]?.[field.slug] || '';
+                            const isTitle = field.slug.includes('title');
+                            const charTarget = isTitle ? '30-60' : '50-160';
+                            const charColor = isTitle
+                              ? (val.length >= 30 && val.length <= 60 ? 'text-emerald-400' : val.length > 0 ? 'text-amber-400' : 'text-red-400')
+                              : (val.length >= 50 && val.length <= 160 ? 'text-emerald-400' : val.length > 0 ? 'text-amber-400' : 'text-red-400');
+
+                            return (
+                              <div key={field.slug}>
+                                <div className="flex items-center justify-between mb-1">
+                                  <label className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">{field.displayName}</label>
+                                  <div className="flex items-center gap-1">
+                                    <span className={`text-[10px] ${charColor}`}>{val.length} chars ({charTarget})</span>
+                                    <button
+                                      onClick={() => aiRewrite(coll.collectionId, item.id, field.slug)}
+                                      disabled={!!aiLoading[`${item.id}-${field.slug}`]}
+                                      className="p-0.5 text-violet-400 hover:text-violet-300 disabled:opacity-50"
+                                      title="AI rewrite"
+                                    >
+                                      {aiLoading[`${item.id}-${field.slug}`] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+                                    </button>
+                                  </div>
+                                </div>
+                                {isTitle ? (
+                                  <input
+                                    type="text"
+                                    value={val}
+                                    onChange={e => updateField(item.id, field.slug, e.target.value)}
+                                    className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-500"
+                                  />
+                                ) : (
+                                  <textarea
+                                    value={val}
+                                    onChange={e => updateField(item.id, field.slug, e.target.value)}
+                                    rows={3}
+                                    className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-500 resize-none"
+                                  />
+                                )}
+                              </div>
+                            );
+                          })}
+
+                          {/* Save button + error */}
+                          <div className="flex items-center justify-between pt-1">
+                            <div>
+                              {error && <span className="text-[10px] text-red-400">{error}</span>}
+                              {isSaved && !isDirty && <span className="text-[10px] text-emerald-400 flex items-center gap-1"><Check className="w-3 h-3" /> Saved as draft</span>}
+                            </div>
+                            <button
+                              onClick={() => saveItem(coll.collectionId, item.id)}
+                              disabled={!isDirty || isSaving}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-xs font-medium transition-colors"
+                            >
+                              {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                              Save
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Tip */}
+      <div className="bg-zinc-800/30 rounded-lg border border-zinc-800 px-4 py-3">
+        <div className="flex items-start gap-2">
+          <Sparkles className="w-3.5 h-3.5 text-violet-400 mt-0.5 flex-shrink-0" />
+          <div className="text-[11px] text-zinc-500">
+            <strong className="text-zinc-400">How it works:</strong> Changes are saved as drafts first. Click <strong className="text-zinc-400">Publish</strong> on a collection to make changes live.
+            The <Wand2 className="w-3 h-3 inline text-violet-400" /> button generates AI-optimized rewrites.
+            {collections.some(c => c.seoFields.filter(f => f.slug !== 'name' && f.slug !== 'slug').length === 0) && (
+              <span className="block mt-1 text-amber-400/80">
+                Tip: Some collections don't have dedicated SEO fields. Consider adding "SEO Title" and "Meta Description" text fields in Webflow's collection schema for better control.
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

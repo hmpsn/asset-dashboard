@@ -10,6 +10,7 @@ import { LinkChecker } from './LinkChecker';
 import { KeywordAnalysis } from './KeywordAnalysis';
 import { SchemaSuggester } from './SchemaSuggester';
 import { CompetitorAnalysis } from './CompetitorAnalysis';
+import { CmsEditor } from './CmsEditor';
 
 type Severity = 'error' | 'warning' | 'info';
 
@@ -52,7 +53,7 @@ interface SeoAuditResult {
   siteWideIssues: SeoIssue[];
 }
 
-type SubTab = 'audit' | 'editor' | 'links' | 'keywords' | 'schema' | 'competitor' | 'history';
+type SubTab = 'audit' | 'editor' | 'cms' | 'links' | 'keywords' | 'schema' | 'competitor' | 'history';
 
 interface SnapshotSummary {
   id: string;
@@ -756,6 +757,7 @@ function SeoAudit({ siteId }: Props) {
   const subTabs: { id: SubTab; label: string; icon: typeof Globe }[] = [
     { id: 'audit', label: 'Audit', icon: Globe },
     { id: 'editor', label: 'Edit SEO', icon: Pencil },
+    { id: 'cms', label: 'CMS SEO', icon: ListChecks },
     { id: 'links', label: 'Dead Links', icon: Link2Off },
     { id: 'keywords', label: 'Keywords', icon: SearchIcon },
     { id: 'schema', label: 'Schema', icon: Code2 },
@@ -787,6 +789,7 @@ function SeoAudit({ siteId }: Props) {
   );
 
   if (subTab === 'editor') return <>{tabNav}<SeoEditor siteId={siteId} /></>;
+  if (subTab === 'cms') return <>{tabNav}<CmsEditor siteId={siteId} /></>;
   if (subTab === 'links') return <>{tabNav}<LinkChecker siteId={siteId} /></>;
   if (subTab === 'keywords') return <>{tabNav}<KeywordAnalysis siteId={siteId} /></>;
   if (subTab === 'schema') return <>{tabNav}<SchemaSuggester siteId={siteId} /></>;

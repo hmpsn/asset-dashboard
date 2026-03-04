@@ -28,6 +28,7 @@ import {
   getCollectionSchema,
   listCollectionItems,
   updateCollectionItem,
+  publishCollectionItems,
   listPages,
   filterPublishedPages,
   getPageDom,
@@ -2057,6 +2058,88 @@ app.get('/api/webflow/collections/:collectionId/items', async (req, res) => {
 app.patch('/api/webflow/collections/:collectionId/items/:itemId', async (req, res) => {
   const result = await updateCollectionItem(req.params.collectionId, req.params.itemId, req.body.fieldData);
   res.json(result);
+});
+
+// --- CMS SEO Editor: list all collections with SEO-relevant fields and items ---
+app.get('/api/webflow/cms-seo/:siteId', async (req, res) => {
+  try {
+    const token = getTokenForSite(req.params.siteId) || undefined;
+    const collections = await listCollections(req.params.siteId, token);
+    const SEO_FIELD_PATTERNS = ['seo title', 'meta title', 'title tag', 'seo description', 'meta description', 'og title', 'og description', 'open graph'];
+
+    const results: Array<{
+      collectionId: string;
+      collectionName: string;
+      collectionSlug: string;
+      seoFields: Array<{ id: string; slug: string; displayName: string; type: string }>;
+      items: Array<{ id: string; fieldData: Record<string, unknown> }>;
+      total: number;
+    }> = [];
+
+    for (const coll of collections) {
+      const schema = await getCollectionSchema(coll.id, token);
+      // Identify SEO-relevant fields: name, slug, plus any field matching SEO patterns
+      const seoFields = schema.fields.filter(f => {
+        const name = f.displayName.toLowerCase();
+        const slug = f.slug.toLowerCase();
+        if (f.slug === 'name' || f.slug === 'slug') return true;
+        if (f.type === 'PlainText' || f.type === 'RichText') {
+          return SEO_FIELD_PATTERNS.some(p => name.includes(p) || slug.includes(p.replace(/\s/g, '-')));
+        }
+        return false;
+      });
+
+      // Only include collections that have items (skip utility collections)
+      const limit = parseInt(req.query.limit as string) || 100;
+      const offset = parseInt(req.query.offset as string) || 0;
+      const { items, total } = await listCollectionItems(coll.id, limit, offset, token);
+      if (total === 0) continue;
+
+      // Extract only the relevant field data from each item
+      const cleanItems = items.map(item => {
+        const fd = (item.fieldData || item) as Record<string, unknown>;
+        const relevant: Record<string, unknown> = {};
+        relevant['name'] = fd['name'] || '';
+        relevant['slug'] = fd['slug'] || '';
+        for (const sf of seoFields) {
+          if (sf.slug !== 'name' && sf.slug !== 'slug') {
+            relevant[sf.slug] = fd[sf.slug] || '';
+          }
+        }
+        return { id: item.id as string || (item as Record<string, unknown>)._id as string, fieldData: relevant };
+      });
+
+      results.push({
+        collectionId: coll.id,
+        collectionName: coll.displayName,
+        collectionSlug: coll.slug,
+        seoFields,
+        items: cleanItems,
+        total,
+      });
+    }
+
+    res.json(results);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('CMS SEO list error:', msg);
+    res.status(500).json({ error: msg });
+  }
+});
+
+// --- CMS SEO: Publish collection items after editing ---
+app.post('/api/webflow/collections/:collectionId/publish', async (req, res) => {
+  try {
+    const { itemIds } = req.body;
+    if (!itemIds || !Array.isArray(itemIds) || itemIds.length === 0) {
+      return res.status(400).json({ error: 'itemIds array required' });
+    }
+    const result = await publishCollectionItems(req.params.collectionId, itemIds);
+    res.json(result);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: msg });
+  }
 });
 
 // Persistent metadata (alt text, upload history)

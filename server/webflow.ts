@@ -304,6 +304,27 @@ export async function updateCollectionItem(
   }
 }
 
+// --- Publish CMS items (make draft changes live) ---
+export async function publishCollectionItems(
+  collectionId: string,
+  itemIds: string[],
+  tokenOverride?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await webflowFetch(`/collections/${collectionId}/items/publish`, {
+      method: 'POST',
+      body: JSON.stringify({ itemIds }),
+    }, tokenOverride);
+    if (!res.ok) {
+      const err = await res.text();
+      return { success: false, error: `${res.status}: ${err}` };
+    }
+    return { success: true };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 // --- Get site subdomain for published HTML scanning ---
 export async function getSiteSubdomain(siteId: string, tokenOverride?: string): Promise<string | null> {
   const res = await webflowFetch(`/sites/${siteId}`, {}, tokenOverride);
