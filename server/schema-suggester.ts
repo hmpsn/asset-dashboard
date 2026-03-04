@@ -450,6 +450,48 @@ Return ONLY valid JSON array, no markdown or explanation.`;
   }
 }
 
+export async function generateSchemaForPage(
+  siteId: string,
+  pageId: string,
+  tokenOverride?: string,
+): Promise<SchemaPageSuggestion | null> {
+  const subdomain = await getSiteSubdomain(siteId, tokenOverride);
+  const baseUrl = subdomain ? `https://${subdomain}.webflow.io` : '';
+  if (!baseUrl) return null;
+
+  const meta = await fetchPageMeta(pageId, tokenOverride);
+  if (!meta) return null;
+
+  const slug = meta.slug || '';
+  const url = (!slug || slug === 'index') ? baseUrl : `${baseUrl}/${slug}`;
+  const isHomepage = !slug || slug === '' || slug === 'home' || slug === 'index';
+  const html = await fetchPublishedHtml(url);
+  const seoTitle = meta.seo?.title || meta.title || '';
+  const seoDesc = meta.seo?.description || '';
+  const existingSchemas = html ? extractExistingSchemas(html) : [];
+
+  let suggestedSchemas = await aiGenerateSchema(
+    meta.title, slug, seoTitle, seoDesc,
+    html, existingSchemas, isHomepage, baseUrl,
+  );
+  // Fall back to rule-based if AI returns nothing
+  if (suggestedSchemas.length === 0) {
+    suggestedSchemas = suggestSchemas(
+      meta.title, slug, seoTitle, seoDesc,
+      html, existingSchemas, isHomepage,
+    );
+  }
+
+  return {
+    pageId,
+    pageTitle: meta.title,
+    slug,
+    url,
+    existingSchemas,
+    suggestedSchemas,
+  };
+}
+
 export async function generateSchemaSuggestions(siteId: string, tokenOverride?: string, useAI: boolean = false): Promise<SchemaPageSuggestion[]> {
   const subdomain = await getSiteSubdomain(siteId, tokenOverride);
   const baseUrl = subdomain ? `https://${subdomain}.webflow.io` : '';

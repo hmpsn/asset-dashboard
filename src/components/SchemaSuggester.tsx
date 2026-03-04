@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  Loader2, Code2, ChevronDown, ChevronRight, Copy, CheckCircle,
-  AlertCircle, Info, Sparkles, Zap, Brain,
+  Loader2, ChevronDown, ChevronRight, Copy, CheckCircle,
+  AlertCircle, Info, Sparkles, Brain, RefreshCw,
 } from 'lucide-react';
 
 interface SchemaSuggestion {
@@ -32,21 +32,66 @@ interface Props {
 
 export function SchemaSuggester({ siteId }: Props) {
   const [data, setData] = useState<SchemaPageSuggestion[] | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [aiMode, setAiMode] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState<Set<string>>(new Set());
+  const [aiGenerated, setAiGenerated] = useState<Set<string>>(new Set());
 
-  const run = useCallback((ai: boolean = false) => {
+  // Auto-run quick scan on mount
+  useEffect(() => {
     setLoading(true);
-    setAiMode(ai);
     setData(null);
-    fetch(`/api/webflow/schema-suggestions/${siteId}${ai ? '?ai=true' : ''}`)
+    fetch(`/api/webflow/schema-suggestions/${siteId}`)
       .then(r => r.json())
       .then(d => setData(Array.isArray(d) ? d : []))
       .catch(() => setData([]))
       .finally(() => setLoading(false));
   }, [siteId]);
+
+  const rescan = () => {
+    setLoading(true);
+    setData(null);
+    setAiGenerated(new Set());
+    fetch(`/api/webflow/schema-suggestions/${siteId}`)
+      .then(r => r.json())
+      .then(d => setData(Array.isArray(d) ? d : []))
+      .catch(() => setData([]))
+      .finally(() => setLoading(false));
+  };
+
+  const generateAiForPage = async (pageId: string) => {
+    setAiGenerating(prev => new Set(prev).add(pageId));
+    try {
+      const res = await fetch(`/api/webflow/schema-suggestions/${siteId}/page`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pageId }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      const result: SchemaPageSuggestion = await res.json();
+      // Replace the page's suggestions with AI results
+      setData(prev => {
+        if (!prev) return prev;
+        return prev.map(p => p.pageId === pageId ? {
+          ...p,
+          suggestedSchemas: result.suggestedSchemas,
+          existingSchemas: result.existingSchemas,
+        } : p);
+      });
+      setAiGenerated(prev => new Set(prev).add(pageId));
+      // Auto-expand to show results
+      setExpanded(prev => new Set(prev).add(pageId));
+    } catch {
+      // keep existing data
+    } finally {
+      setAiGenerating(prev => {
+        const next = new Set(prev);
+        next.delete(pageId);
+        return next;
+      });
+    }
+  };
 
   const toggleExpand = (id: string) => {
     setExpanded(prev => {
@@ -64,42 +109,12 @@ export function SchemaSuggester({ siteId }: Props) {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  if (!data && !loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 gap-4">
-        <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center">
-          <Code2 className="w-8 h-8 text-zinc-600" />
-        </div>
-        <p className="text-zinc-400 text-sm">JSON-LD Schema Suggester</p>
-        <p className="text-xs text-zinc-600 max-w-md text-center">
-          Analyzes each page and suggests appropriate structured data schemas (Organization, Article, FAQ, etc.) to improve search result appearance
-        </p>
-        <div className="flex gap-2 mt-2">
-          <button
-            onClick={() => run(false)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-500 rounded-lg text-sm font-medium transition-colors"
-          >
-            <Zap className="w-4 h-4" /> Quick Scan
-          </button>
-          <button
-            onClick={() => run(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500"
-          >
-            <Brain className="w-4 h-4" /> AI-Powered
-          </button>
-        </div>
-        <p className="text-[11px] text-zinc-700 mt-1">AI mode uses GPT-4o to generate production-ready, pre-filled schemas</p>
-      </div>
-    );
-  }
-
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3 text-zinc-500">
         <Loader2 className="w-6 h-6 animate-spin" />
-        <p className="text-sm">{aiMode ? 'AI is analyzing page content and generating schemas...' : 'Scanning pages for schema opportunities...'}</p>
-        <p className="text-xs text-zinc-600">{aiMode ? 'GPT-4o is reading each page and crafting production-ready JSON-LD' : 'Checking existing JSON-LD and suggesting improvements'}</p>
-        {aiMode && <p className="text-xs text-zinc-700">This may take 30–60 seconds for AI analysis</p>}
+        <p className="text-sm">Scanning pages for schema opportunities...</p>
+        <p className="text-xs text-zinc-600">Checking existing JSON-LD and identifying improvements</p>
       </div>
     );
   }
@@ -109,6 +124,9 @@ export function SchemaSuggester({ siteId }: Props) {
       <div className="flex flex-col items-center justify-center py-16 gap-3">
         <CheckCircle className="w-8 h-8 text-green-400" />
         <p className="text-zinc-400 text-sm">No schema suggestions needed</p>
+        <button onClick={rescan} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors mt-2">
+          <RefreshCw className="w-3 h-3" /> Re-scan
+        </button>
       </div>
     );
   }
@@ -119,30 +137,14 @@ export function SchemaSuggester({ siteId }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Mode toggle + re-run */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {aiMode && (
-            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 border border-violet-500/20 text-violet-400">
-              <Brain className="w-3 h-3" /> AI-Generated
-            </span>
-          )}
           <span className="text-xs text-zinc-500">{data.length} pages · {totalSuggestions} suggestions</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => run(false)}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${!aiMode ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
-          >
-            <Zap className="w-3 h-3" /> Quick
-          </button>
-          <button
-            onClick={() => run(true)}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${aiMode ? 'bg-violet-600 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
-          >
-            <Brain className="w-3 h-3" /> AI
-          </button>
-        </div>
+        <button onClick={rescan} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors">
+          <RefreshCw className="w-3 h-3" /> Re-scan
+        </button>
       </div>
 
       {/* Summary cards */}
@@ -168,30 +170,52 @@ export function SchemaSuggester({ siteId }: Props) {
       <div className="space-y-2">
         {data.map(page => {
           const isOpen = expanded.has(page.pageId);
+          const isAiLoading = aiGenerating.has(page.pageId);
+          const hasAi = aiGenerated.has(page.pageId);
           return (
             <div key={page.pageId} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-              <button
-                onClick={() => toggleExpand(page.pageId)}
-                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-zinc-800/50 transition-colors"
-              >
-                {isOpen ? <ChevronDown className="w-4 h-4 text-zinc-500 flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-zinc-500 flex-shrink-0" />}
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-zinc-200 truncate">{page.pageTitle}</div>
-                  <div className="text-xs text-zinc-500 truncate">/{page.slug}</div>
-                </div>
+              <div className="flex items-center gap-3 px-4 py-3">
+                <button
+                  onClick={() => toggleExpand(page.pageId)}
+                  className="flex items-center gap-3 flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
+                >
+                  {isOpen ? <ChevronDown className="w-4 h-4 text-zinc-500 flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-zinc-500 flex-shrink-0" />}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-zinc-200 truncate">{page.pageTitle}</div>
+                    <div className="text-xs text-zinc-500 truncate">/{page.slug}</div>
+                  </div>
+                </button>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {page.existingSchemas.length > 0 && (
                     <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-500/10 text-green-400 border border-green-500/20">
-                      <CheckCircle className="w-3 h-3" /> {page.existingSchemas.length} existing
+                      <CheckCircle className="w-3 h-3" /> {page.existingSchemas.length}
                     </span>
                   )}
                   {page.suggestedSchemas.length > 0 && (
                     <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                      <Sparkles className="w-3 h-3" /> {page.suggestedSchemas.length} suggested
+                      <Sparkles className="w-3 h-3" /> {page.suggestedSchemas.length}
                     </span>
                   )}
+                  {hasAi ? (
+                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-violet-500/10 text-violet-400 border border-violet-500/20">
+                      <Brain className="w-3 h-3" /> AI
+                    </span>
+                  ) : (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); generateAiForPage(page.pageId); }}
+                      disabled={isAiLoading}
+                      className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors disabled:opacity-50 bg-gradient-to-r from-violet-600/80 to-fuchsia-600/80 hover:from-violet-500 hover:to-fuchsia-500"
+                      title="Generate AI-powered production-ready schemas for this page"
+                    >
+                      {isAiLoading ? (
+                        <><Loader2 className="w-3 h-3 animate-spin" /> Generating...</>
+                      ) : (
+                        <><Brain className="w-3 h-3" /> AI Generate</>
+                      )}
+                    </button>
+                  )}
                 </div>
-              </button>
+              </div>
 
               {isOpen && (
                 <div className="border-t border-zinc-800 divide-y divide-zinc-800/50">
@@ -210,6 +234,11 @@ export function SchemaSuggester({ siteId }: Props) {
                   )}
 
                   {/* Suggestions */}
+                  {page.suggestedSchemas.length === 0 && page.existingSchemas.length === 0 && (
+                    <div className="px-4 py-4 text-center text-xs text-zinc-500">
+                      No suggestions for this page. Click <strong>AI Generate</strong> for deeper analysis.
+                    </div>
+                  )}
                   {page.suggestedSchemas.map((suggestion, i) => {
                     const copyId = `${page.pageId}-${suggestion.type}`;
                     return (
@@ -226,6 +255,9 @@ export function SchemaSuggester({ siteId }: Props) {
                               }`}>
                                 {suggestion.priority}
                               </span>
+                              {hasAi && (
+                                <span className="text-[10px] text-violet-400">AI-generated</span>
+                              )}
                             </div>
                             <p className="text-xs text-zinc-400 mb-2">{suggestion.reason}</p>
 

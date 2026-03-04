@@ -46,7 +46,7 @@ import {
   addActionItem, updateActionItem, deleteActionItem, getActionItems, extractSiteLogo,
 } from './reports.js';
 import { runSiteSpeed, runSinglePageSpeed } from './pagespeed.js';
-import { generateSchemaSuggestions } from './schema-suggester.js';
+import { generateSchemaSuggestions, generateSchemaForPage } from './schema-suggester.js';
 import { runSalesAudit } from './sales-audit.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials } from './google-auth.js';
@@ -813,6 +813,21 @@ app.get('/api/webflow/schema-suggestions/:siteId', async (req, res) => {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('Schema suggester error:', msg, err);
     res.status(500).json({ error: `Schema suggestion failed: ${msg}` });
+  }
+});
+
+app.post('/api/webflow/schema-suggestions/:siteId/page', async (req, res) => {
+  const { pageId } = req.body;
+  if (!pageId) return res.status(400).json({ error: 'pageId required' });
+  try {
+    const token = getTokenForSite(req.params.siteId) || undefined;
+    const result = await generateSchemaForPage(req.params.siteId, pageId, token);
+    if (!result) return res.status(404).json({ error: 'Page not found' });
+    res.json(result);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('Single-page schema error:', msg, err);
+    res.status(500).json({ error: `Schema generation failed: ${msg}` });
   }
 });
 
