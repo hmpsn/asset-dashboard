@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useToast } from './Toast';
 import {
   Check, Globe, ExternalLink, Search, Loader2, Copy, CheckCircle,
   LogIn, LogOut, ChevronRight, Users, Unplug, Lock, KeyRound, X, BarChart3,
@@ -25,7 +26,11 @@ interface GA4Property {
   propertyId: string;
 }
 
+type SettingsTab = 'connections' | 'integrations' | 'dashboards';
+
 export function SettingsPanel() {
+  const { toast } = useToast();
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>('connections');
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [gscSites, setGscSites] = useState<GscSite[]>([]);
   const [ga4Properties, setGa4Properties] = useState<GA4Property[]>([]);
@@ -88,13 +93,15 @@ export function SettingsPanel() {
       });
       const updated = await res.json();
       setWorkspaces(prev => prev.map(w => w.id === workspaceId ? { ...w, gscPropertyUrl: updated.gscPropertyUrl } : w));
-    } catch { /* ignore */ }
+      toast('Search Console property saved');
+    } catch { toast('Failed to save property', 'error'); }
   };
 
   const copyClientLink = (wsId: string) => {
     const url = `${window.location.origin}/client/${wsId}`;
     navigator.clipboard.writeText(url);
     setCopiedLink(wsId);
+    toast('Dashboard link copied');
     setTimeout(() => setCopiedLink(null), 2000);
   };
 
@@ -109,7 +116,8 @@ export function SettingsPanel() {
       setWorkspaces(prev => prev.map(w => w.id === wsId ? { ...w, hasPassword: updated.hasPassword } : w));
       setEditingPassword(null);
       setNewPassword('');
-    } catch { /* ignore */ }
+      toast('Password saved');
+    } catch { toast('Failed to save password', 'error'); }
     finally { setSavingPassword(false); }
   };
 
@@ -122,7 +130,8 @@ export function SettingsPanel() {
       });
       const updated = await res.json();
       setWorkspaces(prev => prev.map(w => w.id === wsId ? { ...w, hasPassword: updated.hasPassword } : w));
-    } catch { /* ignore */ }
+      toast('Password removed');
+    } catch { toast('Failed to remove password', 'error'); }
     finally { setSavingPassword(false); }
   };
 
@@ -134,7 +143,8 @@ export function SettingsPanel() {
       });
       const updated = await res.json();
       setWorkspaces(prev => prev.map(w => w.id === workspaceId ? { ...w, ga4PropertyId: updated.ga4PropertyId } : w));
-    } catch { /* ignore */ }
+      toast('GA4 property saved');
+    } catch { toast('Failed to save GA4 property', 'error'); }
   };
 
   const linked = workspaces.filter(w => w.webflowSiteId);
@@ -142,7 +152,22 @@ export function SettingsPanel() {
   const dashboardReady = workspaces.filter(w => w.webflowSiteId);
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto">
+      {/* Settings tab navigation */}
+      <nav className="flex items-center gap-1 mb-6 border-b" style={{ borderColor: 'var(--brand-border)' }}>
+        {([['connections', 'Connections'], ['integrations', 'Integrations'], ['dashboards', 'Client Dashboards']] as [SettingsTab, string][]).map(([id, label]) => (
+          <button key={id} onClick={() => setSettingsTab(id)}
+            className="px-4 py-2.5 text-xs font-medium border-b-2 transition-colors -mb-px"
+            style={settingsTab === id ? { borderColor: 'var(--brand-mint)', color: 'var(--brand-mint)' } : { borderColor: 'transparent', color: 'var(--brand-text-muted)' }}>
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      <div className="space-y-6">
+
+      {/* ═══ CONNECTIONS TAB ═══ */}
+      {settingsTab === 'connections' && (<>
       {/* Google Search Console Connection */}
       <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
         <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid var(--brand-border)' }}>
@@ -188,6 +213,60 @@ export function SettingsPanel() {
         )}
       </section>
 
+      {/* Webflow Connections */}
+      <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
+        <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--brand-border)' }}>
+          <div className="flex items-center gap-2">
+            <Globe className="w-4 h-4 text-teal-400" />
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Webflow Connections</h3>
+          </div>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--brand-text-muted)' }}>
+            Link sites from the workspace dropdown. Generate tokens at{' '}
+            <a href="https://webflow.com/dashboard/account/integrations" target="_blank" rel="noopener noreferrer" className="text-teal-400 hover:text-teal-300 inline-flex items-center gap-0.5">
+              webflow.com <ExternalLink className="w-3 h-3" />
+            </a>
+          </p>
+        </div>
+        <div className="divide-y" style={{ borderColor: 'var(--brand-border)' }}>
+          {linked.map(ws => (
+            <div key={ws.id} className="px-5 py-3 flex items-center gap-3">
+              <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span className="text-sm font-medium" style={{ color: 'var(--brand-text-bright)' }}>{ws.name}</span>
+              <span className="text-xs text-zinc-500">{ws.webflowSiteName}</span>
+            </div>
+          ))}
+          {unlinked.map(ws => (
+            <div key={ws.id} className="px-5 py-3 flex items-center gap-3 opacity-60">
+              <Unplug className="w-4 h-4 text-zinc-600 shrink-0" />
+              <span className="text-sm text-zinc-500">{ws.name}</span>
+              <span className="text-xs text-zinc-600 ml-auto">Not linked</span>
+            </div>
+          ))}
+          {workspaces.length === 0 && (
+            <div className="px-5 py-4">
+              <p className="text-sm text-zinc-500">No workspaces yet. Create one from the workspace dropdown.</p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* API Keys */}
+      <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
+        <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--brand-border)' }}>
+          <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>API Keys</h3>
+        </div>
+        <div className="px-5 py-3 flex items-center gap-3">
+          <Check className="w-4 h-4 text-emerald-400" />
+          <div>
+            <span className="text-sm" style={{ color: 'var(--brand-text)' }}>OpenAI API Key</span>
+            <span className="text-xs text-zinc-500 ml-2">Configured via .env</span>
+          </div>
+        </div>
+      </section>
+      </>)}
+
+      {/* ═══ INTEGRATIONS TAB ═══ */}
+      {settingsTab === 'integrations' && (<>
       {/* Workspace GSC Assignment */}
       {gscSites.length > 0 && linked.length > 0 && (
         <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
@@ -221,7 +300,7 @@ export function SettingsPanel() {
       )}
 
       {/* GA4 Analytics Assignment */}
-      {ga4Properties.length > 0 && linked.length > 0 && (
+      {ga4Properties.length > 0 && linked.length > 0 ? (
         <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
           <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--brand-border)' }}>
             <div className="flex items-center gap-2">
@@ -253,8 +332,11 @@ export function SettingsPanel() {
             ))}
           </div>
         </section>
-      )}
+      ) : null}
+      </>)}
 
+      {/* ═══ DASHBOARDS TAB ═══ */}
+      {settingsTab === 'dashboards' && (<>
       {/* Client Dashboard Links */}
       {dashboardReady.length > 0 && (
         <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
@@ -359,56 +441,9 @@ export function SettingsPanel() {
         </section>
       )}
 
-      {/* Webflow Connections */}
-      <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
-        <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--brand-border)' }}>
-          <div className="flex items-center gap-2">
-            <Globe className="w-4 h-4 text-teal-400" />
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Webflow Connections</h3>
-          </div>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--brand-text-muted)' }}>
-            Link sites from the workspace dropdown. Generate tokens at{' '}
-            <a href="https://webflow.com/dashboard/account/integrations" target="_blank" rel="noopener noreferrer" className="text-teal-400 hover:text-teal-300 inline-flex items-center gap-0.5">
-              webflow.com <ExternalLink className="w-3 h-3" />
-            </a>
-          </p>
-        </div>
-        <div className="divide-y" style={{ borderColor: 'var(--brand-border)' }}>
-          {linked.map(ws => (
-            <div key={ws.id} className="px-5 py-3 flex items-center gap-3">
-              <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span className="text-sm font-medium" style={{ color: 'var(--brand-text-bright)' }}>{ws.name}</span>
-              <span className="text-xs text-zinc-500">{ws.webflowSiteName}</span>
-            </div>
-          ))}
-          {unlinked.map(ws => (
-            <div key={ws.id} className="px-5 py-3 flex items-center gap-3 opacity-60">
-              <Unplug className="w-4 h-4 text-zinc-600 shrink-0" />
-              <span className="text-sm text-zinc-500">{ws.name}</span>
-              <span className="text-xs text-zinc-600 ml-auto">Not linked</span>
-            </div>
-          ))}
-          {workspaces.length === 0 && (
-            <div className="px-5 py-4">
-              <p className="text-sm text-zinc-500">No workspaces yet. Create one from the workspace dropdown.</p>
-            </div>
-          )}
-        </div>
-      </section>
+      </>)}
 
-      {/* API Keys */}
-      <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
-        <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--brand-border)' }}>
-          <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>API Keys</h3>
-        </div>
-        <div className="px-5 py-3 flex items-center gap-3">
-          <Check className="w-4 h-4 text-emerald-400" />
-          <div>
-            <span className="text-sm" style={{ color: 'var(--brand-text)' }}>OpenAI API Key</span>
-            <span className="text-xs text-zinc-500 ml-2">Configured via .env</span>
-          </div>
-        </div>
-      </section>
+      </div>
     </div>
   );
 }

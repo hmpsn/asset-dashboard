@@ -310,13 +310,30 @@ export function ClientDashboard({ workspaceId }: Props) {
   };
 
   if (loading) return (
-    <div className="min-h-screen bg-[#0a0a1a] flex items-center justify-center">
-      <div className="flex flex-col items-center gap-3 text-zinc-500"><Loader2 className="w-6 h-6 animate-spin" /><p className="text-sm">Loading dashboard...</p></div>
+    <div className="min-h-screen bg-[#0a0a1a] text-zinc-200">
+      <header className="border-b border-zinc-800">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-4">
+          <div className="h-6 w-24 bg-zinc-800 rounded animate-pulse" />
+          <div className="w-px h-8 bg-zinc-800" />
+          <div><div className="h-5 w-40 bg-zinc-800 rounded animate-pulse" /><div className="h-3 w-28 bg-zinc-800/50 rounded animate-pulse mt-1.5" /></div>
+        </div>
+        <div className="max-w-6xl mx-auto px-6 pb-3 flex gap-4">
+          {[1,2,3,4].map(i => <div key={i} className="h-4 w-20 bg-zinc-800/50 rounded animate-pulse" />)}
+        </div>
+      </header>
+      <main className="max-w-6xl mx-auto px-6 py-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {[1,2,3,4,5].map(i => <div key={i} className="bg-zinc-900 rounded-xl p-4 border border-zinc-800"><div className="h-4 w-4 bg-zinc-800 rounded mb-2 animate-pulse" /><div className="h-7 w-16 bg-zinc-800 rounded animate-pulse" /><div className="h-3 w-20 bg-zinc-800/50 rounded animate-pulse mt-2" /></div>)}
+        </div>
+      </main>
     </div>
   );
   if (error || !ws) return (
     <div className="min-h-screen bg-[#0a0a1a] flex items-center justify-center">
-      <p className="text-red-400 text-sm">{error || 'Dashboard not found'}</p>
+      <div className="text-center">
+        <p className="text-red-400 text-sm mb-3">{error || 'Dashboard not found'}</p>
+        <button onClick={() => window.location.reload()} className="text-xs text-zinc-400 hover:text-zinc-200 px-3 py-1.5 rounded-lg border border-zinc-700 hover:border-zinc-600 transition-colors">Try Again</button>
+      </div>
     </div>
   );
 
@@ -326,6 +343,7 @@ export function ClientDashboard({ workspaceId }: Props) {
       <div className="w-full max-w-sm">
         <div className="bg-zinc-900 rounded-2xl border border-zinc-800 p-8 shadow-2xl shadow-black/40">
           <div className="flex flex-col items-center mb-6">
+            <img src="/logo.svg" alt="hmpsn studio" className="h-5 opacity-60 mb-4" />
             <div className="w-12 h-12 rounded-2xl bg-violet-500/10 flex items-center justify-center mb-4">
               <Lock className="w-6 h-6 text-violet-400" />
             </div>
@@ -393,10 +411,10 @@ export function ClientDashboard({ workspaceId }: Props) {
             <div className="w-px h-8 bg-zinc-800" />
             <div>
               <h1 className="text-lg font-semibold">{ws.name}</h1>
-              <p className="text-xs text-zinc-500 mt-0.5">Performance Dashboard</p>
+              <p className="text-xs text-zinc-500 mt-0.5">Performance Dashboard{(overview || audit || ga4Overview) && <span className="ml-2 text-zinc-600">· Updated {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}</p>
             </div>
           </div>
-          {overview && (
+          {(overview || ga4Overview) && (
             <div className="flex items-center gap-1 bg-zinc-900 rounded-lg border border-zinc-800 p-0.5">
               {[7, 28, 90].map(d => (
                 <button key={d} onClick={() => changeDays(d)}
@@ -407,20 +425,22 @@ export function ClientDashboard({ workspaceId }: Props) {
           )}
         </div>
         <div className="max-w-6xl mx-auto px-6">
-          <nav className="flex items-center gap-1 -mb-px">
+          <nav className="flex items-center gap-1 -mb-px overflow-x-auto scrollbar-none">
             {NAV.map(t => {
               const Icon = t.icon;
               const active = tab === t.id;
-              const disabled = false;
+              const hasData = (t.id === 'overview') ||
+                (t.id === 'search' && !!overview) ||
+                (t.id === 'health' && !!audit) ||
+                (t.id === 'analytics' && !!ga4Overview);
               return (
-                <button key={t.id} onClick={() => !disabled && setTab(t.id)} disabled={disabled}
+                <button key={t.id} onClick={() => setTab(t.id)}
                   className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium border-b-2 transition-colors ${
                     active ? 'border-violet-500 text-violet-400' :
-                    disabled ? 'border-transparent text-zinc-700 cursor-not-allowed' :
                     'border-transparent text-zinc-500 hover:text-zinc-300 hover:border-zinc-700'
                   }`}>
                   <Icon className="w-3.5 h-3.5" /> {t.label}
-                  {disabled && <span className="text-[9px] bg-zinc-800 text-zinc-600 px-1.5 py-0.5 rounded ml-1">Soon</span>}
+                  {hasData && !active && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" />}
                 </button>
               );
             })}
@@ -433,7 +453,7 @@ export function ClientDashboard({ workspaceId }: Props) {
         {/* ════════════ OVERVIEW TAB ════════════ */}
         {tab === 'overview' && (<>
           {/* Score cards row */}
-          <div className="grid grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {audit ? (
               <button onClick={() => setTab('health')} className="bg-zinc-900 rounded-xl p-4 border border-zinc-800 hover:border-zinc-700 transition-colors text-left">
                 <div className="flex items-center justify-between mb-1">
@@ -479,7 +499,7 @@ export function ClientDashboard({ workspaceId }: Props) {
           </div>
 
           {/* Two-column layout */}
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <div className="space-y-5">
               {trend.length > 2 && (
                 <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
@@ -971,7 +991,7 @@ export function ClientDashboard({ workspaceId }: Props) {
       </main>
 
       {/* Floating AI Chat */}
-      {overview && (<>
+      {(overview || audit || ga4Overview) && (<>
         {!chatOpen && (
           <button onClick={() => setChatOpen(true)}
             className="fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white text-sm font-medium shadow-lg shadow-violet-900/30 transition-all z-50">
@@ -1024,6 +1044,14 @@ export function ClientDashboard({ workspaceId }: Props) {
           </div>
         )}
       </>)}
+
+      {/* Powered by footer */}
+      <footer className="border-t border-zinc-800/50 mt-12">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+          <span className="text-[10px] text-zinc-700">Powered by hmpsn studio</span>
+          <a href="https://hmpsn.studio" target="_blank" rel="noopener noreferrer" className="text-[10px] text-zinc-700 hover:text-zinc-500 transition-colors">hmpsn.studio</a>
+        </div>
+      </footer>
     </div>
   );
 }

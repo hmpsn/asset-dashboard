@@ -13,6 +13,7 @@ import { ClientDashboard } from './components/ClientDashboard';
 import { LoginScreen } from './components/LoginScreen';
 import { useAuth } from './hooks/useAuth';
 import { useWebSocket } from './hooks/useWebSocket';
+import { ToastProvider } from './components/Toast';
 import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, FileSearch, Search,
 } from 'lucide-react';
@@ -25,7 +26,7 @@ function App() {
   if (clientMatch) {
     return <ClientDashboard workspaceId={clientMatch[1]} />;
   }
-  return <AdminApp />;
+  return <ToastProvider><AdminApp /></ToastProvider>;
 }
 
 function AdminApp() {
@@ -63,6 +64,19 @@ function Dashboard() {
     fetch('/api/queue').then(r => r.json()).then(setQueue).catch(() => {});
     refreshHealth();
   }, [refreshHealth]);
+
+  // Keyboard shortcuts (⌘1-5 for tabs, ⌘, for settings)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!e.metaKey && !e.ctrlKey) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
+      const tabMap: Record<string, Tab> = { '1': 'media', '2': 'seo', '3': 'search', '4': 'performance', '5': 'speed' };
+      if (tabMap[e.key] && selected) { e.preventDefault(); setTab(tabMap[e.key]); }
+      if (e.key === ',') { e.preventDefault(); setTab('settings'); }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selected]);
 
   // Global clipboard paste handler (⌘V)
   useEffect(() => {
@@ -185,7 +199,7 @@ function Dashboard() {
     { id: 'media', label: 'Media', icon: Image },
     { id: 'seo', label: 'SEO', icon: Globe },
     { id: 'search', label: 'Search', icon: Search },
-    { id: 'performance', label: 'Performance', icon: BarChart3 },
+    { id: 'performance', label: 'Page Weight', icon: BarChart3 },
     { id: 'speed', label: 'Speed', icon: Gauge },
   ];
 
@@ -276,11 +290,26 @@ function Dashboard() {
             <SalesReport />
           </div>
         ) : !selected ? (
-          <div className="flex flex-col items-center justify-center h-full gap-4">
+          <div className="flex flex-col items-center justify-center h-full gap-6">
             <img src="/logo.svg" alt="hmpsn.studio" className="h-8 opacity-40" />
-            <div className="text-center">
-              <p className="text-sm font-medium" style={{ color: 'var(--brand-text-bright)' }}>Select or create a workspace</p>
-              <p className="text-xs mt-1" style={{ color: 'var(--brand-text-muted)' }}>Each workspace maps to a Webflow site</p>
+            <div className="text-center max-w-sm">
+              <p className="text-base font-semibold mb-1" style={{ color: 'var(--brand-text-bright)' }}>Welcome to hmpsn studio</p>
+              <p className="text-xs leading-relaxed" style={{ color: 'var(--brand-text-muted)' }}>Get started in 3 steps:</p>
+            </div>
+            <div className="flex flex-col gap-3 w-full max-w-xs">
+              {[
+                { step: '1', text: 'Create a workspace', desc: 'Use the selector in the top right' },
+                { step: '2', text: 'Link a Webflow site', desc: 'Paste your API token to connect' },
+                { step: '3', text: 'Connect Google', desc: 'Go to Settings for Search Console & GA4' },
+              ].map(s => (
+                <div key={s.step} className="flex items-start gap-3 px-4 py-3 rounded-lg" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-xs font-bold" style={{ backgroundColor: 'var(--brand-mint-dim)', color: 'var(--brand-mint)' }}>{s.step}</div>
+                  <div>
+                    <div className="text-xs font-medium" style={{ color: 'var(--brand-text-bright)' }}>{s.text}</div>
+                    <div className="text-[11px] mt-0.5" style={{ color: 'var(--brand-text-muted)' }}>{s.desc}</div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         ) : (
@@ -303,6 +332,7 @@ function Dashboard() {
                   <Globe className="w-5 h-5" style={{ color: 'var(--brand-text-muted)' }} />
                 </div>
                 <p className="text-sm" style={{ color: 'var(--brand-text-muted)' }}>Link a Webflow site for SEO tools</p>
+                <button onClick={() => setTab('settings')} className="mt-3 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors" style={{ backgroundColor: 'var(--brand-mint-dim)', color: 'var(--brand-mint)' }}>Go to Settings</button>
               </div>
             )}
 
@@ -315,6 +345,7 @@ function Dashboard() {
                   <Search className="w-5 h-5" style={{ color: 'var(--brand-text-muted)' }} />
                 </div>
                 <p className="text-sm" style={{ color: 'var(--brand-text-muted)' }}>Link a Webflow site for Search Console data</p>
+                <button onClick={() => setTab('settings')} className="mt-3 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors" style={{ backgroundColor: 'var(--brand-mint-dim)', color: 'var(--brand-mint)' }}>Go to Settings</button>
               </div>
             )}
 
@@ -327,6 +358,7 @@ function Dashboard() {
                   <BarChart3 className="w-5 h-5" style={{ color: 'var(--brand-text-muted)' }} />
                 </div>
                 <p className="text-sm" style={{ color: 'var(--brand-text-muted)' }}>Link a Webflow site to analyze performance</p>
+                <button onClick={() => setTab('settings')} className="mt-3 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors" style={{ backgroundColor: 'var(--brand-mint-dim)', color: 'var(--brand-mint)' }}>Go to Settings</button>
               </div>
             )}
 
@@ -339,6 +371,7 @@ function Dashboard() {
                   <Gauge className="w-5 h-5" style={{ color: 'var(--brand-text-muted)' }} />
                 </div>
                 <p className="text-sm" style={{ color: 'var(--brand-text-muted)' }}>Link a Webflow site to test page speed</p>
+                <button onClick={() => setTab('settings')} className="mt-3 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors" style={{ backgroundColor: 'var(--brand-mint-dim)', color: 'var(--brand-mint)' }}>Go to Settings</button>
               </div>
             )}
           </div>
@@ -350,6 +383,7 @@ function Dashboard() {
         hasOpenAIKey={health.hasOpenAIKey}
         hasWebflowToken={health.hasWebflowToken}
         connected={connected}
+        workspaceCount={workspaces.length}
       />
 
     </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, ChevronDown, Link, Link2Off, Trash2, Globe, Eye, EyeOff, ExternalLink } from 'lucide-react';
+import { Plus, ChevronDown, Link, Link2Off, Trash2, Globe, Eye, EyeOff, ExternalLink, MoreHorizontal, AlertTriangle } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export interface Workspace {
@@ -37,6 +37,8 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
   const [sites, setSites] = useState<WebflowSite[]>([]);
   const [loadingSites, setLoadingSites] = useState(false);
   const [tokenError, setTokenError] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const tokenInputRef = useRef<HTMLInputElement>(null);
 
   const handleCreate = () => {
@@ -123,11 +125,11 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-0.5">
+                    <div className="flex items-center gap-0.5 relative">
                       {ws.webflowSiteId ? (
                         <button
                           onClick={(e) => { e.stopPropagation(); onUnlinkSite(ws.id); }}
-                          className="p-1 hover:bg-zinc-600 rounded"
+                          className="p-1 hover:bg-zinc-600 rounded opacity-0 group-hover:opacity-100 transition-opacity"
                           title="Unlink site"
                         >
                           <Link2Off className="w-3 h-3 text-zinc-400" />
@@ -135,18 +137,28 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
                       ) : (
                         <button
                           onClick={(e) => { e.stopPropagation(); setLinkingId(linkingId === ws.id ? null : ws.id); }}
-                          className="p-1 hover:bg-zinc-600 rounded"
+                          className="p-1 hover:bg-zinc-600 rounded opacity-0 group-hover:opacity-100 transition-opacity"
                           title="Link Webflow site"
                         >
                           <Globe className="w-3 h-3 text-zinc-400" />
                         </button>
                       )}
                       <button
-                        onClick={(e) => { e.stopPropagation(); onDelete(ws.id); }}
-                        className="p-1 hover:bg-zinc-600 rounded"
+                        onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === ws.id ? null : ws.id); }}
+                        className="p-1 hover:bg-zinc-600 rounded opacity-0 group-hover:opacity-100 transition-opacity"
                       >
-                        <Trash2 className="w-3 h-3 text-zinc-400" />
+                        <MoreHorizontal className="w-3 h-3 text-zinc-400" />
                       </button>
+                      {menuOpen === ws.id && (
+                        <div className="absolute right-0 top-full mt-1 w-36 rounded-lg shadow-xl z-50 py-1" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border-hover)' }}>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setConfirmDelete(ws.id); setMenuOpen(null); }}
+                            className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 transition-colors"
+                          >
+                            <Trash2 className="w-3 h-3" /> Delete workspace
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -248,6 +260,32 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
                 New workspace
               </button>
             )}
+          </div>
+        </div>
+      )}
+      {/* Delete confirmation modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100]" onClick={() => setConfirmDelete(null)}>
+          <div className="w-80 rounded-xl p-5 shadow-2xl" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border-hover)' }} onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-9 h-9 rounded-lg bg-red-500/10 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-4 h-4 text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Delete workspace?</h3>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--brand-text-muted)' }}>
+                  This will permanently remove <strong>{workspaces.find(w => w.id === confirmDelete)?.name}</strong> and all its data.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setConfirmDelete(null)} className="flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors" style={{ backgroundColor: 'var(--brand-bg-surface)', color: 'var(--brand-text-muted)', border: '1px solid var(--brand-border)' }}>
+                Cancel
+              </button>
+              <button onClick={() => { onDelete(confirmDelete); setConfirmDelete(null); setOpen(false); }} className="flex-1 px-3 py-2 rounded-lg text-xs font-medium bg-red-600 hover:bg-red-500 text-white transition-colors">
+                Delete
+              </button>
+            </div>
           </div>
         </div>
       )}

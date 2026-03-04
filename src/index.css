@@ -34,6 +34,22 @@ h1, h2, h3, h4, h5, h6 {
   letter-spacing: -0.02em;
 }
 
+/* Client dashboard theme tokens */
+.client-dashboard {
+  --cd-bg: #0a0a1a;
+  --cd-surface: #18181b;
+  --cd-border: #27272a;
+  --cd-border-hover: #3f3f46;
+  --cd-text: #d4d4d8;
+  --cd-text-muted: #71717a;
+  --cd-text-dim: #52525b;
+  --cd-accent: #8b5cf6;
+}
+
+/* Hide scrollbar utility */
+.scrollbar-none::-webkit-scrollbar { display: none; }
+.scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
