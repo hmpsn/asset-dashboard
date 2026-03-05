@@ -3,6 +3,7 @@ import {
   MessageSquare, Send, Loader2, ChevronDown, ChevronUp,
   Trash2, ExternalLink, Clock, CheckCircle2, AlertTriangle,
   Filter, Search, Paperclip, FileText, X,
+  Play, CheckCheck, ArrowRight,
 } from 'lucide-react';
 
 type RequestPriority = 'low' | 'medium' | 'high' | 'urgent';
@@ -74,6 +75,8 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [wsFilter, setWsFilter] = useState<string>(workspaceId || 'all');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   useEffect(() => {
     fetch('/api/workspaces').then(r => r.json()).then(setWorkspaces).catch(() => {});
@@ -134,8 +137,69 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
     try {
       await fetch(`/api/requests/${id}`, { method: 'DELETE' });
       setRequests(prev => prev.filter(r => r.id !== id));
+      setSelected(prev => { const n = new Set(prev); n.delete(id); return n; });
       if (expandedId === id) setExpandedId(null);
     } catch { /* skip */ }
+  };
+
+  // Bulk operations
+  const bulkUpdateStatus = async (status: RequestStatus) => {
+    if (selected.size === 0) return;
+    setBulkUpdating(true);
+    try {
+      const res = await fetch('/api/requests/bulk', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selected), status }),
+      });
+      if (res.ok) {
+        setRequests(prev => prev.map(r => selected.has(r.id) ? { ...r, status, updatedAt: new Date().toISOString() } : r));
+        setSelected(new Set());
+      }
+    } catch { /* skip */ }
+    setBulkUpdating(false);
+  };
+
+  const bulkDelete = async () => {
+    if (selected.size === 0) return;
+    if (!confirm(`Delete ${selected.size} selected task${selected.size > 1 ? 's' : ''}? This cannot be undone.`)) return;
+    setBulkUpdating(true);
+    try {
+      await Promise.all(Array.from(selected).map(id => fetch(`/api/requests/${id}`, { method: 'DELETE' })));
+      setRequests(prev => prev.filter(r => !selected.has(r.id)));
+      setSelected(new Set());
+    } catch { /* skip */ }
+    setBulkUpdating(false);
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelected(prev => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+
+  const selectAll = () => {
+    if (selected.size === filtered.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(filtered.map(r => r.id)));
+    }
+  };
+
+  const quickStatus = async (id: string, status: RequestStatus) => {
+    await updateRequest(id, { status });
+  };
+
+  const nextStatus = (current: RequestStatus): RequestStatus | null => {
+    const flow: Record<string, RequestStatus> = {
+      new: 'in_progress',
+      in_review: 'in_progress',
+      in_progress: 'completed',
+      on_hold: 'in_progress',
+    };
+    return flow[current] || null;
   };
 
   const filtered = requests
@@ -166,19 +230,36 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-3">
-        {[
-          { label: 'Total', value: counts.total, color: 'var(--brand-text-bright)' },
-          { label: 'New', value: counts.new, color: '#60a5fa' },
-          { label: 'Active', value: counts.in_progress, color: '#2dd4bf' },
-          { label: 'Resolved', value: counts.completed, color: '#4ade80' },
-        ].map(s => (
-          <div key={s.label} className="rounded-xl p-4" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
-            <div className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--brand-text-muted)' }}>{s.label}</div>
-            <div className="text-xl font-bold mt-1" style={{ color: s.color }}>{s.value}</div>
+      {/* Stats + Progress */}
+      <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-6">
+            {[
+              { label: 'Total', value: counts.total, color: 'var(--brand-text-bright)' },
+              { label: 'New', value: counts.new, color: '#60a5fa' },
+              { label: 'Active', value: counts.in_progress, color: '#2dd4bf' },
+              { label: 'Resolved', value: counts.completed, color: '#4ade80' },
+            ].map(s => (
+              <div key={s.label} className="text-center">
+                <div className="text-xl font-bold" style={{ color: s.color }}>{s.value}</div>
+                <div className="text-[9px] font-medium uppercase tracking-wider" style={{ color: 'var(--brand-text-muted)' }}>{s.label}</div>
+              </div>
+            ))}
           </div>
-        ))}
+          {counts.total > 0 && (
+            <div className="text-right">
+              <div className="text-lg font-bold" style={{ color: '#4ade80' }}>
+                {Math.round((counts.completed / counts.total) * 100)}%
+              </div>
+              <div className="text-[9px] uppercase tracking-wider" style={{ color: 'var(--brand-text-muted)' }}>Complete</div>
+            </div>
+          )}
+        </div>
+        {counts.total > 0 && (
+          <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--brand-bg)' }}>
+            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(counts.completed / counts.total) * 100}%`, backgroundColor: '#4ade80' }} />
+          </div>
+        )}
       </div>
 
       {/* Filters */}
@@ -224,51 +305,128 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
         </div>
       )}
 
+      {/* Bulk action bar */}
+      {selected.size > 0 && (
+        <div className="rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '2px solid var(--brand-mint)', boxShadow: '0 0 12px rgba(45,212,191,0.1)' }}>
+          <div className="flex items-center gap-2">
+            <CheckCheck className="w-4 h-4" style={{ color: 'var(--brand-mint)' }} />
+            <span className="text-xs font-semibold" style={{ color: 'var(--brand-text-bright)' }}>{selected.size} selected</span>
+          </div>
+          <div className="h-4 w-px" style={{ backgroundColor: 'var(--brand-border)' }} />
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] uppercase tracking-wider mr-1" style={{ color: 'var(--brand-text-muted)' }}>Set status:</span>
+            {STATUS_OPTIONS.map(s => (
+              <button key={s.value} onClick={() => bulkUpdateStatus(s.value)} disabled={bulkUpdating}
+                className={`px-2 py-1 rounded text-[10px] font-medium border transition-colors hover:opacity-90 disabled:opacity-50 ${s.color}`}>
+                {s.label}
+              </button>
+            ))}
+          </div>
+          <div className="h-4 w-px" style={{ backgroundColor: 'var(--brand-border)' }} />
+          <button onClick={bulkDelete} disabled={bulkUpdating}
+            className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50">
+            <Trash2 className="w-3 h-3" /> Delete
+          </button>
+          <button onClick={() => setSelected(new Set())} className="ml-auto text-[10px] hover:underline" style={{ color: 'var(--brand-text-muted)' }}>
+            Clear selection
+          </button>
+        </div>
+      )}
+
       {/* Request list */}
       {!loading && filtered.length > 0 && (
         <div className="space-y-2">
+          {/* Select all header */}
+          <div className="flex items-center gap-2 px-2 py-1">
+            <button onClick={selectAll} className="flex items-center gap-1.5 text-[10px] font-medium transition-colors" style={{ color: 'var(--brand-text-muted)' }}>
+              <div className="w-4 h-4 rounded border flex items-center justify-center transition-colors"
+                style={selected.size === filtered.length && filtered.length > 0
+                  ? { backgroundColor: 'var(--brand-mint)', borderColor: 'var(--brand-mint)' }
+                  : { borderColor: 'var(--brand-border)' }}>
+                {selected.size === filtered.length && filtered.length > 0 && <CheckCheck className="w-3 h-3 text-black" />}
+              </div>
+              {selected.size === filtered.length && filtered.length > 0 ? 'Deselect all' : 'Select all'}
+            </button>
+          </div>
+
           {filtered.map(req => {
             const isExpanded = expandedId === req.id;
+            const isSelected = selected.has(req.id);
             const statusOpt = STATUS_OPTIONS.find(s => s.value === req.status) || STATUS_OPTIONS[0];
             const priorityOpt = PRIORITY_OPTIONS.find(p => p.value === req.priority) || PRIORITY_OPTIONS[1];
             const unreadTeam = req.notes.filter(n => n.author === 'client').length;
+            const isDone = req.status === 'completed' || req.status === 'closed';
+            const next = nextStatus(req.status);
 
             return (
-              <div key={req.id} className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
+              <div key={req.id} className={`rounded-xl overflow-hidden transition-all ${isSelected ? 'ring-1' : ''}`}
+                style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)', ...(isSelected ? { ringColor: 'var(--brand-mint)' } : {}) }}>
                 {/* Row header */}
-                <button onClick={() => { setExpandedId(isExpanded ? null : req.id); setNoteInput(''); }}
-                  className="w-full px-5 py-3.5 text-left hover:opacity-90 transition-opacity">
-                  <div className="flex items-center gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-medium truncate" style={{ color: 'var(--brand-text-bright)' }}>{req.title}</span>
-                        <span className={`text-[9px] px-1.5 py-0.5 rounded border shrink-0 ${statusOpt.color}`}>
-                          {statusOpt.label}
-                        </span>
-                        <span className={`text-[9px] shrink-0 ${priorityOpt.color}`}>
-                          {priorityOpt.label}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--brand-text-muted)' }}>
-                        <span className="px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--brand-bg)', color: 'var(--brand-text-dim)' }}>
-                          {wsName(req.workspaceId)}
-                        </span>
-                        <span className="px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--brand-bg)' }}>
-                          {CAT_LABELS[req.category] || req.category}
-                        </span>
-                        {req.submittedBy && <span style={{ color: 'var(--brand-text-bright)' }}>by {req.submittedBy}</span>}
-                        <span><Clock className="w-2.5 h-2.5 inline mr-0.5" />{new Date(req.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                        {unreadTeam > 0 && <span style={{ color: 'var(--brand-mint)' }}>{unreadTeam} client note{unreadTeam !== 1 ? 's' : ''}</span>}
-                        {req.pageUrl && (
-                          <span className="flex items-center gap-0.5 truncate max-w-[140px]">
-                            <ExternalLink className="w-2.5 h-2.5" />{req.pageUrl}
-                          </span>
-                        )}
-                      </div>
+                <div className="flex items-center">
+                  {/* Checkbox */}
+                  <button onClick={() => toggleSelect(req.id)} className="px-3 py-3.5 flex-shrink-0 self-stretch flex items-center"
+                    style={{ borderRight: '1px solid var(--brand-border)' }}>
+                    <div className="w-4 h-4 rounded border flex items-center justify-center transition-colors"
+                      style={isSelected
+                        ? { backgroundColor: 'var(--brand-mint)', borderColor: 'var(--brand-mint)' }
+                        : { borderColor: 'var(--brand-border)' }}>
+                      {isSelected && <CheckCheck className="w-3 h-3 text-black" />}
                     </div>
-                    {isExpanded ? <ChevronUp className="w-4 h-4 shrink-0" style={{ color: 'var(--brand-text-muted)' }} /> : <ChevronDown className="w-4 h-4 shrink-0" style={{ color: 'var(--brand-text-muted)' }} />}
+                  </button>
+                  {/* Main row */}
+                  <button onClick={() => { setExpandedId(isExpanded ? null : req.id); setNoteInput(''); }}
+                    className="flex-1 px-4 py-3.5 text-left hover:opacity-90 transition-opacity min-w-0">
+                    <div className="flex items-center gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-xs font-medium truncate ${isDone ? 'line-through opacity-60' : ''}`} style={{ color: 'var(--brand-text-bright)' }}>{req.title}</span>
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded border shrink-0 ${statusOpt.color}`}>
+                            {statusOpt.label}
+                          </span>
+                          <span className={`text-[9px] shrink-0 ${priorityOpt.color}`}>
+                            {priorityOpt.label}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--brand-text-muted)' }}>
+                          <span className="px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--brand-bg)', color: 'var(--brand-text-dim)' }}>
+                            {wsName(req.workspaceId)}
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--brand-bg)' }}>
+                            {CAT_LABELS[req.category] || req.category}
+                          </span>
+                          {req.submittedBy && <span style={{ color: 'var(--brand-text-bright)' }}>by {req.submittedBy}</span>}
+                          <span><Clock className="w-2.5 h-2.5 inline mr-0.5" />{new Date(req.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                          {unreadTeam > 0 && <span style={{ color: 'var(--brand-mint)' }}>{unreadTeam} client note{unreadTeam !== 1 ? 's' : ''}</span>}
+                          {req.pageUrl && (
+                            <span className="flex items-center gap-0.5 truncate max-w-[140px]">
+                              <ExternalLink className="w-2.5 h-2.5" />{req.pageUrl}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {isExpanded ? <ChevronUp className="w-4 h-4 shrink-0" style={{ color: 'var(--brand-text-muted)' }} /> : <ChevronDown className="w-4 h-4 shrink-0" style={{ color: 'var(--brand-text-muted)' }} />}
+                    </div>
+                  </button>
+                  {/* Quick action buttons */}
+                  <div className="flex items-center gap-1 px-3 flex-shrink-0">
+                    {next && !isDone && (
+                      <button onClick={() => quickStatus(req.id, next)}
+                        className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-colors"
+                        style={{ backgroundColor: next === 'completed' ? 'rgba(74,222,128,0.1)' : 'rgba(45,212,191,0.1)', color: next === 'completed' ? '#4ade80' : 'var(--brand-mint)' }}
+                        title={next === 'in_progress' ? 'Start working' : next === 'completed' ? 'Mark complete' : next}>
+                        {next === 'in_progress' ? <><Play className="w-3 h-3" /> Start</> : <><CheckCircle2 className="w-3 h-3" /> Done</>}
+                      </button>
+                    )}
+                    {isDone && (
+                      <button onClick={() => quickStatus(req.id, 'in_progress')}
+                        className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-colors"
+                        style={{ backgroundColor: 'rgba(45,212,191,0.1)', color: 'var(--brand-mint)' }}
+                        title="Reopen task">
+                        <ArrowRight className="w-3 h-3" /> Reopen
+                      </button>
+                    )}
                   </div>
-                </button>
+                </div>
 
                 {/* Expanded detail */}
                 {isExpanded && (

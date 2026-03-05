@@ -3017,6 +3017,30 @@ app.post('/api/requests', (req, res) => {
   res.json(request);
 });
 
+// Internal: batch create requests (from audit findings)
+app.post('/api/requests/batch', (req, res) => {
+  const { workspaceId, items } = req.body as { workspaceId: string; items: Array<{ title: string; description: string; category?: string; priority?: string; pageUrl?: string }> };
+  if (!workspaceId || !Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'workspaceId and items[] required' });
+  const created = items.map(item =>
+    createRequest(workspaceId, { title: item.title, description: item.description, category: (item.category as 'seo') || 'seo', priority: (item.priority as 'high') || 'medium', pageUrl: item.pageUrl, submittedBy: 'Web Team' })
+  );
+  broadcast('request:batch_created', { count: created.length });
+  res.json({ created: created.length, ids: created.map(r => r.id) });
+});
+
+// Internal: bulk update request status
+app.patch('/api/requests/bulk', (req, res) => {
+  const { ids, status, priority } = req.body as { ids: string[]; status?: string; priority?: string };
+  if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids[] required' });
+  const updates: Record<string, string> = {};
+  if (status) updates.status = status;
+  if (priority) updates.priority = priority;
+  const results = ids.map(id => updateRequest(id, updates));
+  const succeeded = results.filter(Boolean).length;
+  broadcast('request:bulk_updated', { count: succeeded, status });
+  res.json({ updated: succeeded, total: ids.length });
+});
+
 // Internal: list all requests (optionally filtered by workspace)
 app.get('/api/requests', (req, res) => {
   const wsId = req.query.workspaceId as string | undefined;

@@ -541,22 +541,76 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit' }: Props) {
   // Audit → Task pipeline
   const [createdTasks, setCreatedTasks] = useState<Set<string>>(new Set());
   const [creatingTask, setCreatingTask] = useState<string | null>(null);
+  const [batchCreating, setBatchCreating] = useState(false);
+  const [batchResult, setBatchResult] = useState<{ count: number; timestamp: number } | null>(null);
+
+  const issueToTaskKey = (page: PageSeoResult, issue: SeoIssue) =>
+    `${page.pageId}-${issue.check}-${issue.message.slice(0, 30)}`;
+
+  const issueToTaskItem = (page: PageSeoResult, issue: SeoIssue) => ({
+    title: `[Audit] ${issue.severity === 'error' ? '🔴' : issue.severity === 'warning' ? '⚠️' : 'ℹ️'} ${issue.check}: ${issue.message.slice(0, 80)}`,
+    description: `Page: ${page.page}\nSlug: ${page.slug}\n\nIssue: ${issue.message}\n\nRecommendation: ${issue.recommendation}${issue.suggestedFix ? `\n\nAI Suggestion: ${issue.suggestedFix}` : ''}${issue.value ? `\n\nCurrent value: ${issue.value}` : ''}`,
+    category: 'seo',
+    priority: issue.severity === 'error' ? 'high' : 'medium',
+    pageUrl: page.slug,
+  });
 
   const createTaskFromIssue = async (page: PageSeoResult, issue: SeoIssue) => {
     if (!workspaceId) return;
-    const taskKey = `${page.pageId}-${issue.check}-${issue.message.slice(0, 30)}`;
+    const taskKey = issueToTaskKey(page, issue);
     setCreatingTask(taskKey);
     try {
-      const title = `[Audit] ${issue.severity === 'error' ? '🔴' : '⚠️'} ${issue.check}: ${issue.message.slice(0, 80)}`;
-      const description = `Page: ${page.page}\nSlug: ${page.slug}\n\nIssue: ${issue.message}\n\nRecommendation: ${issue.recommendation}${issue.suggestedFix ? `\n\nAI Suggestion: ${issue.suggestedFix}` : ''}${issue.value ? `\n\nCurrent value: ${issue.value}` : ''}`;
+      const item = issueToTaskItem(page, issue);
       const res = await fetch(`/api/requests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workspaceId, title, description, category: 'seo', priority: issue.severity === 'error' ? 'high' : 'medium', pageUrl: page.slug }),
+        body: JSON.stringify({ workspaceId, ...item }),
       });
       if (res.ok) setCreatedTasks(prev => new Set(prev).add(taskKey));
     } catch { /* skip */ }
     finally { setCreatingTask(null); }
+  };
+
+  const batchCreateTasks = async (mode: 'all' | 'errors' | 'filtered') => {
+    if (!workspaceId || !data) return;
+    setBatchCreating(true);
+    try {
+      const pages = mode === 'filtered' ? filteredPages : data.pages;
+      const items: ReturnType<typeof issueToTaskItem>[] = [];
+      const keys: string[] = [];
+      for (const page of pages) {
+        const issues = mode === 'errors'
+          ? page.issues.filter(i => i.severity === 'error')
+          : mode === 'filtered'
+            ? page.issues
+                .filter(i => severityFilter === 'all' || i.severity === severityFilter)
+                .filter(i => categoryFilter === 'all' || i.category === categoryFilter)
+            : page.issues;
+        for (const issue of issues) {
+          const key = issueToTaskKey(page, issue);
+          if (!createdTasks.has(key)) {
+            items.push(issueToTaskItem(page, issue));
+            keys.push(key);
+          }
+        }
+      }
+      if (items.length === 0) { setBatchCreating(false); return; }
+      const res = await fetch('/api/requests/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceId, items }),
+      });
+      if (res.ok) {
+        const result = await res.json();
+        setCreatedTasks(prev => {
+          const next = new Set(prev);
+          keys.forEach(k => next.add(k));
+          return next;
+        });
+        setBatchResult({ count: result.created, timestamp: Date.now() });
+      }
+    } catch { /* skip */ }
+    finally { setBatchCreating(false); }
   };
 
   // Scheduled audit state
@@ -1158,13 +1212,55 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit' }: Props) {
         })}
       </div>
 
-      {/* Showing count */}
-      <div className="text-xs text-zinc-600 px-1">
-        Showing {filteredPages.length} of {data.pages.length} pages
-        {(severityFilter !== 'all' || categoryFilter !== 'all') && (
-          <button onClick={() => { setSeverityFilter('all'); setCategoryFilter('all'); }} className="ml-2 text-zinc-500 hover:text-zinc-300 underline">
-            Clear filters
-          </button>
+      {/* Showing count + batch actions */}
+      <div className="flex items-center justify-between px-1">
+        <div className="text-xs text-zinc-600">
+          Showing {filteredPages.length} of {data.pages.length} pages
+          {(severityFilter !== 'all' || categoryFilter !== 'all') && (
+            <button onClick={() => { setSeverityFilter('all'); setCategoryFilter('all'); }} className="ml-2 text-zinc-500 hover:text-zinc-300 underline">
+              Clear filters
+            </button>
+          )}
+        </div>
+        {workspaceId && (
+          <div className="flex items-center gap-2">
+            {batchResult && Date.now() - batchResult.timestamp < 8000 && (
+              <span className="text-[10px] text-emerald-400 flex items-center gap-1">
+                <CheckCircle className="w-3 h-3" /> {batchResult.count} tasks created
+              </span>
+            )}
+            {batchCreating ? (
+              <span className="flex items-center gap-1.5 text-[10px] text-zinc-400">
+                <Loader2 className="w-3 h-3 animate-spin" /> Creating tasks...
+              </span>
+            ) : (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => batchCreateTasks('errors')}
+                  className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors"
+                  title="Create tasks for all errors"
+                >
+                  <ClipboardList className="w-3 h-3" /> Add Errors ({data.errors})
+                </button>
+                {(severityFilter !== 'all' || categoryFilter !== 'all') && (
+                  <button
+                    onClick={() => batchCreateTasks('filtered')}
+                    className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-violet-500/10 border border-violet-500/20 text-violet-400 hover:bg-violet-500/20 transition-colors"
+                    title="Create tasks for currently filtered issues"
+                  >
+                    <ClipboardList className="w-3 h-3" /> Add Filtered
+                  </button>
+                )}
+                <button
+                  onClick={() => batchCreateTasks('all')}
+                  className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-600 transition-colors"
+                  title="Create tasks for ALL findings"
+                >
+                  <ClipboardList className="w-3 h-3" /> Add All ({data.errors + data.warnings + data.infos})
+                </button>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
