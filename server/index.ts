@@ -265,6 +265,13 @@ app.get('/api/workspaces', (_req, res) => {
   res.json(workspaces);
 });
 
+app.get('/api/workspaces/:id', (req, res) => {
+  const ws = getWorkspace(req.params.id);
+  if (!ws) return res.status(404).json({ error: 'Not found' });
+  const safe = { ...ws, webflowToken: undefined, clientPassword: undefined, hasPassword: !!ws.clientPassword };
+  res.json(safe);
+});
+
 app.post('/api/workspaces', (req, res) => {
   const { name, webflowSiteId, webflowSiteName } = req.body;
   if (!name) return res.status(400).json({ error: 'Name required' });

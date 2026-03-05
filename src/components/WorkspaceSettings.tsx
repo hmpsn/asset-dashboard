@@ -53,6 +53,9 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
   const [editingDisplayName, setEditingDisplayName] = useState('');
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupColor, setNewGroupColor] = useState('#14b8a6');
+  const [ga4Pages, setGa4Pages] = useState<{path: string}[]>([]);
+  const [expandedGroupPages, setExpandedGroupPages] = useState<string | null>(null);
+  const [groupPageSearch, setGroupPageSearch] = useState('');
 
   const GROUP_COLORS = ['#14b8a6', '#60a5fa', '#34d399', '#fbbf24', '#f472b6', '#fb923c', '#2dd4bf', '#e879f9'];
 
@@ -129,9 +132,13 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
   const loadEvents = async () => {
     setShowEventConfig(true); setLoadingEvents(true);
     try {
-      const res = await fetch(`/api/public/analytics-events/${workspaceId}?days=28`);
-      const events = await res.json();
+      const [evRes, pgRes] = await Promise.all([
+        fetch(`/api/public/analytics-events/${workspaceId}?days=28`),
+        fetch(`/api/public/analytics-top-pages/${workspaceId}?days=28`),
+      ]);
+      const [events, pages] = await Promise.all([evRes.json(), pgRes.json()]);
       if (Array.isArray(events)) setAvailableEvents(events);
+      if (Array.isArray(pages)) setGa4Pages(pages);
       setLocalEventConfig(ws?.eventConfig || []);
       setLocalGroups(ws?.eventGroups || []);
     } catch { setAvailableEvents([]); }
@@ -274,7 +281,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
 
           {/* GSC Property */}
           {googleStatus?.connected && gscSites.length > 0 && (
-            <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
+            <section className="rounded-xl" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
               <div className="px-5 py-4 flex items-center gap-3">
                 <Search className="w-4 h-4 text-blue-400" />
                 <span className="text-sm font-medium flex-1" style={{ color: 'var(--brand-text-bright)' }}>Search Console Property</span>
@@ -295,7 +302,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
 
           {/* GA4 Property */}
           {googleStatus?.connected && ga4Properties.length > 0 && (
-            <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
+            <section className="rounded-xl" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
               <div className="px-5 py-4 flex items-center gap-3">
                 <BarChart3 className="w-4 h-4 text-teal-400" />
                 <span className="text-sm font-medium flex-1" style={{ color: 'var(--brand-text-bright)' }}>GA4 Property</span>
@@ -440,24 +447,72 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                               <button onClick={() => moveGroup(g.id, 1)} disabled={idx === localGroups.length - 1} className="p-0.5 text-zinc-600 hover:text-zinc-400 disabled:opacity-30"><ArrowDown className="w-3 h-3" /></button>
                               <button onClick={() => removeGroup(g.id)} className="p-0.5 text-red-400/50 hover:text-red-400"><Trash2 className="w-3 h-3" /></button>
                             </div>
-                            <div className="px-2 pb-2 flex flex-wrap items-center gap-2">
+                            <div className="px-2 pb-2 space-y-2">
                               <div className="flex items-center gap-1.5">
                                 <label className="text-[10px] text-zinc-600 whitespace-nowrap">Default page:</label>
-                                <input
+                                <SearchableSelect
+                                  options={(() => {
+                                    const allowed = g.allowedPages || [];
+                                    const pages = allowed.length > 0
+                                      ? ga4Pages.filter(p => allowed.some(ap => p.path.includes(ap)))
+                                      : ga4Pages;
+                                    return pages.map(p => ({ value: p.path, label: p.path }));
+                                  })()}
                                   value={g.defaultPageFilter || ''}
-                                  onChange={e => setLocalGroups(prev => prev.map(gr => gr.id === g.id ? { ...gr, defaultPageFilter: e.target.value || undefined } : gr))}
-                                  placeholder="/contact"
-                                  className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 w-28 focus:outline-none focus:border-teal-500 placeholder:text-zinc-600"
+                                  onChange={val => setLocalGroups(prev => prev.map(gr => gr.id === g.id ? { ...gr, defaultPageFilter: val || undefined } : gr))}
+                                  placeholder="Search pages..."
+                                  emptyLabel="None"
+                                  className="w-40"
                                 />
                               </div>
-                              <div className="flex items-center gap-1.5">
-                                <label className="text-[10px] text-zinc-600 whitespace-nowrap">Allowed pages:</label>
-                                <input
-                                  value={(g.allowedPages || []).join(', ')}
-                                  onChange={e => setLocalGroups(prev => prev.map(gr => gr.id === g.id ? { ...gr, allowedPages: e.target.value ? e.target.value.split(',').map(s => s.trim()).filter(Boolean) : undefined } : gr))}
-                                  placeholder="/page1, /page2"
-                                  className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 w-40 focus:outline-none focus:border-teal-500 placeholder:text-zinc-600"
-                                />
+                              <div>
+                                <div className="flex items-center gap-1.5 mb-1">
+                                  <label className="text-[10px] text-zinc-600 whitespace-nowrap">Allowed pages:</label>
+                                  <span className="text-[10px] text-zinc-600">{(g.allowedPages || []).length ? `${g.allowedPages!.length} selected` : 'All pages'}</span>
+                                  <button onClick={() => { setExpandedGroupPages(expandedGroupPages === g.id ? null : g.id); setGroupPageSearch(''); }}
+                                    className="text-[10px] text-teal-400 hover:text-teal-300 ml-auto">{expandedGroupPages === g.id ? 'Close' : 'Edit'}</button>
+                                </div>
+                                {expandedGroupPages === g.id && (
+                                  <div className="bg-zinc-800/50 border border-zinc-700/50 rounded-lg p-2 mt-1">
+                                    <div className="flex items-center gap-1.5 mb-2">
+                                      <Search className="w-3 h-3 text-zinc-500" />
+                                      <input value={groupPageSearch} onChange={e => setGroupPageSearch(e.target.value)}
+                                        placeholder="Filter pages..."
+                                        className="flex-1 bg-transparent text-[10px] text-zinc-300 placeholder:text-zinc-600 focus:outline-none" />
+                                      {(g.allowedPages || []).length > 0 && (
+                                        <button onClick={() => setLocalGroups(prev => prev.map(gr => gr.id === g.id ? { ...gr, allowedPages: undefined } : gr))}
+                                          className="text-[10px] text-zinc-500 hover:text-zinc-300">Clear all</button>
+                                      )}
+                                    </div>
+                                    <div className="max-h-[150px] overflow-y-auto space-y-0.5">
+                                      {ga4Pages
+                                        .filter(p => !groupPageSearch || p.path.toLowerCase().includes(groupPageSearch.toLowerCase()))
+                                        .map(p => {
+                                          const checked = (g.allowedPages || []).some(ap => p.path.includes(ap));
+                                          return (
+                                            <label key={p.path} className="flex items-center gap-1.5 px-1 py-0.5 rounded hover:bg-zinc-700/30 cursor-pointer">
+                                              <input type="checkbox" checked={checked}
+                                                onChange={() => {
+                                                  setLocalGroups(prev => prev.map(gr => {
+                                                    if (gr.id !== g.id) return gr;
+                                                    const current = gr.allowedPages || [];
+                                                    const next = checked
+                                                      ? current.filter(ap => !p.path.includes(ap))
+                                                      : [...current, p.path];
+                                                    return { ...gr, allowedPages: next.length > 0 ? next : undefined };
+                                                  }));
+                                                }}
+                                                className="w-3 h-3 rounded border-zinc-600 bg-zinc-800 text-teal-500 focus:ring-0 focus:ring-offset-0 accent-teal-500" />
+                                              <span className="text-[10px] text-zinc-300 truncate">{p.path}</span>
+                                            </label>
+                                          );
+                                        })}
+                                      {ga4Pages.filter(p => !groupPageSearch || p.path.toLowerCase().includes(groupPageSearch.toLowerCase())).length === 0 && (
+                                        <p className="text-[10px] text-zinc-600 text-center py-2">No pages found</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
