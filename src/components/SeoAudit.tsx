@@ -4,7 +4,7 @@ import {
   Loader2, Search as SearchIcon, ChevronDown, ChevronRight, Download,
   AlertTriangle, AlertCircle, Info, CheckCircle, Globe, FileText,
   RefreshCw, X, Clock, Share2, Copy, ExternalLink,
-  TrendingUp, TrendingDown, Minus, Plus, ListChecks, Trash2, Circle,
+  TrendingUp, TrendingDown, Minus, Plus, ListChecks, Trash2, Circle, ClipboardList,
 } from 'lucide-react';
 import { SeoEditor } from './SeoEditor';
 import { LinkChecker } from './LinkChecker';
@@ -535,6 +535,27 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit' }: Props) {
     } finally {
       setApplyingFix(null);
     }
+  };
+
+  // Audit → Task pipeline
+  const [createdTasks, setCreatedTasks] = useState<Set<string>>(new Set());
+  const [creatingTask, setCreatingTask] = useState<string | null>(null);
+
+  const createTaskFromIssue = async (page: PageSeoResult, issue: SeoIssue) => {
+    if (!workspaceId) return;
+    const taskKey = `${page.pageId}-${issue.check}-${issue.message.slice(0, 30)}`;
+    setCreatingTask(taskKey);
+    try {
+      const title = `[Audit] ${issue.severity === 'error' ? '🔴' : '⚠️'} ${issue.check}: ${issue.message.slice(0, 80)}`;
+      const description = `Page: ${page.page}\nSlug: ${page.slug}\n\nIssue: ${issue.message}\n\nRecommendation: ${issue.recommendation}${issue.suggestedFix ? `\n\nAI Suggestion: ${issue.suggestedFix}` : ''}${issue.value ? `\n\nCurrent value: ${issue.value}` : ''}`;
+      const res = await fetch(`/api/requests`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceId, title, description, category: 'seo', priority: issue.severity === 'error' ? 'high' : 'medium', pageUrl: page.slug }),
+      });
+      if (res.ok) setCreatedTasks(prev => new Set(prev).add(taskKey));
+    } catch { /* skip */ }
+    finally { setCreatingTask(null); }
   };
 
   const [bulkApplying, setBulkApplying] = useState(false);
@@ -1129,6 +1150,21 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit' }: Props) {
                               })()}
                             </div>
                             <div className="flex items-center gap-1 flex-shrink-0">
+                              {workspaceId && (() => {
+                                const taskKey = `${page.pageId}-${issue.check}-${issue.message.slice(0, 30)}`;
+                                const isCreated = createdTasks.has(taskKey);
+                                const isCreating = creatingTask === taskKey;
+                                return isCreated ? (
+                                  <span className="text-[9px] px-1 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 flex items-center gap-0.5">
+                                    <CheckCircle className="w-2.5 h-2.5" /> Task
+                                  </span>
+                                ) : (
+                                  <button onClick={() => createTaskFromIssue(page, issue)} disabled={isCreating}
+                                    className="text-[9px] px-1 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 border border-zinc-700 flex items-center gap-0.5 transition-colors disabled:opacity-50" title="Create request from this finding">
+                                    {isCreating ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <ClipboardList className="w-2.5 h-2.5" />} Task
+                                  </button>
+                                );
+                              })()}
                               {catCfg && (
                                 <span className={`text-[9px] px-1 py-0.5 rounded border border-zinc-800 ${catCfg.color}`}>
                                   {catCfg.label}

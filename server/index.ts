@@ -2845,6 +2845,15 @@ app.post('/api/public/requests/:workspaceId/:requestId/notes', (req, res) => {
   res.json(updated);
 });
 
+// Internal: create request (e.g. from audit finding)
+app.post('/api/requests', (req, res) => {
+  const { workspaceId, title, description, category, priority, pageUrl } = req.body;
+  if (!workspaceId || !title || !description) return res.status(400).json({ error: 'workspaceId, title, and description required' });
+  const request = createRequest(workspaceId, { title, description, category: category || 'seo', priority, pageUrl, submittedBy: 'Web Team' });
+  broadcast('request:created', request);
+  res.json(request);
+});
+
 // Internal: list all requests (optionally filtered by workspace)
 app.get('/api/requests', (req, res) => {
   const wsId = req.query.workspaceId as string | undefined;
