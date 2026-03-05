@@ -4,6 +4,7 @@ import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import multer from 'multer';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -78,8 +79,8 @@ if (APP_PASSWORD) {
   app.use((req, res, next) => {
     // Allow health check without auth
     if (req.path === '/api/health' || req.path === '/api/health/diag') return next();
-    // Check cookie or header
-    const token = req.headers['x-auth-token'];
+    // Check header or cookie
+    const token = req.headers['x-auth-token'] || req.cookies?.auth_token;
     if (token === APP_PASSWORD) return next();
     // Allow auth endpoints through
     if (req.path === '/api/auth/login' && req.method === 'POST') return next();
@@ -100,6 +101,7 @@ if (APP_PASSWORD) {
 }
 
 app.use(cors());
+app.use(cookieParser());
 app.use(express.json());
 
 // Auth login endpoint
@@ -107,6 +109,12 @@ app.post('/api/auth/login', express.json(), (req, res) => {
   const { password } = req.body;
   if (!APP_PASSWORD) return res.json({ ok: true });
   if (password === APP_PASSWORD) {
+    res.cookie('auth_token', APP_PASSWORD, {
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      secure: IS_PROD,
+    });
     res.json({ ok: true, token: APP_PASSWORD });
   } else {
     res.status(401).json({ error: 'Invalid password' });
@@ -115,7 +123,7 @@ app.post('/api/auth/login', express.json(), (req, res) => {
 
 app.get('/api/auth/check', (req, res) => {
   if (!APP_PASSWORD) return res.json({ required: false });
-  const token = req.headers['x-auth-token'];
+  const token = req.headers['x-auth-token'] || req.cookies?.auth_token;
   res.json({ required: true, authenticated: token === APP_PASSWORD });
 });
 

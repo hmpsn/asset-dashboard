@@ -290,7 +290,7 @@ function Dashboard() {
     }
 
     if (tab === 'media') return <MediaTab key={selected.folder} siteId={selected.webflowSiteId} workspaceFolder={selected.folder} queue={workspaceQueue} />;
-    if (seoView) return <SeoAudit key={`seo-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} view={seoView} />;
+    if (seoView) return <SeoAudit key={`seo-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} siteName={selected.webflowSiteName || selected.name} view={seoView} />;
     if (tab === 'search') return <SearchConsole key={`search-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} gscPropertyUrl={selected.gscPropertyUrl} />;
     if (tab === 'page-weight') return <PageWeight key={`weight-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
     if (tab === 'page-speed') return <PageSpeedPanel key={`speed-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;

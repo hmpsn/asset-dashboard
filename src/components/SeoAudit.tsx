@@ -70,6 +70,7 @@ interface SnapshotSummary {
 interface Props {
   siteId: string;
   workspaceId?: string;
+  siteName?: string;
   view?: string;
 }
 
@@ -484,7 +485,7 @@ function AuditHistory({ siteId, history, onRefresh }: { siteId: string; history:
   );
 }
 
-function SeoAudit({ siteId, workspaceId, view = 'audit' }: Props) {
+function SeoAudit({ siteId, workspaceId, siteName, view = 'audit' }: Props) {
   const { startJob, jobs } = useBackgroundTasks();
   const auditJobId = useRef<string | null>(null);
   const [data, setData] = useState<SeoAuditResult | null>(null);
@@ -636,13 +637,22 @@ function SeoAudit({ siteId, workspaceId, view = 'audit' }: Props) {
       const res = await fetch(`/api/reports/${siteId}/snapshot`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ siteName: siteId, audit: data }),
+        body: JSON.stringify({ siteName: siteName || siteId, audit: data }),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(`Failed to save report: ${err.error || res.statusText}`);
+        setSaving(false);
+        return;
+      }
       const result = await res.json();
       const url = `${window.location.origin}/report/${result.id}`;
       setShareUrl(url);
       loadHistory();
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.error('Save and share failed:', err);
+      alert('Failed to save report. Check your connection.');
+    }
     setSaving(false);
   };
 
