@@ -604,11 +604,29 @@ function SeoAudit({ siteId, workspaceId, view = 'audit' }: Props) {
   }, [siteId]);
 
   useEffect(() => {
-    setData(null);
-    setHasRun(false);
+    // Check for existing completed or running seo-audit job for this site
+    const existingJob = jobs
+      .filter(j => j.type === 'seo-audit' && j.status === 'done' && j.result)
+      .find(j => {
+        const r = j.result as SeoAuditResult;
+        return r && Array.isArray(r.pages);
+      });
+    const runningJob = jobs.find(j => j.type === 'seo-audit' && (j.status === 'running' || j.status === 'pending'));
+
+    if (existingJob && !data) {
+      setData(existingJob.result as SeoAuditResult);
+      setHasRun(true);
+    } else if (runningJob && !auditJobId.current) {
+      auditJobId.current = runningJob.id;
+      setLoading(true);
+      setHasRun(true);
+    } else if (!existingJob && !runningJob) {
+      setData(null);
+      setHasRun(false);
+    }
     setAuditError(null);
     loadHistory();
-  }, [siteId, loadHistory]);
+  }, [siteId, loadHistory]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSaveAndShare = async () => {
     if (!data) return;
