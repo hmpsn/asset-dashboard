@@ -35,13 +35,28 @@ export interface PageKeywordMap {
   currentPosition?: number;
   impressions?: number;
   clicks?: number;
+  // SEMRush enrichment
+  volume?: number;
+  difficulty?: number;
+  cpc?: number;
+  secondaryMetrics?: { keyword: string; volume: number; difficulty: number }[];
+}
+
+export interface KeywordGapItem {
+  keyword: string;
+  volume: number;
+  difficulty: number;
+  competitorPosition: number;
+  competitorDomain: string;
 }
 
 export interface KeywordStrategy {
   siteKeywords: string[];        // top-level target keywords for the whole site
   pageMap: PageKeywordMap[];     // keyword assignments per page
   opportunities: string[];       // keyword gaps / untapped opportunities
+  keywordGaps?: KeywordGapItem[]; // keywords competitors rank for but we don't
   businessContext?: string;      // user-provided context (locations, services, industry)
+  semrushMode?: 'quick' | 'full' | 'none'; // which SEMRush mode was used
   generatedAt: string;
 }
 
@@ -59,6 +74,7 @@ export interface Workspace {
   eventConfig?: EventDisplayConfig[];
   eventGroups?: EventGroup[];
   keywordStrategy?: KeywordStrategy;
+  competitorDomains?: string[];
   folder: string;
   createdAt: string;
 }
@@ -116,7 +132,7 @@ export function createWorkspace(name: string, webflowSiteId?: string, webflowSit
   return workspace;
 }
 
-export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy'>>): Workspace | null {
+export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains'>>): Workspace | null {
   const workspaces = readConfig();
   const idx = workspaces.findIndex(w => w.id === id);
   if (idx === -1) return null;

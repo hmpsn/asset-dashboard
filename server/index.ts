@@ -64,6 +64,7 @@ import { listAnnotations, addAnnotation, deleteAnnotation } from './annotations.
 import { startApprovalReminders } from './approval-reminders.js';
 import { startMonthlyReports, triggerMonthlyReport } from './monthly-report.js';
 import { listBriefs, getBrief, deleteBrief, generateBrief } from './content-brief.js';
+import { isSemrushConfigured, getKeywordOverview, getDomainOrganicKeywords, getKeywordGap, getRelatedKeywords, estimateCreditCost, clearSemrushCache } from './semrush.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
 import { listGscSites, getSearchOverview, getPerformanceTrend, getQueryPageData } from './search-console.js';
@@ -2497,7 +2498,14 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
   if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
   const businessContext = (req.body?.businessContext as string) || ws.keywordStrategy?.businessContext || '';
+  const semrushMode = (req.body?.semrushMode as string) || 'none'; // 'quick', 'full', 'none'
+  const competitorDomains = (req.body?.competitorDomains as string[]) || ws.competitorDomains || [];
   const token = getTokenForSite(ws.webflowSiteId) || undefined;
+
+  // Save competitor domains if provided
+  if (req.body?.competitorDomains) {
+    updateWorkspace(ws.id, { competitorDomains });
+  }
 
   try {
     // 1. Gather page data from Webflow
@@ -2560,7 +2568,71 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
       }
     }
 
-    // 5. Build rich context for AI
+    // 5. SEMRush data gathering (based on mode)
+    let semrushContext = '';
+    let semrushDomainData: Awaited<ReturnType<typeof getDomainOrganicKeywords>> = [];
+    let keywordGaps: Awaited<ReturnType<typeof getKeywordGap>> = [];
+    const relatedKws: Awaited<ReturnType<typeof getRelatedKeywords>> = [];
+
+    if (semrushMode !== 'none' && isSemrushConfigured()) {
+      const siteDomain = ws.liveDomain || (subdomain ? `${subdomain}.webflow.io` : '');
+
+      if (siteDomain) {
+        // Both quick and full: get domain organic keywords
+        try {
+          console.log(`[SEMRush] Fetching domain organic keywords for ${siteDomain}...`);
+          semrushDomainData = await getDomainOrganicKeywords(siteDomain, ws.id, semrushMode === 'full' ? 200 : 100);
+          console.log(`[SEMRush] Got ${semrushDomainData.length} domain keywords`);
+
+          if (semrushDomainData.length > 0) {
+            semrushContext += `\n\nSEMRush Domain Organic Keywords (real search volume + difficulty data):\n`;
+            semrushContext += semrushDomainData.slice(0, 100).map(k =>
+              `- "${k.keyword}" → ${k.url} (pos: #${k.position}, vol: ${k.volume}/mo, KD: ${k.difficulty}%, CPC: $${k.cpc}, traffic: ${k.traffic})`
+            ).join('\n');
+          }
+        } catch (err) {
+          console.error('[SEMRush] Domain organic error:', err);
+        }
+
+        // Full mode: competitor gap analysis + related keywords
+        if (semrushMode === 'full' && competitorDomains.length > 0) {
+          try {
+            console.log(`[SEMRush] Running keyword gap analysis vs ${competitorDomains.join(', ')}...`);
+            keywordGaps = await getKeywordGap(siteDomain, competitorDomains, ws.id, 50);
+            console.log(`[SEMRush] Found ${keywordGaps.length} keyword gaps`);
+
+            if (keywordGaps.length > 0) {
+              semrushContext += `\n\nCOMPETITOR KEYWORD GAPS (keywords competitors rank for but YOU don't — high-priority opportunities):\n`;
+              semrushContext += keywordGaps.slice(0, 30).map(g =>
+                `- "${g.keyword}" (vol: ${g.volume}/mo, KD: ${g.difficulty}%) — ${g.competitorDomain} ranks #${g.competitorPosition}`
+              ).join('\n');
+            }
+          } catch (err) {
+            console.error('[SEMRush] Keyword gap error:', err);
+          }
+
+          // Get related keywords for top 5 seed terms
+          try {
+            const seedKeywords = semrushDomainData.slice(0, 5).map(k => k.keyword);
+            for (const seed of seedKeywords) {
+              const related = await getRelatedKeywords(seed, ws.id, 10);
+              relatedKws.push(...related);
+            }
+            if (relatedKws.length > 0) {
+              const unique = relatedKws.filter((k, i, arr) => arr.findIndex(x => x.keyword === k.keyword) === i);
+              semrushContext += `\n\nSEMRush Related Keywords (expansion ideas with real volume):\n`;
+              semrushContext += unique.slice(0, 30).map(k =>
+                `- "${k.keyword}" (vol: ${k.volume}/mo, KD: ${k.difficulty}%)`
+              ).join('\n');
+            }
+          } catch (err) {
+            console.error('[SEMRush] Related keywords error:', err);
+          }
+        }
+      }
+    }
+
+    // 6. Build rich context for AI
     const pageList = pageInfo.map(p => {
       let entry = `- ${p.path}: "${p.title}"`;
       if (p.seoTitle) entry += ` | SEO title: "${p.seoTitle}"`;
@@ -2581,11 +2653,20 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
       businessSection = `\n\nBUSINESS CONTEXT (critical — use this to shape the entire strategy):\n${businessContext}\n`;
     }
 
+    const hasSemrush = semrushContext.length > 0;
+    const semrushInstructions = hasSemrush ? `
+- PRIORITIZE keywords with proven search volume from SEMRush data. Do NOT invent keywords when real data is available.
+- Use SEMRush keyword difficulty (KD%) to prioritize: target KD < 40% for quick wins, KD 40-60% for medium-term, KD > 60% only if highly relevant.
+- For each page's primaryKeyword, prefer keywords with volume data. Include the volume and difficulty in your reasoning.
+- COMPETITOR GAPS are the highest-priority opportunities — these are proven keywords with traffic that you're missing.
+- Use related keywords from SEMRush to inform secondary keywords — these have verified search volume.` : '';
+
     const prompt = `You are a senior SEO strategist with 15+ years of experience. Analyze this website deeply and create a comprehensive keyword strategy.
 ${businessSection}
 Site pages (with actual content excerpts):
 ${pageList}
 ${gscContext}
+${semrushContext}
 
 Create a keyword strategy as a JSON object with this exact structure:
 {
@@ -2602,15 +2683,15 @@ Create a keyword strategy as a JSON object with this exact structure:
 }
 
 Critical rules:
-- READ THE BUSINESS CONTEXT CAREFULLY. If the business operates in multiple locations, EVERY service page needs location-specific keyword variants (e.g. "plumbing services Austin", "plumbing services Houston", "plumbing services San Antonio")
+- READ THE BUSINESS CONTEXT CAREFULLY. If the business operates in multiple locations, EVERY service page needs location-specific keyword variants
 - Each page's primaryKeyword must be UNIQUE — no keyword cannibalization
 - Use GSC data to identify what's already ranking and what has untapped potential (high impressions but poor position = huge opportunity)
 - Primary keywords should be specific and high-intent, NOT generic (e.g. "commercial janitorial services Austin TX" not "cleaning services")
-- Secondary keywords must include: long-tail variants, question-based queries ("how much does X cost in Y"), location modifiers, and related terms
-- Opportunities should identify GAPS: missing location pages, unaddressed service combinations, missing comparison/vs content, missing FAQ content, etc.
+- Secondary keywords must include: long-tail variants, question-based queries, location modifiers, and related terms
+- Opportunities should identify GAPS: missing location pages, unaddressed service combinations, missing comparison/vs content, missing FAQ content${hasSemrush ? ', and keywords from competitor gap analysis' : ''}
 - If the site has location pages, each location needs its own keyword cluster
 - Consider searcher intent: informational, navigational, commercial, transactional
-- Cover ALL pages in the pageMap — do not skip any
+- Cover ALL pages in the pageMap — do not skip any${semrushInstructions}
 - Return ONLY valid JSON, no markdown fences, no explanation`;
 
     const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -2662,10 +2743,71 @@ Critical rules:
       }
     }
 
-    // 6. Save to workspace (preserve business context)
+    // Enrich pageMap with SEMRush volume/difficulty data
+    if (semrushDomainData.length > 0) {
+      // Build lookup: keyword → metrics
+      const kwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k]));
+      for (const pm of strategy.pageMap) {
+        const match = kwLookup.get(pm.primaryKeyword.toLowerCase());
+        if (match) {
+          pm.volume = match.volume;
+          pm.difficulty = match.difficulty;
+          pm.cpc = match.cpc;
+        } else {
+          // Try partial match
+          const partial = semrushDomainData.find(k =>
+            k.keyword.toLowerCase().includes(pm.primaryKeyword.toLowerCase()) ||
+            pm.primaryKeyword.toLowerCase().includes(k.keyword.toLowerCase())
+          );
+          if (partial) {
+            pm.volume = partial.volume;
+            pm.difficulty = partial.difficulty;
+            pm.cpc = partial.cpc;
+          }
+        }
+        // Enrich secondary keywords
+        if (pm.secondaryKeywords?.length) {
+          pm.secondaryMetrics = pm.secondaryKeywords
+            .map((sk: string) => {
+              const m = kwLookup.get(sk.toLowerCase());
+              return m ? { keyword: sk, volume: m.volume, difficulty: m.difficulty } : null;
+            })
+            .filter(Boolean) as { keyword: string; volume: number; difficulty: number }[];
+        }
+      }
+    }
+
+    // If we still have keywords without volume data and SEMRush is available, bulk-fetch them
+    if (isSemrushConfigured() && semrushMode !== 'none') {
+      const needsVolume = strategy.pageMap
+        .filter((pm: { volume?: number; primaryKeyword: string }) => !pm.volume)
+        .map((pm: { primaryKeyword: string }) => pm.primaryKeyword);
+      if (needsVolume.length > 0) {
+        try {
+          const metrics = await getKeywordOverview(needsVolume.slice(0, 30), ws.id);
+          const metricMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m]));
+          for (const pm of strategy.pageMap) {
+            if (!pm.volume) {
+              const m = metricMap.get(pm.primaryKeyword.toLowerCase());
+              if (m) {
+                pm.volume = m.volume;
+                pm.difficulty = m.difficulty;
+                pm.cpc = m.cpc;
+              }
+            }
+          }
+        } catch (err) {
+          console.error('[SEMRush] Keyword overview enrichment error:', err);
+        }
+      }
+    }
+
+    // 7. Save to workspace
     const keywordStrategy = {
       ...strategy,
+      keywordGaps: keywordGaps.length > 0 ? keywordGaps.slice(0, 30) : undefined,
       businessContext: businessContext || undefined,
+      semrushMode: semrushMode as 'quick' | 'full' | 'none',
       generatedAt: new Date().toISOString(),
     };
     updateWorkspace(ws.id, { keywordStrategy });
@@ -2676,6 +2818,21 @@ Critical rules:
     console.error('Keyword strategy error:', msg);
     res.status(500).json({ error: msg });
   }
+});
+
+// --- SEMRush Utilities ---
+app.get('/api/semrush/status', (_req, res) => {
+  res.json({ configured: isSemrushConfigured() });
+});
+
+app.post('/api/semrush/estimate', (req, res) => {
+  const { mode, competitorCount, keywordCount } = req.body;
+  res.json({ credits: estimateCreditCost({ mode: mode || 'quick', competitorCount, keywordCount }) });
+});
+
+app.delete('/api/semrush/cache/:workspaceId', (req, res) => {
+  clearSemrushCache(req.params.workspaceId);
+  res.json({ ok: true });
 });
 
 // Get stored keyword strategy

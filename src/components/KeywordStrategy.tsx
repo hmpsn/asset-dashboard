@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Loader2, Target, ChevronDown, ChevronRight, RefreshCw,
   TrendingUp, AlertCircle, Sparkles, Pencil, Check, X, Briefcase,
+  BarChart3, Shield, DollarSign, Users,
 } from 'lucide-react';
 
 interface PageKeywordMap {
@@ -12,13 +13,27 @@ interface PageKeywordMap {
   currentPosition?: number;
   impressions?: number;
   clicks?: number;
+  volume?: number;
+  difficulty?: number;
+  cpc?: number;
+  secondaryMetrics?: { keyword: string; volume: number; difficulty: number }[];
+}
+
+interface KeywordGapItem {
+  keyword: string;
+  volume: number;
+  difficulty: number;
+  competitorPosition: number;
+  competitorDomain: string;
 }
 
 interface KeywordStrategy {
   siteKeywords: string[];
   pageMap: PageKeywordMap[];
   opportunities: string[];
+  keywordGaps?: KeywordGapItem[];
   businessContext?: string;
+  semrushMode?: 'quick' | 'full' | 'none';
   generatedAt: string;
 }
 
@@ -37,6 +52,10 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const [saving, setSaving] = useState(false);
   const [businessContext, setBusinessContext] = useState('');
   const [contextOpen, setContextOpen] = useState(false);
+  const [semrushAvailable, setSemrushAvailable] = useState(false);
+  const [semrushMode, setSemrushMode] = useState<'none' | 'quick' | 'full'>('none');
+  const [competitors, setCompetitors] = useState('');
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const fetchStrategy = async () => {
     if (!workspaceId) return;
@@ -56,10 +75,20 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
 
   useEffect(() => { fetchStrategy(); }, [workspaceId]);
 
-  // Sync business context from loaded strategy
+  // Check SEMRush availability
+  useEffect(() => {
+    fetch('/api/semrush/status').then(r => r.json()).then(d => {
+      if (d.configured) setSemrushAvailable(true);
+    }).catch(() => {});
+  }, []);
+
+  // Sync business context + competitors from loaded strategy
   useEffect(() => {
     if (strategy?.businessContext && !businessContext) {
       setBusinessContext(strategy.businessContext);
+    }
+    if (strategy?.semrushMode && strategy.semrushMode !== 'none') {
+      setSemrushMode(strategy.semrushMode);
     }
   }, [strategy]);
 
@@ -67,10 +96,15 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     setGenerating(true);
     setError(null);
     try {
+      const compList = competitors.trim() ? competitors.split(/[,\n]+/).map(s => s.trim()).filter(Boolean) : undefined;
       const res = await fetch(`/api/webflow/keyword-strategy/${workspaceId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ businessContext: businessContext.trim() || undefined }),
+        body: JSON.stringify({
+          businessContext: businessContext.trim() || undefined,
+          semrushMode: semrushAvailable ? semrushMode : 'none',
+          competitorDomains: compList,
+        }),
       });
       const data = await res.json();
       if (data.error) {
@@ -137,6 +171,22 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     return 'text-red-400';
   };
 
+  const difficultyColor = (kd?: number) => {
+    if (kd === undefined) return 'text-zinc-500';
+    if (kd <= 30) return 'text-emerald-400';
+    if (kd <= 50) return 'text-amber-400';
+    if (kd <= 70) return 'text-orange-400';
+    return 'text-red-400';
+  };
+
+  const difficultyLabel = (kd?: number) => {
+    if (kd === undefined) return '';
+    if (kd <= 30) return 'Easy';
+    if (kd <= 50) return 'Medium';
+    if (kd <= 70) return 'Hard';
+    return 'Very Hard';
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -181,34 +231,103 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         </button>
       </div>
 
-      {/* Business Context */}
+      {/* Settings Panel */}
       <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
         <button
-          onClick={() => setContextOpen(!contextOpen)}
+          onClick={() => setSettingsOpen(!settingsOpen)}
           className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-zinc-800/20 transition-colors text-left"
         >
           <div className="flex items-center gap-2">
             <Briefcase className="w-3.5 h-3.5 text-violet-400" />
-            <span className="text-xs font-semibold text-zinc-300">Business Context</span>
-            {businessContext && !contextOpen && (
-              <span className="text-[10px] text-zinc-500 truncate max-w-[300px]">{businessContext.slice(0, 80)}...</span>
+            <span className="text-xs font-semibold text-zinc-300">Strategy Settings</span>
+            {!settingsOpen && (
+              <span className="text-[10px] text-zinc-500">
+                {semrushMode !== 'none' ? `SEMRush: ${semrushMode}` : ''}
+                {businessContext ? ` · Context set` : ''}
+                {competitors.trim() ? ` · ${competitors.split(/[,\n]+/).filter(Boolean).length} competitors` : ''}
+              </span>
             )}
           </div>
-          {contextOpen ? <ChevronDown className="w-3.5 h-3.5 text-zinc-600" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-600" />}
+          {settingsOpen ? <ChevronDown className="w-3.5 h-3.5 text-zinc-600" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-600" />}
         </button>
-        {contextOpen && (
-          <div className="px-4 pb-4 space-y-2">
-            <p className="text-[10px] text-zinc-500">
-              Describe your business so the AI understands your full context. Include: service areas/locations, target audience, key services, industry, and competitive differentiators.
-            </p>
-            <textarea
-              value={businessContext}
-              onChange={e => setBusinessContext(e.target.value)}
-              placeholder={`Example: We are a dental practice with offices in Austin, Houston, and San Antonio TX. We offer general dentistry, cosmetic dentistry, orthodontics, and pediatric dentistry. Our target audience is families and professionals ages 25-55. We compete with Aspen Dental and local practices.`}
-              rows={4}
-              className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-violet-500 resize-y"
-            />
-            <p className="text-[10px] text-zinc-600">This context is saved with your strategy and used for all future generations.</p>
+        {settingsOpen && (
+          <div className="px-4 pb-4 space-y-4">
+            {/* SEMRush Mode */}
+            {semrushAvailable && (
+              <div>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <BarChart3 className="w-3.5 h-3.5 text-orange-400" />
+                  <span className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider">SEMRush Data Mode</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['none', 'quick', 'full'] as const).map(mode => (
+                    <button
+                      key={mode}
+                      onClick={() => setSemrushMode(mode)}
+                      className={`px-3 py-2 rounded-lg border text-xs font-medium transition-all ${
+                        semrushMode === mode
+                          ? 'border-orange-500/50 bg-orange-500/10 text-orange-300'
+                          : 'border-zinc-700 bg-zinc-800 text-zinc-500 hover:text-zinc-300'
+                      }`}
+                    >
+                      <div className="font-semibold capitalize">{mode === 'none' ? 'Off' : mode}</div>
+                      <div className="text-[9px] mt-0.5 opacity-70">
+                        {mode === 'none' && 'AI + GSC only'}
+                        {mode === 'quick' && '~500 credits'}
+                        {mode === 'full' && '~7,500 credits'}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-zinc-600 mt-1.5">
+                  {semrushMode === 'quick' && 'Enriches keywords with real search volume + difficulty scores from SEMRush.'}
+                  {semrushMode === 'full' && 'Full competitive analysis: domain keywords, competitor gaps, related keywords, volume + difficulty.'}
+                  {semrushMode === 'none' && 'Uses AI + Google Search Console data only. No SEMRush API credits used.'}
+                </p>
+              </div>
+            )}
+
+            {/* Competitor Domains */}
+            {semrushAvailable && semrushMode === 'full' && (
+              <div>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Users className="w-3.5 h-3.5 text-orange-400" />
+                  <span className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider">Competitor Domains</span>
+                </div>
+                <input
+                  type="text"
+                  value={competitors}
+                  onChange={e => setCompetitors(e.target.value)}
+                  placeholder="e.g. competitor1.com, competitor2.com"
+                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-orange-500"
+                />
+                <p className="text-[10px] text-zinc-600 mt-1">Comma-separated. SEMRush will find keywords they rank for that you don't (max 3).</p>
+              </div>
+            )}
+
+            {/* Business Context */}
+            <div>
+              <button
+                onClick={() => setContextOpen(!contextOpen)}
+                className="flex items-center gap-1.5 mb-1"
+              >
+                <Briefcase className="w-3.5 h-3.5 text-violet-400" />
+                <span className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider">Business Context</span>
+                {contextOpen ? <ChevronDown className="w-3 h-3 text-zinc-600" /> : <ChevronRight className="w-3 h-3 text-zinc-600" />}
+              </button>
+              {contextOpen && (
+                <div className="space-y-1.5">
+                  <textarea
+                    value={businessContext}
+                    onChange={e => setBusinessContext(e.target.value)}
+                    placeholder={`Example: We are a dental practice in Austin, TX. We offer general, cosmetic, and pediatric dentistry. Target audience: families 25-55. Competitors: Aspen Dental, local practices.`}
+                    rows={3}
+                    className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-violet-500 resize-y"
+                  />
+                  <p className="text-[10px] text-zinc-600">Saved with your strategy. Include: locations, services, audience, differentiators.</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -284,10 +403,20 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                       <span className="text-xs text-zinc-300 truncate">{page.pageTitle}</span>
                       <span className="text-[10px] text-zinc-600 font-mono flex-shrink-0">{page.pagePath}</span>
                     </div>
-                    <div className="flex items-center gap-3 flex-shrink-0">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       <span className="text-[10px] text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded max-w-[200px] truncate">
                         {page.primaryKeyword}
                       </span>
+                      {page.volume !== undefined && (
+                        <span className="text-[9px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded font-mono">
+                          {page.volume.toLocaleString()}/mo
+                        </span>
+                      )}
+                      {page.difficulty !== undefined && (
+                        <span className={`text-[9px] ${difficultyColor(page.difficulty)} bg-zinc-800 px-1.5 py-0.5 rounded font-mono`}>
+                          KD {page.difficulty}%
+                        </span>
+                      )}
                       {page.currentPosition && (
                         <span className={`text-[10px] ${positionColor(page.currentPosition)} font-mono`}>
                           #{page.currentPosition.toFixed(0)}
@@ -323,23 +452,54 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                               ))}
                             </div>
                           </div>
-                          {(page.impressions || page.clicks) && (
-                            <div className="flex gap-4 mt-1">
-                              {page.impressions !== undefined && (
-                                <div className="text-[10px] text-zinc-500">
-                                  <span className="text-zinc-400 font-medium">{page.impressions.toLocaleString()}</span> impressions
-                                </div>
-                              )}
-                              {page.clicks !== undefined && (
-                                <div className="text-[10px] text-zinc-500">
-                                  <span className="text-zinc-400 font-medium">{page.clicks.toLocaleString()}</span> clicks
-                                </div>
-                              )}
-                              {page.currentPosition && (
-                                <div className="text-[10px] text-zinc-500">
-                                  Avg position: <span className={`font-medium ${positionColor(page.currentPosition)}`}>#{page.currentPosition.toFixed(1)}</span>
-                                </div>
-                              )}
+                          {/* Metrics row */}
+                          <div className="flex flex-wrap gap-3 mt-1">
+                            {page.volume !== undefined && (
+                              <div className="text-[10px] text-zinc-500 flex items-center gap-1">
+                                <BarChart3 className="w-3 h-3 text-orange-400" />
+                                <span className="text-zinc-300 font-medium">{page.volume.toLocaleString()}</span>/mo
+                              </div>
+                            )}
+                            {page.difficulty !== undefined && (
+                              <div className="text-[10px] text-zinc-500 flex items-center gap-1">
+                                <Shield className="w-3 h-3" />
+                                KD: <span className={`font-medium ${difficultyColor(page.difficulty)}`}>{page.difficulty}%</span>
+                                <span className={`text-[9px] ${difficultyColor(page.difficulty)}`}>({difficultyLabel(page.difficulty)})</span>
+                              </div>
+                            )}
+                            {page.cpc !== undefined && page.cpc > 0 && (
+                              <div className="text-[10px] text-zinc-500 flex items-center gap-1">
+                                <DollarSign className="w-3 h-3 text-green-400" />
+                                CPC: <span className="text-green-400 font-medium">${page.cpc.toFixed(2)}</span>
+                              </div>
+                            )}
+                            {page.impressions !== undefined && (
+                              <div className="text-[10px] text-zinc-500">
+                                <span className="text-zinc-400 font-medium">{page.impressions.toLocaleString()}</span> impressions
+                              </div>
+                            )}
+                            {page.clicks !== undefined && (
+                              <div className="text-[10px] text-zinc-500">
+                                <span className="text-zinc-400 font-medium">{page.clicks.toLocaleString()}</span> clicks
+                              </div>
+                            )}
+                            {page.currentPosition && (
+                              <div className="text-[10px] text-zinc-500">
+                                Avg position: <span className={`font-medium ${positionColor(page.currentPosition)}`}>#{page.currentPosition.toFixed(1)}</span>
+                              </div>
+                            )}
+                          </div>
+                          {/* Secondary keyword metrics */}
+                          {page.secondaryMetrics && page.secondaryMetrics.length > 0 && (
+                            <div className="mt-1">
+                              <span className="text-[9px] text-zinc-600 uppercase tracking-wider">Secondary keyword data</span>
+                              <div className="flex flex-wrap gap-1 mt-0.5">
+                                {page.secondaryMetrics.map((sm, si) => (
+                                  <span key={si} className="text-[9px] px-1.5 py-0.5 bg-zinc-800/80 border border-zinc-700/50 rounded text-zinc-500">
+                                    {sm.keyword} <span className="text-zinc-400">{sm.volume}/mo</span> <span className={difficultyColor(sm.difficulty)}>KD {sm.difficulty}%</span>
+                                  </span>
+                                ))}
+                              </div>
                             </div>
                           )}
                         </>
@@ -387,6 +547,28 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             })}
           </div>
 
+          {/* Keyword Gaps */}
+          {strategy.keywordGaps && strategy.keywordGaps.length > 0 && (
+            <div className="bg-zinc-900 rounded-xl border border-orange-500/20 p-4">
+              <h4 className="text-xs font-semibold text-orange-300 mb-2 flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5" /> Competitor Keyword Gaps
+              </h4>
+              <p className="text-[10px] text-zinc-500 mb-2">Keywords your competitors rank for that you don't — high-priority opportunities.</p>
+              <div className="space-y-1">
+                {strategy.keywordGaps.map((gap, i) => (
+                  <div key={i} className="flex items-center justify-between px-2.5 py-1.5 bg-zinc-800/50 rounded-lg">
+                    <span className="text-[11px] text-zinc-300">{gap.keyword}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] text-zinc-500 font-mono">{gap.volume.toLocaleString()}/mo</span>
+                      <span className={`text-[9px] font-mono ${difficultyColor(gap.difficulty)}`}>KD {gap.difficulty}%</span>
+                      <span className="text-[9px] text-zinc-600">{gap.competitorDomain} #{gap.competitorPosition}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* How it works */}
           <div className="bg-zinc-800/30 rounded-lg border border-zinc-800 px-4 py-3">
             <div className="flex items-start gap-2">
@@ -395,6 +577,11 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                 <strong className="text-zinc-400">How it works:</strong> This strategy is automatically used when you generate AI rewrites
                 in the Edit SEO and CMS SEO tabs. The AI will incorporate your target keywords naturally into titles and descriptions.
                 Edit any page's keywords to refine the strategy.
+                {strategy.semrushMode && strategy.semrushMode !== 'none' && (
+                  <span className="block mt-1 text-orange-400/80">
+                    SEMRush data: Keywords enriched with real search volume and difficulty. Cached for 7 days.
+                  </span>
+                )}
                 {!strategy.pageMap.some(p => p.currentPosition) && (
                   <span className="block mt-1 text-amber-400/80">
                     Tip: Connect Google Search Console to see ranking positions and get data-driven keyword suggestions.
