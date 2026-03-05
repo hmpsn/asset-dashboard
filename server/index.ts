@@ -58,6 +58,7 @@ import { createBatch, listBatches, getBatch, updateItem, markBatchApplied, delet
 import { listRequests, createRequest, updateRequest, addNote, deleteRequest, getRequest, getAttachmentsDir, addAttachmentsToRequest, type RequestAttachment } from './requests.js';
 import { notifyTeamNewRequest, notifyClientTeamResponse, notifyClientStatusChange, isEmailConfigured } from './email.js';
 import { addActivity, listActivity } from './activity-log.js';
+import { getSchedule, listSchedules, upsertSchedule, deleteSchedule, startScheduler } from './scheduled-audits.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
 import { listGscSites, getSearchOverview, getPerformanceTrend, getQueryPageData } from './search-console.js';
@@ -3550,6 +3551,31 @@ if (IS_PROD) {
     res.sendFile(path.join(distPath, 'index.html'));
   });
 }
+
+// --- Scheduled Audits ---
+app.get('/api/audit-schedules', (_req, res) => {
+  res.json(listSchedules());
+});
+
+app.get('/api/audit-schedules/:workspaceId', (req, res) => {
+  const schedule = getSchedule(req.params.workspaceId);
+  if (!schedule) return res.status(404).json({ error: 'No schedule found' });
+  res.json(schedule);
+});
+
+app.put('/api/audit-schedules/:workspaceId', (req, res) => {
+  const { enabled, intervalDays, scoreDropThreshold } = req.body;
+  const schedule = upsertSchedule(req.params.workspaceId, { enabled, intervalDays, scoreDropThreshold });
+  res.json(schedule);
+});
+
+app.delete('/api/audit-schedules/:workspaceId', (req, res) => {
+  deleteSchedule(req.params.workspaceId);
+  res.json({ ok: true });
+});
+
+// Start audit scheduler
+startScheduler();
 
 // Start
 const PORT = parseInt(process.env.PORT || '3001', 10);
