@@ -5,6 +5,7 @@ import {
   Copy, CheckCircle, Lock, KeyRound, X, Users, ChevronRight,
   Pin, PinOff, Pencil, Save, RefreshCw, Plus, Trash2, ArrowUp, ArrowDown, Palette,
 } from 'lucide-react';
+import SearchableSelect from './SearchableSelect';
 
 interface EventGroup { id: string; name: string; order: number; color: string; defaultPageFilter?: string; allowedPages?: string[]; }
 interface EventDisplayConfig { eventName: string; displayName: string; pinned: boolean; group?: string; }
@@ -278,14 +279,15 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                 <Search className="w-4 h-4 text-blue-400" />
                 <span className="text-sm font-medium flex-1" style={{ color: 'var(--brand-text-bright)' }}>Search Console Property</span>
                 {loadingGoogle ? <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-500" /> : (
-                  <select
+                  <SearchableSelect
+                    options={gscSites.map(s => ({ value: s.siteUrl, label: s.siteUrl }))}
                     value={ws?.gscPropertyUrl || ''}
-                    onChange={e => saveGscProperty(e.target.value)}
-                    className="px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500 min-w-[200px]"
-                  >
-                    <option value="">— None —</option>
-                    {gscSites.map(s => <option key={s.siteUrl} value={s.siteUrl}>{s.siteUrl}</option>)}
-                  </select>
+                    onChange={saveGscProperty}
+                    placeholder="Search properties..."
+                    emptyLabel="— None —"
+                    className="min-w-[200px]"
+                    size="md"
+                  />
                 )}
               </div>
             </section>
@@ -298,14 +300,15 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                 <BarChart3 className="w-4 h-4 text-teal-400" />
                 <span className="text-sm font-medium flex-1" style={{ color: 'var(--brand-text-bright)' }}>GA4 Property</span>
                 {loadingGoogle ? <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-500" /> : (
-                  <select
+                  <SearchableSelect
+                    options={ga4Properties.map(p => ({ value: p.propertyId, label: p.displayName }))}
                     value={ws?.ga4PropertyId || ''}
-                    onChange={e => saveGa4Property(e.target.value)}
-                    className="px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500 min-w-[220px]"
-                  >
-                    <option value="">— None —</option>
-                    {ga4Properties.map(p => <option key={p.propertyId} value={p.propertyId}>{p.displayName}</option>)}
-                  </select>
+                    onChange={saveGa4Property}
+                    placeholder="Search properties..."
+                    emptyLabel="— None —"
+                    className="min-w-[220px]"
+                    size="md"
+                  />
                 )}
               </div>
             </section>

@@ -3,6 +3,7 @@ import {
   Loader2, Gauge, Smartphone, Monitor, ChevronDown, ChevronRight,
   Zap, AlertTriangle, Info,
 } from 'lucide-react';
+import SearchableSelect from './SearchableSelect';
 
 interface CoreWebVitals {
   LCP: number | null;
@@ -328,18 +329,14 @@ export function PageSpeedPanel({ siteId }: Props) {
 
         {mode === 'single' ? (
           <div className="w-full max-w-md space-y-3">
-            <select
+            <SearchableSelect
+              options={pages.map(p => ({ value: p.id, label: `${p.title} ${p.slug ? `(/${p.slug})` : '(Home)'}` }))}
               value={selectedPage}
-              onChange={e => setSelectedPage(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-800 text-sm text-zinc-200 focus:outline-none focus:border-zinc-600"
-            >
-              <option value="" disabled>Select a page to test...</option>
-              {pages.map(p => (
-                <option key={p.id} value={p.id}>
-                  {p.title} {p.slug ? `(/${p.slug})` : '(Home)'}
-                </option>
-              ))}
-            </select>
+              onChange={setSelectedPage}
+              placeholder="Search pages..."
+              emptyLabel="Select a page to test..."
+              size="md"
+            />
             <div className="flex gap-2 justify-center">
               <button
                 onClick={() => runSingleTest('mobile')}

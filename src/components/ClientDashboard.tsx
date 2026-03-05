@@ -6,6 +6,7 @@ import {
   CheckCircle2, Info, LayoutDashboard, LineChart, Lock,
   Users, Globe, Activity, Filter, ClipboardCheck, Check, Edit3,
 } from 'lucide-react';
+import SearchableSelect from './SearchableSelect';
 
 interface SearchQuery { query: string; clicks: number; impressions: number; ctr: number; position: number; }
 interface SearchPage { page: string; clicks: number; impressions: number; ctr: number; position: number; }
@@ -1263,28 +1264,22 @@ export function ClientDashboard({ workspaceId }: Props) {
                 const pages = allowedPages && allowedPages.length > 0
                   ? ga4Pages.filter(p => allowedPages.some(ap => p.path.includes(ap)))
                   : ga4Pages;
+                const pageOptions = pages.map(p => ({ value: p.path, label: p.path }));
                 return (
                   <div className="flex items-center gap-2 mb-4">
-                    <select
+                    <SearchableSelect
+                      options={pageOptions}
                       value={modulePageFilters[moduleId] || ''}
-                      onChange={e => {
-                        setModulePageFilters(prev => ({ ...prev, [moduleId]: e.target.value }));
-                        fetchEventsForModule(moduleId, e.target.value);
+                      onChange={val => {
+                        setModulePageFilters(prev => val ? { ...prev, [moduleId]: val } : (() => { const n = { ...prev }; delete n[moduleId]; return n; })());
+                        if (val) fetchEventsForModule(moduleId, val);
+                        else setModulePageData(prev => { const n = { ...prev }; delete n[moduleId]; return n; });
                       }}
-                      className="px-2 py-1 bg-zinc-800/60 border border-zinc-700/50 rounded-lg text-[11px] text-zinc-300 focus:outline-none focus:border-teal-500 max-w-[220px]"
-                    >
-                      <option value="">All Pages</option>
-                      {pages.map((p, i) => (
-                        <option key={i} value={p.path}>{p.path}</option>
-                      ))}
-                    </select>
+                      placeholder="Search pages..."
+                      emptyLabel="All Pages"
+                      className="max-w-[240px]"
+                    />
                     {modulePageLoading[moduleId] && <Loader2 className="w-3 h-3 animate-spin text-teal-400" />}
-                    {modulePageFilters[moduleId] && (
-                      <button onClick={() => {
-                        setModulePageFilters(prev => { const n = { ...prev }; delete n[moduleId]; return n; });
-                        setModulePageData(prev => { const n = { ...prev }; delete n[moduleId]; return n; });
-                      }} className="text-[10px] text-zinc-500 hover:text-zinc-300">Clear</button>
-                    )}
                   </div>
                 );
               };
@@ -1381,13 +1376,14 @@ export function ClientDashboard({ workspaceId }: Props) {
                   <div className="flex flex-wrap items-end gap-3 mb-4">
                     <div className="flex-1 min-w-[180px]">
                       <label className="text-[10px] text-zinc-500 mb-1 block">Event Name</label>
-                      <select value={explorerEvent} onChange={e => setExplorerEvent(e.target.value)}
-                        className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500">
-                        <option value="">All events</option>
-                        {ga4Events.map(ev => (
-                          <option key={ev.eventName} value={ev.eventName}>{eventDisplayName(ev.eventName)}</option>
-                        ))}
-                      </select>
+                      <SearchableSelect
+                        options={ga4Events.map(ev => ({ value: ev.eventName, label: eventDisplayName(ev.eventName) }))}
+                        value={explorerEvent}
+                        onChange={setExplorerEvent}
+                        placeholder="Search events..."
+                        emptyLabel="All events"
+                        size="md"
+                      />
                     </div>
                     <div className="flex-1 min-w-[180px]">
                       <label className="text-[10px] text-zinc-500 mb-1 block">Page Path (contains)</label>
