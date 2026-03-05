@@ -4,7 +4,7 @@ import {
   BarChart3, ArrowUpDown, Sparkles, Send, AlertTriangle,
   Target, Zap, Shield, MessageSquare, X, ChevronDown, ChevronUp,
   CheckCircle2, Info, LayoutDashboard, LineChart, Lock,
-  Users, Globe, Activity, Filter,
+  Users, Globe, Activity, Filter, ClipboardCheck, Check, Edit3,
 } from 'lucide-react';
 
 interface SearchQuery { query: string; clicks: number; impressions: number; ctr: number; position: number; }
@@ -44,7 +44,17 @@ interface GA4EventPageBreakdown { eventName: string; pagePath: string; eventCoun
 interface Props { workspaceId: string; }
 
 type SortKey = 'clicks' | 'impressions' | 'ctr' | 'position';
-type ClientTab = 'overview' | 'search' | 'health' | 'analytics';
+type ClientTab = 'overview' | 'search' | 'health' | 'analytics' | 'approvals';
+
+interface ApprovalItem {
+  id: string; pageId: string; pageTitle: string; pageSlug: string;
+  field: 'seoTitle' | 'seoDescription'; currentValue: string; proposedValue: string;
+  clientValue?: string; status: 'pending' | 'approved' | 'rejected' | 'applied'; clientNote?: string;
+}
+interface ApprovalBatch {
+  id: string; workspaceId: string; siteId: string; name: string;
+  items: ApprovalItem[]; status: string; createdAt: string;
+}
 
 const SEV = {
   error: { bg: 'bg-red-500/10', border: 'border-red-500/20', text: 'text-red-400' },
@@ -191,6 +201,11 @@ export function ClientDashboard({ workspaceId }: Props) {
   const [passwordInput, setPasswordInput] = useState('');
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
+  const [approvalBatches, setApprovalBatches] = useState<ApprovalBatch[]>([]);
+  const [approvalsLoading, setApprovalsLoading] = useState(false);
+  const [applyingBatch, setApplyingBatch] = useState<string | null>(null);
+  const [editingApproval, setEditingApproval] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState('');
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
 
@@ -218,11 +233,22 @@ export function ClientDashboard({ workspaceId }: Props) {
       .catch(() => { setError('Failed to load dashboard'); setLoading(false); });
   }, [workspaceId]);
 
+  const loadApprovals = async (wsId: string) => {
+    setApprovalsLoading(true);
+    try {
+      const res = await fetch(`/api/public/approvals/${wsId}`);
+      const data = await res.json();
+      if (Array.isArray(data)) setApprovalBatches(data);
+    } catch { /* skip */ }
+    setApprovalsLoading(false);
+  };
+
   const loadDashboardData = (data: WorkspaceInfo) => {
     if (data.gscPropertyUrl) loadSearchData(data.id, 28);
     fetch(`/api/public/audit-summary/${data.id}`).then(r => r.json()).then(a => { if (a?.id) setAudit(a); }).catch(() => {});
     fetch(`/api/public/audit-detail/${data.id}`).then(r => r.json()).then(d => { if (d?.id) setAuditDetail(d); }).catch(() => {});
     if (data.ga4PropertyId) loadGA4Data(data.id, 28);
+    loadApprovals(data.id);
   };
 
   const loadGA4Data = async (wsId: string, numDays: number) => {
@@ -476,11 +502,42 @@ export function ClientDashboard({ workspaceId }: Props) {
     return cats;
   })() : {};
 
+  const updateApprovalItem = async (batchId: string, itemId: string, update: { status?: string; clientValue?: string; clientNote?: string }) => {
+    try {
+      const res = await fetch(`/api/public/approvals/${workspaceId}/${batchId}/${itemId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(update),
+      });
+      const updated = await res.json();
+      if (updated.id) {
+        setApprovalBatches(prev => prev.map(b => b.id === batchId ? updated : b));
+      }
+    } catch { /* skip */ }
+    setEditingApproval(null);
+    setEditDraft('');
+  };
+
+  const applyApprovedBatch = async (batchId: string) => {
+    setApplyingBatch(batchId);
+    try {
+      const res = await fetch(`/api/public/approvals/${workspaceId}/${batchId}/apply`, { method: 'POST' });
+      const data = await res.json();
+      if (data.applied > 0) {
+        loadApprovals(workspaceId);
+      }
+    } catch { /* skip */ }
+    setApplyingBatch(null);
+  };
+
+  const pendingApprovals = approvalBatches.reduce((sum, b) => sum + b.items.filter(i => i.status === 'pending').length, 0);
+
   const NAV = [
     { id: 'overview' as ClientTab, label: 'Overview', icon: LayoutDashboard },
     { id: 'search' as ClientTab, label: 'Search', icon: Search },
     { id: 'health' as ClientTab, label: 'Site Health', icon: Shield },
     { id: 'analytics' as ClientTab, label: 'Analytics', icon: LineChart },
+    ...(approvalBatches.length > 0 ? [{ id: 'approvals' as ClientTab, label: 'Approvals', icon: ClipboardCheck }] : []),
   ];
 
   return (
@@ -514,7 +571,8 @@ export function ClientDashboard({ workspaceId }: Props) {
               const hasData = (t.id === 'overview') ||
                 (t.id === 'search' && !!overview) ||
                 (t.id === 'health' && !!audit) ||
-                (t.id === 'analytics' && !!ga4Overview);
+                (t.id === 'analytics' && !!ga4Overview) ||
+                (t.id === 'approvals' && approvalBatches.length > 0);
               return (
                 <button key={t.id} onClick={() => setTab(t.id)}
                   className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium border-b-2 transition-colors ${
@@ -522,7 +580,8 @@ export function ClientDashboard({ workspaceId }: Props) {
                     'border-transparent text-zinc-500 hover:text-zinc-300 hover:border-zinc-700'
                   }`}>
                   <Icon className="w-3.5 h-3.5" /> {t.label}
-                  {hasData && !active && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" />}
+                  {t.id === 'approvals' && pendingApprovals > 0 && <span className="ml-1 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-violet-500 text-white">{pendingApprovals}</span>}
+                  {hasData && !active && t.id !== 'approvals' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" />}
                 </button>
               );
             })}
@@ -1377,6 +1436,196 @@ export function ClientDashboard({ workspaceId }: Props) {
           </div>
         )}
       </>)}
+
+        {/* ════════════ APPROVALS TAB ════════════ */}
+        {tab === 'approvals' && (<>
+          <div className="space-y-6">
+            <div className="flex items-center gap-3">
+              <ClipboardCheck className="w-5 h-5 text-violet-400" />
+              <div>
+                <h2 className="text-sm font-semibold text-zinc-200">SEO Change Approvals</h2>
+                <p className="text-[10px] text-zinc-500 mt-0.5">Review proposed SEO changes, make edits if needed, then approve to push live.</p>
+              </div>
+              {pendingApprovals > 0 && (
+                <span className="ml-auto px-2 py-0.5 text-[10px] font-medium rounded-full bg-violet-500/20 border border-violet-500/30 text-violet-300">
+                  {pendingApprovals} pending
+                </span>
+              )}
+            </div>
+
+            {approvalsLoading && (
+              <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-zinc-500" /></div>
+            )}
+
+            {!approvalsLoading && approvalBatches.length === 0 && (
+              <div className="text-center py-16">
+                <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4">
+                  <ClipboardCheck className="w-8 h-8 text-zinc-700" />
+                </div>
+                <h3 className="text-sm font-medium text-zinc-400 mb-1">No pending approvals</h3>
+                <p className="text-[10px] text-zinc-600">Your agency will send SEO changes here for your review.</p>
+              </div>
+            )}
+
+            {approvalBatches.map(batch => {
+              const batchPending = batch.items.filter(i => i.status === 'pending').length;
+              const batchApproved = batch.items.filter(i => i.status === 'approved').length;
+              const batchApplied = batch.items.filter(i => i.status === 'applied').length;
+              const batchRejected = batch.items.filter(i => i.status === 'rejected').length;
+              const isApplying = applyingBatch === batch.id;
+
+              return (
+                <div key={batch.id} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+                  {/* Batch header */}
+                  <div className="px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-medium text-zinc-200">{batch.name}</h3>
+                      <p className="text-[10px] text-zinc-500 mt-0.5">
+                        {new Date(batch.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {' · '}{batch.items.length} change{batch.items.length !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {batchPending > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400">{batchPending} pending</span>}
+                      {batchApproved > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/10 border border-green-500/30 text-green-400">{batchApproved} approved</span>}
+                      {batchApplied > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400">{batchApplied} applied</span>}
+                      {batchRejected > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/30 text-red-400">{batchRejected} rejected</span>}
+                    </div>
+                  </div>
+
+                  {/* Items */}
+                  <div className="divide-y divide-zinc-800/50">
+                    {batch.items.map(item => {
+                      const isEditing = editingApproval === item.id;
+                      const displayValue = item.clientValue || item.proposedValue;
+                      const fieldLabel = item.field === 'seoTitle' ? 'SEO Title' : 'Meta Description';
+                      const statusColors = {
+                        pending: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
+                        approved: 'bg-green-500/10 border-green-500/30 text-green-400',
+                        rejected: 'bg-red-500/10 border-red-500/30 text-red-400',
+                        applied: 'bg-blue-500/10 border-blue-500/30 text-blue-400',
+                      };
+
+                      return (
+                        <div key={item.id} className="px-5 py-4">
+                          <div className="flex items-start justify-between gap-4 mb-2">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-xs font-medium text-zinc-300 truncate">{item.pageTitle}</span>
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded border ${statusColors[item.status]}`}>{item.status}</span>
+                              </div>
+                              <span className="text-[10px] text-zinc-600">/{item.pageSlug} · {fieldLabel}</span>
+                            </div>
+                          </div>
+
+                          {/* Current vs proposed */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                            <div>
+                              <div className="text-[10px] text-zinc-500 mb-1">Current</div>
+                              <div className="text-[11px] text-zinc-400 bg-zinc-800/30 rounded-lg px-3 py-2 min-h-[2rem]">
+                                {item.currentValue || <span className="italic text-zinc-600">Empty</span>}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] text-zinc-500 mb-1 flex items-center gap-1">
+                                Proposed
+                                {item.clientValue && <span className="text-violet-400">(edited by you)</span>}
+                              </div>
+                              {isEditing ? (
+                                <div className="space-y-2">
+                                  {item.field === 'seoTitle' ? (
+                                    <input
+                                      type="text"
+                                      value={editDraft}
+                                      onChange={e => setEditDraft(e.target.value)}
+                                      className="w-full px-3 py-1.5 bg-zinc-800 border border-violet-500/50 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-400"
+                                    />
+                                  ) : (
+                                    <textarea
+                                      value={editDraft}
+                                      onChange={e => setEditDraft(e.target.value)}
+                                      rows={2}
+                                      className="w-full px-3 py-1.5 bg-zinc-800 border border-violet-500/50 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-400 resize-none"
+                                    />
+                                  )}
+                                  <div className="flex gap-1.5">
+                                    <button
+                                      onClick={() => updateApprovalItem(batch.id, item.id, { clientValue: editDraft })}
+                                      className="px-2.5 py-1 bg-violet-600 hover:bg-violet-500 rounded text-[10px] font-medium transition-colors"
+                                    >Save Edit</button>
+                                    <button
+                                      onClick={() => { setEditingApproval(null); setEditDraft(''); }}
+                                      className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 rounded text-[10px] text-zinc-400 transition-colors"
+                                    >Cancel</button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="text-[11px] text-zinc-200 bg-zinc-800/30 rounded-lg px-3 py-2 min-h-[2rem]">
+                                  {displayValue}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Actions */}
+                          {item.status === 'pending' && !isEditing && (
+                            <div className="flex items-center gap-2 mt-3">
+                              <button
+                                onClick={() => updateApprovalItem(batch.id, item.id, { status: 'approved' })}
+                                className="flex items-center gap-1 px-3 py-1.5 bg-green-600/80 hover:bg-green-500 rounded-lg text-[10px] font-medium transition-colors"
+                              >
+                                <Check className="w-3 h-3" /> Approve
+                              </button>
+                              <button
+                                onClick={() => { setEditingApproval(item.id); setEditDraft(displayValue); }}
+                                className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-[10px] font-medium text-zinc-300 transition-colors"
+                              >
+                                <Edit3 className="w-3 h-3" /> Edit
+                              </button>
+                              <button
+                                onClick={() => updateApprovalItem(batch.id, item.id, { status: 'rejected' })}
+                                className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-[10px] font-medium text-red-400 transition-colors"
+                              >
+                                <X className="w-3 h-3" /> Reject
+                              </button>
+                            </div>
+                          )}
+                          {item.status === 'approved' && (
+                            <div className="flex items-center gap-2 mt-3 text-[10px] text-green-400">
+                              <Check className="w-3 h-3" /> Approved — will be applied when you push changes live
+                            </div>
+                          )}
+                          {item.status === 'applied' && (
+                            <div className="flex items-center gap-2 mt-3 text-[10px] text-blue-400">
+                              <CheckCircle2 className="w-3 h-3" /> Applied to live site
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Batch actions */}
+                  {batchApproved > 0 && (
+                    <div className="px-5 py-4 border-t border-zinc-800 bg-zinc-900/50 flex items-center justify-between">
+                      <span className="text-[11px] text-zinc-400">
+                        {batchApproved} approved change{batchApproved !== 1 ? 's' : ''} ready to push
+                      </span>
+                      <button
+                        onClick={() => applyApprovedBatch(batch.id)}
+                        disabled={isApplying}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-500 disabled:opacity-50 rounded-lg text-xs font-medium transition-colors"
+                      >
+                        {isApplying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                        {isApplying ? 'Applying...' : 'Push Approved Changes Live'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </>)}
 
       {/* Powered by footer */}
       <footer className="border-t border-zinc-800/50 mt-12">

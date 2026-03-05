@@ -53,6 +53,7 @@ import { runSiteSpeed, runSinglePageSpeed } from './pagespeed.js';
 import { generateSchemaSuggestions, generateSchemaForPage } from './schema-suggester.js';
 import { runSalesAudit } from './sales-audit.js';
 import { initJobs, createJob, updateJob, getJob, listJobs } from './jobs.js';
+import { createBatch, listBatches, getBatch, updateItem, markBatchApplied, deleteBatch } from './approvals.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
 import { listGscSites, getSearchOverview, getPerformanceTrend, getQueryPageData } from './search-console.js';
@@ -2602,6 +2603,29 @@ app.patch('/api/webflow/keyword-strategy/:workspaceId', (req, res) => {
   res.json(updated);
 });
 
+// --- Approvals (admin, authenticated) ---
+app.post('/api/approvals/:workspaceId', (req, res) => {
+  const { siteId, name, items } = req.body;
+  if (!siteId || !items?.length) return res.status(400).json({ error: 'siteId and items required' });
+  const batch = createBatch(req.params.workspaceId, siteId, name || 'SEO Changes', items);
+  res.json(batch);
+});
+
+app.get('/api/approvals/:workspaceId', (req, res) => {
+  res.json(listBatches(req.params.workspaceId));
+});
+
+app.get('/api/approvals/:workspaceId/:batchId', (req, res) => {
+  const batch = getBatch(req.params.workspaceId, req.params.batchId);
+  if (!batch) return res.status(404).json({ error: 'Batch not found' });
+  res.json(batch);
+});
+
+app.delete('/api/approvals/:workspaceId/:batchId', (req, res) => {
+  deleteBatch(req.params.workspaceId, req.params.batchId);
+  res.json({ ok: true });
+});
+
 // --- Public Client Dashboard API (no auth required) ---
 app.get('/api/public/workspace/:id', (req, res) => {
   const ws = getWorkspace(req.params.id);
@@ -2628,6 +2652,61 @@ app.post('/api/public/auth/:id', (req, res) => {
   const { password } = req.body;
   if (password === ws.clientPassword) return res.json({ ok: true });
   return res.status(401).json({ error: 'Incorrect password' });
+});
+
+// --- Public Approvals (client dashboard, no auth required) ---
+app.get('/api/public/approvals/:workspaceId', (req, res) => {
+  res.json(listBatches(req.params.workspaceId));
+});
+
+app.get('/api/public/approvals/:workspaceId/:batchId', (req, res) => {
+  const batch = getBatch(req.params.workspaceId, req.params.batchId);
+  if (!batch) return res.status(404).json({ error: 'Batch not found' });
+  res.json(batch);
+});
+
+app.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', (req, res) => {
+  const { status, clientValue, clientNote } = req.body;
+  const batch = updateItem(req.params.workspaceId, req.params.batchId, req.params.itemId, { status, clientValue, clientNote });
+  if (!batch) return res.status(404).json({ error: 'Item not found' });
+  res.json(batch);
+});
+
+// Apply approved items to Webflow
+app.post('/api/public/approvals/:workspaceId/:batchId/apply', async (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws?.webflowSiteId) return res.status(400).json({ error: 'No site linked' });
+  const batch = getBatch(req.params.workspaceId, req.params.batchId);
+  if (!batch) return res.status(404).json({ error: 'Batch not found' });
+
+  const token = getTokenForSite(ws.webflowSiteId) || undefined;
+  if (!token) return res.status(400).json({ error: 'No Webflow API token' });
+
+  const approved = batch.items.filter(i => i.status === 'approved');
+  if (!approved.length) return res.status(400).json({ error: 'No approved items to apply' });
+
+  const results: Array<{ itemId: string; pageId: string; success: boolean; error?: string }> = [];
+  const appliedIds: string[] = [];
+
+  for (const item of approved) {
+    try {
+      const value = item.clientValue || item.proposedValue;
+      const fields = item.field === 'seoTitle'
+        ? { seo: { title: value } }
+        : { seo: { description: value } };
+      await updatePageSeo(item.pageId, fields, token);
+      appliedIds.push(item.id);
+      results.push({ itemId: item.id, pageId: item.pageId, success: true });
+    } catch (err) {
+      results.push({ itemId: item.id, pageId: item.pageId, success: false, error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
+  if (appliedIds.length > 0) {
+    markBatchApplied(req.params.workspaceId, req.params.batchId, appliedIds);
+  }
+
+  res.json({ results, applied: appliedIds.length, failed: results.length - appliedIds.length });
 });
 
 app.get('/api/public/search-overview/:workspaceId', async (req, res) => {

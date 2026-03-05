@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Loader2, Save, Sparkles, Upload, ChevronDown, ChevronRight,
-  Check, AlertCircle, Wand2,
+  Check, AlertCircle, Wand2, Send, CheckSquare, Square,
 } from 'lucide-react';
 
 interface PageMeta {
@@ -39,6 +39,9 @@ export function SeoEditor({ siteId, workspaceId }: Props) {
   const [bulkResults, setBulkResults] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [hasUnsaved, setHasUnsaved] = useState(false);
+  const [approvalSelected, setApprovalSelected] = useState<Set<string>>(new Set());
+  const [sendingApproval, setSendingApproval] = useState(false);
+  const [approvalSent, setApprovalSent] = useState(false);
 
   const fetchPages = async () => {
     setLoading(true);
@@ -199,6 +202,67 @@ export function SeoEditor({ siteId, workspaceId }: Props) {
     }
   };
 
+  const toggleApprovalSelect = (pageId: string) => {
+    setApprovalSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(pageId)) next.delete(pageId); else next.add(pageId);
+      return next;
+    });
+  };
+
+  const selectAllForApproval = () => {
+    if (approvalSelected.size === filteredPages.length) {
+      setApprovalSelected(new Set());
+    } else {
+      setApprovalSelected(new Set(filteredPages.map(p => p.id)));
+    }
+  };
+
+  const sendForApproval = async () => {
+    if (!workspaceId || approvalSelected.size === 0) return;
+    setSendingApproval(true);
+    try {
+      const items: Array<{ pageId: string; pageTitle: string; pageSlug: string; field: 'seoTitle' | 'seoDescription'; currentValue: string; proposedValue: string }> = [];
+      for (const pageId of approvalSelected) {
+        const page = pages.find(p => p.id === pageId);
+        const edit = edits[pageId];
+        if (!page || !edit) continue;
+        // Include title if changed from original
+        if (edit.seoTitle !== (page.seo?.title || '')) {
+          items.push({
+            pageId, pageTitle: page.title, pageSlug: page.slug,
+            field: 'seoTitle', currentValue: page.seo?.title || '', proposedValue: edit.seoTitle,
+          });
+        }
+        // Include description if changed from original
+        if (edit.seoDescription !== (page.seo?.description || '')) {
+          items.push({
+            pageId, pageTitle: page.title, pageSlug: page.slug,
+            field: 'seoDescription', currentValue: page.seo?.description || '', proposedValue: edit.seoDescription,
+          });
+        }
+      }
+      if (items.length === 0) {
+        alert('No changes detected on selected pages. Edit SEO fields first.');
+        setSendingApproval(false);
+        return;
+      }
+      await fetch(`/api/approvals/${workspaceId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ siteId, name: `SEO Changes — ${new Date().toLocaleDateString()}`, items }),
+      });
+      setApprovalSent(true);
+      setApprovalSelected(new Set());
+      setTimeout(() => setApprovalSent(false), 4000);
+    } catch (err) {
+      console.error('Failed to send for approval:', err);
+      alert('Failed to send for approval');
+    } finally {
+      setSendingApproval(false);
+    }
+  };
+
   const toggleExpand = (id: string) => {
     setExpanded(prev => {
       const next = new Set(prev);
@@ -257,6 +321,18 @@ export function SeoEditor({ siteId, workspaceId }: Props) {
         >
           <Wand2 className="w-3 h-3" /> AI Fix Descriptions ({missingDescs})
         </button>
+        {workspaceId && (
+          <button
+            onClick={sendForApproval}
+            disabled={sendingApproval || approvalSelected.size === 0}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              approvalSent ? 'bg-green-600 text-white' : 'bg-violet-600/80 hover:bg-violet-500 disabled:opacity-40 text-white'
+            }`}
+          >
+            {sendingApproval ? <Loader2 className="w-3 h-3 animate-spin" /> : approvalSent ? <Check className="w-3 h-3" /> : <Send className="w-3 h-3" />}
+            {approvalSent ? 'Sent!' : sendingApproval ? 'Sending...' : `Send for Approval (${approvalSelected.size})`}
+          </button>
+        )}
         <button
           onClick={handlePublish}
           disabled={publishing}
@@ -295,6 +371,17 @@ export function SeoEditor({ siteId, workspaceId }: Props) {
         </div>
       )}
 
+      {/* Select all for approval */}
+      {workspaceId && (
+        <div className="flex items-center gap-2">
+          <button onClick={selectAllForApproval} className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors">
+            {approvalSelected.size === filteredPages.length && filteredPages.length > 0 ? <CheckSquare className="w-3.5 h-3.5 text-violet-400" /> : <Square className="w-3.5 h-3.5" />}
+            {approvalSelected.size === filteredPages.length && filteredPages.length > 0 ? 'Deselect all' : 'Select all for approval'}
+          </button>
+          {approvalSelected.size > 0 && <span className="text-xs text-violet-400">{approvalSelected.size} selected</span>}
+        </div>
+      )}
+
       {/* Page list */}
       <div className="space-y-1">
         {filteredPages.map(page => {
@@ -305,12 +392,22 @@ export function SeoEditor({ siteId, workspaceId }: Props) {
           const isAiLoading = aiLoading[page.id];
           const hasSeoTitle = !!(page.seo?.title);
           const hasSeoDesc = !!(page.seo?.description);
+          const isSelected = approvalSelected.has(page.id);
 
           return (
-            <div key={page.id} className="rounded-lg border border-zinc-800 overflow-hidden">
+            <div key={page.id} className={`rounded-lg border overflow-hidden ${isSelected ? 'border-violet-500/40 bg-violet-500/5' : 'border-zinc-800'}`}>
+              <div className="flex items-center">
+                {workspaceId && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); toggleApprovalSelect(page.id); }}
+                    className="pl-4 pr-1 py-3 text-zinc-500 hover:text-violet-400 transition-colors"
+                  >
+                    {isSelected ? <CheckSquare className="w-4 h-4 text-violet-400" /> : <Square className="w-4 h-4" />}
+                  </button>
+                )}
               <button
                 onClick={() => toggleExpand(page.id)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-900/50 transition-colors text-left"
+                className="flex-1 flex items-center gap-3 px-4 py-3 hover:bg-zinc-900/50 transition-colors text-left"
               >
                 {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500" />}
                 <div className="flex-1 min-w-0">
@@ -323,6 +420,7 @@ export function SeoEditor({ siteId, workspaceId }: Props) {
                   {edit?.dirty && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400">Unsaved</span>}
                 </div>
               </button>
+              </div>
 
               {isExpanded && edit && (
                 <div className="px-4 pb-4 space-y-3 bg-zinc-900/30">
