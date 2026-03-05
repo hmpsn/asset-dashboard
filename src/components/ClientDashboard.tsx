@@ -5,7 +5,7 @@ import {
   Target, Zap, Shield, MessageSquare, X, ChevronDown, ChevronUp,
   CheckCircle2, Info, LayoutDashboard, LineChart, Lock,
   Users, Globe, Activity, Filter, ClipboardCheck, Check, Edit3,
-  Sun, Moon,
+  Sun, Moon, Plus,
 } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 
@@ -46,7 +46,16 @@ interface GA4EventPageBreakdown { eventName: string; pagePath: string; eventCoun
 interface Props { workspaceId: string; }
 
 type SortKey = 'clicks' | 'impressions' | 'ctr' | 'position';
-type ClientTab = 'overview' | 'search' | 'health' | 'analytics' | 'approvals';
+type ClientTab = 'overview' | 'search' | 'health' | 'analytics' | 'approvals' | 'requests';
+
+type RequestCategory = 'bug' | 'content' | 'design' | 'seo' | 'feature' | 'other';
+type RequestStatus = 'new' | 'in_review' | 'in_progress' | 'on_hold' | 'completed' | 'closed';
+interface RequestNote { id: string; author: 'client' | 'team'; content: string; createdAt: string; }
+interface ClientRequest {
+  id: string; workspaceId: string; title: string; description: string;
+  category: RequestCategory; priority: string; status: RequestStatus;
+  pageUrl?: string; notes: RequestNote[]; createdAt: string; updatedAt: string;
+}
 
 interface ApprovalItem {
   id: string; pageId: string; pageTitle: string; pageSlug: string;
@@ -166,21 +175,29 @@ function ScoreHistoryChart({ history }: { history: Array<{ id: string; createdAt
 }
 
 function RenderMarkdown({ text }: { text: string }) {
+  const inlineMd = (s: string) =>
+    s.replace(/\*\*(.+?)\*\*/g, '<b class="text-zinc-200">$1</b>')
+     .replace(/`(.+?)`/g, '<code class="bg-zinc-800 px-1 rounded text-zinc-300 text-[10px]">$1</code>');
   const lines = text.split('\n');
   return (
     <div className="space-y-1.5">
       {lines.map((line, i) => {
-        if (line.startsWith('### ')) return <h4 key={i} className="text-xs font-semibold text-zinc-200 mt-2">{line.slice(4)}</h4>;
-        if (line.startsWith('## ')) return <h3 key={i} className="text-sm font-semibold text-zinc-200 mt-2">{line.slice(3)}</h3>;
-        if (line.startsWith('- **')) {
-          const m = line.match(/^- \*\*(.+?)\*\*(.*)$/);
-          if (m) return <div key={i} className="flex gap-1.5 text-[11px]"><span className="text-zinc-500">•</span><span><strong className="text-zinc-200">{m[1]}</strong><span className="text-zinc-400">{m[2]}</span></span></div>;
+        const trimmed = line.trimStart();
+        const indent = line.length - trimmed.length;
+        if (trimmed.startsWith('### ')) return <h4 key={i} className="text-xs font-semibold text-zinc-200 mt-2">{trimmed.slice(4)}</h4>;
+        if (trimmed.startsWith('## ')) return <h3 key={i} className="text-sm font-semibold text-zinc-200 mt-2">{trimmed.slice(3)}</h3>;
+        if (trimmed.startsWith('# ')) return <h3 key={i} className="text-sm font-bold text-zinc-200 mt-3">{trimmed.slice(2)}</h3>;
+        if (trimmed.match(/^\d+\.\s/)) {
+          const content = trimmed.replace(/^\d+\.\s/, '');
+          const num = trimmed.match(/^(\d+)\./)?.[1];
+          return <div key={i} className="flex gap-1.5 text-[11px] text-zinc-400 mt-1" style={{ marginLeft: indent > 0 ? 12 : 0 }}><span className="text-zinc-500 shrink-0 w-4 text-right">{num}.</span><span dangerouslySetInnerHTML={{ __html: inlineMd(content) }} /></div>;
         }
-        if (line.startsWith('- ')) return <div key={i} className="flex gap-1.5 text-[11px] text-zinc-400"><span className="text-zinc-500">•</span><span>{line.slice(2)}</span></div>;
-        if (line.match(/^\d+\. /)) return <div key={i} className="text-[11px] text-zinc-400 ml-2">{line}</div>;
-        if (line.trim() === '') return <div key={i} className="h-1" />;
-        const parsed = line.replace(/\*\*(.+?)\*\*/g, '<b class="text-zinc-200">$1</b>').replace(/`(.+?)`/g, '<code class="bg-zinc-800 px-1 rounded text-zinc-300 text-[10px]">$1</code>');
-        return <p key={i} className="text-[11px] text-zinc-400 leading-relaxed" dangerouslySetInnerHTML={{ __html: parsed }} />;
+        if (trimmed.startsWith('- ')) {
+          const content = trimmed.slice(2);
+          return <div key={i} className="flex gap-1.5 text-[11px] text-zinc-400" style={{ marginLeft: indent > 0 ? 12 : 0 }}><span className="text-zinc-500 shrink-0">•</span><span dangerouslySetInnerHTML={{ __html: inlineMd(content) }} /></div>;
+        }
+        if (trimmed === '') return <div key={i} className="h-1" />;
+        return <p key={i} className="text-[11px] text-zinc-400 leading-relaxed" dangerouslySetInnerHTML={{ __html: inlineMd(trimmed) }} />;
       })}
     </div>
   );
@@ -221,6 +238,7 @@ export function ClientDashboard({ workspaceId }: Props) {
   const [days, setDays] = useState(28);
   const [sortKey, setSortKey] = useState<SortKey>('clicks');
   const [sortAsc, setSortAsc] = useState(false);
+  const [searchSubTab, setSearchSubTab] = useState<'queries' | 'pages'>('queries');
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
@@ -256,6 +274,18 @@ export function ClientDashboard({ workspaceId }: Props) {
   const [applyingBatch, setApplyingBatch] = useState<string | null>(null);
   const [editingApproval, setEditingApproval] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
+  // Requests state
+  const [requests, setRequests] = useState<ClientRequest[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState(false);
+  const [showNewRequest, setShowNewRequest] = useState(false);
+  const [newReqTitle, setNewReqTitle] = useState('');
+  const [newReqDesc, setNewReqDesc] = useState('');
+  const [newReqCategory, setNewReqCategory] = useState<RequestCategory>('other');
+  const [newReqPage, setNewReqPage] = useState('');
+  const [submittingReq, setSubmittingReq] = useState(false);
+  const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
+  const [reqNoteInput, setReqNoteInput] = useState('');
+  const [sendingNote, setSendingNote] = useState(false);
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
 
@@ -299,6 +329,46 @@ export function ClientDashboard({ workspaceId }: Props) {
     }
   }, [ws?.eventGroups, ga4Pages.length]);
 
+  const loadRequests = async (wsId: string) => {
+    setRequestsLoading(true);
+    try {
+      const res = await fetch(`/api/public/requests/${wsId}`);
+      const data = await res.json();
+      if (Array.isArray(data)) setRequests(data);
+    } catch { /* skip */ }
+    finally { setRequestsLoading(false); }
+  };
+
+  const submitRequest = async () => {
+    if (!newReqTitle.trim() || !newReqDesc.trim()) return;
+    setSubmittingReq(true);
+    try {
+      const res = await fetch(`/api/public/requests/${workspaceId}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: newReqTitle.trim(), description: newReqDesc.trim(), category: newReqCategory, pageUrl: newReqPage.trim() || undefined }),
+      });
+      if (res.ok) {
+        setNewReqTitle(''); setNewReqDesc(''); setNewReqCategory('other'); setNewReqPage(''); setShowNewRequest(false);
+        loadRequests(workspaceId);
+      }
+    } catch { /* skip */ }
+    finally { setSubmittingReq(false); }
+  };
+
+  const sendReqNote = async (requestId: string) => {
+    if (!reqNoteInput.trim()) return;
+    setSendingNote(true);
+    try {
+      await fetch(`/api/public/requests/${workspaceId}/${requestId}/notes`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: reqNoteInput.trim() }),
+      });
+      setReqNoteInput('');
+      loadRequests(workspaceId);
+    } catch { /* skip */ }
+    finally { setSendingNote(false); }
+  };
+
   const loadApprovals = async (wsId: string) => {
     setApprovalsLoading(true);
     try {
@@ -315,6 +385,7 @@ export function ClientDashboard({ workspaceId }: Props) {
     fetch(`/api/public/audit-detail/${data.id}`).then(r => r.json()).then(d => { if (d?.id) setAuditDetail(d); }).catch(() => {});
     if (data.ga4PropertyId) loadGA4Data(data.id, 28);
     loadApprovals(data.id);
+    loadRequests(data.id);
   };
 
   const loadGA4Data = async (wsId: string, numDays: number) => {
@@ -503,6 +574,10 @@ export function ClientDashboard({ workspaceId }: Props) {
     if (!overview) return [];
     return [...overview.topQueries].sort((a, b) => sortAsc ? a[sortKey] - b[sortKey] : b[sortKey] - a[sortKey]);
   };
+  const sortedPages = () => {
+    if (!overview) return [];
+    return [...overview.topPages].sort((a, b) => sortAsc ? a[sortKey] - b[sortKey] : b[sortKey] - a[sortKey]);
+  };
 
   const getInsights = () => {
     if (!overview) return null;
@@ -638,6 +713,7 @@ export function ClientDashboard({ workspaceId }: Props) {
     { id: 'health' as ClientTab, label: 'Site Health', icon: Shield },
     { id: 'analytics' as ClientTab, label: 'Analytics', icon: LineChart },
     ...(approvalBatches.length > 0 ? [{ id: 'approvals' as ClientTab, label: 'Approvals', icon: ClipboardCheck }] : []),
+    { id: 'requests' as ClientTab, label: 'Requests', icon: MessageSquare },
   ];
 
   return (
@@ -908,9 +984,16 @@ export function ClientDashboard({ workspaceId }: Props) {
             )}
 
             <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+              <div className="flex items-center gap-1 px-4 pt-3 pb-1">
+                {(['queries', 'pages'] as const).map(st => (
+                  <button key={st} onClick={() => setSearchSubTab(st)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${searchSubTab === st ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  >{st === 'queries' ? 'Queries' : 'Pages'}</button>
+                ))}
+              </div>
               <table className="w-full text-xs">
                 <thead><tr className="border-b border-zinc-800">
-                  <th className="text-left py-3 px-4 text-zinc-500 font-medium">Query</th>
+                  <th className="text-left py-3 px-4 text-zinc-500 font-medium">{searchSubTab === 'queries' ? 'Query' : 'Page'}</th>
                   {(['clicks', 'impressions', 'ctr', 'position'] as SortKey[]).map(key => (
                     <th key={key} className="text-right py-3 px-3 text-zinc-500 font-medium">
                       <button onClick={() => handleSort(key)} className="flex items-center gap-1 ml-auto hover:text-zinc-300">
@@ -920,15 +1003,30 @@ export function ClientDashboard({ workspaceId }: Props) {
                     </th>
                   ))}
                 </tr></thead>
-                <tbody>{sortedQueries().map((q, i) => (
-                  <tr key={i} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                    <td className="py-2.5 px-4 text-zinc-300 font-medium">{q.query}</td>
-                    <td className="py-2.5 px-3 text-right text-blue-400 font-semibold">{q.clicks}</td>
-                    <td className="py-2.5 px-3 text-right text-zinc-400">{q.impressions.toLocaleString()}</td>
-                    <td className="py-2.5 px-3 text-right text-emerald-400">{q.ctr}%</td>
-                    <td className="py-2.5 px-3 text-right"><span className={q.position <= 10 ? 'text-green-400' : q.position <= 20 ? 'text-amber-400' : 'text-red-400'}>{q.position}</span></td>
-                  </tr>
-                ))}</tbody>
+                <tbody>
+                  {searchSubTab === 'queries' && sortedQueries().map((q, i) => (
+                    <tr key={i} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                      <td className="py-2.5 px-4 text-zinc-300 font-medium">{q.query}</td>
+                      <td className="py-2.5 px-3 text-right text-blue-400 font-semibold">{q.clicks}</td>
+                      <td className="py-2.5 px-3 text-right text-zinc-400">{q.impressions.toLocaleString()}</td>
+                      <td className="py-2.5 px-3 text-right text-emerald-400">{q.ctr}%</td>
+                      <td className="py-2.5 px-3 text-right"><span className={q.position <= 10 ? 'text-green-400' : q.position <= 20 ? 'text-amber-400' : 'text-red-400'}>{q.position}</span></td>
+                    </tr>
+                  ))}
+                  {searchSubTab === 'pages' && sortedPages().map((p, i) => {
+                    let pagePath: string;
+                    try { pagePath = new URL(p.page).pathname; } catch { pagePath = p.page; }
+                    return (
+                      <tr key={i} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                        <td className="py-2.5 px-4 text-zinc-300 font-medium max-w-xs truncate">{pagePath}</td>
+                        <td className="py-2.5 px-3 text-right text-blue-400 font-semibold">{p.clicks}</td>
+                        <td className="py-2.5 px-3 text-right text-zinc-400">{p.impressions.toLocaleString()}</td>
+                        <td className="py-2.5 px-3 text-right text-emerald-400">{p.ctr}%</td>
+                        <td className="py-2.5 px-3 text-right"><span className={p.position <= 10 ? 'text-green-400' : p.position <= 20 ? 'text-amber-400' : 'text-red-400'}>{p.position}</span></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
               </table>
             </div>
           </>) : (
@@ -1707,6 +1805,202 @@ export function ClientDashboard({ workspaceId }: Props) {
                 </div>
               );
             })}
+          </div>
+        </>)}
+
+        {/* ════════════ REQUESTS TAB ════════════ */}
+        {tab === 'requests' && (<>
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <MessageSquare className="w-5 h-5 text-teal-400" />
+                <div>
+                  <h2 className="text-sm font-semibold text-zinc-200">Requests</h2>
+                  <p className="text-[10px] text-zinc-500 mt-0.5">Submit requests for your web team to action on.</p>
+                </div>
+              </div>
+              <button onClick={() => setShowNewRequest(!showNewRequest)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-lg text-xs font-medium transition-colors">
+                <Plus className="w-3.5 h-3.5" /> New Request
+              </button>
+            </div>
+
+            {/* New request form */}
+            {showNewRequest && (
+              <div className="bg-zinc-900 rounded-xl border border-teal-500/20 p-5 space-y-4">
+                <h3 className="text-xs font-semibold text-zinc-200">Submit a Request</h3>
+                <div>
+                  <label className="text-[10px] text-zinc-500 mb-1 block">Title</label>
+                  <input value={newReqTitle} onChange={e => setNewReqTitle(e.target.value)}
+                    placeholder="Brief summary of your request..."
+                    className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-zinc-500 mb-1 block">Description</label>
+                  <textarea value={newReqDesc} onChange={e => setNewReqDesc(e.target.value)} rows={3}
+                    placeholder="Describe what you need in detail..."
+                    className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 resize-none" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] text-zinc-500 mb-1 block">Category</label>
+                    <select value={newReqCategory} onChange={e => setNewReqCategory(e.target.value as RequestCategory)}
+                      className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500">
+                      <option value="content">Content Update</option>
+                      <option value="design">Design Change</option>
+                      <option value="bug">Bug Report</option>
+                      <option value="seo">SEO</option>
+                      <option value="feature">New Feature</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-zinc-500 mb-1 block">Related Page URL <span className="text-zinc-600">(optional)</span></label>
+                    <input value={newReqPage} onChange={e => setNewReqPage(e.target.value)}
+                      placeholder="/about or full URL..."
+                      className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500" />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <button onClick={submitRequest} disabled={submittingReq || !newReqTitle.trim() || !newReqDesc.trim()}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-lg text-xs font-medium transition-colors">
+                    {submittingReq ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                    {submittingReq ? 'Submitting...' : 'Submit Request'}
+                  </button>
+                  <button onClick={() => setShowNewRequest(false)}
+                    className="px-3 py-2 text-xs text-zinc-400 hover:text-zinc-200 transition-colors">Cancel</button>
+                </div>
+              </div>
+            )}
+
+            {/* Loading */}
+            {requestsLoading && (
+              <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-zinc-500" /></div>
+            )}
+
+            {/* Empty state */}
+            {!requestsLoading && requests.length === 0 && !showNewRequest && (
+              <div className="text-center py-16">
+                <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4">
+                  <MessageSquare className="w-8 h-8 text-zinc-700" />
+                </div>
+                <h3 className="text-sm font-medium text-zinc-400 mb-1">No requests yet</h3>
+                <p className="text-[10px] text-zinc-600 mb-4">Submit a request and your web team will take care of it.</p>
+                <button onClick={() => setShowNewRequest(true)}
+                  className="px-4 py-2 bg-teal-600 hover:bg-teal-500 rounded-lg text-xs font-medium transition-colors">
+                  <Plus className="w-3.5 h-3.5 inline mr-1" /> Create Your First Request
+                </button>
+              </div>
+            )}
+
+            {/* Request list */}
+            {!requestsLoading && requests.length > 0 && (
+              <div className="space-y-3">
+                {requests.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).map(req => {
+                  const isExpanded = expandedRequest === req.id;
+                  const statusColors: Record<string, string> = {
+                    new: 'bg-blue-500/10 border-blue-500/30 text-blue-400',
+                    in_review: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
+                    in_progress: 'bg-teal-500/10 border-teal-500/30 text-teal-400',
+                    on_hold: 'bg-zinc-500/10 border-zinc-600 text-zinc-400',
+                    completed: 'bg-green-500/10 border-green-500/30 text-green-400',
+                    closed: 'bg-zinc-500/10 border-zinc-600 text-zinc-500',
+                  };
+                  const statusLabels: Record<string, string> = {
+                    new: 'New', in_review: 'In Review', in_progress: 'In Progress',
+                    on_hold: 'On Hold', completed: 'Completed', closed: 'Closed',
+                  };
+                  const catLabels: Record<string, string> = {
+                    bug: 'Bug', content: 'Content', design: 'Design',
+                    seo: 'SEO', feature: 'Feature', other: 'Other',
+                  };
+                  const teamNotes = req.notes.filter(n => n.author === 'team').length;
+                  return (
+                    <div key={req.id} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+                      <button onClick={() => { setExpandedRequest(isExpanded ? null : req.id); setReqNoteInput(''); }}
+                        className="w-full px-5 py-4 text-left hover:bg-zinc-800/30 transition-colors">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-medium text-zinc-200 truncate">{req.title}</span>
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded border shrink-0 ${statusColors[req.status] || statusColors.new}`}>
+                                {statusLabels[req.status] || req.status}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[10px] text-zinc-500">
+                              <span className="px-1.5 py-0.5 bg-zinc-800 rounded text-zinc-400">{catLabels[req.category] || req.category}</span>
+                              <span>{new Date(req.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                              {teamNotes > 0 && <span className="text-teal-400">{teamNotes} team note{teamNotes !== 1 ? 's' : ''}</span>}
+                              {req.pageUrl && <span className="text-zinc-600 truncate max-w-[150px]">{req.pageUrl}</span>}
+                            </div>
+                          </div>
+                          {isExpanded ? <ChevronUp className="w-4 h-4 text-zinc-500 shrink-0" /> : <ChevronDown className="w-4 h-4 text-zinc-500 shrink-0" />}
+                        </div>
+                      </button>
+
+                      {isExpanded && (
+                        <div className="border-t border-zinc-800">
+                          {/* Description */}
+                          <div className="px-5 py-4">
+                            <div className="text-[10px] text-zinc-500 mb-1">Description</div>
+                            <p className="text-[11px] text-zinc-300 leading-relaxed whitespace-pre-wrap">{req.description}</p>
+                          </div>
+
+                          {/* Notes / conversation */}
+                          {req.notes.length > 0 && (
+                            <div className="px-5 pb-3">
+                              <div className="text-[10px] text-zinc-500 mb-2">Conversation</div>
+                              <div className="space-y-2">
+                                {req.notes.map(note => (
+                                  <div key={note.id} className={`flex gap-2 ${note.author === 'client' ? 'justify-end' : ''}`}>
+                                    <div className={`max-w-[80%] rounded-lg px-3 py-2 ${
+                                      note.author === 'team'
+                                        ? 'bg-teal-500/10 border border-teal-500/20'
+                                        : 'bg-zinc-800/50 border border-zinc-700'
+                                    }`}>
+                                      <div className="flex items-center gap-1.5 mb-0.5">
+                                        <span className={`text-[9px] font-medium ${note.author === 'team' ? 'text-teal-400' : 'text-zinc-400'}`}>
+                                          {note.author === 'team' ? 'Web Team' : 'You'}
+                                        </span>
+                                        <span className="text-[9px] text-zinc-600">
+                                          {new Date(note.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                        </span>
+                                      </div>
+                                      <p className="text-[11px] text-zinc-300 whitespace-pre-wrap">{note.content}</p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Reply input */}
+                          {req.status !== 'closed' && req.status !== 'completed' && (
+                            <div className="px-5 py-3 border-t border-zinc-800/50 flex gap-2">
+                              <input value={expandedRequest === req.id ? reqNoteInput : ''} onChange={e => setReqNoteInput(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && sendReqNote(req.id)}
+                                placeholder="Add a note or reply..."
+                                className="flex-1 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500" disabled={sendingNote} />
+                              <button onClick={() => sendReqNote(req.id)} disabled={sendingNote || !reqNoteInput.trim()}
+                                className="px-3 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-lg transition-colors">
+                                <Send className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                          {(req.status === 'completed' || req.status === 'closed') && (
+                            <div className="px-5 py-3 border-t border-zinc-800/50">
+                              <div className="flex items-center gap-1.5 text-[10px] text-green-400">
+                                <CheckCircle2 className="w-3 h-3" /> This request has been {req.status}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </>)}
 

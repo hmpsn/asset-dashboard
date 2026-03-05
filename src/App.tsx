@@ -11,6 +11,7 @@ import { SalesReport } from './components/SalesReport';
 import { GoogleAnalytics } from './components/GoogleAnalytics';
 import { WorkspaceSettings } from './components/WorkspaceSettings';
 import { SearchConsole } from './components/SearchConsole';
+import { RequestManager } from './components/RequestManager';
 import { ClientDashboard } from './components/ClientDashboard';
 import { LoginScreen } from './components/LoginScreen';
 import { useAuth } from './hooks/useAuth';
@@ -32,6 +33,7 @@ type Page =
   | 'page-weight' | 'page-speed'
   | 'workspace-settings'
   | 'prospect'
+  | 'requests'
   | 'settings';
 
 function App() {
@@ -235,6 +237,9 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
       { id: 'search', label: 'Search Console', icon: Search, needsSite: true },
       { id: 'analytics', label: 'Google Analytics', icon: BarChart3, needsSite: true },
     ]},
+    { label: 'CLIENT', items: [
+      { id: 'requests', label: 'Requests', icon: Pencil },
+    ]},
   ];
 
   // ── Content renderer ──
@@ -295,6 +300,7 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
     if (tab === 'page-weight') return <PageWeight key={`weight-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
     if (tab === 'page-speed') return <PageSpeedPanel key={`speed-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
     if (tab === 'analytics') return <GoogleAnalytics key={`ga4-${selected.id}`} workspaceId={selected.id} ga4PropertyId={selected.ga4PropertyId} />;
+    if (tab === 'requests') return <RequestManager key={`requests-${selected.id}`} workspaceId={selected.id} />;
 
     return null;
   };

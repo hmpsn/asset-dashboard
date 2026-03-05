@@ -55,6 +55,7 @@ import { generateSchemaSuggestions, generateSchemaForPage } from './schema-sugge
 import { runSalesAudit } from './sales-audit.js';
 import { initJobs, createJob, updateJob, getJob, listJobs } from './jobs.js';
 import { createBatch, listBatches, getBatch, updateItem, markBatchApplied, deleteBatch } from './approvals.js';
+import { listRequests, createRequest, updateRequest, addNote, deleteRequest, getRequest } from './requests.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
 import { listGscSites, getSearchOverview, getPerformanceTrend, getQueryPageData } from './search-console.js';
@@ -2735,6 +2736,79 @@ app.post('/api/public/approvals/:workspaceId/:batchId/apply', async (req, res) =
   }
 
   res.json({ results, applied: appliedIds.length, failed: results.length - appliedIds.length });
+});
+
+// --- Client Requests ---
+// Public: client creates a request
+app.post('/api/public/requests/:workspaceId', (req, res) => {
+  const { title, description, category, priority, pageUrl } = req.body;
+  if (!title || !description || !category) return res.status(400).json({ error: 'title, description, and category required' });
+  const request = createRequest(req.params.workspaceId, { title, description, category, priority, pageUrl });
+  broadcast('request:created', request);
+  res.json(request);
+});
+
+// Public: client lists their requests
+app.get('/api/public/requests/:workspaceId', (req, res) => {
+  res.json(listRequests(req.params.workspaceId));
+});
+
+// Public: client views a single request (with notes)
+app.get('/api/public/requests/:workspaceId/:requestId', (req, res) => {
+  const r = getRequest(req.params.requestId);
+  if (!r || r.workspaceId !== req.params.workspaceId) return res.status(404).json({ error: 'Not found' });
+  res.json(r);
+});
+
+// Public: client adds a note
+app.post('/api/public/requests/:workspaceId/:requestId/notes', (req, res) => {
+  const { content } = req.body;
+  if (!content) return res.status(400).json({ error: 'content required' });
+  const r = getRequest(req.params.requestId);
+  if (!r || r.workspaceId !== req.params.workspaceId) return res.status(404).json({ error: 'Not found' });
+  const updated = addNote(req.params.requestId, 'client', content);
+  broadcast('request:updated', updated);
+  res.json(updated);
+});
+
+// Internal: list all requests (optionally filtered by workspace)
+app.get('/api/requests', (req, res) => {
+  const wsId = req.query.workspaceId as string | undefined;
+  res.json(listRequests(wsId));
+});
+
+// Internal: get single request
+app.get('/api/requests/:id', (req, res) => {
+  const r = getRequest(req.params.id);
+  if (!r) return res.status(404).json({ error: 'Not found' });
+  res.json(r);
+});
+
+// Internal: update request status/priority/category
+app.patch('/api/requests/:id', (req, res) => {
+  const { status, priority, category } = req.body;
+  const updated = updateRequest(req.params.id, { status, priority, category });
+  if (!updated) return res.status(404).json({ error: 'Not found' });
+  broadcast('request:updated', updated);
+  res.json(updated);
+});
+
+// Internal: team adds a note
+app.post('/api/requests/:id/notes', (req, res) => {
+  const { content } = req.body;
+  if (!content) return res.status(400).json({ error: 'content required' });
+  const updated = addNote(req.params.id, 'team', content);
+  if (!updated) return res.status(404).json({ error: 'Not found' });
+  broadcast('request:updated', updated);
+  res.json(updated);
+});
+
+// Internal: delete request
+app.delete('/api/requests/:id', (req, res) => {
+  const ok = deleteRequest(req.params.id);
+  if (!ok) return res.status(404).json({ error: 'Not found' });
+  broadcast('request:deleted', { id: req.params.id });
+  res.json({ ok: true });
 });
 
 app.get('/api/public/search-overview/:workspaceId', async (req, res) => {
