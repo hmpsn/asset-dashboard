@@ -63,6 +63,7 @@ import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword, togglePinK
 import { listAnnotations, addAnnotation, deleteAnnotation } from './annotations.js';
 import { startApprovalReminders } from './approval-reminders.js';
 import { startMonthlyReports, triggerMonthlyReport } from './monthly-report.js';
+import { listBriefs, getBrief, deleteBrief, generateBrief } from './content-brief.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
 import { listGscSites, getSearchOverview, getPerformanceTrend, getQueryPageData } from './search-console.js';
@@ -3663,6 +3664,59 @@ app.put('/api/audit-schedules/:workspaceId', (req, res) => {
 
 app.delete('/api/audit-schedules/:workspaceId', (req, res) => {
   deleteSchedule(req.params.workspaceId);
+  res.json({ ok: true });
+});
+
+// --- Content Briefs ---
+// List all briefs for a workspace
+app.get('/api/content-briefs/:workspaceId', (req, res) => {
+  res.json(listBriefs(req.params.workspaceId));
+});
+
+// Get a specific brief
+app.get('/api/content-briefs/:workspaceId/:briefId', (req, res) => {
+  const brief = getBrief(req.params.workspaceId, req.params.briefId);
+  if (!brief) return res.status(404).json({ error: 'Brief not found' });
+  res.json(brief);
+});
+
+// Generate a new content brief
+app.post('/api/content-briefs/:workspaceId/generate', async (req, res) => {
+  try {
+    const { targetKeyword, businessContext } = req.body;
+    if (!targetKeyword) return res.status(400).json({ error: 'targetKeyword required' });
+
+    const ws = getWorkspace(req.params.workspaceId);
+    let relatedQueries: { query: string; position: number; clicks: number; impressions: number }[] = [];
+    let existingPages: string[] = [];
+
+    // Fetch GSC data if available
+    if (ws?.gscPropertyUrl) {
+      try {
+        const overview = await getSearchOverview(ws.id, ws.gscPropertyUrl, 28);
+        relatedQueries = overview.topQueries
+          .filter(q => q.query.toLowerCase().includes(targetKeyword.toLowerCase().split(' ')[0]))
+          .slice(0, 20);
+        existingPages = overview.topPages.map(p => {
+          try { return new URL(p.page).pathname; } catch { return p.page; }
+        });
+      } catch { /* GSC not available */ }
+    }
+
+    const brief = await generateBrief(req.params.workspaceId, targetKeyword, {
+      relatedQueries,
+      businessContext: businessContext || ws?.keywordStrategy?.businessContext,
+      existingPages,
+    });
+    res.json(brief);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate brief' });
+  }
+});
+
+// Delete a brief
+app.delete('/api/content-briefs/:workspaceId/:briefId', (req, res) => {
+  deleteBrief(req.params.workspaceId, req.params.briefId);
   res.json({ ok: true });
 });
 

@@ -15,6 +15,7 @@ import { CmsEditor } from './CmsEditor';
 import { KeywordStrategyPanel } from './KeywordStrategy';
 import { RedirectManager } from './RedirectManager';
 import { InternalLinks } from './InternalLinks';
+import { ContentBriefs } from './ContentBriefs';
 
 type Severity = 'error' | 'warning' | 'info';
 
@@ -861,6 +862,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit' }: Props) {
   if (view === 'keywords') return <KeywordAnalysis siteId={siteId} />;
   if (view === 'schema') return <SchemaSuggester siteId={siteId} />;
   if (view === 'competitor') return <CompetitorAnalysis siteId={siteId} />;
+  if (view === 'briefs') return <ContentBriefs workspaceId={workspaceId || ''} />;
   if (view === 'history') return <AuditHistory siteId={siteId} history={history} onRefresh={loadHistory} />;
 
   // ── Audit view (default) ──

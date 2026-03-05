@@ -29,7 +29,7 @@ type Page =
   | 'media'
   | 'seo-audit' | 'seo-history' | 'seo-editor' | 'seo-cms'
   | 'seo-links' | 'seo-redirects' | 'seo-internal'
-  | 'seo-strategy' | 'seo-keywords' | 'seo-schema' | 'seo-competitor'
+  | 'seo-strategy' | 'seo-keywords' | 'seo-schema' | 'seo-competitor' | 'seo-briefs'
   | 'search' | 'analytics'
   | 'page-weight' | 'page-speed'
   | 'workspace-settings'
@@ -233,6 +233,7 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
       { id: 'seo-keywords', label: 'Page Analysis', icon: Search, needsSite: true },
       { id: 'seo-schema', label: 'Schema', icon: Code2, needsSite: true },
       { id: 'seo-competitor', label: 'Competitors', icon: TrendingUp, needsSite: true },
+      { id: 'seo-briefs', label: 'Content Briefs', icon: Clipboard, needsSite: true },
     ]},
     { label: 'ANALYTICS', items: [
       { id: 'search', label: 'Search Console', icon: Search, needsSite: true },
