@@ -61,6 +61,7 @@ import { addActivity, listActivity } from './activity-log.js';
 import { getSchedule, listSchedules, upsertSchedule, deleteSchedule, startScheduler } from './scheduled-audits.js';
 import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword, togglePinKeyword, storeRankSnapshot, getRankHistory, getLatestRanks } from './rank-tracking.js';
 import { listAnnotations, addAnnotation, deleteAnnotation } from './annotations.js';
+import { startApprovalReminders } from './approval-reminders.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
 import { listGscSites, getSearchOverview, getPerformanceTrend, getQueryPageData } from './search-console.js';
@@ -3666,6 +3667,8 @@ app.delete('/api/audit-schedules/:workspaceId', (req, res) => {
 
 // Start audit scheduler
 startScheduler();
+// Start approval reminders
+startApprovalReminders();
 
 // Start
 const PORT = parseInt(process.env.PORT || '3001', 10);
