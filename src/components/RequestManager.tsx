@@ -24,6 +24,7 @@ interface ClientRequest {
   category: RequestCategory;
   priority: RequestPriority;
   status: RequestStatus;
+  submittedBy?: string;
   pageUrl?: string;
   notes: RequestNote[];
   createdAt: string;
@@ -241,6 +242,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                         <span className="px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--brand-bg)' }}>
                           {CAT_LABELS[req.category] || req.category}
                         </span>
+                        {req.submittedBy && <span style={{ color: 'var(--brand-text-bright)' }}>by {req.submittedBy}</span>}
                         <span><Clock className="w-2.5 h-2.5 inline mr-0.5" />{new Date(req.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                         {unreadTeam > 0 && <span style={{ color: 'var(--brand-mint)' }}>{unreadTeam} client note{unreadTeam !== 1 ? 's' : ''}</span>}
                         {req.pageUrl && (

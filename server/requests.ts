@@ -27,6 +27,7 @@ export interface ClientRequest {
   category: RequestCategory;
   priority: RequestPriority;
   status: RequestStatus;
+  submittedBy?: string;
   pageUrl?: string;
   notes: RequestNote[];
   createdAt: string;
@@ -62,6 +63,7 @@ export function createRequest(workspaceId: string, data: {
   description: string;
   category: RequestCategory;
   priority?: RequestPriority;
+  submittedBy?: string;
   pageUrl?: string;
 }): ClientRequest {
   const requests = readRequests();
@@ -74,6 +76,7 @@ export function createRequest(workspaceId: string, data: {
     category: data.category,
     priority: data.priority || 'medium',
     status: 'new',
+    submittedBy: data.submittedBy,
     pageUrl: data.pageUrl,
     notes: [],
     createdAt: now,

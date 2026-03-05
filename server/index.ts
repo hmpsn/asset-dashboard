@@ -56,6 +56,7 @@ import { runSalesAudit } from './sales-audit.js';
 import { initJobs, createJob, updateJob, getJob, listJobs } from './jobs.js';
 import { createBatch, listBatches, getBatch, updateItem, markBatchApplied, deleteBatch } from './approvals.js';
 import { listRequests, createRequest, updateRequest, addNote, deleteRequest, getRequest } from './requests.js';
+import { notifyTeamNewRequest, notifyClientTeamResponse, notifyClientStatusChange, isEmailConfigured } from './email.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
 import { listGscSites, getSearchOverview, getPerformanceTrend, getQueryPageData } from './search-console.js';
@@ -2787,10 +2788,15 @@ app.post('/api/public/approvals/:workspaceId/:batchId/apply', async (req, res) =
 // --- Client Requests ---
 // Public: client creates a request
 app.post('/api/public/requests/:workspaceId', (req, res) => {
-  const { title, description, category, priority, pageUrl } = req.body;
+  const { title, description, category, priority, pageUrl, submittedBy } = req.body;
   if (!title || !description || !category) return res.status(400).json({ error: 'title, description, and category required' });
-  const request = createRequest(req.params.workspaceId, { title, description, category, priority, pageUrl });
+  const request = createRequest(req.params.workspaceId, { title, description, category, priority, pageUrl, submittedBy });
   broadcast('request:created', request);
+  // Email team
+  const ws = getWorkspace(req.params.workspaceId);
+  if (ws) {
+    notifyTeamNewRequest({ workspaceName: ws.name, title, description, category, submittedBy, pageUrl }).catch(() => {});
+  }
   res.json(request);
 });
 
@@ -2833,9 +2839,18 @@ app.get('/api/requests/:id', (req, res) => {
 // Internal: update request status/priority/category
 app.patch('/api/requests/:id', (req, res) => {
   const { status, priority, category } = req.body;
+  const prev = getRequest(req.params.id);
   const updated = updateRequest(req.params.id, { status, priority, category });
   if (!updated) return res.status(404).json({ error: 'Not found' });
   broadcast('request:updated', updated);
+  // Email client on status change
+  if (status && prev && status !== prev.status) {
+    const ws = getWorkspace(updated.workspaceId);
+    if (ws?.clientEmail) {
+      const dashUrl = ws.liveDomain ? `${ws.liveDomain.startsWith('http') ? '' : 'https://'}${ws.liveDomain}/client/${ws.id}` : undefined;
+      notifyClientStatusChange({ clientEmail: ws.clientEmail, workspaceName: ws.name, requestTitle: updated.title, newStatus: status, dashboardUrl: dashUrl }).catch(() => {});
+    }
+  }
   res.json(updated);
 });
 
@@ -2846,6 +2861,12 @@ app.post('/api/requests/:id/notes', (req, res) => {
   const updated = addNote(req.params.id, 'team', content);
   if (!updated) return res.status(404).json({ error: 'Not found' });
   broadcast('request:updated', updated);
+  // Email client
+  const ws = getWorkspace(updated.workspaceId);
+  if (ws?.clientEmail) {
+    const dashUrl = ws.liveDomain ? `${ws.liveDomain.startsWith('http') ? '' : 'https://'}${ws.liveDomain}/client/${ws.id}` : undefined;
+    notifyClientTeamResponse({ clientEmail: ws.clientEmail, workspaceName: ws.name, requestTitle: updated.title, noteContent: content, dashboardUrl: dashUrl }).catch(() => {});
+  }
   res.json(updated);
 });
 
@@ -3396,6 +3417,8 @@ app.get('/api/health', (_req, res) => {
     hasOpenAIKey: !!process.env.OPENAI_API_KEY,
     hasWebflowToken: !!process.env.WEBFLOW_API_TOKEN,
     hasGoogleAuth: !!getGoogleCredentials(),
+    hasEmailConfig: isEmailConfigured(),
+    notificationEmail: process.env.NOTIFICATION_EMAIL || null,
   });
 });
 

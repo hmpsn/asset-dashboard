@@ -54,7 +54,7 @@ interface RequestNote { id: string; author: 'client' | 'team'; content: string; 
 interface ClientRequest {
   id: string; workspaceId: string; title: string; description: string;
   category: RequestCategory; priority: string; status: RequestStatus;
-  pageUrl?: string; notes: RequestNote[]; createdAt: string; updatedAt: string;
+  submittedBy?: string; pageUrl?: string; notes: RequestNote[]; createdAt: string; updatedAt: string;
 }
 
 interface ApprovalItem {
@@ -282,6 +282,7 @@ export function ClientDashboard({ workspaceId }: Props) {
   const [newReqDesc, setNewReqDesc] = useState('');
   const [newReqCategory, setNewReqCategory] = useState<RequestCategory>('other');
   const [newReqPage, setNewReqPage] = useState('');
+  const [newReqName, setNewReqName] = useState('');
   const [submittingReq, setSubmittingReq] = useState(false);
   const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
   const [reqNoteInput, setReqNoteInput] = useState('');
@@ -345,10 +346,10 @@ export function ClientDashboard({ workspaceId }: Props) {
     try {
       const res = await fetch(`/api/public/requests/${workspaceId}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: newReqTitle.trim(), description: newReqDesc.trim(), category: newReqCategory, pageUrl: newReqPage.trim() || undefined }),
+        body: JSON.stringify({ title: newReqTitle.trim(), description: newReqDesc.trim(), category: newReqCategory, pageUrl: newReqPage.trim() || undefined, submittedBy: newReqName.trim() || undefined }),
       });
       if (res.ok) {
-        setNewReqTitle(''); setNewReqDesc(''); setNewReqCategory('other'); setNewReqPage(''); setShowNewRequest(false);
+        setNewReqTitle(''); setNewReqDesc(''); setNewReqCategory('other'); setNewReqPage(''); setNewReqName(''); setShowNewRequest(false);
         loadRequests(workspaceId);
       }
     } catch { /* skip */ }
@@ -706,6 +707,7 @@ export function ClientDashboard({ workspaceId }: Props) {
   };
 
   const pendingApprovals = approvalBatches.reduce((sum, b) => sum + b.items.filter(i => i.status === 'pending').length, 0);
+  const unreadTeamNotes = requests.filter(r => r.notes.length > 0 && r.notes[r.notes.length - 1].author === 'team' && r.status !== 'completed' && r.status !== 'closed').length;
 
   const NAV = [
     { id: 'overview' as ClientTab, label: 'Overview', icon: LayoutDashboard },
@@ -763,7 +765,8 @@ export function ClientDashboard({ workspaceId }: Props) {
                   }`}>
                   <Icon className="w-3.5 h-3.5" /> {t.label}
                   {t.id === 'approvals' && pendingApprovals > 0 && <span className="ml-1 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-violet-500 text-white">{pendingApprovals}</span>}
-                  {hasData && !active && t.id !== 'approvals' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" />}
+                  {t.id === 'requests' && unreadTeamNotes > 0 && <span className="ml-1 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-teal-500 text-white">{unreadTeamNotes}</span>}
+                  {hasData && !active && t.id !== 'approvals' && t.id !== 'requests' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" />}
                 </button>
               );
             })}
@@ -1829,6 +1832,12 @@ export function ClientDashboard({ workspaceId }: Props) {
               <div className="bg-zinc-900 rounded-xl border border-teal-500/20 p-5 space-y-4">
                 <h3 className="text-xs font-semibold text-zinc-200">Submit a Request</h3>
                 <div>
+                  <label className="text-[10px] text-zinc-500 mb-1 block">Your Name</label>
+                  <input value={newReqName} onChange={e => setNewReqName(e.target.value)}
+                    placeholder="So we know who to follow up with..."
+                    className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500" />
+                </div>
+                <div>
                   <label className="text-[10px] text-zinc-500 mb-1 block">Title</label>
                   <input value={newReqTitle} onChange={e => setNewReqTitle(e.target.value)}
                     placeholder="Brief summary of your request..."
@@ -1928,6 +1937,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                             </div>
                             <div className="flex items-center gap-2 text-[10px] text-zinc-500">
                               <span className="px-1.5 py-0.5 bg-zinc-800 rounded text-zinc-400">{catLabels[req.category] || req.category}</span>
+                              {req.submittedBy && <span className="text-zinc-400">by {req.submittedBy}</span>}
                               <span>{new Date(req.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                               {teamNotes > 0 && <span className="text-teal-400">{teamNotes} team note{teamNotes !== 1 ? 's' : ''}</span>}
                               {req.pageUrl && <span className="text-zinc-600 truncate max-w-[150px]">{req.pageUrl}</span>}

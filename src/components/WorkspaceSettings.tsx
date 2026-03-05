@@ -16,6 +16,7 @@ interface WorkspaceData {
   webflowSiteId?: string; webflowSiteName?: string;
   gscPropertyUrl?: string; ga4PropertyId?: string;
   hasPassword?: boolean;
+  clientEmail?: string;
   eventConfig?: EventDisplayConfig[];
   eventGroups?: EventGroup[];
 }
@@ -42,6 +43,8 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
   const [editingPassword, setEditingPassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [savingPassword, setSavingPassword] = useState(false);
+  const [clientEmail, setClientEmail] = useState('');
+  const [savingEmail, setSavingEmail] = useState(false);
   // Event config state
   const [showEventConfig, setShowEventConfig] = useState(false);
   const [availableEvents, setAvailableEvents] = useState<{eventName: string; eventCount: number; users: number}[]>([]);
@@ -61,7 +64,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
 
   useEffect(() => {
     // Load workspace data
-    fetch(`/api/workspaces/${workspaceId}`).then(r => r.json()).then(setWs).catch(() => {});
+    fetch(`/api/workspaces/${workspaceId}`).then(r => r.json()).then((d: WorkspaceData) => { setWs(d); setClientEmail(d.clientEmail || ''); }).catch(() => {});
     // Load Google status + properties
     fetch('/api/google/status').then(r => r.json()).then((s: { connected: boolean; configured: boolean }) => {
       setGoogleStatus(s);
@@ -394,6 +397,25 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                     </button>
                   </div>
                 )}
+                {/* Client notification email */}
+                <div className="pt-2" style={{ borderTop: '1px solid var(--brand-border)' }}>
+                  <div className="text-[10px] font-medium mb-1.5" style={{ color: 'var(--brand-text-muted)' }}>Client Notification Email</div>
+                  <p className="text-[10px] mb-2" style={{ color: 'var(--brand-text-dim)' }}>We'll email this address when your team responds to requests or changes status.</p>
+                  <div className="flex items-center gap-2">
+                    <input type="email" value={clientEmail} onChange={e => setClientEmail(e.target.value)}
+                      placeholder="client@company.com"
+                      className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500" />
+                    <button onClick={async () => {
+                      setSavingEmail(true);
+                      try { await patchWorkspace({ clientEmail: clientEmail.trim() }); toast(clientEmail.trim() ? 'Client email saved' : 'Client email removed'); }
+                      catch { toast('Failed to save email', 'error'); }
+                      finally { setSavingEmail(false); }
+                    }} disabled={savingEmail}
+                      className="px-3 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-xs font-medium transition-colors">
+                      {savingEmail ? '...' : 'Save'}
+                    </button>
+                  </div>
+                </div>
               </div>
             </section>
 
