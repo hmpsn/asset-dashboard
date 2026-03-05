@@ -5,7 +5,7 @@ import {
   Target, Zap, Shield, MessageSquare, X, ChevronDown, ChevronUp,
   CheckCircle2, Info, LayoutDashboard, LineChart, Lock,
   Users, Globe, Activity, Filter, ClipboardCheck, Check, Edit3,
-  Sun, Moon, Plus,
+  Sun, Moon, Plus, Paperclip, FileText,
 } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 
@@ -50,11 +50,12 @@ type ClientTab = 'overview' | 'search' | 'health' | 'analytics' | 'approvals' | 
 
 type RequestCategory = 'bug' | 'content' | 'design' | 'seo' | 'feature' | 'other';
 type RequestStatus = 'new' | 'in_review' | 'in_progress' | 'on_hold' | 'completed' | 'closed';
-interface RequestNote { id: string; author: 'client' | 'team'; content: string; createdAt: string; }
+interface RequestAttachment { id: string; filename: string; originalName: string; mimeType: string; size: number; }
+interface RequestNote { id: string; author: 'client' | 'team'; content: string; attachments?: RequestAttachment[]; createdAt: string; }
 interface ClientRequest {
   id: string; workspaceId: string; title: string; description: string;
   category: RequestCategory; priority: string; status: RequestStatus;
-  submittedBy?: string; pageUrl?: string; notes: RequestNote[]; createdAt: string; updatedAt: string;
+  submittedBy?: string; pageUrl?: string; attachments?: RequestAttachment[]; notes: RequestNote[]; createdAt: string; updatedAt: string;
 }
 
 interface ApprovalItem {
@@ -287,6 +288,10 @@ export function ClientDashboard({ workspaceId }: Props) {
   const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
   const [reqNoteInput, setReqNoteInput] = useState('');
   const [sendingNote, setSendingNote] = useState(false);
+  const [noteFiles, setNoteFiles] = useState<File[]>([]);
+  const noteFileRef = useRef<HTMLInputElement>(null);
+  const [newReqFiles, setNewReqFiles] = useState<File[]>([]);
+  const newReqFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
 
@@ -349,7 +354,14 @@ export function ClientDashboard({ workspaceId }: Props) {
         body: JSON.stringify({ title: newReqTitle.trim(), description: newReqDesc.trim(), category: newReqCategory, pageUrl: newReqPage.trim() || undefined, submittedBy: newReqName.trim() || undefined }),
       });
       if (res.ok) {
-        setNewReqTitle(''); setNewReqDesc(''); setNewReqCategory('other'); setNewReqPage(''); setNewReqName(''); setShowNewRequest(false);
+        const created = await res.json();
+        // Upload attachments if any
+        if (newReqFiles.length > 0) {
+          const fd = new FormData();
+          newReqFiles.forEach(f => fd.append('files', f));
+          await fetch(`/api/public/requests/${workspaceId}/${created.id}/attachments`, { method: 'POST', body: fd });
+        }
+        setNewReqTitle(''); setNewReqDesc(''); setNewReqCategory('other'); setNewReqPage(''); setNewReqName(''); setNewReqFiles([]); setShowNewRequest(false);
         loadRequests(workspaceId);
       }
     } catch { /* skip */ }
@@ -357,14 +369,21 @@ export function ClientDashboard({ workspaceId }: Props) {
   };
 
   const sendReqNote = async (requestId: string) => {
-    if (!reqNoteInput.trim()) return;
+    if (!reqNoteInput.trim() && noteFiles.length === 0) return;
     setSendingNote(true);
     try {
-      await fetch(`/api/public/requests/${workspaceId}/${requestId}/notes`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: reqNoteInput.trim() }),
-      });
-      setReqNoteInput('');
+      if (noteFiles.length > 0) {
+        const fd = new FormData();
+        fd.append('content', reqNoteInput.trim());
+        noteFiles.forEach(f => fd.append('files', f));
+        await fetch(`/api/public/requests/${workspaceId}/${requestId}/notes-with-files`, { method: 'POST', body: fd });
+      } else {
+        await fetch(`/api/public/requests/${workspaceId}/${requestId}/notes`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: reqNoteInput.trim() }),
+        });
+      }
+      setReqNoteInput(''); setNoteFiles([]);
       loadRequests(workspaceId);
     } catch { /* skip */ }
     finally { setSendingNote(false); }
@@ -1869,6 +1888,25 @@ export function ClientDashboard({ workspaceId }: Props) {
                       className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500" />
                   </div>
                 </div>
+                <div>
+                  <label className="text-[10px] text-zinc-500 mb-1 block">Attachments <span className="text-zinc-600">(optional — screenshots, docs)</span></label>
+                  <input type="file" ref={newReqFileRef} className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.txt,.csv"
+                    onChange={e => { if (e.target.files) setNewReqFiles(prev => [...prev, ...Array.from(e.target.files!)]); e.target.value = ''; }} />
+                  <button onClick={() => newReqFileRef.current?.click()} type="button"
+                    className="flex items-center gap-1.5 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-400 hover:text-zinc-200 hover:border-zinc-600 transition-colors">
+                    <Paperclip className="w-3.5 h-3.5" /> Attach Files
+                  </button>
+                  {newReqFiles.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {newReqFiles.map((f, i) => (
+                        <span key={i} className="flex items-center gap-1 text-[10px] bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-zinc-300">
+                          <Paperclip className="w-2.5 h-2.5" />{f.name}
+                          <button onClick={() => setNewReqFiles(prev => prev.filter((_, j) => j !== i))} className="text-zinc-500 hover:text-zinc-300"><X className="w-2.5 h-2.5" /></button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <div className="flex items-center gap-2 pt-1">
                   <button onClick={submitRequest} disabled={submittingReq || !newReqTitle.trim() || !newReqDesc.trim()}
                     className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-lg text-xs font-medium transition-colors">
@@ -1975,7 +2013,23 @@ export function ClientDashboard({ workspaceId }: Props) {
                                           {new Date(note.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                                         </span>
                                       </div>
-                                      <p className="text-[11px] text-zinc-300 whitespace-pre-wrap">{note.content}</p>
+                                      {note.content && <p className="text-[11px] text-zinc-300 whitespace-pre-wrap">{note.content}</p>}
+                                      {note.attachments && note.attachments.length > 0 && (
+                                        <div className="mt-1.5 space-y-1">
+                                          {note.attachments.map(att => (
+                                            att.mimeType.startsWith('image/') ? (
+                                              <a key={att.id} href={`/api/request-attachments/${att.filename}`} target="_blank" rel="noreferrer" className="block">
+                                                <img src={`/api/request-attachments/${att.filename}`} alt={att.originalName} className="max-w-[240px] max-h-[180px] rounded-md border border-zinc-700" />
+                                              </a>
+                                            ) : (
+                                              <a key={att.id} href={`/api/request-attachments/${att.filename}`} target="_blank" rel="noreferrer"
+                                                className="flex items-center gap-1.5 text-[10px] text-teal-400 hover:text-teal-300">
+                                                <FileText className="w-3 h-3" />{att.originalName} <span className="text-zinc-600">({(att.size / 1024).toFixed(0)}KB)</span>
+                                              </a>
+                                            )
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 ))}
@@ -1985,15 +2039,32 @@ export function ClientDashboard({ workspaceId }: Props) {
 
                           {/* Reply input */}
                           {req.status !== 'closed' && req.status !== 'completed' && (
-                            <div className="px-5 py-3 border-t border-zinc-800/50 flex gap-2">
-                              <input value={expandedRequest === req.id ? reqNoteInput : ''} onChange={e => setReqNoteInput(e.target.value)}
-                                onKeyDown={e => e.key === 'Enter' && sendReqNote(req.id)}
-                                placeholder="Add a note or reply..."
-                                className="flex-1 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500" disabled={sendingNote} />
-                              <button onClick={() => sendReqNote(req.id)} disabled={sendingNote || !reqNoteInput.trim()}
-                                className="px-3 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-lg transition-colors">
-                                <Send className="w-3.5 h-3.5" />
-                              </button>
+                            <div className="px-5 py-3 border-t border-zinc-800/50 space-y-2">
+                              {noteFiles.length > 0 && expandedRequest === req.id && (
+                                <div className="flex flex-wrap gap-1.5">
+                                  {noteFiles.map((f, i) => (
+                                    <span key={i} className="flex items-center gap-1 text-[10px] bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-zinc-300">
+                                      <Paperclip className="w-2.5 h-2.5" />{f.name}
+                                      <button onClick={() => setNoteFiles(prev => prev.filter((_, j) => j !== i))} className="text-zinc-500 hover:text-zinc-300"><X className="w-2.5 h-2.5" /></button>
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              <div className="flex gap-2">
+                                <input value={expandedRequest === req.id ? reqNoteInput : ''} onChange={e => setReqNoteInput(e.target.value)}
+                                  onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendReqNote(req.id)}
+                                  placeholder="Add a note or reply..."
+                                  className="flex-1 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500" disabled={sendingNote} />
+                                <input type="file" ref={noteFileRef} className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.txt,.csv"
+                                  onChange={e => { if (e.target.files) setNoteFiles(prev => [...prev, ...Array.from(e.target.files!)]); e.target.value = ''; }} />
+                                <button onClick={() => noteFileRef.current?.click()} className="px-2 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg transition-colors" title="Attach file">
+                                  <Paperclip className="w-3.5 h-3.5 text-zinc-400" />
+                                </button>
+                                <button onClick={() => sendReqNote(req.id)} disabled={sendingNote || (!reqNoteInput.trim() && noteFiles.length === 0)}
+                                  className="px-3 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-lg transition-colors">
+                                  <Send className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </div>
                           )}
                           {(req.status === 'completed' || req.status === 'closed') && (

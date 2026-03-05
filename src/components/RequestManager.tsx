@@ -1,18 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   MessageSquare, Send, Loader2, ChevronDown, ChevronUp,
   Trash2, ExternalLink, Clock, CheckCircle2, AlertTriangle,
-  Filter, Search,
+  Filter, Search, Paperclip, FileText, X,
 } from 'lucide-react';
 
 type RequestPriority = 'low' | 'medium' | 'high' | 'urgent';
 type RequestStatus = 'new' | 'in_review' | 'in_progress' | 'on_hold' | 'completed' | 'closed';
 type RequestCategory = 'bug' | 'content' | 'design' | 'seo' | 'feature' | 'other';
 
+interface RequestAttachment { id: string; filename: string; originalName: string; mimeType: string; size: number; }
+
 interface RequestNote {
   id: string;
   author: 'client' | 'team';
   content: string;
+  attachments?: RequestAttachment[];
   createdAt: string;
 }
 
@@ -26,6 +29,7 @@ interface ClientRequest {
   status: RequestStatus;
   submittedBy?: string;
   pageUrl?: string;
+  attachments?: RequestAttachment[];
   notes: RequestNote[];
   createdAt: string;
   updatedAt: string;
@@ -63,6 +67,8 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [noteInput, setNoteInput] = useState('');
   const [sendingNote, setSendingNote] = useState(false);
+  const [noteFiles, setNoteFiles] = useState<File[]>([]);
+  const noteFileRef = useRef<HTMLInputElement>(null);
   const [statusFilter, setStatusFilter] = useState<RequestStatus | 'all'>('all');
   const [catFilter, setCatFilter] = useState<RequestCategory | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -98,18 +104,26 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
   };
 
   const sendNote = async (requestId: string) => {
-    if (!noteInput.trim()) return;
+    if (!noteInput.trim() && noteFiles.length === 0) return;
     setSendingNote(true);
     try {
-      const res = await fetch(`/api/requests/${requestId}/notes`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: noteInput.trim() }),
-      });
+      let res;
+      if (noteFiles.length > 0) {
+        const fd = new FormData();
+        fd.append('content', noteInput.trim());
+        noteFiles.forEach(f => fd.append('files', f));
+        res = await fetch(`/api/requests/${requestId}/notes-with-files`, { method: 'POST', body: fd });
+      } else {
+        res = await fetch(`/api/requests/${requestId}/notes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: noteInput.trim() }),
+        });
+      }
       if (res.ok) {
         const updated = await res.json();
         setRequests(prev => prev.map(r => r.id === requestId ? updated : r));
-        setNoteInput('');
+        setNoteInput(''); setNoteFiles([]);
       }
     } catch { /* skip */ }
     setSendingNote(false);
@@ -325,7 +339,23 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                                     {new Date(note.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                                   </span>
                                 </div>
-                                <p className="text-[11px] whitespace-pre-wrap" style={{ color: 'var(--brand-text-bright)' }}>{note.content}</p>
+                                {note.content && <p className="text-[11px] whitespace-pre-wrap" style={{ color: 'var(--brand-text-bright)' }}>{note.content}</p>}
+                                {note.attachments && note.attachments.length > 0 && (
+                                  <div className="mt-1.5 space-y-1">
+                                    {note.attachments.map(att => (
+                                      att.mimeType.startsWith('image/') ? (
+                                        <a key={att.id} href={`/api/request-attachments/${att.filename}`} target="_blank" rel="noreferrer" className="block">
+                                          <img src={`/api/request-attachments/${att.filename}`} alt={att.originalName} className="max-w-[240px] max-h-[180px] rounded-md" style={{ border: '1px solid var(--brand-border)' }} />
+                                        </a>
+                                      ) : (
+                                        <a key={att.id} href={`/api/request-attachments/${att.filename}`} target="_blank" rel="noreferrer"
+                                          className="flex items-center gap-1.5 text-[10px] hover:underline" style={{ color: 'var(--brand-mint)' }}>
+                                          <FileText className="w-3 h-3" />{att.originalName} <span style={{ color: 'var(--brand-text-dim)' }}>({(att.size / 1024).toFixed(0)}KB)</span>
+                                        </a>
+                                      )
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           ))}
@@ -334,16 +364,33 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                     )}
 
                     {/* Team reply */}
-                    <div className="px-5 py-3 flex gap-2" style={{ borderTop: '1px solid var(--brand-border)' }}>
-                      <input value={expandedId === req.id ? noteInput : ''} onChange={e => setNoteInput(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && sendNote(req.id)}
-                        placeholder="Send a note to the client..."
-                        className="flex-1 px-3 py-2 rounded-lg text-[11px]" style={{ backgroundColor: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text-bright)' }}
-                        disabled={sendingNote} />
-                      <button onClick={() => sendNote(req.id)} disabled={sendingNote || !noteInput.trim()}
-                        className="px-3 py-2 rounded-lg transition-colors disabled:opacity-50" style={{ backgroundColor: 'var(--brand-mint)', color: '#000' }}>
-                        <Send className="w-3.5 h-3.5" />
-                      </button>
+                    <div className="px-5 py-3 space-y-2" style={{ borderTop: '1px solid var(--brand-border)' }}>
+                      {noteFiles.length > 0 && expandedId === req.id && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {noteFiles.map((f, i) => (
+                            <span key={i} className="flex items-center gap-1 text-[10px] rounded px-2 py-1" style={{ backgroundColor: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}>
+                              <Paperclip className="w-2.5 h-2.5" />{f.name}
+                              <button onClick={() => setNoteFiles(prev => prev.filter((_, j) => j !== i))} className="hover:opacity-70"><X className="w-2.5 h-2.5" /></button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <input value={expandedId === req.id ? noteInput : ''} onChange={e => setNoteInput(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendNote(req.id)}
+                          placeholder="Send a note to the client..."
+                          className="flex-1 px-3 py-2 rounded-lg text-[11px]" style={{ backgroundColor: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text-bright)' }}
+                          disabled={sendingNote} />
+                        <input type="file" ref={noteFileRef} className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.txt,.csv"
+                          onChange={e => { if (e.target.files) setNoteFiles(prev => [...prev, ...Array.from(e.target.files!)]); e.target.value = ''; }} />
+                        <button onClick={() => noteFileRef.current?.click()} className="px-2 py-2 rounded-lg transition-colors" style={{ backgroundColor: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }} title="Attach file">
+                          <Paperclip className="w-3.5 h-3.5" style={{ color: 'var(--brand-text-muted)' }} />
+                        </button>
+                        <button onClick={() => sendNote(req.id)} disabled={sendingNote || (!noteInput.trim() && noteFiles.length === 0)}
+                          className="px-3 py-2 rounded-lg transition-colors disabled:opacity-50" style={{ backgroundColor: 'var(--brand-mint)', color: '#000' }}>
+                          <Send className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
 
                     {/* Status hints */}

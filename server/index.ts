@@ -55,7 +55,7 @@ import { generateSchemaSuggestions, generateSchemaForPage } from './schema-sugge
 import { runSalesAudit } from './sales-audit.js';
 import { initJobs, createJob, updateJob, getJob, listJobs } from './jobs.js';
 import { createBatch, listBatches, getBatch, updateItem, markBatchApplied, deleteBatch } from './approvals.js';
-import { listRequests, createRequest, updateRequest, addNote, deleteRequest, getRequest } from './requests.js';
+import { listRequests, createRequest, updateRequest, addNote, deleteRequest, getRequest, getAttachmentsDir, addAttachmentsToRequest, type RequestAttachment } from './requests.js';
 import { notifyTeamNewRequest, notifyClientTeamResponse, notifyClientStatusChange, isEmailConfigured } from './email.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
@@ -2876,6 +2876,68 @@ app.delete('/api/requests/:id', (req, res) => {
   if (!ok) return res.status(404).json({ error: 'Not found' });
   broadcast('request:deleted', { id: req.params.id });
   res.json({ ok: true });
+});
+
+// --- Request Attachments ---
+function processUploadedAttachments(files: Express.Multer.File[]): RequestAttachment[] {
+  const dir = getAttachmentsDir();
+  return files.map(f => {
+    const id = `att_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const ext = path.extname(f.originalname) || '';
+    const filename = `${id}${ext}`;
+    fs.renameSync(f.path, path.join(dir, filename));
+    return { id, filename, originalName: f.originalname, mimeType: f.mimetype, size: f.size };
+  });
+}
+
+// Serve attachment files (public — needed for client dashboard)
+app.get('/api/request-attachments/:filename', (req, res) => {
+  const filePath = path.join(getAttachmentsDir(), path.basename(req.params.filename));
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Not found' });
+  res.sendFile(filePath);
+});
+
+// Upload attachments to an existing request (client or team)
+app.post('/api/public/requests/:workspaceId/:requestId/attachments', upload.array('files', 5), (req, res) => {
+  const files = req.files as Express.Multer.File[];
+  if (!files?.length) return res.status(400).json({ error: 'No files' });
+  const r = getRequest(req.params.requestId);
+  if (!r || r.workspaceId !== req.params.workspaceId) return res.status(404).json({ error: 'Not found' });
+  const atts = processUploadedAttachments(files);
+  const updated = addAttachmentsToRequest(req.params.requestId, atts);
+  broadcast('request:updated', updated);
+  res.json(updated);
+});
+
+// Upload attachments with a note (public client)
+app.post('/api/public/requests/:workspaceId/:requestId/notes-with-files', upload.array('files', 5), (req, res) => {
+  const content = req.body.content || '';
+  const files = req.files as Express.Multer.File[];
+  if (!content && !files?.length) return res.status(400).json({ error: 'content or files required' });
+  const r = getRequest(req.params.requestId);
+  if (!r || r.workspaceId !== req.params.workspaceId) return res.status(404).json({ error: 'Not found' });
+  const atts = files?.length ? processUploadedAttachments(files) : undefined;
+  const updated = addNote(req.params.requestId, 'client', content, atts);
+  broadcast('request:updated', updated);
+  res.json(updated);
+});
+
+// Upload attachments with a note (internal team)
+app.post('/api/requests/:id/notes-with-files', upload.array('files', 5), (req, res) => {
+  const content = req.body.content || '';
+  const files = req.files as Express.Multer.File[];
+  if (!content && !files?.length) return res.status(400).json({ error: 'content or files required' });
+  const atts = files?.length ? processUploadedAttachments(files) : undefined;
+  const updated = addNote(req.params.id, 'team', content, atts);
+  if (!updated) return res.status(404).json({ error: 'Not found' });
+  broadcast('request:updated', updated);
+  // Email client
+  const ws = getWorkspace(updated.workspaceId);
+  if (ws?.clientEmail && content) {
+    const dashUrl = ws.liveDomain ? `${ws.liveDomain.startsWith('http') ? '' : 'https://'}${ws.liveDomain}/client/${ws.id}` : undefined;
+    notifyClientTeamResponse({ clientEmail: ws.clientEmail, workspaceName: ws.name, requestTitle: updated.title, noteContent: content, dashboardUrl: dashUrl }).catch(() => {});
+  }
+  res.json(updated);
 });
 
 app.get('/api/public/search-overview/:workspaceId', async (req, res) => {

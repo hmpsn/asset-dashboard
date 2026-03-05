@@ -12,10 +12,19 @@ export type RequestPriority = 'low' | 'medium' | 'high' | 'urgent';
 export type RequestStatus = 'new' | 'in_review' | 'in_progress' | 'on_hold' | 'completed' | 'closed';
 export type RequestCategory = 'bug' | 'content' | 'design' | 'seo' | 'feature' | 'other';
 
+export interface RequestAttachment {
+  id: string;
+  filename: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+}
+
 export interface RequestNote {
   id: string;
   author: 'client' | 'team';
   content: string;
+  attachments?: RequestAttachment[];
   createdAt: string;
 }
 
@@ -29,6 +38,7 @@ export interface ClientRequest {
   status: RequestStatus;
   submittedBy?: string;
   pageUrl?: string;
+  attachments?: RequestAttachment[];
   notes: RequestNote[];
   createdAt: string;
   updatedAt: string;
@@ -96,7 +106,24 @@ export function updateRequest(id: string, updates: Partial<Pick<ClientRequest, '
   return requests[idx];
 }
 
-export function addNote(requestId: string, author: 'client' | 'team', content: string): ClientRequest | null {
+export function getAttachmentsDir(): string {
+  const dir = path.join(UPLOAD_ROOT, '.request-attachments');
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+export function addAttachmentsToRequest(requestId: string, attachments: RequestAttachment[]): ClientRequest | null {
+  const requests = readRequests();
+  const idx = requests.findIndex(r => r.id === requestId);
+  if (idx === -1) return null;
+  if (!requests[idx].attachments) requests[idx].attachments = [];
+  requests[idx].attachments!.push(...attachments);
+  requests[idx].updatedAt = new Date().toISOString();
+  writeRequests(requests);
+  return requests[idx];
+}
+
+export function addNote(requestId: string, author: 'client' | 'team', content: string, attachments?: RequestAttachment[]): ClientRequest | null {
   const requests = readRequests();
   const idx = requests.findIndex(r => r.id === requestId);
   if (idx === -1) return null;
@@ -104,6 +131,7 @@ export function addNote(requestId: string, author: 'client' | 'team', content: s
     id: `note_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     author,
     content,
+    attachments: attachments && attachments.length > 0 ? attachments : undefined,
     createdAt: new Date().toISOString(),
   };
   requests[idx].notes.push(note);
