@@ -2891,7 +2891,7 @@ app.get('/api/public/analytics-top-pages/:workspaceId', async (req, res) => {
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
   const days = parseInt(req.query.days as string) || 28;
   try {
-    const pages = await getGA4TopPages(ws.ga4PropertyId, days);
+    const pages = await getGA4TopPages(ws.ga4PropertyId, days, 200);
     res.json(pages);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
