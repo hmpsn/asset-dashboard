@@ -24,11 +24,12 @@ interface Props {
   workspaceName: string;
   webflowSiteId?: string;
   webflowSiteName?: string;
+  onUpdate?: (patch: Record<string, unknown>) => void;
 }
 
 type SectionTab = 'connections' | 'dashboard';
 
-export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, webflowSiteName }: Props) {
+export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, webflowSiteName, onUpdate }: Props) {
   const { toast } = useToast();
   const [tab, setTab] = useState<SectionTab>('connections');
   const [ws, setWs] = useState<WorkspaceData | null>(null);
@@ -77,6 +78,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
     });
     const updated = await res.json();
     setWs(updated);
+    onUpdate?.(patch);
     return updated;
   };
 

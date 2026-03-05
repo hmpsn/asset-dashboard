@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Loader2, Search, TrendingUp, TrendingDown, Eye, MousePointer,
-  BarChart3, ExternalLink, Link2, Unplug, ArrowUpDown,
+  BarChart3, ExternalLink, ArrowUpDown,
   Sparkles, Send, AlertTriangle, Target, Zap, Shield, MessageSquare, X,
 } from 'lucide-react';
 
@@ -39,11 +39,6 @@ interface PerformanceTrend {
   position: number;
 }
 
-interface GscSite {
-  siteUrl: string;
-  permissionLevel: string;
-}
-
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -51,6 +46,7 @@ interface ChatMessage {
 
 interface Props {
   siteId: string;
+  gscPropertyUrl?: string;
 }
 
 function MiniSparkline({ data, color }: { data: number[]; color: string }) {
@@ -138,13 +134,9 @@ const QUICK_QUESTIONS = [
   'What content should I create next based on search data?',
 ];
 
-export function SearchConsole({ siteId }: Props) {
-  const [status, setStatus] = useState<{ configured: boolean; connected: boolean } | null>(null);
-  const [gscSites, setGscSites] = useState<GscSite[]>([]);
-  const [selectedSite, setSelectedSite] = useState<string>('');
+export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
   const [overview, setOverview] = useState<SearchOverview | null>(null);
   const [trend, setTrend] = useState<PerformanceTrend[]>([]);
-  const [loading, setLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<DataTab>('queries');
@@ -163,40 +155,15 @@ export function SearchConsole({ siteId }: Props) {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
-  // Check connection status on mount
+  // Load data when gscPropertyUrl is available
   useEffect(() => {
-    fetch(`/api/google/status/${siteId}`)
-      .then(r => r.json())
-      .then(d => {
-        setStatus(d);
-        if (d.connected) loadGscSites();
-        else setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, [siteId]);
-
-  const loadGscSites = async () => {
-    try {
-      const res = await fetch(`/api/google/gsc-sites/${siteId}`);
-      const sites = await res.json();
-      if (Array.isArray(sites)) {
-        setGscSites(sites);
-        if (sites.length > 0) {
-          setSelectedSite(sites[0].siteUrl);
-          await loadData(sites[0].siteUrl);
-        }
-      } else if (sites.error) {
-        setError(sites.error);
-      }
-    } catch {
-      setError('Failed to load GSC sites');
-    } finally {
-      setLoading(false);
+    if (gscPropertyUrl) {
+      loadData(gscPropertyUrl);
     }
-  };
+  }, [siteId, gscPropertyUrl]);
 
   const loadData = async (gscUrl?: string, d?: number) => {
-    const siteUrl = gscUrl || selectedSite;
+    const siteUrl = gscUrl || gscPropertyUrl;
     const numDays = d || days;
     if (!siteUrl) return;
     setDataLoading(true);
@@ -215,29 +182,6 @@ export function SearchConsole({ siteId }: Props) {
     } finally {
       setDataLoading(false);
     }
-  };
-
-  const connectGoogle = async () => {
-    try {
-      const res = await fetch(`/api/google/auth-url/${siteId}`);
-      const data = await res.json();
-      if (data.url) {
-        window.open(data.url, '_blank', 'width=600,height=700');
-      } else {
-        setError(data.error || 'Could not get auth URL');
-      }
-    } catch {
-      setError('Failed to start Google auth');
-    }
-  };
-
-  const disconnectGoogle = async () => {
-    await fetch(`/api/google/disconnect/${siteId}`, { method: 'POST' });
-    setStatus({ configured: status?.configured || false, connected: false });
-    setOverview(null);
-    setTrend([]);
-    setGscSites([]);
-    setSelectedSite('');
   };
 
   const askAi = async (question: string) => {
@@ -308,7 +252,7 @@ export function SearchConsole({ siteId }: Props) {
     // Try to detect branded queries (containing likely brand terms from the site URL)
     let brandTerms: string[] = [];
     try {
-      const hostname = new URL(selectedSite).hostname.replace('www.', '').split('.')[0];
+      const hostname = new URL(gscPropertyUrl || '').hostname.replace('www.', '').split('.')[0];
       brandTerms = [hostname.toLowerCase()];
     } catch { /* ignore */ }
     const branded = overview.topQueries.filter(q => brandTerms.some(b => q.query.toLowerCase().includes(b)));
@@ -317,48 +261,17 @@ export function SearchConsole({ siteId }: Props) {
     return { lowHanging, topPerformers, ctrOpps, highImpLowClick, brandedVsNon: { branded: branded.length, nonBranded: nonBranded.length } };
   };
 
-  if (loading) {
+  // Not configured state
+  if (!gscPropertyUrl) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-3 text-zinc-500">
-        <Loader2 className="w-6 h-6 animate-spin" />
-        <p className="text-sm">Checking Google connection...</p>
-      </div>
-    );
-  }
-
-  // Not connected state
-  if (!status?.connected) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 gap-5">
-        <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center border border-zinc-800">
-          <Search className="w-8 h-8 text-zinc-500" />
+      <div className="flex flex-col items-center justify-center py-24 gap-3">
+        <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center">
+          <Search className="w-8 h-8 text-zinc-600" />
         </div>
-        <div className="text-center max-w-md">
-          <p className="text-sm font-medium text-zinc-300">Google Search Console</p>
-          <p className="text-xs text-zinc-500 mt-1">
-            Connect your Google account to see search queries, clicks, impressions, and ranking positions for your site.
-          </p>
-        </div>
-        {!status?.configured ? (
-          <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-4 py-3 max-w-sm text-center">
-            <p className="text-xs text-amber-400 font-medium">Google OAuth not configured</p>
-            <p className="text-[11px] text-amber-400/70 mt-1">
-              Add <code className="bg-amber-500/20 px-1 rounded">GOOGLE_CLIENT_ID</code> and{' '}
-              <code className="bg-amber-500/20 px-1 rounded">GOOGLE_CLIENT_SECRET</code> to your .env file.
-            </p>
-          </div>
-        ) : (
-          <button
-            onClick={connectGoogle}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
-            style={{ backgroundColor: 'var(--brand-mint)', color: '#0f1219' }}
-          >
-            <Link2 className="w-4 h-4" /> Connect Google Account
-          </button>
-        )}
-        {error && (
-          <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-lg max-w-sm">{error}</div>
-        )}
+        <p className="text-sm text-zinc-400">Search Console not configured</p>
+        <p className="text-xs text-zinc-600 max-w-md text-center">
+          Select a Search Console property in the workspace settings (gear icon) to view search data.
+        </p>
       </div>
     );
   }
@@ -369,22 +282,10 @@ export function SearchConsole({ siteId }: Props) {
     <div className="space-y-5">
       {/* Top bar */}
       <div className="flex items-center gap-3">
-        {gscSites.length > 1 ? (
-          <select
-            value={selectedSite}
-            onChange={e => { setSelectedSite(e.target.value); loadData(e.target.value); }}
-            className="px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm focus:outline-none"
-          >
-            {gscSites.map(s => (
-              <option key={s.siteUrl} value={s.siteUrl}>{s.siteUrl}</option>
-            ))}
-          </select>
-        ) : gscSites.length === 1 ? (
-          <div className="text-sm text-zinc-300 flex items-center gap-2">
-            <Search className="w-4 h-4 text-zinc-500" />
-            <span className="truncate">{selectedSite}</span>
-          </div>
-        ) : null}
+        <div className="text-sm text-zinc-300 flex items-center gap-2">
+          <Search className="w-4 h-4 text-zinc-500" />
+          <span className="truncate">{gscPropertyUrl}</span>
+        </div>
         <div className="flex-1" />
         <button
           onClick={() => setChatOpen(!chatOpen)}
@@ -407,12 +308,6 @@ export function SearchConsole({ siteId }: Props) {
             </button>
           ))}
         </div>
-        <button
-          onClick={disconnectGoogle}
-          className="flex items-center gap-1.5 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-medium transition-colors text-zinc-400"
-        >
-          <Unplug className="w-3.5 h-3.5" /> Disconnect
-        </button>
       </div>
 
       {error && (

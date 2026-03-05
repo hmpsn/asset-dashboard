@@ -241,7 +241,11 @@ function Dashboard() {
 
   const renderContent = () => {
     if (tab === 'settings') return <SettingsPanel />;
-    if (tab === 'workspace-settings' && selected) return <WorkspaceSettings key={`ws-settings-${selected.id}`} workspaceId={selected.id} workspaceName={selected.name} webflowSiteId={selected.webflowSiteId} webflowSiteName={selected.webflowSiteName} />;
+    if (tab === 'workspace-settings' && selected) return <WorkspaceSettings key={`ws-settings-${selected.id}`} workspaceId={selected.id} workspaceName={selected.name} webflowSiteId={selected.webflowSiteId} webflowSiteName={selected.webflowSiteName} onUpdate={(patch) => {
+      const updated = { ...selected, ...patch } as typeof selected;
+      setSelected(updated);
+      setWorkspaces(prev => prev.map(w => w.id === selected.id ? updated : w));
+    }} />;
     if (tab === 'prospect') return <SalesReport />;
 
     if (!selected) {
@@ -285,7 +289,7 @@ function Dashboard() {
 
     if (tab === 'media') return <MediaTab key={selected.folder} siteId={selected.webflowSiteId} workspaceFolder={selected.folder} queue={workspaceQueue} />;
     if (seoView) return <SeoAudit key={`seo-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} view={seoView} />;
-    if (tab === 'search') return <SearchConsole key={`search-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
+    if (tab === 'search') return <SearchConsole key={`search-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} gscPropertyUrl={selected.gscPropertyUrl} />;
     if (tab === 'page-weight') return <PageWeight key={`weight-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
     if (tab === 'page-speed') return <PageSpeedPanel key={`speed-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
     if (tab === 'analytics') return <GoogleAnalytics key={`ga4-${selected.id}`} workspaceId={selected.id} ga4PropertyId={selected.ga4PropertyId} />;
