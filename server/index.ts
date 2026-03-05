@@ -62,6 +62,7 @@ import { getSchedule, listSchedules, upsertSchedule, deleteSchedule, startSchedu
 import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword, togglePinKeyword, storeRankSnapshot, getRankHistory, getLatestRanks } from './rank-tracking.js';
 import { listAnnotations, addAnnotation, deleteAnnotation } from './annotations.js';
 import { startApprovalReminders } from './approval-reminders.js';
+import { startMonthlyReports, triggerMonthlyReport } from './monthly-report.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
 import { listGscSites, getSearchOverview, getPerformanceTrend, getQueryPageData } from './search-console.js';
@@ -3665,10 +3666,23 @@ app.delete('/api/audit-schedules/:workspaceId', (req, res) => {
   res.json({ ok: true });
 });
 
+// --- Monthly Reports ---
+// Manual trigger: generate + optionally email a monthly report
+app.post('/api/monthly-report/:workspaceId', async (req, res) => {
+  try {
+    const result = await triggerMonthlyReport(req.params.workspaceId);
+    res.json({ sent: result.sent, html: result.html });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate report' });
+  }
+});
+
 // Start audit scheduler
 startScheduler();
 // Start approval reminders
 startApprovalReminders();
+// Start monthly reports
+startMonthlyReports();
 
 // Start
 const PORT = parseInt(process.env.PORT || '3001', 10);
