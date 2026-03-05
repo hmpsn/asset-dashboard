@@ -12,6 +12,7 @@ import { GoogleAnalytics } from './components/GoogleAnalytics';
 import { WorkspaceSettings } from './components/WorkspaceSettings';
 import { SearchConsole } from './components/SearchConsole';
 import { RequestManager } from './components/RequestManager';
+import { WorkspaceOverview } from './components/WorkspaceOverview';
 import { ClientDashboard } from './components/ClientDashboard';
 import { LoginScreen } from './components/LoginScreen';
 import { useAuth } from './hooks/useAuth';
@@ -256,30 +257,10 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
     if (tab === 'prospect') return <SalesReport />;
 
     if (!selected) {
-      return (
-        <div className="flex flex-col items-center justify-center h-full gap-6">
-          <img src="/logo.svg" alt="hmpsn.studio" className="h-10 opacity-40" />
-          <div className="text-center max-w-sm">
-            <p className="text-base font-semibold mb-1" style={{ color: 'var(--brand-text-bright)' }}>Welcome to hmpsn studio</p>
-            <p className="text-xs leading-relaxed" style={{ color: 'var(--brand-text-muted)' }}>Get started in 3 steps:</p>
-          </div>
-          <div className="flex flex-col gap-3 w-full max-w-xs">
-            {[
-              { step: '1', text: 'Create a workspace', desc: 'Use the workspace selector in the sidebar' },
-              { step: '2', text: 'Link a Webflow site', desc: 'Paste your API token to connect' },
-              { step: '3', text: 'Connect Google', desc: 'Go to Settings for Search Console & GA4' },
-            ].map(s => (
-              <div key={s.step} className="flex items-start gap-3 px-4 py-3 rounded-lg" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
-                <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-xs font-bold" style={{ backgroundColor: 'var(--brand-mint-dim)', color: 'var(--brand-mint)' }}>{s.step}</div>
-                <div>
-                  <div className="text-xs font-medium" style={{ color: 'var(--brand-text-bright)' }}>{s.text}</div>
-                  <div className="text-[11px] mt-0.5" style={{ color: 'var(--brand-text-muted)' }}>{s.desc}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      );
+      return <WorkspaceOverview onSelectWorkspace={(id) => {
+        const ws = workspaces.find(w => w.id === id);
+        if (ws) { setSelected(ws); setTab('media'); }
+      }} />;
     }
 
     if (needsSite && !selected.webflowSiteId) {

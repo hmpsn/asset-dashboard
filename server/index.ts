@@ -266,6 +266,52 @@ app.get('/api/workspaces', (_req, res) => {
   res.json(workspaces);
 });
 
+// Workspace overview: aggregated metrics for all workspaces
+app.get('/api/workspace-overview', (_req, res) => {
+  const workspaces = listWorkspaces();
+  const overview = workspaces.map(ws => {
+    // Audit
+    let audit: { score: number; totalPages: number; errors: number; warnings: number; previousScore?: number; lastAuditDate?: string } | null = null;
+    if (ws.webflowSiteId) {
+      const snap = getLatestSnapshot(ws.webflowSiteId);
+      if (snap) {
+        audit = {
+          score: snap.audit.siteScore,
+          totalPages: snap.audit.totalPages,
+          errors: snap.audit.errors,
+          warnings: snap.audit.warnings,
+          previousScore: snap.previousScore,
+          lastAuditDate: snap.createdAt,
+        };
+      }
+    }
+    // Requests
+    const reqs = listRequests(ws.id);
+    const reqNew = reqs.filter(r => r.status === 'new').length;
+    const reqActive = reqs.filter(r => r.status === 'in_review' || r.status === 'in_progress').length;
+    const reqTotal = reqs.length;
+    const latestReq = reqs.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0];
+    // Approvals
+    const batches = listBatches(ws.id);
+    const pendingApprovals = batches.reduce((sum, b) => sum + b.items.filter((i: { status: string }) => i.status === 'pending').length, 0);
+    const totalApprovalItems = batches.reduce((sum, b) => sum + b.items.length, 0);
+
+    return {
+      id: ws.id,
+      name: ws.name,
+      webflowSiteId: ws.webflowSiteId || null,
+      webflowSiteName: ws.webflowSiteName || null,
+      hasGsc: !!ws.gscPropertyUrl,
+      hasGa4: !!ws.ga4PropertyId,
+      hasPassword: !!ws.clientPassword,
+      audit,
+      requests: { total: reqTotal, new: reqNew, active: reqActive, latestDate: latestReq?.updatedAt || null },
+      approvals: { pending: pendingApprovals, total: totalApprovalItems },
+    };
+  });
+  res.json(overview);
+});
+
 app.get('/api/workspaces/:id', (req, res) => {
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Not found' });
