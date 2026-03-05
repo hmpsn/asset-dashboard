@@ -9,6 +9,7 @@ import { SeoAudit } from './components/SeoAudit';
 import { PageSpeedPanel } from './components/PageSpeedPanel';
 import { SalesReport } from './components/SalesReport';
 import { GoogleAnalytics } from './components/GoogleAnalytics';
+import { WorkspaceSettings } from './components/WorkspaceSettings';
 import { SearchConsole } from './components/SearchConsole';
 import { ClientDashboard } from './components/ClientDashboard';
 import { LoginScreen } from './components/LoginScreen';
@@ -27,6 +28,7 @@ type Page =
   | 'seo-strategy' | 'seo-keywords' | 'seo-schema' | 'seo-competitor'
   | 'search' | 'analytics'
   | 'page-weight' | 'page-speed'
+  | 'workspace-settings'
   | 'prospect'
   | 'settings';
 
@@ -239,6 +241,7 @@ function Dashboard() {
 
   const renderContent = () => {
     if (tab === 'settings') return <SettingsPanel />;
+    if (tab === 'workspace-settings' && selected) return <WorkspaceSettings key={`ws-settings-${selected.id}`} workspaceId={selected.id} workspaceName={selected.name} webflowSiteId={selected.webflowSiteId} webflowSiteName={selected.webflowSiteName} />;
     if (tab === 'prospect') return <SalesReport />;
 
     if (!selected) {
@@ -310,9 +313,16 @@ function Dashboard() {
             onLinkSite={handleLinkSite}
             onUnlinkSite={handleUnlinkSite}
           />
-          {selected?.webflowSiteName && (
-            <div className="mt-1.5 px-1">
-              <div className="text-[10px] text-zinc-500 truncate">{selected.webflowSiteName}</div>
+          {selected && (
+            <div className="mt-1.5 flex items-center gap-1.5 px-1">
+              {selected.webflowSiteName && <div className="text-[10px] text-zinc-500 truncate flex-1">{selected.webflowSiteName}</div>}
+              <button
+                onClick={() => setTab('workspace-settings')}
+                className={`p-1 rounded transition-colors ${tab === 'workspace-settings' ? 'text-teal-400 bg-teal-500/10' : 'text-zinc-600 hover:text-zinc-400'}`}
+                title="Workspace settings"
+              >
+                <Settings className="w-3 h-3" />
+              </button>
             </div>
           )}
         </div>

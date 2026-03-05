@@ -1,35 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useToast } from './Toast';
 import {
-  Check, Globe, ExternalLink, Search, Loader2, Copy, CheckCircle,
-  LogIn, LogOut, ChevronRight, Users, Unplug, Lock, KeyRound, X, BarChart3,
-  Pin, PinOff, Pencil, Save, RefreshCw, Plus, Trash2, ArrowUp, ArrowDown, Palette,
+  Check, Search, Loader2, LogIn, LogOut, Globe, ExternalLink, Unplug,
 } from 'lucide-react';
-
-interface EventGroup {
-  id: string;
-  name: string;
-  order: number;
-  color: string;
-}
-
-interface EventDisplayConfig {
-  eventName: string;
-  displayName: string;
-  pinned: boolean;
-  group?: string;
-}
 
 interface Workspace {
   id: string;
   name: string;
   webflowSiteId?: string;
   webflowSiteName?: string;
-  gscPropertyUrl?: string;
-  ga4PropertyId?: string;
-  hasPassword?: boolean;
-  eventConfig?: EventDisplayConfig[];
-  eventGroups?: EventGroup[];
 }
 
 interface GscSite {
@@ -37,45 +16,18 @@ interface GscSite {
   permissionLevel: string;
 }
 
-interface GA4Property {
-  name: string;
-  displayName: string;
-  propertyId: string;
-}
-
-type SettingsTab = 'connections' | 'integrations' | 'dashboards';
-
 export function SettingsPanel() {
   const { toast } = useToast();
-  const [settingsTab, setSettingsTab] = useState<SettingsTab>('connections');
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [gscSites, setGscSites] = useState<GscSite[]>([]);
-  const [ga4Properties, setGa4Properties] = useState<GA4Property[]>([]);
   const [googleStatus, setGoogleStatus] = useState<{ connected: boolean; configured: boolean } | null>(null);
+  const [gscSites, setGscSites] = useState<GscSite[]>([]);
   const [loadingGsc, setLoadingGsc] = useState(false);
-  const [copiedLink, setCopiedLink] = useState<string | null>(null);
-  const [editingPassword, setEditingPassword] = useState<string | null>(null);
-  const [newPassword, setNewPassword] = useState('');
-  const [savingPassword, setSavingPassword] = useState(false);
-  const [eventConfigWs, setEventConfigWs] = useState<string | null>(null);
-  const [availableEvents, setAvailableEvents] = useState<{eventName: string; eventCount: number; users: number}[]>([]);
-  const [localEventConfig, setLocalEventConfig] = useState<EventDisplayConfig[]>([]);
-  const [loadingEvents, setLoadingEvents] = useState(false);
-  const [savingEvents, setSavingEvents] = useState(false);
-  const [editingEventName, setEditingEventName] = useState<string | null>(null);
-  const [editingDisplayName, setEditingDisplayName] = useState('');
-  const [localGroups, setLocalGroups] = useState<EventGroup[]>([]);
-  const [newGroupName, setNewGroupName] = useState('');
-  const [newGroupColor, setNewGroupColor] = useState('#a78bfa');
 
   useEffect(() => {
     fetch('/api/workspaces').then(r => r.json()).then(setWorkspaces).catch(() => {});
     fetch('/api/google/status').then(r => r.json()).then((s: { connected: boolean; configured: boolean }) => {
       setGoogleStatus(s);
-      if (s.connected) {
-        loadGscSites();
-        loadGA4Properties();
-      }
+      if (s.connected) loadGscSites();
     }).catch(() => {});
   }, []);
 
@@ -89,14 +41,6 @@ export function SettingsPanel() {
     finally { setLoadingGsc(false); }
   };
 
-  const loadGA4Properties = async () => {
-    try {
-      const res = await fetch('/api/google/ga4-properties');
-      const props = await res.json();
-      if (Array.isArray(props)) setGa4Properties(props);
-    } catch { /* ignore */ }
-  };
-
   const connectGoogle = async () => {
     const res = await fetch('/api/google/auth-url');
     const data = await res.json();
@@ -107,196 +51,28 @@ export function SettingsPanel() {
     await fetch('/api/google/disconnect', { method: 'POST' });
     setGoogleStatus({ connected: false, configured: true });
     setGscSites([]);
-    setGa4Properties([]);
-    setWorkspaces(prev => prev.map(w => ({ ...w, gscPropertyUrl: undefined, ga4PropertyId: undefined })));
-  };
-
-  const saveGscProperty = async (workspaceId: string, gscPropertyUrl: string) => {
-    try {
-      const res = await fetch(`/api/workspaces/${workspaceId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gscPropertyUrl }),
-      });
-      const updated = await res.json();
-      setWorkspaces(prev => prev.map(w => w.id === workspaceId ? { ...w, gscPropertyUrl: updated.gscPropertyUrl } : w));
-      toast('Search Console property saved');
-    } catch { toast('Failed to save property', 'error'); }
-  };
-
-  const copyClientLink = (wsId: string) => {
-    const url = `${window.location.origin}/client/${wsId}`;
-    navigator.clipboard.writeText(url);
-    setCopiedLink(wsId);
-    toast('Dashboard link copied');
-    setTimeout(() => setCopiedLink(null), 2000);
-  };
-
-  const savePassword = async (wsId: string) => {
-    setSavingPassword(true);
-    try {
-      const res = await fetch(`/api/workspaces/${wsId}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientPassword: newPassword || '' }),
-      });
-      const updated = await res.json();
-      setWorkspaces(prev => prev.map(w => w.id === wsId ? { ...w, hasPassword: updated.hasPassword } : w));
-      setEditingPassword(null);
-      setNewPassword('');
-      toast('Password saved');
-    } catch { toast('Failed to save password', 'error'); }
-    finally { setSavingPassword(false); }
-  };
-
-  const removePassword = async (wsId: string) => {
-    setSavingPassword(true);
-    try {
-      const res = await fetch(`/api/workspaces/${wsId}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientPassword: '' }),
-      });
-      const updated = await res.json();
-      setWorkspaces(prev => prev.map(w => w.id === wsId ? { ...w, hasPassword: updated.hasPassword } : w));
-      toast('Password removed');
-    } catch { toast('Failed to remove password', 'error'); }
-    finally { setSavingPassword(false); }
-  };
-
-  const saveGa4Property = async (workspaceId: string, ga4PropertyId: string) => {
-    try {
-      const res = await fetch(`/api/workspaces/${workspaceId}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ga4PropertyId }),
-      });
-      const updated = await res.json();
-      setWorkspaces(prev => prev.map(w => w.id === workspaceId ? { ...w, ga4PropertyId: updated.ga4PropertyId } : w));
-      toast('GA4 property saved');
-    } catch { toast('Failed to save GA4 property', 'error'); }
-  };
-
-  const GROUP_COLORS = ['#a78bfa', '#60a5fa', '#34d399', '#fbbf24', '#f472b6', '#fb923c', '#2dd4bf', '#e879f9'];
-
-  const loadEventsForWorkspace = async (wsId: string) => {
-    setEventConfigWs(wsId);
-    setLoadingEvents(true);
-    try {
-      const res = await fetch(`/api/public/analytics-events/${wsId}?days=28`);
-      const events = await res.json();
-      if (Array.isArray(events)) setAvailableEvents(events);
-      const ws = workspaces.find(w => w.id === wsId);
-      setLocalEventConfig(ws?.eventConfig || []);
-      setLocalGroups(ws?.eventGroups || []);
-    } catch { setAvailableEvents([]); }
-    finally { setLoadingEvents(false); }
-  };
-
-  const getEventDisplayName = (eventName: string): string => {
-    const cfg = localEventConfig.find(c => c.eventName === eventName);
-    return cfg?.displayName || eventName;
-  };
-
-  const isEventPinned = (eventName: string): boolean => {
-    return localEventConfig.find(c => c.eventName === eventName)?.pinned || false;
-  };
-
-  const toggleEventPin = (eventName: string) => {
-    setLocalEventConfig(prev => {
-      const existing = prev.find(c => c.eventName === eventName);
-      if (existing) return prev.map(c => c.eventName === eventName ? { ...c, pinned: !c.pinned } : c);
-      return [...prev, { eventName, displayName: eventName, pinned: true }];
-    });
-  };
-
-  const addGroup = () => {
-    if (!newGroupName.trim()) return;
-    const id = `grp_${Date.now()}`;
-    const order = localGroups.length;
-    const color = GROUP_COLORS[order % GROUP_COLORS.length];
-    setLocalGroups(prev => [...prev, { id, name: newGroupName.trim(), order, color: newGroupColor || color }]);
-    setNewGroupName('');
-    setNewGroupColor(GROUP_COLORS[(order + 1) % GROUP_COLORS.length]);
-  };
-
-  const removeGroup = (groupId: string) => {
-    setLocalGroups(prev => prev.filter(g => g.id !== groupId).map((g, i) => ({ ...g, order: i })));
-    setLocalEventConfig(prev => prev.map(c => c.group === groupId ? { ...c, group: undefined } : c));
-  };
-
-  const moveGroup = (groupId: string, direction: -1 | 1) => {
-    setLocalGroups(prev => {
-      const idx = prev.findIndex(g => g.id === groupId);
-      if (idx === -1) return prev;
-      const newIdx = idx + direction;
-      if (newIdx < 0 || newIdx >= prev.length) return prev;
-      const copy = [...prev];
-      [copy[idx], copy[newIdx]] = [copy[newIdx], copy[idx]];
-      return copy.map((g, i) => ({ ...g, order: i }));
-    });
-  };
-
-  const assignEventToGroup = (eventName: string, groupId: string | undefined) => {
-    setLocalEventConfig(prev => {
-      const existing = prev.find(c => c.eventName === eventName);
-      if (existing) return prev.map(c => c.eventName === eventName ? { ...c, group: groupId } : c);
-      return [...prev, { eventName, displayName: eventName, pinned: false, group: groupId }];
-    });
-  };
-
-  const updateEventDisplayName = (eventName: string, displayName: string) => {
-    setLocalEventConfig(prev => {
-      const existing = prev.find(c => c.eventName === eventName);
-      if (existing) return prev.map(c => c.eventName === eventName ? { ...c, displayName } : c);
-      return [...prev, { eventName, displayName, pinned: false }];
-    });
-    setEditingEventName(null);
-    setEditingDisplayName('');
-  };
-
-  const saveEventConfig = async () => {
-    if (!eventConfigWs) return;
-    setSavingEvents(true);
-    try {
-      const res = await fetch(`/api/workspaces/${eventConfigWs}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventConfig: localEventConfig, eventGroups: localGroups }),
-      });
-      const updated = await res.json();
-      setWorkspaces(prev => prev.map(w => w.id === eventConfigWs ? { ...w, eventConfig: updated.eventConfig, eventGroups: updated.eventGroups } : w));
-      toast('Event configuration saved');
-    } catch { toast('Failed to save event config', 'error'); }
-    finally { setSavingEvents(false); }
+    toast('Google account disconnected');
   };
 
   const linked = workspaces.filter(w => w.webflowSiteId);
   const unlinked = workspaces.filter(w => !w.webflowSiteId);
-  const dashboardReady = workspaces.filter(w => w.webflowSiteId);
 
   return (
-    <div className="max-w-3xl mx-auto">
-      {/* Settings tab navigation */}
-      <nav className="flex items-center gap-1 mb-6 border-b" style={{ borderColor: 'var(--brand-border)' }}>
-        {([['connections', 'Connections'], ['integrations', 'Integrations'], ['dashboards', 'Client Dashboards']] as [SettingsTab, string][]).map(([id, label]) => (
-          <button key={id} onClick={() => setSettingsTab(id)}
-            className="px-4 py-2.5 text-xs font-medium border-b-2 transition-colors -mb-px"
-            style={settingsTab === id ? { borderColor: 'var(--brand-mint)', color: 'var(--brand-mint)' } : { borderColor: 'transparent', color: 'var(--brand-text-muted)' }}>
-            {label}
-          </button>
-        ))}
-      </nav>
+    <div className="max-w-3xl mx-auto space-y-6">
+      <div>
+        <h2 className="text-lg font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Settings</h2>
+        <p className="text-xs mt-0.5" style={{ color: 'var(--brand-text-muted)' }}>Account-level connections and configuration</p>
+      </div>
 
-      <div className="space-y-6">
-
-      {/* ═══ CONNECTIONS TAB ═══ */}
-      {settingsTab === 'connections' && (<>
-      {/* Google Search Console Connection */}
+      {/* Google Account Connection */}
       <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
         <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid var(--brand-border)' }}>
           <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
             <Search className="w-4 h-4 text-blue-400" />
           </div>
           <div className="flex-1">
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Google Search Console</h3>
-            <p className="text-xs" style={{ color: 'var(--brand-text-muted)' }}>Connect once to access all your properties</p>
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Google Account</h3>
+            <p className="text-xs" style={{ color: 'var(--brand-text-muted)' }}>Connect once to access Search Console &amp; GA4 across all workspaces</p>
           </div>
           {googleStatus?.connected ? (
             <div className="flex items-center gap-2">
@@ -333,7 +109,7 @@ export function SettingsPanel() {
         )}
       </section>
 
-      {/* Webflow Connections */}
+      {/* Webflow Connections Overview */}
       <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
         <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--brand-border)' }}>
           <div className="flex items-center gap-2">
@@ -383,317 +159,11 @@ export function SettingsPanel() {
           </div>
         </div>
       </section>
-      </>)}
 
-      {/* ═══ INTEGRATIONS TAB ═══ */}
-      {settingsTab === 'integrations' && (<>
-      {/* Workspace GSC Assignment */}
-      {gscSites.length > 0 && linked.length > 0 && (
-        <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
-          <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--brand-border)' }}>
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Assign Properties to Workspaces</h3>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--brand-text-muted)' }}>Select which Search Console property feeds into each workspace's client dashboard.</p>
-          </div>
-          <div className="divide-y" style={{ borderColor: 'var(--brand-border)' }}>
-            {linked.map(ws => (
-              <div key={ws.id} className="px-5 py-3 flex items-center gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium" style={{ color: 'var(--brand-text-bright)' }}>{ws.name}</span>
-                    <span className="text-[10px] text-zinc-500">{ws.webflowSiteName}</span>
-                  </div>
-                </div>
-                <select
-                  value={ws.gscPropertyUrl || ''}
-                  onChange={e => saveGscProperty(ws.id, e.target.value)}
-                  className="px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500 min-w-[200px]"
-                >
-                  <option value="">— None —</option>
-                  {gscSites.map(s => (
-                    <option key={s.siteUrl} value={s.siteUrl}>{s.siteUrl}</option>
-                  ))}
-                </select>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* GA4 Analytics Assignment */}
-      {ga4Properties.length > 0 && linked.length > 0 ? (
-        <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
-          <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--brand-border)' }}>
-            <div className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-orange-400" />
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Assign GA4 Properties</h3>
-            </div>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--brand-text-muted)' }}>Select which GA4 property feeds into each workspace's Analytics tab.</p>
-          </div>
-          <div className="divide-y" style={{ borderColor: 'var(--brand-border)' }}>
-            {linked.map(ws => (
-              <div key={ws.id} className="px-5 py-3 flex items-center gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium" style={{ color: 'var(--brand-text-bright)' }}>{ws.name}</span>
-                    <span className="text-[10px] text-zinc-500">{ws.webflowSiteName}</span>
-                  </div>
-                </div>
-                <select
-                  value={ws.ga4PropertyId || ''}
-                  onChange={e => saveGa4Property(ws.id, e.target.value)}
-                  className="px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-orange-500 min-w-[220px]"
-                >
-                  <option value="">— None —</option>
-                  {ga4Properties.map(p => (
-                    <option key={p.propertyId} value={p.propertyId}>{p.displayName}</option>
-                  ))}
-                </select>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {/* Event Display Configuration */}
-      {linked.filter(w => w.ga4PropertyId).length > 0 && (
-        <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
-          <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--brand-border)' }}>
-            <div className="flex items-center gap-2">
-              <Pin className="w-4 h-4 text-violet-400" />
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Event Display Names & Pinning</h3>
-            </div>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--brand-text-muted)' }}>Rename events for client-facing dashboards and pin key metrics to the top.</p>
-          </div>
-          <div className="divide-y" style={{ borderColor: 'var(--brand-border)' }}>
-            {linked.filter(w => w.ga4PropertyId).map(ws => (
-              <div key={ws.id} className="px-5 py-3">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium" style={{ color: 'var(--brand-text-bright)' }}>{ws.name}</span>
-                    {eventConfigWs === ws.id && localEventConfig.filter(c => c.pinned).length > 0 && (
-                      <span className="text-[10px] text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded">{localEventConfig.filter(c => c.pinned).length} pinned</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {eventConfigWs === ws.id && (
-                      <button onClick={saveEventConfig} disabled={savingEvents}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition-colors disabled:opacity-50">
-                        {savingEvents ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save
-                      </button>
-                    )}
-                    <button onClick={() => eventConfigWs === ws.id ? setEventConfigWs(null) : loadEventsForWorkspace(ws.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-                      style={{ backgroundColor: 'var(--brand-bg-card)', color: 'var(--brand-text)' }}>
-                      {eventConfigWs === ws.id ? 'Close' : <><RefreshCw className="w-3 h-3" /> Configure</>}
-                    </button>
-                  </div>
-                </div>
-                {eventConfigWs === ws.id && (
-                  <div className="mt-3 space-y-4">
-                    {loadingEvents ? (
-                      <div className="flex items-center gap-2 text-xs py-4 justify-center" style={{ color: 'var(--brand-text-muted)' }}>
-                        <Loader2 className="w-3 h-3 animate-spin" /> Loading events from GA4...
-                      </div>
-                    ) : availableEvents.length === 0 ? (
-                      <p className="text-xs py-4 text-center" style={{ color: 'var(--brand-text-muted)' }}>No events found. Make sure GA4 is tracking events on this site.</p>
-                    ) : (<>
-                      {/* ── Event Groups ── */}
-                      <div className="rounded-lg border border-zinc-700/50 p-3">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Palette className="w-3.5 h-3.5 text-violet-400" />
-                          <span className="text-xs font-medium" style={{ color: 'var(--brand-text-bright)' }}>Event Groups</span>
-                          <span className="text-[10px] text-zinc-600 ml-auto">{localGroups.length} groups</span>
-                        </div>
-                        <p className="text-[10px] mb-3" style={{ color: 'var(--brand-text-muted)' }}>Group related events together as modules on the dashboard. Drag to reorder.</p>
-                        {localGroups.sort((a, b) => a.order - b.order).map((g, idx) => (
-                          <div key={g.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 mb-1">
-                            <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: g.color }} />
-                            <span className="text-xs flex-1" style={{ color: 'var(--brand-text)' }}>{g.name}</span>
-                            <span className="text-[10px] text-zinc-600">
-                              {localEventConfig.filter(c => c.group === g.id).length} events
-                            </span>
-                            <button onClick={() => moveGroup(g.id, -1)} disabled={idx === 0} className="p-0.5 text-zinc-600 hover:text-zinc-400 disabled:opacity-30"><ArrowUp className="w-3 h-3" /></button>
-                            <button onClick={() => moveGroup(g.id, 1)} disabled={idx === localGroups.length - 1} className="p-0.5 text-zinc-600 hover:text-zinc-400 disabled:opacity-30"><ArrowDown className="w-3 h-3" /></button>
-                            <button onClick={() => removeGroup(g.id)} className="p-0.5 text-red-400/50 hover:text-red-400"><Trash2 className="w-3 h-3" /></button>
-                          </div>
-                        ))}
-                        <div className="flex items-center gap-2 mt-2">
-                          <input type="color" value={newGroupColor} onChange={e => setNewGroupColor(e.target.value)} className="w-6 h-6 rounded cursor-pointer bg-transparent border-0" />
-                          <input value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="New group name..."
-                            onKeyDown={e => e.key === 'Enter' && addGroup()}
-                            className="flex-1 px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-violet-500" />
-                          <button onClick={addGroup} disabled={!newGroupName.trim()}
-                            className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-[10px] font-medium transition-colors">
-                            <Plus className="w-3 h-3" /> Add
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* ── Events List ── */}
-                      <div className="space-y-1 max-h-[400px] overflow-y-auto">
-                        {availableEvents.map((ev) => {
-                          const pinned = isEventPinned(ev.eventName);
-                          const displayName = getEventDisplayName(ev.eventName);
-                          const isEditing = editingEventName === ev.eventName;
-                          const evtGroup = localEventConfig.find(c => c.eventName === ev.eventName)?.group;
-                          return (
-                            <div key={ev.eventName} className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${pinned ? 'bg-violet-500/10 border border-violet-500/20' : 'hover:bg-white/5'}`}>
-                              <button onClick={() => toggleEventPin(ev.eventName)} className="shrink-0" title={pinned ? 'Unpin' : 'Pin to dashboard'}>
-                                {pinned ? <Pin className="w-3.5 h-3.5 text-violet-400" /> : <PinOff className="w-3.5 h-3.5 text-zinc-600 hover:text-zinc-400" />}
-                              </button>
-                              <div className="flex-1 min-w-0">
-                                {isEditing ? (
-                                  <div className="flex items-center gap-1.5">
-                                    <input autoFocus value={editingDisplayName} onChange={e => setEditingDisplayName(e.target.value)}
-                                      onKeyDown={e => { if (e.key === 'Enter') updateEventDisplayName(ev.eventName, editingDisplayName); if (e.key === 'Escape') setEditingEventName(null); }}
-                                      className="flex-1 px-2 py-1 bg-zinc-800 border border-zinc-600 rounded text-xs text-zinc-200 focus:outline-none focus:border-violet-500" />
-                                    <button onClick={() => updateEventDisplayName(ev.eventName, editingDisplayName)} className="text-emerald-400 hover:text-emerald-300"><Check className="w-3.5 h-3.5" /></button>
-                                    <button onClick={() => setEditingEventName(null)} className="text-zinc-500 hover:text-zinc-300"><X className="w-3.5 h-3.5" /></button>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-xs font-medium truncate" style={{ color: displayName !== ev.eventName ? 'var(--brand-text-bright)' : 'var(--brand-text)' }}>
-                                      {displayName !== ev.eventName ? displayName : ev.eventName.replace(/_/g, ' ')}
-                                    </span>
-                                    {displayName !== ev.eventName && <span className="text-[10px] text-zinc-600 font-mono">{ev.eventName}</span>}
-                                  </div>
-                                )}
-                              </div>
-                              {localGroups.length > 0 && (
-                                <select value={evtGroup || ''} onChange={e => assignEventToGroup(ev.eventName, e.target.value || undefined)}
-                                  className="px-1.5 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-400 focus:outline-none focus:border-violet-500 max-w-[100px]">
-                                  <option value="">No group</option>
-                                  {localGroups.sort((a, b) => a.order - b.order).map(g => (
-                                    <option key={g.id} value={g.id}>{g.name}</option>
-                                  ))}
-                                </select>
-                              )}
-                              <span className="text-[10px] text-zinc-500 tabular-nums shrink-0">{ev.eventCount.toLocaleString()}</span>
-                              <button onClick={() => { setEditingEventName(ev.eventName); setEditingDisplayName(getEventDisplayName(ev.eventName) !== ev.eventName ? getEventDisplayName(ev.eventName) : ''); }}
-                                className="shrink-0" title="Rename"><Pencil className="w-3 h-3 text-zinc-600 hover:text-zinc-400" /></button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </>)}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-      </>)}
-
-      {/* ═══ DASHBOARDS TAB ═══ */}
-      {settingsTab === 'dashboards' && (<>
-      {/* Client Dashboard Links */}
-      {dashboardReady.length > 0 && (
-        <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
-          <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--brand-border)' }}>
-            <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-violet-400" />
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Client Dashboards</h3>
-            </div>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--brand-text-muted)' }}>Share these links with clients. Set a password per dashboard for access control.</p>
-          </div>
-          <div className="divide-y" style={{ borderColor: 'var(--brand-border)' }}>
-            {dashboardReady.map(ws => (
-              <div key={ws.id} className="px-5 py-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium" style={{ color: 'var(--brand-text-bright)' }}>{ws.name}</div>
-                    <div className="text-[11px] text-zinc-500 truncate mt-0.5">{ws.gscPropertyUrl || ws.webflowSiteName}</div>
-                  </div>
-                  {/* Password status */}
-                  {ws.hasPassword ? (
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full flex items-center gap-1">
-                        <Lock className="w-3 h-3" /> Protected
-                      </span>
-                      <button
-                        onClick={() => { setEditingPassword(ws.id); setNewPassword(''); }}
-                        className="text-[10px] text-zinc-500 hover:text-zinc-300 px-1.5 py-1 rounded transition-colors"
-                      >Change</button>
-                      <button
-                        onClick={() => removePassword(ws.id)}
-                        disabled={savingPassword}
-                        className="text-[10px] text-red-400/60 hover:text-red-400 px-1.5 py-1 rounded transition-colors"
-                      >Remove</button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => { setEditingPassword(ws.id); setNewPassword(''); }}
-                      className="flex items-center gap-1 text-[10px] text-amber-400/70 bg-amber-500/10 px-2 py-1 rounded-full hover:bg-amber-500/15 transition-colors"
-                    >
-                      <KeyRound className="w-3 h-3" /> Set Password
-                    </button>
-                  )}
-                  <button
-                    onClick={() => copyClientLink(ws.id)}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all"
-                    style={copiedLink === ws.id ? {
-                      backgroundColor: 'rgba(52, 211, 153, 0.1)',
-                      color: '#34d399',
-                      border: '1px solid rgba(52, 211, 153, 0.2)',
-                    } : {
-                      backgroundColor: 'var(--brand-bg-surface)',
-                      color: 'var(--brand-text)',
-                      border: '1px solid var(--brand-border)',
-                    }}
-                  >
-                    {copiedLink === ws.id ? (
-                      <><CheckCircle className="w-3.5 h-3.5" /> Copied!</>
-                    ) : (
-                      <><Copy className="w-3.5 h-3.5" /> Copy Link</>
-                    )}
-                  </button>
-                  <a
-                    href={`/client/${ws.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors"
-                    style={{
-                      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(217, 70, 239, 0.15))',
-                      color: '#c084fc',
-                      border: '1px solid rgba(139, 92, 246, 0.2)',
-                    }}
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" /> Open <ChevronRight className="w-3 h-3" />
-                  </a>
-                </div>
-                {/* Inline password editor */}
-                {editingPassword === ws.id && (
-                  <div className="mt-3 flex items-center gap-2 pl-0">
-                    <input
-                      type="text"
-                      value={newPassword}
-                      onChange={e => setNewPassword(e.target.value)}
-                      placeholder="Enter new password"
-                      className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-violet-500"
-                      autoFocus
-                      onKeyDown={e => e.key === 'Enter' && newPassword.trim() && savePassword(ws.id)}
-                    />
-                    <button
-                      onClick={() => savePassword(ws.id)}
-                      disabled={savingPassword || !newPassword.trim()}
-                      className="px-3 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-xs font-medium transition-colors"
-                    >{savingPassword ? '...' : 'Save'}</button>
-                    <button
-                      onClick={() => { setEditingPassword(null); setNewPassword(''); }}
-                      className="p-2 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
-                    ><X className="w-3.5 h-3.5" /></button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      </>)}
-
-      </div>
+      {/* Hint */}
+      <p className="text-xs text-center py-4" style={{ color: 'var(--brand-text-muted)' }}>
+        Workspace-specific settings (GSC, GA4, client dashboards) are now in the gear icon next to each workspace.
+      </p>
     </div>
   );
 }
