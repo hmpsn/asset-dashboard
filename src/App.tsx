@@ -357,8 +357,9 @@ function Dashboard() {
           ))}
         </nav>
 
-        {/* Bottom: Prospect + Settings */}
+        {/* Bottom: Tools */}
         <div className="px-2 py-2 space-y-0.5" style={{ borderTop: '1px solid var(--brand-border)' }}>
+          <div className="text-[9px] text-zinc-600 font-semibold tracking-widest px-2.5 mb-1">TOOLS</div>
           {([
             { id: 'prospect' as Page, label: 'Prospect', icon: FileSearch },
             { id: 'settings' as Page, label: 'Settings', icon: Settings },
