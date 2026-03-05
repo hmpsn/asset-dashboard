@@ -53,7 +53,7 @@ const SEV = {
 } as const;
 
 const CAT_LABELS: Record<string, { label: string; color: string }> = {
-  content: { label: 'Content', color: '#60a5fa' }, technical: { label: 'Technical', color: '#a78bfa' },
+  content: { label: 'Content', color: '#60a5fa' }, technical: { label: 'Technical', color: '#2dd4bf' },
   social: { label: 'Social', color: '#f472b6' }, performance: { label: 'Performance', color: '#fbbf24' },
   accessibility: { label: 'Accessibility', color: '#34d399' },
 };
@@ -392,7 +392,7 @@ export function ClientDashboard({ workspaceId }: Props) {
   };
 
   if (loading) return (
-    <div className="min-h-screen bg-[#0a0a1a] text-zinc-200">
+    <div className="min-h-screen bg-[#0f1219] text-zinc-200">
       <header className="border-b border-zinc-800">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-4">
           <div className="h-6 w-24 bg-zinc-800 rounded animate-pulse" />
@@ -411,7 +411,7 @@ export function ClientDashboard({ workspaceId }: Props) {
     </div>
   );
   if (error || !ws) return (
-    <div className="min-h-screen bg-[#0a0a1a] flex items-center justify-center">
+    <div className="min-h-screen bg-[#0f1219] flex items-center justify-center">
       <div className="text-center">
         <p className="text-red-400 text-sm mb-3">{error || 'Dashboard not found'}</p>
         <button onClick={() => window.location.reload()} className="text-xs text-zinc-400 hover:text-zinc-200 px-3 py-1.5 rounded-lg border border-zinc-700 hover:border-zinc-600 transition-colors">Try Again</button>
@@ -421,13 +421,13 @@ export function ClientDashboard({ workspaceId }: Props) {
 
   // Password gate
   if (ws.requiresPassword && !authenticated) return (
-    <div className="min-h-screen bg-[#0a0a1a] flex items-center justify-center">
+    <div className="min-h-screen bg-[#0f1219] flex items-center justify-center">
       <div className="w-full max-w-sm">
         <div className="bg-zinc-900 rounded-2xl border border-zinc-800 p-8 shadow-2xl shadow-black/40">
           <div className="flex flex-col items-center mb-6">
-            <img src="/logo.svg" alt="hmpsn studio" className="h-5 opacity-60 mb-4" />
-            <div className="w-12 h-12 rounded-2xl bg-violet-500/10 flex items-center justify-center mb-4">
-              <Lock className="w-6 h-6 text-violet-400" />
+            <img src="/logo.svg" alt="hmpsn studio" className="h-7 opacity-60 mb-4" />
+            <div className="w-12 h-12 rounded-2xl bg-teal-500/10 flex items-center justify-center mb-4">
+              <Lock className="w-6 h-6 text-teal-400" />
             </div>
             <h2 className="text-lg font-semibold text-zinc-200">{ws.name}</h2>
             <p className="text-xs text-zinc-500 mt-1">Enter the password to access this dashboard</p>
@@ -439,7 +439,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                 value={passwordInput}
                 onChange={e => { setPasswordInput(e.target.value); setAuthError(''); }}
                 placeholder="Dashboard password"
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-violet-500 transition-colors"
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors"
                 autoFocus
               />
               {authError && <p className="text-xs text-red-400 mt-2">{authError}</p>}
@@ -447,7 +447,7 @@ export function ClientDashboard({ workspaceId }: Props) {
             <button
               type="submit"
               disabled={authLoading || !passwordInput.trim()}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 disabled:opacity-50 text-white text-sm font-medium transition-all flex items-center justify-center gap-2"
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white text-sm font-medium transition-all flex items-center justify-center gap-2"
             >
               {authLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Access Dashboard'}
             </button>
@@ -484,12 +484,12 @@ export function ClientDashboard({ workspaceId }: Props) {
   ];
 
   return (
-    <div className="min-h-screen bg-[#0a0a1a] text-zinc-200">
+    <div className="min-h-screen bg-[#0f1219] text-zinc-200">
       {/* Header */}
       <header className="border-b border-zinc-800">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <img src="/logo.svg" alt="hmpsn studio" className="h-6 opacity-80" />
+            <img src="/logo.svg" alt="hmpsn studio" className="h-8 opacity-80" />
             <div className="w-px h-8 bg-zinc-800" />
             <div>
               <h1 className="text-lg font-semibold">{ws.name}</h1>
@@ -518,7 +518,7 @@ export function ClientDashboard({ workspaceId }: Props) {
               return (
                 <button key={t.id} onClick={() => setTab(t.id)}
                   className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium border-b-2 transition-colors ${
-                    active ? 'border-violet-500 text-violet-400' :
+                    active ? 'border-teal-500 text-teal-400' :
                     'border-transparent text-zinc-500 hover:text-zinc-300 hover:border-zinc-700'
                   }`}>
                   <Icon className="w-3.5 h-3.5" /> {t.label}
@@ -539,12 +539,12 @@ export function ClientDashboard({ workspaceId }: Props) {
             const cards: { icon: typeof Users; label: string; value: string; color: string; td: number[]; onClick: () => void }[] = [];
             if (audit) cards.push({ icon: Shield, label: 'Site Health', value: String(audit.siteScore), color: audit.siteScore >= 80 ? '#34d399' : audit.siteScore >= 60 ? '#fbbf24' : '#f87171', td: [], onClick: () => setTab('health') });
             if (ga4Overview) {
-              cards.push({ icon: Users, label: 'Users', value: ga4Overview.totalUsers.toLocaleString(), color: '#a78bfa', td: ga4Trend.map(d => d.users), onClick: () => setTab('analytics') });
+              cards.push({ icon: Users, label: 'Users', value: ga4Overview.totalUsers.toLocaleString(), color: '#2dd4bf', td: ga4Trend.map(d => d.users), onClick: () => setTab('analytics') });
               cards.push({ icon: Globe, label: 'Sessions', value: ga4Overview.totalSessions.toLocaleString(), color: '#60a5fa', td: ga4Trend.map(d => d.sessions), onClick: () => setTab('analytics') });
             }
             if (overview) {
               cards.push({ icon: MousePointer, label: 'Clicks', value: overview.totalClicks.toLocaleString(), color: '#60a5fa', td: trend.map(t => t.clicks), onClick: () => setTab('search') });
-              cards.push({ icon: Eye, label: 'Impressions', value: overview.totalImpressions.toLocaleString(), color: '#a78bfa', td: trend.map(t => t.impressions), onClick: () => setTab('search') });
+              cards.push({ icon: Eye, label: 'Impressions', value: overview.totalImpressions.toLocaleString(), color: '#2dd4bf', td: trend.map(t => t.impressions), onClick: () => setTab('search') });
             }
             if (ga4Overview && !overview) cards.push({ icon: Activity, label: 'Bounce Rate', value: `${ga4Overview.bounceRate}%`, color: ga4Overview.bounceRate > 60 ? '#f87171' : '#34d399', td: [], onClick: () => setTab('analytics') });
             if (cards.length === 0) return null;
@@ -579,14 +579,14 @@ export function ClientDashboard({ workspaceId }: Props) {
                       const mkPath = (vals: number[], max: number) => vals.map((v, i) => `${i === 0 ? 'M' : 'L'}${i * xStep},${95 - (v / max) * 85}`).join(' ');
                       return (<>
                         <path d={mkPath(ga4Trend.map(d => d.sessions), maxS)} fill="none" stroke="rgba(96,165,250,0.4)" strokeWidth="1.5" />
-                        <path d={mkPath(ga4Trend.map(d => d.users), maxU)} fill="none" stroke="#a78bfa" strokeWidth="2" />
+                        <path d={mkPath(ga4Trend.map(d => d.users), maxU)} fill="none" stroke="#2dd4bf" strokeWidth="2" />
                         <path d={`${mkPath(ga4Trend.map(d => d.users), maxU)} L${(ga4Trend.length - 1) * xStep},95 L0,95 Z`} fill="url(#overviewGa4)" opacity="0.12" />
-                        <defs><linearGradient id="overviewGa4" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#a78bfa" /><stop offset="100%" stopColor="transparent" /></linearGradient></defs>
+                        <defs><linearGradient id="overviewGa4" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2dd4bf" /><stop offset="100%" stopColor="transparent" /></linearGradient></defs>
                       </>);
                     })()}
                   </svg>
                   <div className="flex items-center gap-4 mt-2">
-                    <span className="flex items-center gap-1.5 text-[10px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-violet-400 inline-block" /> Users</span>
+                    <span className="flex items-center gap-1.5 text-[10px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-teal-400 inline-block" /> Users</span>
                     <span className="flex items-center gap-1.5 text-[10px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-blue-400/40 inline-block" /> Sessions</span>
                   </div>
                 </div>
@@ -599,7 +599,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                   </div>
                   <div className="space-y-3">
                     <div><div className="text-[10px] text-blue-400 mb-1">Clicks</div><TrendChart data={trend} metric="clicks" color="#60a5fa" /></div>
-                    <div><div className="text-[10px] text-purple-400 mb-1">Impressions</div><TrendChart data={trend} metric="impressions" color="#a78bfa" /></div>
+                    <div><div className="text-[10px] text-teal-400 mb-1">Impressions</div><TrendChart data={trend} metric="impressions" color="#2dd4bf" /></div>
                   </div>
                 </div>
               )}
@@ -607,8 +607,8 @@ export function ClientDashboard({ workspaceId }: Props) {
               {sortedConversions.filter(c => isEventPinned(c.eventName)).length > 0 && (
                 <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2"><Zap className="w-4 h-4 text-violet-400" /><span className="text-xs font-medium text-zinc-300">Key Events</span></div>
-                    <button onClick={() => setTab('analytics')} className="text-[10px] text-violet-400 hover:text-violet-300">View all →</button>
+                    <div className="flex items-center gap-2"><Zap className="w-4 h-4 text-teal-400" /><span className="text-xs font-medium text-zinc-300">Key Events</span></div>
+                    <button onClick={() => setTab('analytics')} className="text-[10px] text-teal-400 hover:text-teal-300">View all →</button>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {sortedConversions.filter(c => isEventPinned(c.eventName)).slice(0, 6).map((c, i) => (
@@ -622,8 +622,8 @@ export function ClientDashboard({ workspaceId }: Props) {
                 </div>
               )}
               {!overview && !audit && !ga4Overview && (
-                <div className="bg-gradient-to-br from-violet-500/10 via-zinc-900 to-fuchsia-500/10 rounded-xl border border-zinc-800 p-8 text-center">
-                  <div className="w-12 h-12 rounded-2xl bg-violet-500/10 flex items-center justify-center mx-auto mb-4"><BarChart3 className="w-6 h-6 text-violet-400" /></div>
+                <div className="bg-gradient-to-br from-teal-500/10 via-zinc-900 to-emerald-500/10 rounded-xl border border-zinc-800 p-8 text-center">
+                  <div className="w-12 h-12 rounded-2xl bg-teal-500/10 flex items-center justify-center mx-auto mb-4"><BarChart3 className="w-6 h-6 text-teal-400" /></div>
                   <h2 className="text-lg font-semibold text-zinc-200 mb-2">{ws.name}</h2>
                   <p className="text-sm text-zinc-400">Your dashboard is being configured. Data will appear here once set up by your web team.</p>
                 </div>
@@ -646,7 +646,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                       </div>
                     ))}
                   </div>
-                  {insights.lowHanging.length > 3 && <button onClick={() => setTab('search')} className="text-[10px] text-violet-400 hover:text-violet-300 mt-2">+{insights.lowHanging.length - 3} more →</button>}
+                  {insights.lowHanging.length > 3 && <button onClick={() => setTab('search')} className="text-[10px] text-teal-400 hover:text-teal-300 mt-2">+{insights.lowHanging.length - 3} more →</button>}
                 </div>
               )}
               {auditDetail && auditDetail.audit.errors > 0 && (
@@ -664,7 +664,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                       </div>
                     ))}
                   </div>
-                  <button onClick={() => setTab('health')} className="text-[10px] text-violet-400 hover:text-violet-300 mt-2">View full audit →</button>
+                  <button onClick={() => setTab('health')} className="text-[10px] text-teal-400 hover:text-teal-300 mt-2">View full audit →</button>
                 </div>
               )}
               {audit && !(auditDetail?.audit.errors) && (
@@ -674,7 +674,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                     <div className={`text-2xl font-bold ${audit.siteScore >= 80 ? 'text-green-400' : audit.siteScore >= 60 ? 'text-amber-400' : 'text-red-400'}`}>{audit.siteScore}</div>
                     <div><div className="text-[10px] text-zinc-400">{audit.totalPages} pages</div><div className="text-[10px] text-zinc-600">{new Date(audit.createdAt).toLocaleDateString()}</div></div>
                   </div>
-                  <button onClick={() => setTab('health')} className="text-[10px] text-violet-400 hover:text-violet-300 mt-1.5">Details →</button>
+                  <button onClick={() => setTab('health')} className="text-[10px] text-teal-400 hover:text-teal-300 mt-1.5">Details →</button>
                 </div>
               )}
               {insights && insights.topPerformers.length > 0 && (
@@ -701,7 +701,7 @@ export function ClientDashboard({ workspaceId }: Props) {
             <div className="bg-zinc-900 rounded-xl border border-zinc-800 px-5 py-3 flex items-center justify-between flex-wrap gap-3">
               {[
                 { label: 'Clicks', value: overview.totalClicks.toLocaleString(), color: 'text-blue-400' },
-                { label: 'Impressions', value: overview.totalImpressions.toLocaleString(), color: 'text-violet-400' },
+                { label: 'Impressions', value: overview.totalImpressions.toLocaleString(), color: 'text-teal-400' },
                 { label: 'CTR', value: `${overview.avgCtr}%`, color: 'text-emerald-400' },
                 { label: 'Avg Position', value: String(overview.avgPosition), color: 'text-amber-400' },
               ].map(m => (
@@ -720,7 +720,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div><div className="text-[10px] text-blue-400 mb-1">Clicks</div><TrendChart data={trend} metric="clicks" color="#60a5fa" /></div>
-                  <div><div className="text-[10px] text-purple-400 mb-1">Impressions</div><TrendChart data={trend} metric="impressions" color="#a78bfa" /></div>
+                  <div><div className="text-[10px] text-teal-400 mb-1">Impressions</div><TrendChart data={trend} metric="impressions" color="#2dd4bf" /></div>
                 </div>
               </div>
             )}
@@ -954,12 +954,12 @@ export function ClientDashboard({ workspaceId }: Props) {
             {/* GA4 Overview Cards */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
               {[
-                { label: 'Users', value: ga4Overview.totalUsers.toLocaleString(), color: 'text-violet-400' },
+                { label: 'Users', value: ga4Overview.totalUsers.toLocaleString(), color: 'text-teal-400' },
                 { label: 'Sessions', value: ga4Overview.totalSessions.toLocaleString(), color: 'text-blue-400' },
                 { label: 'Page Views', value: ga4Overview.totalPageviews.toLocaleString(), color: 'text-teal-400' },
                 { label: 'Avg Duration', value: `${Math.floor(ga4Overview.avgSessionDuration / 60)}m ${Math.floor(ga4Overview.avgSessionDuration % 60)}s`, color: 'text-amber-400' },
                 { label: 'Bounce Rate', value: `${ga4Overview.bounceRate}%`, color: ga4Overview.bounceRate > 60 ? 'text-red-400' : 'text-emerald-400' },
-                { label: 'New Users', value: `${ga4Overview.newUserPercentage}%`, color: 'text-fuchsia-400' },
+                { label: 'New Users', value: `${ga4Overview.newUserPercentage}%`, color: 'text-teal-400' },
               ].map(c => (
                 <div key={c.label} className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                   <div className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1">{c.label}</div>
@@ -982,14 +982,14 @@ export function ClientDashboard({ workspaceId }: Props) {
                     return (<>
                       <path d={mkPath(ga4Trend.map(d => d.pageviews), maxP)} fill="none" stroke="rgba(45,212,191,0.3)" strokeWidth="1.5" />
                       <path d={mkPath(ga4Trend.map(d => d.sessions), maxS)} fill="none" stroke="rgba(96,165,250,0.5)" strokeWidth="1.5" />
-                      <path d={mkPath(ga4Trend.map(d => d.users), maxV)} fill="none" stroke="rgba(167,139,250,0.9)" strokeWidth="2" />
+                      <path d={mkPath(ga4Trend.map(d => d.users), maxV)} fill="none" stroke="rgba(45,212,191,0.9)" strokeWidth="2" />
                       <path d={`${mkPath(ga4Trend.map(d => d.users), maxV)} L${(ga4Trend.length - 1) * xStep},190 L0,190 Z`} fill="url(#ga4grad)" opacity="0.15" />
-                      <defs><linearGradient id="ga4grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#a78bfa" /><stop offset="100%" stopColor="transparent" /></linearGradient></defs>
+                      <defs><linearGradient id="ga4grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2dd4bf" /><stop offset="100%" stopColor="transparent" /></linearGradient></defs>
                     </>);
                   })()}
                 </svg>
                 <div className="flex items-center justify-center gap-6 mt-2">
-                  <span className="flex items-center gap-1.5 text-[10px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-violet-400 inline-block" /> Users</span>
+                  <span className="flex items-center gap-1.5 text-[10px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-teal-400 inline-block" /> Users</span>
                   <span className="flex items-center gap-1.5 text-[10px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-blue-400 inline-block" /> Sessions</span>
                   <span className="flex items-center gap-1.5 text-[10px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-teal-400/40 inline-block" /> Pageviews</span>
                 </div>
@@ -1005,7 +1005,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                     <div key={i} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-zinc-800/50">
                       <span className="text-[10px] text-zinc-600 w-5 text-right">{i + 1}</span>
                       <span className="text-xs text-zinc-300 flex-1 truncate font-mono">{p.path}</span>
-                      <span className="text-xs text-violet-400 font-medium tabular-nums">{p.pageviews.toLocaleString()}</span>
+                      <span className="text-xs text-teal-400 font-medium tabular-nums">{p.pageviews.toLocaleString()}</span>
                       <span className="text-[10px] text-zinc-500 w-14 text-right">{p.users.toLocaleString()} u</span>
                     </div>
                   ))}
@@ -1043,8 +1043,8 @@ export function ClientDashboard({ workspaceId }: Props) {
                     {/* Donut-like bars */}
                     <div className="flex-1 space-y-3">
                       {ga4Devices.map((d, i) => {
-                        const colors = ['bg-violet-500', 'bg-blue-500', 'bg-teal-500', 'bg-amber-500'];
-                        const textColors = ['text-violet-400', 'text-blue-400', 'text-teal-400', 'text-amber-400'];
+                        const colors = ['bg-teal-500', 'bg-blue-500', 'bg-emerald-500', 'bg-amber-500'];
+                        const textColors = ['text-teal-400', 'text-blue-400', 'text-teal-400', 'text-amber-400'];
                         return (
                           <div key={i}>
                             <div className="flex items-center justify-between mb-1">
@@ -1101,11 +1101,11 @@ export function ClientDashboard({ workspaceId }: Props) {
                 const pinned = isEventPinned(c.eventName);
                 return (
                   <button key={i} onClick={() => loadEventTrend(c.eventName)}
-                    className={`text-left rounded-xl border p-4 transition-colors ${isSelected ? 'bg-violet-500/10 border-violet-500/30' : pinned ? 'bg-violet-500/5 border-violet-500/15 hover:border-violet-500/30' : 'bg-zinc-800/30 border-zinc-800 hover:border-zinc-700'}`}>
+                    className={`text-left rounded-xl border p-4 transition-colors ${isSelected ? 'bg-teal-500/10 border-teal-500/30' : pinned ? 'bg-teal-500/5 border-teal-500/15 hover:border-teal-500/30' : 'bg-zinc-800/30 border-zinc-800 hover:border-zinc-700'}`}>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-[10px] text-zinc-400 truncate max-w-[140px]">{eventDisplayName(c.eventName)}</span>
                       <div className="flex items-center gap-1.5">
-                        {pinned && <span className="w-1.5 h-1.5 rounded-full bg-violet-400" title="Pinned" />}
+                        {pinned && <span className="w-1.5 h-1.5 rounded-full bg-teal-400" title="Pinned" />}
                         {c.rate > 0 && <span className="text-[10px] font-medium text-emerald-400">{c.rate}%</span>}
                       </div>
                     </div>
@@ -1161,12 +1161,12 @@ export function ClientDashboard({ workspaceId }: Props) {
                           const points = ga4EventTrend.map((d, i) => `${i * xStep},${110 - (d.eventCount / maxV) * 100}`);
                           const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p}`).join(' ');
                           return (<>
-                            <path d={linePath} fill="none" stroke="#a78bfa" strokeWidth="2" />
+                            <path d={linePath} fill="none" stroke="#2dd4bf" strokeWidth="2" />
                             <path d={`${linePath} L${(ga4EventTrend.length - 1) * xStep},110 L0,110 Z`} fill="url(#evtGrad)" opacity="0.15" />
                             {ga4EventTrend.map((d, i) => (
-                              <circle key={i} cx={i * xStep} cy={110 - (d.eventCount / maxV) * 100} r="2.5" fill="#a78bfa" opacity="0.6" />
+                              <circle key={i} cx={i * xStep} cy={110 - (d.eventCount / maxV) * 100} r="2.5" fill="#2dd4bf" opacity="0.6" />
                             ))}
-                            <defs><linearGradient id="evtGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#a78bfa" /><stop offset="100%" stopColor="transparent" /></linearGradient></defs>
+                            <defs><linearGradient id="evtGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2dd4bf" /><stop offset="100%" stopColor="transparent" /></linearGradient></defs>
                           </>);
                         })()}
                       </svg>
@@ -1213,13 +1213,13 @@ export function ClientDashboard({ workspaceId }: Props) {
                                           {eventDisplayName(ev.eventName) !== ev.eventName.replace(/_/g, ' ') && <span className="text-[10px] text-zinc-600 font-mono ml-1">{ev.eventName}</span>}
                                         </div>
                                         <div className="h-1 rounded-full bg-zinc-800 mt-1 max-w-[200px]">
-                                          <div className="h-full rounded-full bg-violet-500/40" style={{ width: `${pct}%` }} />
+                                          <div className="h-full rounded-full bg-teal-500/40" style={{ width: `${pct}%` }} />
                                         </div>
                                       </td>
                                       <td className="py-2 pr-4 text-right text-xs text-zinc-200 tabular-nums font-medium">{ev.eventCount.toLocaleString()}</td>
                                       <td className="py-2 text-right text-xs text-zinc-500 tabular-nums">{ev.users.toLocaleString()}</td>
                                       <td className="py-2 text-right">
-                                        <button onClick={() => loadEventTrend(ev.eventName)} className="text-[10px] text-violet-400 hover:text-violet-300" title="View trend">↗</button>
+                                        <button onClick={() => loadEventTrend(ev.eventName)} className="text-[10px] text-teal-400 hover:text-teal-300" title="View trend">↗</button>
                                       </td>
                                     </tr>
                                   );
@@ -1239,7 +1239,7 @@ export function ClientDashboard({ workspaceId }: Props) {
             <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden mt-6">
               <button onClick={() => setShowExplorer(!showExplorer)} className="w-full flex items-center justify-between px-5 py-3 hover:bg-zinc-800/30 transition-colors">
                 <div className="flex items-center gap-2">
-                  <Filter className="w-4 h-4 text-violet-400" />
+                  <Filter className="w-4 h-4 text-teal-400" />
                   <span className="text-sm font-medium text-zinc-400">Event Explorer</span>
                 </div>
                 {showExplorer ? <ChevronUp className="w-4 h-4 text-zinc-500" /> : <ChevronDown className="w-4 h-4 text-zinc-500" />}
@@ -1251,7 +1251,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                     <div className="flex-1 min-w-[180px]">
                       <label className="text-[10px] text-zinc-500 mb-1 block">Event Name</label>
                       <select value={explorerEvent} onChange={e => setExplorerEvent(e.target.value)}
-                        className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-500">
+                        className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500">
                         <option value="">All events</option>
                         {ga4Events.map(ev => (
                           <option key={ev.eventName} value={ev.eventName}>{eventDisplayName(ev.eventName)}</option>
@@ -1263,10 +1263,10 @@ export function ClientDashboard({ workspaceId }: Props) {
                       <input value={explorerPage} onChange={e => setExplorerPage(e.target.value)}
                         placeholder="/contact, /blog, etc."
                         onKeyDown={e => e.key === 'Enter' && runExplorer(explorerEvent || undefined, explorerPage || undefined)}
-                        className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-500 placeholder:text-zinc-600" />
+                        className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500 placeholder:text-zinc-600" />
                     </div>
                     <button onClick={() => runExplorer(explorerEvent || undefined, explorerPage || undefined)}
-                      className="px-4 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium transition-colors flex items-center gap-1.5">
+                      className="px-4 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-medium transition-colors flex items-center gap-1.5">
                       {explorerLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />} Explore
                     </button>
                     {explorerData.length > 0 && (
@@ -1293,7 +1293,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                               <tr key={i} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
                                 <td className="py-2 pr-3">
                                   <button onClick={() => { setExplorerEvent(row.eventName); runExplorer(row.eventName, explorerPage || undefined); }}
-                                    className="text-xs text-violet-400 hover:text-violet-300">{eventDisplayName(row.eventName)}</button>
+                                    className="text-xs text-teal-400 hover:text-teal-300">{eventDisplayName(row.eventName)}</button>
                                 </td>
                                 <td className="py-2 pr-3">
                                   <button onClick={() => { setExplorerPage(row.pagePath); runExplorer(explorerEvent || undefined, row.pagePath); }}
@@ -1302,7 +1302,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                                 <td className="py-2 pr-3 text-right">
                                   <div className="flex items-center justify-end gap-2">
                                     <div className="w-16 h-1 rounded-full bg-zinc-800 overflow-hidden">
-                                      <div className="h-full rounded-full bg-violet-500/40" style={{ width: `${pct}%` }} />
+                                      <div className="h-full rounded-full bg-teal-500/40" style={{ width: `${pct}%` }} />
                                     </div>
                                     <span className="text-xs text-zinc-200 tabular-nums font-medium">{row.eventCount.toLocaleString()}</span>
                                   </div>
@@ -1327,14 +1327,14 @@ export function ClientDashboard({ workspaceId }: Props) {
       {(overview || audit || ga4Overview) && (<>
         {!chatOpen && (
           <button onClick={() => setChatOpen(true)}
-            className="fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white text-sm font-medium shadow-lg shadow-violet-900/30 transition-all z-50">
+            className="fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 rounded-full bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-sm font-medium shadow-lg shadow-teal-900/30 transition-all z-50">
             <Sparkles className="w-4 h-4" /> Ask AI
           </button>
         )}
         {chatOpen && (
           <div className="fixed bottom-6 right-6 w-96 bg-zinc-900 rounded-2xl border border-zinc-800 shadow-2xl shadow-black/40 overflow-hidden z-50 flex flex-col max-h-[500px]">
             <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 flex-shrink-0">
-              <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-violet-400" /><span className="text-sm font-medium text-zinc-200">AI Assistant</span><span className="text-[10px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">GPT-4o</span></div>
+              <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-teal-400" /><span className="text-sm font-medium text-zinc-200">AI Assistant</span><span className="text-[10px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">GPT-4o</span></div>
               <button onClick={() => setChatOpen(false)} className="text-zinc-500 hover:text-zinc-300"><X className="w-4 h-4" /></button>
             </div>
             <div className="flex-1 overflow-y-auto">
@@ -1344,7 +1344,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                   <div className="grid grid-cols-1 gap-2">
                     {QUICK_QUESTIONS.map((q, i) => (
                       <button key={i} onClick={() => askAi(q)} className="text-left px-3 py-2.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-800 text-[11px] text-zinc-300 transition-colors">
-                        <MessageSquare className="w-3 h-3 text-violet-400 mb-1" />{q}
+                        <MessageSquare className="w-3 h-3 text-teal-400 mb-1" />{q}
                       </button>
                     ))}
                   </div>
@@ -1354,14 +1354,14 @@ export function ClientDashboard({ workspaceId }: Props) {
                 <div className="p-4 space-y-4">
                   {chatMessages.map((msg, i) => (
                     <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
-                      {msg.role === 'assistant' && <div className="w-6 h-6 rounded-lg bg-violet-500/10 flex items-center justify-center flex-shrink-0 mt-0.5"><Sparkles className="w-3 h-3 text-violet-400" /></div>}
-                      <div className={`max-w-[85%] rounded-xl px-3.5 py-2.5 ${msg.role === 'user' ? 'bg-violet-600/20 border border-violet-500/20 text-xs text-zinc-200' : 'bg-zinc-800/50 border border-zinc-800'}`}>
+                      {msg.role === 'assistant' && <div className="w-6 h-6 rounded-lg bg-teal-500/10 flex items-center justify-center flex-shrink-0 mt-0.5"><Sparkles className="w-3 h-3 text-teal-400" /></div>}
+                      <div className={`max-w-[85%] rounded-xl px-3.5 py-2.5 ${msg.role === 'user' ? 'bg-teal-600/20 border border-teal-500/20 text-xs text-zinc-200' : 'bg-zinc-800/50 border border-zinc-800'}`}>
                         {msg.role === 'assistant' ? <RenderMarkdown text={msg.content} /> : msg.content}
                       </div>
                     </div>
                   ))}
                   {chatLoading && (
-                    <div className="flex gap-3"><div className="w-6 h-6 rounded-lg bg-violet-500/10 flex items-center justify-center"><Loader2 className="w-3 h-3 text-violet-400 animate-spin" /></div>
+                    <div className="flex gap-3"><div className="w-6 h-6 rounded-lg bg-teal-500/10 flex items-center justify-center"><Loader2 className="w-3 h-3 text-teal-400 animate-spin" /></div>
                       <div className="bg-zinc-800/50 border border-zinc-800 rounded-xl px-3.5 py-2.5"><div className="flex gap-1"><div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" /><div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '150ms' }} /><div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '300ms' }} /></div></div>
                     </div>
                   )}
@@ -1371,8 +1371,8 @@ export function ClientDashboard({ workspaceId }: Props) {
             </div>
             <div className="px-4 py-3 border-t border-zinc-800 flex gap-2 flex-shrink-0">
               <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && askAi(chatInput)}
-                placeholder="Ask about your site data..." className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-violet-500" disabled={chatLoading} />
-              <button onClick={() => askAi(chatInput)} disabled={chatLoading || !chatInput.trim()} className="px-3 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 rounded-lg transition-colors"><Send className="w-3.5 h-3.5" /></button>
+                placeholder="Ask about your site data..." className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500" disabled={chatLoading} />
+              <button onClick={() => askAi(chatInput)} disabled={chatLoading || !chatInput.trim()} className="px-3 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-lg transition-colors"><Send className="w-3.5 h-3.5" /></button>
             </div>
           </div>
         )}

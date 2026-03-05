@@ -251,7 +251,7 @@ function Dashboard() {
     if (!selected) {
       return (
         <div className="flex flex-col items-center justify-center h-full gap-6">
-          <img src="/logo.svg" alt="hmpsn.studio" className="h-8 opacity-40" />
+          <img src="/logo.svg" alt="hmpsn.studio" className="h-10 opacity-40" />
           <div className="text-center max-w-sm">
             <p className="text-base font-semibold mb-1" style={{ color: 'var(--brand-text-bright)' }}>Welcome to hmpsn studio</p>
             <p className="text-xs leading-relaxed" style={{ color: 'var(--brand-text-muted)' }}>Get started in 3 steps:</p>
@@ -303,7 +303,7 @@ function Dashboard() {
       <aside className="w-[200px] flex-shrink-0 flex flex-col" style={{ borderRight: '1px solid var(--brand-border)' }}>
         {/* Logo */}
         <div className="px-4 pt-4 pb-3">
-          <img src="/logo.svg" alt="hmpsn.studio" className="h-5" />
+          <img src="/logo.svg" alt="hmpsn.studio" className="h-7" />
         </div>
 
         {/* Workspace selector */}

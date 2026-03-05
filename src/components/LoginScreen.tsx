@@ -26,7 +26,7 @@ export function LoginScreen({ onLogin }: Props) {
     <div className="flex items-center justify-center h-screen" style={{ backgroundColor: 'var(--brand-bg)' }}>
       <div className="w-full max-w-sm px-6">
         <div className="flex flex-col items-center gap-3 mb-8">
-          <img src="/logo.svg" alt="hmpsn.studio" className="h-7" />
+          <img src="/logo.svg" alt="hmpsn.studio" className="h-9" />
           <p className="text-xs" style={{ color: 'var(--brand-text-muted)' }}>Asset Dashboard</p>
         </div>
 

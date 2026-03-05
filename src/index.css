@@ -6,9 +6,9 @@
   --brand-bg-surface: #161b26;
   --brand-bg-elevated: #1c2333;
   --brand-bg-card: #212a3a;
-  --brand-text: #94a3b8;
-  --brand-text-bright: #e2e8f0;
-  --brand-text-muted: #64748b;
+  --brand-text: #b8c5d4;
+  --brand-text-bright: #f1f5f9;
+  --brand-text-muted: #8494a7;
   --brand-mint: #2ed9c3;
   --brand-mint-hover: #45f0d8;
   --brand-mint-dim: rgba(46, 217, 195, 0.1);
@@ -32,18 +32,6 @@ body {
 h1, h2, h3, h4, h5, h6 {
   font-family: 'DM Sans', 'Inter', sans-serif;
   letter-spacing: -0.02em;
-}
-
-/* Client dashboard theme tokens */
-.client-dashboard {
-  --cd-bg: #0a0a1a;
-  --cd-surface: #18181b;
-  --cd-border: #27272a;
-  --cd-border-hover: #3f3f46;
-  --cd-text: #d4d4d8;
-  --cd-text-muted: #71717a;
-  --cd-text-dim: #52525b;
-  --cd-accent: #8b5cf6;
 }
 
 /* Hide scrollbar utility */
