@@ -275,6 +275,8 @@ export function ClientDashboard({ workspaceId }: Props) {
   const [applyingBatch, setApplyingBatch] = useState<string | null>(null);
   const [editingApproval, setEditingApproval] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
+  // Activity log
+  const [activityLog, setActivityLog] = useState<{ id: string; type: string; title: string; description?: string; createdAt: string }[]>([]);
   // Requests state
   const [requests, setRequests] = useState<ClientRequest[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(false);
@@ -406,6 +408,7 @@ export function ClientDashboard({ workspaceId }: Props) {
     if (data.ga4PropertyId) loadGA4Data(data.id, 28);
     loadApprovals(data.id);
     loadRequests(data.id);
+    fetch(`/api/public/activity/${data.id}?limit=20`).then(r => r.json()).then(a => { if (Array.isArray(a)) setActivityLog(a); }).catch(() => {});
   };
 
   const loadGA4Data = async (wsId: string, numDays: number) => {
@@ -955,6 +958,48 @@ export function ClientDashboard({ workspaceId }: Props) {
               )}
             </div>
           </div>
+
+          {/* Activity Timeline */}
+          {activityLog.length > 0 && (
+            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Activity className="w-4 h-4 text-teal-400" />
+                <span className="text-xs font-semibold text-zinc-200">Recent Activity</span>
+                <span className="text-[10px] text-zinc-600 ml-auto">What your web team has been working on</span>
+              </div>
+              <div className="relative">
+                <div className="absolute left-[7px] top-2 bottom-2 w-px bg-zinc-800" />
+                <div className="space-y-3">
+                  {activityLog.slice(0, 10).map(entry => {
+                    const icons: Record<string, { color: string; label: string }> = {
+                      audit_completed: { color: '#60a5fa', label: 'Audit' },
+                      request_resolved: { color: '#34d399', label: 'Resolved' },
+                      approval_applied: { color: '#a78bfa', label: 'Applied' },
+                      seo_updated: { color: '#fbbf24', label: 'SEO' },
+                      images_optimized: { color: '#f472b6', label: 'Media' },
+                      links_fixed: { color: '#fb923c', label: 'Links' },
+                      content_updated: { color: '#2dd4bf', label: 'Content' },
+                      note: { color: '#94a3b8', label: 'Note' },
+                    };
+                    const cfg = icons[entry.type] || icons.note;
+                    return (
+                      <div key={entry.id} className="flex items-start gap-3 pl-0">
+                        <div className="w-[15px] h-[15px] rounded-full border-2 flex-shrink-0 mt-0.5 z-10" style={{ borderColor: cfg.color, backgroundColor: 'var(--brand-bg, #0f1219)' }} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded" style={{ backgroundColor: `${cfg.color}15`, color: cfg.color }}>{cfg.label}</span>
+                            <span className="text-[10px] text-zinc-600">{new Date(entry.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                          </div>
+                          <div className="text-[11px] text-zinc-300 mt-0.5">{entry.title}</div>
+                          {entry.description && <div className="text-[10px] text-zinc-500 mt-0.5 line-clamp-1">{entry.description}</div>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
         </>)}
 
         {/* ════════════ SEARCH TAB ════════════ */}
@@ -1850,6 +1895,23 @@ export function ClientDashboard({ workspaceId }: Props) {
             {showNewRequest && (
               <div className="bg-zinc-900 rounded-xl border border-teal-500/20 p-5 space-y-4">
                 <h3 className="text-xs font-semibold text-zinc-200">Submit a Request</h3>
+                <div>
+                  <label className="text-[10px] text-zinc-500 mb-1.5 block">Quick Templates</label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { label: 'Content Update', cat: 'content' as RequestCategory, title: 'Content update needed', desc: 'Page/section to update:\n\nCurrent text:\n\nNew text:' },
+                      { label: 'Bug Report', cat: 'bug' as RequestCategory, title: 'Bug: ', desc: 'What happened:\n\nExpected behavior:\n\nDevice/browser:' },
+                      { label: 'Design Change', cat: 'design' as RequestCategory, title: 'Design change request', desc: 'What needs to change:\n\nWhy:\n\nReference/example (if any):' },
+                      { label: 'New Page', cat: 'feature' as RequestCategory, title: 'New page request', desc: 'Page purpose:\n\nTarget URL/slug:\n\nContent outline:' },
+                      { label: 'SEO Update', cat: 'seo' as RequestCategory, title: 'SEO update request', desc: 'Pages affected:\n\nKeywords to target:\n\nDetails:' },
+                    ].map(t => (
+                      <button key={t.label} onClick={() => { setNewReqCategory(t.cat); setNewReqTitle(t.title); setNewReqDesc(t.desc); }}
+                        className="px-2.5 py-1.5 rounded-lg text-[10px] font-medium border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-600 bg-zinc-800/50 transition-colors">
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div>
                   <label className="text-[10px] text-zinc-500 mb-1 block">Your Name</label>
                   <input value={newReqName} onChange={e => setNewReqName(e.target.value)}

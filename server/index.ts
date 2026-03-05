@@ -57,6 +57,7 @@ import { initJobs, createJob, updateJob, getJob, listJobs } from './jobs.js';
 import { createBatch, listBatches, getBatch, updateItem, markBatchApplied, deleteBatch } from './approvals.js';
 import { listRequests, createRequest, updateRequest, addNote, deleteRequest, getRequest, getAttachmentsDir, addAttachmentsToRequest, type RequestAttachment } from './requests.js';
 import { notifyTeamNewRequest, notifyClientTeamResponse, notifyClientStatusChange, isEmailConfigured } from './email.js';
+import { addActivity, listActivity } from './activity-log.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
 import { listGscSites, getSearchOverview, getPerformanceTrend, getQueryPageData } from './search-console.js';
@@ -998,6 +999,13 @@ app.post('/api/reports/:siteId/save', async (req, res) => {
     }
 
     const snapshot = saveSnapshot(siteId, siteName || siteId, audit, logoUrl);
+    // Log activity
+    const auditWs = listWorkspaces().find(w => w.webflowSiteId === siteId);
+    if (auditWs) {
+      addActivity(auditWs.id, 'audit_completed', `Site audit completed — score ${audit.siteScore}`,
+        `${audit.totalPages} pages scanned, ${audit.errors} errors, ${audit.warnings} warnings`,
+        { score: audit.siteScore, previousScore: snapshot.previousScore });
+    }
     res.json({ id: snapshot.id, createdAt: snapshot.createdAt, siteScore: audit.siteScore, previousScore: snapshot.previousScore });
   } catch (err) {
     console.error('Report save error:', err);
@@ -1110,6 +1118,14 @@ app.put('/api/webflow/pages/:pageId/seo', async (req, res) => {
     const { siteId, seo, openGraph, title } = req.body;
     const token = siteId ? (getTokenForSite(siteId) || undefined) : undefined;
     const result = await updatePageSeo(req.params.pageId, { seo, openGraph, title }, token);
+    // Log activity
+    if (siteId) {
+      const seoWs = listWorkspaces().find(w => w.webflowSiteId === siteId);
+      if (seoWs) {
+        const fields = [seo?.title && 'title', seo?.description && 'description', openGraph && 'OG'].filter(Boolean).join(', ');
+        addActivity(seoWs.id, 'seo_updated', `Updated SEO ${fields} for a page`, undefined, { pageId: req.params.pageId });
+      }
+    }
     res.json(result);
   } catch (err) {
     console.error('Page SEO update error:', err);
@@ -2780,6 +2796,12 @@ app.post('/api/public/approvals/:workspaceId/:batchId/apply', async (req, res) =
 
   if (appliedIds.length > 0) {
     markBatchApplied(req.params.workspaceId, req.params.batchId, appliedIds);
+    // Log activity
+    const batchData = getBatch(req.params.workspaceId, req.params.batchId);
+    addActivity(req.params.workspaceId, 'approval_applied',
+      `Applied ${appliedIds.length} approved SEO changes`,
+      batchData ? `Batch: ${batchData.name}` : undefined,
+      { batchId: req.params.batchId, appliedCount: appliedIds.length });
   }
 
   res.json({ results, applied: appliedIds.length, failed: results.length - appliedIds.length });
@@ -2850,6 +2872,11 @@ app.patch('/api/requests/:id', (req, res) => {
       const dashUrl = ws.liveDomain ? `${ws.liveDomain.startsWith('http') ? '' : 'https://'}${ws.liveDomain}/client/${ws.id}` : undefined;
       notifyClientStatusChange({ clientEmail: ws.clientEmail, workspaceName: ws.name, requestTitle: updated.title, newStatus: status, dashboardUrl: dashUrl }).catch(() => {});
     }
+    // Log activity for completed/closed
+    if (status === 'completed' || status === 'closed') {
+      addActivity(updated.workspaceId, 'request_resolved', `Resolved request: ${updated.title}`,
+        updated.description?.slice(0, 120), { requestId: updated.id, category: updated.category });
+    }
   }
   res.json(updated);
 });
@@ -2876,6 +2903,28 @@ app.delete('/api/requests/:id', (req, res) => {
   if (!ok) return res.status(404).json({ error: 'Not found' });
   broadcast('request:deleted', { id: req.params.id });
   res.json({ ok: true });
+});
+
+// --- Activity Log ---
+// Public: client views activity for their workspace
+app.get('/api/public/activity/:workspaceId', (req, res) => {
+  const limit = parseInt(req.query.limit as string) || 50;
+  res.json(listActivity(req.params.workspaceId, limit));
+});
+
+// Internal: list activity (optionally filtered by workspace)
+app.get('/api/activity', (req, res) => {
+  const wsId = req.query.workspaceId as string | undefined;
+  const limit = parseInt(req.query.limit as string) || 50;
+  res.json(listActivity(wsId, limit));
+});
+
+// Internal: manually add an activity entry
+app.post('/api/activity', (req, res) => {
+  const { workspaceId, type, title, description } = req.body;
+  if (!workspaceId || !type || !title) return res.status(400).json({ error: 'workspaceId, type, and title required' });
+  const entry = addActivity(workspaceId, type, title, description);
+  res.json(entry);
 });
 
 // --- Request Attachments ---
