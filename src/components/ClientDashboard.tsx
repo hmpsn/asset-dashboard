@@ -109,7 +109,7 @@ function TrendChart({ data, metric, color }: { data: PerformanceTrend[]; metric:
   );
 }
 
-function DualTrendChart({ data }: { data: PerformanceTrend[] }) {
+function DualTrendChart({ data, annotations: anns }: { data: PerformanceTrend[]; annotations?: { id: string; date: string; label: string; color?: string }[] }) {
   if (data.length < 2) return null;
   const clicks = data.map(d => d.clicks);
   const imps = data.map(d => d.impressions);
@@ -133,6 +133,12 @@ function DualTrendChart({ data }: { data: PerformanceTrend[] }) {
         <polyline fill="none" stroke="#2dd4bf" strokeWidth="1.2" points={iPoints} vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeOpacity="0.6" />
         <polygon fill="url(#cg-clicks-dual)" points={`0,100 ${cPoints} ${w},100`} />
         <polyline fill="none" stroke="#60a5fa" strokeWidth="1.5" points={cPoints} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+        {anns?.map(ann => {
+          const idx = data.findIndex(d => d.date === ann.date);
+          if (idx < 0) return null;
+          const x = (idx / (data.length - 1)) * w;
+          return <g key={ann.id}><line x1={x} y1={2} x2={x} y2={98} stroke={ann.color || '#2dd4bf'} strokeWidth="0.8" strokeDasharray="2,1.5" opacity="0.7" vectorEffect="non-scaling-stroke" /><circle cx={x} cy={3} r="1.5" fill={ann.color || '#2dd4bf'} vectorEffect="non-scaling-stroke" /><title>{ann.label}</title></g>;
+        })}
       </svg>
     </div>
   );
@@ -280,6 +286,13 @@ export function ClientDashboard({ workspaceId }: Props) {
   // Rank tracking
   const [rankHistory, setRankHistory] = useState<{ date: string; positions: Record<string, number> }[]>([]);
   const [latestRanks, setLatestRanks] = useState<{ query: string; position: number; clicks: number; impressions: number; ctr: number; change?: number }[]>([]);
+  // Annotations
+  const [annotations, setAnnotations] = useState<{ id: string; date: string; label: string; description?: string; color?: string }[]>([]);
+  const [showAddAnnotation, setShowAddAnnotation] = useState(false);
+  const [annDate, setAnnDate] = useState('');
+  const [annLabel, setAnnLabel] = useState('');
+  const [annDesc, setAnnDesc] = useState('');
+  const [annColor, setAnnColor] = useState('#2dd4bf');
   // Requests state
   const [requests, setRequests] = useState<ClientRequest[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(false);
@@ -414,6 +427,7 @@ export function ClientDashboard({ workspaceId }: Props) {
     fetch(`/api/public/activity/${data.id}?limit=20`).then(r => r.json()).then(a => { if (Array.isArray(a)) setActivityLog(a); }).catch(() => {});
     fetch(`/api/public/rank-tracking/${data.id}/history`).then(r => r.json()).then(h => { if (Array.isArray(h)) setRankHistory(h); }).catch(() => {});
     fetch(`/api/public/rank-tracking/${data.id}/latest`).then(r => r.json()).then(l => { if (Array.isArray(l)) setLatestRanks(l); }).catch(() => {});
+    fetch(`/api/public/annotations/${data.id}`).then(r => r.json()).then(a => { if (Array.isArray(a)) setAnnotations(a); }).catch(() => {});
   };
 
   const loadGA4Data = async (wsId: string, numDays: number) => {
@@ -853,6 +867,12 @@ export function ClientDashboard({ workspaceId }: Props) {
                         <path d={mkPath(ga4Trend.map(d => d.users), maxU)} fill="none" stroke="#2dd4bf" strokeWidth="2" />
                         <path d={`${mkPath(ga4Trend.map(d => d.users), maxU)} L${(ga4Trend.length - 1) * xStep},95 L0,95 Z`} fill="url(#overviewGa4)" opacity="0.12" />
                         <defs><linearGradient id="overviewGa4" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2dd4bf" /><stop offset="100%" stopColor="transparent" /></linearGradient></defs>
+                        {annotations.map(ann => {
+                          const idx = ga4Trend.findIndex(d => d.date === ann.date);
+                          if (idx < 0) return null;
+                          const x = idx * xStep;
+                          return <g key={ann.id}><line x1={x} y1={2} x2={x} y2={95} stroke={ann.color || '#2dd4bf'} strokeWidth="1" strokeDasharray="3,2" opacity="0.6" /><circle cx={x} cy={4} r="3" fill={ann.color || '#2dd4bf'} /><title>{ann.label}</title></g>;
+                        })}
                       </>);
                     })()}
                   </svg>
@@ -1031,7 +1051,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                   <span className="text-xs font-medium text-zinc-400">Performance Trend</span>
                   <span className="text-[10px] text-zinc-600">{overview.dateRange.start} — {overview.dateRange.end}</span>
                 </div>
-                <DualTrendChart data={trend} />
+                <DualTrendChart data={trend} annotations={annotations} />
               </div>
             )}
 
@@ -1182,6 +1202,85 @@ export function ClientDashboard({ workspaceId }: Props) {
                   })}
                 </tbody>
               </table>
+            </div>
+
+            {/* Annotations Panel */}
+            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-zinc-400" />
+                  <span className="text-xs font-semibold text-zinc-200">Timeline Annotations</span>
+                  {annotations.length > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{annotations.length}</span>}
+                </div>
+                <button onClick={() => setShowAddAnnotation(!showAddAnnotation)} className="text-[10px] text-teal-400 hover:text-teal-300">
+                  {showAddAnnotation ? 'Cancel' : '+ Add'}
+                </button>
+              </div>
+              {showAddAnnotation && (
+                <div className="mb-3 p-3 rounded-lg bg-zinc-950 border border-zinc-800 space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-zinc-500 block mb-0.5">Date</label>
+                      <input type="date" value={annDate} onChange={e => setAnnDate(e.target.value)}
+                        className="w-full px-2 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-300" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-zinc-500 block mb-0.5">Color</label>
+                      <div className="flex gap-1.5">
+                        {['#2dd4bf', '#60a5fa', '#f472b6', '#fbbf24', '#a78bfa', '#f87171'].map(c => (
+                          <button key={c} onClick={() => setAnnColor(c)}
+                            className={`w-5 h-5 rounded-full border-2 ${annColor === c ? 'border-white' : 'border-zinc-700'}`}
+                            style={{ backgroundColor: c }} />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-zinc-500 block mb-0.5">Label</label>
+                    <input type="text" value={annLabel} onChange={e => setAnnLabel(e.target.value)} placeholder="e.g. Launched new pages"
+                      className="w-full px-2 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-300" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-zinc-500 block mb-0.5">Description (optional)</label>
+                    <input type="text" value={annDesc} onChange={e => setAnnDesc(e.target.value)} placeholder="Details..."
+                      className="w-full px-2 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-300" />
+                  </div>
+                  <button
+                    disabled={!annDate || !annLabel}
+                    onClick={async () => {
+                      if (!ws || !annDate || !annLabel) return;
+                      const res = await fetch(`/api/public/annotations/${ws.id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date: annDate, label: annLabel, description: annDesc || undefined, color: annColor }) });
+                      if (res.ok) {
+                        const ann = await res.json();
+                        setAnnotations(prev => [...prev, ann]);
+                        setAnnDate(''); setAnnLabel(''); setAnnDesc(''); setShowAddAnnotation(false);
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-40 transition-colors"
+                  >Add Annotation</button>
+                </div>
+              )}
+              {annotations.length > 0 ? (
+                <div className="space-y-1.5">
+                  {annotations.map(ann => (
+                    <div key={ann.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-zinc-950/50 group">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: ann.color || '#2dd4bf' }} />
+                      <span className="text-[10px] text-zinc-500 flex-shrink-0">{ann.date}</span>
+                      <span className="text-xs text-zinc-300 flex-1 truncate">{ann.label}</span>
+                      {ann.description && <span className="text-[10px] text-zinc-600 truncate max-w-[120px]">{ann.description}</span>}
+                      <button onClick={async () => {
+                        if (!ws) return;
+                        await fetch(`/api/public/annotations/${ws.id}/${ann.id}`, { method: 'DELETE' });
+                        setAnnotations(prev => prev.filter(a => a.id !== ann.id));
+                      }} className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-red-400 transition-all">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[10px] text-zinc-600">No annotations yet. Add markers to track key events on your timeline.</p>
+              )}
             </div>
           </>) : (
             <div className="text-center py-16">

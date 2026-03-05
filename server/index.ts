@@ -60,6 +60,7 @@ import { notifyTeamNewRequest, notifyClientTeamResponse, notifyClientStatusChang
 import { addActivity, listActivity } from './activity-log.js';
 import { getSchedule, listSchedules, upsertSchedule, deleteSchedule, startScheduler } from './scheduled-audits.js';
 import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword, togglePinKeyword, storeRankSnapshot, getRankHistory, getLatestRanks } from './rank-tracking.js';
+import { listAnnotations, addAnnotation, deleteAnnotation } from './annotations.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
 import { listGscSites, getSearchOverview, getPerformanceTrend, getQueryPageData } from './search-console.js';
@@ -3552,6 +3553,30 @@ if (IS_PROD) {
     res.sendFile(path.join(distPath, 'index.html'));
   });
 }
+
+// --- Annotations ---
+// Public: list annotations for a workspace
+app.get('/api/public/annotations/:workspaceId', (req, res) => {
+  res.json(listAnnotations(req.params.workspaceId));
+});
+
+// Internal: list annotations
+app.get('/api/annotations/:workspaceId', (req, res) => {
+  res.json(listAnnotations(req.params.workspaceId));
+});
+
+// Internal: add annotation
+app.post('/api/annotations/:workspaceId', (req, res) => {
+  const { date, label, description, color } = req.body;
+  if (!date || !label) return res.status(400).json({ error: 'date and label required' });
+  res.json(addAnnotation(req.params.workspaceId, date, label, description, color));
+});
+
+// Internal: delete annotation
+app.delete('/api/annotations/:workspaceId/:id', (req, res) => {
+  deleteAnnotation(req.params.workspaceId, req.params.id);
+  res.json({ ok: true });
+});
 
 // --- Rank Tracking ---
 // Get tracked keywords for a workspace
