@@ -20,7 +20,7 @@ import { BackgroundTaskProvider } from './hooks/useBackgroundTasks';
 import { TaskPanel } from './components/TaskPanel';
 import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, FileSearch, Search,
-  Pencil, ListChecks, Link2Off, CornerDownRight, Share2, Target, Code2, TrendingUp, Clock,
+  Pencil, ListChecks, Link2Off, CornerDownRight, Share2, Target, Code2, TrendingUp, Clock, LogOut,
 } from 'lucide-react';
 
 type Page =
@@ -53,10 +53,10 @@ function AdminApp() {
     return <LoginScreen onLogin={auth.login} />;
   }
 
-  return <><Dashboard /><TaskPanel /></>;
+  return <><Dashboard onLogout={auth.logout} /><TaskPanel /></>;
 }
 
-function Dashboard() {
+function Dashboard({ onLogout }: { onLogout?: () => void }) {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [selected, setSelected] = useState<Workspace | null>(null);
   const [queue, setQueue] = useState<QueueItem[]>([]);
@@ -387,6 +387,15 @@ function Dashboard() {
               </button>
             );
           })}
+          {onLogout && (
+            <button
+              onClick={() => { fetch('/api/auth/logout', { method: 'POST' }); onLogout(); }}
+              className="w-full flex items-center gap-2.5 px-2.5 py-[5px] rounded-lg text-[12px] font-medium text-zinc-600 hover:text-red-400 hover:bg-red-500/5 transition-all mt-2"
+            >
+              <LogOut className="w-3.5 h-3.5 flex-shrink-0" />
+              <span className="truncate">Log Out</span>
+            </button>
+          )}
         </div>
       </aside>
 

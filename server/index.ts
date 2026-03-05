@@ -73,6 +73,11 @@ for (const dir of [getUploadRoot(), getOptRoot()]) {
   fs.mkdirSync(dir, { recursive: true });
 }
 
+// --- Core middleware (must come before auth) ---
+app.use(cors());
+app.use(cookieParser());
+app.use(express.json());
+
 // --- Auth middleware (password gate) ---
 const APP_PASSWORD = process.env.APP_PASSWORD;
 if (APP_PASSWORD) {
@@ -100,10 +105,6 @@ if (APP_PASSWORD) {
   });
 }
 
-app.use(cors());
-app.use(cookieParser());
-app.use(express.json());
-
 // Auth login endpoint
 app.post('/api/auth/login', express.json(), (req, res) => {
   const { password } = req.body;
@@ -119,6 +120,11 @@ app.post('/api/auth/login', express.json(), (req, res) => {
   } else {
     res.status(401).json({ error: 'Invalid password' });
   }
+});
+
+app.post('/api/auth/logout', (_req, res) => {
+  res.clearCookie('auth_token');
+  res.json({ ok: true });
 });
 
 app.get('/api/auth/check', (req, res) => {
