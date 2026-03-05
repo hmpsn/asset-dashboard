@@ -97,6 +97,35 @@ function TrendChart({ data, metric, color }: { data: PerformanceTrend[]; metric:
   );
 }
 
+function DualTrendChart({ data }: { data: PerformanceTrend[] }) {
+  if (data.length < 2) return null;
+  const clicks = data.map(d => d.clicks);
+  const imps = data.map(d => d.impressions);
+  const cMax = Math.max(...clicks), cMin = Math.min(...clicks), cRange = cMax - cMin || 1;
+  const iMax = Math.max(...imps), iMin = Math.min(...imps), iRange = iMax - iMin || 1;
+  const w = 100;
+  const cPoints = clicks.map((v, i) => `${(i / (clicks.length - 1)) * w},${100 - ((v - cMin) / cRange) * 85 - 7}`).join(' ');
+  const iPoints = imps.map((v, i) => `${(i / (imps.length - 1)) * w},${100 - ((v - iMin) / iRange) * 85 - 7}`).join(' ');
+  return (
+    <div>
+      <div className="flex items-center gap-4 mb-2">
+        <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded bg-blue-400" /><span className="text-[10px] text-blue-400">Clicks</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded bg-teal-400" /><span className="text-[10px] text-teal-400">Impressions</span></div>
+      </div>
+      <svg viewBox={`0 0 ${w} 100`} className="w-full" style={{ height: 120 }} preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="cg-clicks-dual" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#60a5fa" stopOpacity="0.15" /><stop offset="100%" stopColor="#60a5fa" stopOpacity="0" /></linearGradient>
+          <linearGradient id="cg-imps-dual" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2dd4bf" stopOpacity="0.1" /><stop offset="100%" stopColor="#2dd4bf" stopOpacity="0" /></linearGradient>
+        </defs>
+        <polygon fill="url(#cg-imps-dual)" points={`0,100 ${iPoints} ${w},100`} />
+        <polyline fill="none" stroke="#2dd4bf" strokeWidth="1.2" points={iPoints} vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeOpacity="0.6" />
+        <polygon fill="url(#cg-clicks-dual)" points={`0,100 ${cPoints} ${w},100`} />
+        <polyline fill="none" stroke="#60a5fa" strokeWidth="1.5" points={cPoints} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+      </svg>
+    </div>
+  );
+}
+
 function ScoreRing({ score, size = 120 }: { score: number; size?: number }) {
   const sw = 8, r = (size - sw) / 2, c = 2 * Math.PI * r, offset = c - (score / 100) * c;
   const color = score >= 80 ? '#34d399' : score >= 60 ? '#fbbf24' : '#f87171';
@@ -155,10 +184,19 @@ function RenderMarkdown({ text }: { text: string }) {
   );
 }
 
-/** Rewrite webflow.io URLs to live domain */
+/** Rewrite webflow.io URLs to live domain, or show just the path */
 function toLiveUrl(url: string, liveDomain?: string): string {
-  if (!liveDomain || !url) return url;
-  return url.replace(/https?:\/\/[^/]+\.webflow\.io/, liveDomain.replace(/\/$/, ''));
+  if (!url) return url;
+  if (liveDomain) {
+    return url.replace(/https?:\/\/[^/]+\.webflow\.io/, liveDomain.replace(/\/$/, ''));
+  }
+  // No live domain — strip the staging domain and show just the path
+  try {
+    const path = new URL(url).pathname;
+    return path || '/';
+  } catch {
+    return url.replace(/https?:\/\/[^/]+/, '') || '/';
+  }
 }
 
 export function ClientDashboard({ workspaceId }: Props) {
@@ -195,8 +233,10 @@ export function ClientDashboard({ workspaceId }: Props) {
   const [explorerEvent, setExplorerEvent] = useState('');
   const [explorerPage, setExplorerPage] = useState('');
   const [explorerLoading, setExplorerLoading] = useState(false);
-  const [showAllEvents, setShowAllEvents] = useState(false);
   const [showExplorer, setShowExplorer] = useState(false);
+  const [eventsPageFilter, setEventsPageFilter] = useState('');
+  const [eventsPageData, setEventsPageData] = useState<GA4ConversionSummary[] | null>(null);
+  const [eventsPageLoading, setEventsPageLoading] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [authError, setAuthError] = useState('');
@@ -291,6 +331,32 @@ export function ClientDashboard({ workspaceId }: Props) {
     const bp = isEventPinned(b.eventName) ? 1 : 0;
     return bp - ap;
   });
+
+  const fetchEventsForPage = async (pagePath: string) => {
+    if (!ws) return;
+    if (!pagePath) { setEventsPageData(null); return; }
+    setEventsPageLoading(true);
+    try {
+      const params = new URLSearchParams({ days: String(days), page: pagePath });
+      const res = await fetch(`/api/public/analytics-event-explorer/${ws.id}?${params}`);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        // Aggregate by event name into conversion-like format
+        const byEvent: Record<string, { conversions: number; users: number }> = {};
+        for (const row of data) {
+          if (!byEvent[row.eventName]) byEvent[row.eventName] = { conversions: 0, users: 0 };
+          byEvent[row.eventName].conversions += row.eventCount;
+          byEvent[row.eventName].users += row.users;
+        }
+        const totalUsers = Object.values(byEvent).reduce((s, v) => s + v.users, 0) || 1;
+        setEventsPageData(Object.entries(byEvent).map(([eventName, v]) => ({
+          eventName, conversions: v.conversions, users: v.users,
+          rate: Math.round((v.conversions / totalUsers) * 100 * 10) / 10,
+        })).sort((a, b) => b.conversions - a.conversions));
+      }
+    } catch { setEventsPageData(null); }
+    finally { setEventsPageLoading(false); }
+  };
 
   const runExplorer = async (event?: string, page?: string) => {
     if (!ws) return;
@@ -777,9 +843,26 @@ export function ClientDashboard({ workspaceId }: Props) {
                   <span className="text-xs font-medium text-zinc-400">Performance Trend</span>
                   <span className="text-[10px] text-zinc-600">{overview.dateRange.start} — {overview.dateRange.end}</span>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div><div className="text-[10px] text-blue-400 mb-1">Clicks</div><TrendChart data={trend} metric="clicks" color="#60a5fa" /></div>
-                  <div><div className="text-[10px] text-teal-400 mb-1">Impressions</div><TrendChart data={trend} metric="impressions" color="#2dd4bf" /></div>
+                <DualTrendChart data={trend} />
+              </div>
+            )}
+
+            {insights && (
+              <div className="space-y-3">
+                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+                  <div className="text-xs font-medium text-zinc-300 mb-3">Search Health Summary</div>
+                  <div className="grid grid-cols-4 gap-3">
+                    <div className="text-center"><div className={`text-lg font-bold ${insights.page1 > 5 ? 'text-green-400' : 'text-amber-400'}`}>{insights.page1}</div><div className="text-[10px] text-zinc-500">Page 1 Rankings</div></div>
+                    <div className="text-center"><div className={`text-lg font-bold ${insights.top3 > 2 ? 'text-green-400' : 'text-amber-400'}`}>{insights.top3}</div><div className="text-[10px] text-zinc-500">Top 3 Rankings</div></div>
+                    <div className="text-center"><div className={`text-lg font-bold ${overview.avgCtr > 3 ? 'text-green-400' : overview.avgCtr > 1.5 ? 'text-amber-400' : 'text-red-400'}`}>{overview.avgCtr}%</div><div className="text-[10px] text-zinc-500">Avg CTR</div></div>
+                    <div className="text-center"><div className={`text-lg font-bold ${insights.lowHanging.length > 0 ? 'text-amber-400' : 'text-green-400'}`}>{insights.lowHanging.length}</div><div className="text-[10px] text-zinc-500">Opportunities</div></div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {insights.lowHanging.length > 0 && <InsightCard icon={Target} color="amber" title="Low-Hanging Fruit" count={insights.lowHanging.length} desc="Ranking 5-20 with impressions — push to page 1" items={insights.lowHanging.slice(0, 8).map(q => ({ label: q.query, value: `#${q.position}`, sub: `${q.impressions} imp` }))} />}
+                  {insights.topPerformers.length > 0 && <InsightCard icon={Shield} color="green" title="Top Performers" count={insights.topPerformers.length} desc="Top 3 with real clicks — protect these" items={insights.topPerformers.slice(0, 8).map(q => ({ label: q.query, value: `#${q.position}`, sub: `${q.clicks} clicks` }))} />}
+                  {insights.ctrOpps.length > 0 && <InsightCard icon={TrendingDown} color="red" title="CTR Opportunities" count={insights.ctrOpps.length} desc="Page 1 but CTR under 3%" items={insights.ctrOpps.slice(0, 8).map(q => ({ label: q.query, value: `${q.ctr}% CTR`, sub: `#${q.position}` }))} />}
+                  {insights.highImpLowClick.length > 0 && <InsightCard icon={AlertTriangle} color="orange" title="Visibility Without Clicks" count={insights.highImpLowClick.length} desc="100+ impressions, under 5 clicks" items={insights.highImpLowClick.slice(0, 8).map(q => ({ label: q.query, value: `${q.clicks} clicks`, sub: `${q.impressions} imp` }))} />}
                 </div>
               </div>
             )}
@@ -808,26 +891,6 @@ export function ClientDashboard({ workspaceId }: Props) {
                 ))}</tbody>
               </table>
             </div>
-
-            {insights && (
-              <div className="space-y-3">
-                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                  <div className="text-xs font-medium text-zinc-300 mb-3">Search Health Summary</div>
-                  <div className="grid grid-cols-4 gap-3">
-                    <div className="text-center"><div className={`text-lg font-bold ${insights.page1 > 5 ? 'text-green-400' : 'text-amber-400'}`}>{insights.page1}</div><div className="text-[10px] text-zinc-500">Page 1 Rankings</div></div>
-                    <div className="text-center"><div className={`text-lg font-bold ${insights.top3 > 2 ? 'text-green-400' : 'text-amber-400'}`}>{insights.top3}</div><div className="text-[10px] text-zinc-500">Top 3 Rankings</div></div>
-                    <div className="text-center"><div className={`text-lg font-bold ${overview.avgCtr > 3 ? 'text-green-400' : overview.avgCtr > 1.5 ? 'text-amber-400' : 'text-red-400'}`}>{overview.avgCtr}%</div><div className="text-[10px] text-zinc-500">Avg CTR</div></div>
-                    <div className="text-center"><div className={`text-lg font-bold ${insights.lowHanging.length > 0 ? 'text-amber-400' : 'text-green-400'}`}>{insights.lowHanging.length}</div><div className="text-[10px] text-zinc-500">Opportunities</div></div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {insights.lowHanging.length > 0 && <InsightCard icon={Target} color="amber" title="Low-Hanging Fruit" count={insights.lowHanging.length} desc="Ranking 5-20 with impressions — push to page 1" items={insights.lowHanging.slice(0, 8).map(q => ({ label: q.query, value: `#${q.position}`, sub: `${q.impressions} imp` }))} />}
-                  {insights.topPerformers.length > 0 && <InsightCard icon={Shield} color="green" title="Top Performers" count={insights.topPerformers.length} desc="Top 3 with real clicks — protect these" items={insights.topPerformers.slice(0, 8).map(q => ({ label: q.query, value: `#${q.position}`, sub: `${q.clicks} clicks` }))} />}
-                  {insights.ctrOpps.length > 0 && <InsightCard icon={TrendingDown} color="red" title="CTR Opportunities" count={insights.ctrOpps.length} desc="Page 1 but CTR under 3%" items={insights.ctrOpps.slice(0, 8).map(q => ({ label: q.query, value: `${q.ctr}% CTR`, sub: `#${q.position}` }))} />}
-                  {insights.highImpLowClick.length > 0 && <InsightCard icon={AlertTriangle} color="orange" title="Visibility Without Clicks" count={insights.highImpLowClick.length} desc="100+ impressions, under 5 clicks" items={insights.highImpLowClick.slice(0, 8).map(q => ({ label: q.query, value: `${q.clicks} clicks`, sub: `${q.impressions} imp` }))} />}
-                </div>
-              </div>
-            )}
           </>) : (
             <div className="text-center py-16">
               <Search className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
@@ -1146,12 +1209,13 @@ export function ClientDashboard({ workspaceId }: Props) {
 
             {/* ── Event Modules (Grouped) ── */}
             {(ga4Conversions.length > 0 || ga4Events.length > 0) && (() => {
+              const activeConversions = eventsPageData || sortedConversions;
               const groups = (ws.eventGroups || []).slice().sort((a, b) => a.order - b.order);
-              const getGroupEvents = (groupId: string) => sortedConversions.filter(c => {
+              const getGroupEvents = (groupId: string) => activeConversions.filter(c => {
                 const cfg = ws.eventConfig?.find(ec => ec.eventName === c.eventName);
                 return cfg?.group === groupId;
               });
-              const ungroupedEvents = sortedConversions.filter(c => {
+              const ungroupedEvents = activeConversions.filter(c => {
                 const cfg = ws.eventConfig?.find(ec => ec.eventName === c.eventName);
                 return !cfg?.group || !groups.find(g => g.id === cfg.group);
               });
@@ -1175,6 +1239,23 @@ export function ClientDashboard({ workspaceId }: Props) {
               };
               return (
                 <div className="space-y-6 mt-6">
+                  {/* Page filter for events */}
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Filter by page</span>
+                    <select
+                      value={eventsPageFilter}
+                      onChange={e => { setEventsPageFilter(e.target.value); fetchEventsForPage(e.target.value); }}
+                      className="flex-1 max-w-xs px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
+                    >
+                      <option value="">All Pages</option>
+                      {ga4Pages.map((p, i) => (
+                        <option key={i} value={p.path}>{p.path}</option>
+                      ))}
+                    </select>
+                    {eventsPageLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400" />}
+                    {eventsPageFilter && <button onClick={() => { setEventsPageFilter(''); setEventsPageData(null); }} className="text-[10px] text-zinc-500 hover:text-zinc-300">Clear</button>}
+                  </div>
+
                   {/* Render each group as a module */}
                   {groups.map(group => {
                     const groupEvents = getGroupEvents(group.id);
@@ -1198,9 +1279,14 @@ export function ClientDashboard({ workspaceId }: Props) {
                       <h3 className="text-sm font-semibold text-zinc-300 mb-1">{groups.length > 0 ? 'Other Events' : 'Key Events'}</h3>
                       <p className="text-[10px] text-zinc-600 mb-4">{groups.length > 0 ? 'Events not assigned to a group' : 'Custom and conversion events tracked on your site'}</p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {ungroupedEvents.slice(0, 9).map(renderEventCard)}
+                        {ungroupedEvents.slice(0, 12).map(renderEventCard)}
                       </div>
                     </div>
+                  )}
+
+                  {/* No events for this page */}
+                  {eventsPageFilter && activeConversions.length === 0 && !eventsPageLoading && (
+                    <div className="text-center py-8 text-xs text-zinc-600">No events found for {eventsPageFilter}</div>
                   )}
 
                   {/* Event Trend (shown when an event is selected) */}
@@ -1234,60 +1320,6 @@ export function ClientDashboard({ workspaceId }: Props) {
                         <span>Total: {ga4EventTrend.reduce((s, d) => s + d.eventCount, 0).toLocaleString()}</span>
                         <span>{ga4EventTrend[ga4EventTrend.length - 1]?.date}</span>
                       </div>
-                    </div>
-                  )}
-
-                  {/* Collapsible: All Tracked Events */}
-                  {ga4Events.length > 0 && (
-                    <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-                      <button onClick={() => setShowAllEvents(!showAllEvents)} className="w-full flex items-center justify-between px-5 py-3 hover:bg-zinc-800/30 transition-colors">
-                        <div className="flex items-center gap-2">
-                          <BarChart3 className="w-4 h-4 text-zinc-500" />
-                          <span className="text-sm font-medium text-zinc-400">All Tracked Events</span>
-                          <span className="text-[10px] text-zinc-600">{ga4Events.length} events</span>
-                        </div>
-                        {showAllEvents ? <ChevronUp className="w-4 h-4 text-zinc-500" /> : <ChevronDown className="w-4 h-4 text-zinc-500" />}
-                      </button>
-                      {showAllEvents && (
-                        <div className="px-5 pb-5">
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-left">
-                              <thead>
-                                <tr className="border-b border-zinc-800">
-                                  <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 pr-4">Event</th>
-                                  <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 pr-4 text-right">Count</th>
-                                  <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 text-right">Users</th>
-                                  <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 w-8" />
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {ga4Events.map((ev, i) => {
-                                  const maxCount = ga4Events[0]?.eventCount || 1;
-                                  const pct = (ev.eventCount / maxCount) * 100;
-                                  return (
-                                    <tr key={i} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                                      <td className="py-2 pr-4">
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-xs text-zinc-300">{eventDisplayName(ev.eventName)}</span>
-                                          {eventDisplayName(ev.eventName) !== ev.eventName.replace(/_/g, ' ') && <span className="text-[10px] text-zinc-600 font-mono ml-1">{ev.eventName}</span>}
-                                        </div>
-                                        <div className="h-1 rounded-full bg-zinc-800 mt-1 max-w-[200px]">
-                                          <div className="h-full rounded-full bg-teal-500/40" style={{ width: `${pct}%` }} />
-                                        </div>
-                                      </td>
-                                      <td className="py-2 pr-4 text-right text-xs text-zinc-200 tabular-nums font-medium">{ev.eventCount.toLocaleString()}</td>
-                                      <td className="py-2 text-right text-xs text-zinc-500 tabular-nums">{ev.users.toLocaleString()}</td>
-                                      <td className="py-2 text-right">
-                                        <button onClick={() => loadEventTrend(ev.eventName)} className="text-[10px] text-teal-400 hover:text-teal-300" title="View trend">↗</button>
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>

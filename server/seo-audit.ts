@@ -304,12 +304,6 @@ function auditPage(
       issues.push({ check: 'img-alt', severity: 'warning', message: `${noAlt.length} image${noAlt.length > 1 ? 's' : ''} missing alt text`, recommendation: 'Add descriptive alt text to all meaningful images for accessibility and SEO.' });
     }
 
-    // Canonical tag
-    const canonical = html.match(/<link[^>]*rel=["']canonical["'][^>]*href=["']([^"']*)["']/i);
-    if (!canonical) {
-      issues.push({ check: 'canonical', severity: 'warning', message: 'Missing canonical tag', recommendation: 'Add a canonical tag to prevent duplicate content issues.' });
-    }
-
     // Viewport meta
     const viewport = html.match(/<meta[^>]*name=["']viewport["']/i);
     if (!viewport) {
@@ -410,14 +404,7 @@ function auditPage(
       }
     }
 
-    // 6. Image dimensions (CLS prevention)
-    // Only flag when a significant portion lack dimensions; Webflow often handles sizing via CSS
-    const noDimensions = imgs.filter(i => !i.hasWidth || !i.hasHeight);
-    if (noDimensions.length > 3 && noDimensions.length > imgs.length * 0.5) {
-      issues.push({ check: 'img-dimensions', severity: 'info', message: `${noDimensions.length} of ${imgs.length} images missing width/height attributes`, recommendation: 'Consider adding explicit width and height on images to help prevent Cumulative Layout Shift (CLS). If CSS handles sizing, this may not apply.' });
-    }
-
-    // 7. Inline CSS size
+    // 6. Inline CSS size
     const inlineCSSSize = extractStyleBlocks(html);
     if (inlineCSSSize > 15000) {
       issues.push({ check: 'inline-css', severity: 'warning', message: `Large inline CSS (${Math.round(inlineCSSSize / 1024)}KB)`, recommendation: 'Move large CSS blocks to external stylesheets for better caching and reduced HTML size.' });

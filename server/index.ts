@@ -2705,10 +2705,17 @@ app.post('/api/public/approvals/:workspaceId/:batchId/apply', async (req, res) =
   for (const item of approved) {
     try {
       const value = item.clientValue || item.proposedValue;
-      const fields = item.field === 'seoTitle'
-        ? { seo: { title: value } }
-        : { seo: { description: value } };
-      await updatePageSeo(item.pageId, fields, token);
+      if (item.collectionId) {
+        // CMS item — update via collection API
+        const result = await updateCollectionItem(item.collectionId, item.pageId, { [item.field]: value }, token);
+        if (!result.success) throw new Error(result.error || 'CMS update failed');
+      } else {
+        // Static page — update via page SEO API
+        const fields = item.field === 'seoTitle'
+          ? { seo: { title: value } }
+          : { seo: { description: value } };
+        await updatePageSeo(item.pageId, fields, token);
+      }
       appliedIds.push(item.id);
       results.push({ itemId: item.id, pageId: item.pageId, success: true });
     } catch (err) {

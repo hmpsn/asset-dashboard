@@ -15,8 +15,6 @@ interface PageMeta {
 interface EditState {
   seoTitle: string;
   seoDescription: string;
-  ogTitle: string;
-  ogDescription: string;
   dirty: boolean;
 }
 
@@ -51,18 +49,9 @@ export function SeoEditor({ siteId, workspaceId }: Props) {
       setPages(data);
       const editMap: Record<string, EditState> = {};
       for (const p of data) {
-        // When OG fields are set to "copy from SEO" in Webflow, title/description
-        // may be empty but titleCopied/descriptionCopied will be true.
-        // Show the effective value so users see OG as populated.
-        const ogTitle = p.openGraph?.title
-          || (p.openGraph?.titleCopied ? (p.seo?.title || p.title || '') : '');
-        const ogDesc = p.openGraph?.description
-          || (p.openGraph?.descriptionCopied ? (p.seo?.description || '') : '');
         editMap[p.id] = {
           seoTitle: p.seo?.title || '',
           seoDescription: p.seo?.description || '',
-          ogTitle,
-          ogDescription: ogDesc,
           dirty: false,
         };
       }
@@ -98,7 +87,7 @@ export function SeoEditor({ siteId, workspaceId }: Props) {
         body: JSON.stringify({
           siteId,
           seo: { title: edit.seoTitle, description: edit.seoDescription },
-          openGraph: { title: edit.ogTitle, description: edit.ogDescription },
+          openGraph: { title: edit.seoTitle, description: edit.seoDescription },
         }),
       });
       const data = await res.json();
@@ -475,30 +464,6 @@ export function SeoEditor({ siteId, workspaceId }: Props) {
                       value={edit.seoDescription}
                       onChange={e => updateField(page.id, 'seoDescription', e.target.value)}
                       placeholder="Enter meta description..."
-                      rows={2}
-                      className="w-full px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-sm focus:outline-none focus:border-zinc-500 resize-none"
-                    />
-                  </div>
-
-                  {/* OG Title */}
-                  <div>
-                    <label className="text-xs font-medium text-zinc-400 mb-1 block">OG Title</label>
-                    <input
-                      type="text"
-                      value={edit.ogTitle}
-                      onChange={e => updateField(page.id, 'ogTitle', e.target.value)}
-                      placeholder="Open Graph title (for social sharing)..."
-                      className="w-full px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-sm focus:outline-none focus:border-zinc-500"
-                    />
-                  </div>
-
-                  {/* OG Description */}
-                  <div>
-                    <label className="text-xs font-medium text-zinc-400 mb-1 block">OG Description</label>
-                    <textarea
-                      value={edit.ogDescription}
-                      onChange={e => updateField(page.id, 'ogDescription', e.target.value)}
-                      placeholder="Open Graph description (for social sharing)..."
                       rows={2}
                       className="w-full px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-sm focus:outline-none focus:border-zinc-500 resize-none"
                     />

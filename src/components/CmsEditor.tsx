@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Loader2, Save, ChevronDown, ChevronRight, Check, AlertCircle,
-  Search, Sparkles, Wand2, Upload,
+  Search, Sparkles, Wand2, Upload, Send,
 } from 'lucide-react';
 
 interface SeoField {
@@ -44,6 +44,9 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
   const [published, setPublished] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
+  const [approvalSelected, setApprovalSelected] = useState<Set<string>>(new Set());
+  const [sendingApproval, setSendingApproval] = useState(false);
+  const [approvalSent, setApprovalSent] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -157,6 +160,66 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
     }
   };
 
+  const toggleApprovalItem = (itemId: string) => {
+    setApprovalSelected(prev => {
+      const n = new Set(prev);
+      if (n.has(itemId)) n.delete(itemId); else n.add(itemId);
+      return n;
+    });
+  };
+
+  const sendForApproval = async () => {
+    if (!workspaceId || approvalSelected.size === 0) return;
+    setSendingApproval(true);
+    try {
+      const items: Array<{ pageId: string; pageTitle: string; pageSlug: string; field: string; collectionId: string; currentValue: string; proposedValue: string }> = [];
+      for (const itemId of approvalSelected) {
+        const edit = edits[itemId];
+        if (!edit) continue;
+        // Find the collection and original item
+        let coll: CmsCollection | undefined;
+        let origItem: CmsItem | undefined;
+        for (const c of collections) {
+          const found = c.items.find(i => i.id === itemId);
+          if (found) { coll = c; origItem = found; break; }
+        }
+        if (!coll || !origItem) continue;
+        const itemName = String(origItem.fieldData['name'] || '');
+        const itemSlug = String(origItem.fieldData['slug'] || '');
+        // Check each editable field for changes
+        for (const sf of coll.seoFields) {
+          const original = String(origItem.fieldData[sf.slug] || '');
+          const proposed = edit[sf.slug] || '';
+          if (proposed !== original) {
+            items.push({
+              pageId: itemId, pageTitle: itemName, pageSlug: itemSlug,
+              field: sf.slug, collectionId: coll.collectionId,
+              currentValue: original, proposedValue: proposed,
+            });
+          }
+        }
+      }
+      if (items.length === 0) {
+        alert('No changes detected on selected items. Edit fields first.');
+        setSendingApproval(false);
+        return;
+      }
+      await fetch(`/api/approvals/${workspaceId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ siteId, name: `CMS SEO Changes — ${new Date().toLocaleDateString()}`, items }),
+      });
+      setApprovalSent(true);
+      setApprovalSelected(new Set());
+      setTimeout(() => setApprovalSent(false), 4000);
+    } catch (err) {
+      console.error('Failed to send for approval:', err);
+      alert('Failed to send for approval');
+    } finally {
+      setSendingApproval(false);
+    }
+  };
+
   const toggleCollection = (id: string) => {
     setExpandedCollections(prev => {
       const n = new Set(prev);
@@ -214,6 +277,18 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
             <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
               {savedCount} saved (draft)
             </span>
+          )}
+          {workspaceId && (
+            <button
+              onClick={sendForApproval}
+              disabled={sendingApproval || approvalSelected.size === 0}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                approvalSent ? 'bg-green-600 text-white' : 'bg-violet-600/80 hover:bg-violet-500 disabled:opacity-40 text-white'
+              }`}
+            >
+              {sendingApproval ? <Loader2 className="w-3 h-3 animate-spin" /> : approvalSent ? <Check className="w-3 h-3" /> : <Send className="w-3 h-3" />}
+              {approvalSent ? 'Sent!' : sendingApproval ? 'Sending...' : `Send for Approval (${approvalSelected.size})`}
+            </button>
           )}
         </div>
       </div>
@@ -300,6 +375,15 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                         className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-zinc-800/20 transition-colors"
                       >
                         <div className="flex items-center gap-2 min-w-0">
+                          {workspaceId && (
+                            <input
+                              type="checkbox"
+                              checked={approvalSelected.has(item.id)}
+                              onChange={e => { e.stopPropagation(); toggleApprovalItem(item.id); }}
+                              onClick={e => e.stopPropagation()}
+                              className="w-3.5 h-3.5 rounded border-zinc-600 text-violet-500 focus:ring-violet-500 bg-zinc-800 flex-shrink-0 cursor-pointer"
+                            />
+                          )}
                           {isItemExpanded ? <ChevronDown className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" />}
                           <span className="text-xs text-zinc-300 truncate">{itemName || '(untitled)'}</span>
                           <span className="text-[10px] text-zinc-600 font-mono flex-shrink-0">/{itemSlug}</span>

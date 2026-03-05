@@ -15,7 +15,8 @@ export interface ApprovalItem {
   pageId: string;
   pageTitle: string;
   pageSlug: string;
-  field: 'seoTitle' | 'seoDescription';
+  field: string;              // 'seoTitle' | 'seoDescription' for pages, or CMS field slug
+  collectionId?: string;      // present for CMS items
   currentValue: string;
   proposedValue: string;
   clientValue?: string;       // client's edited version (if they modify it)
