@@ -641,7 +641,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit' }: Props) {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        alert(`Failed to save report: ${err.error || res.statusText}`);
+        alert(`Failed to save report (${res.status}): ${err.error || res.statusText}`);
         setSaving(false);
         return;
       }
