@@ -709,11 +709,11 @@ export function ClientDashboard({ workspaceId }: Props) {
 
   const NAV = [
     { id: 'overview' as ClientTab, label: 'Overview', icon: LayoutDashboard },
-    { id: 'search' as ClientTab, label: 'Search', icon: Search },
     { id: 'health' as ClientTab, label: 'Site Health', icon: Shield },
     { id: 'analytics' as ClientTab, label: 'Analytics', icon: LineChart },
-    ...(approvalBatches.length > 0 ? [{ id: 'approvals' as ClientTab, label: 'Approvals', icon: ClipboardCheck }] : []),
+    { id: 'search' as ClientTab, label: 'Search', icon: Search },
     { id: 'requests' as ClientTab, label: 'Requests', icon: MessageSquare },
+    ...(approvalBatches.length > 0 ? [{ id: 'approvals' as ClientTab, label: 'Approvals', icon: ClipboardCheck }] : []),
   ];
 
   return (
@@ -1561,7 +1561,6 @@ export function ClientDashboard({ workspaceId }: Props) {
             </div>
           </>)}
         </>)}
-      </main>
 
       {/* Floating AI Chat */}
       {(overview || audit || ga4Overview) && (<>
@@ -2003,6 +2002,8 @@ export function ClientDashboard({ workspaceId }: Props) {
             )}
           </div>
         </>)}
+
+      </main>
 
       {/* Powered by footer */}
       <footer className="border-t border-zinc-800/50 mt-12">
