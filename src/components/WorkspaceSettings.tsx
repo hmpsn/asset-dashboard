@@ -6,7 +6,7 @@ import {
   Pin, PinOff, Pencil, Save, RefreshCw, Plus, Trash2, ArrowUp, ArrowDown, Palette,
 } from 'lucide-react';
 
-interface EventGroup { id: string; name: string; order: number; color: string; }
+interface EventGroup { id: string; name: string; order: number; color: string; defaultPageFilter?: string; allowedPages?: string[]; }
 interface EventDisplayConfig { eventName: string; displayName: string; pinned: boolean; group?: string; }
 interface GscSite { siteUrl: string; permissionLevel: string; }
 interface GA4Property { name: string; displayName: string; propertyId: string; }
@@ -428,13 +428,35 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                           <span className="text-[10px] text-zinc-600 ml-auto">{localGroups.length} groups</span>
                         </div>
                         {localGroups.sort((a, b) => a.order - b.order).map((g, idx) => (
-                          <div key={g.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 mb-1">
-                            <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: g.color }} />
-                            <span className="text-xs flex-1" style={{ color: 'var(--brand-text)' }}>{g.name}</span>
-                            <span className="text-[10px] text-zinc-600">{localEventConfig.filter(c => c.group === g.id).length} events</span>
-                            <button onClick={() => moveGroup(g.id, -1)} disabled={idx === 0} className="p-0.5 text-zinc-600 hover:text-zinc-400 disabled:opacity-30"><ArrowUp className="w-3 h-3" /></button>
-                            <button onClick={() => moveGroup(g.id, 1)} disabled={idx === localGroups.length - 1} className="p-0.5 text-zinc-600 hover:text-zinc-400 disabled:opacity-30"><ArrowDown className="w-3 h-3" /></button>
-                            <button onClick={() => removeGroup(g.id)} className="p-0.5 text-red-400/50 hover:text-red-400"><Trash2 className="w-3 h-3" /></button>
+                          <div key={g.id} className="rounded-lg hover:bg-white/5 mb-1">
+                            <div className="flex items-center gap-2 px-2 py-1.5">
+                              <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: g.color }} />
+                              <span className="text-xs flex-1" style={{ color: 'var(--brand-text)' }}>{g.name}</span>
+                              <span className="text-[10px] text-zinc-600">{localEventConfig.filter(c => c.group === g.id).length} events</span>
+                              <button onClick={() => moveGroup(g.id, -1)} disabled={idx === 0} className="p-0.5 text-zinc-600 hover:text-zinc-400 disabled:opacity-30"><ArrowUp className="w-3 h-3" /></button>
+                              <button onClick={() => moveGroup(g.id, 1)} disabled={idx === localGroups.length - 1} className="p-0.5 text-zinc-600 hover:text-zinc-400 disabled:opacity-30"><ArrowDown className="w-3 h-3" /></button>
+                              <button onClick={() => removeGroup(g.id)} className="p-0.5 text-red-400/50 hover:text-red-400"><Trash2 className="w-3 h-3" /></button>
+                            </div>
+                            <div className="px-2 pb-2 flex flex-wrap items-center gap-2">
+                              <div className="flex items-center gap-1.5">
+                                <label className="text-[10px] text-zinc-600 whitespace-nowrap">Default page:</label>
+                                <input
+                                  value={g.defaultPageFilter || ''}
+                                  onChange={e => setLocalGroups(prev => prev.map(gr => gr.id === g.id ? { ...gr, defaultPageFilter: e.target.value || undefined } : gr))}
+                                  placeholder="/contact"
+                                  className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 w-28 focus:outline-none focus:border-teal-500 placeholder:text-zinc-600"
+                                />
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <label className="text-[10px] text-zinc-600 whitespace-nowrap">Allowed pages:</label>
+                                <input
+                                  value={(g.allowedPages || []).join(', ')}
+                                  onChange={e => setLocalGroups(prev => prev.map(gr => gr.id === g.id ? { ...gr, allowedPages: e.target.value ? e.target.value.split(',').map(s => s.trim()).filter(Boolean) : undefined } : gr))}
+                                  placeholder="/page1, /page2"
+                                  className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 w-40 focus:outline-none focus:border-teal-500 placeholder:text-zinc-600"
+                                />
+                              </div>
+                            </div>
                           </div>
                         ))}
                         <div className="flex items-center gap-2 mt-2">

@@ -16,6 +16,8 @@ export interface EventGroup {
   name: string;
   order: number;
   color: string;
+  defaultPageFilter?: string;
+  allowedPages?: string[];
 }
 
 export interface EventDisplayConfig {

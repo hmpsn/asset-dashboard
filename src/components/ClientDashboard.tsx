@@ -15,7 +15,7 @@ interface SearchOverview {
   dateRange: { start: string; end: string };
 }
 interface PerformanceTrend { date: string; clicks: number; impressions: number; ctr: number; position: number; }
-interface EventGroup { id: string; name: string; order: number; color: string; }
+interface EventGroup { id: string; name: string; order: number; color: string; defaultPageFilter?: string; allowedPages?: string[]; }
 interface EventDisplayConfig { eventName: string; displayName: string; pinned: boolean; group?: string; }
 interface WorkspaceInfo { id: string; name: string; webflowSiteId?: string; webflowSiteName?: string; gscPropertyUrl?: string; ga4PropertyId?: string; liveDomain?: string; eventConfig?: EventDisplayConfig[]; eventGroups?: EventGroup[]; requiresPassword?: boolean; }
 interface AuditSummary { id: string; createdAt: string; siteScore: number; totalPages: number; errors: number; warnings: number; previousScore?: number; }
@@ -234,9 +234,9 @@ export function ClientDashboard({ workspaceId }: Props) {
   const [explorerPage, setExplorerPage] = useState('');
   const [explorerLoading, setExplorerLoading] = useState(false);
   const [showExplorer, setShowExplorer] = useState(false);
-  const [eventsPageFilter, setEventsPageFilter] = useState('');
-  const [eventsPageData, setEventsPageData] = useState<GA4ConversionSummary[] | null>(null);
-  const [eventsPageLoading, setEventsPageLoading] = useState(false);
+  const [modulePageFilters, setModulePageFilters] = useState<Record<string, string>>({});
+  const [modulePageData, setModulePageData] = useState<Record<string, GA4ConversionSummary[]>>({});
+  const [modulePageLoading, setModulePageLoading] = useState<Record<string, boolean>>({});
   const [authenticated, setAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [authError, setAuthError] = useState('');
@@ -272,6 +272,22 @@ export function ClientDashboard({ workspaceId }: Props) {
       })
       .catch(() => { setError('Failed to load dashboard'); setLoading(false); });
   }, [workspaceId]);
+
+  // Initialize per-module page filters from group defaults
+  useEffect(() => {
+    if (!ws || ga4Pages.length === 0) return;
+    const groups = ws.eventGroups || [];
+    const defaults: Record<string, string> = {};
+    for (const g of groups) {
+      if (g.defaultPageFilter) defaults[g.id] = g.defaultPageFilter;
+    }
+    if (Object.keys(defaults).length > 0) {
+      setModulePageFilters(prev => ({ ...defaults, ...prev }));
+      for (const [moduleId, pagePath] of Object.entries(defaults)) {
+        if (!modulePageData[moduleId]) fetchEventsForModule(moduleId, pagePath);
+      }
+    }
+  }, [ws?.eventGroups, ga4Pages.length]);
 
   const loadApprovals = async (wsId: string) => {
     setApprovalsLoading(true);
@@ -332,16 +348,18 @@ export function ClientDashboard({ workspaceId }: Props) {
     return bp - ap;
   });
 
-  const fetchEventsForPage = async (pagePath: string) => {
+  const fetchEventsForModule = async (moduleId: string, pagePath: string) => {
     if (!ws) return;
-    if (!pagePath) { setEventsPageData(null); return; }
-    setEventsPageLoading(true);
+    if (!pagePath) {
+      setModulePageData(prev => { const n = { ...prev }; delete n[moduleId]; return n; });
+      return;
+    }
+    setModulePageLoading(prev => ({ ...prev, [moduleId]: true }));
     try {
       const params = new URLSearchParams({ days: String(days), page: pagePath });
       const res = await fetch(`/api/public/analytics-event-explorer/${ws.id}?${params}`);
       const data = await res.json();
       if (Array.isArray(data)) {
-        // Aggregate by event name into conversion-like format
         const byEvent: Record<string, { conversions: number; users: number }> = {};
         for (const row of data) {
           if (!byEvent[row.eventName]) byEvent[row.eventName] = { conversions: 0, users: 0 };
@@ -349,13 +367,19 @@ export function ClientDashboard({ workspaceId }: Props) {
           byEvent[row.eventName].users += row.users;
         }
         const totalUsers = Object.values(byEvent).reduce((s, v) => s + v.users, 0) || 1;
-        setEventsPageData(Object.entries(byEvent).map(([eventName, v]) => ({
-          eventName, conversions: v.conversions, users: v.users,
-          rate: Math.round((v.conversions / totalUsers) * 100 * 10) / 10,
-        })).sort((a, b) => b.conversions - a.conversions));
+        setModulePageData(prev => ({
+          ...prev,
+          [moduleId]: Object.entries(byEvent).map(([eventName, v]) => ({
+            eventName, conversions: v.conversions, users: v.users,
+            rate: Math.round((v.conversions / totalUsers) * 100 * 10) / 10,
+          })).sort((a, b) => b.conversions - a.conversions),
+        }));
       }
-    } catch { setEventsPageData(null); }
-    finally { setEventsPageLoading(false); }
+    } catch {
+      setModulePageData(prev => { const n = { ...prev }; delete n[moduleId]; return n; });
+    } finally {
+      setModulePageLoading(prev => ({ ...prev, [moduleId]: false }));
+    }
   };
 
   const runExplorer = async (event?: string, page?: string) => {
@@ -1090,31 +1114,76 @@ export function ClientDashboard({ workspaceId }: Props) {
               ))}
             </div>
 
-            {/* Traffic Trend Chart */}
+            {/* Traffic Trend + Devices row */}
             {ga4Trend.length > 0 && (
-              <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5 mb-6">
-                <h3 className="text-sm font-semibold text-zinc-300 mb-4">Traffic Trend</h3>
-                <svg viewBox={`0 0 800 200`} className="w-full h-48">
-                  {(() => {
-                    const maxV = Math.max(...ga4Trend.map(d => d.users), 1);
-                    const maxS = Math.max(...ga4Trend.map(d => d.sessions), 1);
-                    const maxP = Math.max(...ga4Trend.map(d => d.pageviews), 1);
-                    const xStep = 800 / Math.max(ga4Trend.length - 1, 1);
-                    const mkPath = (vals: number[], max: number) => vals.map((v, i) => `${i === 0 ? 'M' : 'L'}${i * xStep},${190 - (v / max) * 170}`).join(' ');
-                    return (<>
-                      <path d={mkPath(ga4Trend.map(d => d.pageviews), maxP)} fill="none" stroke="rgba(45,212,191,0.3)" strokeWidth="1.5" />
-                      <path d={mkPath(ga4Trend.map(d => d.sessions), maxS)} fill="none" stroke="rgba(96,165,250,0.5)" strokeWidth="1.5" />
-                      <path d={mkPath(ga4Trend.map(d => d.users), maxV)} fill="none" stroke="rgba(45,212,191,0.9)" strokeWidth="2" />
-                      <path d={`${mkPath(ga4Trend.map(d => d.users), maxV)} L${(ga4Trend.length - 1) * xStep},190 L0,190 Z`} fill="url(#ga4grad)" opacity="0.15" />
-                      <defs><linearGradient id="ga4grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2dd4bf" /><stop offset="100%" stopColor="transparent" /></linearGradient></defs>
-                    </>);
-                  })()}
-                </svg>
-                <div className="flex items-center justify-center gap-6 mt-2">
-                  <span className="flex items-center gap-1.5 text-[10px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-teal-400 inline-block" /> Users</span>
-                  <span className="flex items-center gap-1.5 text-[10px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-blue-400 inline-block" /> Sessions</span>
-                  <span className="flex items-center gap-1.5 text-[10px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-teal-400/40 inline-block" /> Pageviews</span>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                {/* Traffic Trend (2/3) */}
+                <div className="lg:col-span-2 bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+                  <h3 className="text-sm font-semibold text-zinc-300 mb-4">Traffic Trend</h3>
+                  <svg viewBox={`0 0 800 200`} className="w-full h-48">
+                    {(() => {
+                      const maxV = Math.max(...ga4Trend.map(d => d.users), 1);
+                      const maxS = Math.max(...ga4Trend.map(d => d.sessions), 1);
+                      const maxP = Math.max(...ga4Trend.map(d => d.pageviews), 1);
+                      const xStep = 800 / Math.max(ga4Trend.length - 1, 1);
+                      const mkPath = (vals: number[], max: number) => vals.map((v, i) => `${i === 0 ? 'M' : 'L'}${i * xStep},${190 - (v / max) * 170}`).join(' ');
+                      return (<>
+                        <path d={mkPath(ga4Trend.map(d => d.pageviews), maxP)} fill="none" stroke="rgba(45,212,191,0.3)" strokeWidth="1.5" />
+                        <path d={mkPath(ga4Trend.map(d => d.sessions), maxS)} fill="none" stroke="rgba(96,165,250,0.5)" strokeWidth="1.5" />
+                        <path d={mkPath(ga4Trend.map(d => d.users), maxV)} fill="none" stroke="rgba(45,212,191,0.9)" strokeWidth="2" />
+                        <path d={`${mkPath(ga4Trend.map(d => d.users), maxV)} L${(ga4Trend.length - 1) * xStep},190 L0,190 Z`} fill="url(#ga4grad)" opacity="0.15" />
+                        <defs><linearGradient id="ga4grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2dd4bf" /><stop offset="100%" stopColor="transparent" /></linearGradient></defs>
+                      </>);
+                    })()}
+                  </svg>
+                  <div className="flex items-center justify-center gap-6 mt-2">
+                    <span className="flex items-center gap-1.5 text-[10px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-teal-400 inline-block" /> Users</span>
+                    <span className="flex items-center gap-1.5 text-[10px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-blue-400 inline-block" /> Sessions</span>
+                    <span className="flex items-center gap-1.5 text-[10px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-teal-400/40 inline-block" /> Pageviews</span>
+                  </div>
                 </div>
+
+                {/* Devices Pie Chart (1/3) */}
+                {ga4Devices.length > 0 && (
+                  <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5 flex flex-col">
+                    <h3 className="text-sm font-semibold text-zinc-300 mb-4">Devices</h3>
+                    <div className="flex-1 flex flex-col items-center justify-center">
+                      {(() => {
+                        const PIE_COLORS = ['#14b8a6', '#60a5fa', '#34d399', '#fbbf24'];
+                        const total = ga4Devices.reduce((s, d) => s + d.sessions, 0) || 1;
+                        let cumAngle = -90;
+                        const slices = ga4Devices.map((d, i) => {
+                          const pct = d.sessions / total;
+                          const angle = pct * 360;
+                          const startAngle = cumAngle;
+                          cumAngle += angle;
+                          const r = 60, cx = 70, cy = 70;
+                          const startRad = (startAngle * Math.PI) / 180;
+                          const endRad = ((startAngle + angle) * Math.PI) / 180;
+                          const x1 = cx + r * Math.cos(startRad), y1 = cy + r * Math.sin(startRad);
+                          const x2 = cx + r * Math.cos(endRad), y2 = cy + r * Math.sin(endRad);
+                          const largeArc = angle > 180 ? 1 : 0;
+                          const path = `M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${largeArc} 1 ${x2},${y2} Z`;
+                          return <path key={i} d={path} fill={PIE_COLORS[i % PIE_COLORS.length]} opacity="0.85" />;
+                        });
+                        return (
+                          <>
+                            <svg viewBox="0 0 140 140" className="w-32 h-32">{slices}</svg>
+                            <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 mt-3">
+                              {ga4Devices.map((d, i) => (
+                                <span key={i} className="flex items-center gap-1.5 text-[10px] text-zinc-400">
+                                  <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                                  <span className="capitalize">{d.device}</span>
+                                  <span className="text-zinc-600">{d.percentage}%</span>
+                                </span>
+                              ))}
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1156,69 +1225,22 @@ export function ClientDashboard({ workspaceId }: Props) {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Device Breakdown */}
-              {ga4Devices.length > 0 && (
-                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
-                  <h3 className="text-sm font-semibold text-zinc-300 mb-4">Devices</h3>
-                  <div className="flex items-center gap-6">
-                    {/* Donut-like bars */}
-                    <div className="flex-1 space-y-3">
-                      {ga4Devices.map((d, i) => {
-                        const colors = ['bg-teal-500', 'bg-blue-500', 'bg-emerald-500', 'bg-amber-500'];
-                        const textColors = ['text-teal-400', 'text-blue-400', 'text-teal-400', 'text-amber-400'];
-                        return (
-                          <div key={i}>
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-xs text-zinc-300 capitalize">{d.device}</span>
-                              <span className={`text-xs font-medium ${textColors[i % textColors.length]}`}>{d.percentage}%</span>
-                            </div>
-                            <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
-                              <div className={`h-full rounded-full ${colors[i % colors.length]}`} style={{ width: `${d.percentage}%` }} />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Top Countries */}
-              {ga4Countries.length > 0 && (
-                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
-                  <h3 className="text-sm font-semibold text-zinc-300 mb-3">Top Countries</h3>
-                  <div className="space-y-1">
-                    {ga4Countries.slice(0, 10).map((c, i) => {
-                      const maxUsers = ga4Countries[0]?.users || 1;
-                      return (
-                        <div key={i} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-zinc-800/50">
-                          <span className="text-[10px] text-zinc-600 w-5 text-right">{i + 1}</span>
-                          <span className="text-xs text-zinc-300 flex-1">{c.country}</span>
-                          <div className="w-20 h-1.5 rounded-full bg-zinc-800 overflow-hidden">
-                            <div className="h-full rounded-full bg-emerald-500" style={{ width: `${(c.users / maxUsers) * 100}%` }} />
-                          </div>
-                          <span className="text-xs text-emerald-400 font-medium tabular-nums w-12 text-right">{c.users.toLocaleString()}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-
             {/* ── Event Modules (Grouped) ── */}
             {(ga4Conversions.length > 0 || ga4Events.length > 0) && (() => {
-              const activeConversions = eventsPageData || sortedConversions;
               const groups = (ws.eventGroups || []).slice().sort((a, b) => a.order - b.order);
-              const getGroupEvents = (groupId: string) => activeConversions.filter(c => {
-                const cfg = ws.eventConfig?.find(ec => ec.eventName === c.eventName);
-                return cfg?.group === groupId;
-              });
-              const ungroupedEvents = activeConversions.filter(c => {
-                const cfg = ws.eventConfig?.find(ec => ec.eventName === c.eventName);
-                return !cfg?.group || !groups.find(g => g.id === cfg.group);
-              });
+              const getEventsForModule = (moduleId: string) => {
+                const source = modulePageData[moduleId] || sortedConversions;
+                if (moduleId === '__ungrouped__') {
+                  return source.filter((c: GA4ConversionSummary) => {
+                    const cfg = ws.eventConfig?.find(ec => ec.eventName === c.eventName);
+                    return !cfg?.group || !groups.find(g => g.id === cfg.group);
+                  });
+                }
+                return source.filter((c: GA4ConversionSummary) => {
+                  const cfg = ws.eventConfig?.find(ec => ec.eventName === c.eventName);
+                  return cfg?.group === moduleId;
+                });
+              };
               const renderEventCard = (c: GA4ConversionSummary, i: number) => {
                 const isSelected = ga4SelectedEvent === c.eventName;
                 const pinned = isEventPinned(c.eventName);
@@ -1237,56 +1259,74 @@ export function ClientDashboard({ workspaceId }: Props) {
                   </button>
                 );
               };
-              return (
-                <div className="space-y-6 mt-6">
-                  {/* Page filter for events */}
-                  <div className="flex items-center gap-3">
-                    <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Filter by page</span>
+              const renderPageFilter = (moduleId: string, allowedPages?: string[]) => {
+                const pages = allowedPages && allowedPages.length > 0
+                  ? ga4Pages.filter(p => allowedPages.some(ap => p.path.includes(ap)))
+                  : ga4Pages;
+                return (
+                  <div className="flex items-center gap-2 mb-4">
                     <select
-                      value={eventsPageFilter}
-                      onChange={e => { setEventsPageFilter(e.target.value); fetchEventsForPage(e.target.value); }}
-                      className="flex-1 max-w-xs px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
+                      value={modulePageFilters[moduleId] || ''}
+                      onChange={e => {
+                        setModulePageFilters(prev => ({ ...prev, [moduleId]: e.target.value }));
+                        fetchEventsForModule(moduleId, e.target.value);
+                      }}
+                      className="px-2 py-1 bg-zinc-800/60 border border-zinc-700/50 rounded-lg text-[11px] text-zinc-300 focus:outline-none focus:border-teal-500 max-w-[220px]"
                     >
                       <option value="">All Pages</option>
-                      {ga4Pages.map((p, i) => (
+                      {pages.map((p, i) => (
                         <option key={i} value={p.path}>{p.path}</option>
                       ))}
                     </select>
-                    {eventsPageLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400" />}
-                    {eventsPageFilter && <button onClick={() => { setEventsPageFilter(''); setEventsPageData(null); }} className="text-[10px] text-zinc-500 hover:text-zinc-300">Clear</button>}
+                    {modulePageLoading[moduleId] && <Loader2 className="w-3 h-3 animate-spin text-teal-400" />}
+                    {modulePageFilters[moduleId] && (
+                      <button onClick={() => {
+                        setModulePageFilters(prev => { const n = { ...prev }; delete n[moduleId]; return n; });
+                        setModulePageData(prev => { const n = { ...prev }; delete n[moduleId]; return n; });
+                      }} className="text-[10px] text-zinc-500 hover:text-zinc-300">Clear</button>
+                    )}
                   </div>
-
+                );
+              };
+              const ungroupedEvents = getEventsForModule('__ungrouped__');
+              return (
+                <div className="space-y-6 mt-6">
                   {/* Render each group as a module */}
                   {groups.map(group => {
-                    const groupEvents = getGroupEvents(group.id);
-                    if (groupEvents.length === 0) return null;
+                    const groupEvents = getEventsForModule(group.id);
+                    const noResults = modulePageFilters[group.id] && groupEvents.length === 0 && !modulePageLoading[group.id];
                     return (
                       <div key={group.id} className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
-                        <div className="flex items-center gap-2 mb-4">
+                        <div className="flex items-center gap-2 mb-2">
                           <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: group.color }} />
                           <h3 className="text-sm font-semibold text-zinc-300">{group.name}</h3>
                           <span className="text-[10px] text-zinc-600 ml-auto">{groupEvents.length} events</span>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {groupEvents.map(renderEventCard)}
-                        </div>
+                        {renderPageFilter(group.id, group.allowedPages)}
+                        {noResults ? (
+                          <div className="text-center py-4 text-[11px] text-zinc-600">No events found for this page</div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {groupEvents.map(renderEventCard)}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                   {/* Ungrouped events */}
-                  {ungroupedEvents.length > 0 && (
+                  {(ungroupedEvents.length > 0 || modulePageFilters['__ungrouped__']) && (
                     <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
                       <h3 className="text-sm font-semibold text-zinc-300 mb-1">{groups.length > 0 ? 'Other Events' : 'Key Events'}</h3>
-                      <p className="text-[10px] text-zinc-600 mb-4">{groups.length > 0 ? 'Events not assigned to a group' : 'Custom and conversion events tracked on your site'}</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {ungroupedEvents.slice(0, 12).map(renderEventCard)}
-                      </div>
+                      <p className="text-[10px] text-zinc-600 mb-2">{groups.length > 0 ? 'Events not assigned to a group' : 'Custom and conversion events tracked on your site'}</p>
+                      {renderPageFilter('__ungrouped__')}
+                      {modulePageFilters['__ungrouped__'] && ungroupedEvents.length === 0 && !modulePageLoading['__ungrouped__'] ? (
+                        <div className="text-center py-4 text-[11px] text-zinc-600">No events found for this page</div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {ungroupedEvents.slice(0, 12).map(renderEventCard)}
+                        </div>
+                      )}
                     </div>
-                  )}
-
-                  {/* No events for this page */}
-                  {eventsPageFilter && activeConversions.length === 0 && !eventsPageLoading && (
-                    <div className="text-center py-8 text-xs text-zinc-600">No events found for {eventsPageFilter}</div>
                   )}
 
                   {/* Event Trend (shown when an event is selected) */}
