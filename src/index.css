@@ -69,3 +69,78 @@ input::placeholder, textarea::placeholder {
   background: rgba(46, 217, 195, 0.25);
   color: var(--brand-text-bright);
 }
+
+/* ─── Global Legibility: bump mid-grey text contrast ─── */
+.text-zinc-600 { color: #78788a !important; }
+.text-zinc-500 { color: #9898a8 !important; }
+
+/* ─── Client Dashboard Light Theme ─── */
+.dashboard-light {
+  background-color: #f8fafc !important;
+  color: #1e293b !important;
+}
+/* Backgrounds */
+.dashboard-light .bg-\[\#0f1219\] { background-color: #f8fafc !important; }
+.dashboard-light .bg-zinc-950 { background-color: #f8fafc !important; }
+.dashboard-light .bg-zinc-900 { background-color: #ffffff !important; }
+.dashboard-light .bg-zinc-800 { background-color: #f1f5f9 !important; }
+.dashboard-light .bg-zinc-800\/30 { background-color: rgba(241,245,249,0.5) !important; }
+.dashboard-light .bg-zinc-800\/50 { background-color: rgba(241,245,249,0.7) !important; }
+.dashboard-light .bg-zinc-800\/60 { background-color: rgba(241,245,249,0.8) !important; }
+.dashboard-light .bg-zinc-700 { background-color: #e2e8f0 !important; }
+/* Borders */
+.dashboard-light .border-zinc-800 { border-color: #e2e8f0 !important; }
+.dashboard-light .border-zinc-800\/50 { border-color: rgba(226,232,240,0.6) !important; }
+.dashboard-light .border-zinc-700 { border-color: #cbd5e1 !important; }
+.dashboard-light .border-zinc-700\/50 { border-color: rgba(203,213,225,0.5) !important; }
+.dashboard-light .border-zinc-600 { border-color: #94a3b8 !important; }
+/* Text */
+.dashboard-light .text-zinc-200 { color: #1e293b !important; }
+.dashboard-light .text-zinc-300 { color: #334155 !important; }
+.dashboard-light .text-zinc-400 { color: #475569 !important; }
+.dashboard-light .text-zinc-500 { color: #64748b !important; }
+.dashboard-light .text-zinc-600 { color: #94a3b8 !important; }
+/* Accent text adjustments for light bg */
+.dashboard-light .text-teal-400 { color: #0d9488 !important; }
+.dashboard-light .text-emerald-400 { color: #059669 !important; }
+.dashboard-light .text-blue-400 { color: #2563eb !important; }
+.dashboard-light .text-amber-400 { color: #d97706 !important; }
+.dashboard-light .text-red-400 { color: #dc2626 !important; }
+.dashboard-light .text-violet-400 { color: #7c3aed !important; }
+/* Accent backgrounds */
+.dashboard-light .bg-teal-500\/10 { background-color: rgba(20,184,166,0.08) !important; }
+.dashboard-light .bg-teal-500\/5 { background-color: rgba(20,184,166,0.04) !important; }
+.dashboard-light .bg-emerald-500\/10 { background-color: rgba(16,185,129,0.08) !important; }
+.dashboard-light .bg-blue-500\/5 { background-color: rgba(37,99,235,0.05) !important; }
+.dashboard-light .bg-amber-500\/10 { background-color: rgba(245,158,11,0.08) !important; }
+.dashboard-light .bg-red-500\/10 { background-color: rgba(239,68,68,0.08) !important; }
+/* Hover states */
+.dashboard-light .hover\:bg-zinc-800\/30:hover { background-color: rgba(241,245,249,0.6) !important; }
+.dashboard-light .hover\:bg-zinc-800\/50:hover { background-color: rgba(241,245,249,0.8) !important; }
+.dashboard-light .hover\:border-zinc-700:hover { border-color: #94a3b8 !important; }
+.dashboard-light .hover\:border-zinc-600:hover { border-color: #64748b !important; }
+.dashboard-light .hover\:text-zinc-300:hover { color: #1e293b !important; }
+.dashboard-light .hover\:text-zinc-200:hover { color: #0f172a !important; }
+/* Inputs & interactive */
+.dashboard-light input,
+.dashboard-light textarea,
+.dashboard-light select { color: #1e293b !important; }
+.dashboard-light input::placeholder,
+.dashboard-light textarea::placeholder { color: #94a3b8 !important; }
+.dashboard-light .placeholder-zinc-500::placeholder,
+.dashboard-light .placeholder\:text-zinc-600::placeholder { color: #94a3b8 !important; }
+/* Gradient overrides */
+.dashboard-light .bg-gradient-to-r.from-teal-600.to-emerald-600 {
+  background-image: linear-gradient(to right, #0d9488, #059669) !important;
+}
+/* Dividers */
+.dashboard-light .bg-zinc-800 { background-color: #e2e8f0 !important; }
+/* Scrollbar for light theme */
+.dashboard-light ::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.2); }
+.dashboard-light ::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.35); }
+/* SVG strokes stay as-is (teal/blue accent colors work on white) */
+/* Score ring / chart fill adjustments */
+.dashboard-light .text-white { color: #ffffff !important; }
+/* Shadow adjustments */
+.dashboard-light .shadow-2xl { box-shadow: 0 25px 50px -12px rgba(0,0,0,0.08) !important; }
+.dashboard-light .shadow-black\/40 { --tw-shadow-color: rgba(0,0,0,0.06) !important; }

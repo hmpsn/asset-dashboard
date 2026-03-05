@@ -5,6 +5,7 @@ import {
   Target, Zap, Shield, MessageSquare, X, ChevronDown, ChevronUp,
   CheckCircle2, Info, LayoutDashboard, LineChart, Lock,
   Users, Globe, Activity, Filter, ClipboardCheck, Check, Edit3,
+  Sun, Moon,
 } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 
@@ -201,6 +202,14 @@ function toLiveUrl(url: string, liveDomain?: string): string {
 }
 
 export function ClientDashboard({ workspaceId }: Props) {
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    try { return (localStorage.getItem('dashboard-theme') as 'dark' | 'light') || 'dark'; } catch { return 'dark'; }
+  });
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    try { localStorage.setItem('dashboard-theme', next); } catch { /* skip */ }
+  };
   const [ws, setWs] = useState<WorkspaceInfo | null>(null);
   const [overview, setOverview] = useState<SearchOverview | null>(null);
   const [trend, setTrend] = useState<PerformanceTrend[]>([]);
@@ -632,27 +641,33 @@ export function ClientDashboard({ workspaceId }: Props) {
   ];
 
   return (
-    <div className="min-h-screen bg-[#0f1219] text-zinc-200">
+    <div className={`min-h-screen bg-[#0f1219] text-zinc-200 ${theme === 'light' ? 'dashboard-light' : ''}`}>
       {/* Header */}
       <header className="border-b border-zinc-800">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <img src="/logo.svg" alt="hmpsn studio" className="h-8 opacity-80" />
+            <img src="/logo.svg" alt="hmpsn studio" className="h-8 opacity-80" style={theme === 'light' ? { filter: 'invert(1) brightness(0.3)' } : undefined} />
             <div className="w-px h-8 bg-zinc-800" />
             <div>
               <h1 className="text-lg font-semibold">{ws.name}</h1>
               <p className="text-xs text-zinc-500 mt-0.5">Performance Dashboard{(overview || audit || ga4Overview) && <span className="ml-2 text-zinc-600">· Updated {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}</p>
             </div>
           </div>
-          {(overview || ga4Overview) && (
-            <div className="flex items-center gap-1 bg-zinc-900 rounded-lg border border-zinc-800 p-0.5">
-              {[7, 28, 90].map(d => (
-                <button key={d} onClick={() => changeDays(d)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${days === d ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}
-                >{d}d</button>
-              ))}
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            <button onClick={toggleTheme} title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              className="p-2 rounded-lg border border-zinc-800 hover:border-zinc-700 transition-colors">
+              {theme === 'dark' ? <Sun className="w-4 h-4 text-zinc-400" /> : <Moon className="w-4 h-4 text-zinc-400" />}
+            </button>
+            {(overview || ga4Overview) && (
+              <div className="flex items-center gap-1 bg-zinc-900 rounded-lg border border-zinc-800 p-0.5">
+                {[7, 28, 90].map(d => (
+                  <button key={d} onClick={() => changeDays(d)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${days === d ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  >{d}d</button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
         <div className="max-w-6xl mx-auto px-6">
           <nav className="flex items-center gap-1 -mb-px overflow-x-auto scrollbar-none">
