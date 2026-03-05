@@ -16,6 +16,8 @@ import { LoginScreen } from './components/LoginScreen';
 import { useAuth } from './hooks/useAuth';
 import { useWebSocket } from './hooks/useWebSocket';
 import { ToastProvider } from './components/Toast';
+import { BackgroundTaskProvider } from './hooks/useBackgroundTasks';
+import { TaskPanel } from './components/TaskPanel';
 import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, FileSearch, Search,
   Pencil, ListChecks, Link2Off, CornerDownRight, Share2, Target, Code2, TrendingUp, Clock,
@@ -38,7 +40,7 @@ function App() {
   if (clientMatch) {
     return <ClientDashboard workspaceId={clientMatch[1]} />;
   }
-  return <ToastProvider><AdminApp /></ToastProvider>;
+  return <ToastProvider><BackgroundTaskProvider><AdminApp /></BackgroundTaskProvider></ToastProvider>;
 }
 
 function AdminApp() {
@@ -51,7 +53,7 @@ function AdminApp() {
     return <LoginScreen onLogin={auth.login} />;
   }
 
-  return <Dashboard />;
+  return <><Dashboard /><TaskPanel /></>;
 }
 
 function Dashboard() {

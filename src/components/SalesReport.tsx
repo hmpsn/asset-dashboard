@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { Globe, Search, ExternalLink, ChevronDown, ChevronRight, AlertTriangle, CheckCircle, Info, Zap, FileText } from 'lucide-react';
 
 interface SalesIssue {
@@ -73,6 +74,8 @@ function SeverityBadge({ severity }: { severity: string }) {
 }
 
 export function SalesReport() {
+  const { startJob, jobs } = useBackgroundTasks();
+  const salesJobId = useRef<string | null>(null);
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,10 +85,6 @@ export function SalesReport() {
   const [view, setView] = useState<'input' | 'report'>('input');
   const [progress, setProgress] = useState('');
 
-  useEffect(() => {
-    loadHistory();
-  }, []);
-
   const loadHistory = async () => {
     try {
       const res = await fetch('/api/sales-reports');
@@ -93,37 +92,51 @@ export function SalesReport() {
     } catch { /* skip */ }
   };
 
+  useEffect(() => {
+    loadHistory();
+  }, []);
+
   const runReport = async () => {
     if (!url.trim()) return;
     setLoading(true);
     setError(null);
     setProgress('Discovering pages...');
-
-    try {
-      const res = await fetch('/api/sales-report', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url.trim(), maxPages: 50 }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || `Server error: ${res.status}`);
-      }
-
-      const data = await res.json();
-      if (!data.pages || !Array.isArray(data.pages)) throw new Error('Invalid response');
-
-      setReport(data);
-      setView('report');
-      loadHistory();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Report failed');
-    } finally {
+    const jobId = await startJob('sales-report', { url: url.trim(), maxPages: 50 });
+    if (jobId) {
+      salesJobId.current = jobId;
+    } else {
+      setError('Failed to start report job');
       setLoading(false);
       setProgress('');
     }
   };
+
+  // Watch for sales report job completion
+  useEffect(() => {
+    if (!salesJobId.current) return;
+    const job = jobs.find(j => j.id === salesJobId.current);
+    if (!job) return;
+    if (job.status === 'running') {
+      setProgress(job.message || 'Running...');
+    } else if (job.status === 'done' && job.result) {
+      const data = job.result as SalesAuditResult;
+      if (data.pages && Array.isArray(data.pages)) {
+        setReport(data);
+        setView('report');
+        loadHistory();
+      } else {
+        setError('Invalid response');
+      }
+      setLoading(false);
+      setProgress('');
+      salesJobId.current = null;
+    } else if (job.status === 'error') {
+      setError(job.error || 'Report failed');
+      setLoading(false);
+      setProgress('');
+      salesJobId.current = null;
+    }
+  }, [jobs]);
 
   const loadReport = async (id: string) => {
     try {

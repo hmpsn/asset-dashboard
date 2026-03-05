@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import {
   Loader2, Search as SearchIcon, ChevronDown, ChevronRight, Download,
   AlertTriangle, AlertCircle, Info, CheckCircle, Globe, FileText,
@@ -484,6 +485,8 @@ function AuditHistory({ siteId, history, onRefresh }: { siteId: string; history:
 }
 
 function SeoAudit({ siteId, workspaceId, view = 'audit' }: Props) {
+  const { startJob, jobs } = useBackgroundTasks();
+  const auditJobId = useRef<string | null>(null);
   const [data, setData] = useState<SeoAuditResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasRun, setHasRun] = useState(false);
@@ -559,22 +562,39 @@ function SeoAudit({ siteId, workspaceId, view = 'audit' }: Props) {
     setBulkProgress(null);
   };
 
-  const runAudit = () => {
+  const runAudit = async () => {
     setLoading(true);
     setHasRun(true);
     setAuditError(null);
-    fetch(`/api/webflow/seo-audit/${siteId}`)
-      .then(r => {
-        if (!r.ok) throw new Error(`Server error: ${r.status}`);
-        return r.json();
-      })
-      .then(d => {
-        if (!d || !Array.isArray(d.pages)) throw new Error(d?.error || 'Invalid audit response');
-        setData(d);
-      })
-      .catch((e) => { setAuditError(e.message || 'Audit failed'); })
-      .finally(() => setLoading(false));
+    const jobId = await startJob('seo-audit', { siteId, workspaceId });
+    if (jobId) {
+      auditJobId.current = jobId;
+    } else {
+      setAuditError('Failed to start audit job');
+      setLoading(false);
+    }
   };
+
+  // Watch for audit job completion via WebSocket-driven jobs array
+  useEffect(() => {
+    if (!auditJobId.current) return;
+    const job = jobs.find(j => j.id === auditJobId.current);
+    if (!job) return;
+    if (job.status === 'done' && job.result) {
+      const d = job.result as SeoAuditResult;
+      if (d && Array.isArray(d.pages)) {
+        setData(d);
+      } else {
+        setAuditError('Invalid audit response');
+      }
+      setLoading(false);
+      auditJobId.current = null;
+    } else if (job.status === 'error') {
+      setAuditError(job.error || 'Audit failed');
+      setLoading(false);
+      auditJobId.current = null;
+    }
+  }, [jobs]);
 
   const loadHistory = useCallback(() => {
     fetch(`/api/reports/${siteId}/history`)

@@ -52,6 +52,7 @@ import {
 import { runSiteSpeed, runSinglePageSpeed } from './pagespeed.js';
 import { generateSchemaSuggestions, generateSchemaForPage } from './schema-suggester.js';
 import { runSalesAudit } from './sales-audit.js';
+import { initJobs, createJob, updateJob, getJob, listJobs } from './jobs.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
 import { listGscSites, getSearchOverview, getPerformanceTrend, getQueryPageData } from './search-console.js';
@@ -205,6 +206,9 @@ function broadcast(event: string, data: unknown) {
     }
   }
 }
+
+// --- Background Jobs ---
+initJobs(broadcast);
 
 // --- File Upload ---
 const tmpDir = path.join(getUploadRoot(), '.tmp');
@@ -2893,6 +2897,264 @@ app.get('/api/public/analytics-event-explorer/:workspaceId', async (req, res) =>
 });
 
 // Health check
+// --- Background Job Endpoints ---
+app.get('/api/jobs', (_req, res) => {
+  const wsId = _req.query.workspaceId as string | undefined;
+  res.json(listJobs(wsId));
+});
+
+app.get('/api/jobs/:id', (req, res) => {
+  const job = getJob(req.params.id);
+  if (!job) return res.status(404).json({ error: 'Job not found' });
+  res.json(job);
+});
+
+app.post('/api/jobs', async (req, res) => {
+  const { type, params } = req.body as { type: string; params: Record<string, unknown> };
+  if (!type) return res.status(400).json({ error: 'type required' });
+
+  try {
+    switch (type) {
+      case 'seo-audit': {
+        const siteId = params.siteId as string;
+        if (!siteId) return res.status(400).json({ error: 'siteId required' });
+        const token = getTokenForSite(siteId) || undefined;
+        if (!token) return res.status(400).json({ error: 'No Webflow API token configured' });
+        const job = createJob('seo-audit', { message: 'Running SEO audit...', workspaceId: params.workspaceId as string });
+        res.json({ jobId: job.id });
+        // Fire and forget
+        (async () => {
+          try {
+            updateJob(job.id, { status: 'running', message: 'Scanning pages...' });
+            const result = await runSeoAudit(siteId, token);
+            updateJob(job.id, { status: 'done', result, message: `Audit complete — score ${result.siteScore}` });
+          } catch (err) {
+            updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Audit failed' });
+          }
+        })();
+        break;
+      }
+
+      case 'compress': {
+        const { assetId, imageUrl, siteId, altText, fileName } = params as { assetId: string; imageUrl: string; siteId: string; altText?: string; fileName?: string };
+        if (!assetId || !imageUrl || !siteId) return res.status(400).json({ error: 'assetId, imageUrl, siteId required' });
+        const compressToken = getTokenForSite(siteId) || undefined;
+        const job = createJob('compress', { message: `Compressing ${fileName || 'image'}...`, workspaceId: params.workspaceId as string });
+        res.json({ jobId: job.id });
+        (async () => {
+          try {
+            updateJob(job.id, { status: 'running' });
+            const sharp = (await import('sharp')).default;
+            const response = await fetch(imageUrl);
+            const originalBuffer = Buffer.from(await response.arrayBuffer());
+            const originalSize = originalBuffer.length;
+            const ext = (fileName || imageUrl).split('.').pop()?.split('?')[0]?.toLowerCase() || 'jpg';
+            let compressed: Buffer;
+            let newFileName: string;
+            const baseName = (fileName || 'image').replace(/\.[^.]+$/, '');
+
+            if (ext === 'svg') {
+              const svgo = await import('svgo');
+              const svgString = originalBuffer.toString('utf-8');
+              const svgResult = svgo.optimize(svgString, { multipass: true, plugins: ['preset-default'] } as Parameters<typeof svgo.optimize>[1]);
+              compressed = Buffer.from(svgResult.data, 'utf-8');
+              newFileName = `${baseName}.svg`;
+            } else if (ext === 'jpg' || ext === 'jpeg') {
+              compressed = await sharp(originalBuffer).jpeg({ quality: 80, mozjpeg: true }).toBuffer();
+              newFileName = `${baseName}.jpg`;
+            } else if (ext === 'png') {
+              const webpBuffer = await sharp(originalBuffer).webp({ quality: 80 }).toBuffer();
+              const pngBuffer = await sharp(originalBuffer).png({ compressionLevel: 9, palette: true }).toBuffer();
+              if (webpBuffer.length < pngBuffer.length) { compressed = webpBuffer; newFileName = `${baseName}.webp`; }
+              else { compressed = pngBuffer; newFileName = `${baseName}.png`; }
+            } else {
+              compressed = await sharp(originalBuffer).webp({ quality: 80 }).toBuffer();
+              newFileName = `${baseName}.webp`;
+            }
+
+            const newSize = compressed.length;
+            const savings = originalSize - newSize;
+            const savingsPercent = Math.round((savings / originalSize) * 100);
+
+            if (savingsPercent < 3) {
+              updateJob(job.id, { status: 'done', result: { skipped: true, reason: `Already optimized (only ${savingsPercent}% savings)` }, message: 'Already optimized' });
+              return;
+            }
+
+            const tmpPath = `/tmp/compressed_${Date.now()}_${newFileName}`;
+            fs.writeFileSync(tmpPath, compressed);
+            const uploadResult = await uploadAsset(siteId, tmpPath, newFileName, altText, compressToken);
+            try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+
+            if (!uploadResult.success) {
+              updateJob(job.id, { status: 'error', error: uploadResult.error, message: 'Upload failed' });
+              return;
+            }
+            await deleteAsset(assetId, compressToken);
+            updateJob(job.id, {
+              status: 'done',
+              result: { success: true, newAssetId: uploadResult.assetId, originalSize, newSize, savings, savingsPercent, newFileName },
+              message: `Saved ${Math.round(savings / 1024)}KB (${savingsPercent}%)`,
+            });
+          } catch (err) {
+            updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Compression failed' });
+          }
+        })();
+        break;
+      }
+
+      case 'bulk-compress': {
+        const { assets, siteId } = params as { assets: Array<{ assetId: string; imageUrl: string; altText?: string; fileName?: string }>; siteId: string };
+        if (!assets?.length || !siteId) return res.status(400).json({ error: 'assets and siteId required' });
+        const job = createJob('bulk-compress', { message: `Compressing ${assets.length} assets...`, total: assets.length, workspaceId: params.workspaceId as string });
+        res.json({ jobId: job.id });
+        (async () => {
+          try {
+            updateJob(job.id, { status: 'running', progress: 0 });
+            let totalSaved = 0;
+            const results: unknown[] = [];
+            for (let i = 0; i < assets.length; i++) {
+              const asset = assets[i];
+              try {
+                const compressRes = await fetch(`http://localhost:${PORT}/api/webflow/compress/${asset.assetId}`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', ...(APP_PASSWORD ? { 'x-auth-token': APP_PASSWORD } : {}) },
+                  body: JSON.stringify({ imageUrl: asset.imageUrl, siteId, altText: asset.altText, fileName: asset.fileName }),
+                });
+                const r = await compressRes.json() as Record<string, unknown>;
+                results.push({ assetId: asset.assetId, ...r });
+                if (typeof r.savings === 'number') totalSaved += r.savings;
+              } catch (err) {
+                results.push({ assetId: asset.assetId, error: String(err) });
+              }
+              updateJob(job.id, { progress: i + 1, message: `Compressed ${i + 1}/${assets.length} (${Math.round(totalSaved / 1024)}KB saved)` });
+            }
+            updateJob(job.id, { status: 'done', result: { results, totalSaved }, progress: assets.length, message: `Done — saved ${Math.round(totalSaved / 1024)}KB total` });
+          } catch (err) {
+            updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Bulk compress failed' });
+          }
+        })();
+        break;
+      }
+
+      case 'bulk-alt': {
+        const { assets: altAssets, siteId: altSiteId } = params as { assets: Array<{ assetId: string; imageUrl: string }>; siteId?: string };
+        if (!altAssets?.length) return res.status(400).json({ error: 'assets required' });
+        const job = createJob('bulk-alt', { message: `Generating alt text for ${altAssets.length} images...`, total: altAssets.length, workspaceId: params.workspaceId as string });
+        res.json({ jobId: job.id });
+        (async () => {
+          try {
+            updateJob(job.id, { status: 'running', progress: 0 });
+            const token = altSiteId ? (getTokenForSite(altSiteId) || undefined) : undefined;
+            const results: Array<{ assetId: string; altText?: string; updated: boolean; error?: string }> = [];
+            for (let i = 0; i < altAssets.length; i++) {
+              const asset = altAssets[i];
+              try {
+                const imgRes = await fetch(asset.imageUrl);
+                if (!imgRes.ok) { results.push({ assetId: asset.assetId, updated: false, error: `Download failed: ${imgRes.status}` }); continue; }
+                const buffer = Buffer.from(await imgRes.arrayBuffer());
+                const imgExt = path.extname(asset.imageUrl).split('?')[0] || '.jpg';
+                const tmpPath = `/tmp/bulk_alt_${Date.now()}${imgExt}`;
+                fs.writeFileSync(tmpPath, buffer);
+                const altTextResult = await generateAltText(tmpPath);
+                try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+                if (altTextResult) {
+                  await updateAsset(asset.assetId, { altText: altTextResult }, token);
+                  results.push({ assetId: asset.assetId, altText: altTextResult, updated: true });
+                } else {
+                  results.push({ assetId: asset.assetId, updated: false, error: 'Generation returned null' });
+                }
+              } catch (err) {
+                results.push({ assetId: asset.assetId, updated: false, error: String(err) });
+              }
+              updateJob(job.id, { progress: i + 1, message: `Generated ${i + 1}/${altAssets.length} alt texts` });
+            }
+            updateJob(job.id, { status: 'done', result: results, progress: altAssets.length, message: `Done — ${results.filter(r => r.updated).length}/${altAssets.length} updated` });
+          } catch (err) {
+            updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Bulk alt text failed' });
+          }
+        })();
+        break;
+      }
+
+      case 'bulk-seo-fix': {
+        const { siteId: seoSiteId, pages, field } = params as { siteId: string; pages: Array<{ pageId: string; title: string; currentSeoTitle?: string; currentDescription?: string }>; field: 'title' | 'description' };
+        if (!seoSiteId || !pages?.length || !field) return res.status(400).json({ error: 'siteId, pages, field required' });
+        const job = createJob('bulk-seo-fix', { message: `Fixing ${field}s for ${pages.length} pages...`, total: pages.length, workspaceId: params.workspaceId as string });
+        res.json({ jobId: job.id });
+        (async () => {
+          try {
+            updateJob(job.id, { status: 'running', progress: 0 });
+            const openaiKey = process.env.OPENAI_API_KEY;
+            const token = getTokenForSite(seoSiteId) || undefined;
+            if (!openaiKey) { updateJob(job.id, { status: 'error', error: 'OPENAI_API_KEY not configured', message: 'Missing API key' }); return; }
+            const results: Array<{ pageId: string; text: string; applied: boolean; error?: string }> = [];
+            for (let i = 0; i < pages.length; i++) {
+              const page = pages[i];
+              try {
+                const prompt = field === 'description'
+                  ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}". Return ONLY the text.`
+                  : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}". Return ONLY the text.`;
+                const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+                  method: 'POST',
+                  headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }], max_tokens: 200, temperature: 0.7 }),
+                });
+                const aiData = await aiRes.json() as { choices?: Array<{ message?: { content?: string } }> };
+                let text = aiData.choices?.[0]?.message?.content?.trim() || '';
+                text = text.replace(/^["']|["']$/g, '');
+                const maxLen = field === 'description' ? 160 : 60;
+                if (text.length > maxLen) { const t = text.slice(0, maxLen); const ls = t.lastIndexOf(' '); text = ls > maxLen * 0.6 ? t.slice(0, ls) : t; }
+                if (text) {
+                  const seoFields = field === 'description' ? { seo: { description: text } } : { seo: { title: text } };
+                  await updatePageSeo(page.pageId, seoFields, token);
+                  results.push({ pageId: page.pageId, text, applied: true });
+                } else {
+                  results.push({ pageId: page.pageId, text: '', applied: false, error: 'Empty AI response' });
+                }
+              } catch (err) {
+                results.push({ pageId: page.pageId, text: '', applied: false, error: String(err) });
+              }
+              updateJob(job.id, { progress: i + 1, message: `Fixed ${i + 1}/${pages.length} ${field}s` });
+            }
+            updateJob(job.id, { status: 'done', result: { results, field }, progress: pages.length, message: `Done — ${results.filter(r => r.applied).length}/${pages.length} ${field}s updated` });
+          } catch (err) {
+            updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Bulk SEO fix failed' });
+          }
+        })();
+        break;
+      }
+
+      case 'sales-report': {
+        const { url, maxPages } = params as { url: string; maxPages?: number };
+        if (!url) return res.status(400).json({ error: 'url required' });
+        const job = createJob('sales-report', { message: `Auditing ${url}...` });
+        res.json({ jobId: job.id });
+        (async () => {
+          try {
+            updateJob(job.id, { status: 'running', message: 'Crawling site...' });
+            const result = await runSalesAudit(url, maxPages || 25);
+            const reportsDir = path.join(IS_PROD ? '/tmp/asset-dashboard' : path.join(__dirname, '..'), 'sales-reports');
+            fs.mkdirSync(reportsDir, { recursive: true });
+            const reportId = `sr_${Date.now()}`;
+            const reportFile = path.join(reportsDir, `${reportId}.json`);
+            fs.writeFileSync(reportFile, JSON.stringify({ id: reportId, ...result, createdAt: new Date().toISOString() }));
+            updateJob(job.id, { status: 'done', result: { id: reportId, ...result }, message: `Audit complete — score ${result.siteScore}` });
+          } catch (err) {
+            updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Sales report failed' });
+          }
+        })();
+        break;
+      }
+
+      default:
+        return res.status(400).json({ error: `Unknown job type: ${type}` });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,

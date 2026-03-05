@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Search, Image, AlertTriangle, Trash2, Sparkles, Check, X,
   FileText, ExternalLink, ChevronDown, Loader2, Minimize2, Wand2, FolderOpen,
 } from 'lucide-react';
+import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 
 interface Asset {
   id: string;
@@ -30,6 +31,8 @@ type SortField = 'fileName' | 'fileSize' | 'createdOn';
 type FilterType = 'all' | 'missing-alt' | 'oversized' | 'images' | 'svg' | 'unused';
 
 function AssetBrowser({ siteId }: Props) {
+  const { startJob, jobs } = useBackgroundTasks();
+  const bulkCompressJobId = useRef<string | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -63,15 +66,17 @@ function AssetBrowser({ siteId }: Props) {
   const [organizeExecuting, setOrganizeExecuting] = useState(false);
   const [organizeResult, setOrganizeResult] = useState<{ moved: number; failed: number; total: number } | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadAssets = useCallback(() => {
     fetch(`/api/webflow/assets/${siteId}`)
       .then(r => r.json())
-      .then(data => { if (!cancelled) setAssets(Array.isArray(data) ? data : []); })
+      .then(data => setAssets(Array.isArray(data) ? data : []))
       .catch(() => {})
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .finally(() => setLoading(false));
   }, [siteId]);
+
+  useEffect(() => {
+    loadAssets();
+  }, [loadAssets]);
 
   // Load unused asset IDs in background after assets load
   useEffect(() => {
@@ -373,51 +378,47 @@ function AssetBrowser({ siteId }: Props) {
     if (!toCompress.length) return;
     setBulkCompressProgress({ done: 0, total: toCompress.length, saved: 0 });
     setAltError(null);
-    let totalSaved = 0;
-    for (let i = 0; i < toCompress.length; i++) {
-      const asset = toCompress[i];
-      const url = asset.hostedUrl || asset.url;
-      if (!url) { setBulkCompressProgress({ done: i + 1, total: toCompress.length, saved: totalSaved }); continue; }
-      setCompressing(prev => new Set(prev).add(asset.id));
-      try {
-        const res = await fetch(`/api/webflow/compress/${asset.id}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imageUrl: url,
-            siteId,
-            altText: asset.altText,
-            fileName: asset.displayName || asset.originalFileName,
-          }),
-        });
-        const data = await res.json();
-        if (data.success) {
-          totalSaved += data.savings || 0;
-          setAssets(prev => prev.map(a => a.id === asset.id ? {
-            ...a,
-            id: data.newAssetId,
-            size: data.newSize,
-            hostedUrl: data.newHostedUrl,
-            displayName: data.newFileName,
-          } : a));
-          // Update selected set with new asset ID
-          setSelected(prev => {
-            const n = new Set(prev);
-            n.delete(asset.id);
-            n.add(data.newAssetId);
-            return n;
-          });
-        }
-      } catch { /* ignore */ }
-      setCompressing(prev => { const n = new Set(prev); n.delete(asset.id); return n; });
-      setBulkCompressProgress({ done: i + 1, total: toCompress.length, saved: totalSaved });
+    const jobId = await startJob('bulk-compress', {
+      siteId,
+      assets: toCompress.map(a => ({
+        assetId: a.id,
+        imageUrl: a.hostedUrl || a.url,
+        altText: a.altText,
+        fileName: a.displayName || a.originalFileName,
+      })),
+    });
+    if (jobId) {
+      bulkCompressJobId.current = jobId;
+    } else {
+      setAltError('Failed to start bulk compress job');
+      setBulkCompressProgress(null);
     }
-    if (totalSaved > 0) {
-      setCompressResult(`Bulk compressed: saved ${formatSize(totalSaved)} total`);
-      setTimeout(() => setCompressResult(null), 5000);
-    }
-    setBulkCompressProgress(null);
   };
+
+  // Watch for bulk compress job progress/completion
+  useEffect(() => {
+    if (!bulkCompressJobId.current) return;
+    const job = jobs.find(j => j.id === bulkCompressJobId.current);
+    if (!job) return;
+    if (job.status === 'running' && job.progress != null && job.total) {
+      setBulkCompressProgress({ done: job.progress, total: job.total, saved: 0 });
+    } else if (job.status === 'done') {
+      const result = job.result as { totalSaved?: number } | undefined;
+      const saved = result?.totalSaved || 0;
+      if (saved > 0) {
+        setCompressResult(`Bulk compressed: saved ${formatSize(saved)} total`);
+        setTimeout(() => setCompressResult(null), 5000);
+      }
+      setBulkCompressProgress(null);
+      bulkCompressJobId.current = null;
+      // Refresh asset list to pick up new asset IDs/sizes
+      loadAssets();
+    } else if (job.status === 'error') {
+      setAltError(job.error || 'Bulk compress failed');
+      setBulkCompressProgress(null);
+      bulkCompressJobId.current = null;
+    }
+  }, [jobs, loadAssets]);
 
   const handleOrganizePreview = async () => {
     setOrganizeLoading(true);
