@@ -3368,6 +3368,8 @@ app.get('/api/public/workspace/:id', (req, res) => {
     // Branding
     brandLogoUrl: ws.brandLogoUrl || '',
     brandAccentColor: ws.brandAccentColor || '',
+    // Content pricing
+    contentPricing: ws.contentPricing || null,
   });
 });
 

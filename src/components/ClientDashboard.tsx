@@ -19,7 +19,8 @@ interface SearchOverview {
 interface PerformanceTrend { date: string; clicks: number; impressions: number; ctr: number; position: number; }
 interface EventGroup { id: string; name: string; order: number; color: string; defaultPageFilter?: string; allowedPages?: string[]; }
 interface EventDisplayConfig { eventName: string; displayName: string; pinned: boolean; group?: string; }
-interface WorkspaceInfo { id: string; name: string; webflowSiteId?: string; webflowSiteName?: string; gscPropertyUrl?: string; ga4PropertyId?: string; liveDomain?: string; eventConfig?: EventDisplayConfig[]; eventGroups?: EventGroup[]; requiresPassword?: boolean; clientPortalEnabled?: boolean; seoClientView?: boolean; analyticsClientView?: boolean; }
+interface ContentPricing { briefPrice: number; fullPostPrice: number; currency: string; briefLabel?: string; fullPostLabel?: string; briefDescription?: string; fullPostDescription?: string; }
+interface WorkspaceInfo { id: string; name: string; webflowSiteId?: string; webflowSiteName?: string; gscPropertyUrl?: string; ga4PropertyId?: string; liveDomain?: string; eventConfig?: EventDisplayConfig[]; eventGroups?: EventGroup[]; requiresPassword?: boolean; clientPortalEnabled?: boolean; seoClientView?: boolean; analyticsClientView?: boolean; contentPricing?: ContentPricing | null; }
 interface AuditSummary { id: string; createdAt: string; siteScore: number; totalPages: number; errors: number; warnings: number; previousScore?: number; }
 interface SeoIssue { check: string; severity: 'error' | 'warning' | 'info'; category?: string; message: string; recommendation: string; value?: string; }
 interface PageAuditResult { pageId: string; page: string; slug: string; url: string; score: number; issues: SeoIssue[]; }
@@ -289,7 +290,7 @@ export function ClientDashboard({ workspaceId }: Props) {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [strategyData, setStrategyData] = useState<ClientKeywordStrategy | null>(null);
   const [requestedTopics, setRequestedTopics] = useState<Set<string>>(new Set());
-  const [requestingTopic, setRequestingTopic] = useState<string | null>(null);
+  const [requestingTopic, setRequestingTopic] = useState<string | null>(null); // used by confirmPricingAndSubmit
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [mapSearch, setMapSearch] = useState('');
   const [mapSort, setMapSort] = useState<'default' | 'position' | 'impressions' | 'clicks'>('default');
@@ -364,9 +365,21 @@ export function ClientDashboard({ workspaceId }: Props) {
   const [newTopicName, setNewTopicName] = useState('');
   const [newTopicKeyword, setNewTopicKeyword] = useState('');
   const [newTopicNotes, setNewTopicNotes] = useState('');
-  const [submittingTopic, setSubmittingTopic] = useState(false);
   const [newTopicServiceType, setNewTopicServiceType] = useState<'brief_only' | 'full_post'>('brief_only');
   const [upgradingReqId, setUpgradingReqId] = useState<string | null>(null);
+  // Pricing confirmation modal state
+  const [pricingModal, setPricingModal] = useState<{
+    serviceType: 'brief_only' | 'full_post';
+    topic: string;
+    targetKeyword: string;
+    intent?: string;
+    priority?: string;
+    rationale?: string;
+    notes?: string;
+    source: 'strategy' | 'client' | 'upgrade';
+    upgradeReqId?: string;
+  } | null>(null);
+  const [pricingConfirming, setPricingConfirming] = useState(false);
   const [expandedContentReq, setExpandedContentReq] = useState<string | null>(null);
   const [contentComment, setContentComment] = useState('');
   const [sendingContentComment, setSendingContentComment] = useState(false);
@@ -607,27 +620,6 @@ export function ClientDashboard({ workspaceId }: Props) {
     } catch { setGa4EventTrend([]); }
   };
 
-  // Content hub handlers
-  const submitClientTopic = async () => {
-    if (!newTopicName.trim() || !newTopicKeyword.trim()) return;
-    setSubmittingTopic(true);
-    try {
-      const res = await fetch(`/api/public/content-request/${workspaceId}/submit`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic: newTopicName.trim(), targetKeyword: newTopicKeyword.trim(), notes: newTopicNotes.trim() || undefined, serviceType: newTopicServiceType }),
-      });
-      if (res.ok) {
-        const created = await res.json();
-        setContentRequests(prev => [created, ...prev]);
-        setRequestedTopics(prev => new Set(prev).add(created.targetKeyword));
-        setNewTopicName(''); setNewTopicKeyword(''); setNewTopicNotes(''); setNewTopicServiceType('brief_only'); setShowTopicForm(false);
-        setToast({ message: 'Topic submitted! Your team will review it.', type: 'success' });
-        setTimeout(() => setToast(null), 5000);
-      }
-    } catch { /* skip */ }
-    setSubmittingTopic(false);
-  };
-
   const declineTopic = async (reqId: string) => {
     try {
       const res = await fetch(`/api/public/content-request/${workspaceId}/${reqId}/decline`, {
@@ -666,6 +658,54 @@ export function ClientDashboard({ workspaceId }: Props) {
       }
     } catch { /* skip */ }
     setUpgradingReqId(null);
+  };
+
+  // Confirm pricing and execute the actual request
+  const confirmPricingAndSubmit = async () => {
+    if (!pricingModal) return;
+    setPricingConfirming(true);
+    try {
+      if (pricingModal.source === 'upgrade' && pricingModal.upgradeReqId) {
+        // Upgrade flow
+        await upgradeToFullPost(pricingModal.upgradeReqId);
+      } else if (pricingModal.source === 'strategy') {
+        // Strategy-based request
+        setRequestingTopic(pricingModal.targetKeyword);
+        const res = await fetch(`/api/public/content-request/${workspaceId}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, intent: pricingModal.intent, priority: pricingModal.priority, rationale: pricingModal.rationale, serviceType: pricingModal.serviceType }),
+        });
+        if (!res.ok) throw new Error(`Server returned ${res.status}`);
+        setRequestedTopics(prev => new Set(prev).add(pricingModal.targetKeyword));
+        fetch(`/api/public/content-requests/${workspaceId}`).then(r => r.ok ? r.json() : []).then((reqs: ClientContentRequest[]) => {
+          if (Array.isArray(reqs) && reqs.length > 0) setContentRequests(reqs);
+        }).catch(() => {});
+        const label = pricingModal.serviceType === 'full_post' ? 'Full blog post' : 'Brief';
+        setToast({ message: `${label} requested for "${pricingModal.topic}"! Check the Content tab.`, type: 'success' });
+        setTimeout(() => setToast(null), 5000);
+        setRequestingTopic(null);
+      } else {
+        // Client topic submission
+        const res = await fetch(`/api/public/content-request/${workspaceId}/submit`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, notes: pricingModal.notes || undefined, serviceType: pricingModal.serviceType }),
+        });
+        if (res.ok) {
+          const created = await res.json();
+          setContentRequests(prev => [created, ...prev]);
+          setRequestedTopics(prev => new Set(prev).add(created.targetKeyword));
+          setNewTopicName(''); setNewTopicKeyword(''); setNewTopicNotes(''); setNewTopicServiceType('brief_only'); setShowTopicForm(false);
+          setToast({ message: 'Topic submitted! Your team will review it.', type: 'success' });
+          setTimeout(() => setToast(null), 5000);
+        }
+      }
+    } catch (err) {
+      console.error('Content request failed:', err);
+      setToast({ message: 'Failed to submit request. Please try again.', type: 'error' });
+      setTimeout(() => setToast(null), 5000);
+    }
+    setPricingConfirming(false);
+    setPricingModal(null);
   };
 
   const requestChanges = async (reqId: string) => {
@@ -1745,7 +1785,6 @@ export function ClientDashboard({ workspaceId }: Props) {
                       {strategyData.contentGaps.map((gap, i) => {
                         const prioColor = gap.priority === 'high' ? 'text-red-400 bg-red-500/15 border-red-500/30' : gap.priority === 'medium' ? 'text-amber-400 bg-amber-500/15 border-amber-500/30' : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
                         const alreadyRequested = requestedTopics.has(gap.targetKeyword);
-                        const isRequesting = requestingTopic === gap.targetKeyword;
                         return (
                           <div key={i} className="px-4 py-3.5 rounded-lg bg-zinc-900/60 border border-zinc-800/80 hover:border-teal-500/30 transition-all group flex flex-col">
                             <div className="flex items-center gap-2 flex-wrap mb-1.5">
@@ -1761,62 +1800,18 @@ export function ClientDashboard({ workspaceId }: Props) {
                               ) : (
                                 <div className="flex items-center gap-2">
                                   <button
-                                    disabled={isRequesting}
-                                    onClick={async () => {
-                                      setRequestingTopic(gap.targetKeyword);
-                                      try {
-                                        const res = await fetch(`/api/public/content-request/${workspaceId}`, {
-                                          method: 'POST',
-                                          headers: { 'Content-Type': 'application/json' },
-                                          body: JSON.stringify({ topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, serviceType: 'brief_only' }),
-                                        });
-                                        if (!res.ok) throw new Error(`Server returned ${res.status}`);
-                                        setRequestedTopics(prev => new Set(prev).add(gap.targetKeyword));
-                                        fetch(`/api/public/content-requests/${workspaceId}`).then(r => r.ok ? r.json() : []).then((reqs: ClientContentRequest[]) => {
-                                          if (Array.isArray(reqs) && reqs.length > 0) setContentRequests(reqs);
-                                        }).catch(() => {});
-                                        setToast({ message: `Brief requested for "${gap.topic}"! Check the Content tab.`, type: 'success' });
-                                        setTimeout(() => setToast(null), 5000);
-                                      } catch (err) {
-                                        console.error('Content request failed:', err);
-                                        setToast({ message: 'Failed to submit request. Please try again.', type: 'error' });
-                                        setTimeout(() => setToast(null), 5000);
-                                      }
-                                      setRequestingTopic(null);
-                                    }}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600/20 border border-teal-500/30 text-[10px] text-teal-300 font-medium hover:bg-teal-600/40 transition-all disabled:opacity-50"
+                                    onClick={() => setPricingModal({ serviceType: 'brief_only', topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, source: 'strategy' })}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600/20 border border-teal-500/30 text-[10px] text-teal-300 font-medium hover:bg-teal-600/40 transition-all"
                                   >
-                                    {isRequesting ? <span className="w-3 h-3 border-2 border-teal-400 border-t-transparent rounded-full animate-spin" /> : <FileText className="w-3 h-3" />}
-                                    Get a Brief
+                                    <FileText className="w-3 h-3" /> Get a Brief
+                                    {ws?.contentPricing && <span className="text-[8px] opacity-70 ml-0.5">{new Intl.NumberFormat('en-US', { style: 'currency', currency: ws.contentPricing.currency || 'USD', minimumFractionDigits: 0 }).format(ws.contentPricing.briefPrice)}</span>}
                                   </button>
                                   <button
-                                    disabled={isRequesting}
-                                    onClick={async () => {
-                                      setRequestingTopic(gap.targetKeyword);
-                                      try {
-                                        const res = await fetch(`/api/public/content-request/${workspaceId}`, {
-                                          method: 'POST',
-                                          headers: { 'Content-Type': 'application/json' },
-                                          body: JSON.stringify({ topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, serviceType: 'full_post' }),
-                                        });
-                                        if (!res.ok) throw new Error(`Server returned ${res.status}`);
-                                        setRequestedTopics(prev => new Set(prev).add(gap.targetKeyword));
-                                        fetch(`/api/public/content-requests/${workspaceId}`).then(r => r.ok ? r.json() : []).then((reqs: ClientContentRequest[]) => {
-                                          if (Array.isArray(reqs) && reqs.length > 0) setContentRequests(reqs);
-                                        }).catch(() => {});
-                                        setToast({ message: `Full blog post requested for "${gap.topic}"! Check the Content tab.`, type: 'success' });
-                                        setTimeout(() => setToast(null), 5000);
-                                      } catch (err) {
-                                        console.error('Content request failed:', err);
-                                        setToast({ message: 'Failed to submit request. Please try again.', type: 'error' });
-                                        setTimeout(() => setToast(null), 5000);
-                                      }
-                                      setRequestingTopic(null);
-                                    }}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600/30 to-violet-600/30 border border-blue-500/30 text-[10px] text-blue-200 font-medium hover:from-blue-600/50 hover:to-violet-600/50 transition-all disabled:opacity-50"
+                                    onClick={() => setPricingModal({ serviceType: 'full_post', topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, source: 'strategy' })}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600/30 to-violet-600/30 border border-blue-500/30 text-[10px] text-blue-200 font-medium hover:from-blue-600/50 hover:to-violet-600/50 transition-all"
                                   >
-                                    {isRequesting ? <span className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                                    Get Full Post
+                                    <Sparkles className="w-3 h-3" /> Get Full Post
+                                    {ws?.contentPricing && <span className="text-[8px] opacity-70 ml-0.5">{new Intl.NumberFormat('en-US', { style: 'currency', currency: ws.contentPricing.currency || 'USD', minimumFractionDigits: 0 }).format(ws.contentPricing.fullPostPrice)}</span>}
                                   </button>
                                 </div>
                               )}
@@ -2065,8 +2060,11 @@ export function ClientDashboard({ workspaceId }: Props) {
                 <div className="text-[9px] text-zinc-600 mt-1">{newTopicServiceType === 'brief_only' ? 'A detailed content strategy document for this topic' : 'Brief + professionally written article delivered ready to publish'}</div>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={submitClientTopic} disabled={!newTopicName.trim() || !newTopicKeyword.trim() || submittingTopic} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 text-xs text-white font-medium hover:bg-blue-500 transition-colors disabled:opacity-50">
-                  {submittingTopic ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Submit Topic
+                <button onClick={() => {
+                  if (!newTopicName.trim() || !newTopicKeyword.trim()) return;
+                  setPricingModal({ serviceType: newTopicServiceType, topic: newTopicName.trim(), targetKeyword: newTopicKeyword.trim(), notes: newTopicNotes.trim() || undefined, source: 'client' });
+                }} disabled={!newTopicName.trim() || !newTopicKeyword.trim() || pricingConfirming} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 text-xs text-white font-medium hover:bg-blue-500 transition-colors disabled:opacity-50">
+                  <Send className="w-3.5 h-3.5" /> Submit Topic
                 </button>
                 <button onClick={() => setShowTopicForm(false)} className="px-3 py-2 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Cancel</button>
               </div>
@@ -2397,12 +2395,12 @@ export function ClientDashboard({ workspaceId }: Props) {
                             <div className="text-[10px] text-zinc-400 mt-0.5 leading-relaxed">Love the brief? Upgrade to a professionally written blog post delivered ready to publish.</div>
                           </div>
                           <button
-                            disabled={upgradingReqId === req.id}
-                            onClick={(e) => { e.stopPropagation(); upgradeToFullPost(req.id); }}
-                            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-violet-600 text-xs text-white font-medium hover:from-blue-500 hover:to-violet-500 transition-all disabled:opacity-50 flex-shrink-0 shadow-lg shadow-blue-900/20"
+                            onClick={(e) => { e.stopPropagation(); setPricingModal({ serviceType: 'full_post', topic: req.topic, targetKeyword: req.targetKeyword, source: 'upgrade', upgradeReqId: req.id }); }}
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-violet-600 text-xs text-white font-medium hover:from-blue-500 hover:to-violet-500 transition-all flex-shrink-0 shadow-lg shadow-blue-900/20"
                           >
-                            {upgradingReqId === req.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                            <Sparkles className="w-3.5 h-3.5" />
                             Upgrade to Full Post
+                            {ws?.contentPricing && <span className="text-[9px] opacity-70 ml-0.5">+{new Intl.NumberFormat('en-US', { style: 'currency', currency: ws.contentPricing.currency || 'USD', minimumFractionDigits: 0 }).format(Math.max(0, ws.contentPricing.fullPostPrice - ws.contentPricing.briefPrice))}</span>}
                           </button>
                         </div>
                       )}
@@ -3396,6 +3394,117 @@ export function ClientDashboard({ workspaceId }: Props) {
           </div>
         </div>
       )}
+
+      {/* Pricing confirmation modal */}
+      {pricingModal && (() => {
+        const pricing = ws?.contentPricing;
+        const isUpgrade = pricingModal.source === 'upgrade';
+        const isFull = pricingModal.serviceType === 'full_post';
+        const price = pricing ? (isFull ? pricing.fullPostPrice : pricing.briefPrice) : null;
+        const upgradePrice = isUpgrade && pricing ? Math.max(0, pricing.fullPostPrice - pricing.briefPrice) : null;
+        const displayPrice = isUpgrade ? upgradePrice : price;
+        const currency = pricing?.currency || 'USD';
+        const fmt = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency, minimumFractionDigits: 0 }).format(n);
+
+        const briefIncludes = [
+          'SEO-optimized content strategy',
+          'Target keyword analysis & SERP research',
+          'Detailed content outline with headings',
+          'E-E-A-T guidance & content checklist',
+          'Schema markup recommendations',
+        ];
+        const fullPostIncludes = [
+          'Everything in the Content Brief',
+          'Professionally written article',
+          'SEO-optimized for target keywords',
+          'Ready to publish on your site',
+          'One round of revisions included',
+        ];
+
+        return (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => !pricingConfirming && setPricingModal(null)}>
+            <div className="bg-zinc-900 border border-zinc-700/50 rounded-2xl shadow-2xl shadow-black/40 w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+              {/* Header */}
+              <div className={`px-6 pt-6 pb-4 ${isFull ? 'bg-gradient-to-br from-blue-600/10 via-violet-600/10 to-transparent' : 'bg-gradient-to-br from-teal-600/10 to-transparent'}`}>
+                <div className="flex items-center gap-3 mb-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isFull ? 'bg-gradient-to-br from-blue-500/20 to-violet-500/20' : 'bg-teal-500/20'}`}>
+                    {isFull ? <Sparkles className="w-5 h-5 text-blue-400" /> : <FileText className="w-5 h-5 text-teal-400" />}
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-zinc-100">
+                      {isUpgrade ? 'Upgrade to Full Blog Post' : isFull ? (pricing?.fullPostLabel || 'Full Blog Post') : (pricing?.briefLabel || 'Content Brief')}
+                    </div>
+                    <div className="text-[10px] text-zinc-500 mt-0.5">
+                      {isUpgrade ? 'Continue from your approved brief' : 'Confirm your content request'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Topic info */}
+                <div className="bg-zinc-950/50 rounded-lg px-3 py-2.5 border border-zinc-800">
+                  <div className="text-xs text-zinc-300 font-medium">{pricingModal.topic}</div>
+                  <div className="text-[10px] text-teal-400 mt-0.5">&ldquo;{pricingModal.targetKeyword}&rdquo;</div>
+                </div>
+              </div>
+
+              {/* What's included */}
+              <div className="px-6 py-4 border-t border-zinc-800/50">
+                <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-2.5">What&apos;s included</div>
+                <div className="space-y-1.5">
+                  {(isFull ? fullPostIncludes : briefIncludes).map((item, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <Check className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${isFull ? 'text-blue-400' : 'text-teal-400'}`} />
+                      <span className="text-[11px] text-zinc-400">{item}</span>
+                    </div>
+                  ))}
+                </div>
+                {pricing && (isFull ? pricing.fullPostDescription : pricing.briefDescription) && (
+                  <div className="text-[10px] text-zinc-500 mt-3 leading-relaxed">{isFull ? pricing.fullPostDescription : pricing.briefDescription}</div>
+                )}
+              </div>
+
+              {/* Pricing + Actions */}
+              <div className="px-6 pb-6 pt-2">
+                {displayPrice != null && (
+                  <div className="flex items-baseline gap-2 mb-4">
+                    <span className={`text-2xl font-bold ${isFull ? 'text-blue-300' : 'text-teal-300'}`}>{fmt(displayPrice)}</span>
+                    {isUpgrade && <span className="text-[10px] text-zinc-500">upgrade difference</span>}
+                    {!isUpgrade && <span className="text-[10px] text-zinc-500">one-time</span>}
+                  </div>
+                )}
+                {displayPrice == null && (
+                  <div className="text-[11px] text-zinc-500 mb-4 bg-zinc-800/50 rounded-lg px-3 py-2 border border-zinc-700/50">
+                    Pricing will be confirmed by your team after submission.
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2">
+                  <button
+                    disabled={pricingConfirming}
+                    onClick={confirmPricingAndSubmit}
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-50 shadow-lg ${isFull ? 'bg-gradient-to-r from-blue-600 to-violet-600 text-white hover:from-blue-500 hover:to-violet-500 shadow-blue-900/30' : 'bg-teal-600 text-white hover:bg-teal-500 shadow-teal-900/30'}`}
+                  >
+                    {pricingConfirming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                    {pricingConfirming ? 'Submitting...' : displayPrice != null ? `Confirm & Pay ${fmt(displayPrice)}` : 'Confirm Request'}
+                  </button>
+                  <button
+                    disabled={pricingConfirming}
+                    onClick={() => setPricingModal(null)}
+                    className="px-4 py-2.5 rounded-xl text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <div className="text-center mt-3">
+                  <span className="text-[9px] text-zinc-600">
+                    {displayPrice != null ? 'Payment will be processed securely. You can review your invoice anytime.' : 'No charge until pricing is confirmed by your team.'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Toast notification */}
       {toast && (

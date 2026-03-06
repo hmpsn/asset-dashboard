@@ -4,7 +4,7 @@ import {
   Globe, Search, BarChart3, Loader2, Check, Unplug, ExternalLink, LogIn, LogOut,
   Copy, CheckCircle, Lock, KeyRound, X, Users, ChevronRight,
   Pin, PinOff, Pencil, Save, RefreshCw, Plus, Trash2, ArrowUp, ArrowDown, Palette,
-  Shield, SlidersHorizontal, Mail, Image as ImageIcon,
+  Shield, SlidersHorizontal, Mail, Image as ImageIcon, DollarSign,
 } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 
@@ -27,6 +27,7 @@ interface WorkspaceData {
   autoReportFrequency?: 'weekly' | 'monthly';
   brandLogoUrl?: string;
   brandAccentColor?: string;
+  contentPricing?: { briefPrice: number; fullPostPrice: number; currency: string; briefLabel?: string; fullPostLabel?: string; briefDescription?: string; fullPostDescription?: string } | null;
 }
 
 interface Props {
@@ -67,6 +68,12 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
   const [ga4Pages, setGa4Pages] = useState<{path: string}[]>([]);
   const [expandedGroupPages, setExpandedGroupPages] = useState<string | null>(null);
   const [groupPageSearch, setGroupPageSearch] = useState('');
+  // Content pricing state
+  const [showPricingConfig, setShowPricingConfig] = useState(false);
+  const [pricingBrief, setPricingBrief] = useState(0);
+  const [pricingFull, setPricingFull] = useState(0);
+  const [pricingCurrency, setPricingCurrency] = useState('USD');
+  const [savingPricing, setSavingPricing] = useState(false);
 
   const GROUP_COLORS = ['#14b8a6', '#60a5fa', '#34d399', '#fbbf24', '#f472b6', '#fb923c', '#2dd4bf', '#e879f9'];
 
@@ -627,6 +634,129 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                   </div>
                 </div>
               </div>
+            </section>
+
+            {/* Content Pricing */}
+            <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
+              <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid var(--brand-border)' }}>
+                <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
+                  <DollarSign className="w-4 h-4 text-green-400" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Content Pricing</h3>
+                  <p className="text-xs" style={{ color: 'var(--brand-text-muted)' }}>Set pricing for content briefs and full blog posts. Clients see these before confirming.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    if (!showPricingConfig) {
+                      setPricingBrief(ws?.contentPricing?.briefPrice || 0);
+                      setPricingFull(ws?.contentPricing?.fullPostPrice || 0);
+                      setPricingCurrency(ws?.contentPricing?.currency || 'USD');
+                    }
+                    setShowPricingConfig(!showPricingConfig);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                  style={{ backgroundColor: 'var(--brand-bg-card)', color: 'var(--brand-text)' }}>
+                  {showPricingConfig ? 'Close' : <><Pencil className="w-3 h-3" /> Configure</>}
+                </button>
+              </div>
+
+              {/* Summary row when collapsed */}
+              {!showPricingConfig && (
+                <div className="px-5 py-3 flex items-center gap-4">
+                  {ws?.contentPricing ? (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-medium" style={{ color: 'var(--brand-text-muted)' }}>Brief:</span>
+                        <span className="text-xs font-semibold text-teal-400">${ws.contentPricing.briefPrice}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-medium" style={{ color: 'var(--brand-text-muted)' }}>Full Post:</span>
+                        <span className="text-xs font-semibold text-blue-400">${ws.contentPricing.fullPostPrice}</span>
+                      </div>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Active</span>
+                    </>
+                  ) : (
+                    <span className="text-[10px]" style={{ color: 'var(--brand-text-dim)' }}>No pricing set — clients will see "Pricing confirmed after submission"</span>
+                  )}
+                </div>
+              )}
+
+              {/* Expanded config form */}
+              {showPricingConfig && (
+                <div className="px-5 py-4 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-[10px] font-medium mb-1.5" style={{ color: 'var(--brand-text-muted)' }}>Content Brief Price</div>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500">$</span>
+                        <input type="number" min={0} value={pricingBrief || ''} onChange={e => setPricingBrief(Number(e.target.value))}
+                          placeholder="150"
+                          className="w-full bg-zinc-800 border border-zinc-700 rounded-lg pl-7 pr-3 py-2 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-teal-500" />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-medium mb-1.5" style={{ color: 'var(--brand-text-muted)' }}>Full Blog Post Price</div>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500">$</span>
+                        <input type="number" min={0} value={pricingFull || ''} onChange={e => setPricingFull(Number(e.target.value))}
+                          placeholder="500"
+                          className="w-full bg-zinc-800 border border-zinc-700 rounded-lg pl-7 pr-3 py-2 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-teal-500" />
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-medium mb-1.5" style={{ color: 'var(--brand-text-muted)' }}>Currency</div>
+                    <select value={pricingCurrency} onChange={e => setPricingCurrency(e.target.value)}
+                      className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-teal-500">
+                      <option value="USD">USD ($)</option>
+                      <option value="EUR">EUR (€)</option>
+                      <option value="GBP">GBP (£)</option>
+                      <option value="CAD">CAD (C$)</option>
+                      <option value="AUD">AUD (A$)</option>
+                    </select>
+                  </div>
+                  <div className="pt-2 flex items-center gap-3" style={{ borderTop: '1px solid var(--brand-border)' }}>
+                    <button
+                      disabled={savingPricing}
+                      onClick={async () => {
+                        setSavingPricing(true);
+                        try {
+                          const contentPricing = pricingBrief > 0 || pricingFull > 0
+                            ? { briefPrice: pricingBrief, fullPostPrice: pricingFull, currency: pricingCurrency }
+                            : null;
+                          await patchWorkspace({ contentPricing });
+                          toast(contentPricing ? 'Content pricing saved' : 'Content pricing removed');
+                          setShowPricingConfig(false);
+                        } catch { toast('Failed to save pricing', 'error'); }
+                        finally { setSavingPricing(false); }
+                      }}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition-colors disabled:opacity-50">
+                      {savingPricing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save Pricing
+                    </button>
+                    {ws?.contentPricing && (
+                      <button
+                        disabled={savingPricing}
+                        onClick={async () => {
+                          setSavingPricing(true);
+                          try {
+                            await patchWorkspace({ contentPricing: null });
+                            setPricingBrief(0); setPricingFull(0);
+                            toast('Content pricing removed');
+                            setShowPricingConfig(false);
+                          } catch { toast('Failed to remove pricing', 'error'); }
+                          finally { setSavingPricing(false); }
+                        }}
+                        className="text-xs text-red-400/60 hover:text-red-400 transition-colors">
+                        Remove Pricing
+                      </button>
+                    )}
+                  </div>
+                  <div className="text-[9px] leading-relaxed" style={{ color: 'var(--brand-text-dim)' }}>
+                    Clients will see these prices in a confirmation dialog before submitting content requests. Stripe integration for direct payments is coming soon.
+                  </div>
+                </div>
+              )}
             </section>
 
             {/* Event Configuration */}

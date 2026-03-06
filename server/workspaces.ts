@@ -105,6 +105,16 @@ export interface Workspace {
   brandVoice?: string;           // brand voice guidelines, tone description, style notes
   brandLogoUrl?: string;
   brandAccentColor?: string;
+  // Content pricing (per-workspace, exposed to client portal)
+  contentPricing?: {
+    briefPrice: number;       // e.g. 150 (in dollars)
+    fullPostPrice: number;    // e.g. 500
+    currency: string;         // e.g. 'USD'
+    briefLabel?: string;      // optional custom label
+    fullPostLabel?: string;
+    briefDescription?: string;
+    fullPostDescription?: string;
+  };
   folder: string;
   createdAt: string;
 }
@@ -162,7 +172,7 @@ export function createWorkspace(name: string, webflowSiteId?: string, webflowSit
   return workspace;
 }
 
-export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'brandLogoUrl' | 'brandAccentColor'>>): Workspace | null {
+export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing'>>): Workspace | null {
   const workspaces = readConfig();
   const idx = workspaces.findIndex(w => w.id === id);
   if (idx === -1) return null;
