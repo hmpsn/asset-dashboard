@@ -4419,15 +4419,6 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
-// --- Serve frontend in production ---
-if (IS_PROD) {
-  const distPath = path.join(__dirname, '..', 'dist');
-  app.use(express.static(distPath));
-  app.get('*', (_req, res) => {
-    res.sendFile(path.join(distPath, 'index.html'));
-  });
-}
-
 // --- Annotations ---
 // Public: list annotations for a workspace
 app.get('/api/public/annotations/:workspaceId', (req, res) => {
@@ -4617,6 +4608,15 @@ app.post('/api/monthly-report/:workspaceId', async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate report' });
   }
 });
+
+// --- Serve frontend in production (MUST be after all API routes) ---
+if (IS_PROD) {
+  const distPath = path.join(__dirname, '..', 'dist');
+  app.use(express.static(distPath));
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
 
 // Start audit scheduler
 startScheduler();
