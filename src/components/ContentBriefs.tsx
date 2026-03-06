@@ -59,7 +59,10 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
   const [keyword, setKeyword] = useState('');
   const [businessCtx, setBusinessCtx] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
   const [error, setError] = useState('');
+
+  const getBriefById = (briefId: string) => briefs.find(b => b.id === briefId);
 
   const copyAsMarkdown = (b: ContentBrief) => {
     const lines: string[] = [
@@ -138,7 +141,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
         onRequestCountChange?.(next.filter(r => r.status === 'requested').length);
         return next;
       });
-      setExpanded(brief.id);
+      setExpandedRequest(req.id);
     } catch { /* skip */ }
     setGeneratingBriefFor(null);
   };
@@ -228,59 +231,106 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
               const StatusIcon = sc.icon;
               const isGenerating = generatingBriefFor === req.id;
               const hasBrief = !!req.briefId;
+              const inlineBrief = hasBrief && expandedRequest === req.id ? getBriefById(req.briefId!) : null;
               return (
-                <div key={req.id} className="px-3 py-2.5 rounded-lg bg-zinc-800/50 border border-zinc-800">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-zinc-200">{req.topic}</span>
-                        {req.source === 'client' && <span className="text-[8px] px-1 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">Client</span>}
+                <div key={req.id} className="rounded-lg bg-zinc-800/50 border border-zinc-800 overflow-hidden">
+                  <div className="px-3 py-2.5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-zinc-200">{req.topic}</span>
+                          {req.source === 'client' && <span className="text-[8px] px-1 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">Client</span>}
+                        </div>
+                        <div className="text-[10px] text-teal-400 mt-0.5">"{req.targetKeyword}"</div>
+                        <div className="flex items-center gap-3 mt-1">
+                          <span className="text-[9px] text-zinc-600 uppercase">{req.intent} · {req.priority}</span>
+                          <span className="text-[9px] text-zinc-600">{new Date(req.requestedAt).toLocaleDateString()}</span>
+                          {req.comments && req.comments.length > 0 && <span className="flex items-center gap-0.5 text-[9px] text-zinc-500"><MessageSquare className="w-2.5 h-2.5" />{req.comments.length}</span>}
+                        </div>
                       </div>
-                      <div className="text-[10px] text-teal-400 mt-0.5">"{req.targetKeyword}"</div>
-                      <div className="flex items-center gap-3 mt-1">
-                        <span className="text-[9px] text-zinc-600 uppercase">{req.intent} · {req.priority}</span>
-                        <span className="text-[9px] text-zinc-600">{new Date(req.requestedAt).toLocaleDateString()}</span>
-                        {req.comments && req.comments.length > 0 && <span className="flex items-center gap-0.5 text-[9px] text-zinc-500"><MessageSquare className="w-2.5 h-2.5" />{req.comments.length}</span>}
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                      <span className={`flex items-center gap-1 text-[10px] ${sc.color}`}><StatusIcon className="w-3 h-3" /> {sc.label}</span>
-                      <div className="flex items-center gap-1 flex-wrap justify-end">
-                        {hasBrief && req.status !== 'requested' && (
-                          <button onClick={() => setExpanded(req.briefId!)} className="px-2 py-1 rounded bg-blue-600/20 border border-blue-500/30 text-[10px] text-blue-300 hover:bg-blue-600/30 transition-colors">View Brief</button>
-                        )}
-                        {req.status === 'requested' && (
-                          <>
-                            <button disabled={isGenerating} onClick={() => handleGenerateBriefForRequest(req)} className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/20 border border-teal-500/30 text-[10px] text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50">
-                              {isGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                              {isGenerating ? 'Generating...' : 'Generate Brief'}
+                      <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                        <span className={`flex items-center gap-1 text-[10px] ${sc.color}`}><StatusIcon className="w-3 h-3" /> {sc.label}</span>
+                        <div className="flex items-center gap-1 flex-wrap justify-end">
+                          {hasBrief && req.status !== 'requested' && (
+                            <button onClick={() => setExpandedRequest(expandedRequest === req.id ? null : req.id)} className={`px-2 py-1 rounded border text-[10px] transition-colors ${expandedRequest === req.id ? 'bg-blue-600/30 border-blue-500/40 text-blue-200' : 'bg-blue-600/20 border-blue-500/30 text-blue-300 hover:bg-blue-600/30'}`}>
+                              {expandedRequest === req.id ? 'Hide Brief' : 'View Brief'}
                             </button>
-                            <button onClick={() => handleUpdateRequestStatus(req.id, 'declined')} className="px-2 py-1 rounded bg-zinc-800 text-[10px] text-zinc-500 hover:text-red-400 transition-colors">Decline</button>
-                          </>
-                        )}
-                        {req.status === 'brief_generated' && (
-                          <button onClick={() => handleUpdateRequestStatus(req.id, 'client_review')} className="px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 text-[10px] text-cyan-300 hover:bg-cyan-600/30 transition-colors">Send to Client</button>
-                        )}
-                        {req.status === 'client_review' && (
-                          <span className="text-[9px] text-cyan-400/60 italic">Awaiting client feedback</span>
-                        )}
-                        {req.status === 'approved' && (
-                          <button onClick={() => handleUpdateRequestStatus(req.id, 'in_progress')} className="px-2 py-1 rounded bg-violet-600/20 border border-violet-500/30 text-[10px] text-violet-300 hover:bg-violet-600/30 transition-colors">Start Production</button>
-                        )}
-                        {req.status === 'changes_requested' && (
-                          <button onClick={() => handleUpdateRequestStatus(req.id, 'client_review')} className="px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 text-[10px] text-cyan-300 hover:bg-cyan-600/30 transition-colors">Resubmit to Client</button>
-                        )}
-                        {req.status === 'in_progress' && (
-                          <button onClick={() => handleUpdateRequestStatus(req.id, 'delivered')} className="px-2 py-1 rounded bg-green-600/20 border border-green-500/30 text-[10px] text-green-300 hover:bg-green-600/30 transition-colors">Mark Delivered</button>
-                        )}
+                          )}
+                          {req.status === 'requested' && (
+                            <>
+                              <button disabled={isGenerating} onClick={() => handleGenerateBriefForRequest(req)} className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/20 border border-teal-500/30 text-[10px] text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50">
+                                {isGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                                {isGenerating ? 'Generating...' : 'Generate Brief'}
+                              </button>
+                              <button onClick={() => handleUpdateRequestStatus(req.id, 'declined')} className="px-2 py-1 rounded bg-zinc-800 text-[10px] text-zinc-500 hover:text-red-400 transition-colors">Decline</button>
+                            </>
+                          )}
+                          {req.status === 'brief_generated' && (
+                            <button onClick={() => handleUpdateRequestStatus(req.id, 'client_review')} className="px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 text-[10px] text-cyan-300 hover:bg-cyan-600/30 transition-colors">Send to Client</button>
+                          )}
+                          {req.status === 'client_review' && (
+                            <span className="text-[9px] text-cyan-400/60 italic">Awaiting client feedback</span>
+                          )}
+                          {req.status === 'approved' && (
+                            <button onClick={() => handleUpdateRequestStatus(req.id, 'in_progress')} className="px-2 py-1 rounded bg-violet-600/20 border border-violet-500/30 text-[10px] text-violet-300 hover:bg-violet-600/30 transition-colors">Start Production</button>
+                          )}
+                          {req.status === 'changes_requested' && (
+                            <button onClick={() => handleUpdateRequestStatus(req.id, 'client_review')} className="px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 text-[10px] text-cyan-300 hover:bg-cyan-600/30 transition-colors">Resubmit to Client</button>
+                          )}
+                          {req.status === 'in_progress' && (
+                            <button onClick={() => handleUpdateRequestStatus(req.id, 'delivered')} className="px-2 py-1 rounded bg-green-600/20 border border-green-500/30 text-[10px] text-green-300 hover:bg-green-600/30 transition-colors">Mark Delivered</button>
+                          )}
+                        </div>
                       </div>
                     </div>
+                    {req.status === 'changes_requested' && req.clientFeedback && (
+                      <div className="mt-2 text-[10px] text-orange-300/80 bg-orange-500/10 px-2.5 py-1.5 rounded border border-orange-500/20"><span className="text-orange-400 font-medium">Client feedback:</span> {req.clientFeedback}</div>
+                    )}
+                    {req.status === 'declined' && req.declineReason && (
+                      <div className="mt-2 text-[10px] text-zinc-500 bg-zinc-800/50 px-2.5 py-1.5 rounded border border-zinc-800"><span className="text-zinc-400 font-medium">Reason:</span> {req.declineReason}</div>
+                    )}
                   </div>
-                  {req.status === 'changes_requested' && req.clientFeedback && (
-                    <div className="mt-2 text-[10px] text-orange-300/80 bg-orange-500/10 px-2.5 py-1.5 rounded border border-orange-500/20"><span className="text-orange-400 font-medium">Client feedback:</span> {req.clientFeedback}</div>
-                  )}
-                  {req.status === 'declined' && req.declineReason && (
-                    <div className="mt-2 text-[10px] text-zinc-500 bg-zinc-800/50 px-2.5 py-1.5 rounded border border-zinc-800"><span className="text-zinc-400 font-medium">Reason:</span> {req.declineReason}</div>
+                  {/* Inline brief preview */}
+                  {inlineBrief && (
+                    <div className="border-t border-zinc-700/50 px-3 pb-3 pt-2 bg-zinc-900/50 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Brief Preview</span>
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => copyAsMarkdown(inlineBrief)} className="flex items-center gap-1 px-2 py-0.5 rounded text-[9px] bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 transition-colors"><Copy className="w-2.5 h-2.5" /> Copy AI</button>
+                          <button onClick={() => exportClientHTML(inlineBrief)} className="flex items-center gap-1 px-2 py-0.5 rounded text-[9px] bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors"><Download className="w-2.5 h-2.5" /> PDF</button>
+                          <button onClick={() => setExpanded(expanded === inlineBrief.id ? null : inlineBrief.id)} className="flex items-center gap-1 px-2 py-0.5 rounded text-[9px] bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors">Full Detail</button>
+                        </div>
+                      </div>
+                      {inlineBrief.executiveSummary && (
+                        <div className="text-[11px] text-zinc-400 leading-relaxed bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">{inlineBrief.executiveSummary}</div>
+                      )}
+                      <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
+                        <div className="text-[9px] text-zinc-600 mb-0.5">Suggested Title</div>
+                        <div className="text-xs text-teal-400 font-medium">{inlineBrief.suggestedTitle}</div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="bg-zinc-950 rounded px-2 py-1.5 border border-zinc-800 text-center">
+                          <div className="text-[8px] text-zinc-600">Words</div>
+                          <div className="text-xs font-bold text-blue-400">{inlineBrief.wordCountTarget?.toLocaleString()}</div>
+                        </div>
+                        {inlineBrief.contentFormat && <div className="bg-zinc-950 rounded px-2 py-1.5 border border-zinc-800 text-center"><div className="text-[8px] text-zinc-600">Format</div><div className="text-xs font-medium text-amber-400 capitalize">{inlineBrief.contentFormat}</div></div>}
+                        {inlineBrief.difficultyScore != null && <div className="bg-zinc-950 rounded px-2 py-1.5 border border-zinc-800 text-center"><div className="text-[8px] text-zinc-600">Difficulty</div><div className={`text-xs font-bold ${inlineBrief.difficultyScore <= 30 ? 'text-green-400' : inlineBrief.difficultyScore <= 60 ? 'text-amber-400' : 'text-red-400'}`}>{inlineBrief.difficultyScore}/100</div></div>}
+                      </div>
+                      {inlineBrief.outline?.length > 0 && (
+                        <div>
+                          <div className="text-[9px] text-zinc-600 mb-1">Outline ({inlineBrief.outline.length} sections)</div>
+                          <div className="space-y-0.5">
+                            {inlineBrief.outline.map((s, i) => (
+                              <div key={i} className="flex items-center gap-2 text-[10px] text-zinc-400 px-2 py-0.5">
+                                <span className="text-zinc-600 font-mono w-3 text-right">{i + 1}.</span>
+                                <span className="flex-1">{s.heading}</span>
+                                {s.wordCount && <span className="text-[8px] text-zinc-600">{s.wordCount}w</span>}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               );
@@ -338,16 +388,20 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
         </button>
       </div>
 
-      {/* Briefs list */}
-      {briefs.length === 0 ? (
-        <div className="text-center py-12">
-          <FileText className="w-8 h-8 text-zinc-700 mx-auto mb-2" />
-          <p className="text-sm text-zinc-500">No content briefs yet</p>
-          <p className="text-xs text-zinc-600 mt-1">Enter a keyword above to generate an AI-powered content brief</p>
-        </div>
-      ) : (
+      {/* Briefs list (standalone — not linked to a request) */}
+      {(() => {
+        const linkedBriefIds = new Set(clientRequests.filter(r => r.briefId).map(r => r.briefId!));
+        const standaloneBriefs = briefs.filter(b => !linkedBriefIds.has(b.id));
+        if (standaloneBriefs.length === 0) return (
+          <div className="text-center py-12">
+            <FileText className="w-8 h-8 text-zinc-700 mx-auto mb-2" />
+            <p className="text-sm text-zinc-500">No standalone briefs</p>
+            <p className="text-xs text-zinc-600 mt-1">Generate a brief above, or briefs linked to requests will appear in the request cards</p>
+          </div>
+        );
+        return (
         <div className="space-y-2">
-          {briefs.map(brief => (
+          {standaloneBriefs.map(brief => (
             <div key={brief.id} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
               {/* Brief header */}
               <button
@@ -569,7 +623,8 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
             </div>
           ))}
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

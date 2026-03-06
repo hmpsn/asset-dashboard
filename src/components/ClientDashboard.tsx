@@ -1743,7 +1743,11 @@ export function ClientDashboard({ workspaceId }: Props) {
                                       });
                                       if (!res.ok) throw new Error(`Server returned ${res.status}`);
                                       setRequestedTopics(prev => new Set(prev).add(gap.targetKeyword));
-                                      setToast({ message: `Topic "${gap.topic}" requested! Your team will prepare a content brief.`, type: 'success' });
+                                      // Reload content requests so Content tab updates
+                                      fetch(`/api/public/content-requests/${workspaceId}`).then(r => r.ok ? r.json() : []).then((reqs: ClientContentRequest[]) => {
+                                        if (Array.isArray(reqs) && reqs.length > 0) setContentRequests(reqs);
+                                      }).catch(() => {});
+                                      setToast({ message: `Topic "${gap.topic}" requested! Check the Content tab for updates.`, type: 'success' });
                                       setTimeout(() => setToast(null), 5000);
                                     } catch (err) {
                                       console.error('Content request failed:', err);
@@ -1950,6 +1954,28 @@ export function ClientDashboard({ workspaceId }: Props) {
 
         {/* ════════════ CONTENT TAB ════════════ */}
         {tab === 'content' && (<>
+          {/* Alert banner for items needing review */}
+          {(() => {
+            const reviewCount = contentRequests.filter(r => r.status === 'client_review').length;
+            const newComments = contentRequests.filter(r => r.comments && r.comments.length > 0 && r.comments[r.comments.length - 1].author === 'team' && r.status !== 'declined').length;
+            if (reviewCount > 0 || newComments > 0) return (
+              <div className="bg-gradient-to-r from-blue-600/20 to-teal-600/10 border border-blue-500/30 rounded-xl px-5 py-3 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                  <FileText className="w-4 h-4 text-blue-400" />
+                </div>
+                <div className="flex-1">
+                  <div className="text-xs font-semibold text-blue-200">
+                    {reviewCount > 0 && <>{reviewCount} brief{reviewCount > 1 ? 's' : ''} ready for your review</>}
+                    {reviewCount > 0 && newComments > 0 && ' · '}
+                    {newComments > 0 && <>{newComments} item{newComments > 1 ? 's' : ''} with new team responses</>}
+                  </div>
+                  <div className="text-[10px] text-blue-400/60 mt-0.5">Your team has updates waiting for you below</div>
+                </div>
+              </div>
+            );
+            return null;
+          })()}
+
           <div className="flex items-center justify-between mb-1">
             <div>
               <h2 className="text-base font-semibold text-zinc-100">Content Pipeline</h2>
@@ -1976,9 +2002,13 @@ export function ClientDashboard({ workspaceId }: Props) {
             </div>
           )}
 
-          {/* Pipeline items */}
+          {/* Pipeline items — review-needed first */}
           <div className="space-y-3">
-            {contentRequests.filter(r => r.status !== 'declined').map(req => {
+            {contentRequests.filter(r => r.status !== 'declined').sort((a, b) => {
+              const priority = (s: string) => s === 'client_review' ? 0 : s === 'changes_requested' ? 1 : 2;
+              const diff = priority(a.status) - priority(b.status);
+              return diff !== 0 ? diff : b.updatedAt.localeCompare(a.updatedAt);
+            }).map(req => {
               const steps = ['requested', 'brief_generated', 'client_review', 'approved', 'in_progress', 'delivered'] as const;
               const stepLabels = ['Requested', 'Brief Ready', 'Your Review', 'Approved', 'In Production', 'Delivered'];
               // Map changes_requested back to client_review step for timeline display
