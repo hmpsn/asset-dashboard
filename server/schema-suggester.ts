@@ -461,8 +461,8 @@ export async function generateSchemaSuggestions(
 
   const results: SchemaPageSuggestion[] = [];
   const hasAI = !!process.env.OPENAI_API_KEY;
-  // Process sequentially when using AI to avoid rate limits (TPM)
-  const batch = hasAI ? 1 : 5;
+  // gpt-4o-mini has ~200K TPM — batch 3 AI calls at a time safely
+  const batch = hasAI ? 3 : 5;
 
   // Helper: find keyword context for a page slug
   const getPageKeywords = (slug: string): SchemaContext['pageKeywords'] => {
@@ -558,7 +558,7 @@ export async function generateSchemaSuggestions(
 
   // ── Also analyze CMS/collection pages discovered via sitemap ──
   const staticPaths = buildStaticPathSet(pages);
-  const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, 200);
+  const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, 1000);
   if (cmsUrls.length > 0) {
     console.log(`[schema] Also analyzing ${cmsUrls.length} CMS pages`);
     for (let i = 0; i < cmsUrls.length; i += batch) {
