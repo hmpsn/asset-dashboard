@@ -2567,17 +2567,34 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     }
 
     // Sitemap = authoritative list of live pages
+    // Filter out utility/thin/legal pages that don't need keyword strategy
+    const SKIP_PATHS = new Set(['/404', '/search', '/password', '/offline', '/thank-you', '/thanks', '/confirmation']);
+    const SKIP_PREFIXES = ['/tag/', '/category/', '/author/', '/page/'];
+    const SKIP_SUFFIXES = ['/rss', '/feed', '/rss.xml', '/feed.xml'];
+    const SKIP_PATTERNS = [/\/404$/i, /\/search$/i, /\/password$/i];
+
     const allPaths = new Set<string>();
     if (baseUrl) {
       try {
         const sitemapUrls = await discoverSitemapUrls(baseUrl);
         console.log(`[Strategy] Sitemap discovered ${sitemapUrls.length} URLs from ${baseUrl}`);
+        let skippedUtility = 0;
         for (const url of sitemapUrls) {
           try {
-            const path = new URL(url).pathname || '/';
+            const rawPath = new URL(url).pathname || '/';
+            // Normalize: strip trailing slash (except root)
+            const path = rawPath === '/' ? '/' : rawPath.replace(/\/$/, '');
+
+            // Skip utility pages
+            if (SKIP_PATHS.has(path.toLowerCase())) { skippedUtility++; continue; }
+            if (SKIP_PREFIXES.some(p => path.toLowerCase().startsWith(p))) { skippedUtility++; continue; }
+            if (SKIP_SUFFIXES.some(s => path.toLowerCase().endsWith(s))) { skippedUtility++; continue; }
+            if (SKIP_PATTERNS.some(r => r.test(path))) { skippedUtility++; continue; }
+
             allPaths.add(path);
           } catch { /* skip invalid URLs */ }
         }
+        if (skippedUtility > 0) console.log(`[Strategy] Skipped ${skippedUtility} utility/index pages`);
       } catch (err) {
         console.log('[Strategy] Sitemap discovery failed:', err);
       }
@@ -2652,7 +2669,21 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     }
     const skipped = pathArray.length - pageInfo.length;
     if (skipped > 0) console.log(`[Strategy] Filtered out ${skipped} non-live pages (404/unreachable)`);
-    sendProgress('content', `Fetched ${pageInfo.length} live pages (${skipped} non-live filtered out)`, 0.46);
+
+    // Post-fetch: filter out pages with very thin content (utility/legal pages with < 50 chars)
+    const beforeThinFilter = pageInfo.length;
+    const thinPages = pageInfo.filter(p => p.contentSnippet.length < 50 && p.path !== '/');
+    if (thinPages.length > 0) {
+      console.log(`[Strategy] Thin content pages (< 50 chars): ${thinPages.map(p => p.path).join(', ')}`);
+      // Remove thin pages from the array
+      for (const thin of thinPages) {
+        const idx = pageInfo.indexOf(thin);
+        if (idx >= 0) pageInfo.splice(idx, 1);
+      }
+      console.log(`[Strategy] Removed ${thinPages.length} thin content pages`);
+    }
+
+    sendProgress('content', `Fetched ${pageInfo.length} live pages (${skipped} non-live, ${beforeThinFilter - pageInfo.length} thin filtered)`, 0.46);
 
     // 4. Try to gather GSC data if connected
     sendProgress('search_data', 'Fetching Google Search Console data...', 0.48);
