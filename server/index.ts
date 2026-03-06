@@ -37,6 +37,7 @@ import {
   getPageDom,
   updatePageSeo,
   publishSite,
+  publishSchemaToPage,
   uploadAsset,
   listAssetFolders,
   createAssetFolder,
@@ -1047,6 +1048,33 @@ app.post('/api/webflow/schema-suggestions/:siteId/page', async (req, res) => {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('Single-page schema error:', msg, err);
     res.status(500).json({ error: `Schema generation failed: ${msg}` });
+  }
+});
+
+// --- Publish Schema to Webflow Page ---
+app.post('/api/webflow/schema-publish/:siteId', async (req, res) => {
+  const { pageId, schema, publishAfter } = req.body;
+  if (!pageId || !schema) return res.status(400).json({ error: 'pageId and schema required' });
+  try {
+    const token = getTokenForSite(req.params.siteId) || undefined;
+    const result = await publishSchemaToPage(req.params.siteId, pageId, schema, token);
+    if (!result.success) return res.status(500).json(result);
+
+    // Optionally publish the site so changes go live
+    let published = false;
+    if (publishAfter) {
+      const pubResult = await publishSite(req.params.siteId, token);
+      published = pubResult.success;
+      if (!pubResult.success) {
+        console.error('[schema-publish] Site publish failed:', pubResult.error);
+      }
+    }
+
+    res.json({ success: true, published });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('Schema publish error:', msg, err);
+    res.status(500).json({ error: `Schema publish failed: ${msg}` });
   }
 });
 

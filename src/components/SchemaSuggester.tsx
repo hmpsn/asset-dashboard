@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Loader2, ChevronDown, ChevronRight, Copy, CheckCircle,
-  AlertCircle, Info, Sparkles, RefreshCw,
+  AlertCircle, Info, Sparkles, RefreshCw, Upload,
 } from 'lucide-react';
 
 interface SchemaSuggestion {
@@ -31,6 +31,10 @@ export function SchemaSuggester({ siteId }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [regenerating, setRegenerating] = useState<Set<string>>(new Set());
+  const [publishing, setPublishing] = useState<Set<string>>(new Set());
+  const [published, setPublished] = useState<Set<string>>(new Set());
+  const [publishError, setPublishError] = useState<Record<string, string>>({});
+  const [confirmPublish, setConfirmPublish] = useState<string | null>(null);
 
   // Auto-run scan on mount
   useEffect(() => {
@@ -77,6 +81,32 @@ export function SchemaSuggester({ siteId }: Props) {
       // keep existing data
     } finally {
       setRegenerating(prev => {
+        const next = new Set(prev);
+        next.delete(pageId);
+        return next;
+      });
+    }
+  };
+
+  const publishToWebflow = async (pageId: string, schema: Record<string, unknown>) => {
+    setPublishing(prev => new Set(prev).add(pageId));
+    setPublishError(prev => { const n = { ...prev }; delete n[pageId]; return n; });
+    setConfirmPublish(null);
+    try {
+      const res = await fetch(`/api/webflow/schema-publish/${siteId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pageId, schema, publishAfter: true }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      setPublished(prev => new Set(prev).add(pageId));
+    } catch (err) {
+      setPublishError(prev => ({ ...prev, [pageId]: err instanceof Error ? err.message : 'Publish failed' }));
+    } finally {
+      setPublishing(prev => {
         const next = new Set(prev);
         next.delete(pageId);
         return next;
@@ -254,16 +284,62 @@ export function SchemaSuggester({ siteId }: Props) {
                       <pre className="text-xs font-mono bg-zinc-950 rounded-lg p-3 overflow-x-auto text-zinc-400 border border-zinc-800 max-h-64 overflow-y-auto">
                         {JSON.stringify(schema.template, null, 2)}
                       </pre>
-                      <button
-                        onClick={() => copyTemplate(schema, page.pageId)}
-                        className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors"
-                      >
-                        {copiedId === `${page.pageId}-${schema.type}` ? (
-                          <><CheckCircle className="w-3 h-3 text-green-400" /> Copied</>
+                      <div className="absolute top-2 right-2 flex items-center gap-1.5">
+                        <button
+                          onClick={() => copyTemplate(schema, page.pageId)}
+                          className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors"
+                        >
+                          {copiedId === `${page.pageId}-${schema.type}` ? (
+                            <><CheckCircle className="w-3 h-3 text-green-400" /> Copied</>
+                          ) : (
+                            <><Copy className="w-3 h-3" /> Copy</>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Publish to Webflow */}
+                    <div className="mt-3 flex items-center gap-2">
+                      {!page.pageId.startsWith('cms-') && (
+                        published.has(page.pageId) ? (
+                          <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
+                            <CheckCircle className="w-3.5 h-3.5" /> Published to Webflow
+                          </span>
+                        ) : confirmPublish === page.pageId ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-amber-400">Publish schema to this page's &lt;head&gt;?</span>
+                            <button
+                              onClick={() => publishToWebflow(page.pageId, schema.template)}
+                              disabled={publishing.has(page.pageId)}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 bg-green-600 hover:bg-green-500 text-white"
+                            >
+                              {publishing.has(page.pageId) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                              Yes, publish
+                            </button>
+                            <button
+                              onClick={() => setConfirmPublish(null)}
+                              className="px-2 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
                         ) : (
-                          <><Copy className="w-3 h-3" /> Copy as &lt;script&gt;</>
-                        )}
-                      </button>
+                          <button
+                            onClick={() => setConfirmPublish(page.pageId)}
+                            disabled={publishing.has(page.pageId)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 bg-gradient-to-r from-blue-600/80 to-indigo-600/80 hover:from-blue-500 hover:to-indigo-500 text-white"
+                          >
+                            {publishing.has(page.pageId) ? (
+                              <><Loader2 className="w-3 h-3 animate-spin" /> Publishing...</>
+                            ) : (
+                              <><Upload className="w-3.5 h-3.5" /> Publish to Webflow</>
+                            )}
+                          </button>
+                        )
+                      )}
+                      {publishError[page.pageId] && (
+                        <span className="text-xs text-red-400">{publishError[page.pageId]}</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -276,7 +352,7 @@ export function SchemaSuggester({ siteId }: Props) {
       <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-blue-500/5 border border-blue-500/10">
         <Info className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
         <div className="text-xs text-zinc-400">
-          <strong className="text-zinc-300">How to use:</strong> Each page gets one unified <code className="text-blue-300">@graph</code> schema with cross-referenced types. Copy the JSON-LD and paste it into the page's custom code in Webflow (Page Settings → Custom Code → Head Code). Values are pre-filled from your page content and keyword strategy.
+          <strong className="text-zinc-300">How to use:</strong> Each page gets one unified <code className="text-blue-300">@graph</code> schema with cross-referenced types. Click <strong>Publish to Webflow</strong> to inject it directly into the page's <code className="text-blue-300">&lt;head&gt;</code> via the Custom Code API, or <strong>Copy</strong> to paste it manually. Existing custom code on your pages is never touched — only schema scripts are managed.
         </div>
       </div>
     </div>

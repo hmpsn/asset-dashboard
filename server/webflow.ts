@@ -560,6 +560,142 @@ export async function publishSite(
   return { success: true };
 }
 
+// --- Custom Code API: Register, Apply, and Manage inline scripts ---
+
+// Identifier prefix so we can recognize our schema scripts vs. user code
+const SCHEMA_SCRIPT_PREFIX = 'JSON-LD Schema';
+
+interface RegisteredScript {
+  id: string;
+  displayName: string;
+  version: string;
+  hostedLocation?: string;
+}
+
+interface PageCustomCodeBlock {
+  id: string;
+  location: 'header' | 'footer';
+  version: string;
+}
+
+// Register an inline script with the site
+async function registerInlineScript(
+  siteId: string,
+  sourceCode: string,
+  displayName: string,
+  version: string,
+  tokenOverride?: string,
+): Promise<RegisteredScript | null> {
+  const res = await webflowFetch(`/sites/${siteId}/registered_scripts/inline`, {
+    method: 'POST',
+    body: JSON.stringify({
+      sourceCode,
+      displayName,
+      version,
+      canCopy: false,
+    }),
+  }, tokenOverride);
+  if (!res.ok) {
+    const text = await res.text();
+    console.error(`[schema-publish] Failed to register inline script: ${res.status} ${text}`);
+    return null;
+  }
+  return await res.json() as RegisteredScript;
+}
+
+// List all registered scripts for a site
+async function listRegisteredScripts(siteId: string, tokenOverride?: string): Promise<RegisteredScript[]> {
+  const res = await webflowFetch(`/sites/${siteId}/registered_scripts`, {}, tokenOverride);
+  if (!res.ok) return [];
+  const data = await res.json() as { registeredScripts?: RegisteredScript[] };
+  return data.registeredScripts || [];
+}
+
+// Get existing custom code blocks applied to a page
+async function getPageCustomCode(pageId: string, tokenOverride?: string): Promise<PageCustomCodeBlock[]> {
+  const res = await webflowFetch(`/pages/${pageId}/custom_code`, {}, tokenOverride);
+  if (!res.ok) return []; // 404 means no custom code yet — that's fine
+  const data = await res.json() as { scripts?: PageCustomCodeBlock[] };
+  return data.scripts || [];
+}
+
+// Upsert (replace) all custom code blocks on a page
+async function upsertPageCustomCode(
+  pageId: string,
+  scripts: PageCustomCodeBlock[],
+  tokenOverride?: string,
+): Promise<boolean> {
+  const res = await webflowFetch(`/pages/${pageId}/custom_code`, {
+    method: 'PUT',
+    body: JSON.stringify({ scripts }),
+  }, tokenOverride);
+  if (!res.ok) {
+    const text = await res.text();
+    console.error(`[schema-publish] Failed to upsert page custom code: ${res.status} ${text}`);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Safely publish a JSON-LD schema to a Webflow page.
+ * 
+ * SAFETY: This function ONLY touches scripts whose displayName starts with
+ * our SCHEMA_SCRIPT_PREFIX. All other custom code on the page is preserved.
+ * 
+ * Flow:
+ * 1. Register the JSON-LD as a new inline script version
+ * 2. GET existing custom code on the page
+ * 3. Remove only our previous schema scripts, keep everything else
+ * 4. Add the new schema script to the header
+ * 5. PUT the merged list back
+ */
+export async function publishSchemaToPage(
+  siteId: string,
+  pageId: string,
+  schemaJson: Record<string, unknown>,
+  tokenOverride?: string,
+): Promise<{ success: boolean; error?: string }> {
+  const sourceCode = `<script type="application/ld+json">\n${JSON.stringify(schemaJson, null, 2)}\n</script>`;
+  const version = `1.0.${Date.now()}`; // unique version per publish
+  const displayName = `${SCHEMA_SCRIPT_PREFIX} (${pageId.slice(0, 8)})`;
+
+  // 1. Get all registered scripts so we know which IDs are ours
+  const allScripts = await listRegisteredScripts(siteId, tokenOverride);
+  const ourPreviousScriptIds = new Set(
+    allScripts
+      .filter(s => s.displayName.startsWith(SCHEMA_SCRIPT_PREFIX))
+      .map(s => s.id)
+  );
+
+  // 2. Register the new inline script
+  const registered = await registerInlineScript(siteId, sourceCode, displayName, version, tokenOverride);
+  if (!registered) {
+    return { success: false, error: 'Failed to register schema script with Webflow' };
+  }
+
+  // 3. Get existing custom code on this page
+  const existingBlocks = await getPageCustomCode(pageId, tokenOverride);
+
+  // 4. Filter out ONLY our previous schema scripts, keep everything else untouched
+  const preserved = existingBlocks.filter(block => !ourPreviousScriptIds.has(block.id));
+
+  // 5. Add the new schema script in the header
+  const updatedBlocks: PageCustomCodeBlock[] = [
+    ...preserved,
+    { id: registered.id, location: 'header', version },
+  ];
+
+  // 6. Upsert the merged list
+  const applied = await upsertPageCustomCode(pageId, updatedBlocks, tokenOverride);
+  if (!applied) {
+    return { success: false, error: 'Failed to apply schema to page custom code' };
+  }
+
+  console.log(`[schema-publish] Published schema to page ${pageId}: ${preserved.length} existing scripts preserved, 1 schema added`);
+  return { success: true };
+}
+
 export async function listSites(tokenOverride?: string): Promise<Array<{ id: string; displayName: string; shortName: string }>> {
   const token = tokenOverride || getToken();
   if (!token) return [];
