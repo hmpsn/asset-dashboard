@@ -2869,6 +2869,7 @@ app.delete('/api/approvals/:workspaceId/:batchId', (req, res) => {
 app.get('/api/public/workspace/:id', (req, res) => {
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (ws.clientPortalEnabled === false) return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
   // Only expose safe fields for client view
   res.json({
     id: ws.id,

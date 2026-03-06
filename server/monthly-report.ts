@@ -1,20 +1,46 @@
-import { listWorkspaces, type Workspace } from './workspaces.js';
+import { listWorkspaces, getUploadRoot, type Workspace } from './workspaces.js';
 import { getLatestSnapshot } from './reports.js';
 import { listActivity } from './activity-log.js';
 import { listRequests } from './requests.js';
 import { listBatches } from './approvals.js';
 import { isEmailConfigured } from './email.js';
 import nodemailer from 'nodemailer';
+import fs from 'fs';
+import path from 'path';
 
-const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // daily check
+const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // check every 6 hours
 let reportInterval: ReturnType<typeof setInterval> | null = null;
 
-// Track when we last sent a report per workspace
-const sentReports = new Map<string, string>(); // wsId -> 'YYYY-MM'
+// ── Persist sent-report timestamps to disk (survives restarts/deploys) ──
+const SENT_FILE = path.join(getUploadRoot(), '.report-sent.json');
+
+function loadSentReports(): Record<string, string> {
+  try {
+    if (fs.existsSync(SENT_FILE)) return JSON.parse(fs.readFileSync(SENT_FILE, 'utf-8'));
+  } catch { /* fresh */ }
+  return {};
+}
+
+function saveSentReports(data: Record<string, string>) {
+  try { fs.writeFileSync(SENT_FILE, JSON.stringify(data, null, 2)); } catch { /* ignore */ }
+}
 
 function currentMonth(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+// ISO week number for weekly frequency
+function currentWeek(): string {
+  const now = new Date();
+  const jan1 = new Date(now.getFullYear(), 0, 1);
+  const days = Math.floor((now.getTime() - jan1.getTime()) / 86400000);
+  const week = Math.ceil((days + jan1.getDay() + 1) / 7);
+  return `${now.getFullYear()}-W${String(week).padStart(2, '0')}`;
+}
+
+function currentPeriod(frequency: 'weekly' | 'monthly'): string {
+  return frequency === 'weekly' ? currentWeek() : currentMonth();
 }
 
 interface MonthlyData {
@@ -170,43 +196,50 @@ async function sendMonthlyReport(ws: Workspace, data: MonthlyData) {
 }
 
 async function checkAndSendReports() {
-  const month = currentMonth();
   const workspaces = listWorkspaces();
+  const sent = loadSentReports();
+  let changed = false;
 
   for (const ws of workspaces) {
+    // Must have autoReports enabled AND a client email configured
+    if (!ws.autoReports) continue;
     if (!ws.clientEmail) continue;
-    if (sentReports.get(ws.id) === month) continue;
 
-    // Only send on or after the 1st of the month
-    const now = new Date();
-    if (now.getDate() < 1) continue; // safety
+    const freq = ws.autoReportFrequency || 'monthly';
+    const period = currentPeriod(freq);
+
+    // Already sent for this period
+    if (sent[ws.id] === period) continue;
 
     const data = gatherMonthlyData(ws);
-    console.log(`[Monthly Report] Generating report for ${ws.name} (${month})`);
+    console.log(`[Auto Report] Generating ${freq} report for ${ws.name} (${period})`);
 
     try {
       await sendMonthlyReport(ws, data);
-      sentReports.set(ws.id, month);
-      console.log(`[Monthly Report] Sent to ${ws.clientEmail}`);
+      sent[ws.id] = period;
+      changed = true;
+      console.log(`[Auto Report] Sent to ${ws.clientEmail}`);
     } catch (err) {
-      console.error(`[Monthly Report] Failed for ${ws.name}:`, err);
+      console.error(`[Auto Report] Failed for ${ws.name}:`, err);
     }
   }
+
+  if (changed) saveSentReports(sent);
 }
 
 export function startMonthlyReports() {
   if (reportInterval) return;
 
-  // Check after 2 min on startup, then daily
+  // Check after 5 min on startup (avoids re-send during rapid restart cycles), then every 6 hours
   setTimeout(() => {
-    checkAndSendReports().catch(err => console.error('[Monthly Report] Error:', err));
-  }, 120000);
+    checkAndSendReports().catch(err => console.error('[Auto Report] Error:', err));
+  }, 5 * 60 * 1000);
 
   reportInterval = setInterval(() => {
-    checkAndSendReports().catch(err => console.error('[Monthly Report] Error:', err));
+    checkAndSendReports().catch(err => console.error('[Auto Report] Error:', err));
   }, CHECK_INTERVAL_MS);
 
-  console.log('[Monthly Report] Report generator started (checks daily)');
+  console.log('[Auto Report] Report scheduler started (checks every 6 hours)');
 }
 
 export function stopMonthlyReports() {

@@ -242,6 +242,7 @@ export function ClientDashboard({ workspaceId }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<ClientTab>('overview');
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [days, setDays] = useState(28);
   const [sortKey, setSortKey] = useState<SortKey>('clicks');
   const [sortAsc, setSortAsc] = useState(false);
@@ -317,7 +318,10 @@ export function ClientDashboard({ workspaceId }: Props) {
   useEffect(() => {
     setLoading(true);
     fetch(`/api/public/workspace/${workspaceId}`)
-      .then(r => r.json())
+      .then(r => {
+        if (r.status === 403) { setError('This dashboard is currently unavailable. Please contact your web team for access.'); setLoading(false); throw new Error('portal_disabled'); }
+        return r.json();
+      })
       .then((data: WorkspaceInfo) => {
         if (!data.id) { setError('Workspace not found'); setLoading(false); return; }
         setWs(data);
@@ -750,15 +754,16 @@ export function ClientDashboard({ workspaceId }: Props) {
   const pendingApprovals = approvalBatches.reduce((sum, b) => sum + b.items.filter(i => i.status === 'pending').length, 0);
   const unreadTeamNotes = requests.filter(r => r.notes.length > 0 && r.notes[r.notes.length - 1].author === 'team' && r.status !== 'completed' && r.status !== 'closed').length;
 
+  const seoLocked = !ws?.seoClientView;
   const NAV = [
-    { id: 'overview' as ClientTab, label: 'Overview', icon: LayoutDashboard },
-    ...(ws?.seoClientView ? [{ id: 'health' as ClientTab, label: 'Site Health', icon: Shield }] : []),
+    { id: 'overview' as ClientTab, label: 'Overview', icon: LayoutDashboard, locked: false },
+    { id: 'health' as ClientTab, label: 'Site Health', icon: Shield, locked: seoLocked },
     ...(ws?.analyticsClientView !== false ? [
-      { id: 'analytics' as ClientTab, label: 'Analytics', icon: LineChart },
-      { id: 'search' as ClientTab, label: 'Search', icon: Search },
+      { id: 'analytics' as ClientTab, label: 'Analytics', icon: LineChart, locked: false },
+      { id: 'search' as ClientTab, label: 'Search', icon: Search, locked: false },
     ] : []),
-    { id: 'requests' as ClientTab, label: 'Requests', icon: MessageSquare },
-    ...(approvalBatches.length > 0 ? [{ id: 'approvals' as ClientTab, label: 'Approvals', icon: ClipboardCheck }] : []),
+    { id: 'requests' as ClientTab, label: 'Requests', icon: MessageSquare, locked: false },
+    ...(approvalBatches.length > 0 ? [{ id: 'approvals' as ClientTab, label: 'Approvals', icon: ClipboardCheck, locked: false }] : []),
   ];
 
   return (
@@ -801,15 +806,17 @@ export function ClientDashboard({ workspaceId }: Props) {
                 (t.id === 'analytics' && !!ga4Overview) ||
                 (t.id === 'approvals' && approvalBatches.length > 0);
               return (
-                <button key={t.id} onClick={() => setTab(t.id)}
+                <button key={t.id} onClick={() => t.locked ? setShowUpgradeModal(true) : setTab(t.id)}
                   className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium border-b-2 transition-colors ${
+                    t.locked ? 'border-transparent text-zinc-600 cursor-default' :
                     active ? 'border-teal-500 text-teal-400' :
                     'border-transparent text-zinc-500 hover:text-zinc-300 hover:border-zinc-700'
                   }`}>
                   <Icon className="w-3.5 h-3.5" /> {t.label}
+                  {t.locked && <Lock className="w-3 h-3 ml-0.5 text-zinc-600" />}
                   {t.id === 'approvals' && pendingApprovals > 0 && <span className="ml-1 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-violet-500 text-white">{pendingApprovals}</span>}
                   {t.id === 'requests' && unreadTeamNotes > 0 && <span className="ml-1 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-teal-500 text-white">{unreadTeamNotes}</span>}
-                  {hasData && !active && t.id !== 'approvals' && t.id !== 'requests' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" />}
+                  {!t.locked && hasData && !active && t.id !== 'approvals' && t.id !== 'requests' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" />}
                 </button>
               );
             })}
@@ -2335,6 +2342,36 @@ export function ClientDashboard({ workspaceId }: Props) {
         </>)}
 
       </main>
+
+      {/* ── SEO Upgrade Modal ── */}
+      {showUpgradeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowUpgradeModal(false)}>
+          <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-8 max-w-md w-full mx-4 text-center shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="w-14 h-14 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center mx-auto mb-4">
+              <Sparkles className="w-7 h-7 text-violet-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-zinc-100 mb-2">SEO Insights — Premium Feature</h3>
+            <p className="text-sm text-zinc-400 leading-relaxed mb-6">
+              Get detailed site health audits, page-level SEO scoring, and actionable recommendations to improve your search rankings.
+            </p>
+            <div className="space-y-2 text-left mb-6">
+              {['Real-time site health monitoring', 'Page-by-page SEO audit scores', 'Actionable fix recommendations', 'Score trend tracking over time'].map(f => (
+                <div key={f} className="flex items-center gap-2 text-xs text-zinc-300">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" />
+                  {f}
+                </div>
+              ))}
+            </div>
+            <a href="mailto:josh@hmpsn.studio?subject=SEO%20Insights%20Upgrade&body=I'm%20interested%20in%20enabling%20SEO%20insights%20for%20my%20dashboard."
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition-colors">
+              <Sparkles className="w-4 h-4" /> Connect With Our Team
+            </a>
+            <button onClick={() => setShowUpgradeModal(false)} className="block mx-auto mt-3 text-xs text-zinc-500 hover:text-zinc-400 transition-colors">
+              Maybe later
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Powered by footer */}
       <footer className="border-t border-zinc-800/50 mt-12">
