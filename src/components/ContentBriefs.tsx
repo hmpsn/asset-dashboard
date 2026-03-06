@@ -28,6 +28,9 @@ interface ContentBrief {
   difficultyScore?: number;
   trafficPotential?: string;
   ctaRecommendations?: string[];
+  eeatGuidance?: { experience: string; expertise: string; authority: string; trust: string };
+  contentChecklist?: string[];
+  schemaRecommendations?: { type: string; notes: string }[];
 }
 
 interface ContentTopicRequest {
@@ -567,6 +570,58 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                           </div>
                         </div>
                       )}
+
+                      {/* E-E-A-T Guidance */}
+                      {inlineBrief.eeatGuidance && (
+                        <div>
+                          <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-2">E-E-A-T Signals</div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {[
+                              { label: 'Experience', value: inlineBrief.eeatGuidance.experience, color: 'text-blue-400' },
+                              { label: 'Expertise', value: inlineBrief.eeatGuidance.expertise, color: 'text-teal-400' },
+                              { label: 'Authority', value: inlineBrief.eeatGuidance.authority, color: 'text-violet-400' },
+                              { label: 'Trust', value: inlineBrief.eeatGuidance.trust, color: 'text-amber-400' },
+                            ].filter(e => e.value).map((e, i) => (
+                              <div key={i} className="bg-zinc-950 rounded-lg px-3 py-2.5 border border-zinc-800">
+                                <div className={`text-[9px] ${e.color} font-medium uppercase tracking-wider mb-1`}>{e.label}</div>
+                                <div className="text-[11px] text-zinc-400 leading-relaxed">{e.value}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Content Checklist */}
+                      {inlineBrief.contentChecklist && inlineBrief.contentChecklist.length > 0 && (
+                        <div>
+                          <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-2">Content Checklist</div>
+                          <div className="bg-zinc-950 rounded-lg border border-zinc-800 divide-y divide-zinc-800/50">
+                            {inlineBrief.contentChecklist.map((item, i) => (
+                              <div key={i} className="flex items-start gap-2.5 px-4 py-2.5">
+                                <div className="w-4 h-4 mt-0.5 rounded border border-zinc-700 flex-shrink-0" />
+                                <span className="text-[11px] text-zinc-400 leading-relaxed">{item}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Schema Recommendations */}
+                      {inlineBrief.schemaRecommendations && inlineBrief.schemaRecommendations.length > 0 && (
+                        <div>
+                          <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-2">Schema Markup</div>
+                          <div className="space-y-2">
+                            {inlineBrief.schemaRecommendations.map((schema, i) => (
+                              <div key={i} className="bg-zinc-950 rounded-lg px-4 py-3 border border-zinc-800">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-medium">{schema.type}</span>
+                                </div>
+                                <div className="text-[11px] text-zinc-400 leading-relaxed">{schema.notes}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -841,6 +896,58 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                       <div className="flex flex-wrap gap-1.5">
                         {brief.internalLinkSuggestions.map((link, i) => (
                           <span key={i} className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-blue-400">/{link}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* E-E-A-T Guidance */}
+                  {brief.eeatGuidance && (
+                    <div>
+                      <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-2">E-E-A-T Signals</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {[
+                          { label: 'Experience', value: brief.eeatGuidance.experience, color: 'text-blue-400' },
+                          { label: 'Expertise', value: brief.eeatGuidance.expertise, color: 'text-teal-400' },
+                          { label: 'Authority', value: brief.eeatGuidance.authority, color: 'text-violet-400' },
+                          { label: 'Trust', value: brief.eeatGuidance.trust, color: 'text-amber-400' },
+                        ].filter(e => e.value).map((e, i) => (
+                          <div key={i} className="bg-zinc-950 rounded-lg px-3 py-2.5 border border-zinc-800">
+                            <div className={`text-[9px] ${e.color} font-medium uppercase tracking-wider mb-1`}>{e.label}</div>
+                            <div className="text-[11px] text-zinc-400 leading-relaxed">{e.value}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Content Checklist */}
+                  {brief.contentChecklist && brief.contentChecklist.length > 0 && (
+                    <div>
+                      <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-2">Content Checklist</div>
+                      <div className="bg-zinc-950 rounded-lg border border-zinc-800 divide-y divide-zinc-800/50">
+                        {brief.contentChecklist.map((item, i) => (
+                          <div key={i} className="flex items-start gap-2.5 px-4 py-2.5">
+                            <div className="w-4 h-4 mt-0.5 rounded border border-zinc-700 flex-shrink-0" />
+                            <span className="text-[11px] text-zinc-400 leading-relaxed">{item}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Schema Recommendations */}
+                  {brief.schemaRecommendations && brief.schemaRecommendations.length > 0 && (
+                    <div>
+                      <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-2">Schema Markup</div>
+                      <div className="space-y-2">
+                        {brief.schemaRecommendations.map((schema, i) => (
+                          <div key={i} className="bg-zinc-950 rounded-lg px-4 py-3 border border-zinc-800">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-medium">{schema.type}</span>
+                            </div>
+                            <div className="text-[11px] text-zinc-400 leading-relaxed">{schema.notes}</div>
+                          </div>
                         ))}
                       </div>
                     </div>

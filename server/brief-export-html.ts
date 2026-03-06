@@ -95,6 +95,18 @@ export function renderBriefHTML(brief: ContentBrief): string {
   .cta-badge.primary { background: rgba(46,217,195,0.15); color: #2ed9c3; }
   .cta-badge.secondary { background: #27272a; color: #71717a; }
 
+  .eeat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .eeat-card { background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 14px 16px; }
+  .eeat-card .eeat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-bottom: 6px; }
+  .eeat-card .eeat-value { font-size: 12px; color: #a1a1aa; line-height: 1.6; }
+  .checklist-wrap { background: #18181b; border: 1px solid #27272a; border-radius: 10px; overflow: hidden; }
+  .checklist-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 16px; border-bottom: 1px solid rgba(39,39,42,0.5); font-size: 12px; color: #a1a1aa; line-height: 1.5; }
+  .checklist-item:last-child { border-bottom: none; }
+  .checklist-box { width: 14px; height: 14px; border: 1.5px solid #52525b; border-radius: 3px; flex-shrink: 0; margin-top: 2px; }
+  .schema-card { background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 14px 16px; margin-bottom: 8px; }
+  .schema-badge { display: inline-block; font-size: 10px; padding: 3px 10px; border-radius: 6px; background: rgba(34,211,238,0.1); border: 1px solid rgba(34,211,238,0.25); color: #22d3ee; font-weight: 600; margin-bottom: 6px; }
+  .schema-notes { font-size: 12px; color: #a1a1aa; line-height: 1.5; }
+
   .footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid #27272a; text-align: center; font-size: 11px; color: #52525b; }
   .footer a { color: #2ed9c3; text-decoration: none; }
 </style>
@@ -168,6 +180,28 @@ export function renderBriefHTML(brief: ContentBrief): string {
   ${b.competitorInsights ? `<div class="section"><div class="section-title">Competitor Insights</div><div class="field"><div class="fv">${esc(b.competitorInsights)}</div></div></div>` : ''}
 
   ${b.internalLinkSuggestions.length > 0 ? `<div class="section"><div class="section-title">Internal Link Suggestions</div><div class="tags">${b.internalLinkSuggestions.map(l => `<span class="tag" style="color:#60a5fa">/${esc(l)}</span>`).join('')}</div></div>` : ''}
+
+  ${b.eeatGuidance ? `<div class="section">
+    <div class="section-title">E-E-A-T Signals</div>
+    <div class="eeat-grid">
+      ${b.eeatGuidance.experience ? `<div class="eeat-card"><div class="eeat-label" style="color:#60a5fa">Experience</div><div class="eeat-value">${esc(b.eeatGuidance.experience)}</div></div>` : ''}
+      ${b.eeatGuidance.expertise ? `<div class="eeat-card"><div class="eeat-label" style="color:#2ed9c3">Expertise</div><div class="eeat-value">${esc(b.eeatGuidance.expertise)}</div></div>` : ''}
+      ${b.eeatGuidance.authority ? `<div class="eeat-card"><div class="eeat-label" style="color:#a78bfa">Authority</div><div class="eeat-value">${esc(b.eeatGuidance.authority)}</div></div>` : ''}
+      ${b.eeatGuidance.trust ? `<div class="eeat-card"><div class="eeat-label" style="color:#fbbf24">Trust</div><div class="eeat-value">${esc(b.eeatGuidance.trust)}</div></div>` : ''}
+    </div>
+  </div>` : ''}
+
+  ${b.contentChecklist?.length ? `<div class="section">
+    <div class="section-title">Content Checklist</div>
+    <div class="checklist-wrap">
+      ${b.contentChecklist.map(item => `<div class="checklist-item"><div class="checklist-box"></div><span>${esc(item)}</span></div>`).join('')}
+    </div>
+  </div>` : ''}
+
+  ${b.schemaRecommendations?.length ? `<div class="section">
+    <div class="section-title">Schema Markup Recommendations</div>
+    ${b.schemaRecommendations.map(s => `<div class="schema-card"><div class="schema-badge">${esc(s.type)}</div><div class="schema-notes">${esc(s.notes)}</div></div>`).join('')}
+  </div>` : ''}
 
   <div class="footer">
     <div style="margin-bottom:8px">${LOGO_SVG.replace('width="160" height="51"', 'width="100" height="32"')}</div>

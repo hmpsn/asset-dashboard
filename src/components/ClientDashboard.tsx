@@ -5,7 +5,7 @@ import {
   Target, Zap, Shield, MessageSquare, X, ChevronDown, ChevronUp,
   CheckCircle2, Info, LayoutDashboard, LineChart, Lock, Trophy,
   Users, Globe, Activity, Filter, ClipboardCheck, Check, Edit3,
-  Sun, Moon, Plus, Paperclip, FileText,
+  Sun, Moon, Plus, Paperclip, FileText, Download,
 } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 
@@ -56,8 +56,19 @@ interface ClientContentRequest {
 interface ClientBriefPreview {
   id: string; targetKeyword: string; suggestedTitle: string; suggestedMetaDesc: string;
   wordCountTarget: number; intent: string; audience: string; contentFormat?: string;
-  executiveSummary?: string; outline: { heading: string; notes: string; wordCount?: number }[];
+  executiveSummary?: string; outline: { heading: string; notes: string; wordCount?: number; keywords?: string[] }[];
   difficultyScore?: number; trafficPotential?: string;
+  toneAndStyle?: string;
+  ctaRecommendations?: string[];
+  secondaryKeywords?: string[];
+  topicalEntities?: string[];
+  peopleAlsoAsk?: string[];
+  serpAnalysis?: { contentType: string; avgWordCount: number; commonElements: string[]; gaps: string[] };
+  internalLinkSuggestions?: string[];
+  competitorInsights?: string;
+  eeatGuidance?: { experience: string; expertise: string; authority: string; trust: string };
+  contentChecklist?: string[];
+  schemaRecommendations?: { type: string; notes: string }[];
 }
 
 type SortKey = 'clicks' | 'impressions' | 'ctr' | 'position';
@@ -2067,41 +2078,224 @@ export function ClientDashboard({ workspaceId }: Props) {
                   {/* Expanded detail */}
                   {isExpanded && (
                     <div className="px-5 pb-5 space-y-4 border-t border-zinc-800">
-                      {/* Brief preview */}
+                      {/* Full brief */}
                       {brief && (
-                        <div className="mt-4 space-y-3">
-                          <div className="bg-zinc-950 rounded-lg px-4 py-3 border border-zinc-800">
-                            <div className="text-[10px] text-zinc-500 mb-1">Suggested Title</div>
-                            <div className="text-sm text-teal-400 font-medium">{brief.suggestedTitle}</div>
-                          </div>
+                        <div className="mt-4 space-y-5">
+                          {/* — Strategic Overview — */}
                           {brief.executiveSummary && (
-                            <div className="bg-zinc-950 rounded-lg px-4 py-3 border border-zinc-800">
-                              <div className="text-[10px] text-zinc-500 mb-1">Summary</div>
-                              <div className="text-xs text-zinc-400 leading-relaxed">{brief.executiveSummary}</div>
+                            <div className="bg-teal-500/5 border border-teal-500/20 rounded-lg px-4 py-3">
+                              <div className="text-[10px] text-teal-400 font-medium uppercase tracking-wider mb-1.5">Strategic Overview</div>
+                              <div className="text-xs text-zinc-300 leading-relaxed">{brief.executiveSummary}</div>
                             </div>
                           )}
-                          <div className="grid grid-cols-3 gap-3">
-                            <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800 text-center">
-                              <div className="text-[9px] text-zinc-600">Words</div>
+
+                          {/* Key Metrics */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div className="bg-zinc-950 rounded-lg px-3 py-2.5 border border-zinc-800">
+                              <div className="text-[9px] text-zinc-600 mb-0.5">Word Count</div>
                               <div className="text-sm font-bold text-blue-400">{brief.wordCountTarget?.toLocaleString()}</div>
                             </div>
-                            {brief.contentFormat && <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800 text-center"><div className="text-[9px] text-zinc-600">Format</div><div className="text-sm font-medium text-amber-400 capitalize">{brief.contentFormat}</div></div>}
-                            {brief.difficultyScore != null && <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800 text-center"><div className="text-[9px] text-zinc-600">Difficulty</div><div className={`text-sm font-bold ${brief.difficultyScore <= 30 ? 'text-green-400' : brief.difficultyScore <= 60 ? 'text-amber-400' : 'text-red-400'}`}>{brief.difficultyScore}/100</div></div>}
+                            <div className="bg-zinc-950 rounded-lg px-3 py-2.5 border border-zinc-800">
+                              <div className="text-[9px] text-zinc-600 mb-0.5">Search Intent</div>
+                              <div className="text-xs text-zinc-300 capitalize font-medium">{brief.intent}</div>
+                            </div>
+                            {brief.contentFormat && (
+                              <div className="bg-zinc-950 rounded-lg px-3 py-2.5 border border-zinc-800">
+                                <div className="text-[9px] text-zinc-600 mb-0.5">Format</div>
+                                <div className="text-xs text-amber-400 capitalize font-medium">{brief.contentFormat}</div>
+                              </div>
+                            )}
+                            {brief.difficultyScore != null && (
+                              <div className="bg-zinc-950 rounded-lg px-3 py-2.5 border border-zinc-800">
+                                <div className="text-[9px] text-zinc-600 mb-0.5">Difficulty</div>
+                                <div className={`text-sm font-bold ${brief.difficultyScore <= 30 ? 'text-green-400' : brief.difficultyScore <= 60 ? 'text-amber-400' : 'text-red-400'}`}>{brief.difficultyScore}/100</div>
+                              </div>
+                            )}
                           </div>
+
+                          {/* Traffic Potential */}
+                          {brief.trafficPotential && (
+                            <div className="bg-zinc-950 rounded-lg px-4 py-2.5 border border-zinc-800 flex items-start gap-2">
+                              <TrendingUp className="w-3.5 h-3.5 text-green-400 mt-0.5 flex-shrink-0" />
+                              <div><div className="text-[9px] text-zinc-600 mb-0.5">Traffic Potential</div><div className="text-xs text-zinc-300">{brief.trafficPotential}</div></div>
+                            </div>
+                          )}
+
+                          {/* — Content Direction — */}
+                          <div className="space-y-3">
+                            <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">Content Direction</div>
+                            <div className="bg-zinc-950 rounded-lg px-4 py-3 border border-zinc-800">
+                              <div className="text-[9px] text-zinc-600 mb-1">Suggested Title</div>
+                              <div className="text-sm text-teal-400 font-medium">{brief.suggestedTitle}</div>
+                            </div>
+                            <div className="bg-zinc-950 rounded-lg px-4 py-3 border border-zinc-800">
+                              <div className="text-[9px] text-zinc-600 mb-1">Meta Description</div>
+                              <div className="text-xs text-zinc-300">{brief.suggestedMetaDesc}</div>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {brief.audience && (
+                                <div className="bg-zinc-950 rounded-lg px-4 py-3 border border-zinc-800">
+                                  <div className="text-[9px] text-zinc-600 mb-1">Target Audience</div>
+                                  <div className="text-xs text-zinc-400 leading-relaxed">{brief.audience}</div>
+                                </div>
+                              )}
+                              {brief.toneAndStyle && (
+                                <div className="bg-zinc-950 rounded-lg px-4 py-3 border border-zinc-800">
+                                  <div className="text-[9px] text-zinc-600 mb-1">Tone & Style</div>
+                                  <div className="text-xs text-zinc-400 leading-relaxed">{brief.toneAndStyle}</div>
+                                </div>
+                              )}
+                            </div>
+                            {brief.ctaRecommendations && brief.ctaRecommendations.length > 0 && (
+                              <div>
+                                <div className="text-[9px] text-zinc-600 mb-1.5">Calls to Action</div>
+                                <div className="space-y-1">{brief.ctaRecommendations.map((cta: string, i: number) => (
+                                  <div key={i} className="text-xs text-zinc-300 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800 flex items-start gap-2">
+                                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${i === 0 ? 'bg-teal-500/20 text-teal-400' : 'bg-zinc-800 text-zinc-500'}`}>{i === 0 ? 'Primary' : 'Secondary'}</span>{cta}
+                                  </div>
+                                ))}</div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* — Detailed Outline — */}
                           {brief.outline?.length > 0 && (
-                            <div>
-                              <div className="text-[10px] text-zinc-500 mb-1.5">Content Outline</div>
-                              <div className="space-y-1">
-                                {brief.outline.map((s, i) => (
-                                  <div key={i} className="flex items-center gap-2 text-xs text-zinc-400 bg-zinc-950 rounded-lg px-3 py-1.5 border border-zinc-800/50">
-                                    <span className="text-zinc-600 font-mono w-5 text-right flex-shrink-0">{i + 1}.</span>
-                                    <span className="flex-1">{s.heading}</span>
-                                    {s.wordCount && <span className="text-[9px] text-zinc-600">{s.wordCount}w</span>}
+                            <div className="space-y-3">
+                              <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">Content Outline</div>
+                              <div className="space-y-2">
+                                {brief.outline.map((s: { heading: string; notes: string; wordCount?: number; keywords?: string[] }, i: number) => (
+                                  <div key={i} className="bg-zinc-950 rounded-lg px-4 py-3 border border-zinc-800">
+                                    <div className="flex items-center justify-between">
+                                      <div className="text-xs font-medium text-zinc-200">H2: {s.heading}</div>
+                                      {s.wordCount && <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{s.wordCount} words</span>}
+                                    </div>
+                                    <div className="text-[11px] text-zinc-500 mt-1.5 leading-relaxed">{s.notes}</div>
+                                    {s.keywords && s.keywords.length > 0 && (
+                                      <div className="flex flex-wrap gap-1 mt-2">{s.keywords.map((kw: string, j: number) => <span key={j} className="text-[9px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400/80">{kw}</span>)}</div>
+                                    )}
                                   </div>
                                 ))}
                               </div>
                             </div>
                           )}
+
+                          {/* — SEO Intelligence — */}
+                          <div className="space-y-3">
+                            <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">SEO Intelligence</div>
+                            {brief.secondaryKeywords && brief.secondaryKeywords.length > 0 && (
+                              <div>
+                                <div className="text-[9px] text-zinc-600 mb-1.5">Keywords to Include</div>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {brief.secondaryKeywords.map((kw: string, i: number) => (
+                                    <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">{kw}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {brief.topicalEntities && brief.topicalEntities.length > 0 && (
+                              <div>
+                                <div className="text-[9px] text-zinc-600 mb-1.5">Topics to Reference</div>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {brief.topicalEntities.map((entity: string, i: number) => (
+                                    <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-300">{entity}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {brief.peopleAlsoAsk && brief.peopleAlsoAsk.length > 0 && (
+                              <div>
+                                <div className="text-[9px] text-zinc-600 mb-1.5">Questions to Address</div>
+                                <div className="space-y-1">
+                                  {brief.peopleAlsoAsk.map((q: string, i: number) => (
+                                    <div key={i} className="flex items-start gap-2 text-xs text-zinc-300 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
+                                      <span className="text-amber-400 flex-shrink-0 font-medium">Q{i + 1}.</span> {q}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {brief.serpAnalysis?.gaps && brief.serpAnalysis.gaps.length > 0 && (
+                              <div>
+                                <div className="text-[9px] text-zinc-600 mb-1.5">Your Competitive Edge</div>
+                                <div className="space-y-1">
+                                  {brief.serpAnalysis.gaps.map((g: string, i: number) => (
+                                    <div key={i} className="text-[11px] text-green-300/80 flex items-start gap-1.5 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
+                                      <span className="text-green-400 mt-0.5 flex-shrink-0">→</span>{g}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {brief.internalLinkSuggestions && brief.internalLinkSuggestions.length > 0 && (
+                              <div>
+                                <div className="text-[9px] text-zinc-600 mb-1.5">Internal Links to Include</div>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {brief.internalLinkSuggestions.map((link: string, i: number) => (
+                                    <span key={i} className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-blue-400">/{link}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* — E-E-A-T Guidance — */}
+                          {brief.eeatGuidance && (
+                            <div className="space-y-3">
+                              <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">E-E-A-T Signals</div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {[
+                                  { label: 'Experience', value: brief.eeatGuidance.experience, color: 'text-blue-400' },
+                                  { label: 'Expertise', value: brief.eeatGuidance.expertise, color: 'text-teal-400' },
+                                  { label: 'Authority', value: brief.eeatGuidance.authority, color: 'text-violet-400' },
+                                  { label: 'Trust', value: brief.eeatGuidance.trust, color: 'text-amber-400' },
+                                ].filter(e => e.value).map((e, i) => (
+                                  <div key={i} className="bg-zinc-950 rounded-lg px-3 py-2.5 border border-zinc-800">
+                                    <div className={`text-[9px] ${e.color} font-medium uppercase tracking-wider mb-1`}>{e.label}</div>
+                                    <div className="text-[11px] text-zinc-400 leading-relaxed">{e.value}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* — Content Checklist — */}
+                          {brief.contentChecklist && brief.contentChecklist.length > 0 && (
+                            <div className="space-y-3">
+                              <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">Content Checklist</div>
+                              <div className="bg-zinc-950 rounded-lg border border-zinc-800 divide-y divide-zinc-800/50">
+                                {brief.contentChecklist.map((item: string, i: number) => (
+                                  <div key={i} className="flex items-start gap-2.5 px-4 py-2.5">
+                                    <div className="w-4 h-4 mt-0.5 rounded border border-zinc-700 flex-shrink-0" />
+                                    <span className="text-[11px] text-zinc-400 leading-relaxed">{item}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* — Schema Markup — */}
+                          {brief.schemaRecommendations && brief.schemaRecommendations.length > 0 && (
+                            <div className="space-y-3">
+                              <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">Schema Markup</div>
+                              <div className="space-y-2">
+                                {brief.schemaRecommendations.map((schema: { type: string; notes: string }, i: number) => (
+                                  <div key={i} className="bg-zinc-950 rounded-lg px-4 py-3 border border-zinc-800">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-medium">{schema.type}</span>
+                                    </div>
+                                    <div className="text-[11px] text-zinc-400 leading-relaxed">{schema.notes}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Export */}
+                          <div className="flex items-center gap-2 pt-1">
+                            <button onClick={() => window.open(`/api/content-briefs/${workspaceId}/${brief.id}/export`, '_blank')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors">
+                              <Download className="w-3 h-3" /> Download PDF
+                            </button>
+                          </div>
                         </div>
                       )}
 

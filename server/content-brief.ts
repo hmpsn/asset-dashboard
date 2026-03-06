@@ -42,6 +42,10 @@ export interface ContentBrief {
   difficultyScore?: number;
   trafficPotential?: string;
   ctaRecommendations?: string[];
+  // Enhanced fields (v3)
+  eeatGuidance?: { experience: string; expertise: string; authority: string; trust: string };
+  contentChecklist?: string[];
+  schemaRecommendations?: { type: string; notes: string }[];
 }
 
 function getBriefFile(workspaceId: string): string {
@@ -149,7 +153,23 @@ Generate a content brief in the following JSON format:
   "trafficPotential": "Estimated monthly search volume range and traffic potential (e.g., '500-1,000 monthly searches, moderate competition')",
   "competitorInsights": "Detailed analysis of what top-ranking content covers, their strengths, weaknesses, and how to differentiate",
   "ctaRecommendations": ["Primary CTA the content should drive", "Secondary CTA or micro-conversion"],
-  "internalLinkSuggestions": ["page-slug-1", "page-slug-2", "page-slug-3"]
+  "internalLinkSuggestions": ["page-slug-1", "page-slug-2", "page-slug-3"],
+  "eeatGuidance": {
+    "experience": "Specific first-hand experience signals to include (e.g., original photos, case studies, personal anecdotes, hands-on testing notes)",
+    "expertise": "How to demonstrate subject-matter expertise (e.g., cite specific data, reference industry standards, include technical depth)",
+    "authority": "Authority signals to build (e.g., link to authoritative sources, reference credentials, mention industry recognition)",
+    "trust": "Trust signals to include (e.g., transparent methodology, updated dates, author bio recommendations, sources to cite)"
+  },
+  "contentChecklist": [
+    "Actionable item the writer should verify before publishing (8-10 items)",
+    "e.g., Include at least 2 original data points or statistics",
+    "e.g., Add a comparison table in the [specific] section",
+    "e.g., Include an FAQ section using the People Also Ask questions",
+    "e.g., Add alt text to all images using secondary keywords"
+  ],
+  "schemaRecommendations": [
+    { "type": "Schema type (e.g., FAQPage, HowTo, Article, LocalBusiness)", "notes": "How to implement — which content maps to this schema and why it helps rankings" }
+  ]
 }
 
 Requirements:
@@ -162,6 +182,9 @@ Requirements:
 - difficultyScore: 1-100 based on estimated keyword competition
 - Make every section actionable and specific — a copywriter or AI tool should be able to write directly from this brief
 - Internal link suggestions should reference existing pages where relevant
+- E-E-A-T guidance must be specific and actionable for this particular topic, not generic advice
+- Content checklist: 8-10 concrete, verifiable items tailored to this brief (not generic SEO advice)
+- Schema recommendations: 1-3 relevant schema types with specific implementation guidance
 
 Return ONLY valid JSON, no markdown fences, no explanation.`;
 
@@ -174,7 +197,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     body: JSON.stringify({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
-      max_tokens: 3500,
+      max_tokens: 5000,
       temperature: 0.7,
     }),
   });
@@ -218,6 +241,9 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     difficultyScore: (parsed.difficultyScore as number) || undefined,
     trafficPotential: (parsed.trafficPotential as string) || undefined,
     ctaRecommendations: (parsed.ctaRecommendations as string[]) || undefined,
+    eeatGuidance: (parsed.eeatGuidance as ContentBrief['eeatGuidance']) || undefined,
+    contentChecklist: (parsed.contentChecklist as string[]) || undefined,
+    schemaRecommendations: (parsed.schemaRecommendations as ContentBrief['schemaRecommendations']) || undefined,
   };
 
   const briefs = readBriefs(workspaceId);
