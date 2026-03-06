@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Loader2, ChevronDown, ChevronRight, Copy, CheckCircle,
-  AlertCircle, Info, Sparkles, RefreshCw, Upload, Send,
+  AlertCircle, Info, Sparkles, RefreshCw, Upload, Send, Search, Plus,
 } from 'lucide-react';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 
@@ -42,6 +42,11 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
   const [sendingToClient, setSendingToClient] = useState(false);
   const [sentToClient, setSentToClient] = useState(false);
   const [progressMsg, setProgressMsg] = useState<string | null>(null);
+  const [showPagePicker, setShowPagePicker] = useState(false);
+  const [availablePages, setAvailablePages] = useState<Array<{ id: string; title: string; slug: string }>>([]);
+  const [pageSearch, setPageSearch] = useState('');
+  const [loadingPages, setLoadingPages] = useState(false);
+  const [generatingSingle, setGeneratingSingle] = useState<string | null>(null);
   const { jobs, startJob, cancelJob } = useBackgroundTasks();
   const jobIdRef = useRef<string | null>(null);
 
@@ -133,6 +138,50 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
     }
   };
 
+  const fetchPages = async () => {
+    if (availablePages.length > 0) { setShowPagePicker(true); return; }
+    setLoadingPages(true);
+    try {
+      const res = await fetch(`/api/webflow/pages/${siteId}`);
+      const pages = await res.json();
+      if (Array.isArray(pages)) {
+        setAvailablePages(pages.map((p: { _id?: string; id?: string; title?: string; slug?: string }) => ({
+          id: p._id || p.id || '',
+          title: p.title || p.slug || 'Untitled',
+          slug: p.slug || '',
+        })));
+      }
+      setShowPagePicker(true);
+    } catch { /* skip */ }
+    setLoadingPages(false);
+  };
+
+  const generateSinglePage = async (pageId: string) => {
+    setGeneratingSingle(pageId);
+    setShowPagePicker(false);
+    setStarted(true);
+    try {
+      const res = await fetch(`/api/webflow/schema-suggestions/${siteId}/page`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pageId }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      const result: SchemaPageSuggestion = await res.json();
+      setData(prev => {
+        if (!prev) return [result];
+        const exists = prev.findIndex(p => p.pageId === pageId);
+        if (exists >= 0) return prev.map(p => p.pageId === pageId ? result : p);
+        return [...prev, result];
+      });
+      setExpanded(prev => new Set(prev).add(pageId));
+    } catch {
+      setScanError('Single page generation failed');
+    } finally {
+      setGeneratingSingle(null);
+    }
+  };
+
   const regeneratePage = async (pageId: string) => {
     setRegenerating(prev => new Set(prev).add(pageId));
     try {
@@ -214,14 +263,66 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
         </div>
         <div className="text-center space-y-1.5">
           <p className="text-sm font-medium text-zinc-200">Schema Generator</p>
-          <p className="text-xs text-zinc-500 max-w-sm">Scans all pages, generates optimized JSON-LD structured data with @graph, and validates against Google requirements. Schemas can be published directly to Webflow.</p>
+          <p className="text-xs text-zinc-500 max-w-sm">Generate optimized JSON-LD structured data with @graph, validated against Google requirements. Schemas can be published directly to Webflow.</p>
         </div>
-        <button
-          onClick={runScan}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-violet-600 hover:bg-violet-500 text-white transition-colors mt-2"
-        >
-          <Sparkles className="w-4 h-4" /> Generate Schemas
-        </button>
+        <div className="flex items-center gap-3 mt-2">
+          <button
+            onClick={runScan}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-violet-600 hover:bg-violet-500 text-white transition-colors"
+          >
+            <Sparkles className="w-4 h-4" /> All Pages
+          </button>
+          <button
+            onClick={fetchPages}
+            disabled={loadingPages}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition-colors disabled:opacity-50"
+          >
+            {loadingPages ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Single Page
+          </button>
+        </div>
+        {showPagePicker && (
+          <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden mt-2">
+            <div className="px-3 py-2 border-b border-zinc-800">
+              <div className="relative">
+                <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+                <input
+                  type="text"
+                  value={pageSearch}
+                  onChange={e => setPageSearch(e.target.value)}
+                  placeholder="Search pages..."
+                  className="w-full pl-7 pr-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-500"
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="max-h-[200px] overflow-y-auto">
+              {availablePages
+                .filter(p => !pageSearch || p.title.toLowerCase().includes(pageSearch.toLowerCase()) || p.slug.toLowerCase().includes(pageSearch.toLowerCase()))
+                .map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => generateSinglePage(p.id)}
+                    disabled={generatingSingle === p.id}
+                    className="w-full text-left px-4 py-2 hover:bg-zinc-800/50 transition-colors border-b border-zinc-800/30 last:border-b-0 disabled:opacity-50"
+                  >
+                    <span className="text-xs text-zinc-300 block">{p.title}</span>
+                    <span className="text-[10px] text-zinc-600">/{p.slug}</span>
+                  </button>
+                ))}
+              {availablePages.length === 0 && (
+                <div className="px-4 py-3 text-xs text-zinc-600 text-center">No pages found</div>
+              )}
+            </div>
+            <div className="px-3 py-2 border-t border-zinc-800">
+              <button onClick={() => setShowPagePicker(false)} className="text-[10px] text-zinc-500 hover:text-zinc-400 transition-colors">Cancel</button>
+            </div>
+          </div>
+        )}
+        {generatingSingle && (
+          <div className="flex items-center gap-2 text-zinc-500 text-sm mt-2">
+            <Loader2 className="w-4 h-4 animate-spin" /> Generating schema...
+          </div>
+        )}
       </div>
     );
   }
@@ -303,11 +404,67 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
               <Send className="w-3 h-3" /> {sentToClient ? 'Sent to Client' : sendingToClient ? 'Sending...' : 'Send to Client'}
             </button>
           )}
+          <div className="relative">
+            <button
+              onClick={fetchPages}
+              disabled={loading || loadingPages}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loadingPages ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />} Add Page
+            </button>
+            {showPagePicker && (
+              <div className="absolute right-0 top-full mt-1 w-72 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-xl z-20">
+                <div className="px-3 py-2 border-b border-zinc-800">
+                  <div className="relative">
+                    <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+                    <input
+                      type="text"
+                      value={pageSearch}
+                      onChange={e => setPageSearch(e.target.value)}
+                      placeholder="Search pages..."
+                      className="w-full pl-7 pr-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-500"
+                      autoFocus
+                    />
+                  </div>
+                </div>
+                <div className="max-h-[200px] overflow-y-auto">
+                  {availablePages
+                    .filter(p => !pageSearch || p.title.toLowerCase().includes(pageSearch.toLowerCase()) || p.slug.toLowerCase().includes(pageSearch.toLowerCase()))
+                    .map(p => {
+                      const alreadyGenerated = data?.some(d => d.pageId === p.id);
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => generateSinglePage(p.id)}
+                          disabled={generatingSingle === p.id}
+                          className="w-full text-left px-4 py-2 hover:bg-zinc-800/50 transition-colors border-b border-zinc-800/30 last:border-b-0 disabled:opacity-50"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-zinc-300">{p.title}</span>
+                            {alreadyGenerated && <span className="text-[9px] text-zinc-600">exists</span>}
+                          </div>
+                          <span className="text-[10px] text-zinc-600">/{p.slug}</span>
+                        </button>
+                      );
+                    })}
+                </div>
+                <div className="px-3 py-2 border-t border-zinc-800">
+                  <button onClick={() => { setShowPagePicker(false); setPageSearch(''); }} className="text-[10px] text-zinc-500 hover:text-zinc-400 transition-colors">Close</button>
+                </div>
+              </div>
+            )}
+          </div>
           <button onClick={runScan} disabled={loading} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             <RefreshCw className="w-3 h-3" /> Re-generate All
           </button>
         </div>
       </div>
+      {generatingSingle && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-violet-500/10 border border-violet-500/20 rounded-xl">
+          <Loader2 className="w-3.5 h-3.5 animate-spin text-violet-400" />
+          <span className="text-xs text-violet-300">Generating schema for page...</span>
+        </div>
+      )}
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-3">
