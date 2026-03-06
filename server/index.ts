@@ -2667,19 +2667,24 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
       }
     }
 
-    // 6. Build rich context for AI
+    // 6. Build rich context for AI — dynamically scale content per page to stay within token limits
+    const totalPages = pageInfo.length;
+    // ~4 chars per token; target max ~18k tokens for page content (leaves room for prompt + GSC + SEMRush)
+    const maxContentChars = totalPages > 80 ? 200 : totalPages > 40 ? 500 : totalPages > 20 ? 800 : 1200;
+    const maxGscRows = totalPages > 60 ? 40 : totalPages > 30 ? 60 : 100;
+
     const pageList = pageInfo.map(p => {
       let entry = `- ${p.path}: "${p.title}"`;
       if (p.seoTitle) entry += ` | SEO title: "${p.seoTitle}"`;
       if (p.seoDesc) entry += ` | Meta desc: "${p.seoDesc}"`;
-      if (p.contentSnippet) entry += `\n  Content: ${p.contentSnippet}`;
+      if (p.contentSnippet) entry += `\n  Content: ${p.contentSnippet.slice(0, maxContentChars)}`;
       return entry;
     }).join('\n');
 
     let gscContext = '';
     if (gscData.length > 0) {
-      const sorted = [...gscData].sort((a, b) => b.impressions - a.impressions).slice(0, 100);
-      gscContext = `\n\nGoogle Search Console data (last 90 days, top 100 query-page combos by impressions):\n` +
+      const sorted = [...gscData].sort((a, b) => b.impressions - a.impressions).slice(0, maxGscRows);
+      gscContext = `\n\nGoogle Search Console data (last 90 days, top ${maxGscRows} query-page combos by impressions):\n` +
         sorted.map(r => `- "${r.query}" → ${r.page} (pos: ${r.position}, clicks: ${r.clicks}, imp: ${r.impressions})`).join('\n');
     }
 
@@ -2756,7 +2761,7 @@ Critical rules:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: 'You are an expert SEO strategist. You always return valid JSON only, no markdown, no explanation.' },
           { role: 'user', content: prompt },
