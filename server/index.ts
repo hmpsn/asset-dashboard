@@ -307,6 +307,9 @@ app.get('/api/workspace-overview', (_req, res) => {
     const batches = listBatches(ws.id);
     const pendingApprovals = batches.reduce((sum, b) => sum + b.items.filter((i: { status: string }) => i.status === 'pending').length, 0);
     const totalApprovalItems = batches.reduce((sum, b) => sum + b.items.length, 0);
+    // Content requests (from client portal)
+    const contentReqs = listContentRequests(ws.id);
+    const pendingContentReqs = contentReqs.filter(r => r.status === 'requested').length;
 
     return {
       id: ws.id,
@@ -319,6 +322,7 @@ app.get('/api/workspace-overview', (_req, res) => {
       audit,
       requests: { total: reqTotal, new: reqNew, active: reqActive, latestDate: latestReq?.updatedAt || null },
       approvals: { pending: pendingApprovals, total: totalApprovalItems },
+      contentRequests: { pending: pendingContentReqs, total: contentReqs.length },
     };
   });
   res.json(overview);
@@ -3342,7 +3346,7 @@ app.delete('/api/approvals/:workspaceId/:batchId', (req, res) => {
 app.get('/api/public/workspace/:id', (req, res) => {
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  if (ws.clientPortalEnabled === false) return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
+  if (ws.clientPortalEnabled != null && !ws.clientPortalEnabled) return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
   // Only expose safe fields for client view
   res.json({
     id: ws.id,
@@ -3429,6 +3433,7 @@ app.post('/api/public/content-request/:workspaceId', (req, res) => {
   const { topic, targetKeyword, intent, priority, rationale, clientNote } = req.body;
   if (!topic || !targetKeyword) return res.status(400).json({ error: 'topic and targetKeyword are required' });
   const request = createContentRequest(req.params.workspaceId, { topic, targetKeyword, intent, priority, rationale, clientNote });
+  addActivity(req.params.workspaceId, 'content_requested', `Content topic requested: "${topic}"`, `Keyword: "${targetKeyword}" · Priority: ${priority}`, { requestId: request.id });
   res.json(request);
 });
 
@@ -3495,6 +3500,7 @@ app.post('/api/content-requests/:workspaceId/:id/generate-brief', async (req, re
       briefId: brief.id,
     });
 
+    addActivity(req.params.workspaceId, 'brief_generated', `Content brief generated for "${request.targetKeyword}"`, `Title: ${brief.suggestedTitle}`, { requestId: request.id, briefId: brief.id });
     res.json(brief);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';

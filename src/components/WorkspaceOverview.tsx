@@ -23,6 +23,7 @@ interface WorkspaceSummary {
   } | null;
   requests: { total: number; new: number; active: number; latestDate: string | null };
   approvals: { pending: number; total: number };
+  contentRequests?: { pending: number; total: number };
 }
 
 function ScoreRing({ score, size = 48, stroke = 4 }: { score: number; size?: number; stroke?: number }) {
@@ -88,6 +89,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
   const totalNewRequests = data.reduce((s, w) => s + w.requests.new, 0);
   const totalActiveRequests = data.reduce((s, w) => s + w.requests.active, 0);
   const totalPendingApprovals = data.reduce((s, w) => s + w.approvals.pending, 0);
+  const totalPendingContent = data.reduce((s, w) => s + (w.contentRequests?.pending || 0), 0);
   const avgScore = data.filter(w => w.audit).length > 0
     ? Math.round(data.filter(w => w.audit).reduce((s, w) => s + (w.audit?.score || 0), 0) / data.filter(w => w.audit).length)
     : null;
@@ -103,10 +105,11 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
       </div>
 
       {/* Global stats bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {[
           { label: 'New Requests', value: totalNewRequests, color: totalNewRequests > 0 ? '#f87171' : 'var(--brand-text-muted)', icon: Bell },
           { label: 'Active Requests', value: totalActiveRequests, color: totalActiveRequests > 0 ? '#fbbf24' : 'var(--brand-text-muted)', icon: MessageSquare },
+          { label: 'Content Briefs', value: totalPendingContent, color: totalPendingContent > 0 ? '#f59e0b' : 'var(--brand-text-muted)', icon: ClipboardCheck },
           { label: 'Pending Approvals', value: totalPendingApprovals, color: totalPendingApprovals > 0 ? '#a78bfa' : 'var(--brand-text-muted)', icon: ClipboardCheck },
           { label: 'Avg Health Score', value: avgScore !== null ? avgScore : '—', color: avgScore !== null ? (avgScore >= 80 ? '#4ade80' : avgScore >= 60 ? '#fbbf24' : '#f87171') : 'var(--brand-text-muted)', icon: Shield },
         ].map(stat => (
@@ -123,7 +126,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
       {/* Workspace cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {data.map(ws => {
-          const hasAlerts = ws.requests.new > 0 || ws.approvals.pending > 0;
+          const hasAlerts = ws.requests.new > 0 || ws.approvals.pending > 0 || (ws.contentRequests?.pending || 0) > 0;
           const scoreDelta = ws.audit && ws.audit.previousScore != null ? ws.audit.score - ws.audit.previousScore : null;
 
           return (

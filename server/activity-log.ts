@@ -16,6 +16,8 @@ export type ActivityType =
   | 'images_optimized'
   | 'links_fixed'
   | 'content_updated'
+  | 'content_requested'
+  | 'brief_generated'
   | 'note';
 
 export interface ActivityEntry {
