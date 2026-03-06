@@ -2516,12 +2516,32 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
   };
 
   try {
-    // 1. Resolve site base URL
+    // 1. Resolve site base URL — auto-resolve liveDomain if missing
     sendProgress('discovery', 'Resolving site URL...', 0.02);
+    let liveDomain = ws.liveDomain || '';
+    if (!liveDomain && token) {
+      try {
+        const domRes = await fetch(`https://api.webflow.com/v2/sites/${ws.webflowSiteId}/custom_domains`, {
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        });
+        if (domRes.ok) {
+          const domData = await domRes.json() as { customDomains?: { url?: string }[] };
+          const domains = domData.customDomains || [];
+          if (domains.length > 0 && domains[0].url) {
+            const d = domains[0].url;
+            liveDomain = d.startsWith('http') ? d : `https://${d}`;
+            // Persist so we don't re-resolve every time
+            updateWorkspace(ws.id, { liveDomain });
+            console.log(`[Strategy] Auto-resolved liveDomain: ${liveDomain}`);
+          }
+        }
+      } catch { /* best-effort */ }
+    }
     const subdomain = await getSiteSubdomain(ws.webflowSiteId, token);
-    const baseUrl = ws.liveDomain
-      ? (ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`)
+    const baseUrl = liveDomain
+      ? (liveDomain.startsWith('http') ? liveDomain : `https://${liveDomain}`)
       : subdomain ? `https://${subdomain}.webflow.io` : '';
+    console.log(`[Strategy] Using baseUrl: ${baseUrl}`);
 
     // 2. Gather pages from BOTH Webflow API (static pages + metadata) AND sitemap (all pages including CMS)
     sendProgress('discovery', 'Fetching pages from Webflow...', 0.05);
@@ -2568,7 +2588,7 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
       const chunk = pathArray.slice(i, i + contentBatch);
       const fetched = Math.min(i + contentBatch, pathArray.length);
       sendProgress('content', `Fetching page content... ${fetched}/${pathArray.length}`, 0.15 + (fetched / pathArray.length) * 0.30);
-      const contents = await Promise.all(chunk.map(async (pagePath) => {
+      const contents = await Promise.all(chunk.map(async (pagePath): Promise<{ path: string; title: string; seoTitle: string; seoDesc: string; contentSnippet: string } | null> => {
         const wfMeta = wfMetaByPath.get(pagePath);
         let contentSnippet = '';
         let htmlTitle = '';
@@ -2577,7 +2597,10 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         if (url) {
           try {
             const htmlRes = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(8000) });
-            if (htmlRes.ok) {
+            if (!htmlRes.ok) {
+              // Non-200 = page doesn't exist on live site (e.g. non-live CMS collection)
+              if (!wfMeta) return null; // Skip sitemap-only pages that 404
+            } else {
               const html = await htmlRes.text();
               // Extract title and meta description from HTML for pages without Webflow metadata
               if (!wfMeta) {
@@ -2601,7 +2624,9 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
                 .trim()
                 .slice(0, 1200);
             }
-          } catch { /* skip content fetch failures */ }
+          } catch {
+            if (!wfMeta) return null; // Skip unreachable sitemap-only pages
+          }
         }
         const pathName = pagePath.replace(/^\//, '').replace(/\/$/, '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Home';
         return {
@@ -2612,8 +2637,11 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
           contentSnippet,
         };
       }));
-      pageInfo.push(...contents);
+      pageInfo.push(...contents.filter((c): c is NonNullable<typeof c> => c !== null));
     }
+    const skipped = pathArray.length - pageInfo.length;
+    if (skipped > 0) console.log(`[Strategy] Filtered out ${skipped} non-live pages (404/unreachable)`);
+    sendProgress('content', `Fetched ${pageInfo.length} live pages (${skipped} non-live filtered out)`, 0.46);
 
     // 4. Try to gather GSC data if connected
     sendProgress('search_data', 'Fetching Google Search Console data...', 0.48);
