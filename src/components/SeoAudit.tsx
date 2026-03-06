@@ -689,9 +689,10 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
     const job = jobs.find(j => j.id === auditJobId.current);
     if (!job) return;
     if (job.status === 'done' && job.result) {
-      const d = job.result as SeoAuditResult;
+      const d = job.result as SeoAuditResult & { snapshotId?: string };
       if (d && Array.isArray(d.pages)) {
         setData(d);
+        loadHistory(); // Refresh history — snapshot was auto-saved server-side
       } else {
         setAuditError('Invalid audit response');
       }
@@ -741,6 +742,15 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
     setSaving(true);
     setShareUrl(null);
     try {
+      // Use auto-saved snapshot ID if available (avoids creating duplicates)
+      const autoId = (data as SeoAuditResult & { snapshotId?: string }).snapshotId;
+      if (autoId) {
+        const url = `${window.location.origin}/report/${autoId}`;
+        setShareUrl(url);
+        setSaving(false);
+        return;
+      }
+      // Fallback: manual save for audits that weren't auto-saved
       const res = await fetch(`/api/reports/${siteId}/snapshot`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

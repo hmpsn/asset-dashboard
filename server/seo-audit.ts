@@ -455,6 +455,34 @@ function auditPage(
   return { pageId, page: pageName, slug, url, score, issues };
 }
 
+// Slugs / title keywords for pages that should be excluded from SEO audits.
+// These are utility, legal, or error pages that inflate page counts and dilute the health score.
+const EXCLUDED_SLUGS = new Set([
+  '404', 'page-not-found', 'not-found',
+  'search', 'search-results',
+  'thank-you', 'thanks', 'thankyou',
+  'confirmation', 'success',
+  'unsubscribe', 'opt-out',
+]);
+const EXCLUDED_SLUG_KEYWORDS = [
+  'password', 'protected', 'login', 'signin', 'sign-in',
+  'privacy-policy', 'privacy', 'cookie-policy', 'cookie',
+  'terms-of-service', 'terms-and-conditions', 'terms-of-use', 'terms',
+  'legal', 'disclaimer', 'gdpr', 'ccpa',
+  'style-guide', 'styleguide',
+];
+
+/** Returns true if a page should be excluded from SEO audit based on slug/title. */
+function isExcludedPage(slug: string, title?: string): boolean {
+  const s = (slug || '').toLowerCase().replace(/^\//, '');
+  const t = (title || '').toLowerCase();
+  if (EXCLUDED_SLUGS.has(s)) return true;
+  for (const kw of EXCLUDED_SLUG_KEYWORDS) {
+    if (s.includes(kw) || t.includes(kw)) return true;
+  }
+  return false;
+}
+
 export async function runSeoAudit(siteId: string, tokenOverride?: string): Promise<SeoAuditResult> {
   const siteInfo = await getSiteInfo(siteId, tokenOverride);
   const baseUrl = siteInfo.subdomain ? `https://${siteInfo.subdomain}.webflow.io` : '';
@@ -464,11 +492,11 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string): Promi
     : baseUrl;
   console.log(`SEO audit: subdomain=${siteInfo.subdomain}, baseUrl=${baseUrl}, siteWideUrl=${siteWideUrl}`);
   const allPages = await listPages(siteId, tokenOverride);
-  // Filter published pages and exclude password-protected pages
+  // Filter published pages and exclude utility / legal / error pages
   const pages = filterPublishedPages(allPages).filter(
-    (p: { title: string; slug: string }) => !(p.title || '').toLowerCase().includes('password') && !(p.slug || '').toLowerCase().includes('password')
+    (p: { title: string; slug: string }) => !isExcludedPage(p.slug, p.title)
   );
-  console.log(`SEO audit: ${allPages.length} total pages, ${pages.length} published (excluded password + draft pages)`);
+  console.log(`SEO audit: ${allPages.length} total pages, ${pages.length} published (excluded utility/legal/password/draft pages)`);
 
   // Fetch metadata and HTML in parallel (batch of 5), cache meta for site-wide checks
   const results: PageSeoResult[] = [];
@@ -514,10 +542,12 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string): Promi
     const staticPaths = buildStaticPathSet(pages);
     const { cmsUrls, totalFound } = await discoverCmsUrls(scanUrl, staticPaths, CMS_PAGE_LIMIT);
 
-    if (cmsUrls.length > 0) {
-      console.log(`SEO audit: auditing ${cmsUrls.length} CMS pages (${totalFound} total found)`);
-      for (let i = 0; i < cmsUrls.length; i += batch) {
-        const chunk = cmsUrls.slice(i, i + batch);
+    // Filter out utility/legal CMS pages the same way we filter static pages
+    const filteredCmsUrls = cmsUrls.filter(item => !isExcludedPage(item.path, item.pageName));
+    if (filteredCmsUrls.length > 0) {
+      console.log(`SEO audit: auditing ${filteredCmsUrls.length} CMS pages (${totalFound} total in sitemap, ${cmsUrls.length - filteredCmsUrls.length} excluded)`);
+      for (let i = 0; i < filteredCmsUrls.length; i += batch) {
+        const chunk = filteredCmsUrls.slice(i, i + batch);
         const chunkResults = await Promise.all(
           chunk.map(async (item) => {
             const html = await fetchPublishedHtml(item.url);

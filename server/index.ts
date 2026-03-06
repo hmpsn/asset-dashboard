@@ -405,10 +405,6 @@ app.get('/api/workspace-overview', (_req, res) => {
       contentRequests: { pending: pendingContentReqs, total: contentReqs.length },
     };
   });
-  // Debug: log audit status per workspace
-  for (const o of overview) {
-    console.log(`[overview] ${o.name}: audit=${o.audit ? `score=${o.audit.score}` : 'null'}`);
-  }
   res.json(overview);
 });
 
@@ -4287,7 +4283,16 @@ app.post('/api/jobs', async (req, res) => {
           try {
             updateJob(job.id, { status: 'running', message: 'Scanning pages...' });
             const result = await runSeoAudit(siteId, token);
-            updateJob(job.id, { status: 'done', result, message: `Audit complete — score ${result.siteScore}` });
+            // Auto-save snapshot so overview + client dashboard stay in sync
+            const ws = getWorkspace(params.workspaceId as string);
+            const siteName = ws?.webflowSiteName || ws?.name || siteId;
+            const snapshot = saveSnapshot(siteId, siteName, result);
+            if (ws) {
+              addActivity(ws.id, 'audit_completed', `Site audit completed — score ${result.siteScore}`,
+                `${result.totalPages} pages scanned, ${result.errors} errors, ${result.warnings} warnings`,
+                { score: result.siteScore, previousScore: snapshot.previousScore });
+            }
+            updateJob(job.id, { status: 'done', result: { ...result, snapshotId: snapshot.id }, message: `Audit complete — score ${result.siteScore}` });
           } catch (err) {
             updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Audit failed' });
           }
@@ -4752,16 +4757,9 @@ server.listen(PORT, '0.0.0.0', () => {
   for (const ws of workspaces) {
     console.log(`[startup]   - ${ws.name}: siteId=${ws.webflowSiteId || 'none'}, hasToken=${!!ws.webflowToken}`);
   }
-  // Reports directory diagnostics
+  // Reports directory check
   const reportsDir = path.join(dataDir, 'reports');
   const reportsExists = fs.existsSync(reportsDir);
-  console.log(`[startup] REPORTS_DIR=${reportsDir} exists=${reportsExists}`);
-  if (reportsExists) {
-    const siteDirs = fs.readdirSync(reportsDir);
-    console.log(`[startup] Report site dirs: ${siteDirs.length > 0 ? siteDirs.join(', ') : '(empty)'}`);
-    for (const sd of siteDirs) {
-      const files = fs.readdirSync(path.join(reportsDir, sd)).filter(f => f.endsWith('.json'));
-      console.log(`[startup]   ${sd}: ${files.length} snapshot(s)`);
-    }
-  }
+  const snapshotCount = reportsExists ? fs.readdirSync(reportsDir).reduce((sum, sd) => sum + fs.readdirSync(path.join(reportsDir, sd)).filter(f => f.endsWith('.json')).length, 0) : 0;
+  console.log(`[startup] REPORTS_DIR=${reportsDir} exists=${reportsExists} snapshots=${snapshotCount}`);
 });

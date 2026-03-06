@@ -70,7 +70,6 @@ export function saveSnapshot(siteId: string, siteName: string, audit: SeoAuditRe
   };
   const filePath = path.join(siteDir(siteId), `${id}.json`);
   fs.writeFileSync(filePath, JSON.stringify(snapshot, null, 2));
-  console.log(`[reports] Saved snapshot ${id} to ${filePath} (REPORTS_DIR=${REPORTS_DIR})`);
   return snapshot;
 }
 
