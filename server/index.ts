@@ -4564,6 +4564,69 @@ app.post('/api/jobs', async (req, res) => {
         break;
       }
 
+      case 'keyword-strategy': {
+        const wsId = params.workspaceId as string;
+        if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
+        const stratWs = getWorkspace(wsId);
+        if (!stratWs) return res.status(404).json({ error: 'Workspace not found' });
+        if (!stratWs.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
+        if (!process.env.OPENAI_API_KEY) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
+        const job = createJob('keyword-strategy', { message: 'Generating keyword strategy...', workspaceId: wsId });
+        res.json({ jobId: job.id });
+        (async () => {
+          try {
+            updateJob(job.id, { status: 'running', message: 'Fetching pages and analyzing keywords...' });
+            // Call the existing strategy endpoint internally
+            const stratUrl = `http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`;
+            const businessContext = (params.businessContext as string) || stratWs.keywordStrategy?.businessContext || '';
+            const semrushMode = (params.semrushMode as string) || 'none';
+            const competitorDomains = (params.competitorDomains as string[]) || stratWs.competitorDomains || [];
+            const stratRes = await fetch(stratUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', ...(APP_PASSWORD ? { 'x-auth-token': APP_PASSWORD } : {}) },
+              body: JSON.stringify({ businessContext, semrushMode, competitorDomains }),
+            });
+            if (!stratRes.ok) {
+              const errText = await stratRes.text();
+              throw new Error(`Strategy generation failed: ${errText.slice(0, 200)}`);
+            }
+            const stratResult = await stratRes.json();
+            updateJob(job.id, {
+              status: 'done',
+              result: stratResult,
+              message: `Strategy complete — ${(stratResult as Record<string, unknown[]>).pageMap?.length || 0} pages mapped`,
+            });
+          } catch (err) {
+            updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Strategy generation failed' });
+          }
+        })();
+        break;
+      }
+
+      case 'schema-generator': {
+        const schemaSiteId = params.siteId as string;
+        if (!schemaSiteId) return res.status(400).json({ error: 'siteId required' });
+        const schemaToken = getTokenForSite(schemaSiteId) || undefined;
+        if (!schemaToken) return res.status(400).json({ error: 'No Webflow API token configured' });
+        const job = createJob('schema-generator', { message: 'Generating schemas...', workspaceId: params.workspaceId as string });
+        res.json({ jobId: job.id });
+        (async () => {
+          try {
+            updateJob(job.id, { status: 'running', message: 'Scanning pages and generating unified schemas...' });
+            const { ctx, pageKeywordMap } = buildSchemaContext(schemaSiteId);
+            const result = await generateSchemaSuggestions(schemaSiteId, schemaToken, ctx, pageKeywordMap);
+            updateJob(job.id, {
+              status: 'done',
+              result,
+              message: `Done — ${result.length} page schemas generated`,
+            });
+          } catch (err) {
+            updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Schema generation failed' });
+          }
+        })();
+        break;
+      }
+
       default:
         return res.status(400).json({ error: `Unknown job type: ${type}` });
     }

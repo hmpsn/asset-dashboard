@@ -1,4 +1,6 @@
 import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from './webflow.js';
+import { scanRedirects } from './redirect-scanner.js';
+import { runSinglePageSpeed } from './pagespeed.js';
 
 const WEBFLOW_API = 'https://api.webflow.com/v2';
 
@@ -32,12 +34,14 @@ const CHECK_CATEGORY: Record<string, CheckCategory> = {
   'robots-txt': 'technical', 'sitemap': 'technical', 'response-time': 'technical',
   'structured-data': 'technical', 'html-size': 'technical',
   'orphan-pages': 'technical', 'indexability': 'technical',
+  'redirects': 'technical', 'redirect-chains': 'technical',
   // Social
   'og-tags': 'social', 'og-image': 'social',
   // Performance
   'lazy-loading': 'performance', 'img-dimensions': 'performance',
   'inline-css': 'performance', 'inline-js': 'performance', 'render-blocking': 'performance',
   'img-filesize': 'performance',
+  'cwv': 'performance', 'cwv-lcp': 'performance', 'cwv-cls': 'performance', 'cwv-tbt': 'performance',
   // Accessibility
   'img-alt': 'accessibility',
 };
@@ -698,6 +702,86 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string): Promi
     // SSL / HTTPS check
     if (!checkUrl.startsWith('https://')) {
       siteWideIssues.push({ check: 'ssl', severity: 'error', message: 'Site is not using HTTPS', recommendation: 'Enable SSL/HTTPS for your site. HTTPS is a ranking signal and required for user trust.' });
+    }
+  }
+
+  // --- Redirect health check (runs inline, fast HEAD requests) ---
+  try {
+    console.log('[seo-audit] Running redirect scan...');
+    const redirectResult = await scanRedirects(siteId, tokenOverride);
+    const { summary, chains } = redirectResult;
+
+    if (summary.notFound > 0) {
+      siteWideIssues.push({
+        check: 'redirects', severity: summary.notFound > 3 ? 'error' : 'warning',
+        message: `${summary.notFound} page${summary.notFound > 1 ? 's' : ''} returning 404`,
+        recommendation: `These pages return 404 errors and may be losing traffic/link equity. Set up 301 redirects to relevant pages.`,
+        value: `${summary.notFound} broken`,
+      });
+    }
+    if (summary.redirecting > 0) {
+      siteWideIssues.push({
+        check: 'redirects', severity: 'info',
+        message: `${summary.redirecting} page${summary.redirecting > 1 ? 's' : ''} redirecting`,
+        recommendation: 'Review redirecting pages to ensure internal links point directly to final destinations, avoiding unnecessary redirect hops.',
+        value: `${summary.redirecting} redirecting`,
+      });
+    }
+    if (summary.chainsDetected > 0) {
+      const worstChain = chains.reduce((max, c) => c.totalHops > max.totalHops ? c : max, chains[0]);
+      siteWideIssues.push({
+        check: 'redirect-chains', severity: summary.longestChain > 2 ? 'error' : 'warning',
+        message: `${summary.chainsDetected} redirect chain${summary.chainsDetected > 1 ? 's' : ''} detected (longest: ${summary.longestChain} hops)`,
+        recommendation: `Redirect chains waste crawl budget and slow page loads. Worst chain: ${worstChain?.originalUrl || 'unknown'} → ${worstChain?.totalHops || 0} hops. Update redirects to point directly to the final destination.`,
+        value: `${summary.longestChain} hops max`,
+      });
+    }
+    if (chains.some(c => c.isLoop)) {
+      siteWideIssues.push({
+        check: 'redirect-chains', severity: 'error',
+        message: 'Redirect loop detected',
+        recommendation: 'One or more pages create an infinite redirect loop. This makes the page completely inaccessible to users and search engines. Fix immediately.',
+      });
+    }
+  } catch (err) {
+    console.error('[seo-audit] Redirect scan failed (non-fatal):', err);
+  }
+
+  // --- Homepage Core Web Vitals (quick single-page PSI check) ---
+  const homepageUrl = siteWideUrl || baseUrl;
+  if (homepageUrl && process.env.GOOGLE_PSI_KEY) {
+    try {
+      console.log('[seo-audit] Running homepage PageSpeed check...');
+      const psi = await runSinglePageSpeed(homepageUrl, 'mobile', 'Homepage');
+      if (psi) {
+        const scoreLabel = psi.score >= 90 ? 'good' : psi.score >= 50 ? 'needs improvement' : 'poor';
+        const severity: Severity = psi.score >= 90 ? 'info' : psi.score >= 50 ? 'warning' : 'error';
+        siteWideIssues.push({
+          check: 'cwv', severity,
+          message: `Homepage performance score: ${psi.score}/100 (${scoreLabel})`,
+          recommendation: psi.score >= 90
+            ? 'Great performance! Core Web Vitals are a Google ranking signal.'
+            : `Performance score of ${psi.score} may hurt rankings. Core Web Vitals are a Google ranking signal. Run the full PageSpeed tool for detailed recommendations.`,
+          value: `${psi.score}/100`,
+        });
+        // Individual CWV metrics
+        if (psi.vitals.LCP !== null) {
+          const lcpSec = (psi.vitals.LCP / 1000).toFixed(1);
+          if (psi.vitals.LCP > 4000) {
+            siteWideIssues.push({ check: 'cwv-lcp', severity: 'error', message: `LCP is ${lcpSec}s (poor — should be under 2.5s)`, recommendation: 'Largest Contentful Paint over 4s severely impacts user experience. Optimize images, reduce server response time, and minimize render-blocking resources.', value: `${lcpSec}s` });
+          } else if (psi.vitals.LCP > 2500) {
+            siteWideIssues.push({ check: 'cwv-lcp', severity: 'warning', message: `LCP is ${lcpSec}s (needs improvement — target under 2.5s)`, recommendation: 'Optimize Largest Contentful Paint by compressing images, using next-gen formats, and preloading key resources.', value: `${lcpSec}s` });
+          }
+        }
+        if (psi.vitals.CLS !== null && psi.vitals.CLS > 0.25) {
+          siteWideIssues.push({ check: 'cwv-cls', severity: psi.vitals.CLS > 0.5 ? 'error' : 'warning', message: `CLS is ${psi.vitals.CLS.toFixed(3)} (should be under 0.1)`, recommendation: 'Cumulative Layout Shift is too high. Set explicit dimensions on images/videos, avoid inserting content above existing content, and use CSS containment.', value: `${psi.vitals.CLS.toFixed(3)}` });
+        }
+        if (psi.vitals.TBT !== null && psi.vitals.TBT > 600) {
+          siteWideIssues.push({ check: 'cwv-tbt', severity: psi.vitals.TBT > 1500 ? 'error' : 'warning', message: `Total Blocking Time is ${Math.round(psi.vitals.TBT)}ms (should be under 200ms)`, recommendation: 'Reduce JavaScript execution time, break up long tasks, and defer non-critical scripts.', value: `${Math.round(psi.vitals.TBT)}ms` });
+        }
+      }
+    } catch (err) {
+      console.error('[seo-audit] PageSpeed check failed (non-fatal):', err);
     }
   }
 
