@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Loader2, ChevronDown, ChevronRight, Copy, CheckCircle,
-  AlertCircle, Info, Sparkles, Brain, RefreshCw,
+  AlertCircle, Info, Sparkles, RefreshCw,
 } from 'lucide-react';
 
 interface SchemaSuggestion {
@@ -18,13 +18,8 @@ interface SchemaPageSuggestion {
   url: string;
   existingSchemas: string[];
   suggestedSchemas: SchemaSuggestion[];
+  validationErrors?: string[];
 }
-
-const PRIORITY_DOT = {
-  high: 'bg-red-400',
-  medium: 'bg-amber-400',
-  low: 'bg-green-400',
-};
 
 interface Props {
   siteId: string;
@@ -35,10 +30,9 @@ export function SchemaSuggester({ siteId }: Props) {
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [aiGenerating, setAiGenerating] = useState<Set<string>>(new Set());
-  const [aiGenerated, setAiGenerated] = useState<Set<string>>(new Set());
+  const [regenerating, setRegenerating] = useState<Set<string>>(new Set());
 
-  // Auto-run quick scan on mount
+  // Auto-run scan on mount
   useEffect(() => {
     setLoading(true);
     setData(null);
@@ -52,7 +46,6 @@ export function SchemaSuggester({ siteId }: Props) {
   const rescan = () => {
     setLoading(true);
     setData(null);
-    setAiGenerated(new Set());
     fetch(`/api/webflow/schema-suggestions/${siteId}`)
       .then(r => r.json())
       .then(d => setData(Array.isArray(d) ? d : []))
@@ -60,8 +53,8 @@ export function SchemaSuggester({ siteId }: Props) {
       .finally(() => setLoading(false));
   };
 
-  const generateAiForPage = async (pageId: string) => {
-    setAiGenerating(prev => new Set(prev).add(pageId));
+  const regeneratePage = async (pageId: string) => {
+    setRegenerating(prev => new Set(prev).add(pageId));
     try {
       const res = await fetch(`/api/webflow/schema-suggestions/${siteId}/page`, {
         method: 'POST',
@@ -70,22 +63,20 @@ export function SchemaSuggester({ siteId }: Props) {
       });
       if (!res.ok) throw new Error('Failed');
       const result: SchemaPageSuggestion = await res.json();
-      // Replace the page's suggestions with AI results
       setData(prev => {
         if (!prev) return prev;
         return prev.map(p => p.pageId === pageId ? {
           ...p,
           suggestedSchemas: result.suggestedSchemas,
           existingSchemas: result.existingSchemas,
+          validationErrors: result.validationErrors,
         } : p);
       });
-      setAiGenerated(prev => new Set(prev).add(pageId));
-      // Auto-expand to show results
       setExpanded(prev => new Set(prev).add(pageId));
     } catch {
       // keep existing data
     } finally {
-      setAiGenerating(prev => {
+      setRegenerating(prev => {
         const next = new Set(prev);
         next.delete(pageId);
         return next;
@@ -131,38 +122,42 @@ export function SchemaSuggester({ siteId }: Props) {
     );
   }
 
-  const totalSuggestions = data.reduce((s, p) => s + p.suggestedSchemas.length, 0);
-  const highPriority = data.reduce((s, p) => s + p.suggestedSchemas.filter(sg => sg.priority === 'high').length, 0);
   const pagesWithExisting = data.filter(p => p.existingSchemas.length > 0).length;
+  const pagesWithErrors = data.filter(p => (p.validationErrors?.length || 0) > 0).length;
+  const totalTypes = data.reduce((s, p) => {
+    const schema = p.suggestedSchemas[0]?.template;
+    const graph = schema?.['@graph'] as Record<string, unknown>[] | undefined;
+    return s + (graph?.length || 0);
+  }, 0);
 
   return (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-zinc-500">{data.length} pages · {totalSuggestions} suggestions</span>
+          <span className="text-xs text-zinc-500">{data.length} pages · {totalTypes} schema types generated</span>
         </div>
         <button onClick={rescan} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors">
-          <RefreshCw className="w-3 h-3" /> Re-scan
+          <RefreshCw className="w-3 h-3" /> Re-generate All
         </button>
       </div>
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
-          <div className="text-xs text-zinc-500 mb-1">Suggestions</div>
-          <div className="text-2xl font-bold text-zinc-200">{totalSuggestions}</div>
-          <div className="text-xs text-zinc-500">across {data.length} pages</div>
+          <div className="text-xs text-zinc-500 mb-1">Pages</div>
+          <div className="text-2xl font-bold text-zinc-200">{data.length}</div>
+          <div className="text-xs text-zinc-500">{totalTypes} @graph types total</div>
         </div>
         <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
-          <div className="text-xs text-zinc-500 mb-1">High Priority</div>
-          <div className="text-2xl font-bold text-red-400">{highPriority}</div>
-          <div className="text-xs text-zinc-500">should implement first</div>
+          <div className="text-xs text-zinc-500 mb-1">Validated</div>
+          <div className={`text-2xl font-bold ${pagesWithErrors > 0 ? 'text-amber-400' : 'text-green-400'}`}>{data.length - pagesWithErrors}/{data.length}</div>
+          <div className="text-xs text-zinc-500">{pagesWithErrors > 0 ? `${pagesWithErrors} with warnings` : 'all passing'}</div>
         </div>
         <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
           <div className="text-xs text-zinc-500 mb-1">Existing Schemas</div>
           <div className="text-2xl font-bold text-green-400">{pagesWithExisting}</div>
-          <div className="text-xs text-zinc-500">pages with JSON-LD</div>
+          <div className="text-xs text-zinc-500">pages already have JSON-LD</div>
         </div>
       </div>
 
@@ -170,10 +165,12 @@ export function SchemaSuggester({ siteId }: Props) {
       <div className="space-y-2">
         {data.map(page => {
           const isOpen = expanded.has(page.pageId);
-          const isAiLoading = aiGenerating.has(page.pageId);
-          const hasAi = aiGenerated.has(page.pageId);
+          const isRegenLoading = regenerating.has(page.pageId);
+          const hasErrors = (page.validationErrors?.length || 0) > 0;
+          const schema = page.suggestedSchemas[0];
+          const graphTypes = schema ? ((schema.template?.['@graph'] as Record<string, unknown>[]) || []).map(n => n['@type'] as string).filter(Boolean) : [];
           return (
-            <div key={page.pageId} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+            <div key={page.pageId} className={`bg-zinc-900 rounded-xl border overflow-hidden ${hasErrors ? 'border-amber-500/30' : 'border-zinc-800'}`}>
               <div className="flex items-center gap-3 px-4 py-3">
                 <button
                   onClick={() => toggleExpand(page.pageId)}
@@ -188,41 +185,36 @@ export function SchemaSuggester({ siteId }: Props) {
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {page.existingSchemas.length > 0 && (
                     <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-500/10 text-green-400 border border-green-500/20">
-                      <CheckCircle className="w-3 h-3" /> {page.existingSchemas.length}
+                      <CheckCircle className="w-3 h-3" /> {page.existingSchemas.length} existing
                     </span>
                   )}
-                  {page.suggestedSchemas.length > 0 && (
-                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                      <Sparkles className="w-3 h-3" /> {page.suggestedSchemas.length}
-                    </span>
-                  )}
-                  {hasAi ? (
+                  {graphTypes.length > 0 && (
                     <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-violet-500/10 text-violet-400 border border-violet-500/20">
-                      <Brain className="w-3 h-3" /> AI
+                      <Sparkles className="w-3 h-3" /> {graphTypes.length} types
                     </span>
-                  ) : (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); generateAiForPage(page.pageId); }}
-                      disabled={isAiLoading}
-                      className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors disabled:opacity-50 bg-gradient-to-r from-violet-600/80 to-fuchsia-600/80 hover:from-violet-500 hover:to-fuchsia-500"
-                      title="Generate AI-powered production-ready schemas for this page"
-                    >
-                      {isAiLoading ? (
-                        <><Loader2 className="w-3 h-3 animate-spin" /> Generating...</>
-                      ) : (
-                        <><Brain className="w-3 h-3" /> AI Generate</>
-                      )}
-                    </button>
                   )}
+                  {hasErrors && (
+                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                      <AlertCircle className="w-3 h-3" /> {page.validationErrors!.length}
+                    </span>
+                  )}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); regeneratePage(page.pageId); }}
+                    disabled={isRegenLoading}
+                    className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors disabled:opacity-50 text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700"
+                    title="Regenerate schema for this page"
+                  >
+                    {isRegenLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                  </button>
                 </div>
               </div>
 
-              {isOpen && (
-                <div className="border-t border-zinc-800 divide-y divide-zinc-800/50">
+              {isOpen && schema && (
+                <div className="border-t border-zinc-800">
                   {/* Existing schemas */}
                   {page.existingSchemas.length > 0 && (
-                    <div className="px-4 py-3">
-                      <div className="text-xs font-medium text-zinc-400 mb-2">Existing Schemas</div>
+                    <div className="px-4 py-3 border-b border-zinc-800/50">
+                      <div className="text-xs font-medium text-zinc-400 mb-2">Already on page</div>
                       <div className="flex flex-wrap gap-1.5">
                         {page.existingSchemas.map((s, i) => (
                           <span key={i} className="px-2 py-1 rounded-md text-xs font-mono bg-green-500/10 text-green-400 border border-green-500/20">
@@ -233,55 +225,47 @@ export function SchemaSuggester({ siteId }: Props) {
                     </div>
                   )}
 
-                  {/* Suggestions */}
-                  {page.suggestedSchemas.length === 0 && page.existingSchemas.length === 0 && (
-                    <div className="px-4 py-4 text-center text-xs text-zinc-500">
-                      No suggestions for this page. Click <strong>AI Generate</strong> for deeper analysis.
+                  {/* Validation errors */}
+                  {hasErrors && (
+                    <div className="px-4 py-2 bg-amber-500/5 border-b border-amber-500/20">
+                      <div className="text-xs font-medium text-amber-400 mb-1">Validation warnings</div>
+                      {page.validationErrors!.map((err, i) => (
+                        <div key={i} className="text-[11px] text-amber-300/80">• {err}</div>
+                      ))}
                     </div>
                   )}
-                  {page.suggestedSchemas.map((suggestion, i) => {
-                    const copyId = `${page.pageId}-${suggestion.type}`;
-                    return (
-                      <div key={i} className="px-4 py-3">
-                        <div className="flex items-start gap-3">
-                          <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${PRIORITY_DOT[suggestion.priority]}`} />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-sm font-medium text-zinc-200">{suggestion.type}</span>
-                              <span className={`text-xs px-1.5 py-0.5 rounded ${
-                                suggestion.priority === 'high' ? 'bg-red-500/10 text-red-400' :
-                                suggestion.priority === 'medium' ? 'bg-amber-500/10 text-amber-400' :
-                                'bg-green-500/10 text-green-400'
-                              }`}>
-                                {suggestion.priority}
-                              </span>
-                              {hasAi && (
-                                <span className="text-[10px] text-violet-400">AI-generated</span>
-                              )}
-                            </div>
-                            <p className="text-xs text-zinc-400 mb-2">{suggestion.reason}</p>
 
-                            {/* Template preview */}
-                            <div className="relative">
-                              <pre className="text-xs font-mono bg-zinc-950 rounded-lg p-3 overflow-x-auto text-zinc-400 border border-zinc-800 max-h-48 overflow-y-auto">
-                                {JSON.stringify(suggestion.template, null, 2)}
-                              </pre>
-                              <button
-                                onClick={() => copyTemplate(suggestion, page.pageId)}
-                                className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors"
-                              >
-                                {copiedId === copyId ? (
-                                  <><CheckCircle className="w-3 h-3 text-green-400" /> Copied</>
-                                ) : (
-                                  <><Copy className="w-3 h-3" /> Copy</>
-                                )}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {/* Graph types */}
+                  <div className="px-4 py-2 border-b border-zinc-800/50">
+                    <div className="text-xs font-medium text-zinc-400 mb-1.5">@graph types</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {graphTypes.map((t, i) => (
+                        <span key={i} className="px-2 py-1 rounded-md text-xs font-mono bg-violet-500/10 text-violet-300 border border-violet-500/20">
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-zinc-500 mt-1.5">{schema.reason}</p>
+                  </div>
+
+                  {/* Unified schema preview */}
+                  <div className="px-4 py-3">
+                    <div className="relative">
+                      <pre className="text-xs font-mono bg-zinc-950 rounded-lg p-3 overflow-x-auto text-zinc-400 border border-zinc-800 max-h-64 overflow-y-auto">
+                        {JSON.stringify(schema.template, null, 2)}
+                      </pre>
+                      <button
+                        onClick={() => copyTemplate(schema, page.pageId)}
+                        className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors"
+                      >
+                        {copiedId === `${page.pageId}-${schema.type}` ? (
+                          <><CheckCircle className="w-3 h-3 text-green-400" /> Copied</>
+                        ) : (
+                          <><Copy className="w-3 h-3" /> Copy as &lt;script&gt;</>
+                        )}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -292,14 +276,7 @@ export function SchemaSuggester({ siteId }: Props) {
       <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-blue-500/5 border border-blue-500/10">
         <Info className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
         <div className="text-xs text-zinc-400">
-          <strong className="text-zinc-300">How to use:</strong> Copy the JSON-LD template, customize the placeholder values, and paste it into the page's custom code section in Webflow (Page Settings → Custom Code → Head Code).
-        </div>
-      </div>
-
-      <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-500/5 border border-amber-500/10">
-        <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-        <div className="text-xs text-zinc-400">
-          <strong className="text-zinc-300">Internal tool:</strong> This tool is for internal use only and is not visible to clients in reports.
+          <strong className="text-zinc-300">How to use:</strong> Each page gets one unified <code className="text-blue-300">@graph</code> schema with cross-referenced types. Copy the JSON-LD and paste it into the page's custom code in Webflow (Page Settings → Custom Code → Head Code). Values are pre-filled from your page content and keyword strategy.
         </div>
       </div>
     </div>

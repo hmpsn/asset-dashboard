@@ -13,6 +13,7 @@ export interface SchemaPageSuggestion {
   url: string;
   existingSchemas: string[];
   suggestedSchemas: SchemaSuggestion[];
+  validationErrors?: string[];
 }
 
 export interface SchemaSuggestion {
@@ -20,6 +21,68 @@ export interface SchemaSuggestion {
   reason: string;
   priority: 'high' | 'medium' | 'low';
   template: Record<string, unknown>;
+}
+
+// Context from the workspace/strategy for richer schema generation
+export interface SchemaContext {
+  companyName?: string;
+  liveDomain?: string;
+  logoUrl?: string;
+  businessContext?: string;
+  brandVoice?: string;
+  pageKeywords?: { primary: string; secondary: string[] };
+  searchIntent?: string;
+  siteKeywords?: string[];
+}
+
+// Google required fields per @type (for validation)
+const REQUIRED_FIELDS: Record<string, string[]> = {
+  Article: ['headline', 'author', 'datePublished', 'image'],
+  BlogPosting: ['headline', 'author', 'datePublished', 'image'],
+  NewsArticle: ['headline', 'author', 'datePublished', 'image'],
+  FAQPage: ['mainEntity'],
+  Organization: ['name'],
+  LocalBusiness: ['name', 'address'],
+  WebSite: ['name', 'url'],
+  WebPage: ['name'],
+  BreadcrumbList: ['itemListElement'],
+  Service: ['name'],
+  Product: ['name'],
+  Event: ['name', 'startDate', 'location'],
+  HowTo: ['name', 'step'],
+  Review: ['itemReviewed', 'author'],
+  VideoObject: ['name', 'uploadDate', 'thumbnailUrl'],
+  Person: ['name'],
+};
+
+function validateGraphNode(node: Record<string, unknown>): string[] {
+  const errors: string[] = [];
+  const type = node['@type'] as string;
+  if (!type) { errors.push('Missing @type'); return errors; }
+  const required = REQUIRED_FIELDS[type];
+  if (!required) return []; // unknown type, skip validation
+  for (const field of required) {
+    const val = node[field];
+    if (val === undefined || val === null || val === '' || val === '[') {
+      errors.push(`${type}: missing required field "${field}"`);
+    }
+    // Check for unfilled placeholders
+    if (typeof val === 'string' && val.startsWith('[') && val.endsWith(']')) {
+      errors.push(`${type}: placeholder not filled for "${field}"`);
+    }
+  }
+  return errors;
+}
+
+function validateUnifiedSchema(schema: Record<string, unknown>): string[] {
+  const errors: string[] = [];
+  if (!schema['@context']) errors.push('Missing @context');
+  const graph = schema['@graph'] as Record<string, unknown>[];
+  if (!Array.isArray(graph)) { errors.push('Missing @graph array'); return errors; }
+  for (const node of graph) {
+    errors.push(...validateGraphNode(node));
+  }
+  return errors;
 }
 
 interface PageMeta {
@@ -81,268 +144,42 @@ function extractExistingSchemas(html: string): string[] {
   return schemas;
 }
 
-// Analyze page content and suggest appropriate schemas
-function suggestSchemas(
-  pageTitle: string,
-  slug: string,
-  seoTitle: string,
-  seoDesc: string,
-  html: string | null,
-  existingSchemas: string[],
-  isHomepage: boolean,
-): SchemaSuggestion[] {
-  const suggestions: SchemaSuggestion[] = [];
-  const titleLower = (seoTitle || pageTitle || '').toLowerCase();
-  const slugLower = (slug || '').toLowerCase();
-  const bodyText = html ? html.replace(/<[^>]+>/g, ' ').toLowerCase() : '';
+// --- AI-Powered Unified Schema Generation ---
 
-  const has = (type: string) => existingSchemas.some(s => s.toLowerCase() === type.toLowerCase());
-
-  // Homepage → Organization or WebSite
-  if (isHomepage) {
-    if (!has('Organization') && !has('LocalBusiness')) {
-      suggestions.push({
-        type: 'Organization',
-        reason: 'Homepage should have Organization schema to establish brand identity in search results.',
-        priority: 'high',
-        template: {
-          '@context': 'https://schema.org',
-          '@type': 'Organization',
-          name: '[Company Name]',
-          url: '[Website URL]',
-          logo: '[Logo URL]',
-          description: seoDesc || '[Company description]',
-          sameAs: ['[LinkedIn URL]', '[Twitter URL]'],
-        },
-      });
-    }
-    if (!has('WebSite')) {
-      suggestions.push({
-        type: 'WebSite',
-        reason: 'WebSite schema helps search engines understand your site structure and can enable sitelinks search box.',
-        priority: 'medium',
-        template: {
-          '@context': 'https://schema.org',
-          '@type': 'WebSite',
-          name: '[Site Name]',
-          url: '[Website URL]',
-          potentialAction: {
-            '@type': 'SearchAction',
-            target: '[Website URL]/search?q={search_term_string}',
-            'query-input': 'required name=search_term_string',
-          },
-        },
-      });
-    }
-  }
-
-  // Blog/article pages
-  const isBlogPost = slugLower.includes('blog/') || slugLower.includes('post/') || slugLower.includes('article/') ||
-    titleLower.includes('blog') || bodyText.includes('published') || bodyText.includes('author');
-  if (isBlogPost && !has('Article') && !has('BlogPosting') && !has('NewsArticle')) {
-    suggestions.push({
-      type: 'Article',
-      reason: 'Blog/article pages benefit from Article schema for rich snippets in search results (author, date, image).',
-      priority: 'high',
-      template: {
-        '@context': 'https://schema.org',
-        '@type': 'Article',
-        headline: seoTitle || pageTitle,
-        description: seoDesc || '[Article description]',
-        author: { '@type': 'Person', name: '[Author Name]' },
-        datePublished: '[YYYY-MM-DD]',
-        dateModified: '[YYYY-MM-DD]',
-        image: '[Featured Image URL]',
-        publisher: {
-          '@type': 'Organization',
-          name: '[Company Name]',
-          logo: { '@type': 'ImageObject', url: '[Logo URL]' },
-        },
-      },
-    });
-  }
-
-  // FAQ pages
-  const isFaq = slugLower.includes('faq') || titleLower.includes('faq') ||
-    titleLower.includes('frequently asked') || titleLower.includes('questions');
-  const hasQAContent = html ? (html.match(/<(h[2-4]|summary)[^>]*>.*\?/gi) || []).length >= 2 : false;
-  if ((isFaq || hasQAContent) && !has('FAQPage')) {
-    suggestions.push({
-      type: 'FAQPage',
-      reason: 'FAQ content can display as rich results with expandable Q&A directly in search results, significantly increasing visibility.',
-      priority: 'high',
-      template: {
-        '@context': 'https://schema.org',
-        '@type': 'FAQPage',
-        mainEntity: [
-          {
-            '@type': 'Question',
-            name: '[Question 1]',
-            acceptedAnswer: { '@type': 'Answer', text: '[Answer 1]' },
-          },
-          {
-            '@type': 'Question',
-            name: '[Question 2]',
-            acceptedAnswer: { '@type': 'Answer', text: '[Answer 2]' },
-          },
-        ],
-      },
-    });
-  }
-
-  // Service pages
-  const isService = slugLower.includes('service') || slugLower.includes('solution') ||
-    titleLower.includes('service') || titleLower.includes('solution') || titleLower.includes('what we do');
-  if (isService && !has('Service') && !has('Product')) {
-    suggestions.push({
-      type: 'Service',
-      reason: 'Service pages should describe offerings with structured data so search engines can surface them in relevant queries.',
-      priority: 'medium',
-      template: {
-        '@context': 'https://schema.org',
-        '@type': 'Service',
-        name: seoTitle || pageTitle,
-        description: seoDesc || '[Service description]',
-        provider: { '@type': 'Organization', name: '[Company Name]' },
-        serviceType: '[Service Category]',
-      },
-    });
-  }
-
-  // About pages
-  const isAbout = slugLower.includes('about') || titleLower.includes('about us') || titleLower.includes('our team') || titleLower.includes('our story');
-  if (isAbout && !has('AboutPage') && !has('Organization')) {
-    suggestions.push({
-      type: 'Organization',
-      reason: 'About pages should reinforce Organization schema with founders, team, and company details.',
-      priority: 'medium',
-      template: {
-        '@context': 'https://schema.org',
-        '@type': 'Organization',
-        name: '[Company Name]',
-        url: '[Website URL]',
-        description: seoDesc || '[About description]',
-        foundingDate: '[YYYY]',
-        founders: [{ '@type': 'Person', name: '[Founder Name]' }],
-      },
-    });
-  }
-
-  // Contact pages
-  const isContact = slugLower.includes('contact') || titleLower.includes('contact') || titleLower.includes('get in touch');
-  if (isContact && !has('ContactPage') && !has('LocalBusiness')) {
-    suggestions.push({
-      type: 'LocalBusiness',
-      reason: 'Contact pages with address/phone information should include LocalBusiness schema for local SEO and Knowledge Panel.',
-      priority: 'medium',
-      template: {
-        '@context': 'https://schema.org',
-        '@type': 'LocalBusiness',
-        name: '[Company Name]',
-        address: {
-          '@type': 'PostalAddress',
-          streetAddress: '[Street]',
-          addressLocality: '[City]',
-          addressRegion: '[State]',
-          postalCode: '[Zip]',
-          addressCountry: '[Country]',
-        },
-        telephone: '[Phone]',
-        email: '[Email]',
-      },
-    });
-  }
-
-  // Pricing pages
-  const isPricing = slugLower.includes('pricing') || titleLower.includes('pricing') || titleLower.includes('plans');
-  if (isPricing && !has('Product') && !has('Offer')) {
-    suggestions.push({
-      type: 'Product',
-      reason: 'Pricing pages can use Product/Offer schema to display pricing directly in search results.',
-      priority: 'medium',
-      template: {
-        '@context': 'https://schema.org',
-        '@type': 'Product',
-        name: '[Product/Plan Name]',
-        description: seoDesc || '[Plan description]',
-        offers: {
-          '@type': 'AggregateOffer',
-          lowPrice: '[Lowest Price]',
-          highPrice: '[Highest Price]',
-          priceCurrency: 'USD',
-        },
-      },
-    });
-  }
-
-  // Case study / testimonial pages
-  const isCaseStudy = slugLower.includes('case-stud') || slugLower.includes('testimonial') || slugLower.includes('review') ||
-    titleLower.includes('case study') || titleLower.includes('testimonial') || titleLower.includes('success stor');
-  if (isCaseStudy && !has('Review') && !has('AggregateRating')) {
-    suggestions.push({
-      type: 'Review',
-      reason: 'Case studies and testimonials can use Review schema to show star ratings and endorsements in search results.',
-      priority: 'low',
-      template: {
-        '@context': 'https://schema.org',
-        '@type': 'Review',
-        itemReviewed: { '@type': 'Organization', name: '[Your Company]' },
-        author: { '@type': 'Person', name: '[Client Name]' },
-        reviewBody: '[Testimonial text]',
-        reviewRating: { '@type': 'Rating', ratingValue: '5', bestRating: '5' },
-      },
-    });
-  }
-
-  // Event pages
-  const isEvent = slugLower.includes('event') || slugLower.includes('webinar') || slugLower.includes('conference') ||
-    titleLower.includes('event') || titleLower.includes('webinar');
-  if (isEvent && !has('Event')) {
-    suggestions.push({
-      type: 'Event',
-      reason: 'Event pages can display date, location, and registration info directly in search results.',
-      priority: 'medium',
-      template: {
-        '@context': 'https://schema.org',
-        '@type': 'Event',
-        name: seoTitle || pageTitle,
-        description: seoDesc || '[Event description]',
-        startDate: '[YYYY-MM-DDTHH:MM]',
-        endDate: '[YYYY-MM-DDTHH:MM]',
-        location: { '@type': 'Place', name: '[Venue]', address: '[Address]' },
-        organizer: { '@type': 'Organization', name: '[Company Name]' },
-      },
-    });
-  }
-
-  // BreadcrumbList — almost every page should have this
-  if (!has('BreadcrumbList') && !isHomepage && slug) {
-    const parts = slug.split('/').filter(Boolean);
-    if (parts.length >= 1) {
-      suggestions.push({
-        type: 'BreadcrumbList',
-        reason: 'Breadcrumb schema helps search engines understand your site hierarchy and displays breadcrumb trails in results.',
-        priority: 'low',
-        template: {
-          '@context': 'https://schema.org',
-          '@type': 'BreadcrumbList',
-          itemListElement: parts.map((part, i) => ({
-            '@type': 'ListItem',
-            position: i + 1,
-            name: part.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-            item: `[Website URL]/${parts.slice(0, i + 1).join('/')}`,
-          })),
-        },
-      });
-    }
-  }
-
-  return suggestions;
+function extractPageContent(html: string): string {
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  const body = bodyMatch ? bodyMatch[1] : html;
+  return body
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+    .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+    .replace(/<header[\s\S]*?<\/header>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 4000);
 }
 
-// --- AI-Powered Schema Generation ---
+function extractStructuredInfo(html: string) {
+  const emails = (html.match(/[\w.-]+@[\w.-]+\.\w+/g) || []).slice(0, 3);
+  const phones = (html.match(/(?:\+1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g) || []).slice(0, 2);
+  const images = (html.match(/src=["']([^"']*(?:jpg|jpeg|png|webp)[^"']*)["']/gi) || []).slice(0, 5).map(m => {
+    const s = m.match(/src=["']([^"']+)["']/i);
+    return s ? s[1] : '';
+  }).filter(Boolean);
+  // Extract questions (headings or summaries ending with ?)
+  const questions = (html.match(/<(?:h[2-4]|summary)[^>]*>([^<]*\?)/gi) || []).map(m => m.replace(/<[^>]+>/g, '').trim()).slice(0, 10);
+  // Extract author info
+  const authorMatch = html.match(/(?:author|written\s*by|posted\s*by)[:\s]*([^<,]{2,40})/i);
+  const author = authorMatch ? authorMatch[1].trim() : '';
+  // Extract date
+  const dateMatch = html.match(/(?:datetime|published|date)[=:"'\s]*(\d{4}-\d{2}-\d{2})/i);
+  const publishDate = dateMatch ? dateMatch[1] : '';
+  return { emails, phones, images, questions, author, publishDate };
+}
 
-async function aiGenerateSchema(
+async function aiGenerateUnifiedSchema(
   pageTitle: string,
   slug: string,
   seoTitle: string,
@@ -351,112 +188,185 @@ async function aiGenerateSchema(
   existingSchemas: string[],
   isHomepage: boolean,
   baseUrl: string,
-): Promise<SchemaSuggestion[]> {
+  ctx: SchemaContext,
+): Promise<{ schema: Record<string, unknown>; reason: string; errors: string[] } | null> {
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return []; // Fall back to rule-based if no API key
+  if (!apiKey) return null;
 
-  const safeSlug = slug || '';
-  const safeSeoTitle = seoTitle || pageTitle || '';
-  const safeSeoDesc = seoDesc || '';
-  // Extract meaningful content from HTML (strip tags, limit length)
-  let pageContent = '';
-  if (html) {
-    // Get body content only
-    const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
-    const body = bodyMatch ? bodyMatch[1] : html;
-    // Remove scripts, styles, nav, footer
-    pageContent = body
-      .replace(/<script[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[\s\S]*?<\/style>/gi, '')
-      .replace(/<nav[\s\S]*?<\/nav>/gi, '')
-      .replace(/<footer[\s\S]*?<\/footer>/gi, '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 3000); // Limit to ~3k chars for token efficiency
+  const pageUrl = (!slug || slug === 'index' || slug === 'home') ? baseUrl : `${baseUrl}/${slug}`;
+  const pageContent = html ? extractPageContent(html) : '';
+  const info = html ? extractStructuredInfo(html) : { emails: [], phones: [], images: [], questions: [], author: '', publishDate: '' };
+
+  const companyName = ctx.companyName || '(unknown — infer from page content)';
+  const siteUrl = ctx.liveDomain ? (ctx.liveDomain.startsWith('http') ? ctx.liveDomain : `https://${ctx.liveDomain}`) : baseUrl;
+
+  // Build keyword context
+  let keywordBlock = '';
+  if (ctx.pageKeywords) {
+    keywordBlock = `\nTARGET KEYWORDS FOR THIS PAGE:\n- Primary: ${ctx.pageKeywords.primary}\n- Secondary: ${ctx.pageKeywords.secondary.join(', ') || 'none'}`;
+    if (ctx.searchIntent) keywordBlock += `\n- Search Intent: ${ctx.searchIntent}`;
+  }
+  if (ctx.siteKeywords?.length) {
+    keywordBlock += `\nSITE-LEVEL KEYWORDS: ${ctx.siteKeywords.slice(0, 10).join(', ')}`;
   }
 
-  // Extract any structured info from the page
-  const emails = html ? (html.match(/[\w.-]+@[\w.-]+\.\w+/g) || []).slice(0, 3) : [];
-  const phones = html ? (html.match(/(?:\+1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g) || []).slice(0, 2) : [];
-  const images = html ? (html.match(/src=["']([^"']*(?:jpg|jpeg|png|webp|svg)[^"']*)["']/gi) || []).slice(0, 5).map(m => {
-    const s = m.match(/src=["']([^"']+)["']/i);
-    return s ? s[1] : '';
-  }).filter(Boolean) : [];
+  const prompt = `You are a Google Structured Data expert. Generate ONE production-ready JSON-LD schema for this page using the @graph pattern. The schema must pass Google's Rich Results Test with zero errors.
 
-  const prompt = `You are an expert SEO structured data consultant. Analyze this webpage and generate production-ready JSON-LD schema(s) that would maximize this page's rich snippet potential in Google Search.
+SITE INFO:
+- Company: ${companyName}
+- Site URL: ${siteUrl}
+- Logo: ${ctx.logoUrl || '(not available)'}
+${ctx.businessContext ? `- Business Context: ${ctx.businessContext}` : ''}
+${keywordBlock}
 
 PAGE INFO:
-- URL: ${baseUrl}/${safeSlug}
-- Title: ${safeSeoTitle}
-- Meta Description: ${safeSeoDesc || '(none)'}
+- URL: ${pageUrl}
+- Title: ${seoTitle || pageTitle}
+- Meta Description: ${seoDesc || '(none)'}
 - Is Homepage: ${isHomepage}
 - Existing Schemas: ${existingSchemas.length > 0 ? existingSchemas.join(', ') : 'None'}
-- Emails found: ${emails.join(', ') || 'none'}
-- Phone numbers found: ${phones.join(', ') || 'none'}
-- Images found: ${images.slice(0, 3).join(', ') || 'none'}
+${info.author ? `- Author: ${info.author}` : ''}
+${info.publishDate ? `- Publish Date: ${info.publishDate}` : ''}
+${info.emails.length ? `- Emails: ${info.emails.join(', ')}` : ''}
+${info.phones.length ? `- Phones: ${info.phones.join(', ')}` : ''}
+${info.images.length ? `- Key Images: ${info.images.slice(0, 3).join(', ')}` : ''}
+${info.questions.length ? `- FAQ Questions Found: ${info.questions.join(' | ')}` : ''}
 
 PAGE CONTENT (excerpt):
-${pageContent.slice(0, 2000)}
+${pageContent.slice(0, 3000)}
 
-INSTRUCTIONS:
-1. Generate 1-3 JSON-LD schemas that are MOST impactful for this specific page
-2. Fill in ALL values using actual content from the page - NO placeholders
-3. Each schema must be valid, complete, and ready to paste into the page's <head>
-4. Prioritize schemas that enable rich snippets (FAQ, HowTo, Article, Organization, Product, BreadcrumbList, etc.)
-5. Don't suggest schemas that already exist on the page
-6. For Organization schema, use the site URL as the homepage, and extract company name from the page content
-7. Be specific — use actual content, dates, descriptions from the page
+REQUIREMENTS:
+1. Return ONE JSON-LD object with "@context": "https://schema.org" and an "@graph" array
+2. The @graph MUST include a WebPage node and an Organization node on every page
+3. Add a WebSite node on the homepage
+4. Add page-specific types based on content (Article, FAQPage, Service, Product, BreadcrumbList, HowTo, Event, LocalBusiness, etc.)
+5. Use "@id" cross-references between nodes (e.g. Organization "@id": "${siteUrl}/#organization")
+6. Fill ALL values from actual page content — ZERO placeholders like [Company Name]
+7. For images, use full absolute URLs (prefix with ${siteUrl} if relative)
+8. FAQPage: extract REAL questions and answers from the page content
+9. Article/BlogPosting: use real author name, real dates, real headline
+10. BreadcrumbList: build from the URL path structure
+11. Every @type must have all Google-required fields filled with real data
+12. If you cannot determine a required value from the content, omit that @type entirely rather than using a placeholder
 
-Respond with a JSON array of objects, each with:
-- "type": the @type value
-- "reason": 1-2 sentence explanation of SEO impact
-- "priority": "high" | "medium" | "low"
-- "template": the complete JSON-LD object (with @context)
-
-Return ONLY valid JSON array, no markdown or explanation.`;
+Return ONLY the JSON-LD object. No markdown, no explanation, no wrapping.`;
 
   try {
     const OpenAI = (await import('openai')).default;
     const client = new OpenAI({ apiKey });
 
     const response = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
-      max_tokens: 2000,
-      temperature: 0.3,
+      model: 'gpt-4o',
+      max_tokens: 3000,
+      temperature: 0.2,
       messages: [{ role: 'user', content: prompt }],
     });
 
     const content = response.choices[0]?.message?.content?.trim();
-    if (!content) return [];
+    if (!content) return null;
 
-    // Parse the response - handle both raw JSON and markdown-wrapped JSON
     let jsonStr = content;
     const mdMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (mdMatch) jsonStr = mdMatch[1].trim();
 
-    const parsed = JSON.parse(jsonStr);
-    if (!Array.isArray(parsed)) return [];
+    const schema = JSON.parse(jsonStr) as Record<string, unknown>;
 
-    return parsed.map((item: { type?: string; reason?: string; priority?: string; template?: Record<string, unknown> }) => ({
-      type: item.type || 'Unknown',
-      reason: item.reason || '',
-      priority: (item.priority === 'high' || item.priority === 'medium' || item.priority === 'low') ? item.priority : 'medium',
-      template: item.template || {},
-    })).filter((s: { template: Record<string, unknown> }) => s.template['@type']) as SchemaSuggestion[];
+    // Ensure it has @graph structure
+    if (!schema['@graph'] && schema['@type']) {
+      // AI returned a single type instead of @graph — wrap it
+      const wrapped = { '@context': 'https://schema.org', '@graph': [schema] };
+      delete (wrapped['@graph'][0] as Record<string, unknown>)['@context'];
+      const errors = validateUnifiedSchema(wrapped);
+      const types = (wrapped['@graph'] as Record<string, unknown>[]).map(n => n['@type']).filter(Boolean);
+      return { schema: wrapped, reason: `Unified schema with ${types.join(', ')}`, errors };
+    }
+
+    const errors = validateUnifiedSchema(schema);
+    const graph = schema['@graph'] as Record<string, unknown>[];
+    const types = graph?.map(n => n['@type']).filter(Boolean) || [];
+    return { schema, reason: `Unified @graph schema with ${types.join(', ')}`, errors };
   } catch (err) {
-    console.error('AI schema generation error:', err);
-    return [];
+    console.error('[schema] AI unified generation error:', err);
+    return null;
   }
+}
+
+// Fallback: build a basic @graph schema without AI
+function buildFallbackSchema(
+  pageTitle: string,
+  slug: string,
+  seoTitle: string,
+  seoDesc: string,
+  isHomepage: boolean,
+  baseUrl: string,
+  ctx: SchemaContext,
+): Record<string, unknown> {
+  const pageUrl = (!slug || slug === 'index' || slug === 'home') ? baseUrl : `${baseUrl}/${slug}`;
+  const siteUrl = ctx.liveDomain ? (ctx.liveDomain.startsWith('http') ? ctx.liveDomain : `https://${ctx.liveDomain}`) : baseUrl;
+  const companyName = ctx.companyName || seoTitle || pageTitle;
+
+  const graph: Record<string, unknown>[] = [
+    {
+      '@type': 'Organization',
+      '@id': `${siteUrl}/#organization`,
+      name: companyName,
+      url: siteUrl,
+      ...(ctx.logoUrl ? { logo: { '@type': 'ImageObject', url: ctx.logoUrl } } : {}),
+    },
+    {
+      '@type': 'WebPage',
+      '@id': `${pageUrl}/#webpage`,
+      url: pageUrl,
+      name: seoTitle || pageTitle,
+      ...(seoDesc ? { description: seoDesc } : {}),
+      isPartOf: { '@id': `${siteUrl}/#website` },
+      about: { '@id': `${siteUrl}/#organization` },
+    },
+  ];
+
+  if (isHomepage) {
+    graph.push({
+      '@type': 'WebSite',
+      '@id': `${siteUrl}/#website`,
+      url: siteUrl,
+      name: companyName,
+      publisher: { '@id': `${siteUrl}/#organization` },
+    });
+  }
+
+  // Add BreadcrumbList for non-homepage
+  if (!isHomepage && slug) {
+    const parts = slug.split('/').filter(Boolean);
+    if (parts.length >= 1) {
+      graph.push({
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: siteUrl },
+          ...parts.map((part, i) => ({
+            '@type': 'ListItem',
+            position: i + 2,
+            name: part.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+            item: `${siteUrl}/${parts.slice(0, i + 1).join('/')}`,
+          })),
+        ],
+      });
+    }
+  }
+
+  return { '@context': 'https://schema.org', '@graph': graph };
 }
 
 export async function generateSchemaForPage(
   siteId: string,
   pageId: string,
   tokenOverride?: string,
+  ctx: SchemaContext = {},
 ): Promise<SchemaPageSuggestion | null> {
   const subdomain = await getSiteSubdomain(siteId, tokenOverride);
-  const baseUrl = subdomain ? `https://${subdomain}.webflow.io` : '';
+  const liveDomain = ctx.liveDomain;
+  const baseUrl = liveDomain
+    ? (liveDomain.startsWith('http') ? liveDomain : `https://${liveDomain}`)
+    : subdomain ? `https://${subdomain}.webflow.io` : '';
   if (!baseUrl) return null;
 
   const meta = await fetchPageMeta(pageId, tokenOverride);
@@ -470,16 +380,35 @@ export async function generateSchemaForPage(
   const seoDesc = meta.seo?.description || '';
   const existingSchemas = html ? extractExistingSchemas(html) : [];
 
-  let suggestedSchemas = await aiGenerateSchema(
+  // Try AI unified schema first
+  const aiResult = await aiGenerateUnifiedSchema(
     meta.title, slug, seoTitle, seoDesc,
-    html, existingSchemas, isHomepage, baseUrl,
+    html, existingSchemas, isHomepage, baseUrl, ctx,
   );
-  // Fall back to rule-based if AI returns nothing
-  if (suggestedSchemas.length === 0) {
-    suggestedSchemas = suggestSchemas(
-      meta.title, slug, seoTitle, seoDesc,
-      html, existingSchemas, isHomepage,
-    );
+
+  let suggestedSchemas: SchemaSuggestion[];
+  let validationErrors: string[] = [];
+
+  if (aiResult) {
+    const types = ((aiResult.schema['@graph'] as Record<string, unknown>[]) || []).map(n => n['@type']).filter(Boolean);
+    suggestedSchemas = [{
+      type: types.join(' + '),
+      reason: aiResult.reason,
+      priority: 'high',
+      template: aiResult.schema,
+    }];
+    validationErrors = aiResult.errors;
+  } else {
+    // Fallback to basic @graph schema
+    const fallback = buildFallbackSchema(meta.title, slug, seoTitle, seoDesc, isHomepage, baseUrl, ctx);
+    const types = ((fallback['@graph'] as Record<string, unknown>[]) || []).map(n => n['@type']).filter(Boolean);
+    suggestedSchemas = [{
+      type: types.join(' + '),
+      reason: `Basic schema with ${types.join(', ')} (AI unavailable — add OPENAI_API_KEY for richer schemas)`,
+      priority: 'medium',
+      template: fallback,
+    }];
+    validationErrors = validateUnifiedSchema(fallback);
   }
 
   return {
@@ -489,28 +418,52 @@ export async function generateSchemaForPage(
     url,
     existingSchemas,
     suggestedSchemas,
+    validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
   };
 }
 
-export async function generateSchemaSuggestions(siteId: string, tokenOverride?: string, useAI: boolean = false): Promise<SchemaPageSuggestion[]> {
+export async function generateSchemaSuggestions(
+  siteId: string,
+  tokenOverride?: string,
+  ctx: SchemaContext = {},
+  pageKeywordMap?: { pagePath: string; primaryKeyword: string; secondaryKeywords: string[]; searchIntent?: string }[],
+): Promise<SchemaPageSuggestion[]> {
   const subdomain = await getSiteSubdomain(siteId, tokenOverride);
-  const baseUrl = subdomain ? `https://${subdomain}.webflow.io` : '';
-  console.log(`[schema] subdomain=${subdomain}, baseUrl=${baseUrl}`);
+  const liveDomain = ctx.liveDomain;
+  const baseUrl = liveDomain
+    ? (liveDomain.startsWith('http') ? liveDomain : `https://${liveDomain}`)
+    : subdomain ? `https://${subdomain}.webflow.io` : '';
+  console.log(`[schema] baseUrl=${baseUrl}, liveDomain=${liveDomain || '(none)'}`);
   if (!baseUrl) {
-    console.error('[schema] No subdomain found for site', siteId);
+    console.error('[schema] No subdomain or liveDomain found for site', siteId);
     return [];
   }
 
   const allPages = await listPages(siteId, tokenOverride);
-  console.log(`[schema] Total pages: ${allPages.length}`);
   const pages = filterPublishedPages(allPages).filter(
     (p: { title: string; slug: string }) => !(p.title || '').toLowerCase().includes('password') && !(p.slug || '').toLowerCase().includes('password')
   );
-  console.log(`[schema] Published (non-password) pages: ${pages.length}`, pages.map(p => `${p.title} [${p.slug}]`));
+  console.log(`[schema] ${pages.length} published pages to analyze`);
 
   const results: SchemaPageSuggestion[] = [];
-  // AI mode: smaller batches (API calls are slower), rule-based: larger batches
-  const batch = useAI ? 2 : 5;
+  const hasAI = !!process.env.OPENAI_API_KEY;
+  const batch = hasAI ? 2 : 5;
+
+  // Helper: find keyword context for a page slug
+  const getPageKeywords = (slug: string): SchemaContext['pageKeywords'] => {
+    if (!pageKeywordMap) return undefined;
+    const pagePath = `/${slug}`;
+    const match = pageKeywordMap.find(p =>
+      p.pagePath === pagePath || p.pagePath === `/${slug}/` || p.pagePath === slug
+    );
+    if (match) return { primary: match.primaryKeyword, secondary: match.secondaryKeywords || [] };
+    return undefined;
+  };
+  const getPageIntent = (slug: string): string | undefined => {
+    if (!pageKeywordMap) return undefined;
+    const pagePath = `/${slug}`;
+    return pageKeywordMap.find(p => p.pagePath === pagePath || p.pagePath === `/${slug}/`)?.searchIntent;
+  };
 
   for (let i = 0; i < pages.length; i += batch) {
     const chunk = pages.slice(i, i + batch);
@@ -526,32 +479,53 @@ export async function generateSchemaSuggestions(siteId: string, tokenOverride?: 
         const seoTitle = meta?.seo?.title || page.title || '';
         const seoDesc = meta?.seo?.description || '';
         const existingSchemas = html ? extractExistingSchemas(html) : [];
-        console.log(`[schema] Page "${page.title}" [${page.slug}] → url=${url}, isHome=${isHomepage}, html=${html ? html.length + ' chars' : 'FAILED'}, existing=${existingSchemas.join(',') || 'none'}`);
+
+        // Build page-specific context
+        const pageCtx: SchemaContext = {
+          ...ctx,
+          pageKeywords: getPageKeywords(page.slug),
+          searchIntent: getPageIntent(page.slug),
+        };
 
         let suggestedSchemas: SchemaSuggestion[];
+        let validationErrors: string[] = [];
 
-        if (useAI) {
-          // AI-powered: generates pre-filled, production-ready schemas
-          suggestedSchemas = await aiGenerateSchema(
+        if (hasAI) {
+          const aiResult = await aiGenerateUnifiedSchema(
             page.title, page.slug, seoTitle, seoDesc,
-            html, existingSchemas, isHomepage, baseUrl,
+            html, existingSchemas, isHomepage, baseUrl, pageCtx,
           );
-          // If AI fails or returns nothing, fall back to rule-based
-          if (suggestedSchemas.length === 0) {
-            suggestedSchemas = suggestSchemas(
-              page.title, page.slug, seoTitle, seoDesc,
-              html, existingSchemas, isHomepage,
-            );
+          if (aiResult) {
+            const types = ((aiResult.schema['@graph'] as Record<string, unknown>[]) || []).map(n => n['@type']).filter(Boolean);
+            suggestedSchemas = [{
+              type: types.join(' + '),
+              reason: aiResult.reason,
+              priority: 'high',
+              template: aiResult.schema,
+            }];
+            validationErrors = aiResult.errors;
+          } else {
+            const fallback = buildFallbackSchema(page.title, page.slug, seoTitle, seoDesc, isHomepage, baseUrl, pageCtx);
+            const types = ((fallback['@graph'] as Record<string, unknown>[]) || []).map(n => n['@type']).filter(Boolean);
+            suggestedSchemas = [{
+              type: types.join(' + '),
+              reason: `Basic schema with ${types.join(', ')} (AI generation failed for this page)`,
+              priority: 'medium',
+              template: fallback,
+            }];
+            validationErrors = validateUnifiedSchema(fallback);
           }
         } else {
-          suggestedSchemas = suggestSchemas(
-            page.title, page.slug, seoTitle, seoDesc,
-            html, existingSchemas, isHomepage,
-          );
+          const fallback = buildFallbackSchema(page.title, page.slug, seoTitle, seoDesc, isHomepage, baseUrl, pageCtx);
+          const types = ((fallback['@graph'] as Record<string, unknown>[]) || []).map(n => n['@type']).filter(Boolean);
+          suggestedSchemas = [{
+            type: types.join(' + '),
+            reason: `Basic schema with ${types.join(', ')} (add OPENAI_API_KEY for richer schemas)`,
+            priority: 'medium',
+            template: fallback,
+          }];
+          validationErrors = validateUnifiedSchema(fallback);
         }
-
-        // Only include pages that have suggestions or existing schemas
-        if (suggestedSchemas.length === 0 && existingSchemas.length === 0) return null;
 
         return {
           pageId: page.id,
@@ -560,6 +534,7 @@ export async function generateSchemaSuggestions(siteId: string, tokenOverride?: 
           url,
           existingSchemas,
           suggestedSchemas,
+          validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
         } as SchemaPageSuggestion;
       })
     );
@@ -580,28 +555,52 @@ export async function generateSchemaSuggestions(siteId: string, tokenOverride?: 
           const html = await fetchPublishedHtml(item.url);
           const htmlTitle = html ? (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || '') : '';
           const existingSchemas = html ? extractExistingSchemas(html) : [];
-          console.log(`[schema] CMS "${item.pageName}" [${slug}] → url=${item.url}, html=${html ? html.length + ' chars' : 'FAILED'}, existing=${existingSchemas.join(',') || 'none'}`);
+
+          const pageCtx: SchemaContext = {
+            ...ctx,
+            pageKeywords: getPageKeywords(slug),
+            searchIntent: getPageIntent(slug),
+          };
 
           let suggestedSchemas: SchemaSuggestion[];
-          if (useAI) {
-            suggestedSchemas = await aiGenerateSchema(
+          let validationErrors: string[] = [];
+
+          if (hasAI) {
+            const aiResult = await aiGenerateUnifiedSchema(
               item.pageName, slug, htmlTitle, '',
-              html, existingSchemas, isHomepage, baseUrl,
+              html, existingSchemas, isHomepage, baseUrl, pageCtx,
             );
-            if (suggestedSchemas.length === 0) {
-              suggestedSchemas = suggestSchemas(
-                item.pageName, slug, htmlTitle, '',
-                html, existingSchemas, isHomepage,
-              );
+            if (aiResult) {
+              const types = ((aiResult.schema['@graph'] as Record<string, unknown>[]) || []).map(n => n['@type']).filter(Boolean);
+              suggestedSchemas = [{
+                type: types.join(' + '),
+                reason: aiResult.reason,
+                priority: 'high',
+                template: aiResult.schema,
+              }];
+              validationErrors = aiResult.errors;
+            } else {
+              const fallback = buildFallbackSchema(item.pageName, slug, htmlTitle, '', isHomepage, baseUrl, pageCtx);
+              const types = ((fallback['@graph'] as Record<string, unknown>[]) || []).map(n => n['@type']).filter(Boolean);
+              suggestedSchemas = [{
+                type: types.join(' + '),
+                reason: `Basic schema with ${types.join(', ')}`,
+                priority: 'medium',
+                template: fallback,
+              }];
+              validationErrors = validateUnifiedSchema(fallback);
             }
           } else {
-            suggestedSchemas = suggestSchemas(
-              item.pageName, slug, htmlTitle, '',
-              html, existingSchemas, isHomepage,
-            );
+            const fallback = buildFallbackSchema(item.pageName, slug, htmlTitle, '', isHomepage, baseUrl, pageCtx);
+            const types = ((fallback['@graph'] as Record<string, unknown>[]) || []).map(n => n['@type']).filter(Boolean);
+            suggestedSchemas = [{
+              type: types.join(' + '),
+              reason: `Basic schema with ${types.join(', ')}`,
+              priority: 'medium',
+              template: fallback,
+            }];
+            validationErrors = validateUnifiedSchema(fallback);
           }
-
-          if (suggestedSchemas.length === 0 && existingSchemas.length === 0) return null;
 
           return {
             pageId: `cms-${slug}`,
@@ -610,6 +609,7 @@ export async function generateSchemaSuggestions(siteId: string, tokenOverride?: 
             url: item.url,
             existingSchemas,
             suggestedSchemas,
+            validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
           } as SchemaPageSuggestion;
         })
       );
@@ -617,12 +617,14 @@ export async function generateSchemaSuggestions(siteId: string, tokenOverride?: 
     }
   }
 
-  // Sort: pages with high-priority suggestions first, then by number of suggestions
+  // Sort: pages with validation errors last, homepage first
   results.sort((a, b) => {
-    const aMax = Math.min(...a.suggestedSchemas.map(s => s.priority === 'high' ? 0 : s.priority === 'medium' ? 1 : 2), 3);
-    const bMax = Math.min(...b.suggestedSchemas.map(s => s.priority === 'high' ? 0 : s.priority === 'medium' ? 1 : 2), 3);
-    if (aMax !== bMax) return aMax - bMax;
-    return b.suggestedSchemas.length - a.suggestedSchemas.length;
+    const aHome = a.slug === '' || a.slug === 'index' || a.slug === 'home' ? 0 : 1;
+    const bHome = b.slug === '' || b.slug === 'index' || b.slug === 'home' ? 0 : 1;
+    if (aHome !== bHome) return aHome - bHome;
+    const aErr = (a.validationErrors?.length || 0) > 0 ? 1 : 0;
+    const bErr = (b.validationErrors?.length || 0) > 0 ? 1 : 0;
+    return aErr - bErr;
   });
 
   return results;

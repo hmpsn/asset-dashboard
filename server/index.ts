@@ -54,7 +54,7 @@ import {
   addActionItem, updateActionItem, deleteActionItem, getActionItems, extractSiteLogo,
 } from './reports.js';
 import { runSiteSpeed, runSinglePageSpeed } from './pagespeed.js';
-import { generateSchemaSuggestions, generateSchemaForPage } from './schema-suggester.js';
+import { generateSchemaSuggestions, generateSchemaForPage, type SchemaContext } from './schema-suggester.js';
 import { runSalesAudit } from './sales-audit.js';
 import { initJobs, createJob, updateJob, getJob, listJobs } from './jobs.js';
 import { createBatch, listBatches, getBatch, updateItem, markBatchApplied, deleteBatch } from './approvals.js';
@@ -999,11 +999,33 @@ app.post('/api/competitor-compare', async (req, res) => {
 });
 
 // --- JSON-LD Schema Suggester (internal tool, not client-visible) ---
+// Helper: build SchemaContext from workspace data for schema generation
+function buildSchemaContext(siteId: string): { ctx: SchemaContext; pageKeywordMap?: { pagePath: string; primaryKeyword: string; secondaryKeywords: string[]; searchIntent?: string }[] } {
+  const allWs = listWorkspaces();
+  const ws = allWs.find(w => w.webflowSiteId === siteId);
+  const ctx: SchemaContext = {};
+  if (ws) {
+    ctx.companyName = ws.name;
+    ctx.liveDomain = ws.liveDomain;
+    ctx.brandVoice = ws.brandVoice;
+    ctx.businessContext = ws.keywordStrategy?.businessContext;
+    ctx.siteKeywords = ws.keywordStrategy?.siteKeywords;
+    ctx.logoUrl = ws.brandLogoUrl;
+  }
+  const pageKeywordMap = ws?.keywordStrategy?.pageMap?.map(p => ({
+    pagePath: p.pagePath,
+    primaryKeyword: p.primaryKeyword,
+    secondaryKeywords: p.secondaryKeywords || [],
+    searchIntent: p.searchIntent,
+  }));
+  return { ctx, pageKeywordMap };
+}
+
 app.get('/api/webflow/schema-suggestions/:siteId', async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
-    const useAI = req.query.ai === 'true';
-    const result = await generateSchemaSuggestions(req.params.siteId, token, useAI);
+    const { ctx, pageKeywordMap } = buildSchemaContext(req.params.siteId);
+    const result = await generateSchemaSuggestions(req.params.siteId, token, ctx, pageKeywordMap);
     res.json(result);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -1017,7 +1039,8 @@ app.post('/api/webflow/schema-suggestions/:siteId/page', async (req, res) => {
   if (!pageId) return res.status(400).json({ error: 'pageId required' });
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
-    const result = await generateSchemaForPage(req.params.siteId, pageId, token);
+    const { ctx } = buildSchemaContext(req.params.siteId);
+    const result = await generateSchemaForPage(req.params.siteId, pageId, token, ctx);
     if (!result) return res.status(404).json({ error: 'Page not found' });
     res.json(result);
   } catch (err) {
