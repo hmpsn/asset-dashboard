@@ -481,7 +481,9 @@ export async function generateSchemaSuggestions(
   };
 
   for (let i = 0; i < pages.length; i += batch) {
+    if (i > 0 && hasAI) await new Promise(r => setTimeout(r, 1500));
     const chunk = pages.slice(i, i + batch);
+    console.log(`[schema] Processing static pages ${i + 1}-${Math.min(i + batch, pages.length)} of ${pages.length}`);
     const chunkResults = await Promise.all(
       chunk.map(async (page) => {
         const url = (!page.slug || page.slug === 'index') ? baseUrl : `${baseUrl}/${page.slug}`;
@@ -562,7 +564,9 @@ export async function generateSchemaSuggestions(
   if (cmsUrls.length > 0) {
     console.log(`[schema] Also analyzing ${cmsUrls.length} CMS pages`);
     for (let i = 0; i < cmsUrls.length; i += batch) {
+      if (i > 0 && hasAI) await new Promise(r => setTimeout(r, 1500));
       const chunk = cmsUrls.slice(i, i + batch);
+      console.log(`[schema] Processing CMS pages ${i + 1}-${Math.min(i + batch, cmsUrls.length)} of ${cmsUrls.length}`);
       const chunkResults = await Promise.all(
         chunk.map(async (item) => {
           const slug = item.path.replace(/^\//, '');

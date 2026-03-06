@@ -34,26 +34,37 @@ export function SchemaSuggester({ siteId }: Props) {
   const [publishing, setPublishing] = useState<Set<string>>(new Set());
   const [published, setPublished] = useState<Set<string>>(new Set());
   const [publishError, setPublishError] = useState<Record<string, string>>({});
+  const [scanError, setScanError] = useState<string | null>(null);
   const [confirmPublish, setConfirmPublish] = useState<string | null>(null);
 
   // Auto-run scan on mount
   useEffect(() => {
     setLoading(true);
     setData(null);
+    setScanError(null);
     fetch(`/api/webflow/schema-suggestions/${siteId}`)
-      .then(r => r.json())
+      .then(async r => {
+        const d = await r.json();
+        if (!r.ok || d.error) throw new Error(d.error || `Server error ${r.status}`);
+        return d;
+      })
       .then(d => setData(Array.isArray(d) ? d : []))
-      .catch(() => setData([]))
+      .catch(err => { setScanError(err instanceof Error ? err.message : 'Scan failed'); setData(null); })
       .finally(() => setLoading(false));
   }, [siteId]);
 
   const rescan = () => {
     setLoading(true);
     setData(null);
+    setScanError(null);
     fetch(`/api/webflow/schema-suggestions/${siteId}`)
-      .then(r => r.json())
+      .then(async r => {
+        const d = await r.json();
+        if (!r.ok || d.error) throw new Error(d.error || `Server error ${r.status}`);
+        return d;
+      })
       .then(d => setData(Array.isArray(d) ? d : []))
-      .catch(() => setData([]))
+      .catch(err => { setScanError(err instanceof Error ? err.message : 'Scan failed'); setData(null); })
       .finally(() => setLoading(false));
   };
 
@@ -136,6 +147,19 @@ export function SchemaSuggester({ siteId }: Props) {
         <Loader2 className="w-6 h-6 animate-spin" />
         <p className="text-sm">Scanning pages for schema opportunities...</p>
         <p className="text-xs text-zinc-600">Checking existing JSON-LD and identifying improvements</p>
+      </div>
+    );
+  }
+
+  if (scanError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 gap-3">
+        <AlertCircle className="w-8 h-8 text-red-400" />
+        <p className="text-red-400 text-sm font-medium">Schema generation failed</p>
+        <p className="text-zinc-500 text-xs max-w-md text-center">{scanError}</p>
+        <button onClick={rescan} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors mt-2">
+          <RefreshCw className="w-3 h-3" /> Retry
+        </button>
       </div>
     );
   }

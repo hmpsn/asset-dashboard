@@ -283,3 +283,33 @@ A brief value assessment of every feature in the platform, covering what it does
 | Client Self-Service | 6 | 24/7 data access reduces reporting overhead |
 
 The platform's core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+
+---
+
+## Future Additions
+
+Items to revisit as budget/tier upgrades allow or when priorities shift.
+
+### OpenAI Tier Upgrade
+- **Schema Generator → gpt-4o**: Currently using `gpt-4o-mini` due to 30K TPM limit on the current org tier. Once spend pushes to the next tier (200K+ TPM on gpt-4o), switch back for marginally richer schema output. One-line change in `server/schema-suggester.ts`.
+- **SEO Audit AI → gpt-4o-mini savings**: The audit's AI recommendations (title/meta fixes) currently use gpt-4o. Could switch to mini to save cost with minimal quality loss since it's structured output.
+
+### Schema Generator Enhancements
+- **Bulk publish**: One-click to publish all generated schemas to Webflow (currently per-page).
+- **Schema diff view**: Show what changed between existing and suggested schema before publishing.
+- **Auto-schedule**: Re-generate schemas on a cadence (e.g., weekly) and flag pages where content changed but schema is stale.
+
+### Site Audit Enhancements
+- **Full-site PageSpeed**: Currently only runs homepage CWV inline. Could offer a deeper multi-page PSI scan as a separate background job.
+- **Accessibility audit expansion**: Currently only checks img alt text. Could add WCAG contrast, ARIA, heading order, form label checks.
+- **Historical trend charts**: Track audit score over time per-page, not just site-wide.
+
+### Background Job System
+- **WebSocket progress**: Push real-time progress updates to the frontend via WebSocket instead of polling.
+- **Job queue persistence**: Jobs are currently in-memory. Persist to disk/DB so they survive server restarts.
+- **Concurrent job limits**: Prevent multiple audits from running simultaneously on the same site.
+
+### Client Dashboard
+- **Interactive inline charts**: The GA4 traffic overview and rank history charts in the client dashboard use inline SVGs that aren't yet click-to-inspect. Refactor to reusable interactive chart components.
+- **PDF export**: One-click PDF report generation from the client dashboard view.
+- **Custom date range picker**: Replace preset buttons (7d/28d/90d) with a full calendar date range selector.
