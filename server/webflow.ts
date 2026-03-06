@@ -739,6 +739,45 @@ export async function discoverCmsUrls(
 /**
  * Build the set of static page paths from Webflow API pages for use with discoverCmsUrls.
  */
+/**
+ * Discover all URLs from a site's sitemap.xml (handles sitemap index with multiple sub-sitemaps).
+ * Returns full URLs. Used by keyword strategy to find CMS/blog pages not in Webflow pages API.
+ */
+export async function discoverSitemapUrls(baseUrl: string): Promise<string[]> {
+  const urls: string[] = [];
+  const extractLocs = (xml: string): string[] => {
+    const locs: string[] = [];
+    const re = /<loc>([^<]+)<\/loc>/gi;
+    let m;
+    while ((m = re.exec(xml)) !== null) locs.push(m[1].trim());
+    return locs;
+  };
+
+  try {
+    const res = await fetch(`${baseUrl}/sitemap.xml`, { redirect: 'follow', signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return urls;
+    const text = await res.text();
+    if (!text.includes('<urlset') && !text.includes('<sitemapindex')) return urls;
+
+    if (text.includes('<sitemapindex')) {
+      // Sitemap index — parse ALL sub-sitemaps
+      const subUrls = extractLocs(text);
+      for (const subUrl of subUrls) {
+        try {
+          const subRes = await fetch(subUrl, { redirect: 'follow', signal: AbortSignal.timeout(8000) });
+          if (subRes.ok) {
+            const subText = await subRes.text();
+            urls.push(...extractLocs(subText));
+          }
+        } catch { /* skip failed sub-sitemap */ }
+      }
+    } else {
+      urls.push(...extractLocs(text));
+    }
+  } catch { /* sitemap fetch failed */ }
+  return urls;
+}
+
 export function buildStaticPathSet(pages: WebflowPage[]): Set<string> {
   const paths = new Set<string>();
   paths.add(''); // root

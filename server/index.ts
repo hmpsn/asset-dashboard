@@ -41,6 +41,7 @@ import {
   createAssetFolder,
   moveAssetToFolder,
   getSiteSubdomain,
+  discoverSitemapUrls,
 } from './webflow.js';
 import { generateAltText } from './alttext.js';
 import { runSeoAudit } from './seo-audit.js';
@@ -2499,30 +2500,70 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
   }
 
   try {
-    // 1. Gather page data from Webflow
-    const allPages = await listPages(ws.webflowSiteId, token);
-    const published = filterPublishedPages(allPages);
-
-    // 2. Resolve site base URL for content fetching
+    // 1. Resolve site base URL
     const subdomain = await getSiteSubdomain(ws.webflowSiteId, token);
     const baseUrl = ws.liveDomain
       ? `https://${ws.liveDomain}`
       : subdomain ? `https://${subdomain}.webflow.io` : '';
 
-    // 3. Fetch actual page content for richer context (parallel, batched)
+    // 2. Gather pages from BOTH Webflow API (static pages + metadata) AND sitemap (all pages including CMS)
+    const allPages = await listPages(ws.webflowSiteId, token);
+    const published = filterPublishedPages(allPages);
+
+    // Build lookup of Webflow page metadata by path
+    const wfMetaByPath = new Map<string, { title: string; seoTitle: string; seoDesc: string }>();
+    for (const p of published) {
+      const pagePath = p.publishedPath || `/${p.slug || ''}`;
+      wfMetaByPath.set(pagePath, {
+        title: p.title || p.slug || '',
+        seoTitle: p.seo?.title || '',
+        seoDesc: p.seo?.description || '',
+      });
+    }
+
+    // Discover ALL pages via sitemap (includes CMS collection pages, blog posts, etc.)
+    const allPaths = new Set<string>(wfMetaByPath.keys());
+    if (baseUrl) {
+      try {
+        const sitemapUrls = await discoverSitemapUrls(baseUrl);
+        console.log(`[Strategy] Sitemap discovered ${sitemapUrls.length} URLs`);
+        for (const url of sitemapUrls) {
+          try {
+            const path = new URL(url).pathname || '/';
+            allPaths.add(path);
+          } catch { /* skip invalid URLs */ }
+        }
+      } catch {
+        console.log('[Strategy] Sitemap discovery failed, continuing with Webflow pages only');
+      }
+    }
+    console.log(`[Strategy] Total pages: ${allPaths.size} (${wfMetaByPath.size} from Webflow API, ${allPaths.size - wfMetaByPath.size} additional from sitemap)`);
+
+    // 3. Fetch actual page content for ALL discovered pages (parallel, batched)
     const pageInfo: Array<{ path: string; title: string; seoTitle: string; seoDesc: string; contentSnippet: string }> = [];
-    const contentBatch = 5;
-    for (let i = 0; i < published.length; i += contentBatch) {
-      const chunk = published.slice(i, i + contentBatch);
-      const contents = await Promise.all(chunk.map(async (p) => {
-        const pagePath = p.publishedPath || `/${p.slug || ''}`;
-        const url = baseUrl ? `${baseUrl}${pagePath === '/' ? '' : pagePath}` : '';
+    const pathArray = Array.from(allPaths);
+    const contentBatch = 6;
+    for (let i = 0; i < pathArray.length; i += contentBatch) {
+      const chunk = pathArray.slice(i, i + contentBatch);
+      const contents = await Promise.all(chunk.map(async (pagePath) => {
+        const wfMeta = wfMetaByPath.get(pagePath);
         let contentSnippet = '';
+        let htmlTitle = '';
+        let htmlMetaDesc = '';
+        const url = baseUrl ? `${baseUrl}${pagePath === '/' ? '' : pagePath}` : '';
         if (url) {
           try {
             const htmlRes = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(8000) });
             if (htmlRes.ok) {
               const html = await htmlRes.text();
+              // Extract title and meta description from HTML for pages without Webflow metadata
+              if (!wfMeta) {
+                const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+                if (titleMatch) htmlTitle = titleMatch[1].trim();
+                const descMatch = html.match(/<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i)
+                  || html.match(/<meta\s+content=["']([^"']+)["']\s+name=["']description["']/i);
+                if (descMatch) htmlMetaDesc = descMatch[1].trim();
+              }
               const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
               const body = bodyMatch ? bodyMatch[1] : html;
               contentSnippet = body
@@ -2530,19 +2571,21 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
                 .replace(/<style[\s\S]*?<\/style>/gi, '')
                 .replace(/<nav[\s\S]*?<\/nav>/gi, '')
                 .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+                .replace(/<header[\s\S]*?<\/header>/gi, '')
                 .replace(/<[^>]+>/g, ' ')
                 .replace(/&[a-z]+;/gi, ' ')
                 .replace(/\s+/g, ' ')
                 .trim()
-                .slice(0, 800);
+                .slice(0, 1200);
             }
           } catch { /* skip content fetch failures */ }
         }
+        const pathName = pagePath.replace(/^\//, '').replace(/\/$/, '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Home';
         return {
           path: pagePath,
-          title: p.title || p.slug || '',
-          seoTitle: p.seo?.title || '',
-          seoDesc: p.seo?.description || '',
+          title: wfMeta?.title || htmlTitle || pathName,
+          seoTitle: wfMeta?.seoTitle || htmlTitle || '',
+          seoDesc: wfMeta?.seoDesc || htmlMetaDesc || '',
           contentSnippet,
         };
       }));
@@ -2652,7 +2695,7 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
 - COMPETITOR GAPS are the highest-priority opportunities — these are proven keywords with traffic that you're missing.
 - Use related keywords from SEMRush to inform secondary keywords — these have verified search volume.` : '';
 
-    const prompt = `You are a senior SEO strategist with 15+ years of experience. Analyze this website deeply and create a comprehensive keyword strategy.
+    const prompt = `You are a senior SEO strategist with 15+ years of experience. Analyze this website deeply and create a comprehensive keyword strategy that a client can immediately act on.
 ${businessSection}
 Site pages (with actual content excerpts):
 ${pageList}
@@ -2667,10 +2710,28 @@ Create a keyword strategy as a JSON object with this exact structure:
       "pagePath": "/exact-path",
       "pageTitle": "Page Title",
       "primaryKeyword": "specific, high-intent keyword for this page",
-      "secondaryKeywords": ["4-6 supporting keywords including long-tail and location variants"]
+      "secondaryKeywords": ["4-6 supporting keywords including long-tail and location variants"],
+      "searchIntent": "commercial|informational|transactional|navigational"
     }
   ],
-  "opportunities": ["5-8 specific, actionable keyword opportunities the site is missing"]
+  "opportunities": ["5-8 specific, actionable keyword opportunities the site is missing"],
+  "contentGaps": [
+    {
+      "topic": "Blog post or page topic",
+      "targetKeyword": "primary keyword to target",
+      "intent": "informational|commercial|transactional|navigational",
+      "priority": "high|medium|low",
+      "rationale": "Why this content should be created and the expected impact"
+    }
+  ],
+  "quickWins": [
+    {
+      "pagePath": "/exact-path",
+      "action": "Specific, actionable fix (e.g. 'Update title tag to include primary keyword')",
+      "estimatedImpact": "high|medium|low",
+      "rationale": "Why this will improve rankings — reference specific data if available"
+    }
+  ]
 }
 
 Critical rules:
@@ -2680,9 +2741,11 @@ Critical rules:
 - Primary keywords should be specific and high-intent, NOT generic (e.g. "commercial janitorial services Austin TX" not "cleaning services")
 - Secondary keywords must include: long-tail variants, question-based queries, location modifiers, and related terms
 - Opportunities should identify GAPS: missing location pages, unaddressed service combinations, missing comparison/vs content, missing FAQ content${hasSemrush ? ', and keywords from competitor gap analysis' : ''}
+- contentGaps: suggest 3-6 NEW content pieces (blog posts, landing pages, guides) the site should create. Prioritize topics with clear search demand and business relevance.
+- quickWins: identify 3-5 existing pages where small changes (title tag tweaks, adding keywords to H1, improving meta description) could boost rankings. Focus on pages already ranking positions 5-20 in GSC data if available.
 - If the site has location pages, each location needs its own keyword cluster
-- Consider searcher intent: informational, navigational, commercial, transactional
-- Cover ALL pages in the pageMap — do not skip any${semrushInstructions}
+- Consider searcher intent for EVERY page and label it
+- Cover ALL ${pathArray.length} pages in the pageMap — do not skip any, including CMS/blog pages${semrushInstructions}
 - Return ONLY valid JSON, no markdown fences, no explanation`;
 
     const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -2697,7 +2760,7 @@ Critical rules:
           { role: 'system', content: 'You are an expert SEO strategist. You always return valid JSON only, no markdown, no explanation.' },
           { role: 'user', content: prompt },
         ],
-        max_tokens: 8000,
+        max_tokens: 12000,
         temperature: 0.3,
       }),
     });
@@ -2918,6 +2981,19 @@ app.get('/api/public/seo-strategy/:workspaceId', (req, res) => {
       secondaryKeywords: p.secondaryKeywords || [],
     })),
     opportunities: strategy.opportunities || [],
+    contentGaps: (strategy.contentGaps || []).map(g => ({
+      topic: g.topic,
+      targetKeyword: g.targetKeyword,
+      intent: g.intent,
+      priority: g.priority,
+      rationale: g.rationale,
+    })),
+    quickWins: (strategy.quickWins || []).map(q => ({
+      pagePath: q.pagePath,
+      action: q.action,
+      estimatedImpact: q.estimatedImpact,
+      rationale: q.rationale,
+    })),
     keywordGaps: (strategy.keywordGaps || []).slice(0, 20).map(g => ({
       keyword: g.keyword,
       volume: g.volume,

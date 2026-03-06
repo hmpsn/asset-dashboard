@@ -50,10 +50,28 @@ export interface KeywordGapItem {
   competitorDomain: string;
 }
 
+export interface ContentGap {
+  topic: string;           // suggested content topic
+  targetKeyword: string;   // primary keyword to target
+  intent: 'informational' | 'commercial' | 'transactional' | 'navigational';
+  priority: 'high' | 'medium' | 'low';
+  rationale: string;       // why this content should be created
+}
+
+export interface QuickWin {
+  pagePath: string;
+  currentKeyword?: string;
+  action: string;          // specific action to take
+  estimatedImpact: 'high' | 'medium' | 'low';
+  rationale: string;
+}
+
 export interface KeywordStrategy {
   siteKeywords: string[];        // top-level target keywords for the whole site
   pageMap: PageKeywordMap[];     // keyword assignments per page
   opportunities: string[];       // keyword gaps / untapped opportunities
+  contentGaps?: ContentGap[];    // specific content pieces that should be created
+  quickWins?: QuickWin[];        // low-effort, high-impact fixes
   keywordGaps?: KeywordGapItem[]; // keywords competitors rank for but we don't
   businessContext?: string;      // user-provided context (locations, services, industry)
   semrushMode?: 'quick' | 'full' | 'none'; // which SEMRush mode was used

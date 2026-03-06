@@ -52,6 +52,8 @@ interface ClientKeywordStrategy {
   siteKeywords: string[];
   pageMap: { pagePath: string; primaryKeyword: string; secondaryKeywords?: string[] }[];
   opportunities: string[];
+  contentGaps?: { topic: string; targetKeyword: string; intent: string; priority: string; rationale: string }[];
+  quickWins?: { pagePath: string; action: string; estimatedImpact: string; rationale: string }[];
   keywordGaps?: { keyword: string; volume?: number; difficulty?: number }[];
   businessContext?: string;
   generatedAt: string;
@@ -1536,15 +1538,62 @@ export function ClientDashboard({ workspaceId }: Props) {
                 </div>
               </div>
 
+              {/* Quick Wins */}
+              {strategyData.quickWins && strategyData.quickWins.length > 0 && (
+                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+                  <div className="text-xs font-medium text-zinc-400 mb-3 flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-amber-400" /> Quick Wins</div>
+                  <div className="space-y-2">
+                    {strategyData.quickWins.map((qw, i) => {
+                      const impactColor = qw.estimatedImpact === 'high' ? 'text-green-400 bg-green-500/10 border-green-500/20' : qw.estimatedImpact === 'medium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
+                      return (
+                        <div key={i} className="px-3 py-2.5 rounded-lg bg-zinc-800/30 border border-zinc-800">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-mono text-zinc-500">{qw.pagePath}</span>
+                            <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded border ${impactColor}`}>{qw.estimatedImpact} impact</span>
+                          </div>
+                          <div className="text-[11px] text-zinc-300 mt-1">{qw.action}</div>
+                          <div className="text-[10px] text-zinc-500 mt-0.5">{qw.rationale}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Content Gaps */}
+              {strategyData.contentGaps && strategyData.contentGaps.length > 0 && (
+                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+                  <div className="text-xs font-medium text-zinc-400 mb-3 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-blue-400" /> Content Opportunities</div>
+                  <div className="space-y-2">
+                    {strategyData.contentGaps.map((gap, i) => {
+                      const prioColor = gap.priority === 'high' ? 'text-red-400 bg-red-500/10 border-red-500/20' : gap.priority === 'medium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
+                      return (
+                        <div key={i} className="px-3 py-2.5 rounded-lg bg-zinc-800/30 border border-zinc-800">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-zinc-200">{gap.topic}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[9px] text-zinc-500 uppercase">{gap.intent}</span>
+                              <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded border ${prioColor}`}>{gap.priority}</span>
+                            </div>
+                          </div>
+                          <div className="text-[10px] text-teal-400 mt-0.5">Target: "{gap.targetKeyword}"</div>
+                          <div className="text-[10px] text-zinc-500 mt-0.5">{gap.rationale}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Opportunities + Keyword Gaps side by side */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 {strategyData.opportunities.length > 0 && (
                   <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
-                    <div className="text-xs font-medium text-zinc-400 mb-3 flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-amber-400" /> Keyword Opportunities</div>
+                    <div className="text-xs font-medium text-zinc-400 mb-3 flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5 text-violet-400" /> Keyword Opportunities</div>
                     <div className="space-y-2">
                       {strategyData.opportunities.map((opp, i) => (
                         <div key={i} className="flex items-start gap-2 text-[11px] text-zinc-300">
-                          <span className="w-4 h-4 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center flex-shrink-0 mt-0.5 text-[9px] text-amber-400 font-bold">{i + 1}</span>
+                          <span className="w-4 h-4 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center flex-shrink-0 mt-0.5 text-[9px] text-violet-400 font-bold">{i + 1}</span>
                           {opp}
                         </div>
                       ))}
@@ -1554,7 +1603,7 @@ export function ClientDashboard({ workspaceId }: Props) {
 
                 {strategyData.keywordGaps && strategyData.keywordGaps.length > 0 && (
                   <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
-                    <div className="text-xs font-medium text-zinc-400 mb-3 flex items-center gap-1.5"><Target className="w-3.5 h-3.5 text-violet-400" /> Competitor Keyword Gaps</div>
+                    <div className="text-xs font-medium text-zinc-400 mb-3 flex items-center gap-1.5"><Target className="w-3.5 h-3.5 text-teal-400" /> Competitor Keyword Gaps</div>
                     <div className="space-y-1.5">
                       {strategyData.keywordGaps.map((gap, i) => (
                         <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg bg-zinc-800/30">
