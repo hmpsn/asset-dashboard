@@ -32,6 +32,7 @@ export interface PageKeywordMap {
   pageTitle: string;
   primaryKeyword: string;
   secondaryKeywords: string[];
+  searchIntent?: string;
   currentPosition?: number;
   impressions?: number;
   clicks?: number;

@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import {
   Loader2, Target, ChevronDown, ChevronRight, RefreshCw,
   TrendingUp, AlertCircle, Sparkles, Pencil, Check, X, Briefcase,
-  BarChart3, Shield, DollarSign, Users, Search,
+  BarChart3, Shield, DollarSign, Users, Search, Zap, FileText,
+  Eye, MousePointerClick, Trophy, ArrowUp, ArrowDown,
 } from 'lucide-react';
 import { KeywordAnalysis } from './KeywordAnalysis';
 
@@ -11,6 +12,7 @@ interface PageKeywordMap {
   pageTitle: string;
   primaryKeyword: string;
   secondaryKeywords: string[];
+  searchIntent?: string;
   currentPosition?: number;
   impressions?: number;
   clicks?: number;
@@ -28,10 +30,27 @@ interface KeywordGapItem {
   competitorDomain: string;
 }
 
+interface ContentGap {
+  topic: string;
+  targetKeyword: string;
+  intent: string;
+  priority: string;
+  rationale: string;
+}
+
+interface QuickWin {
+  pagePath: string;
+  action: string;
+  estimatedImpact: string;
+  rationale: string;
+}
+
 interface KeywordStrategy {
   siteKeywords: string[];
   pageMap: PageKeywordMap[];
   opportunities: string[];
+  contentGaps?: ContentGap[];
+  quickWins?: QuickWin[];
   keywordGaps?: KeywordGapItem[];
   businessContext?: string;
   semrushMode?: 'quick' | 'full' | 'none';
@@ -64,6 +83,9 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
   const [progressStep, setProgressStep] = useState('');
   const [progressDetail, setProgressDetail] = useState('');
   const [progressPct, setProgressPct] = useState(0);
+  const [pageSearch, setPageSearch] = useState('');
+  const [sortBy, setSortBy] = useState<'opportunity' | 'position' | 'volume' | 'impressions'>('opportunity');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   const stepLabels: Record<string, string> = {
     discovery: 'Discovering pages',
@@ -232,6 +254,68 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
     if (kd <= 70) return 'Hard';
     return 'Very Hard';
   };
+
+  const intentColor = (intent?: string) => {
+    switch (intent) {
+      case 'commercial': return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
+      case 'informational': return 'text-green-400 bg-green-500/10 border-green-500/20';
+      case 'transactional': return 'text-amber-400 bg-amber-500/10 border-amber-500/20';
+      case 'navigational': return 'text-purple-400 bg-purple-500/10 border-purple-500/20';
+      default: return 'text-zinc-400 bg-zinc-500/10 border-zinc-500/20';
+    }
+  };
+
+  const getOpportunityScore = (p: PageKeywordMap) => {
+    const pos = p.currentPosition || 999;
+    const imp = p.impressions || 0;
+    const vol = p.volume || 0;
+    if (pos >= 4 && pos <= 20 && imp > 0) return imp * (21 - pos);
+    if (pos > 20 && imp > 0) return imp * 2;
+    if (pos <= 3) return imp * 0.5;
+    if (vol > 0) return vol;
+    return 1;
+  };
+
+  // Computed metrics
+  const ranked = strategy?.pageMap.filter(p => p.currentPosition) || [];
+  const avgPos = ranked.length > 0 ? ranked.reduce((s, p) => s + (p.currentPosition || 0), 0) / ranked.length : 0;
+  const totalImpressions = strategy?.pageMap.reduce((s, p) => s + (p.impressions || 0), 0) || 0;
+  const totalClicks = strategy?.pageMap.reduce((s, p) => s + (p.clicks || 0), 0) || 0;
+  const top3 = ranked.filter(p => (p.currentPosition || 99) <= 3);
+  const top10 = ranked.filter(p => (p.currentPosition || 99) <= 10 && (p.currentPosition || 0) > 3);
+  const top20 = ranked.filter(p => (p.currentPosition || 99) <= 20 && (p.currentPosition || 0) > 10);
+  const beyond20 = ranked.filter(p => (p.currentPosition || 0) > 20);
+  const notRankingCount = (strategy?.pageMap.length || 0) - ranked.length;
+
+  const lowHangingFruit = ranked
+    .filter(p => (p.currentPosition || 0) >= 4 && (p.currentPosition || 0) <= 20 && (p.impressions || 0) > 20)
+    .sort((a, b) => (b.impressions || 0) - (a.impressions || 0))
+    .slice(0, 6);
+
+  const intentCounts = strategy?.pageMap.reduce((acc, p) => {
+    const intent = p.searchIntent || 'unknown';
+    acc[intent] = (acc[intent] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>) || {};
+
+  const filteredPages = (strategy?.pageMap || [])
+    .filter(p => {
+      if (!pageSearch) return true;
+      const q = pageSearch.toLowerCase();
+      return p.pageTitle.toLowerCase().includes(q) ||
+             p.pagePath.toLowerCase().includes(q) ||
+             p.primaryKeyword.toLowerCase().includes(q);
+    })
+    .sort((a, b) => {
+      let cmp = 0;
+      switch (sortBy) {
+        case 'position': cmp = (a.currentPosition || 999) - (b.currentPosition || 999); break;
+        case 'volume': cmp = (b.volume || 0) - (a.volume || 0); break;
+        case 'impressions': cmp = (b.impressions || 0) - (a.impressions || 0); break;
+        case 'opportunity': cmp = getOpportunityScore(b) - getOpportunityScore(a); break;
+      }
+      return sortDir === 'asc' ? -cmp : cmp;
+    });
 
   if (loading) {
     return (
@@ -467,7 +551,153 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
 
       {strategy && (
         <>
-          {/* Site Keywords */}
+          {/* ── Summary Dashboard ── */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
+              <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Pages Mapped</div>
+              <div className="text-xl font-bold text-zinc-100">{strategy.pageMap.length}</div>
+            </div>
+            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
+              <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Eye className="w-3 h-3" /> Impressions</div>
+              <div className="text-xl font-bold text-zinc-100">{totalImpressions.toLocaleString()}</div>
+              <div className="text-[10px] text-zinc-600">last 90 days</div>
+            </div>
+            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
+              <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><MousePointerClick className="w-3 h-3" /> Clicks</div>
+              <div className="text-xl font-bold text-zinc-100">{totalClicks.toLocaleString()}</div>
+              <div className="text-[10px] text-zinc-600">{totalImpressions > 0 ? `${((totalClicks / totalImpressions) * 100).toFixed(1)}% CTR` : ''}</div>
+            </div>
+            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
+              <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Trophy className="w-3 h-3" /> Avg Position</div>
+              <div className={`text-xl font-bold ${positionColor(avgPos)}`}>{ranked.length > 0 ? `#${avgPos.toFixed(1)}` : '—'}</div>
+              <div className="text-[10px] text-zinc-600">{ranked.length} pages ranking</div>
+            </div>
+            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
+              <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Ranking Tiers</div>
+              <div className="flex items-center gap-1 mt-1 flex-wrap">
+                {top3.length > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium">{top3.length} top 3</span>}
+                {top10.length > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 font-medium">{top10.length} top 10</span>}
+                {notRankingCount > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-700/50 text-zinc-500 font-medium">{notRankingCount} unranked</span>}
+              </div>
+            </div>
+          </div>
+
+          {/* ── Performance Tiers Bar ── */}
+          {ranked.length > 0 && (
+            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xs font-semibold text-zinc-300">Ranking Distribution</h4>
+                <span className="text-[10px] text-zinc-600">{ranked.length} of {strategy.pageMap.length} pages with ranking data</span>
+              </div>
+              <div className="flex h-4 rounded-full overflow-hidden bg-zinc-800">
+                {top3.length > 0 && <div className="bg-emerald-500 h-full transition-all" style={{ width: `${(top3.length / strategy.pageMap.length) * 100}%` }} />}
+                {top10.length > 0 && <div className="bg-green-500 h-full transition-all" style={{ width: `${(top10.length / strategy.pageMap.length) * 100}%` }} />}
+                {top20.length > 0 && <div className="bg-amber-500 h-full transition-all" style={{ width: `${(top20.length / strategy.pageMap.length) * 100}%` }} />}
+                {beyond20.length > 0 && <div className="bg-red-500/60 h-full transition-all" style={{ width: `${(beyond20.length / strategy.pageMap.length) * 100}%` }} />}
+                {notRankingCount > 0 && <div className="bg-zinc-700 h-full transition-all" style={{ width: `${(notRankingCount / strategy.pageMap.length) * 100}%` }} />}
+              </div>
+              <div className="flex items-center gap-4 mt-2 flex-wrap">
+                <span className="flex items-center gap-1.5 text-[10px]"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" /> <span className="text-emerald-400 font-medium">{top3.length}</span> <span className="text-zinc-500">Top 3</span></span>
+                <span className="flex items-center gap-1.5 text-[10px]"><span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" /> <span className="text-green-400 font-medium">{top10.length}</span> <span className="text-zinc-500">4–10</span></span>
+                <span className="flex items-center gap-1.5 text-[10px]"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" /> <span className="text-amber-400 font-medium">{top20.length}</span> <span className="text-zinc-500">11–20</span></span>
+                <span className="flex items-center gap-1.5 text-[10px]"><span className="w-2.5 h-2.5 rounded-full bg-red-500/60 inline-block" /> <span className="text-red-400 font-medium">{beyond20.length}</span> <span className="text-zinc-500">20+</span></span>
+                <span className="flex items-center gap-1.5 text-[10px]"><span className="w-2.5 h-2.5 rounded-full bg-zinc-700 inline-block" /> <span className="text-zinc-500 font-medium">{notRankingCount}</span> <span className="text-zinc-600">Not ranking</span></span>
+              </div>
+              {Object.keys(intentCounts).length > 1 && (
+                <div className="mt-3 pt-3 border-t border-zinc-800">
+                  <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">Search Intent Mix</div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {Object.entries(intentCounts).sort((a, b) => b[1] - a[1]).map(([intent, count]) => (
+                      <span key={intent} className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${intentColor(intent)}`}>
+                        {intent} ({count})
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Low-Hanging Fruit ── */}
+          {lowHangingFruit.length > 0 && (
+            <div className="bg-zinc-900 rounded-xl border border-amber-500/20 p-4">
+              <h4 className="text-xs font-semibold text-amber-300 mb-1 flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5" /> Low-Hanging Fruit
+              </h4>
+              <p className="text-[10px] text-zinc-500 mb-3">Pages ranking #4–20 with significant impressions — small improvements here drive major traffic gains.</p>
+              <div className="space-y-1.5">
+                {lowHangingFruit.map((page, i) => (
+                  <div key={i} className="flex items-center justify-between px-3 py-2 bg-zinc-800/50 rounded-lg">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[11px] text-zinc-300 truncate">{page.pageTitle}</div>
+                      <div className="text-[10px] text-zinc-600 font-mono">{page.pagePath}</div>
+                    </div>
+                    <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+                      <span className="text-[10px] text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded truncate max-w-[160px]">{page.primaryKeyword}</span>
+                      <span className={`text-[10px] font-mono font-medium ${positionColor(page.currentPosition)}`}>#{page.currentPosition?.toFixed(0)}</span>
+                      <span className="text-[10px] text-zinc-500">{(page.impressions || 0).toLocaleString()} imp</span>
+                      {page.clicks !== undefined && page.clicks > 0 && <span className="text-[10px] text-zinc-500">{page.clicks} clicks</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Quick Wins ── */}
+          {strategy.quickWins && strategy.quickWins.length > 0 && (
+            <div className="bg-zinc-900 rounded-xl border border-emerald-500/20 p-4">
+              <h4 className="text-xs font-semibold text-emerald-300 mb-1 flex items-center gap-1.5">
+                <TrendingUp className="w-3.5 h-3.5" /> Quick Wins
+              </h4>
+              <p className="text-[10px] text-zinc-500 mb-3">High-impact changes that can be implemented immediately.</p>
+              <div className="space-y-2">
+                {strategy.quickWins.map((qw, i) => {
+                  const impactColor = qw.estimatedImpact === 'high' ? 'text-green-400 bg-green-500/10 border-green-500/20' : qw.estimatedImpact === 'medium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
+                  return (
+                    <div key={i} className="px-3 py-2.5 bg-zinc-800/40 rounded-lg border border-zinc-800">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-mono text-zinc-500">{qw.pagePath}</span>
+                        <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded border ${impactColor}`}>{qw.estimatedImpact} impact</span>
+                      </div>
+                      <div className="text-[11px] text-zinc-200 mt-1 font-medium">{qw.action}</div>
+                      <div className="text-[10px] text-zinc-500 mt-0.5">{qw.rationale}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ── Content Gaps ── */}
+          {strategy.contentGaps && strategy.contentGaps.length > 0 && (
+            <div className="bg-zinc-900 rounded-xl border border-blue-500/20 p-4">
+              <h4 className="text-xs font-semibold text-blue-300 mb-1 flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5" /> Content Gaps
+              </h4>
+              <p className="text-[10px] text-zinc-500 mb-3">New content to create — topics with search demand but no page on the site.</p>
+              <div className="space-y-2">
+                {strategy.contentGaps.map((gap, i) => {
+                  const prioColor = gap.priority === 'high' ? 'text-red-400 bg-red-500/10 border-red-500/20' : gap.priority === 'medium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
+                  return (
+                    <div key={i} className="px-3 py-2.5 bg-zinc-800/40 rounded-lg border border-zinc-800">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-zinc-200">{gap.topic}</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[9px] uppercase px-1.5 py-0.5 rounded-full border font-medium ${intentColor(gap.intent)}`}>{gap.intent}</span>
+                          <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded border ${prioColor}`}>{gap.priority}</span>
+                        </div>
+                      </div>
+                      <div className="text-[10px] text-violet-400 mt-1">Target keyword: &ldquo;{gap.targetKeyword}&rdquo;</div>
+                      <div className="text-[10px] text-zinc-500 mt-0.5">{gap.rationale}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ── Site Keywords ── */}
           <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
             <h4 className="text-xs font-semibold text-zinc-300 mb-2 flex items-center gap-1.5">
               <Target className="w-3.5 h-3.5 text-violet-400" /> Site Target Keywords
@@ -481,46 +711,84 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
             </div>
           </div>
 
-          {/* Opportunities */}
+          {/* ── Opportunities ── */}
           {strategy.opportunities.length > 0 && (
             <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
               <h4 className="text-xs font-semibold text-zinc-300 mb-2 flex items-center gap-1.5">
-                <TrendingUp className="w-3.5 h-3.5 text-emerald-400" /> Keyword Opportunities
+                <Sparkles className="w-3.5 h-3.5 text-violet-400" /> Keyword Opportunities
               </h4>
-              <ul className="space-y-1.5">
+              <div className="space-y-1.5">
                 {strategy.opportunities.map((opp, i) => (
-                  <li key={i} className="text-[11px] text-zinc-400 flex items-start gap-2">
-                    <span className="text-emerald-400 mt-0.5 flex-shrink-0">•</span>
+                  <div key={i} className="flex items-start gap-2 text-[11px] text-zinc-400">
+                    <span className="w-4 h-4 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center flex-shrink-0 mt-0.5 text-[9px] text-violet-400 font-bold">{i + 1}</span>
                     {opp}
-                  </li>
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
           )}
 
-          {/* Page Keyword Map */}
+          {/* ── Page Keyword Map ── */}
           <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
             <div className="px-4 py-3 border-b border-zinc-800">
-              <h4 className="text-xs font-semibold text-zinc-300">Page Keyword Map</h4>
-              <p className="text-[10px] text-zinc-600 mt-0.5">Click a page to see details. Use the edit button to refine keywords.</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-semibold text-zinc-300">Page Keyword Map</h4>
+                  <p className="text-[10px] text-zinc-600 mt-0.5">{filteredPages.length} pages · Click to expand · Pencil to edit</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-600" />
+                  <input
+                    type="text"
+                    value={pageSearch}
+                    onChange={e => setPageSearch(e.target.value)}
+                    placeholder="Search pages, keywords..."
+                    className="w-full pl-8 pr-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-[11px] text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-violet-500"
+                  />
+                </div>
+                <div className="flex items-center gap-1">
+                  {(['opportunity', 'position', 'impressions', 'volume'] as const).map(s => (
+                    <button
+                      key={s}
+                      onClick={() => { if (sortBy === s) setSortDir(d => d === 'desc' ? 'asc' : 'desc'); else { setSortBy(s); setSortDir('desc'); } }}
+                      className={`px-2 py-1 rounded text-[10px] font-medium transition-colors flex items-center gap-0.5 ${
+                        sortBy === s ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30' : 'bg-zinc-800 text-zinc-500 border border-zinc-700 hover:text-zinc-300'
+                      }`}
+                    >
+                      {s === 'opportunity' ? 'Priority' : s.charAt(0).toUpperCase() + s.slice(1)}
+                      {sortBy === s && (sortDir === 'desc' ? <ArrowDown className="w-2.5 h-2.5" /> : <ArrowUp className="w-2.5 h-2.5" />)}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
-            {strategy.pageMap.map((page, idx) => {
-              const isExpanded = expandedPages.has(idx);
-              const isEditing = editingPage === idx;
+            {filteredPages.map((page) => {
+              const realIdx = strategy.pageMap.indexOf(page);
+              const isExpanded = expandedPages.has(realIdx);
+              const isEditing = editingPage === realIdx;
 
               return (
-                <div key={idx} className="border-b border-zinc-800/50 last:border-b-0">
+                <div key={realIdx} className="border-b border-zinc-800/50 last:border-b-0">
                   <button
-                    onClick={() => togglePage(idx)}
+                    onClick={() => togglePage(realIdx)}
                     className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-zinc-800/20 transition-colors text-left"
                   >
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" />}
-                      <span className="text-xs text-zinc-300 truncate">{page.pageTitle}</span>
-                      <span className="text-[10px] text-zinc-600 font-mono flex-shrink-0">{page.pagePath}</span>
+                      <div className="min-w-0 flex-1">
+                        <span className="text-xs text-zinc-300 truncate block">{page.pageTitle}</span>
+                        <span className="text-[10px] text-zinc-600 font-mono">{page.pagePath}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-[10px] text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded max-w-[200px] truncate">
+                    <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                      {page.searchIntent && (
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded-full border font-medium ${intentColor(page.searchIntent)}`}>
+                          {page.searchIntent}
+                        </span>
+                      )}
+                      <span className="text-[10px] text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded max-w-[180px] truncate">
                         {page.primaryKeyword}
                       </span>
                       {page.volume !== undefined && (
@@ -533,10 +801,15 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                           KD {page.difficulty}%
                         </span>
                       )}
-                      {page.currentPosition && (
-                        <span className={`text-[10px] ${positionColor(page.currentPosition)} font-mono`}>
+                      {page.currentPosition ? (
+                        <span className={`text-[10px] ${positionColor(page.currentPosition)} font-mono font-medium bg-zinc-800 px-1.5 py-0.5 rounded`}>
                           #{page.currentPosition.toFixed(0)}
                         </span>
+                      ) : (
+                        <span className="text-[10px] text-zinc-600 bg-zinc-800 px-1.5 py-0.5 rounded font-mono">—</span>
+                      )}
+                      {page.impressions !== undefined && page.impressions > 0 && (
+                        <span className="text-[9px] text-zinc-500 font-mono">{page.impressions.toLocaleString()} imp</span>
                       )}
                     </div>
                   </button>
@@ -551,7 +824,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                               <p className="text-xs text-zinc-200 mt-0.5">{page.primaryKeyword}</p>
                             </div>
                             <button
-                              onClick={(e) => { e.stopPropagation(); startEdit(idx); }}
+                              onClick={(e) => { e.stopPropagation(); startEdit(realIdx); }}
                               className="p-1 text-zinc-500 hover:text-violet-400 transition-colors"
                               title="Edit keywords"
                             >
