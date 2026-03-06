@@ -3,7 +3,8 @@ import {
   Loader2, Target, ChevronDown, ChevronRight, RefreshCw,
   TrendingUp, AlertCircle, Sparkles, Pencil, Check, X, Briefcase,
   BarChart3, Shield, DollarSign, Users, Search, Zap, FileText,
-  Eye, MousePointerClick, Trophy, ArrowUp, ArrowDown,
+  Eye, MousePointerClick, Trophy, ArrowUp, ArrowDown, Wand2,
+  Copy, Link, MessageSquare, Save,
 } from 'lucide-react';
 import { KeywordAnalysis } from './KeywordAnalysis';
 
@@ -58,6 +59,15 @@ interface KeywordStrategy {
   generatedAt: string;
 }
 
+interface SeoCopy {
+  seoTitle: string;
+  metaDescription: string;
+  h1: string;
+  introParagraph: string;
+  internalLinkSuggestions?: { targetPath: string; anchorText: string; context: string }[];
+  changes?: string[];
+}
+
 interface Props {
   workspaceId: string;
   siteId?: string;
@@ -87,6 +97,12 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
   const [pageSearch, setPageSearch] = useState('');
   const [sortBy, setSortBy] = useState<'opportunity' | 'position' | 'volume' | 'impressions'>('opportunity');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [generatingCopy, setGeneratingCopy] = useState<string | null>(null);
+  const [seoCopyResults, setSeoCopyResults] = useState<Map<string, SeoCopy>>(new Map());
+  const [brandVoice, setBrandVoice] = useState('');
+  const [brandVoiceOpen, setBrandVoiceOpen] = useState(false);
+  const [savingBrandVoice, setSavingBrandVoice] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const stepLabels: Record<string, string> = {
     discovery: 'Discovering pages',
@@ -292,6 +308,54 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
     .filter(p => (p.currentPosition || 0) >= 4 && (p.currentPosition || 0) <= 20 && (p.impressions || 0) > 20)
     .sort((a, b) => (b.impressions || 0) - (a.impressions || 0))
     .slice(0, 6);
+
+  // Load brand voice on mount
+  useEffect(() => {
+    if (!workspaceId) return;
+    fetch(`/api/workspaces/${workspaceId}`).then(r => r.json()).then(ws => {
+      if (ws.brandVoice) setBrandVoice(ws.brandVoice);
+    }).catch(() => {});
+  }, [workspaceId]);
+
+  const saveBrandVoiceHandler = async () => {
+    setSavingBrandVoice(true);
+    try {
+      await fetch(`/api/workspaces/${workspaceId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brandVoice: brandVoice.trim() }),
+      });
+    } catch { /* ignore */ }
+    finally { setSavingBrandVoice(false); }
+  };
+
+  const generateSeoCopy = async (page: PageKeywordMap) => {
+    setGeneratingCopy(page.pagePath);
+    try {
+      const res = await fetch('/api/webflow/seo-copy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pagePath: page.pagePath,
+          pageTitle: page.pageTitle,
+          workspaceId,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) { console.error(data.error); return; }
+      setSeoCopyResults(prev => new Map(prev).set(page.pagePath, data));
+    } catch (err) {
+      console.error('SEO copy generation failed:', err);
+    } finally {
+      setGeneratingCopy(null);
+    }
+  };
+
+  const copyText = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(label);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
 
   const intentCounts = strategy?.pageMap.reduce((acc, p) => {
     const intent = p.searchIntent || 'unknown';
@@ -901,6 +965,123 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                               </div>
                             </div>
                           )}
+
+                          {/* Generate SEO Copy */}
+                          <div className="mt-3 pt-2 border-t border-zinc-800">
+                            {!seoCopyResults.has(page.pagePath) ? (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); generateSeoCopy(page); }}
+                                disabled={generatingCopy === page.pagePath}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 border border-violet-500/30 hover:bg-violet-600/30 disabled:opacity-50 text-violet-300 text-[11px] font-medium transition-colors"
+                              >
+                                {generatingCopy === page.pagePath ? (
+                                  <><Loader2 className="w-3 h-3 animate-spin" /> Generating SEO Copy...</>
+                                ) : (
+                                  <><Wand2 className="w-3 h-3" /> Generate SEO Copy</>
+                                )}
+                              </button>
+                            ) : (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <h5 className="text-[10px] font-semibold text-violet-300 uppercase tracking-wider flex items-center gap-1">
+                                    <Wand2 className="w-3 h-3" /> Generated SEO Copy
+                                  </h5>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); generateSeoCopy(page); }}
+                                    disabled={generatingCopy === page.pagePath}
+                                    className="flex items-center gap-1 text-[9px] text-zinc-500 hover:text-violet-400 transition-colors"
+                                  >
+                                    {generatingCopy === page.pagePath ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <RefreshCw className="w-2.5 h-2.5" />} Regenerate
+                                  </button>
+                                </div>
+                                {(() => {
+                                  const copy = seoCopyResults.get(page.pagePath)!;
+                                  return (
+                                    <div className="space-y-2">
+                                      {/* SEO Title */}
+                                      <div className="bg-zinc-800/60 rounded-lg p-2.5">
+                                        <div className="flex items-center justify-between mb-1">
+                                          <span className="text-[9px] text-zinc-500 font-medium uppercase tracking-wider">SEO Title</span>
+                                          <button onClick={(e) => { e.stopPropagation(); copyText(copy.seoTitle, 'seoTitle'); }} className="flex items-center gap-0.5 text-[9px] text-zinc-500 hover:text-violet-400">
+                                            {copiedField === 'seoTitle' ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : <Copy className="w-2.5 h-2.5" />}
+                                            {copiedField === 'seoTitle' ? 'Copied!' : 'Copy'}
+                                          </button>
+                                        </div>
+                                        <p className="text-xs text-zinc-200">{copy.seoTitle}</p>
+                                        <span className="text-[9px] text-zinc-600 mt-0.5 block">{copy.seoTitle.length} chars</span>
+                                      </div>
+                                      {/* Meta Description */}
+                                      <div className="bg-zinc-800/60 rounded-lg p-2.5">
+                                        <div className="flex items-center justify-between mb-1">
+                                          <span className="text-[9px] text-zinc-500 font-medium uppercase tracking-wider">Meta Description</span>
+                                          <button onClick={(e) => { e.stopPropagation(); copyText(copy.metaDescription, 'metaDesc'); }} className="flex items-center gap-0.5 text-[9px] text-zinc-500 hover:text-violet-400">
+                                            {copiedField === 'metaDesc' ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : <Copy className="w-2.5 h-2.5" />}
+                                            {copiedField === 'metaDesc' ? 'Copied!' : 'Copy'}
+                                          </button>
+                                        </div>
+                                        <p className="text-xs text-zinc-300">{copy.metaDescription}</p>
+                                        <span className="text-[9px] text-zinc-600 mt-0.5 block">{copy.metaDescription.length} chars</span>
+                                      </div>
+                                      {/* H1 */}
+                                      <div className="bg-zinc-800/60 rounded-lg p-2.5">
+                                        <div className="flex items-center justify-between mb-1">
+                                          <span className="text-[9px] text-zinc-500 font-medium uppercase tracking-wider">Suggested H1</span>
+                                          <button onClick={(e) => { e.stopPropagation(); copyText(copy.h1, 'h1'); }} className="flex items-center gap-0.5 text-[9px] text-zinc-500 hover:text-violet-400">
+                                            {copiedField === 'h1' ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : <Copy className="w-2.5 h-2.5" />}
+                                            {copiedField === 'h1' ? 'Copied!' : 'Copy'}
+                                          </button>
+                                        </div>
+                                        <p className="text-xs text-zinc-200 font-medium">{copy.h1}</p>
+                                      </div>
+                                      {/* Intro Paragraph */}
+                                      <div className="bg-zinc-800/60 rounded-lg p-2.5">
+                                        <div className="flex items-center justify-between mb-1">
+                                          <span className="text-[9px] text-zinc-500 font-medium uppercase tracking-wider">Intro Paragraph</span>
+                                          <button onClick={(e) => { e.stopPropagation(); copyText(copy.introParagraph, 'intro'); }} className="flex items-center gap-0.5 text-[9px] text-zinc-500 hover:text-violet-400">
+                                            {copiedField === 'intro' ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : <Copy className="w-2.5 h-2.5" />}
+                                            {copiedField === 'intro' ? 'Copied!' : 'Copy'}
+                                          </button>
+                                        </div>
+                                        <p className="text-xs text-zinc-300 leading-relaxed">{copy.introParagraph}</p>
+                                      </div>
+                                      {/* Internal Link Suggestions */}
+                                      {copy.internalLinkSuggestions && copy.internalLinkSuggestions.length > 0 && (
+                                        <div className="bg-zinc-800/60 rounded-lg p-2.5">
+                                          <span className="text-[9px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-1 mb-1.5">
+                                            <Link className="w-2.5 h-2.5" /> Internal Link Suggestions
+                                          </span>
+                                          <div className="space-y-1">
+                                            {copy.internalLinkSuggestions.map((link, li) => (
+                                              <div key={li} className="flex items-start gap-2 text-[10px]">
+                                                <span className="text-violet-400 font-mono shrink-0">{link.targetPath}</span>
+                                                <span className="text-zinc-400">"{link.anchorText}"</span>
+                                                <span className="text-zinc-600 italic">{link.context}</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                      {/* Changes Rationale */}
+                                      {copy.changes && copy.changes.length > 0 && (
+                                        <div className="bg-zinc-800/40 rounded-lg p-2.5">
+                                          <span className="text-[9px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-1 mb-1.5">
+                                            <MessageSquare className="w-2.5 h-2.5" /> Why These Changes
+                                          </span>
+                                          <ul className="space-y-0.5">
+                                            {copy.changes.map((c, ci) => (
+                                              <li key={ci} className="text-[10px] text-zinc-400 flex items-start gap-1">
+                                                <span className="text-violet-400 mt-0.5">•</span> {c}
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            )}
+                          </div>
                         </>
                       ) : (
                         <div className="space-y-2">
@@ -968,6 +1149,42 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
             </div>
           )}
 
+          {/* Brand Voice Settings */}
+          <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+            <button
+              onClick={() => setBrandVoiceOpen(!brandVoiceOpen)}
+              className="flex items-center justify-between w-full text-left"
+            >
+              <h4 className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+                <MessageSquare className="w-3.5 h-3.5 text-violet-400" /> Brand Voice & Style Guidelines
+                {brandVoice && <span className="text-[9px] text-emerald-400 font-normal ml-1">(configured)</span>}
+              </h4>
+              {brandVoiceOpen ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500" />}
+            </button>
+            {brandVoiceOpen && (
+              <div className="mt-3 space-y-2">
+                <p className="text-[10px] text-zinc-500">
+                  Define your brand's voice and tone. This will be used in ALL AI-generated copy — SEO rewrites, content briefs, and SEO copy generation.
+                  You can also drop <code className="text-violet-400">.txt</code> or <code className="text-violet-400">.md</code> files into the <code className="text-violet-400">brand-docs/</code> folder in your workspace uploads.
+                </p>
+                <textarea
+                  value={brandVoice}
+                  onChange={e => setBrandVoice(e.target.value)}
+                  placeholder="e.g., Professional but approachable. Use active voice. Avoid jargon. Speak directly to the reader. Our tone is confident and helpful, never salesy..."
+                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-500 min-h-[80px] resize-y"
+                  rows={4}
+                />
+                <button
+                  onClick={saveBrandVoiceHandler}
+                  disabled={savingBrandVoice}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-[11px] font-medium"
+                >
+                  {savingBrandVoice ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save Brand Voice
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* How it works */}
           <div className="bg-zinc-800/30 rounded-lg border border-zinc-800 px-4 py-3">
             <div className="flex items-start gap-2">
@@ -975,6 +1192,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
               <div className="text-[11px] text-zinc-500">
                 <strong className="text-zinc-400">How it works:</strong> This strategy is automatically used when you generate AI rewrites
                 in the Edit SEO and CMS SEO tabs. The AI will incorporate your target keywords naturally into titles and descriptions.
+                Use the <strong className="text-violet-400">Generate SEO Copy</strong> button on any page to get rewritten title, meta, H1, and intro paragraph.
                 Edit any page's keywords to refine the strategy.
                 {strategy.semrushMode && strategy.semrushMode !== 'none' && (
                   <span className="block mt-1 text-orange-400/80">

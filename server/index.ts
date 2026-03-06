@@ -1199,8 +1199,8 @@ app.post('/api/webflow/seo-rewrite', async (req, res) => {
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
-  // Build shared keyword strategy context
-  const { keywordBlock: keywordContext } = buildSeoContext(workspaceId, pagePath);
+  // Build shared keyword strategy + brand voice context
+  const { keywordBlock: keywordContext, brandVoiceBlock } = buildSeoContext(workspaceId, pagePath);
 
   try {
     let prompt: string;
@@ -1210,7 +1210,7 @@ app.post('/api/webflow/seo-rewrite', async (req, res) => {
 Page title: ${pageTitle}
 Current meta description: ${currentDescription || '(none)'}
 Site context: ${siteContext || 'N/A'}
-Page content excerpt: ${pageContent ? pageContent.slice(0, 1500) : 'N/A'}${keywordContext}
+Page content excerpt: ${pageContent ? pageContent.slice(0, 1500) : 'N/A'}${keywordContext}${brandVoiceBlock}
 
 Requirements:
 - Between 150-160 characters (hard limit: 160)
@@ -1227,7 +1227,7 @@ Page title: ${pageTitle}
 Current SEO title: ${currentSeoTitle || '(none)'}
 Current meta description: ${currentDescription || '(none)'}
 Site context: ${siteContext || 'N/A'}
-Page content excerpt: ${pageContent ? pageContent.slice(0, 1500) : 'N/A'}${keywordContext}
+Page content excerpt: ${pageContent ? pageContent.slice(0, 1500) : 'N/A'}${keywordContext}${brandVoiceBlock}
 
 Requirements:
 - Between 50-60 characters (hard limit: 60)
@@ -1291,10 +1291,10 @@ app.post('/api/webflow/seo-bulk-fix/:siteId', async (req, res) => {
   const results = [];
   for (const page of pages) {
     try {
-      const { keywordBlock } = buildSeoContext(workspaceId, page.slug ? `/${page.slug}` : undefined);
+      const { keywordBlock, brandVoiceBlock: bvBlock } = buildSeoContext(workspaceId, page.slug ? `/${page.slug}` : undefined);
       const prompt = field === 'description'
-        ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}".${keywordBlock}\nReturn ONLY the text.`
-        : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}".${keywordBlock}\nReturn ONLY the text.`;
+        ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}".${keywordBlock}${bvBlock}\nReturn ONLY the text.`
+        : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}".${keywordBlock}${bvBlock}\nReturn ONLY the text.`;
 
       const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -1367,6 +1367,138 @@ app.get('/api/webflow/page-html/:siteId', async (req, res) => {
   }
 });
 
+// --- Per-Page SEO Copy Generator ---
+app.post('/api/webflow/seo-copy', async (req, res) => {
+  const { pagePath, pageTitle, currentSeoTitle, currentDescription, currentH1, pageContent, workspaceId } = req.body;
+  if (!pagePath || !workspaceId) return res.status(400).json({ error: 'pagePath and workspaceId required' });
+
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
+
+  // Build full context: keywords + brand voice + keyword map
+  const { keywordBlock, brandVoiceBlock, strategy } = buildSeoContext(workspaceId, pagePath);
+  const kwMapContext = buildKeywordMapContext(workspaceId);
+
+  // If no page content was passed, try to fetch it from the live domain
+  let content = pageContent || '';
+  if (!content) {
+    const ws = getWorkspace(workspaceId);
+    const domain = ws?.liveDomain;
+    if (domain) {
+      try {
+        const url = `https://${domain}${pagePath === '/' ? '' : pagePath}`;
+        const r = await fetch(url, { headers: { 'User-Agent': 'AssetDashboard-SEOCopy/1.0' }, signal: AbortSignal.timeout(10000) });
+        if (r.ok) {
+          const html = await r.text();
+          const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+          const body = bodyMatch ? bodyMatch[1] : html;
+          content = body
+            .replace(/<script[\s\S]*?<\/script>/gi, '')
+            .replace(/<style[\s\S]*?<\/style>/gi, '')
+            .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+            .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 4000);
+        }
+      } catch { /* non-critical — proceed without content */ }
+    }
+  }
+
+  // Find this page's keyword data
+  const pageKw = strategy?.pageMap?.find(
+    p => p.pagePath === pagePath || pagePath.includes(p.pagePath) || p.pagePath.includes(pagePath)
+  );
+
+  const prompt = `You are an expert SEO copywriter. Generate optimized SEO copy for this specific web page.
+
+PAGE: ${pagePath}
+Current title: ${pageTitle || '(none)'}
+Current SEO title: ${currentSeoTitle || '(same as title)'}
+Current meta description: ${currentDescription || '(none)'}
+Current H1: ${currentH1 || '(none)'}
+${pageKw ? `Primary keyword: "${pageKw.primaryKeyword}"
+Secondary keywords: ${pageKw.secondaryKeywords?.join(', ') || 'none'}
+Search intent: ${pageKw.searchIntent || 'unknown'}
+${pageKw.currentPosition ? `Current Google position: #${pageKw.currentPosition.toFixed(0)}` : ''}
+${pageKw.impressions ? `Monthly impressions: ${pageKw.impressions}` : ''}` : ''}
+${content ? `\nPage content:\n${content.slice(0, 3000)}` : ''}${keywordBlock}${brandVoiceBlock}${kwMapContext}
+
+Generate optimized copy in this exact JSON format:
+{
+  "seoTitle": "Optimized SEO title tag (50-60 chars, front-load primary keyword)",
+  "metaDescription": "Compelling meta description (150-160 chars, include CTA, naturally incorporate keywords)",
+  "h1": "Optimized H1 heading (clear, keyword-rich, matches search intent)",
+  "introParagraph": "Rewritten opening paragraph (2-3 sentences, hook the reader, incorporate primary keyword naturally within first sentence, set clear expectations for the page content)",
+  "internalLinkSuggestions": [
+    { "targetPath": "/page-path", "anchorText": "suggested link text", "context": "Where/why to place this link" }
+  ],
+  "changes": [
+    "Brief bullet explaining each change you made and why it will improve rankings"
+  ]
+}
+
+CRITICAL RULES:
+- PRESERVE the existing brand voice and tone exactly — do NOT make it sound generic or corporate
+- Every piece of copy must sound like it was written by the same person/team who wrote the existing content
+- Incorporate keywords NATURALLY — never stuff or force them
+- The intro paragraph should feel like a natural improvement, not a complete rewrite from scratch
+- Internal link suggestions should reference real pages from the keyword map
+- Changes array should explain your reasoning so the team can learn
+
+Return ONLY valid JSON, no markdown fences.`;
+
+  try {
+    const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: 'You are an expert SEO copywriter who preserves brand voice while optimizing for search. Return valid JSON only.' },
+          { role: 'user', content: prompt },
+        ],
+        max_tokens: 1500,
+        temperature: 0.6,
+      }),
+    });
+
+    if (!aiRes.ok) {
+      const errText = await aiRes.text();
+      return res.status(500).json({ error: `OpenAI error: ${errText.slice(0, 200)}` });
+    }
+
+    const aiData = await aiRes.json() as { choices?: Array<{ message?: { content?: string } }> };
+    const raw = aiData.choices?.[0]?.message?.content?.trim() || '{}';
+    const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '');
+
+    let parsed;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch {
+      return res.status(500).json({ error: 'AI returned invalid JSON', raw: raw.slice(0, 500) });
+    }
+
+    // Enforce character limits
+    if (parsed.seoTitle && parsed.seoTitle.length > 60) {
+      const t = parsed.seoTitle.slice(0, 60);
+      const ls = t.lastIndexOf(' ');
+      parsed.seoTitle = ls > 36 ? t.slice(0, ls) : t;
+    }
+    if (parsed.metaDescription && parsed.metaDescription.length > 160) {
+      const t = parsed.metaDescription.slice(0, 160);
+      const ls = t.lastIndexOf(' ');
+      parsed.metaDescription = ls > 96 ? t.slice(0, ls) : t;
+    }
+
+    res.json(parsed);
+  } catch (err) {
+    console.error('SEO copy generator error:', err);
+    res.status(500).json({ error: 'SEO copy generation failed' });
+  }
+});
+
 // --- AI Keyword Analysis ---
 app.post('/api/webflow/keyword-analysis', async (req, res) => {
   const { pageTitle, seoTitle, metaDescription, pageContent, slug, siteContext, workspaceId } = req.body;
@@ -1375,7 +1507,7 @@ app.post('/api/webflow/keyword-analysis', async (req, res) => {
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
-  const { keywordBlock } = buildSeoContext(workspaceId, slug ? `/${slug}` : undefined);
+  const { keywordBlock, brandVoiceBlock: bvBlock2 } = buildSeoContext(workspaceId, slug ? `/${slug}` : undefined);
   const kwMapContext = buildKeywordMapContext(workspaceId);
 
   try {
@@ -1386,7 +1518,7 @@ SEO title: ${seoTitle || '(same as page title)'}
 Meta description: ${metaDescription || '(none)'}
 URL slug: /${slug || ''}
 Site context: ${siteContext || 'N/A'}
-Page content excerpt: ${pageContent ? pageContent.slice(0, 3000) : 'N/A'}${keywordBlock}${kwMapContext}
+Page content excerpt: ${pageContent ? pageContent.slice(0, 3000) : 'N/A'}${keywordBlock}${bvBlock2}${kwMapContext}
 
 Provide your analysis as a JSON object with exactly these fields:
 {
@@ -4123,10 +4255,10 @@ app.post('/api/jobs', async (req, res) => {
             for (let i = 0; i < pages.length; i++) {
               const page = pages[i];
               try {
-                const { keywordBlock } = buildSeoContext(bwsId, page.slug ? `/${page.slug}` : undefined);
+                const { keywordBlock: kwb, brandVoiceBlock: bvb } = buildSeoContext(bwsId, page.slug ? `/${page.slug}` : undefined);
                 const prompt = field === 'description'
-                  ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}".${keywordBlock}\nReturn ONLY the text.`
-                  : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}".${keywordBlock}\nReturn ONLY the text.`;
+                  ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}".${kwb}${bvb}\nReturn ONLY the text.`
+                  : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}".${kwb}${bvb}\nReturn ONLY the text.`;
                 const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
                   method: 'POST',
                   headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },

@@ -780,8 +780,8 @@ export function ClientDashboard({ workspaceId }: Props) {
   const strategyLocked = !ws?.seoClientView;
   const NAV = [
     { id: 'overview' as ClientTab, label: 'Overview', icon: LayoutDashboard, locked: false },
-    { id: 'health' as ClientTab, label: 'Site Health', icon: Shield, locked: false },
     { id: 'strategy' as ClientTab, label: 'SEO Strategy', icon: Target, locked: strategyLocked },
+    { id: 'health' as ClientTab, label: 'Site Health', icon: Shield, locked: false },
     ...(ws?.analyticsClientView !== false ? [
       { id: 'analytics' as ClientTab, label: 'Analytics', icon: LineChart, locked: false },
       { id: 'search' as ClientTab, label: 'Search', icon: Search, locked: false },
@@ -852,37 +852,53 @@ export function ClientDashboard({ workspaceId }: Props) {
 
         {/* ════════════ OVERVIEW TAB ════════════ */}
         {tab === 'overview' && (<>
-          {/* Adaptive key metrics row */}
+          {/* Welcome header */}
+          <div className="mb-1">
+            <h2 className="text-base font-semibold text-zinc-100">Welcome back</h2>
+            <p className="text-xs text-zinc-500 mt-0.5">Here's how your site is performing</p>
+          </div>
+
+          {/* Key metrics row */}
           {(() => {
-            const cards: { icon: typeof Users; label: string; value: string; color: string; td: number[]; onClick: () => void }[] = [];
-            if (audit) cards.push({ icon: Shield, label: 'Site Health', value: String(audit.siteScore), color: audit.siteScore >= 80 ? '#34d399' : audit.siteScore >= 60 ? '#fbbf24' : '#f87171', td: [], onClick: () => setTab('health') });
+            const cards: { icon: typeof Users; label: string; value: string; sub?: string; color: string; td: number[]; onClick: () => void }[] = [];
+            if (audit) cards.push({ icon: Shield, label: 'Site Health', value: String(audit.siteScore), sub: `${audit.totalPages} pages`, color: audit.siteScore >= 80 ? '#34d399' : audit.siteScore >= 60 ? '#fbbf24' : '#f87171', td: [], onClick: () => setTab('health') });
             if (ga4Overview) {
-              cards.push({ icon: Users, label: 'Users', value: ga4Overview.totalUsers.toLocaleString(), color: '#2dd4bf', td: ga4Trend.map(d => d.users), onClick: () => setTab('analytics') });
-              cards.push({ icon: Globe, label: 'Sessions', value: ga4Overview.totalSessions.toLocaleString(), color: '#60a5fa', td: ga4Trend.map(d => d.sessions), onClick: () => setTab('analytics') });
+              cards.push({ icon: Users, label: 'Visitors', value: ga4Overview.totalUsers.toLocaleString(), sub: 'last 30 days', color: '#2dd4bf', td: ga4Trend.map(d => d.users), onClick: () => setTab('analytics') });
             }
             if (overview) {
-              cards.push({ icon: MousePointer, label: 'Clicks', value: overview.totalClicks.toLocaleString(), color: '#60a5fa', td: trend.map(t => t.clicks), onClick: () => setTab('search') });
-              cards.push({ icon: Eye, label: 'Impressions', value: overview.totalImpressions.toLocaleString(), color: '#2dd4bf', td: trend.map(t => t.impressions), onClick: () => setTab('search') });
+              cards.push({ icon: MousePointer, label: 'Search Clicks', value: overview.totalClicks.toLocaleString(), sub: overview.totalImpressions > 0 ? `${((overview.totalClicks / overview.totalImpressions) * 100).toFixed(1)}% CTR` : '', color: '#60a5fa', td: trend.map(t => t.clicks), onClick: () => setTab('search') });
+              cards.push({ icon: Eye, label: 'Impressions', value: overview.totalImpressions.toLocaleString(), sub: 'Google searches', color: '#a78bfa', td: trend.map(t => t.impressions), onClick: () => setTab('search') });
+            } else if (ga4Overview) {
+              cards.push({ icon: Globe, label: 'Sessions', value: ga4Overview.totalSessions.toLocaleString(), sub: 'last 30 days', color: '#60a5fa', td: ga4Trend.map(d => d.sessions), onClick: () => setTab('analytics') });
             }
-            if (ga4Overview && !overview) cards.push({ icon: Activity, label: 'Bounce Rate', value: `${ga4Overview.bounceRate}%`, color: ga4Overview.bounceRate > 60 ? '#f87171' : '#34d399', td: [], onClick: () => setTab('analytics') });
+            if (strategyData) {
+              const rankedPages = strategyData.pageMap.filter(p => p.currentPosition);
+              const avgP = rankedPages.length > 0 ? rankedPages.reduce((s, p) => s + (p.currentPosition || 0), 0) / rankedPages.length : 0;
+              cards.push({ icon: Target, label: 'Avg SEO Position', value: rankedPages.length > 0 ? `#${avgP.toFixed(1)}` : '—', sub: rankedPages.length > 0 ? `${rankedPages.length} keywords ranking` : `${strategyData.pageMap.length} pages mapped`, color: avgP && avgP <= 10 ? '#34d399' : avgP && avgP <= 20 ? '#fbbf24' : '#60a5fa', td: [], onClick: () => setTab('strategy') });
+            }
             if (cards.length === 0) return null;
             return (
               <div className={`grid gap-3 ${cards.length <= 3 ? 'grid-cols-' + cards.length : cards.length === 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'}`}>
                 {cards.map((card, i) => { const Icon = card.icon; return (
-                  <button key={i} onClick={card.onClick} className="bg-zinc-900 rounded-xl p-4 border border-zinc-800 hover:border-zinc-700 transition-colors text-left">
-                    <div className="flex items-center justify-between mb-1"><Icon className="w-4 h-4" style={{ color: card.color }} />{card.td.length > 2 && <MiniSparkline data={card.td} color={card.color} />}</div>
-                    <div className="text-2xl font-bold" style={{ color: card.label === 'Site Health' ? card.color : undefined }}>{card.value}</div>
+                  <button key={i} onClick={card.onClick} className="bg-zinc-900 rounded-xl p-4 border border-zinc-800 hover:border-zinc-700 transition-colors text-left group">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <Icon className="w-4 h-4" style={{ color: card.color }} />
+                      {card.td.length > 2 && <MiniSparkline data={card.td} color={card.color} />}
+                    </div>
+                    <div className="text-2xl font-bold text-zinc-100" style={{ color: card.label === 'Site Health' ? card.color : undefined }}>{card.value}</div>
                     <div className="text-[10px] text-zinc-500 mt-0.5">{card.label}</div>
+                    {card.sub && <div className="text-[9px] text-zinc-600 mt-0.5">{card.sub}</div>}
                   </button>
                 ); })}
               </div>
             );
           })()}
 
-          {/* Unified trend + highlights */}
+          {/* Main content: trend + sidebar */}
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
-            {/* Left: single trend chart (3/5 width) */}
+            {/* Left column (3/5) */}
             <div className="lg:col-span-3 space-y-5">
+              {/* Traffic trend chart */}
               {ga4Trend.length > 2 && (
                 <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                   <div className="flex items-center justify-between mb-3">
@@ -927,7 +943,30 @@ export function ClientDashboard({ workspaceId }: Props) {
                   </div>
                 </div>
               )}
-              {/* Pinned key events on overview */}
+
+              {/* Top search wins — celebrate what's working */}
+              {insights && insights.topPerformers.length > 0 && (
+                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-5 h-5 rounded-md bg-emerald-500/15 flex items-center justify-center"><CheckCircle2 className="w-3 h-3 text-emerald-400" /></div>
+                    <span className="text-xs font-medium text-zinc-300">Your Top Search Rankings</span>
+                    <button onClick={() => setTab('search')} className="text-[10px] text-teal-400 hover:text-teal-300 ml-auto">View all →</button>
+                  </div>
+                  <div className="space-y-1.5">
+                    {insights.topPerformers.slice(0, 5).map((q, i) => (
+                      <div key={i} className="flex items-center justify-between text-[11px] py-2 px-3 rounded-lg bg-zinc-800/30">
+                        <span className="text-zinc-300 truncate mr-3">{q.query}</span>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className={`font-mono font-medium ${q.position <= 3 ? 'text-emerald-400' : q.position <= 10 ? 'text-green-400' : 'text-amber-400'}`}>#{q.position}</span>
+                          <span className="text-[9px] text-zinc-600">{q.clicks} clicks</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Pinned key events */}
               {sortedConversions.filter(c => isEventPinned(c.eventName)).length > 0 && (
                 <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                   <div className="flex items-center justify-between mb-3">
@@ -945,6 +984,8 @@ export function ClientDashboard({ workspaceId }: Props) {
                   </div>
                 </div>
               )}
+
+              {/* Empty state */}
               {!overview && !audit && !ga4Overview && (
                 <div className="bg-gradient-to-br from-teal-500/10 via-zinc-900 to-emerald-500/10 rounded-xl border border-zinc-800 p-8 text-center">
                   <div className="w-12 h-12 rounded-2xl bg-teal-500/10 flex items-center justify-center mx-auto mb-4"><BarChart3 className="w-6 h-6 text-teal-400" /></div>
@@ -954,110 +995,125 @@ export function ClientDashboard({ workspaceId }: Props) {
               )}
             </div>
 
-            {/* Right: highlights (2/5 width) */}
+            {/* Right sidebar (2/5) — insights & status */}
             <div className="lg:col-span-2 space-y-4">
+              {/* Site health snapshot */}
+              {audit && (
+                <button onClick={() => setTab('health')} className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 text-left hover:border-zinc-700 transition-colors w-full">
+                  <div className="flex items-center gap-2 mb-2"><Shield className="w-4 h-4" style={{ color: audit.siteScore >= 80 ? '#34d399' : audit.siteScore >= 60 ? '#fbbf24' : '#f87171' }} /><span className="text-xs font-medium text-zinc-300">Site Health</span></div>
+                  <div className="flex items-center gap-3">
+                    <div className={`text-2xl font-bold ${audit.siteScore >= 80 ? 'text-green-400' : audit.siteScore >= 60 ? 'text-amber-400' : 'text-red-400'}`}>{audit.siteScore}/100</div>
+                    <div className="flex-1">
+                      <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full transition-all" style={{ width: `${audit.siteScore}%`, backgroundColor: audit.siteScore >= 80 ? '#34d399' : audit.siteScore >= 60 ? '#fbbf24' : '#f87171' }} />
+                      </div>
+                    </div>
+                  </div>
+                  {auditDetail && auditDetail.audit.errors > 0 && (
+                    <div className="mt-2 text-[10px] text-red-400">{auditDetail.audit.errors} issue{auditDetail.audit.errors !== 1 ? 's' : ''} to fix</div>
+                  )}
+                  {audit.siteScore >= 80 && <div className="mt-2 text-[10px] text-emerald-400">Looking good — your site is healthy</div>}
+                </button>
+              )}
+
+              {/* Search opportunities */}
               {insights && insights.lowHanging.length > 0 && (
                 <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Target className="w-4 h-4 text-amber-400" />
-                    <span className="text-xs font-medium text-zinc-300">Top Opportunities</span>
+                    <TrendingUp className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs font-medium text-zinc-300">Almost There</span>
                   </div>
+                  <p className="text-[10px] text-zinc-500 mb-2">Keywords close to page 1 — small improvements could mean big traffic gains.</p>
                   <div className="space-y-1.5">
                     {insights.lowHanging.slice(0, 3).map((q, i) => (
                       <div key={i} className="flex items-center justify-between text-[11px] py-1.5 px-2.5 rounded-lg bg-zinc-800/30">
                         <span className="text-zinc-300 truncate mr-2">{q.query}</span>
-                        <span className="text-amber-400 font-medium flex-shrink-0">#{q.position}</span>
+                        <span className="text-amber-400 font-mono font-medium flex-shrink-0">#{q.position}</span>
                       </div>
                     ))}
                   </div>
                   {insights.lowHanging.length > 3 && <button onClick={() => setTab('search')} className="text-[10px] text-teal-400 hover:text-teal-300 mt-2">+{insights.lowHanging.length - 3} more →</button>}
                 </div>
               )}
-              {auditDetail && auditDetail.audit.errors > 0 && (
+
+              {/* Growth insights — subtle strategy teaser, only if data exists */}
+              {strategyData && (strategyData.quickWins?.length || strategyData.contentGaps?.length) ? (
                 <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <AlertTriangle className="w-4 h-4 text-red-400" />
-                    <span className="text-xs font-medium text-zinc-300">Critical Issues</span>
-                    <span className="text-[10px] text-red-400/70 ml-auto">{auditDetail.audit.errors}</span>
+                  <div className="flex items-center gap-2 mb-2.5">
+                    <Sparkles className="w-4 h-4 text-violet-400" />
+                    <span className="text-xs font-medium text-zinc-300">Growth Insights</span>
                   </div>
-                  <div className="space-y-1.5">
-                    {auditDetail.audit.pages.flatMap(p => p.issues.filter(i => i.severity === 'error').map(i => ({ ...i, pageName: p.page }))).slice(0, 3).map((issue, i) => (
-                      <div key={i} className="text-[11px] py-1.5 px-2.5 rounded-lg bg-red-500/5 border border-red-500/10">
-                        <div className="text-red-400 font-medium">{issue.message}</div>
-                        <div className="text-zinc-600 mt-0.5 truncate">{issue.pageName}</div>
-                      </div>
-                    ))}
+                  <div className="space-y-2">
+                    {strategyData.quickWins && strategyData.quickWins.length > 0 && (
+                      <button onClick={() => setTab('strategy')} className="w-full text-left px-3 py-2.5 rounded-lg bg-zinc-800/30 hover:bg-zinc-800/50 transition-colors">
+                        <div className="flex items-center gap-2">
+                          <Zap className="w-3 h-3 text-amber-400 flex-shrink-0" />
+                          <span className="text-[11px] text-zinc-300">We identified <strong className="text-amber-300">{strategyData.quickWins.length} quick wins</strong> that could improve your rankings</span>
+                        </div>
+                      </button>
+                    )}
+                    {strategyData.contentGaps && strategyData.contentGaps.length > 0 && (
+                      <button onClick={() => setTab('strategy')} className="w-full text-left px-3 py-2.5 rounded-lg bg-zinc-800/30 hover:bg-zinc-800/50 transition-colors">
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-3 h-3 text-teal-400 flex-shrink-0" />
+                          <span className="text-[11px] text-zinc-300">Found <strong className="text-teal-300">{strategyData.contentGaps.length} content {strategyData.contentGaps.length === 1 ? 'opportunity' : 'opportunities'}</strong> for new traffic</span>
+                        </div>
+                      </button>
+                    )}
+                    {strategyData.opportunities && strategyData.opportunities.length > 0 && (
+                      <button onClick={() => setTab('strategy')} className="w-full text-left px-3 py-2.5 rounded-lg bg-zinc-800/30 hover:bg-zinc-800/50 transition-colors">
+                        <div className="flex items-center gap-2">
+                          <Target className="w-3 h-3 text-violet-400 flex-shrink-0" />
+                          <span className="text-[11px] text-zinc-300"><strong className="text-violet-300">{strategyData.opportunities.length} keyword {strategyData.opportunities.length === 1 ? 'opportunity' : 'opportunities'}</strong> identified</span>
+                        </div>
+                      </button>
+                    )}
                   </div>
-                  <button onClick={() => setTab('health')} className="text-[10px] text-teal-400 hover:text-teal-300 mt-2">View full audit →</button>
+                  <div className="text-[10px] text-zinc-600 mt-2.5 pt-2 border-t border-zinc-800">View your full SEO strategy for details</div>
                 </div>
-              )}
-              {audit && !(auditDetail?.audit.errors) && (
+              ) : null}
+
+              {/* Activity timeline (compact in sidebar) */}
+              {activityLog.length > 0 && (
                 <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                  <div className="flex items-center gap-2 mb-2"><CheckCircle2 className="w-4 h-4 text-green-400" /><span className="text-xs font-medium text-zinc-300">Site Health</span></div>
-                  <div className="flex items-center gap-3">
-                    <div className={`text-2xl font-bold ${audit.siteScore >= 80 ? 'text-green-400' : audit.siteScore >= 60 ? 'text-amber-400' : 'text-red-400'}`}>{audit.siteScore}</div>
-                    <div><div className="text-[10px] text-zinc-400">{audit.totalPages} pages</div><div className="text-[10px] text-zinc-600">{new Date(audit.createdAt).toLocaleDateString()}</div></div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Activity className="w-4 h-4 text-teal-400" />
+                    <span className="text-xs font-medium text-zinc-300">Recent Work</span>
                   </div>
-                  <button onClick={() => setTab('health')} className="text-[10px] text-teal-400 hover:text-teal-300 mt-1.5">Details →</button>
-                </div>
-              )}
-              {insights && insights.topPerformers.length > 0 && (
-                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                  <div className="flex items-center gap-2 mb-2"><Zap className="w-4 h-4 text-green-400" /><span className="text-xs font-medium text-zinc-300">Top Performers</span></div>
-                  <div className="space-y-1.5">
-                    {insights.topPerformers.slice(0, 3).map((q, i) => (
-                      <div key={i} className="flex items-center justify-between text-[11px] py-1.5 px-2.5 rounded-lg bg-zinc-800/30">
-                        <span className="text-zinc-300 truncate mr-2">{q.query}</span>
-                        <span className="text-green-400 font-medium flex-shrink-0">#{q.position}</span>
-                      </div>
-                    ))}
+                  <div className="relative">
+                    <div className="absolute left-[5px] top-1 bottom-1 w-px bg-zinc-800" />
+                    <div className="space-y-2.5">
+                      {activityLog.slice(0, 5).map(entry => {
+                        const icons: Record<string, { color: string; label: string }> = {
+                          audit_completed: { color: '#60a5fa', label: 'Audit' },
+                          request_resolved: { color: '#34d399', label: 'Done' },
+                          approval_applied: { color: '#a78bfa', label: 'Applied' },
+                          seo_updated: { color: '#fbbf24', label: 'SEO' },
+                          images_optimized: { color: '#f472b6', label: 'Media' },
+                          links_fixed: { color: '#fb923c', label: 'Links' },
+                          content_updated: { color: '#2dd4bf', label: 'Content' },
+                          note: { color: '#94a3b8', label: 'Note' },
+                        };
+                        const cfg = icons[entry.type] || icons.note;
+                        return (
+                          <div key={entry.id} className="flex items-start gap-2.5 pl-0">
+                            <div className="w-[11px] h-[11px] rounded-full border-2 flex-shrink-0 mt-1 z-10" style={{ borderColor: cfg.color, backgroundColor: 'var(--brand-bg, #0f1219)' }} />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[9px] font-medium px-1 py-0.5 rounded" style={{ backgroundColor: `${cfg.color}15`, color: cfg.color }}>{cfg.label}</span>
+                                <span className="text-[9px] text-zinc-600">{new Date(entry.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                              </div>
+                              <div className="text-[10px] text-zinc-400 mt-0.5 line-clamp-1">{entry.title}</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               )}
             </div>
           </div>
-
-          {/* Activity Timeline */}
-          {activityLog.length > 0 && (
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <Activity className="w-4 h-4 text-teal-400" />
-                <span className="text-xs font-semibold text-zinc-200">Recent Activity</span>
-                <span className="text-[10px] text-zinc-600 ml-auto">What your web team has been working on</span>
-              </div>
-              <div className="relative">
-                <div className="absolute left-[7px] top-2 bottom-2 w-px bg-zinc-800" />
-                <div className="space-y-3">
-                  {activityLog.slice(0, 10).map(entry => {
-                    const icons: Record<string, { color: string; label: string }> = {
-                      audit_completed: { color: '#60a5fa', label: 'Audit' },
-                      request_resolved: { color: '#34d399', label: 'Resolved' },
-                      approval_applied: { color: '#a78bfa', label: 'Applied' },
-                      seo_updated: { color: '#fbbf24', label: 'SEO' },
-                      images_optimized: { color: '#f472b6', label: 'Media' },
-                      links_fixed: { color: '#fb923c', label: 'Links' },
-                      content_updated: { color: '#2dd4bf', label: 'Content' },
-                      note: { color: '#94a3b8', label: 'Note' },
-                    };
-                    const cfg = icons[entry.type] || icons.note;
-                    return (
-                      <div key={entry.id} className="flex items-start gap-3 pl-0">
-                        <div className="w-[15px] h-[15px] rounded-full border-2 flex-shrink-0 mt-0.5 z-10" style={{ borderColor: cfg.color, backgroundColor: 'var(--brand-bg, #0f1219)' }} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded" style={{ backgroundColor: `${cfg.color}15`, color: cfg.color }}>{cfg.label}</span>
-                            <span className="text-[10px] text-zinc-600">{new Date(entry.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                          </div>
-                          <div className="text-[11px] text-zinc-300 mt-0.5">{entry.title}</div>
-                          {entry.description && <div className="text-[10px] text-zinc-500 mt-0.5 line-clamp-1">{entry.description}</div>}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
         </>)}
 
         {/* ════════════ SEARCH TAB ════════════ */}
@@ -1532,7 +1588,158 @@ export function ClientDashboard({ workspaceId }: Props) {
                 );
               })()}
 
-              {/* Site-Level Target Keywords */}
+              {/* ── QUICK WINS (urgency builder) ── */}
+              {strategyData.quickWins && strategyData.quickWins.length > 0 && (
+                <div className="bg-gradient-to-br from-amber-950/30 to-zinc-900 rounded-xl border border-amber-500/30 p-5 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+                  <div className="relative">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-7 h-7 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                        <Zap className="w-4 h-4 text-amber-400" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-semibold text-amber-200">Quick Wins</div>
+                        <div className="text-[10px] text-amber-400/60">Low-effort changes that can improve rankings fast</div>
+                      </div>
+                    </div>
+                    <div className="space-y-2 mt-3">
+                      {strategyData.quickWins.map((qw, i) => {
+                        const impactColor = qw.estimatedImpact === 'high' ? 'text-green-400 bg-green-500/15 border-green-500/30' : qw.estimatedImpact === 'medium' ? 'text-amber-400 bg-amber-500/15 border-amber-500/30' : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
+                        return (
+                          <div key={i} className="px-3.5 py-3 rounded-lg bg-zinc-900/60 border border-zinc-800/80 hover:border-amber-500/20 transition-colors">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-mono text-zinc-500">{qw.pagePath}</span>
+                              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${impactColor}`}>{qw.estimatedImpact} impact</span>
+                            </div>
+                            <div className="text-[11px] text-zinc-200 mt-1.5 font-medium">{qw.action}</div>
+                            <div className="text-[10px] text-zinc-500 mt-1">{qw.rationale}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── CONTENT OPPORTUNITIES (conversion moment) ── */}
+              {strategyData.contentGaps && strategyData.contentGaps.length > 0 && (
+                <div className="bg-gradient-to-br from-teal-950/40 to-zinc-900 rounded-xl border border-teal-500/30 p-5 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-40 h-40 bg-teal-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+                  <div className="relative">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-teal-500/20 flex items-center justify-center">
+                          <FileText className="w-4 h-4 text-teal-400" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-semibold text-teal-200">Content Opportunities</div>
+                          <div className="text-[10px] text-teal-400/60">New pages that could drive significant organic traffic</div>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 mt-2 mb-3 leading-relaxed">
+                      Based on your keyword strategy and competitor analysis, these topics represent untapped search traffic. Click <strong className="text-teal-300">Request This Topic</strong> to have our team create a full content brief.
+                    </p>
+                    <div className="space-y-2.5">
+                      {strategyData.contentGaps.map((gap, i) => {
+                        const prioColor = gap.priority === 'high' ? 'text-red-400 bg-red-500/15 border-red-500/30' : gap.priority === 'medium' ? 'text-amber-400 bg-amber-500/15 border-amber-500/30' : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
+                        const alreadyRequested = requestedTopics.has(gap.targetKeyword);
+                        const isRequesting = requestingTopic === gap.targetKeyword;
+                        return (
+                          <div key={i} className="px-4 py-3.5 rounded-lg bg-zinc-900/60 border border-zinc-800/80 hover:border-teal-500/30 transition-all group">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-xs font-semibold text-zinc-100">{gap.topic}</span>
+                                  <span className="text-[9px] text-zinc-500 uppercase tracking-wider">{gap.intent}</span>
+                                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${prioColor}`}>{gap.priority} priority</span>
+                                </div>
+                                <div className="text-[11px] text-teal-400 mt-1 font-medium">Target keyword: &ldquo;{gap.targetKeyword}&rdquo;</div>
+                                <div className="text-[10px] text-zinc-500 mt-1 leading-relaxed">{gap.rationale}</div>
+                              </div>
+                              <div className="flex-shrink-0 pt-1">
+                                {alreadyRequested ? (
+                                  <span className="flex items-center gap-1 text-[10px] text-teal-400 bg-teal-500/10 px-2.5 py-1.5 rounded-lg border border-teal-500/20"><CheckCircle2 className="w-3.5 h-3.5" /> Requested</span>
+                                ) : (
+                                  <button
+                                    disabled={isRequesting}
+                                    onClick={async () => {
+                                      setRequestingTopic(gap.targetKeyword);
+                                      try {
+                                        await fetch(`/api/public/content-request/${workspaceId}`, {
+                                          method: 'POST',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({ topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale }),
+                                        });
+                                        setRequestedTopics(prev => new Set(prev).add(gap.targetKeyword));
+                                      } catch { /* skip */ }
+                                      setRequestingTopic(null);
+                                    }}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600/30 border border-teal-500/40 text-[11px] text-teal-200 font-medium hover:bg-teal-600/50 hover:border-teal-400/60 transition-all disabled:opacity-50 shadow-sm shadow-teal-900/20"
+                                  >
+                                    {isRequesting ? <><span className="w-3 h-3 border-2 border-teal-400 border-t-transparent rounded-full animate-spin" /> Requesting...</> : <><Plus className="w-3.5 h-3.5" /> Request This Topic</>}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── OPPORTUNITIES + KEYWORD GAPS ── */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {strategyData.opportunities.length > 0 && (
+                  <div className="bg-gradient-to-br from-violet-950/30 to-zinc-900 rounded-xl border border-violet-500/20 p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-6 h-6 rounded-lg bg-violet-500/20 flex items-center justify-center">
+                        <Sparkles className="w-3.5 h-3.5 text-violet-400" />
+                      </div>
+                      <div className="text-xs font-semibold text-violet-200">Keyword Opportunities</div>
+                    </div>
+                    <div className="space-y-2">
+                      {strategyData.opportunities.map((opp, i) => (
+                        <div key={i} className="flex items-start gap-2.5 text-[11px] text-zinc-300 px-3 py-2 rounded-lg bg-zinc-900/40 border border-zinc-800/50">
+                          <span className="w-5 h-5 rounded-full bg-violet-500/15 border border-violet-500/25 flex items-center justify-center flex-shrink-0 mt-0.5 text-[9px] text-violet-400 font-bold">{i + 1}</span>
+                          {opp}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {strategyData.keywordGaps && strategyData.keywordGaps.length > 0 && (
+                  <div className="bg-gradient-to-br from-orange-950/20 to-zinc-900 rounded-xl border border-orange-500/20 p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-6 h-6 rounded-lg bg-orange-500/20 flex items-center justify-center">
+                        <Target className="w-3.5 h-3.5 text-orange-400" />
+                      </div>
+                      <div className="text-xs font-semibold text-orange-200">Competitor Keyword Gaps</div>
+                      <span className="text-[9px] text-zinc-600">Keywords your competitors rank for</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {strategyData.keywordGaps.map((gap, i) => (
+                        <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg bg-zinc-900/40 border border-zinc-800/50">
+                          <span className="text-[11px] text-zinc-300 font-medium">{gap.keyword}</span>
+                          <div className="flex items-center gap-3">
+                            {gap.volume != null && <span className="text-[10px] text-zinc-500">{gap.volume.toLocaleString()} vol</span>}
+                            {gap.difficulty != null && (
+                              <span className={`text-[10px] font-medium ${gap.difficulty <= 30 ? 'text-green-400' : gap.difficulty <= 60 ? 'text-amber-400' : 'text-red-400'}`}>
+                                KD {gap.difficulty}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── SITE-LEVEL TARGET KEYWORDS ── */}
               <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
                 <div className="text-xs font-medium text-zinc-400 mb-3">Site-Level Target Keywords</div>
                 <div className="flex flex-wrap gap-2">
@@ -1559,7 +1766,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                 )}
               </div>
 
-              {/* Page Keyword Map */}
+              {/* ── PAGE KEYWORD MAP (detailed reference) ── */}
               <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
                 <div className="px-5 py-3 border-b border-zinc-800">
                   <span className="text-xs font-medium text-zinc-300">Page Keyword Map</span>
@@ -1605,120 +1812,6 @@ export function ClientDashboard({ workspaceId }: Props) {
                     </div>
                   ))}
                 </div>
-              </div>
-
-              {/* Quick Wins */}
-              {strategyData.quickWins && strategyData.quickWins.length > 0 && (
-                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
-                  <div className="text-xs font-medium text-zinc-400 mb-3 flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-amber-400" /> Quick Wins</div>
-                  <div className="space-y-2">
-                    {strategyData.quickWins.map((qw, i) => {
-                      const impactColor = qw.estimatedImpact === 'high' ? 'text-green-400 bg-green-500/10 border-green-500/20' : qw.estimatedImpact === 'medium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
-                      return (
-                        <div key={i} className="px-3 py-2.5 rounded-lg bg-zinc-800/30 border border-zinc-800">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-mono text-zinc-500">{qw.pagePath}</span>
-                            <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded border ${impactColor}`}>{qw.estimatedImpact} impact</span>
-                          </div>
-                          <div className="text-[11px] text-zinc-300 mt-1">{qw.action}</div>
-                          <div className="text-[10px] text-zinc-500 mt-0.5">{qw.rationale}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Content Gaps */}
-              {strategyData.contentGaps && strategyData.contentGaps.length > 0 && (
-                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="text-xs font-medium text-zinc-400 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-blue-400" /> Content Opportunities</div>
-                    <span className="text-[10px] text-zinc-600">Select a topic to request a content brief from our team</span>
-                  </div>
-                  <div className="space-y-2">
-                    {strategyData.contentGaps.map((gap, i) => {
-                      const prioColor = gap.priority === 'high' ? 'text-red-400 bg-red-500/10 border-red-500/20' : gap.priority === 'medium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
-                      const alreadyRequested = requestedTopics.has(gap.targetKeyword);
-                      const isRequesting = requestingTopic === gap.targetKeyword;
-                      return (
-                        <div key={i} className="px-3 py-2.5 rounded-lg bg-zinc-800/30 border border-zinc-800">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-zinc-200">{gap.topic}</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-[9px] text-zinc-500 uppercase">{gap.intent}</span>
-                              <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded border ${prioColor}`}>{gap.priority}</span>
-                            </div>
-                          </div>
-                          <div className="text-[10px] text-teal-400 mt-0.5">Target: &ldquo;{gap.targetKeyword}&rdquo;</div>
-                          <div className="text-[10px] text-zinc-500 mt-0.5">{gap.rationale}</div>
-                          <div className="mt-2 flex items-center justify-end">
-                            {alreadyRequested ? (
-                              <span className="flex items-center gap-1 text-[10px] text-teal-400"><CheckCircle2 className="w-3 h-3" /> Requested</span>
-                            ) : (
-                              <button
-                                disabled={isRequesting}
-                                onClick={async () => {
-                                  setRequestingTopic(gap.targetKeyword);
-                                  try {
-                                    await fetch(`/api/public/content-request/${workspaceId}`, {
-                                      method: 'POST',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({ topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale }),
-                                    });
-                                    setRequestedTopics(prev => new Set(prev).add(gap.targetKeyword));
-                                  } catch { /* skip */ }
-                                  setRequestingTopic(null);
-                                }}
-                                className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-teal-600/20 border border-teal-500/30 text-[10px] text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50"
-                              >
-                                {isRequesting ? <><span className="w-3 h-3 border border-teal-400 border-t-transparent rounded-full animate-spin" /> Requesting...</> : <><Plus className="w-3 h-3" /> Request This Topic</>}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Opportunities + Keyword Gaps side by side */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                {strategyData.opportunities.length > 0 && (
-                  <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
-                    <div className="text-xs font-medium text-zinc-400 mb-3 flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5 text-violet-400" /> Keyword Opportunities</div>
-                    <div className="space-y-2">
-                      {strategyData.opportunities.map((opp, i) => (
-                        <div key={i} className="flex items-start gap-2 text-[11px] text-zinc-300">
-                          <span className="w-4 h-4 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center flex-shrink-0 mt-0.5 text-[9px] text-violet-400 font-bold">{i + 1}</span>
-                          {opp}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {strategyData.keywordGaps && strategyData.keywordGaps.length > 0 && (
-                  <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
-                    <div className="text-xs font-medium text-zinc-400 mb-3 flex items-center gap-1.5"><Target className="w-3.5 h-3.5 text-teal-400" /> Competitor Keyword Gaps</div>
-                    <div className="space-y-1.5">
-                      {strategyData.keywordGaps.map((gap, i) => (
-                        <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg bg-zinc-800/30">
-                          <span className="text-[11px] text-zinc-300">{gap.keyword}</span>
-                          <div className="flex items-center gap-3">
-                            {gap.volume != null && <span className="text-[10px] text-zinc-500">{gap.volume.toLocaleString()} vol</span>}
-                            {gap.difficulty != null && (
-                              <span className={`text-[10px] font-medium ${gap.difficulty <= 30 ? 'text-green-400' : gap.difficulty <= 60 ? 'text-amber-400' : 'text-red-400'}`}>
-                                KD {gap.difficulty}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           ) : (

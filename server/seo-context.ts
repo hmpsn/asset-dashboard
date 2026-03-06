@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { getWorkspace, type KeywordStrategy } from './workspaces';
 
 /**
@@ -8,6 +10,8 @@ import { getWorkspace, type KeywordStrategy } from './workspaces';
 export interface SeoContext {
   /** Keyword strategy block for AI prompts */
   keywordBlock: string;
+  /** Brand voice block for AI prompts */
+  brandVoiceBlock: string;
   /** Business context string (industry, location, services) */
   businessContext: string;
   /** Full strategy object (for direct access if needed) */
@@ -20,14 +24,26 @@ export interface SeoContext {
  * @param pagePath - optional page path to find page-specific keywords
  */
 export function buildSeoContext(workspaceId?: string, pagePath?: string): SeoContext {
-  const empty: SeoContext = { keywordBlock: '', businessContext: '', strategy: undefined };
+  const empty: SeoContext = { keywordBlock: '', brandVoiceBlock: '', businessContext: '', strategy: undefined };
   if (!workspaceId) return empty;
 
   const ws = getWorkspace(workspaceId);
   if (!ws) return empty;
 
   const strategy = ws.keywordStrategy;
-  if (!strategy) return empty;
+
+  // --- Brand voice ---
+  let brandVoiceBlock = '';
+  const voiceParts: string[] = [];
+  if (ws.brandVoice) voiceParts.push(ws.brandVoice);
+  // Read any .txt/.md files from workspace brand-docs folder
+  const brandDocsContent = readBrandDocs(ws.folder);
+  if (brandDocsContent) voiceParts.push(brandDocsContent);
+  if (voiceParts.length > 0) {
+    brandVoiceBlock = `\n\nBRAND VOICE & STYLE (you MUST match this voice — do not deviate):\n${voiceParts.join('\n\n')}`;
+  }
+
+  if (!strategy) return { keywordBlock: '', brandVoiceBlock, businessContext: '', strategy: undefined };
 
   let keywordBlock = '';
 
@@ -45,6 +61,9 @@ export function buildSeoContext(workspaceId?: string, pagePath?: string): SeoCon
       if (pageKw.secondaryKeywords?.length) {
         keywordBlock += `\nSecondary keywords: ${pageKw.secondaryKeywords.join(', ')}`;
       }
+      if (pageKw.searchIntent) {
+        keywordBlock += `\nSearch intent: ${pageKw.searchIntent}`;
+      }
     }
   }
 
@@ -58,7 +77,39 @@ export function buildSeoContext(workspaceId?: string, pagePath?: string): SeoCon
     keywordBlock = `\n\nKEYWORD STRATEGY (incorporate these naturally):\n${keywordBlock}`;
   }
 
-  return { keywordBlock, businessContext, strategy };
+  return { keywordBlock, brandVoiceBlock, businessContext, strategy };
+}
+
+/**
+ * Read .txt and .md files from a workspace's brand-docs/ folder.
+ * Returns concatenated content (truncated to ~4000 chars to fit in prompts).
+ */
+function readBrandDocs(workspaceFolder: string): string {
+  const DATA_BASE = process.env.DATA_DIR
+    || (process.env.NODE_ENV === 'production' ? '/tmp/asset-dashboard' : '');
+  const uploadRoot = DATA_BASE
+    ? path.join(DATA_BASE, 'uploads')
+    : path.join(process.env.HOME || '', 'toUpload');
+  const brandDir = path.join(uploadRoot, workspaceFolder, 'brand-docs');
+
+  if (!fs.existsSync(brandDir)) return '';
+
+  try {
+    const files = fs.readdirSync(brandDir).filter(f => /\.(txt|md)$/i.test(f)).sort();
+    if (files.length === 0) return '';
+
+    let content = '';
+    for (const file of files) {
+      const text = fs.readFileSync(path.join(brandDir, file), 'utf-8').trim();
+      if (text) {
+        content += `--- ${file} ---\n${text}\n\n`;
+      }
+      if (content.length > 4000) break;
+    }
+    return content.slice(0, 4000);
+  } catch {
+    return '';
+  }
 }
 
 /**
