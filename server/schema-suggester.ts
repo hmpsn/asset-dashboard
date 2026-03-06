@@ -237,17 +237,21 @@ ${pageContent.slice(0, 3000)}
 
 REQUIREMENTS:
 1. Return ONE JSON-LD object with "@context": "https://schema.org" and an "@graph" array
-2. The @graph MUST include a WebPage node and an Organization node on every page
-3. Add a WebSite node on the homepage
-4. Add page-specific types based on content (Article, FAQPage, Service, Product, BreadcrumbList, HowTo, Event, LocalBusiness, etc.)
-5. Use "@id" cross-references between nodes (e.g. Organization "@id": "${siteUrl}/#organization")
-6. Fill ALL values from actual page content — ZERO placeholders like [Company Name]
-7. For images, use full absolute URLs (prefix with ${siteUrl} if relative)
-8. FAQPage: extract REAL questions and answers from the page content
-9. Article/BlogPosting: use real author name, real dates, real headline
-10. BreadcrumbList: build from the URL path structure
-11. Every @type must have all Google-required fields filled with real data
-12. If you cannot determine a required value from the content, omit that @type entirely rather than using a placeholder
+2. The @graph MUST include a WebPage node on every page
+3. Include an Organization node with "@id": "${siteUrl}/#organization" on every page
+4. ONLY add a WebSite node on the HOMEPAGE (isHomepage=true). NEVER include WebSite on subpages.
+5. NEVER include a SearchAction unless the site has a real, confirmed search endpoint. Do NOT use "?s={search_term_string}" — that is a WordPress convention.
+6. Add page-specific types based on content (Article, FAQPage, Service, Product, BreadcrumbList, HowTo, Event, LocalBusiness, etc.)
+7. Use "@id" cross-references between nodes (e.g. Organization "@id": "${siteUrl}/#organization")
+8. Fill ALL values from actual page content — ZERO placeholders, ZERO fabricated data
+9. CRITICAL: NEVER invent or fabricate addresses, phone numbers, email addresses, opening hours, geo coordinates, or any contact information. Only include these fields if the EXACT data appears in the page content above. If a LocalBusiness is appropriate but the page lacks an address, include the LocalBusiness with only the fields you can confirm from the content (name, url, description). Omit address/telephone/openingHours/geo entirely if not found.
+10. For images, use full absolute URLs (prefix with ${siteUrl} if relative). Only use image URLs found in the page content.
+11. FAQPage: extract REAL questions and answers from the page content. Never fabricate Q&A pairs.
+12. Article/BlogPosting: use real author name, real dates, real headline from the content
+13. BreadcrumbList: use the FLAT format — each ListItem has "name" and "item" (URL string) directly, NOT nested inside an "item" object. Example: {"@type":"ListItem","position":1,"name":"Home","item":"${siteUrl}/"}
+14. LocalBusiness for multi-location/region pages: include "parentOrganization": {"@id": "${siteUrl}/#organization"} to link the location to the parent brand
+15. Every @type must have all Google-required fields filled with REAL data from the page
+16. If you cannot determine a required value from the content, OMIT that @type entirely rather than using a placeholder or fabricating data
 
 Return ONLY the JSON-LD object. No markdown, no explanation, no wrapping.`;
 
