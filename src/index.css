@@ -78,6 +78,15 @@ input::placeholder, textarea::placeholder {
 
 /* === Base === */
 .dashboard-light {
+  --brand-bg: #f8fafc;
+  --brand-bg-surface: #ffffff;
+  --brand-bg-elevated: #ffffff;
+  --brand-bg-card: #f1f5f9;
+  --brand-text: #334155;
+  --brand-text-bright: #0f172a;
+  --brand-text-muted: #64748b;
+  --brand-border: rgba(148, 163, 184, 0.2);
+  --brand-border-hover: rgba(148, 163, 184, 0.35);
   background-color: #f8fafc !important;
   color: #1e293b !important;
 }
@@ -220,3 +229,96 @@ input::placeholder, textarea::placeholder {
 .dashboard-light .shadow-2xl { box-shadow: 0 25px 50px -12px rgba(0,0,0,0.08) !important; }
 .dashboard-light .shadow-black\/40 { --tw-shadow-color: rgba(0,0,0,0.06) !important; }
 .dashboard-light .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0,0,0,0.06), 0 4px 6px -4px rgba(0,0,0,0.04) !important; }
+.dashboard-light .shadow-sm { box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important; }
+.dashboard-light .shadow-teal-900\/20 { --tw-shadow-color: rgba(13,148,136,0.08) !important; }
+
+/* ── Strategy Card Gradients → light subtle tints ── */
+.dashboard-light .from-amber-950\/30 { --tw-gradient-from: rgba(180,83,9,0.06) !important; }
+.dashboard-light .from-teal-950\/40 { --tw-gradient-from: rgba(13,148,136,0.06) !important; }
+.dashboard-light .from-violet-950\/30 { --tw-gradient-from: rgba(124,58,237,0.05) !important; }
+.dashboard-light .from-orange-950\/20 { --tw-gradient-from: rgba(194,65,12,0.05) !important; }
+.dashboard-light .to-zinc-900 { --tw-gradient-to: #ffffff !important; }
+.dashboard-light .via-zinc-900 { --tw-gradient-via: #ffffff !important; }
+
+/* ── Semi-transparent zinc backgrounds ── */
+.dashboard-light .bg-zinc-900\/60 { background-color: rgba(255,255,255,0.9) !important; }
+.dashboard-light .bg-zinc-900\/40 { background-color: rgba(255,255,255,0.7) !important; }
+.dashboard-light .bg-zinc-950\/50 { background-color: #f8fafc !important; }
+.dashboard-light .bg-zinc-950 { background-color: #f8fafc !important; }
+.dashboard-light .bg-zinc-700\/30 { background-color: rgba(226,232,240,0.5) !important; }
+.dashboard-light .bg-zinc-800\/80 { background-color: rgba(241,245,249,0.9) !important; }
+
+/* ── Accent heading text (card titles in gradient sections) ── */
+.dashboard-light .text-amber-200 { color: #92400e !important; }
+.dashboard-light .text-amber-300 { color: #b45309 !important; }
+.dashboard-light .text-teal-200 { color: #0f766e !important; }
+.dashboard-light .text-violet-200 { color: #6d28d9 !important; }
+.dashboard-light .text-orange-200 { color: #9a3412 !important; }
+
+/* ── Accent subtitle/muted text ── */
+.dashboard-light .text-amber-400\/60 { color: rgba(180,83,9,0.7) !important; }
+.dashboard-light .text-teal-400\/60 { color: rgba(13,148,136,0.7) !important; }
+
+/* ── Icon badge backgrounds (strategy cards) ── */
+.dashboard-light .bg-amber-500\/20 { background-color: rgba(180,83,9,0.1) !important; }
+.dashboard-light .bg-amber-500\/5 { background-color: rgba(180,83,9,0.03) !important; }
+.dashboard-light .bg-teal-500\/20 { background-color: rgba(13,148,136,0.1) !important; }
+.dashboard-light .bg-teal-500\/5 { background-color: rgba(13,148,136,0.03) !important; }
+.dashboard-light .bg-orange-500\/20 { background-color: rgba(194,65,12,0.1) !important; }
+.dashboard-light .bg-emerald-500\/15 { background-color: rgba(4,120,87,0.08) !important; }
+
+/* ── Impact/priority pill backgrounds ── */
+.dashboard-light .bg-green-500\/15 { background-color: rgba(21,128,61,0.1) !important; }
+.dashboard-light .bg-amber-500\/15 { background-color: rgba(180,83,9,0.1) !important; }
+.dashboard-light .bg-red-500\/15 { background-color: rgba(220,38,38,0.1) !important; }
+.dashboard-light .bg-violet-500\/15 { background-color: rgba(124,58,237,0.08) !important; }
+
+/* ── Accent borders (strategy cards + pills) ── */
+.dashboard-light .border-amber-500\/20 { border-color: rgba(180,83,9,0.18) !important; }
+.dashboard-light .border-teal-500\/20 { border-color: rgba(13,148,136,0.18) !important; }
+.dashboard-light .border-violet-500\/20 { border-color: rgba(124,58,237,0.15) !important; }
+.dashboard-light .border-violet-500\/25 { border-color: rgba(124,58,237,0.18) !important; }
+.dashboard-light .border-orange-500\/20 { border-color: rgba(194,65,12,0.15) !important; }
+.dashboard-light .border-zinc-800\/80 { border-color: rgba(226,232,240,0.9) !important; }
+.dashboard-light .border-zinc-600\/20 { border-color: rgba(148,163,184,0.2) !important; }
+.dashboard-light .border-teal-500\/40 { border-color: rgba(13,148,136,0.3) !important; }
+
+/* ── Button backgrounds (Request Topic, etc.) ── */
+.dashboard-light .bg-teal-600\/30 { background-color: rgba(13,148,136,0.12) !important; }
+.dashboard-light .bg-teal-600 { background-color: #0d9488 !important; }
+.dashboard-light .hover\:bg-teal-600\/50:hover { background-color: rgba(13,148,136,0.2) !important; }
+.dashboard-light .hover\:border-teal-400\/60:hover { border-color: rgba(13,148,136,0.4) !important; }
+.dashboard-light .hover\:border-amber-500\/20:hover { border-color: rgba(180,83,9,0.22) !important; }
+.dashboard-light .hover\:border-teal-500\/30:hover { border-color: rgba(13,148,136,0.28) !important; }
+.dashboard-light .hover\:bg-teal-500:hover { background-color: #0f766e !important; }
+
+/* ── Dividers ── */
+.dashboard-light .divide-zinc-800\/50 > * + * { border-color: rgba(226,232,240,0.6) !important; }
+
+/* ── Search intent badges (keyword map) ── */
+.dashboard-light .bg-amber-500\/10 { background-color: rgba(180,83,9,0.08) !important; }
+.dashboard-light .bg-green-500\/10 { background-color: rgba(21,128,61,0.08) !important; }
+.dashboard-light .bg-blue-500\/10 { background-color: rgba(37,99,235,0.08) !important; }
+.dashboard-light .border-green-500\/20 { border-color: rgba(21,128,61,0.18) !important; }
+
+/* ── Focus states for new inputs ── */
+.dashboard-light .focus\:border-teal-500\/50:focus { border-color: rgba(13,148,136,0.4) !important; }
+.dashboard-light select { background-color: #ffffff !important; }
+
+/* ── AI Chat & floating button ── */
+.dashboard-light .bg-teal-600\/20 { background-color: rgba(13,148,136,0.1) !important; }
+.dashboard-light .from-teal-600 { --tw-gradient-from: #0d9488 !important; }
+.dashboard-light .to-emerald-600 { --tw-gradient-to: #047857 !important; }
+.dashboard-light .shadow-teal-900\/30 { --tw-shadow-color: rgba(13,148,136,0.12) !important; }
+
+/* ── Approval / action buttons ── */
+.dashboard-light .bg-violet-600 { background-color: #7c3aed !important; }
+.dashboard-light .hover\:bg-violet-500:hover { background-color: #6d28d9 !important; }
+.dashboard-light .bg-green-600 { background-color: #15803d !important; }
+.dashboard-light .bg-green-600\/80 { background-color: rgba(21,128,61,0.8) !important; }
+.dashboard-light .hover\:bg-green-500:hover { background-color: #16a34a !important; }
+
+/* ── Misc accent borders/backgrounds ── */
+.dashboard-light .border-green-500\/30 { border-color: rgba(21,128,61,0.22) !important; }
+.dashboard-light .border-zinc-800\/50 { border-color: rgba(226,232,240,0.6) !important; }
+.dashboard-light .bg-zinc-800\/50 { background-color: rgba(241,245,249,0.7) !important; }
