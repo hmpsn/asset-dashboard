@@ -2839,6 +2839,11 @@ Critical rules:
       temperature: 0.3,
     });
 
+    // Send keepalive pings during long OpenAI call to prevent Render proxy from killing idle SSE connection
+    const keepalive = wantsStream ? setInterval(() => {
+      try { res.write(`: keepalive\n\n`); } catch { /* connection closed */ }
+    }, 10_000) : null;
+
     // Retry once on network failure (Render can be flaky with long OpenAI calls)
     let aiRes: Response | null = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
@@ -2857,6 +2862,7 @@ Critical rules:
         const cause = fetchErr instanceof Error ? (fetchErr.cause || fetchErr.message) : String(fetchErr);
         console.error(`[Strategy] OpenAI fetch attempt ${attempt} failed:`, cause);
         if (attempt === 2) {
+          if (keepalive) clearInterval(keepalive);
           const errMsg = `OpenAI connection failed after 2 attempts: ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)}`;
           if (wantsStream) { try { res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`); res.end(); } catch { /* closed */ } return; }
           return res.status(500).json({ error: errMsg });
@@ -2865,6 +2871,7 @@ Critical rules:
         await new Promise(r => setTimeout(r, 2000)); // wait 2s before retry
       }
     }
+    if (keepalive) clearInterval(keepalive);
 
     if (!aiRes!.ok) {
       const errText = await aiRes!.text();
