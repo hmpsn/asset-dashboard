@@ -3253,10 +3253,18 @@ app.get('/api/public/seo-strategy/:workspaceId', (req, res) => {
   // Return client-safe subset (no semrushMode, no internal-only fields)
   res.json({
     siteKeywords: strategy.siteKeywords || [],
+    siteKeywordMetrics: strategy.siteKeywordMetrics || undefined,
     pageMap: (strategy.pageMap || []).map(p => ({
       pagePath: p.pagePath,
+      pageTitle: p.pageTitle,
       primaryKeyword: p.primaryKeyword,
       secondaryKeywords: p.secondaryKeywords || [],
+      searchIntent: p.searchIntent,
+      currentPosition: p.currentPosition,
+      impressions: p.impressions,
+      clicks: p.clicks,
+      volume: p.volume,
+      difficulty: p.difficulty,
     })),
     opportunities: strategy.opportunities || [],
     contentGaps: (strategy.contentGaps || []).map(g => ({
