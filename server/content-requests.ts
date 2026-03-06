@@ -12,17 +12,9 @@ const CONTENT_REQUESTS_DIR = DATA_BASE
 
 fs.mkdirSync(CONTENT_REQUESTS_DIR, { recursive: true });
 
-// Migrate data from old storage path (~/toUpload/<wsId>/.content-requests.json)
-function migrateOldRequests(workspaceId: string): void {
-  const newFile = path.join(CONTENT_REQUESTS_DIR, `${workspaceId}.json`);
-  if (fs.existsSync(newFile)) return; // already migrated or has data
-  const oldFile = path.join(UPLOAD_ROOT, workspaceId, '.content-requests.json');
-  if (fs.existsSync(oldFile)) {
-    try {
-      fs.copyFileSync(oldFile, newFile);
-      console.log(`[Migration] Copied content requests for ${workspaceId} from old path`);
-    } catch { /* skip */ }
-  }
+// Old storage path: ~/toUpload/<wsId>/.content-requests.json
+function getOldFile(workspaceId: string): string {
+  return path.join(UPLOAD_ROOT, workspaceId, '.content-requests.json');
 }
 
 export interface ContentTopicRequest {
@@ -46,11 +38,24 @@ function getFile(workspaceId: string): string {
 }
 
 function read(workspaceId: string): ContentTopicRequest[] {
-  migrateOldRequests(workspaceId);
+  // Try new path first
   try {
     const f = getFile(workspaceId);
     if (fs.existsSync(f)) return JSON.parse(fs.readFileSync(f, 'utf-8'));
   } catch { /* fresh */ }
+  // Fall back to old path
+  try {
+    const old = getOldFile(workspaceId);
+    if (fs.existsSync(old)) {
+      const data = JSON.parse(fs.readFileSync(old, 'utf-8'));
+      if (Array.isArray(data) && data.length > 0) {
+        // Migrate forward: write to new path so future reads are fast
+        write(workspaceId, data);
+        console.log(`[Migration] Moved ${data.length} content requests for ${workspaceId} to new path`);
+        return data;
+      }
+    }
+  } catch { /* skip */ }
   return [];
 }
 

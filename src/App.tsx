@@ -8,6 +8,7 @@ import { SeoAudit } from './components/SeoAudit';
 import { Performance } from './components/Performance';
 import { SalesReport } from './components/SalesReport';
 import { GoogleAnalytics } from './components/GoogleAnalytics';
+import { Annotations } from './components/Annotations';
 import { WorkspaceSettings } from './components/WorkspaceSettings';
 import { SearchConsole } from './components/SearchConsole';
 import { RequestManager } from './components/RequestManager';
@@ -21,7 +22,7 @@ import { BackgroundTaskProvider } from './hooks/useBackgroundTasks';
 import { TaskPanel } from './components/TaskPanel';
 import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, FileSearch, Search,
-  Pencil, CornerDownRight, Share2, Target, Code2, LogOut, Swords, TrendingUp,
+  Pencil, CornerDownRight, Share2, Target, Code2, LogOut, Swords, TrendingUp, Flag,
 } from 'lucide-react';
 
 type Page =
@@ -29,7 +30,7 @@ type Page =
   | 'seo-audit' | 'seo-editor'
   | 'seo-redirects' | 'seo-internal'
   | 'seo-strategy' | 'seo-schema' | 'seo-briefs' | 'seo-competitors' | 'seo-ranks'
-  | 'search' | 'analytics'
+  | 'search' | 'analytics' | 'annotations'
   | 'performance'
   | 'workspace-settings'
   | 'prospect'
@@ -248,12 +249,13 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
     { label: 'ANALYTICS', items: [
       { id: 'search', label: 'Search Console', icon: Search, needsSite: true },
       { id: 'analytics', label: 'Google Analytics', icon: BarChart3, needsSite: true },
+      { id: 'annotations', label: 'Annotations', icon: Flag, needsSite: true },
     ]},
   ];
 
   // ── Content renderer ──
   const seoView = tab.startsWith('seo-') ? tab.replace('seo-', '') : null;
-  const needsSite = !!(seoView || tab === 'search' || tab === 'analytics' || tab === 'performance');
+  const needsSite = !!(seoView || tab === 'search' || tab === 'analytics' || tab === 'annotations' || tab === 'performance');
 
   const renderContent = () => {
     if (tab === 'settings') return <SettingsPanel />;
@@ -288,6 +290,7 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
     if (tab === 'search') return <SearchConsole key={`search-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} gscPropertyUrl={selected.gscPropertyUrl} />;
     if (tab === 'performance') return <Performance key={`perf-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
     if (tab === 'analytics') return <GoogleAnalytics key={`ga4-${selected.id}`} workspaceId={selected.id} ga4PropertyId={selected.ga4PropertyId} />;
+    if (tab === 'annotations') return <Annotations key={`ann-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'requests') return <RequestManager key={`requests-${selected.id}`} workspaceId={selected.id} />;
 
     return null;

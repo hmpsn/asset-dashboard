@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Loader2, Users, Eye, Clock, ArrowUpDown, Globe, Monitor, Smartphone, Tablet,
-  TrendingUp, TrendingDown, BarChart3, Flag, Plus, Trash2, ChevronDown, ChevronUp,
+  TrendingUp, TrendingDown, BarChart3,
 } from 'lucide-react';
 
 interface GA4Overview {
@@ -46,16 +46,6 @@ interface GA4CountryBreakdown {
   country: string;
   users: number;
   sessions: number;
-}
-
-interface Annotation {
-  id: string;
-  workspaceId: string;
-  date: string;
-  label: string;
-  description?: string;
-  color?: string;
-  createdAt: string;
 }
 
 interface Props {
@@ -133,11 +123,6 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
   const [countries, setCountries] = useState<GA4CountryBreakdown[]>([]);
   const [trendMetric, setTrendMetric] = useState<'users' | 'sessions' | 'pageviews'>('users');
 
-  // Annotations
-  const [annotations, setAnnotations] = useState<Annotation[]>([]);
-  const [showAnnotations, setShowAnnotations] = useState(false);
-  const [newAnn, setNewAnn] = useState({ date: '', label: '', description: '', color: '#2dd4bf' });
-
   const loadData = useCallback(async (numDays: number) => {
     setLoading(true);
     setError(null);
@@ -168,34 +153,6 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
   useEffect(() => {
     if (ga4PropertyId) loadData(days);
   }, [ga4PropertyId, loadData, days]);
-
-  // Load annotations
-  useEffect(() => {
-    fetch(`/api/annotations/${workspaceId}`).then(r => r.json()).then(d => {
-      if (Array.isArray(d)) setAnnotations(d);
-    }).catch(() => {});
-  }, [workspaceId]);
-
-  const addAnnotation = async () => {
-    if (!newAnn.date || !newAnn.label) return;
-    try {
-      const res = await fetch(`/api/annotations/${workspaceId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newAnn),
-      });
-      if (res.ok) {
-        const entry = await res.json();
-        setAnnotations(prev => [entry, ...prev]);
-        setNewAnn({ date: '', label: '', description: '', color: '#2dd4bf' });
-      }
-    } catch { /* skip */ }
-  };
-
-  const deleteAnnotation = async (id: string) => {
-    await fetch(`/api/annotations/${workspaceId}/${id}`, { method: 'DELETE' });
-    setAnnotations(prev => prev.filter(a => a.id !== id));
-  };
 
   // ── Not configured state ──
   if (!ga4PropertyId) {
@@ -420,75 +377,6 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
         </div>
       </div>
 
-      {/* Annotations Panel */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-        <button
-          onClick={() => setShowAnnotations(!showAnnotations)}
-          className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-zinc-800/30 transition-colors"
-        >
-          <Flag className="w-3.5 h-3.5 text-amber-400" />
-          <span className="text-xs font-medium text-zinc-300 flex-1">Timeline Annotations</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{annotations.length}</span>
-          {showAnnotations ? <ChevronUp className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />}
-        </button>
-        {showAnnotations && (
-          <div className="px-4 pb-4 space-y-3 border-t border-zinc-800">
-            <p className="text-[10px] text-zinc-500 pt-2">Annotations appear on the client dashboard timeline charts.</p>
-            {/* Add annotation form */}
-            <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 space-y-2">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] text-zinc-500 block mb-0.5">Date</label>
-                  <input type="date" value={newAnn.date} onChange={e => setNewAnn(p => ({ ...p, date: e.target.value }))}
-                    className="w-full px-2 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-300" />
-                </div>
-                <div>
-                  <label className="text-[10px] text-zinc-500 block mb-0.5">Color</label>
-                  <div className="flex gap-1.5 pt-1">
-                    {['#2dd4bf', '#60a5fa', '#f472b6', '#fbbf24', '#a78bfa', '#f87171'].map(c => (
-                      <button key={c} onClick={() => setNewAnn(p => ({ ...p, color: c }))}
-                        className={`w-5 h-5 rounded-full border-2 ${newAnn.color === c ? 'border-white' : 'border-zinc-700'}`}
-                        style={{ backgroundColor: c }} />
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div>
-                <label className="text-[10px] text-zinc-500 block mb-0.5">Label</label>
-                <input type="text" value={newAnn.label} onChange={e => setNewAnn(p => ({ ...p, label: e.target.value }))} placeholder="e.g. Launched new pages"
-                  className="w-full px-2 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-300 placeholder-zinc-600" />
-              </div>
-              <div>
-                <label className="text-[10px] text-zinc-500 block mb-0.5">Description (optional)</label>
-                <input type="text" value={newAnn.description} onChange={e => setNewAnn(p => ({ ...p, description: e.target.value }))} placeholder="Details..."
-                  className="w-full px-2 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-300 placeholder-zinc-600" />
-              </div>
-              <button onClick={addAnnotation} disabled={!newAnn.date || !newAnn.label}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-40 transition-colors">
-                <Plus className="w-3 h-3" /> Add Annotation
-              </button>
-            </div>
-            {/* Existing annotations */}
-            {annotations.length > 0 ? (
-              <div className="space-y-1.5">
-                {annotations.sort((a, b) => b.date.localeCompare(a.date)).map(ann => (
-                  <div key={ann.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 group">
-                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: ann.color || '#2dd4bf' }} />
-                    <span className="text-[10px] text-zinc-500 flex-shrink-0">{ann.date}</span>
-                    <span className="text-xs text-zinc-300 flex-1 truncate">{ann.label}</span>
-                    {ann.description && <span className="text-[10px] text-zinc-600 truncate max-w-[150px]">{ann.description}</span>}
-                    <button onClick={() => deleteAnnotation(ann.id)} className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-red-400 transition-all flex-shrink-0">
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-[10px] text-zinc-600">No annotations yet. Add markers to track key events on your timeline.</p>
-            )}
-          </div>
-        )}
-      </div>
     </div>
   );
 }

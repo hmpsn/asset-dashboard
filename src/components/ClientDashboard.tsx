@@ -809,10 +809,10 @@ export function ClientDashboard({ workspaceId }: Props) {
             </button>
             {(overview || ga4Overview) && (
               <div className="flex items-center gap-1 bg-zinc-900 rounded-lg border border-zinc-800 p-0.5">
-                {[7, 28, 90].map(d => (
+                {[7, 28, 90, 180, 365].map(d => (
                   <button key={d} onClick={() => changeDays(d)}
                     className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${days === d ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}
-                  >{d}d</button>
+                  >{d >= 365 ? '1y' : d >= 180 ? '6mo' : `${d}d`}</button>
                 ))}
               </div>
             )}

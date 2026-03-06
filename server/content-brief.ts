@@ -13,17 +13,9 @@ const BRIEFS_DIR = DATA_BASE
 
 fs.mkdirSync(BRIEFS_DIR, { recursive: true });
 
-// Migrate data from old storage path (~/toUpload/<wsId>/.content-briefs/briefs.json)
-function migrateOldBriefs(workspaceId: string): void {
-  const newFile = path.join(BRIEFS_DIR, `${workspaceId}.json`);
-  if (fs.existsSync(newFile)) return;
-  const oldFile = path.join(UPLOAD_ROOT, workspaceId, '.content-briefs', 'briefs.json');
-  if (fs.existsSync(oldFile)) {
-    try {
-      fs.copyFileSync(oldFile, newFile);
-      console.log(`[Migration] Copied content briefs for ${workspaceId} from old path`);
-    } catch { /* skip */ }
-  }
+// Old storage path: ~/toUpload/<wsId>/.content-briefs/briefs.json
+function getOldBriefFile(workspaceId: string): string {
+  return path.join(UPLOAD_ROOT, workspaceId, '.content-briefs', 'briefs.json');
 }
 
 export interface ContentBrief {
@@ -47,11 +39,23 @@ function getBriefFile(workspaceId: string): string {
 }
 
 function readBriefs(workspaceId: string): ContentBrief[] {
-  migrateOldBriefs(workspaceId);
+  // Try new path first
   try {
     const f = getBriefFile(workspaceId);
     if (fs.existsSync(f)) return JSON.parse(fs.readFileSync(f, 'utf-8'));
   } catch { /* fresh */ }
+  // Fall back to old path
+  try {
+    const old = getOldBriefFile(workspaceId);
+    if (fs.existsSync(old)) {
+      const data = JSON.parse(fs.readFileSync(old, 'utf-8'));
+      if (Array.isArray(data) && data.length > 0) {
+        writeBriefs(workspaceId, data);
+        console.log(`[Migration] Moved ${data.length} content briefs for ${workspaceId} to new path`);
+        return data;
+      }
+    }
+  } catch { /* skip */ }
   return [];
 }
 
