@@ -2260,14 +2260,22 @@ app.get('/api/webflow/cms-seo/:siteId', async (req, res) => {
         return false;
       });
 
-      // Only include collections that have items (skip utility collections)
+      // Only include collections that have published items (skip utility/empty collections)
       const limit = parseInt(req.query.limit as string) || 100;
       const offset = parseInt(req.query.offset as string) || 0;
       const { items, total } = await listCollectionItems(coll.id, limit, offset, token);
       if (total === 0) continue;
 
+      // Filter to only live (published, non-draft, non-archived) items
+      const liveItems = items.filter(item => {
+        const draft = item.isDraft as boolean | undefined;
+        const archived = item.isArchived as boolean | undefined;
+        return !draft && !archived;
+      });
+      if (liveItems.length === 0) continue;
+
       // Extract only the relevant field data from each item
-      const cleanItems = items.map(item => {
+      const cleanItems = liveItems.map(item => {
         const fd = (item.fieldData || item) as Record<string, unknown>;
         const relevant: Record<string, unknown> = {};
         relevant['name'] = fd['name'] || '';
@@ -2286,7 +2294,7 @@ app.get('/api/webflow/cms-seo/:siteId', async (req, res) => {
         collectionSlug: coll.slug,
         seoFields,
         items: cleanItems,
-        total,
+        total: liveItems.length,
       });
     }
 

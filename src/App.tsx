@@ -21,12 +21,12 @@ import { BackgroundTaskProvider } from './hooks/useBackgroundTasks';
 import { TaskPanel } from './components/TaskPanel';
 import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, FileSearch, Search,
-  Pencil, ListChecks, CornerDownRight, Share2, Target, Code2, LogOut,
+  Pencil, CornerDownRight, Share2, Target, Code2, LogOut,
 } from 'lucide-react';
 
 type Page =
   | 'media'
-  | 'seo-audit' | 'seo-editor' | 'seo-cms'
+  | 'seo-audit' | 'seo-editor'
   | 'seo-redirects' | 'seo-internal'
   | 'seo-strategy' | 'seo-schema' | 'seo-briefs'
   | 'search' | 'analytics'
@@ -224,8 +224,7 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
     ]},
     { label: 'SEO', items: [
       { id: 'seo-strategy', label: 'Strategy', icon: Target, needsSite: true },
-      { id: 'seo-editor', label: 'Page SEO', icon: Pencil, needsSite: true },
-      { id: 'seo-cms', label: 'CMS SEO', icon: ListChecks, needsSite: true },
+      { id: 'seo-editor', label: 'SEO Editor', icon: Pencil, needsSite: true },
       { id: 'seo-internal', label: 'Internal Links', icon: Share2, needsSite: true },
       { id: 'seo-schema', label: 'Schema', icon: Code2, needsSite: true },
       { id: 'seo-briefs', label: 'Content Briefs', icon: Clipboard, needsSite: true },

@@ -6,12 +6,9 @@ import {
   RefreshCw, X, Clock, Share2, Copy, ExternalLink,
   TrendingUp, TrendingDown, Minus, Plus, ListChecks, Trash2, Circle, ClipboardList,
 } from 'lucide-react';
-import { SeoEditor } from './SeoEditor';
+import { SeoEditorWrapper } from './SeoEditorWrapper';
 import { LinkChecker } from './LinkChecker';
-// KeywordAnalysis removed — merged into Strategy panel
 import { SchemaSuggester } from './SchemaSuggester';
-// CompetitorAnalysis removed — merged into Strategy via SEMRush
-import { CmsEditor } from './CmsEditor';
 import { KeywordStrategyPanel } from './KeywordStrategy';
 import { RedirectManager } from './RedirectManager';
 import { InternalLinks } from './InternalLinks';
@@ -910,8 +907,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit' }: Props) {
   };
 
   // ── View-based routing (controlled by parent) ──
-  if (view === 'editor') return <SeoEditor siteId={siteId} workspaceId={workspaceId} />;
-  if (view === 'cms') return <CmsEditor siteId={siteId} workspaceId={workspaceId} />;
+  if (view === 'editor') return <SeoEditorWrapper siteId={siteId} workspaceId={workspaceId} />;
   if (view === 'strategy') return <KeywordStrategyPanel workspaceId={workspaceId || ''} siteId={siteId} />;
   if (view === 'redirects') return <RedirectManager siteId={siteId} />;
   if (view === 'internal') return <InternalLinks siteId={siteId} workspaceId={workspaceId} />;
