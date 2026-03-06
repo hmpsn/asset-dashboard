@@ -67,7 +67,7 @@ import { startApprovalReminders } from './approval-reminders.js';
 import { startMonthlyReports, triggerMonthlyReport } from './monthly-report.js';
 import { listBriefs, getBrief, deleteBrief, generateBrief } from './content-brief.js';
 import { renderBriefHTML } from './brief-export-html.js';
-import { listContentRequests, getContentRequest, createContentRequest, updateContentRequest, addComment } from './content-requests.js';
+import { listContentRequests, getContentRequest, createContentRequest, updateContentRequest, deleteContentRequest, addComment } from './content-requests.js';
 import { isSemrushConfigured, getKeywordOverview, getDomainOrganicKeywords, getKeywordGap, getRelatedKeywords, estimateCreditCost, clearSemrushCache } from './semrush.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
@@ -3543,6 +3543,13 @@ app.patch('/api/content-requests/:workspaceId/:id', (req, res) => {
   res.json(updated);
 });
 
+// Delete a content request
+app.delete('/api/content-requests/:workspaceId/:id', (req, res) => {
+  const deleted = deleteContentRequest(req.params.workspaceId, req.params.id);
+  if (!deleted) return res.status(404).json({ error: 'Request not found' });
+  res.json({ ok: true });
+});
+
 // Generate a brief for a content request
 app.post('/api/content-requests/:workspaceId/:id/generate-brief', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
@@ -4534,13 +4541,20 @@ app.delete('/api/audit-schedules/:workspaceId', (req, res) => {
 // --- Content Briefs ---
 // List all briefs for a workspace
 app.get('/api/content-briefs/:workspaceId', (req, res) => {
-  res.json(listBriefs(req.params.workspaceId));
+  const briefs = listBriefs(req.params.workspaceId);
+  console.log(`[Briefs] LIST ${req.params.workspaceId}: ${briefs.length} briefs found`);
+  res.json(briefs);
 });
 
 // Get a specific brief
 app.get('/api/content-briefs/:workspaceId/:briefId', (req, res) => {
+  console.log(`[Briefs] GET ${req.params.workspaceId}/${req.params.briefId}`);
   const brief = getBrief(req.params.workspaceId, req.params.briefId);
-  if (!brief) return res.status(404).json({ error: 'Brief not found' });
+  if (!brief) {
+    console.log(`[Briefs] NOT FOUND: ${req.params.briefId} in workspace ${req.params.workspaceId}`);
+    return res.status(404).json({ error: 'Brief not found' });
+  }
+  console.log(`[Briefs] FOUND: "${brief.targetKeyword}"`);
   res.json(brief);
 });
 

@@ -61,12 +61,14 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
   const [expanded, setExpanded] = useState<string | null>(null);
   const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
   const [loadingBrief, setLoadingBrief] = useState<string | null>(null);
+  const [briefError, setBriefError] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   const getBriefById = (briefId: string) => briefs.find(b => b.id === briefId);
 
   const toggleRequestBrief = async (reqId: string, briefId: string) => {
-    if (expandedRequest === reqId) { setExpandedRequest(null); return; }
+    if (expandedRequest === reqId) { setExpandedRequest(null); setBriefError(null); return; }
+    setBriefError(null);
     // If brief already in local state, just expand
     if (getBriefById(briefId)) { setExpandedRequest(reqId); return; }
     // Fetch brief from server
@@ -76,10 +78,32 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
       if (res.ok) {
         const brief = await res.json();
         setBriefs(prev => [brief, ...prev.filter(b => b.id !== brief.id)]);
+        setExpandedRequest(reqId);
+      } else {
+        console.error(`[View Brief] ${res.status} for briefId=${briefId}`);
+        setBriefError(`Brief not found (${res.status}). It may have been deleted after a server restart. Try regenerating it.`);
+        setExpandedRequest(reqId);
+      }
+    } catch (err) {
+      console.error('[View Brief] fetch error:', err);
+      setBriefError('Failed to load brief. Check the console for details.');
+      setExpandedRequest(reqId);
+    }
+    setLoadingBrief(null);
+  };
+
+  const handleDeleteRequest = async (reqId: string) => {
+    try {
+      const res = await fetch(`/api/content-requests/${workspaceId}/${reqId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setClientRequests(prev => {
+          const next = prev.filter(r => r.id !== reqId);
+          onRequestCountChange?.(next.filter(r => r.status === 'requested').length);
+          return next;
+        });
+        if (expandedRequest === reqId) setExpandedRequest(null);
       }
     } catch { /* skip */ }
-    setLoadingBrief(null);
-    setExpandedRequest(reqId);
   };
 
   const copyAsMarkdown = (b: ContentBrief) => {
@@ -307,7 +331,22 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                     {req.status === 'declined' && req.declineReason && (
                       <div className="mt-2 text-[10px] text-zinc-500 bg-zinc-800/50 px-2.5 py-1.5 rounded border border-zinc-800"><span className="text-zinc-400 font-medium">Reason:</span> {req.declineReason}</div>
                     )}
+                    <div className="flex items-center justify-end mt-1.5">
+                      <button onClick={() => { if (confirm(`Delete request "${req.topic}"?`)) handleDeleteRequest(req.id); }} className="text-[9px] text-zinc-700 hover:text-red-400 transition-colors">Delete</button>
+                    </div>
                   </div>
+                  {/* Brief error message */}
+                  {expandedRequest === req.id && !inlineBrief && briefError && (
+                    <div className="border-t border-red-500/20 px-3 py-3 bg-red-950/20">
+                      <div className="flex items-center gap-2 text-[11px] text-red-400">
+                        <XCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span>{briefError}</span>
+                      </div>
+                      <button onClick={() => { handleGenerateBriefForRequest(req); setBriefError(null); setExpandedRequest(null); }} className="mt-2 flex items-center gap-1 px-2 py-1 rounded bg-teal-600/20 border border-teal-500/30 text-[10px] text-teal-300 hover:bg-teal-600/30 transition-colors">
+                        <Sparkles className="w-3 h-3" /> Regenerate Brief
+                      </button>
+                    </div>
+                  )}
                   {/* Inline brief preview */}
                   {inlineBrief && (
                     <div className="border-t border-zinc-700/50 px-3 pb-3 pt-2 bg-zinc-900/50 space-y-3">

@@ -126,6 +126,15 @@ export function updateContentRequest(
   return items[idx];
 }
 
+export function deleteContentRequest(workspaceId: string, id: string): boolean {
+  const items = read(workspaceId);
+  const idx = items.findIndex(r => r.id === id);
+  if (idx === -1) return false;
+  items.splice(idx, 1);
+  write(workspaceId, items);
+  return true;
+}
+
 export function addComment(
   workspaceId: string,
   requestId: string,
