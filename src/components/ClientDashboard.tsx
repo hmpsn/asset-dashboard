@@ -19,7 +19,7 @@ interface SearchOverview {
 interface PerformanceTrend { date: string; clicks: number; impressions: number; ctr: number; position: number; }
 interface EventGroup { id: string; name: string; order: number; color: string; defaultPageFilter?: string; allowedPages?: string[]; }
 interface EventDisplayConfig { eventName: string; displayName: string; pinned: boolean; group?: string; }
-interface WorkspaceInfo { id: string; name: string; webflowSiteId?: string; webflowSiteName?: string; gscPropertyUrl?: string; ga4PropertyId?: string; liveDomain?: string; eventConfig?: EventDisplayConfig[]; eventGroups?: EventGroup[]; requiresPassword?: boolean; }
+interface WorkspaceInfo { id: string; name: string; webflowSiteId?: string; webflowSiteName?: string; gscPropertyUrl?: string; ga4PropertyId?: string; liveDomain?: string; eventConfig?: EventDisplayConfig[]; eventGroups?: EventGroup[]; requiresPassword?: boolean; clientPortalEnabled?: boolean; seoClientView?: boolean; analyticsClientView?: boolean; }
 interface AuditSummary { id: string; createdAt: string; siteScore: number; totalPages: number; errors: number; warnings: number; previousScore?: number; }
 interface SeoIssue { check: string; severity: 'error' | 'warning' | 'info'; category?: string; message: string; recommendation: string; value?: string; }
 interface PageAuditResult { pageId: string; page: string; slug: string; url: string; score: number; issues: SeoIssue[]; }
@@ -752,9 +752,11 @@ export function ClientDashboard({ workspaceId }: Props) {
 
   const NAV = [
     { id: 'overview' as ClientTab, label: 'Overview', icon: LayoutDashboard },
-    { id: 'health' as ClientTab, label: 'Site Health', icon: Shield },
-    { id: 'analytics' as ClientTab, label: 'Analytics', icon: LineChart },
-    { id: 'search' as ClientTab, label: 'Search', icon: Search },
+    ...(ws?.seoClientView ? [{ id: 'health' as ClientTab, label: 'Site Health', icon: Shield }] : []),
+    ...(ws?.analyticsClientView !== false ? [
+      { id: 'analytics' as ClientTab, label: 'Analytics', icon: LineChart },
+      { id: 'search' as ClientTab, label: 'Search', icon: Search },
+    ] : []),
     { id: 'requests' as ClientTab, label: 'Requests', icon: MessageSquare },
     ...(approvalBatches.length > 0 ? [{ id: 'approvals' as ClientTab, label: 'Approvals', icon: ClipboardCheck }] : []),
   ];

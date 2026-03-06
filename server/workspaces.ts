@@ -75,6 +75,15 @@ export interface Workspace {
   eventGroups?: EventGroup[];
   keywordStrategy?: KeywordStrategy;
   competitorDomains?: string[];
+  // Feature toggles
+  clientPortalEnabled?: boolean;
+  seoClientView?: boolean;
+  analyticsClientView?: boolean;
+  autoReports?: boolean;
+  autoReportFrequency?: 'weekly' | 'monthly';
+  // Branding
+  brandLogoUrl?: string;
+  brandAccentColor?: string;
   folder: string;
   createdAt: string;
 }
@@ -132,7 +141,7 @@ export function createWorkspace(name: string, webflowSiteId?: string, webflowSit
   return workspace;
 }
 
-export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains'>>): Workspace | null {
+export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandLogoUrl' | 'brandAccentColor'>>): Workspace | null {
   const workspaces = readConfig();
   const idx = workspaces.findIndex(w => w.id === id);
   if (idx === -1) return null;

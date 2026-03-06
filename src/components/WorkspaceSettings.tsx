@@ -4,6 +4,7 @@ import {
   Globe, Search, BarChart3, Loader2, Check, Unplug, ExternalLink, LogIn, LogOut,
   Copy, CheckCircle, Lock, KeyRound, X, Users, ChevronRight,
   Pin, PinOff, Pencil, Save, RefreshCw, Plus, Trash2, ArrowUp, ArrowDown, Palette,
+  Shield, SlidersHorizontal, Mail, Image as ImageIcon,
 } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 
@@ -19,6 +20,13 @@ interface WorkspaceData {
   clientEmail?: string;
   eventConfig?: EventDisplayConfig[];
   eventGroups?: EventGroup[];
+  clientPortalEnabled?: boolean;
+  seoClientView?: boolean;
+  analyticsClientView?: boolean;
+  autoReports?: boolean;
+  autoReportFrequency?: 'weekly' | 'monthly';
+  brandLogoUrl?: string;
+  brandAccentColor?: string;
 }
 
 interface Props {
@@ -29,7 +37,7 @@ interface Props {
   onUpdate?: (patch: Record<string, unknown>) => void;
 }
 
-type SectionTab = 'connections' | 'dashboard';
+type SectionTab = 'connections' | 'features' | 'dashboard';
 
 export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, webflowSiteName, onUpdate }: Props) {
   const { toast } = useToast();
@@ -221,7 +229,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
 
       {/* Tab nav */}
       <nav className="flex items-center gap-1 border-b" style={{ borderColor: 'var(--brand-border)' }}>
-        {([['connections', 'Connections'], ['dashboard', 'Client Dashboard']] as [SectionTab, string][]).map(([id, label]) => (
+        {([['connections', 'Connections'], ['features', 'Features'], ['dashboard', 'Client Dashboard']] as [SectionTab, string][]).map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
             className="px-4 py-2.5 text-xs font-medium border-b-2 transition-colors -mb-px"
             style={tab === id ? { borderColor: 'var(--brand-mint)', color: 'var(--brand-mint)' } : { borderColor: 'transparent', color: 'var(--brand-text-muted)' }}>
@@ -323,6 +331,190 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
               </div>
             </section>
           )}
+        </div>
+      )}
+
+      {/* ═══ FEATURES ═══ */}
+      {tab === 'features' && (
+        <div className="space-y-5">
+          {/* Client Portal Toggles */}
+          <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
+            <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid var(--brand-border)' }}>
+              <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
+                <SlidersHorizontal className="w-4 h-4 text-violet-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Client Portal Features</h3>
+                <p className="text-xs" style={{ color: 'var(--brand-text-muted)' }}>Control what the client can see and access in their dashboard</p>
+              </div>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              {/* Client Portal */}
+              <label className="flex items-center justify-between cursor-pointer group">
+                <div className="flex items-center gap-3">
+                  <Users className="w-4 h-4 text-zinc-500" />
+                  <div>
+                    <div className="text-xs font-medium" style={{ color: 'var(--brand-text-bright)' }}>Client Portal</div>
+                    <div className="text-[10px]" style={{ color: 'var(--brand-text-muted)' }}>Master toggle — enable or disable the client dashboard entirely</div>
+                  </div>
+                </div>
+                <button onClick={async () => {
+                  const val = !(ws?.clientPortalEnabled !== false);
+                  await patchWorkspace({ clientPortalEnabled: val });
+                  toast(val ? 'Client portal enabled' : 'Client portal disabled');
+                }}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                    ws?.clientPortalEnabled !== false ? 'bg-teal-500' : 'bg-zinc-700'
+                  }`}>
+                  <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                    ws?.clientPortalEnabled !== false ? 'translate-x-4' : 'translate-x-0.5'
+                  }`} />
+                </button>
+              </label>
+              {/* SEO Client View */}
+              <label className="flex items-center justify-between cursor-pointer group">
+                <div className="flex items-center gap-3">
+                  <Shield className="w-4 h-4 text-zinc-500" />
+                  <div>
+                    <div className="text-xs font-medium" style={{ color: 'var(--brand-text-bright)' }}>SEO Health View</div>
+                    <div className="text-[10px]" style={{ color: 'var(--brand-text-muted)' }}>Show SEO audit scores and detailed findings to the client (paid upgrade)</div>
+                  </div>
+                </div>
+                <button onClick={async () => {
+                  const val = !ws?.seoClientView;
+                  await patchWorkspace({ seoClientView: val });
+                  toast(val ? 'SEO view enabled for client' : 'SEO view hidden from client');
+                }}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                    ws?.seoClientView ? 'bg-teal-500' : 'bg-zinc-700'
+                  }`}>
+                  <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                    ws?.seoClientView ? 'translate-x-4' : 'translate-x-0.5'
+                  }`} />
+                </button>
+              </label>
+              {/* Analytics Client View */}
+              <label className="flex items-center justify-between cursor-pointer group">
+                <div className="flex items-center gap-3">
+                  <BarChart3 className="w-4 h-4 text-zinc-500" />
+                  <div>
+                    <div className="text-xs font-medium" style={{ color: 'var(--brand-text-bright)' }}>Analytics View</div>
+                    <div className="text-[10px]" style={{ color: 'var(--brand-text-muted)' }}>Show Google Analytics and Search Console data to the client</div>
+                  </div>
+                </div>
+                <button onClick={async () => {
+                  const val = !(ws?.analyticsClientView !== false);
+                  await patchWorkspace({ analyticsClientView: val });
+                  toast(val ? 'Analytics view enabled for client' : 'Analytics view hidden from client');
+                }}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                    ws?.analyticsClientView !== false ? 'bg-teal-500' : 'bg-zinc-700'
+                  }`}>
+                  <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                    ws?.analyticsClientView !== false ? 'translate-x-4' : 'translate-x-0.5'
+                  }`} />
+                </button>
+              </label>
+            </div>
+          </section>
+
+          {/* Automated Reports */}
+          <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
+            <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid var(--brand-border)' }}>
+              <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                <Mail className="w-4 h-4 text-blue-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Automated Reports</h3>
+                <p className="text-xs" style={{ color: 'var(--brand-text-muted)' }}>Automatically send SEO and performance reports to the client</p>
+              </div>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              <label className="flex items-center justify-between cursor-pointer">
+                <div className="flex items-center gap-3">
+                  <Mail className="w-4 h-4 text-zinc-500" />
+                  <div>
+                    <div className="text-xs font-medium" style={{ color: 'var(--brand-text-bright)' }}>Enable Auto-Reports</div>
+                    <div className="text-[10px]" style={{ color: 'var(--brand-text-muted)' }}>Send scheduled SEO audit reports to the client email{ws?.clientEmail ? ` (${ws.clientEmail})` : ' — set email in Client Dashboard tab'}</div>
+                  </div>
+                </div>
+                <button onClick={async () => {
+                  const val = !ws?.autoReports;
+                  await patchWorkspace({ autoReports: val });
+                  toast(val ? 'Auto-reports enabled' : 'Auto-reports disabled');
+                }}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                    ws?.autoReports ? 'bg-teal-500' : 'bg-zinc-700'
+                  }`}>
+                  <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                    ws?.autoReports ? 'translate-x-4' : 'translate-x-0.5'
+                  }`} />
+                </button>
+              </label>
+              {ws?.autoReports && (
+                <div className="flex items-center gap-3 pl-7">
+                  <span className="text-xs" style={{ color: 'var(--brand-text-muted)' }}>Frequency:</span>
+                  {(['monthly', 'weekly'] as const).map(freq => (
+                    <button key={freq} onClick={async () => {
+                      await patchWorkspace({ autoReportFrequency: freq });
+                      toast(`Report frequency set to ${freq}`);
+                    }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        (ws?.autoReportFrequency || 'monthly') === freq
+                          ? 'bg-teal-500/15 text-teal-300 border border-teal-500/30'
+                          : 'bg-zinc-800 text-zinc-500 border border-zinc-700 hover:text-zinc-300'
+                      }`}>
+                      {freq.charAt(0).toUpperCase() + freq.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Branding */}
+          <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
+            <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid var(--brand-border)' }}>
+              <div className="w-8 h-8 rounded-lg bg-pink-500/10 flex items-center justify-center">
+                <ImageIcon className="w-4 h-4 text-pink-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>White-Label Branding</h3>
+                <p className="text-xs" style={{ color: 'var(--brand-text-muted)' }}>Customize the client dashboard and reports appearance</p>
+              </div>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              <div>
+                <div className="text-[10px] font-medium mb-1.5" style={{ color: 'var(--brand-text-muted)' }}>Logo URL</div>
+                <div className="flex items-center gap-2">
+                  <input type="url" defaultValue={ws?.brandLogoUrl || ''}
+                    placeholder="https://example.com/logo.svg"
+                    onBlur={async (e) => {
+                      const val = e.target.value.trim();
+                      if (val !== (ws?.brandLogoUrl || '')) {
+                        await patchWorkspace({ brandLogoUrl: val });
+                        toast('Logo URL saved');
+                      }
+                    }}
+                    className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500" />
+                  {ws?.brandLogoUrl && <img src={ws.brandLogoUrl} alt="" className="h-6 rounded" />}
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] font-medium mb-1.5" style={{ color: 'var(--brand-text-muted)' }}>Accent Color</div>
+                <div className="flex items-center gap-2">
+                  <input type="color" defaultValue={ws?.brandAccentColor || '#2dd4bf'}
+                    onChange={async (e) => {
+                      const val = e.target.value;
+                      await patchWorkspace({ brandAccentColor: val });
+                    }}
+                    className="w-8 h-8 rounded-lg border border-zinc-700 cursor-pointer bg-transparent" />
+                  <code className="text-xs text-zinc-400">{ws?.brandAccentColor || '#2dd4bf'}</code>
+                  <span className="text-[10px]" style={{ color: 'var(--brand-text-muted)' }}>Used in reports and the client portal header</span>
+                </div>
+              </div>
+            </div>
+          </section>
         </div>
       )}
 

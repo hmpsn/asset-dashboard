@@ -2890,6 +2890,14 @@ app.get('/api/public/workspace/:id', (req, res) => {
     eventConfig: ws.eventConfig || [],
     eventGroups: ws.eventGroups || [],
     requiresPassword: !!ws.clientPassword,
+    // Feature toggles
+    clientPortalEnabled: ws.clientPortalEnabled !== false,
+    seoClientView: !!ws.seoClientView,
+    analyticsClientView: ws.analyticsClientView !== false,
+    autoReports: !!ws.autoReports,
+    // Branding
+    brandLogoUrl: ws.brandLogoUrl || '',
+    brandAccentColor: ws.brandAccentColor || '',
   });
 });
 
