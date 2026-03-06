@@ -22,14 +22,14 @@ import { BackgroundTaskProvider } from './hooks/useBackgroundTasks';
 import { TaskPanel } from './components/TaskPanel';
 import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, FileSearch, Search,
-  Pencil, ListChecks, Link2Off, CornerDownRight, Share2, Target, Code2, TrendingUp, Clock, LogOut,
+  Pencil, ListChecks, Link2Off, CornerDownRight, Share2, Target, Code2, Clock, LogOut,
 } from 'lucide-react';
 
 type Page =
   | 'media'
   | 'seo-audit' | 'seo-history' | 'seo-editor' | 'seo-cms'
   | 'seo-links' | 'seo-redirects' | 'seo-internal'
-  | 'seo-strategy' | 'seo-keywords' | 'seo-schema' | 'seo-competitor' | 'seo-briefs'
+  | 'seo-strategy' | 'seo-schema' | 'seo-briefs'
   | 'search' | 'analytics'
   | 'page-weight' | 'page-speed'
   | 'workspace-settings'
@@ -226,13 +226,11 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
       { id: 'seo-history', label: 'History', icon: Clock, needsSite: true },
     ]},
     { label: 'SEO', items: [
+      { id: 'seo-strategy', label: 'Strategy', icon: Target, needsSite: true },
       { id: 'seo-editor', label: 'Page SEO', icon: Pencil, needsSite: true },
       { id: 'seo-cms', label: 'CMS SEO', icon: ListChecks, needsSite: true },
       { id: 'seo-internal', label: 'Internal Links', icon: Share2, needsSite: true },
-      { id: 'seo-strategy', label: 'Keywords', icon: Target, needsSite: true },
-      { id: 'seo-keywords', label: 'Page Analysis', icon: Search, needsSite: true },
       { id: 'seo-schema', label: 'Schema', icon: Code2, needsSite: true },
-      { id: 'seo-competitor', label: 'Competitors', icon: TrendingUp, needsSite: true },
       { id: 'seo-briefs', label: 'Content Briefs', icon: Clipboard, needsSite: true },
     ]},
     { label: 'ANALYTICS', items: [

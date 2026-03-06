@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import {
   Loader2, Target, ChevronDown, ChevronRight, RefreshCw,
   TrendingUp, AlertCircle, Sparkles, Pencil, Check, X, Briefcase,
-  BarChart3, Shield, DollarSign, Users,
+  BarChart3, Shield, DollarSign, Users, Search,
 } from 'lucide-react';
+import { KeywordAnalysis } from './KeywordAnalysis';
 
 interface PageKeywordMap {
   pagePath: string;
@@ -39,9 +40,13 @@ interface KeywordStrategy {
 
 interface Props {
   workspaceId: string;
+  siteId?: string;
 }
 
-export function KeywordStrategyPanel({ workspaceId }: Props) {
+type StrategyTab = 'strategy' | 'analysis';
+
+export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
+  const [activeTab, setActiveTab] = useState<StrategyTab>('strategy');
   const [strategy, setStrategy] = useState<KeywordStrategy | null>(null);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -204,9 +209,59 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     );
   }
 
+  // Sub-tab: Page Analysis
+  if (activeTab === 'analysis' && siteId) {
+    return (
+      <div className="space-y-4">
+        {/* Tab bar */}
+        <div className="flex items-center gap-1 border-b border-zinc-800 pb-0">
+          {[
+            { id: 'strategy' as const, label: 'Keyword Strategy', icon: Target },
+            { id: 'analysis' as const, label: 'Page Analysis', icon: Search },
+          ].map(t => (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px ${
+                activeTab === t.id
+                  ? 'border-violet-500 text-violet-300'
+                  : 'border-transparent text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              <t.icon className="w-3.5 h-3.5" />
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <KeywordAnalysis siteId={siteId} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      {/* Header */}
+      {/* Tab bar + Header */}
+      {siteId && (
+        <div className="flex items-center gap-1 border-b border-zinc-800 pb-0">
+          {[
+            { id: 'strategy' as const, label: 'Keyword Strategy', icon: Target },
+            { id: 'analysis' as const, label: 'Page Analysis', icon: Search },
+          ].map(t => (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px ${
+                activeTab === t.id
+                  ? 'border-violet-500 text-violet-300'
+                  : 'border-transparent text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              <t.icon className="w-3.5 h-3.5" />
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-zinc-200">Keyword Strategy</h3>

@@ -8,9 +8,9 @@ import {
 } from 'lucide-react';
 import { SeoEditor } from './SeoEditor';
 import { LinkChecker } from './LinkChecker';
-import { KeywordAnalysis } from './KeywordAnalysis';
+// KeywordAnalysis removed — merged into Strategy panel
 import { SchemaSuggester } from './SchemaSuggester';
-import { CompetitorAnalysis } from './CompetitorAnalysis';
+// CompetitorAnalysis removed — merged into Strategy via SEMRush
 import { CmsEditor } from './CmsEditor';
 import { KeywordStrategyPanel } from './KeywordStrategy';
 import { RedirectManager } from './RedirectManager';
@@ -909,13 +909,11 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit' }: Props) {
   // ── View-based routing (controlled by parent) ──
   if (view === 'editor') return <SeoEditor siteId={siteId} workspaceId={workspaceId} />;
   if (view === 'cms') return <CmsEditor siteId={siteId} workspaceId={workspaceId} />;
-  if (view === 'strategy') return <KeywordStrategyPanel workspaceId={workspaceId || ''} />;
+  if (view === 'strategy') return <KeywordStrategyPanel workspaceId={workspaceId || ''} siteId={siteId} />;
   if (view === 'links') return <LinkChecker siteId={siteId} />;
   if (view === 'redirects') return <RedirectManager siteId={siteId} />;
   if (view === 'internal') return <InternalLinks siteId={siteId} workspaceId={workspaceId} />;
-  if (view === 'keywords') return <KeywordAnalysis siteId={siteId} />;
   if (view === 'schema') return <SchemaSuggester siteId={siteId} />;
-  if (view === 'competitor') return <CompetitorAnalysis siteId={siteId} />;
   if (view === 'briefs') return <ContentBriefs workspaceId={workspaceId || ''} />;
   if (view === 'history') return <AuditHistory siteId={siteId} history={history} onRefresh={loadHistory} />;
 
