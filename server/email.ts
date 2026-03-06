@@ -132,6 +132,30 @@ export async function notifyClientStatusChange(opts: {
   return sendEmail(opts.clientEmail, subject, html);
 }
 
+export async function notifyTeamContentRequest(opts: {
+  workspaceName: string;
+  topic: string;
+  targetKeyword: string;
+  priority: string;
+  rationale: string;
+}): Promise<boolean> {
+  const to = getNotificationEmail();
+  if (!to) return false;
+  const subject = `Content Request: "${opts.topic}" — ${opts.workspaceName}`;
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto;">
+      <div style="background: #0f1219; color: #e4e4e7; padding: 24px; border-radius: 12px;">
+        <div style="font-size: 11px; color: #71717a; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Content Topic Request — ${escHtml(opts.workspaceName)}</div>
+        <h2 style="margin: 0 0 4px; font-size: 16px; color: #f4f4f5;">${escHtml(opts.topic)}</h2>
+        <div style="font-size: 12px; color: #2dd4bf; margin-bottom: 16px;">Keyword: "${escHtml(opts.targetKeyword)}" · Priority: ${escHtml(opts.priority)}</div>
+        <div style="background: #18181b; border: 1px solid #27272a; border-radius: 8px; padding: 16px; font-size: 13px; line-height: 1.5; color: #d4d4d8; white-space: pre-wrap;">${escHtml(opts.rationale)}</div>
+        <div style="margin-top: 20px; font-size: 11px; color: #52525b;">Log in to your dashboard → Content Briefs to generate a brief.</div>
+      </div>
+    </div>
+  `;
+  return sendEmail(to, subject, html);
+}
+
 function escHtml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }

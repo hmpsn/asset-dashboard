@@ -58,7 +58,7 @@ import { runSalesAudit } from './sales-audit.js';
 import { initJobs, createJob, updateJob, getJob, listJobs } from './jobs.js';
 import { createBatch, listBatches, getBatch, updateItem, markBatchApplied, deleteBatch } from './approvals.js';
 import { listRequests, createRequest, updateRequest, addNote, deleteRequest, getRequest, getAttachmentsDir, addAttachmentsToRequest, type RequestAttachment } from './requests.js';
-import { notifyTeamNewRequest, notifyClientTeamResponse, notifyClientStatusChange, isEmailConfigured } from './email.js';
+import { notifyTeamNewRequest, notifyClientTeamResponse, notifyClientStatusChange, notifyTeamContentRequest, isEmailConfigured } from './email.js';
 import { addActivity, listActivity } from './activity-log.js';
 import { getSchedule, listSchedules, upsertSchedule, deleteSchedule, startScheduler } from './scheduled-audits.js';
 import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword, togglePinKeyword, storeRankSnapshot, getRankHistory, getLatestRanks } from './rank-tracking.js';
@@ -3434,6 +3434,7 @@ app.post('/api/public/content-request/:workspaceId', (req, res) => {
   if (!topic || !targetKeyword) return res.status(400).json({ error: 'topic and targetKeyword are required' });
   const request = createContentRequest(req.params.workspaceId, { topic, targetKeyword, intent, priority, rationale, clientNote });
   addActivity(req.params.workspaceId, 'content_requested', `Content topic requested: "${topic}"`, `Keyword: "${targetKeyword}" · Priority: ${priority}`, { requestId: request.id });
+  notifyTeamContentRequest({ workspaceName: ws.name, topic, targetKeyword, priority, rationale: rationale || '' }).catch(() => {});
   res.json(request);
 });
 

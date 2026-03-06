@@ -13,6 +13,8 @@ import { KeywordStrategyPanel } from './KeywordStrategy';
 import { RedirectManager } from './RedirectManager';
 import { InternalLinks } from './InternalLinks';
 import { ContentBriefs } from './ContentBriefs';
+import { CompetitorAnalysis } from './CompetitorAnalysis';
+import { RankTracker } from './RankTracker';
 
 type Severity = 'error' | 'warning' | 'info';
 
@@ -914,6 +916,8 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
   if (view === 'internal') return <InternalLinks siteId={siteId} workspaceId={workspaceId} />;
   if (view === 'schema') return <SchemaSuggester siteId={siteId} />;
   if (view === 'briefs') return <ContentBriefs workspaceId={workspaceId || ''} onRequestCountChange={onRequestCountChange} />;
+  if (view === 'competitors') return <CompetitorAnalysis siteId={siteId} />;
+  if (view === 'ranks') return <RankTracker workspaceId={workspaceId || ''} hasGsc={!!workspaceId} />;
 
   // ── Audit view (default) — with sub-tabs ──
   const auditTabBar = (

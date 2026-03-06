@@ -3,9 +3,11 @@ import path from 'path';
 
 const DATA_BASE = process.env.DATA_DIR
   || (process.env.NODE_ENV === 'production' ? '/tmp/asset-dashboard' : '');
-const UPLOAD_ROOT = DATA_BASE
-  ? path.join(DATA_BASE, 'uploads')
-  : path.join(process.env.HOME || '', 'toUpload');
+const CONTENT_REQUESTS_DIR = DATA_BASE
+  ? path.join(DATA_BASE, 'content-requests')
+  : path.join(process.env.HOME || '', 'toUpload', 'content-requests');
+
+fs.mkdirSync(CONTENT_REQUESTS_DIR, { recursive: true });
 
 export interface ContentTopicRequest {
   id: string;
@@ -24,9 +26,7 @@ export interface ContentTopicRequest {
 }
 
 function getFile(workspaceId: string): string {
-  const dir = path.join(UPLOAD_ROOT, workspaceId);
-  fs.mkdirSync(dir, { recursive: true });
-  return path.join(dir, '.content-requests.json');
+  return path.join(CONTENT_REQUESTS_DIR, `${workspaceId}.json`);
 }
 
 function read(workspaceId: string): ContentTopicRequest[] {

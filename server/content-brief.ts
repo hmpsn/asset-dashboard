@@ -4,15 +4,11 @@ import { buildSeoContext, buildKeywordMapContext } from './seo-context.js';
 
 const DATA_BASE = process.env.DATA_DIR
   || (process.env.NODE_ENV === 'production' ? '/tmp/asset-dashboard' : '');
-const UPLOAD_ROOT = DATA_BASE
-  ? path.join(DATA_BASE, 'uploads')
-  : path.join(process.env.HOME || '', 'toUpload');
+const BRIEFS_DIR = DATA_BASE
+  ? path.join(DATA_BASE, 'content-briefs')
+  : path.join(process.env.HOME || '', 'toUpload', 'content-briefs');
 
-function getBriefsDir(workspaceId: string): string {
-  const dir = path.join(UPLOAD_ROOT, workspaceId, '.content-briefs');
-  fs.mkdirSync(dir, { recursive: true });
-  return dir;
-}
+fs.mkdirSync(BRIEFS_DIR, { recursive: true });
 
 export interface ContentBrief {
   id: string;
@@ -31,7 +27,7 @@ export interface ContentBrief {
 }
 
 function getBriefFile(workspaceId: string): string {
-  return path.join(getBriefsDir(workspaceId), 'briefs.json');
+  return path.join(BRIEFS_DIR, `${workspaceId}.json`);
 }
 
 function readBriefs(workspaceId: string): ContentBrief[] {

@@ -452,21 +452,39 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                 </button>
               </label>
               {ws?.autoReports && (
-                <div className="flex items-center gap-3 pl-7">
-                  <span className="text-xs" style={{ color: 'var(--brand-text-muted)' }}>Frequency:</span>
-                  {(['monthly', 'weekly'] as const).map(freq => (
-                    <button key={freq} onClick={async () => {
-                      await patchWorkspace({ autoReportFrequency: freq });
-                      toast(`Report frequency set to ${freq}`);
+                <div className="space-y-3 pl-7">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs" style={{ color: 'var(--brand-text-muted)' }}>Frequency:</span>
+                    {(['monthly', 'weekly'] as const).map(freq => (
+                      <button key={freq} onClick={async () => {
+                        await patchWorkspace({ autoReportFrequency: freq });
+                        toast(`Report frequency set to ${freq}`);
+                      }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                          (ws?.autoReportFrequency || 'monthly') === freq
+                            ? 'bg-teal-500/15 text-teal-300 border border-teal-500/30'
+                            : 'bg-zinc-800 text-zinc-500 border border-zinc-700 hover:text-zinc-300'
+                        }`}>
+                        {freq.charAt(0).toUpperCase() + freq.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={async () => {
+                      toast('Generating report...');
+                      try {
+                        const res = await fetch(`/api/monthly-report/${workspaceId}`, { method: 'POST' });
+                        if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Failed'); }
+                        const data = await res.json();
+                        toast(data.sent ? 'Report sent to client!' : 'Report generated (no client email configured)');
+                      } catch (err) {
+                        toast(err instanceof Error ? err.message : 'Report failed');
+                      }
                     }}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                        (ws?.autoReportFrequency || 'monthly') === freq
-                          ? 'bg-teal-500/15 text-teal-300 border border-teal-500/30'
-                          : 'bg-zinc-800 text-zinc-500 border border-zinc-700 hover:text-zinc-300'
-                      }`}>
-                      {freq.charAt(0).toUpperCase() + freq.slice(1)}
-                    </button>
-                  ))}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 transition-colors"
+                  >
+                    <Mail className="w-3 h-3" /> Send Report Now
+                  </button>
                 </div>
               )}
             </div>

@@ -21,14 +21,14 @@ import { BackgroundTaskProvider } from './hooks/useBackgroundTasks';
 import { TaskPanel } from './components/TaskPanel';
 import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, FileSearch, Search,
-  Pencil, CornerDownRight, Share2, Target, Code2, LogOut,
+  Pencil, CornerDownRight, Share2, Target, Code2, LogOut, Swords, TrendingUp,
 } from 'lucide-react';
 
 type Page =
   | 'media'
   | 'seo-audit' | 'seo-editor'
   | 'seo-redirects' | 'seo-internal'
-  | 'seo-strategy' | 'seo-schema' | 'seo-briefs'
+  | 'seo-strategy' | 'seo-schema' | 'seo-briefs' | 'seo-competitors' | 'seo-ranks'
   | 'search' | 'analytics'
   | 'performance'
   | 'workspace-settings'
@@ -242,6 +242,8 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
       { id: 'seo-internal', label: 'Internal Links', icon: Share2, needsSite: true },
       { id: 'seo-schema', label: 'Schema', icon: Code2, needsSite: true },
       { id: 'seo-briefs', label: 'Content Briefs', icon: Clipboard, needsSite: true },
+      { id: 'seo-competitors', label: 'Competitors', icon: Swords, needsSite: true },
+      { id: 'seo-ranks', label: 'Rank Tracker', icon: TrendingUp, needsSite: true },
     ]},
     { label: 'ANALYTICS', items: [
       { id: 'search', label: 'Search Console', icon: Search, needsSite: true },
@@ -283,7 +285,7 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
 
     if (tab === 'media') return <MediaTab key={selected.folder} siteId={selected.webflowSiteId} workspaceFolder={selected.folder} queue={workspaceQueue} />;
     if (seoView) return <SeoAudit key={`seo-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} siteName={selected.webflowSiteName || selected.name} view={seoView} onRequestCountChange={setPendingContentRequests} />;
-    if (tab === 'search') return <SearchConsole key={`search-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} gscPropertyUrl={selected.gscPropertyUrl} />;
+    if (tab === 'search') return <SearchConsole key={`search-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} gscPropertyUrl={selected.gscPropertyUrl} workspaceId={selected.id} />;
     if (tab === 'performance') return <Performance key={`perf-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
     if (tab === 'analytics') return <GoogleAnalytics key={`ga4-${selected.id}`} workspaceId={selected.id} ga4PropertyId={selected.ga4PropertyId} />;
     if (tab === 'requests') return <RequestManager key={`requests-${selected.id}`} workspaceId={selected.id} />;

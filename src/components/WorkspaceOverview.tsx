@@ -2,8 +2,17 @@ import { useState, useEffect } from 'react';
 import {
   Globe, Shield, MessageSquare, ClipboardCheck, AlertTriangle,
   CheckCircle2, ArrowUpRight, ArrowDownRight, Minus, Loader2,
-  Search, BarChart3, Lock, ExternalLink, Bell,
+  Search, BarChart3, Lock, ExternalLink, Bell, Activity, FileText, Zap,
 } from 'lucide-react';
+
+interface ActivityEntry {
+  id: string;
+  workspaceId: string;
+  type: string;
+  title: string;
+  description?: string;
+  createdAt: string;
+}
 
 interface WorkspaceSummary {
   id: string;
@@ -55,14 +64,17 @@ function timeAgo(dateStr: string): string {
 
 export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (id: string) => void }) {
   const [data, setData] = useState<WorkspaceSummary[]>([]);
+  const [recentActivity, setRecentActivity] = useState<ActivityEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/workspace-overview')
-      .then(r => r.json())
-      .then(d => { if (Array.isArray(d)) setData(d); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    Promise.all([
+      fetch('/api/workspace-overview').then(r => r.json()),
+      fetch('/api/activity?limit=15').then(r => r.json()).catch(() => []),
+    ]).then(([d, act]) => {
+      if (Array.isArray(d)) setData(d);
+      if (Array.isArray(act)) setRecentActivity(act);
+    }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   if (loading) {
@@ -230,6 +242,47 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
           );
         })}
       </div>
+
+      {/* Recent Activity */}
+      {recentActivity.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <Activity className="w-4 h-4" style={{ color: 'var(--brand-text-muted)' }} />
+            <h2 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Recent Activity</h2>
+          </div>
+          <div className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
+            {recentActivity.map((entry, i) => {
+              const wsName = data.find(w => w.id === entry.workspaceId)?.name || '';
+              const iconMap: Record<string, typeof Zap> = {
+                audit_completed: Globe,
+                content_requested: FileText,
+                brief_generated: Zap,
+                request_resolved: CheckCircle2,
+                approval_applied: ClipboardCheck,
+                seo_updated: Globe,
+              };
+              const Icon = iconMap[entry.type] || Activity;
+              return (
+                <div
+                  key={entry.id}
+                  className={`flex items-start gap-3 px-4 py-2.5 ${i < recentActivity.length - 1 ? 'border-b' : ''}`}
+                  style={{ borderColor: 'var(--brand-border)' }}
+                >
+                  <Icon className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" style={{ color: 'var(--brand-mint)' }} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs" style={{ color: 'var(--brand-text-bright)' }}>{entry.title}</div>
+                    {entry.description && <div className="text-[10px] mt-0.5" style={{ color: 'var(--brand-text-muted)' }}>{entry.description}</div>}
+                  </div>
+                  <div className="flex-shrink-0 text-right">
+                    {wsName && <div className="text-[9px]" style={{ color: 'var(--brand-text-dim)' }}>{wsName}</div>}
+                    <div className="text-[9px]" style={{ color: 'var(--brand-text-dim)' }}>{timeAgo(entry.createdAt)}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
