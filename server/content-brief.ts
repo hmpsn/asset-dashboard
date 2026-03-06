@@ -4,11 +4,27 @@ import { buildSeoContext, buildKeywordMapContext } from './seo-context.js';
 
 const DATA_BASE = process.env.DATA_DIR
   || (process.env.NODE_ENV === 'production' ? '/tmp/asset-dashboard' : '');
+const UPLOAD_ROOT = DATA_BASE
+  ? path.join(DATA_BASE, 'uploads')
+  : path.join(process.env.HOME || '', 'toUpload');
 const BRIEFS_DIR = DATA_BASE
   ? path.join(DATA_BASE, 'content-briefs')
   : path.join(process.env.HOME || '', 'toUpload', 'content-briefs');
 
 fs.mkdirSync(BRIEFS_DIR, { recursive: true });
+
+// Migrate data from old storage path (~/toUpload/<wsId>/.content-briefs/briefs.json)
+function migrateOldBriefs(workspaceId: string): void {
+  const newFile = path.join(BRIEFS_DIR, `${workspaceId}.json`);
+  if (fs.existsSync(newFile)) return;
+  const oldFile = path.join(UPLOAD_ROOT, workspaceId, '.content-briefs', 'briefs.json');
+  if (fs.existsSync(oldFile)) {
+    try {
+      fs.copyFileSync(oldFile, newFile);
+      console.log(`[Migration] Copied content briefs for ${workspaceId} from old path`);
+    } catch { /* skip */ }
+  }
+}
 
 export interface ContentBrief {
   id: string;
@@ -31,6 +47,7 @@ function getBriefFile(workspaceId: string): string {
 }
 
 function readBriefs(workspaceId: string): ContentBrief[] {
+  migrateOldBriefs(workspaceId);
   try {
     const f = getBriefFile(workspaceId);
     if (fs.existsSync(f)) return JSON.parse(fs.readFileSync(f, 'utf-8'));

@@ -306,13 +306,8 @@ export function ClientDashboard({ workspaceId }: Props) {
   // Rank tracking
   const [rankHistory, setRankHistory] = useState<{ date: string; positions: Record<string, number> }[]>([]);
   const [latestRanks, setLatestRanks] = useState<{ query: string; position: number; clicks: number; impressions: number; ctr: number; change?: number }[]>([]);
-  // Annotations
+  // Annotations (read-only, managed from admin)
   const [annotations, setAnnotations] = useState<{ id: string; date: string; label: string; description?: string; color?: string }[]>([]);
-  const [showAddAnnotation, setShowAddAnnotation] = useState(false);
-  const [annDate, setAnnDate] = useState('');
-  const [annLabel, setAnnLabel] = useState('');
-  const [annDesc, setAnnDesc] = useState('');
-  const [annColor, setAnnColor] = useState('#2dd4bf');
   // Requests state
   const [requests, setRequests] = useState<ClientRequest[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(false);
@@ -1297,84 +1292,26 @@ export function ClientDashboard({ workspaceId }: Props) {
               </table>
             </div>
 
-            {/* Annotations Panel */}
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
+            {/* Annotations (read-only, managed from admin) */}
+            {annotations.length > 0 && (
+              <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+                <div className="flex items-center gap-2 mb-3">
                   <Activity className="w-4 h-4 text-zinc-400" />
                   <span className="text-xs font-semibold text-zinc-200">Timeline Annotations</span>
-                  {annotations.length > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{annotations.length}</span>}
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{annotations.length}</span>
                 </div>
-                <button onClick={() => setShowAddAnnotation(!showAddAnnotation)} className="text-[10px] text-teal-400 hover:text-teal-300">
-                  {showAddAnnotation ? 'Cancel' : '+ Add'}
-                </button>
-              </div>
-              {showAddAnnotation && (
-                <div className="mb-3 p-3 rounded-lg bg-zinc-950 border border-zinc-800 space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] text-zinc-500 block mb-0.5">Date</label>
-                      <input type="date" value={annDate} onChange={e => setAnnDate(e.target.value)}
-                        className="w-full px-2 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-300" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-zinc-500 block mb-0.5">Color</label>
-                      <div className="flex gap-1.5">
-                        {['#2dd4bf', '#60a5fa', '#f472b6', '#fbbf24', '#a78bfa', '#f87171'].map(c => (
-                          <button key={c} onClick={() => setAnnColor(c)}
-                            className={`w-5 h-5 rounded-full border-2 ${annColor === c ? 'border-white' : 'border-zinc-700'}`}
-                            style={{ backgroundColor: c }} />
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-zinc-500 block mb-0.5">Label</label>
-                    <input type="text" value={annLabel} onChange={e => setAnnLabel(e.target.value)} placeholder="e.g. Launched new pages"
-                      className="w-full px-2 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-300" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-zinc-500 block mb-0.5">Description (optional)</label>
-                    <input type="text" value={annDesc} onChange={e => setAnnDesc(e.target.value)} placeholder="Details..."
-                      className="w-full px-2 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-300" />
-                  </div>
-                  <button
-                    disabled={!annDate || !annLabel}
-                    onClick={async () => {
-                      if (!ws || !annDate || !annLabel) return;
-                      const res = await fetch(`/api/public/annotations/${ws.id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date: annDate, label: annLabel, description: annDesc || undefined, color: annColor }) });
-                      if (res.ok) {
-                        const ann = await res.json();
-                        setAnnotations(prev => [...prev, ann]);
-                        setAnnDate(''); setAnnLabel(''); setAnnDesc(''); setShowAddAnnotation(false);
-                      }
-                    }}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-40 transition-colors"
-                  >Add Annotation</button>
-                </div>
-              )}
-              {annotations.length > 0 ? (
                 <div className="space-y-1.5">
                   {annotations.map(ann => (
-                    <div key={ann.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-zinc-950/50 group">
+                    <div key={ann.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-zinc-950/50">
                       <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: ann.color || '#2dd4bf' }} />
                       <span className="text-[10px] text-zinc-500 flex-shrink-0">{ann.date}</span>
                       <span className="text-xs text-zinc-300 flex-1 truncate">{ann.label}</span>
                       {ann.description && <span className="text-[10px] text-zinc-600 truncate max-w-[120px]">{ann.description}</span>}
-                      <button onClick={async () => {
-                        if (!ws) return;
-                        await fetch(`/api/public/annotations/${ws.id}/${ann.id}`, { method: 'DELETE' });
-                        setAnnotations(prev => prev.filter(a => a.id !== ann.id));
-                      }} className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-red-400 transition-all">
-                        <X className="w-3 h-3" />
-                      </button>
                     </div>
                   ))}
                 </div>
-              ) : (
-                <p className="text-[10px] text-zinc-600">No annotations yet. Add markers to track key events on your timeline.</p>
-              )}
-            </div>
+              </div>
+            )}
           </>) : (
             <div className="text-center py-16">
               <Search className="w-8 h-8 text-zinc-600 mx-auto mb-2" />

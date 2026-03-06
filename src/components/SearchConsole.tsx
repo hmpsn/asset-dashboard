@@ -3,7 +3,6 @@ import {
   Loader2, Search, TrendingUp, TrendingDown, Eye, MousePointer,
   BarChart3, ExternalLink, ArrowUpDown,
   Sparkles, Send, AlertTriangle, Target, Zap, Shield, MessageSquare, X,
-  Flag, Plus, Trash2, ChevronDown, ChevronUp,
 } from 'lucide-react';
 
 interface SearchQuery {
@@ -45,19 +44,9 @@ interface ChatMessage {
   content: string;
 }
 
-interface Annotation {
-  id: string;
-  workspaceId: string;
-  date: string;
-  label: string;
-  description?: string;
-  createdAt: string;
-}
-
 interface Props {
   siteId: string;
   gscPropertyUrl?: string;
-  workspaceId?: string;
 }
 
 function MiniSparkline({ data, color }: { data: number[]; color: string }) {
@@ -145,7 +134,7 @@ const QUICK_QUESTIONS = [
   'What content should I create next based on search data?',
 ];
 
-export function SearchConsole({ siteId, gscPropertyUrl, workspaceId }: Props) {
+export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
   const [overview, setOverview] = useState<SearchOverview | null>(null);
   const [trend, setTrend] = useState<PerformanceTrend[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
@@ -154,11 +143,6 @@ export function SearchConsole({ siteId, gscPropertyUrl, workspaceId }: Props) {
   const [days, setDays] = useState(28);
   const [sortKey, setSortKey] = useState<SortKey>('clicks');
   const [sortAsc, setSortAsc] = useState(false);
-
-  // Annotations
-  const [annotations, setAnnotations] = useState<Annotation[]>([]);
-  const [newAnnotation, setNewAnnotation] = useState({ date: '', label: '', description: '' });
-  const [showAnnotations, setShowAnnotations] = useState(false);
 
   // AI Chat state
   const [chatOpen, setChatOpen] = useState(false);
@@ -170,36 +154,6 @@ export function SearchConsole({ siteId, gscPropertyUrl, workspaceId }: Props) {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
-
-  // Load annotations
-  useEffect(() => {
-    if (!workspaceId) return;
-    fetch(`/api/annotations/${workspaceId}`).then(r => r.json()).then(d => {
-      if (Array.isArray(d)) setAnnotations(d);
-    }).catch(() => {});
-  }, [workspaceId]);
-
-  const addAnnotationHandler = async () => {
-    if (!workspaceId || !newAnnotation.date || !newAnnotation.label) return;
-    try {
-      const res = await fetch(`/api/annotations/${workspaceId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newAnnotation),
-      });
-      if (res.ok) {
-        const entry = await res.json();
-        setAnnotations(prev => [entry, ...prev]);
-        setNewAnnotation({ date: '', label: '', description: '' });
-      }
-    } catch { /* skip */ }
-  };
-
-  const deleteAnnotationHandler = async (id: string) => {
-    if (!workspaceId) return;
-    await fetch(`/api/annotations/${workspaceId}/${id}`, { method: 'DELETE' });
-    setAnnotations(prev => prev.filter(a => a.id !== id));
-  };
 
   // Load data when gscPropertyUrl is available
   useEffect(() => {
@@ -342,7 +296,7 @@ export function SearchConsole({ siteId, gscPropertyUrl, workspaceId }: Props) {
           <Sparkles className="w-3.5 h-3.5" /> Ask AI
         </button>
         <div className="flex items-center gap-1 bg-zinc-900 rounded-lg border border-zinc-800 p-0.5">
-          {[7, 28, 90].map(d => (
+          {[7, 28, 90, 180, 480].map(d => (
             <button
               key={d}
               onClick={() => { setDays(d); loadData(undefined, d); }}
@@ -350,7 +304,7 @@ export function SearchConsole({ siteId, gscPropertyUrl, workspaceId }: Props) {
                 days === d ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'
               }`}
             >
-              {d}d
+              {d >= 480 ? '16mo' : d >= 180 ? '6mo' : `${d}d`}
             </button>
           ))}
         </div>
@@ -759,58 +713,6 @@ export function SearchConsole({ siteId, gscPropertyUrl, workspaceId }: Props) {
         </>
       )}
 
-      {/* Annotations Panel */}
-      {workspaceId && (
-        <div className="mt-6 bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-          <button
-            onClick={() => setShowAnnotations(!showAnnotations)}
-            className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-zinc-800/30 transition-colors"
-          >
-            <Flag className="w-3.5 h-3.5 text-amber-400" />
-            <span className="text-xs font-medium text-zinc-300 flex-1">Annotations</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{annotations.length}</span>
-            {showAnnotations ? <ChevronUp className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />}
-          </button>
-          {showAnnotations && (
-            <div className="px-4 pb-4 space-y-3 border-t border-zinc-800">
-              {/* Add annotation form */}
-              <div className="flex items-end gap-2 pt-3">
-                <div className="flex-shrink-0">
-                  <label className="text-[10px] text-zinc-500 block mb-0.5">Date</label>
-                  <input type="date" value={newAnnotation.date} onChange={e => setNewAnnotation(p => ({ ...p, date: e.target.value }))}
-                    className="px-2 py-1.5 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300" />
-                </div>
-                <div className="flex-1">
-                  <label className="text-[10px] text-zinc-500 block mb-0.5">Label</label>
-                  <input type="text" value={newAnnotation.label} onChange={e => setNewAnnotation(p => ({ ...p, label: e.target.value }))}
-                    placeholder="e.g. Algorithm update, site redesign..." className="w-full px-2 py-1.5 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600" />
-                </div>
-                <button onClick={addAnnotationHandler} disabled={!newAnnotation.date || !newAnnotation.label}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-40 transition-colors">
-                  <Plus className="w-3 h-3" /> Add
-                </button>
-              </div>
-              {/* Existing annotations */}
-              {annotations.length > 0 ? (
-                <div className="space-y-1.5">
-                  {annotations.sort((a, b) => b.date.localeCompare(a.date)).map(ann => (
-                    <div key={ann.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800">
-                      <span className="text-[10px] text-zinc-500 flex-shrink-0">{ann.date}</span>
-                      <span className="text-xs text-zinc-300 flex-1 truncate">{ann.label}</span>
-                      {ann.description && <span className="text-[10px] text-zinc-500 truncate max-w-[150px]">{ann.description}</span>}
-                      <button onClick={() => deleteAnnotationHandler(ann.id)} className="text-zinc-700 hover:text-red-400 transition-colors flex-shrink-0">
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-[10px] text-zinc-600 pt-1">No annotations yet. Add events like algorithm updates, site launches, or marketing campaigns.</p>
-              )}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }

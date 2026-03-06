@@ -3,11 +3,27 @@ import path from 'path';
 
 const DATA_BASE = process.env.DATA_DIR
   || (process.env.NODE_ENV === 'production' ? '/tmp/asset-dashboard' : '');
+const UPLOAD_ROOT = DATA_BASE
+  ? path.join(DATA_BASE, 'uploads')
+  : path.join(process.env.HOME || '', 'toUpload');
 const CONTENT_REQUESTS_DIR = DATA_BASE
   ? path.join(DATA_BASE, 'content-requests')
   : path.join(process.env.HOME || '', 'toUpload', 'content-requests');
 
 fs.mkdirSync(CONTENT_REQUESTS_DIR, { recursive: true });
+
+// Migrate data from old storage path (~/toUpload/<wsId>/.content-requests.json)
+function migrateOldRequests(workspaceId: string): void {
+  const newFile = path.join(CONTENT_REQUESTS_DIR, `${workspaceId}.json`);
+  if (fs.existsSync(newFile)) return; // already migrated or has data
+  const oldFile = path.join(UPLOAD_ROOT, workspaceId, '.content-requests.json');
+  if (fs.existsSync(oldFile)) {
+    try {
+      fs.copyFileSync(oldFile, newFile);
+      console.log(`[Migration] Copied content requests for ${workspaceId} from old path`);
+    } catch { /* skip */ }
+  }
+}
 
 export interface ContentTopicRequest {
   id: string;
@@ -30,6 +46,7 @@ function getFile(workspaceId: string): string {
 }
 
 function read(workspaceId: string): ContentTopicRequest[] {
+  migrateOldRequests(workspaceId);
   try {
     const f = getFile(workspaceId);
     if (fs.existsSync(f)) return JSON.parse(fs.readFileSync(f, 'utf-8'));
