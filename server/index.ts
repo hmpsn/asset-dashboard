@@ -2737,25 +2737,38 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
       }
     }
 
-    // 6. Build rich context for AI — dynamically scale content per page to stay within token limits
+    // 6. Build rich context for AI — aggressively cap to stay under ~40K chars total prompt
     const totalPages = pageInfo.length;
-    // ~4 chars per token; target max ~18k tokens for page content (leaves room for prompt + GSC + SEMRush)
-    const maxContentChars = totalPages > 80 ? 200 : totalPages > 40 ? 500 : totalPages > 20 ? 800 : 1200;
-    const maxGscRows = totalPages > 60 ? 40 : totalPages > 30 ? 60 : 100;
+    // For large sites: top N pages get full content, rest get path+title only
+    const fullContentPages = totalPages > 80 ? 40 : totalPages > 40 ? 60 : totalPages;
+    const maxContentChars = totalPages > 80 ? 150 : totalPages > 40 ? 300 : totalPages > 20 ? 600 : 1000;
+    const maxGscRows = totalPages > 60 ? 30 : totalPages > 30 ? 50 : 80;
 
-    const pageList = pageInfo.map(p => {
+    // Sort: pages with GSC data or longer content first (more valuable for strategy)
+    const gscPages = new Set(gscData.map(r => new URL(r.page).pathname).filter(Boolean));
+    const sortedPageInfo = [...pageInfo].sort((a, b) => {
+      const aHasGsc = gscPages.has(a.path) ? 1 : 0;
+      const bHasGsc = gscPages.has(b.path) ? 1 : 0;
+      if (aHasGsc !== bHasGsc) return bHasGsc - aHasGsc;
+      return (b.contentSnippet?.length || 0) - (a.contentSnippet?.length || 0);
+    });
+
+    const pageList = sortedPageInfo.map((p, i) => {
       let entry = `- ${p.path}: "${p.title}"`;
-      if (p.seoTitle) entry += ` | SEO title: "${p.seoTitle}"`;
-      if (p.seoDesc) entry += ` | Meta desc: "${p.seoDesc}"`;
-      if (p.contentSnippet) entry += `\n  Content: ${p.contentSnippet.slice(0, maxContentChars)}`;
+      if (i < fullContentPages) {
+        // Full detail for top pages
+        if (p.seoTitle) entry += ` | SEO: "${p.seoTitle}"`;
+        if (p.seoDesc) entry += ` | Desc: "${p.seoDesc.slice(0, 120)}"`;
+        if (p.contentSnippet) entry += `\n  Content: ${p.contentSnippet.slice(0, maxContentChars)}`;
+      }
       return entry;
     }).join('\n');
 
     let gscContext = '';
     if (gscData.length > 0) {
       const sorted = [...gscData].sort((a, b) => b.impressions - a.impressions).slice(0, maxGscRows);
-      gscContext = `\n\nGoogle Search Console data (last 90 days, top ${maxGscRows} query-page combos by impressions):\n` +
-        sorted.map(r => `- "${r.query}" → ${r.page} (pos: ${r.position}, clicks: ${r.clicks}, imp: ${r.impressions})`).join('\n');
+      gscContext = `\n\nGoogle Search Console data (last 90 days, top ${maxGscRows} by impressions):\n` +
+        sorted.map(r => `- "${r.query}" → ${r.page} (pos: ${r.position.toFixed(1)}, clicks: ${r.clicks}, imp: ${r.impressions})`).join('\n');
     }
 
     let businessSection = '';
@@ -2835,7 +2848,7 @@ Critical rules:
         { role: 'system', content: 'You are an expert SEO strategist. You always return valid JSON only, no markdown, no explanation.' },
         { role: 'user', content: prompt },
       ],
-      max_tokens: 12000,
+      max_tokens: 8000,
       temperature: 0.3,
     });
 
@@ -2855,7 +2868,7 @@ Critical rules:
             'Content-Type': 'application/json',
           },
           body: aiBody,
-          signal: AbortSignal.timeout(120_000), // 2 minute timeout
+          signal: AbortSignal.timeout(180_000), // 3 minute timeout
         });
         break; // success
       } catch (fetchErr) {
