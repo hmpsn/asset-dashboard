@@ -71,22 +71,48 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
     setBriefError(null);
     // If brief already in local state, just expand
     if (getBriefById(briefId)) { setExpandedRequest(reqId); return; }
-    // Fetch brief from server
+    // Not in local state — try fetching individually
     setLoadingBrief(reqId);
     try {
-      const res = await fetch(`/api/content-briefs/${workspaceId}/${briefId}`);
+      const url = `/api/content-briefs/${workspaceId}/${briefId}`;
+      const res = await fetch(url);
+      const text = await res.text();
       if (res.ok) {
-        const brief = await res.json();
-        setBriefs(prev => [brief, ...prev.filter(b => b.id !== brief.id)]);
-        setExpandedRequest(reqId);
-      } else {
-        console.error(`[View Brief] ${res.status} for briefId=${briefId}`);
-        setBriefError(`Brief not found (${res.status}). It may have been deleted after a server restart. Try regenerating it.`);
-        setExpandedRequest(reqId);
+        try {
+          const brief = JSON.parse(text);
+          setBriefs(prev => [brief, ...prev.filter(b => b.id !== brief.id)]);
+          setLoadingBrief(null);
+          setExpandedRequest(reqId);
+          return;
+        } catch {
+          setBriefError(`Response was not valid JSON. Status: ${res.status}. Body starts with: ${text.slice(0, 120)}`);
+          setExpandedRequest(reqId);
+          setLoadingBrief(null);
+          return;
+        }
       }
+      // Individual fetch failed — try refetching the full list as fallback
+      const listRes = await fetch(`/api/content-briefs/${workspaceId}`);
+      if (listRes.ok) {
+        const listText = await listRes.text();
+        try {
+          const allBriefs = JSON.parse(listText);
+          if (Array.isArray(allBriefs)) {
+            setBriefs(allBriefs);
+            const found = allBriefs.find((b: ContentBrief) => b.id === briefId);
+            if (found) {
+              setLoadingBrief(null);
+              setExpandedRequest(reqId);
+              return;
+            }
+          }
+        } catch { /* list parse failed */ }
+      }
+      setBriefError(`Brief "${briefId}" not found. Single fetch: ${res.status}. The brief may have been lost after a server restart. Try regenerating.`);
+      setExpandedRequest(reqId);
     } catch (err) {
-      console.error('[View Brief] fetch error:', err);
-      setBriefError('Failed to load brief. Check the console for details.');
+      const msg = err instanceof Error ? err.message : String(err);
+      setBriefError(`Network error loading brief: ${msg}`);
       setExpandedRequest(reqId);
     }
     setLoadingBrief(null);
@@ -153,8 +179,11 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
     const checkDone = () => { if (++done >= 2) setLoading(false); };
 
     fetch(`/api/content-briefs/${workspaceId}`)
-      .then(r => { console.log('[ContentBriefs] briefs response status:', r.status); return r.json(); })
-      .then(b => { console.log('[ContentBriefs] briefs data:', b); if (Array.isArray(b)) setBriefs(b); })
+      .then(async r => {
+        const text = await r.text();
+        console.log(`[ContentBriefs] briefs status=${r.status} len=${text.length}`);
+        try { const parsed = JSON.parse(text); if (Array.isArray(parsed)) { console.log(`[ContentBriefs] ${parsed.length} briefs loaded`); setBriefs(parsed); } else { console.warn('[ContentBriefs] briefs response is not array:', typeof parsed); } } catch { console.error('[ContentBriefs] briefs JSON parse failed, starts with:', text.slice(0, 200)); }
+      })
       .catch(err => console.error('[ContentBriefs] briefs fetch error:', err))
       .finally(checkDone);
 
