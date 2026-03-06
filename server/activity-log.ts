@@ -21,6 +21,7 @@ export type ActivityType =
   | 'brief_generated'
   | 'brief_approved'
   | 'changes_requested'
+  | 'content_upgraded'
   | 'note';
 
 export interface ActivityEntry {

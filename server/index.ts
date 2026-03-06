@@ -3431,9 +3431,9 @@ app.get('/api/public/seo-strategy/:workspaceId', (req, res) => {
 app.post('/api/public/content-request/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const { topic, targetKeyword, intent, priority, rationale, clientNote } = req.body;
+  const { topic, targetKeyword, intent, priority, rationale, clientNote, serviceType } = req.body;
   if (!topic || !targetKeyword) return res.status(400).json({ error: 'topic and targetKeyword are required' });
-  const request = createContentRequest(req.params.workspaceId, { topic, targetKeyword, intent, priority, rationale, clientNote });
+  const request = createContentRequest(req.params.workspaceId, { topic, targetKeyword, intent, priority, rationale, clientNote, serviceType });
   addActivity(req.params.workspaceId, 'content_requested', `Content topic requested: "${topic}"`, `Keyword: "${targetKeyword}" · Priority: ${priority}`, { requestId: request.id });
   notifyTeamContentRequest({ workspaceName: ws.name, topic, targetKeyword, priority, rationale: rationale || '' }).catch(() => {});
   res.json(request);
@@ -3447,6 +3447,7 @@ app.get('/api/public/content-requests/:workspaceId', (req, res) => {
   res.json(requests.map(r => ({
     id: r.id, topic: r.topic, targetKeyword: r.targetKeyword, intent: r.intent,
     priority: r.priority, status: r.status, source: r.source,
+    serviceType: r.serviceType || 'brief_only', upgradedAt: r.upgradedAt,
     comments: r.comments || [], requestedAt: r.requestedAt, updatedAt: r.updatedAt,
     // Include briefId only when in client_review or later
     briefId: ['client_review', 'approved', 'changes_requested', 'in_progress', 'delivered'].includes(r.status) ? r.briefId : undefined,
@@ -3457,12 +3458,12 @@ app.get('/api/public/content-requests/:workspaceId', (req, res) => {
 app.post('/api/public/content-request/:workspaceId/submit', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const { topic, targetKeyword, notes } = req.body;
+  const { topic, targetKeyword, notes, serviceType } = req.body;
   if (!topic || !targetKeyword) return res.status(400).json({ error: 'topic and targetKeyword are required' });
   const request = createContentRequest(req.params.workspaceId, {
     topic, targetKeyword, intent: 'informational', priority: 'medium',
     rationale: notes || `Client-submitted topic: ${topic}`,
-    clientNote: notes, source: 'client',
+    clientNote: notes, source: 'client', serviceType: serviceType || 'brief_only',
   });
   addActivity(req.params.workspaceId, 'content_requested', `Client submitted topic: "${topic}"`, `Keyword: "${targetKeyword}"`, { requestId: request.id });
   notifyTeamContentRequest({ workspaceName: ws.name, topic, targetKeyword, priority: 'medium', rationale: notes || '' }).catch(() => {});
@@ -3496,6 +3497,17 @@ app.post('/api/public/content-request/:workspaceId/:id/request-changes', (req, r
   });
   if (!updated) return res.status(404).json({ error: 'Request not found' });
   addActivity(req.params.workspaceId, 'changes_requested', `Client requested changes on "${updated.topic}"`, feedback || '', { requestId: updated.id });
+  res.json(updated);
+});
+
+// Client upgrades from brief_only to full_post
+app.post('/api/public/content-request/:workspaceId/:id/upgrade', (req, res) => {
+  const updated = updateContentRequest(req.params.workspaceId, req.params.id, {
+    serviceType: 'full_post',
+    upgradedAt: new Date().toISOString(),
+  });
+  if (!updated) return res.status(404).json({ error: 'Request not found' });
+  addActivity(req.params.workspaceId, 'content_upgraded', `Client upgraded "${updated.topic}" to full blog post`, '', { requestId: updated.id });
   res.json(updated);
 });
 

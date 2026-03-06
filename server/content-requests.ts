@@ -39,6 +39,8 @@ export interface ContentTopicRequest {
   declineReason?: string;
   clientFeedback?: string;
   source?: 'strategy' | 'client';
+  serviceType?: 'brief_only' | 'full_post';
+  upgradedAt?: string;
   comments?: ContentRequestComment[];
   requestedAt: string;
   updatedAt: string;
@@ -84,7 +86,7 @@ export function getContentRequest(workspaceId: string, id: string): ContentTopic
 
 export function createContentRequest(
   workspaceId: string,
-  data: { topic: string; targetKeyword: string; intent: string; priority: string; rationale: string; clientNote?: string; source?: 'strategy' | 'client' }
+  data: { topic: string; targetKeyword: string; intent: string; priority: string; rationale: string; clientNote?: string; source?: 'strategy' | 'client'; serviceType?: 'brief_only' | 'full_post' }
 ): ContentTopicRequest {
   const items = read(workspaceId);
 
@@ -102,6 +104,7 @@ export function createContentRequest(
     rationale: data.rationale,
     clientNote: data.clientNote,
     source: data.source || 'strategy',
+    serviceType: data.serviceType || 'brief_only',
     comments: [],
     status: 'requested',
     requestedAt: new Date().toISOString(),
@@ -116,7 +119,7 @@ export function createContentRequest(
 export function updateContentRequest(
   workspaceId: string,
   id: string,
-  updates: Partial<Pick<ContentTopicRequest, 'status' | 'briefId' | 'internalNote' | 'declineReason' | 'clientFeedback'>>
+  updates: Partial<Pick<ContentTopicRequest, 'status' | 'briefId' | 'internalNote' | 'declineReason' | 'clientFeedback' | 'serviceType' | 'upgradedAt'>>
 ): ContentTopicRequest | null {
   const items = read(workspaceId);
   const idx = items.findIndex(r => r.id === id);

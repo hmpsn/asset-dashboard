@@ -49,6 +49,7 @@ interface ClientContentRequest {
   id: string; topic: string; targetKeyword: string; intent: string; priority: string;
   status: 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'delivered' | 'declined';
   source?: 'strategy' | 'client'; briefId?: string;
+  serviceType?: 'brief_only' | 'full_post'; upgradedAt?: string;
   comments?: { id: string; author: 'client' | 'team'; content: string; createdAt: string }[];
   requestedAt: string; updatedAt: string;
 }
@@ -364,6 +365,8 @@ export function ClientDashboard({ workspaceId }: Props) {
   const [newTopicKeyword, setNewTopicKeyword] = useState('');
   const [newTopicNotes, setNewTopicNotes] = useState('');
   const [submittingTopic, setSubmittingTopic] = useState(false);
+  const [newTopicServiceType, setNewTopicServiceType] = useState<'brief_only' | 'full_post'>('brief_only');
+  const [upgradingReqId, setUpgradingReqId] = useState<string | null>(null);
   const [expandedContentReq, setExpandedContentReq] = useState<string | null>(null);
   const [contentComment, setContentComment] = useState('');
   const [sendingContentComment, setSendingContentComment] = useState(false);
@@ -611,13 +614,13 @@ export function ClientDashboard({ workspaceId }: Props) {
     try {
       const res = await fetch(`/api/public/content-request/${workspaceId}/submit`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic: newTopicName.trim(), targetKeyword: newTopicKeyword.trim(), notes: newTopicNotes.trim() || undefined }),
+        body: JSON.stringify({ topic: newTopicName.trim(), targetKeyword: newTopicKeyword.trim(), notes: newTopicNotes.trim() || undefined, serviceType: newTopicServiceType }),
       });
       if (res.ok) {
         const created = await res.json();
         setContentRequests(prev => [created, ...prev]);
         setRequestedTopics(prev => new Set(prev).add(created.targetKeyword));
-        setNewTopicName(''); setNewTopicKeyword(''); setNewTopicNotes(''); setShowTopicForm(false);
+        setNewTopicName(''); setNewTopicKeyword(''); setNewTopicNotes(''); setNewTopicServiceType('brief_only'); setShowTopicForm(false);
         setToast({ message: 'Topic submitted! Your team will review it.', type: 'success' });
         setTimeout(() => setToast(null), 5000);
       }
@@ -649,6 +652,20 @@ export function ClientDashboard({ workspaceId }: Props) {
         setTimeout(() => setToast(null), 5000);
       }
     } catch { /* skip */ }
+  };
+
+  const upgradeToFullPost = async (reqId: string) => {
+    setUpgradingReqId(reqId);
+    try {
+      const res = await fetch(`/api/public/content-request/${workspaceId}/${reqId}/upgrade`, { method: 'POST' });
+      if (res.ok) {
+        const updated = await res.json();
+        setContentRequests(prev => prev.map(r => r.id === reqId ? updated : r));
+        setToast({ message: 'Upgraded to full blog post! Your team will begin writing.', type: 'success' });
+        setTimeout(() => setToast(null), 5000);
+      }
+    } catch { /* skip */ }
+    setUpgradingReqId(null);
   };
 
   const requestChanges = async (reqId: string) => {
@@ -1742,35 +1759,66 @@ export function ClientDashboard({ workspaceId }: Props) {
                               {alreadyRequested ? (
                                 <span className="flex items-center gap-1 text-[10px] text-teal-400 bg-teal-500/10 px-2.5 py-1.5 rounded-lg border border-teal-500/20 w-fit"><CheckCircle2 className="w-3.5 h-3.5" /> Requested</span>
                               ) : (
-                                <button
-                                  disabled={isRequesting}
-                                  onClick={async () => {
-                                    setRequestingTopic(gap.targetKeyword);
-                                    try {
-                                      const res = await fetch(`/api/public/content-request/${workspaceId}`, {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale }),
-                                      });
-                                      if (!res.ok) throw new Error(`Server returned ${res.status}`);
-                                      setRequestedTopics(prev => new Set(prev).add(gap.targetKeyword));
-                                      // Reload content requests so Content tab updates
-                                      fetch(`/api/public/content-requests/${workspaceId}`).then(r => r.ok ? r.json() : []).then((reqs: ClientContentRequest[]) => {
-                                        if (Array.isArray(reqs) && reqs.length > 0) setContentRequests(reqs);
-                                      }).catch(() => {});
-                                      setToast({ message: `Topic "${gap.topic}" requested! Check the Content tab for updates.`, type: 'success' });
-                                      setTimeout(() => setToast(null), 5000);
-                                    } catch (err) {
-                                      console.error('Content request failed:', err);
-                                      setToast({ message: 'Failed to submit request. Please try again.', type: 'error' });
-                                      setTimeout(() => setToast(null), 5000);
-                                    }
-                                    setRequestingTopic(null);
-                                  }}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600/30 border border-teal-500/40 text-[11px] text-teal-200 font-medium hover:bg-teal-600/50 hover:border-teal-400/60 transition-all disabled:opacity-50 shadow-sm shadow-teal-900/20"
-                                >
-                                  {isRequesting ? <><span className="w-3 h-3 border-2 border-teal-400 border-t-transparent rounded-full animate-spin" /> Requesting...</> : <><Plus className="w-3.5 h-3.5" /> Request This Topic</>}
-                                </button>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    disabled={isRequesting}
+                                    onClick={async () => {
+                                      setRequestingTopic(gap.targetKeyword);
+                                      try {
+                                        const res = await fetch(`/api/public/content-request/${workspaceId}`, {
+                                          method: 'POST',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({ topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, serviceType: 'brief_only' }),
+                                        });
+                                        if (!res.ok) throw new Error(`Server returned ${res.status}`);
+                                        setRequestedTopics(prev => new Set(prev).add(gap.targetKeyword));
+                                        fetch(`/api/public/content-requests/${workspaceId}`).then(r => r.ok ? r.json() : []).then((reqs: ClientContentRequest[]) => {
+                                          if (Array.isArray(reqs) && reqs.length > 0) setContentRequests(reqs);
+                                        }).catch(() => {});
+                                        setToast({ message: `Brief requested for "${gap.topic}"! Check the Content tab.`, type: 'success' });
+                                        setTimeout(() => setToast(null), 5000);
+                                      } catch (err) {
+                                        console.error('Content request failed:', err);
+                                        setToast({ message: 'Failed to submit request. Please try again.', type: 'error' });
+                                        setTimeout(() => setToast(null), 5000);
+                                      }
+                                      setRequestingTopic(null);
+                                    }}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600/20 border border-teal-500/30 text-[10px] text-teal-300 font-medium hover:bg-teal-600/40 transition-all disabled:opacity-50"
+                                  >
+                                    {isRequesting ? <span className="w-3 h-3 border-2 border-teal-400 border-t-transparent rounded-full animate-spin" /> : <FileText className="w-3 h-3" />}
+                                    Get a Brief
+                                  </button>
+                                  <button
+                                    disabled={isRequesting}
+                                    onClick={async () => {
+                                      setRequestingTopic(gap.targetKeyword);
+                                      try {
+                                        const res = await fetch(`/api/public/content-request/${workspaceId}`, {
+                                          method: 'POST',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({ topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, serviceType: 'full_post' }),
+                                        });
+                                        if (!res.ok) throw new Error(`Server returned ${res.status}`);
+                                        setRequestedTopics(prev => new Set(prev).add(gap.targetKeyword));
+                                        fetch(`/api/public/content-requests/${workspaceId}`).then(r => r.ok ? r.json() : []).then((reqs: ClientContentRequest[]) => {
+                                          if (Array.isArray(reqs) && reqs.length > 0) setContentRequests(reqs);
+                                        }).catch(() => {});
+                                        setToast({ message: `Full blog post requested for "${gap.topic}"! Check the Content tab.`, type: 'success' });
+                                        setTimeout(() => setToast(null), 5000);
+                                      } catch (err) {
+                                        console.error('Content request failed:', err);
+                                        setToast({ message: 'Failed to submit request. Please try again.', type: 'error' });
+                                        setTimeout(() => setToast(null), 5000);
+                                      }
+                                      setRequestingTopic(null);
+                                    }}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600/30 to-violet-600/30 border border-blue-500/30 text-[10px] text-blue-200 font-medium hover:from-blue-600/50 hover:to-violet-600/50 transition-all disabled:opacity-50"
+                                  >
+                                    {isRequesting ? <span className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                                    Get Full Post
+                                  </button>
+                                </div>
                               )}
                             </div>
                           </div>
@@ -2004,6 +2052,18 @@ export function ClientDashboard({ workspaceId }: Props) {
               <input type="text" value={newTopicName} onChange={e => setNewTopicName(e.target.value)} placeholder="Topic name (e.g. 'Benefits of sedation dentistry')" className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600" />
               <input type="text" value={newTopicKeyword} onChange={e => setNewTopicKeyword(e.target.value)} placeholder="Target keyword (e.g. 'sedation dentistry benefits')" className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600" />
               <textarea value={newTopicNotes} onChange={e => setNewTopicNotes(e.target.value)} placeholder="Any notes or context for this topic... (optional)" rows={2} className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 resize-none" />
+              <div>
+                <div className="text-[10px] text-zinc-500 mb-1.5">What would you like?</div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setNewTopicServiceType('brief_only')} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border text-xs font-medium transition-all ${newTopicServiceType === 'brief_only' ? 'bg-teal-600/20 border-teal-500/40 text-teal-300' : 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}>
+                    <FileText className="w-3.5 h-3.5" /> Content Brief
+                  </button>
+                  <button onClick={() => setNewTopicServiceType('full_post')} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border text-xs font-medium transition-all ${newTopicServiceType === 'full_post' ? 'bg-gradient-to-r from-blue-600/20 to-violet-600/20 border-blue-500/40 text-blue-300' : 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}>
+                    <Sparkles className="w-3.5 h-3.5" /> Full Blog Post
+                  </button>
+                </div>
+                <div className="text-[9px] text-zinc-600 mt-1">{newTopicServiceType === 'brief_only' ? 'A detailed content strategy document for this topic' : 'Brief + professionally written article delivered ready to publish'}</div>
+              </div>
               <div className="flex items-center gap-2">
                 <button onClick={submitClientTopic} disabled={!newTopicName.trim() || !newTopicKeyword.trim() || submittingTopic} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 text-xs text-white font-medium hover:bg-blue-500 transition-colors disabled:opacity-50">
                   {submittingTopic ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Submit Topic
@@ -2031,13 +2091,19 @@ export function ClientDashboard({ workspaceId }: Props) {
               const diff = priority(a.status) - priority(b.status);
               return diff !== 0 ? diff : b.updatedAt.localeCompare(a.updatedAt);
             }).map(req => {
-              const steps = ['requested', 'brief_generated', 'client_review', 'approved', 'in_progress', 'delivered'] as const;
-              const stepLabels = ['Requested', 'Brief Ready', 'Your Review', 'Approved', 'In Production', 'Delivered'];
+              const isBriefOnly = (req.serviceType || 'brief_only') === 'brief_only' && !req.upgradedAt;
+              const steps = isBriefOnly
+                ? ['requested', 'brief_generated', 'client_review', 'approved', 'delivered'] as const
+                : ['requested', 'brief_generated', 'client_review', 'approved', 'in_progress', 'delivered'] as const;
+              const stepLabels = isBriefOnly
+                ? ['Requested', 'Brief Ready', 'Your Review', 'Approved', 'Brief Delivered']
+                : ['Requested', 'Brief Ready', 'Your Review', 'Approved', 'In Production', 'Delivered'];
               // Map changes_requested back to client_review step for timeline display
               const displayStatus = req.status === 'changes_requested' ? 'client_review' : req.status;
-              const currentIdx = steps.indexOf(displayStatus as typeof steps[number]);
+              const currentIdx = (steps as readonly string[]).indexOf(displayStatus);
               const isExpanded = expandedContentReq === req.id;
               const brief = req.briefId ? briefPreviews[req.briefId] : null;
+              const canUpgrade = isBriefOnly && ['approved', 'delivered'].includes(req.status);
 
               return (
                 <div key={req.id} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
@@ -2048,7 +2114,13 @@ export function ClientDashboard({ workspaceId }: Props) {
                   }} className="w-full px-5 py-4 text-left hover:bg-zinc-800/30 transition-colors">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold text-zinc-200">{req.topic}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-zinc-200">{req.topic}</span>
+                          <span className={`text-[8px] px-1.5 py-0.5 rounded border font-medium ${(req.serviceType || 'brief_only') === 'full_post' ? 'bg-gradient-to-r from-blue-500/10 to-violet-500/10 text-blue-300 border-blue-500/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
+                            {(req.serviceType || 'brief_only') === 'full_post' ? '✦ Full Post' : 'Brief'}
+                          </span>
+                          {req.upgradedAt && <span className="text-[8px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 font-medium">Upgraded</span>}
+                        </div>
                         <div className="text-xs text-teal-400 mt-0.5">&ldquo;{req.targetKeyword}&rdquo;</div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -2310,6 +2382,27 @@ export function ClientDashboard({ workspaceId }: Props) {
                           </button>
                           <button onClick={() => { setDeclineReqId(req.id); setDeclineReason(''); }} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-zinc-800 text-xs text-zinc-500 hover:text-red-400 transition-colors">
                             <X className="w-3.5 h-3.5" /> Decline
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Upgrade CTA for brief_only items after approval */}
+                      {canUpgrade && (
+                        <div className="bg-gradient-to-r from-blue-600/10 via-violet-600/10 to-blue-600/10 border border-blue-500/20 rounded-xl p-4 flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-violet-500/20 flex items-center justify-center flex-shrink-0">
+                            <Sparkles className="w-5 h-5 text-blue-400" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="text-xs font-semibold text-blue-200">Want the full article written?</div>
+                            <div className="text-[10px] text-zinc-400 mt-0.5 leading-relaxed">Love the brief? Upgrade to a professionally written blog post delivered ready to publish.</div>
+                          </div>
+                          <button
+                            disabled={upgradingReqId === req.id}
+                            onClick={(e) => { e.stopPropagation(); upgradeToFullPost(req.id); }}
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-violet-600 text-xs text-white font-medium hover:from-blue-500 hover:to-violet-500 transition-all disabled:opacity-50 flex-shrink-0 shadow-lg shadow-blue-900/20"
+                          >
+                            {upgradingReqId === req.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                            Upgrade to Full Post
                           </button>
                         </div>
                       )}
