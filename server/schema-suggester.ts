@@ -441,6 +441,7 @@ export async function generateSchemaSuggestions(
   tokenOverride?: string,
   ctx: SchemaContext = {},
   pageKeywordMap?: { pagePath: string; primaryKeyword: string; secondaryKeywords: string[]; searchIntent?: string }[],
+  onProgress?: (partial: SchemaPageSuggestion[], done: boolean, message: string) => void,
 ): Promise<SchemaPageSuggestion[]> {
   const subdomain = await getSiteSubdomain(siteId, tokenOverride);
   const liveDomain = ctx.liveDomain;
@@ -556,6 +557,7 @@ export async function generateSchemaSuggestions(
       })
     );
     results.push(...chunkResults.filter(Boolean) as SchemaPageSuggestion[]);
+    onProgress?.(results, false, `Processed ${Math.min(i + batch, pages.length)} of ${pages.length} static pages...`);
   }
 
   // ── Also analyze CMS/collection pages discovered via sitemap ──
@@ -633,6 +635,7 @@ export async function generateSchemaSuggestions(
         })
       );
       results.push(...chunkResults.filter(Boolean) as SchemaPageSuggestion[]);
+      onProgress?.(results, false, `Processed ${Math.min(i + batch, cmsUrls.length)} of ${cmsUrls.length} CMS pages...`);
     }
   }
 

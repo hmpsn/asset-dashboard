@@ -9,6 +9,8 @@ const TYPE_LABELS: Record<string, string> = {
   'bulk-alt': 'Bulk Alt Text',
   'bulk-seo-fix': 'Bulk SEO Fix',
   'sales-report': 'Sales Report',
+  'schema-generator': 'Schema Generator',
+  'keyword-strategy': 'Keyword Strategy',
 };
 
 function JobRow({ job, onDismiss }: { job: BackgroundJob; onDismiss: () => void }) {

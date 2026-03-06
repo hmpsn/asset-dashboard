@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Loader2, ChevronDown, ChevronRight, Copy, CheckCircle,
   AlertCircle, Info, Sparkles, RefreshCw, Upload,
 } from 'lucide-react';
+import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 
 interface SchemaSuggestion {
   type: string;
@@ -23,11 +24,13 @@ interface SchemaPageSuggestion {
 
 interface Props {
   siteId: string;
+  workspaceId?: string;
 }
 
-export function SchemaSuggester({ siteId }: Props) {
+export function SchemaSuggester({ siteId, workspaceId }: Props) {
   const [data, setData] = useState<SchemaPageSuggestion[] | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [started, setStarted] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [regenerating, setRegenerating] = useState<Set<string>>(new Set());
@@ -36,36 +39,47 @@ export function SchemaSuggester({ siteId }: Props) {
   const [publishError, setPublishError] = useState<Record<string, string>>({});
   const [scanError, setScanError] = useState<string | null>(null);
   const [confirmPublish, setConfirmPublish] = useState<string | null>(null);
+  const [progressMsg, setProgressMsg] = useState<string | null>(null);
+  const { jobs, startJob } = useBackgroundTasks();
+  const jobIdRef = useRef<string | null>(null);
 
-  // Auto-run scan on mount
+  // Stream partial results from background job via WebSocket
   useEffect(() => {
-    setLoading(true);
-    setData(null);
-    setScanError(null);
-    fetch(`/api/webflow/schema-suggestions/${siteId}`)
-      .then(async r => {
-        const d = await r.json();
-        if (!r.ok || d.error) throw new Error(d.error || `Server error ${r.status}`);
-        return d;
-      })
-      .then(d => setData(Array.isArray(d) ? d : []))
-      .catch(err => { setScanError(err instanceof Error ? err.message : 'Scan failed'); setData(null); })
-      .finally(() => setLoading(false));
-  }, [siteId]);
+    if (!jobIdRef.current) return;
+    const job = jobs.find(j => j.id === jobIdRef.current);
+    if (!job) return;
+    if (job.result && Array.isArray(job.result) && job.result.length > 0) {
+      setData(job.result as SchemaPageSuggestion[]);
+    }
+    if (job.message) setProgressMsg(job.message);
+    if (job.status === 'done') {
+      setLoading(false);
+      if (job.result && Array.isArray(job.result)) {
+        setData(job.result as SchemaPageSuggestion[]);
+      }
+      setProgressMsg(null);
+      jobIdRef.current = null;
+    } else if (job.status === 'error') {
+      setLoading(false);
+      setScanError(job.error || 'Schema generation failed');
+      setProgressMsg(null);
+      jobIdRef.current = null;
+    }
+  }, [jobs]);
 
-  const rescan = () => {
+  const runScan = async () => {
+    setStarted(true);
     setLoading(true);
     setData(null);
     setScanError(null);
-    fetch(`/api/webflow/schema-suggestions/${siteId}`)
-      .then(async r => {
-        const d = await r.json();
-        if (!r.ok || d.error) throw new Error(d.error || `Server error ${r.status}`);
-        return d;
-      })
-      .then(d => setData(Array.isArray(d) ? d : []))
-      .catch(err => { setScanError(err instanceof Error ? err.message : 'Scan failed'); setData(null); })
-      .finally(() => setLoading(false));
+    setProgressMsg('Starting schema generation...');
+    const jobId = await startJob('schema-generator', { siteId, workspaceId: workspaceId || '' });
+    if (jobId) {
+      jobIdRef.current = jobId;
+    } else {
+      setScanError('Failed to start schema generation job');
+      setLoading(false);
+    }
   };
 
   const regeneratePage = async (pageId: string) => {
@@ -141,12 +155,32 @@ export function SchemaSuggester({ siteId }: Props) {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  if (loading) {
+  if (!started) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <div className="w-14 h-14 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
+          <Sparkles className="w-7 h-7 text-violet-400" />
+        </div>
+        <div className="text-center space-y-1.5">
+          <p className="text-sm font-medium text-zinc-200">Schema Generator</p>
+          <p className="text-xs text-zinc-500 max-w-sm">Scans all pages, generates optimized JSON-LD structured data with @graph, and validates against Google requirements. Schemas can be published directly to Webflow.</p>
+        </div>
+        <button
+          onClick={runScan}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-violet-600 hover:bg-violet-500 text-white transition-colors mt-2"
+        >
+          <Sparkles className="w-4 h-4" /> Generate Schemas
+        </button>
+      </div>
+    );
+  }
+
+  if (loading && (!data || data.length === 0)) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3 text-zinc-500">
         <Loader2 className="w-6 h-6 animate-spin" />
-        <p className="text-sm">Scanning pages for schema opportunities...</p>
-        <p className="text-xs text-zinc-600">Checking existing JSON-LD and identifying improvements</p>
+        <p className="text-sm">{progressMsg || 'Scanning pages for schema opportunities...'}</p>
+        <p className="text-xs text-zinc-600">Results will appear as each batch completes</p>
       </div>
     );
   }
@@ -157,7 +191,7 @@ export function SchemaSuggester({ siteId }: Props) {
         <AlertCircle className="w-8 h-8 text-red-400" />
         <p className="text-red-400 text-sm font-medium">Schema generation failed</p>
         <p className="text-zinc-500 text-xs max-w-md text-center">{scanError}</p>
-        <button onClick={rescan} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors mt-2">
+        <button onClick={runScan} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors mt-2">
           <RefreshCw className="w-3 h-3" /> Retry
         </button>
       </div>
@@ -169,7 +203,7 @@ export function SchemaSuggester({ siteId }: Props) {
       <div className="flex flex-col items-center justify-center py-16 gap-3">
         <CheckCircle className="w-8 h-8 text-green-400" />
         <p className="text-zinc-400 text-sm">No schema suggestions needed</p>
-        <button onClick={rescan} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors mt-2">
+        <button onClick={runScan} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors mt-2">
           <RefreshCw className="w-3 h-3" /> Re-scan
         </button>
       </div>
@@ -186,12 +220,20 @@ export function SchemaSuggester({ siteId }: Props) {
 
   return (
     <div className="space-y-4">
+      {/* Progress banner while streaming */}
+      {loading && (
+        <div className="flex items-center gap-2.5 px-4 py-2.5 bg-violet-500/10 border border-violet-500/20 rounded-xl">
+          <Loader2 className="w-4 h-4 animate-spin text-violet-400 flex-shrink-0" />
+          <span className="text-xs text-violet-300">{progressMsg || 'Generating schemas...'}</span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-zinc-500">{data.length} pages · {totalTypes} schema types generated</span>
+          <span className="text-xs text-zinc-500">{data.length} pages · {totalTypes} schema types generated{loading ? ' (so far)' : ''}</span>
         </div>
-        <button onClick={rescan} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors">
+        <button onClick={runScan} disabled={loading} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
           <RefreshCw className="w-3 h-3" /> Re-generate All
         </button>
       </div>

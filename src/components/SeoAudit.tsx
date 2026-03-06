@@ -924,7 +924,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
   if (view === 'strategy') return <KeywordStrategyPanel workspaceId={workspaceId || ''} siteId={siteId} />;
   if (view === 'redirects') return <RedirectManager siteId={siteId} />;
   if (view === 'internal') return <InternalLinks siteId={siteId} workspaceId={workspaceId} />;
-  if (view === 'schema') return <SchemaSuggester siteId={siteId} />;
+  if (view === 'schema') return <SchemaSuggester siteId={siteId} workspaceId={workspaceId} />;
   if (view === 'briefs') return <ContentBriefs workspaceId={workspaceId || ''} onRequestCountChange={onRequestCountChange} />;
   if (view === 'competitors') return <CompetitorAnalysis siteId={siteId} />;
   if (view === 'ranks') return <RankTracker workspaceId={workspaceId || ''} hasGsc={!!workspaceId} />;

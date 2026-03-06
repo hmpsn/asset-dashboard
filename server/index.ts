@@ -4614,11 +4614,15 @@ app.post('/api/jobs', async (req, res) => {
           try {
             updateJob(job.id, { status: 'running', message: 'Scanning pages and generating unified schemas...' });
             const { ctx, pageKeywordMap } = buildSchemaContext(schemaSiteId);
-            const result = await generateSchemaSuggestions(schemaSiteId, schemaToken, ctx, pageKeywordMap);
+            const result = await generateSchemaSuggestions(schemaSiteId, schemaToken, ctx, pageKeywordMap, (partial, _done, message) => {
+              updateJob(job.id, { status: 'running', result: partial, message, progress: partial.length });
+            });
             updateJob(job.id, {
               status: 'done',
               result,
               message: `Done — ${result.length} page schemas generated`,
+              progress: result.length,
+              total: result.length,
             });
           } catch (err) {
             updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Schema generation failed' });
