@@ -56,6 +56,7 @@ import {
 } from './reports.js';
 import { runSiteSpeed, runSinglePageSpeed } from './pagespeed.js';
 import { generateSchemaSuggestions, generateSchemaForPage, type SchemaContext } from './schema-suggester.js';
+import { saveSchemaSnapshot, getSchemaSnapshot } from './schema-store.js';
 import { runSalesAudit } from './sales-audit.js';
 import { initJobs, createJob, updateJob, getJob, listJobs, cancelJob, registerAbort, isJobCancelled } from './jobs.js';
 import { createBatch, listBatches, getBatch, updateItem, markBatchApplied, deleteBatch } from './approvals.js';
@@ -1035,6 +1036,13 @@ app.get('/api/webflow/schema-suggestions/:siteId', async (req, res) => {
   }
 });
 
+// Load previously saved schema results from disk
+app.get('/api/webflow/schema-snapshot/:siteId', (req, res) => {
+  const snapshot = getSchemaSnapshot(req.params.siteId);
+  if (!snapshot) return res.json(null);
+  res.json(snapshot);
+});
+
 app.post('/api/webflow/schema-suggestions/:siteId/page', async (req, res) => {
   const { pageId } = req.body;
   if (!pageId) return res.status(400).json({ error: 'pageId required' });
@@ -1305,7 +1313,10 @@ app.get('/api/webflow/link-check/:siteId', async (req, res) => {
 app.get('/api/webflow/redirect-scan/:siteId', async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
-    const result = await scanRedirects(req.params.siteId, token);
+    // Resolve live domain from workspace so we scan the real site, not .webflow.io
+    const allWs = listWorkspaces();
+    const ws = allWs.find(w => w.webflowSiteId === req.params.siteId);
+    const result = await scanRedirects(req.params.siteId, token, ws?.liveDomain);
     res.json(result);
   } catch (err) {
     console.error('Redirect scan error:', err);
@@ -4629,6 +4640,10 @@ app.post('/api/jobs', async (req, res) => {
             const result = await generateSchemaSuggestions(schemaSiteId, schemaToken, ctx, pageKeywordMap, (partial, _done, message) => {
               updateJob(job.id, { status: 'running', result: partial, message, progress: partial.length });
             }, () => isJobCancelled(job.id));
+            // Persist to disk so results survive deploys
+            if (result.length > 0) {
+              saveSchemaSnapshot(schemaSiteId, (params.workspaceId as string) || '', result);
+            }
             if (isJobCancelled(job.id)) {
               updateJob(job.id, { status: 'cancelled', result, message: `Cancelled — ${result.length} pages completed before stop` });
             } else {

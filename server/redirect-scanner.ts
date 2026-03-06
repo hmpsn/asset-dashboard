@@ -36,6 +36,8 @@ export interface PageStatus {
   status: number | 'error';
   statusText: string;
   redirectsTo?: string;
+  recommendedTarget?: string;
+  recommendedReason?: string;
   source: 'static' | 'cms';
 }
 
@@ -139,10 +141,66 @@ async function checkPageStatus(url: string): Promise<{ status: number | 'error';
   }
 }
 
-export async function scanRedirects(siteId: string, tokenOverride?: string): Promise<RedirectScanResult> {
+/**
+ * Match a broken/redirecting path against healthy pages by slug keyword overlap.
+ * Returns the best-matching healthy page, or null if no reasonable match.
+ */
+function findBestMatch(brokenPath: string, healthyPages: PageStatus[]): PageStatus | null {
+  if (healthyPages.length === 0) return null;
+
+  // Tokenize path into meaningful words (strip leading slash, split on / and -)
+  const tokenize = (p: string) =>
+    p.replace(/^\//, '').toLowerCase().split(/[-_/]+/).filter(t => t.length > 1);
+
+  const brokenTokens = tokenize(brokenPath);
+  if (brokenTokens.length === 0) return null;
+
+  let bestScore = 0;
+  let bestPage: PageStatus | null = null;
+
+  for (const page of healthyPages) {
+    if (page.path === '/' && brokenPath !== '/') continue; // don't recommend homepage for everything
+
+    const pageTokens = tokenize(page.path);
+    const titleTokens = page.title.toLowerCase().split(/\s+/).filter(t => t.length > 2);
+    const allPageTokens = [...new Set([...pageTokens, ...titleTokens])];
+
+    // Score: count overlapping tokens
+    let score = 0;
+    for (const bt of brokenTokens) {
+      for (const pt of allPageTokens) {
+        if (bt === pt) { score += 3; break; }
+        if (pt.includes(bt) || bt.includes(pt)) { score += 1.5; break; }
+      }
+    }
+
+    // Bonus for matching path depth
+    const brokenDepth = brokenPath.split('/').filter(Boolean).length;
+    const pageDepth = page.path.split('/').filter(Boolean).length;
+    if (brokenDepth === pageDepth) score += 0.5;
+
+    // Bonus for shared path prefix
+    if (brokenPath.length > 1 && page.path.startsWith(brokenPath.split('/').slice(0, 2).join('/'))) {
+      score += 1;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestPage = page;
+    }
+  }
+
+  // Only return if there's a meaningful match (at least one full token match)
+  return bestScore >= 3 ? bestPage : null;
+}
+
+export async function scanRedirects(siteId: string, tokenOverride?: string, liveDomain?: string): Promise<RedirectScanResult> {
   const token = tokenOverride || process.env.WEBFLOW_API_TOKEN || '';
   const subdomain = await getSiteSubdomain(siteId, token);
-  const baseUrl = subdomain ? `https://${subdomain}.webflow.io` : '';
+  const baseUrl = liveDomain
+    ? (liveDomain.startsWith('http') ? liveDomain : `https://${liveDomain}`)
+    : subdomain ? `https://${subdomain}.webflow.io` : '';
+  console.log(`[redirect-scanner] Using baseUrl: ${baseUrl} (liveDomain=${liveDomain || '(none)'})`);
   if (!baseUrl) {
     return {
       chains: [],
@@ -264,6 +322,34 @@ export async function scanRedirects(siteId: string, tokenOverride?: string): Pro
   }
 
   const longestChain = chains.reduce((max, c) => Math.max(max, c.totalHops), 0);
+
+  // 6. Generate redirect target recommendations for redirecting and 404 pages
+  const healthyPages = pageStatuses.filter(p => typeof p.status === 'number' && p.status >= 200 && p.status < 300);
+  for (const ps of pageStatuses) {
+    if (typeof ps.status !== 'number') continue;
+    if (ps.status >= 300 && ps.status < 400 && ps.redirectsTo) {
+      // Already redirecting — check if destination is healthy
+      const destPath = (() => { try { return new URL(ps.redirectsTo).pathname; } catch { return null; } })();
+      if (destPath) {
+        const destPage = pageStatuses.find(p => p.path === destPath);
+        if (destPage && (destPage.status === 'error' || (typeof destPage.status === 'number' && destPage.status >= 400))) {
+          // Destination is broken — recommend a better target
+          const match = findBestMatch(ps.path, healthyPages);
+          if (match) {
+            ps.recommendedTarget = match.path;
+            ps.recommendedReason = `Current destination ${destPath} returns ${destPage.status}. Suggested: ${match.path} (${match.title})`;
+          }
+        }
+      }
+    } else if (ps.status >= 400 && ps.status < 500) {
+      // 404 — recommend a redirect target
+      const match = findBestMatch(ps.path, healthyPages);
+      if (match) {
+        ps.recommendedTarget = match.path;
+        ps.recommendedReason = `Page not found. Best match: ${match.title}`;
+      }
+    }
+  }
 
   console.log(`Redirect scanner: ${healthy} healthy, ${redirecting} redirecting, ${notFound} not found, ${chains.length} chains`);
 

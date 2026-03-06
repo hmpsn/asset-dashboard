@@ -45,6 +45,22 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
   const { jobs, startJob, cancelJob } = useBackgroundTasks();
   const jobIdRef = useRef<string | null>(null);
 
+  // Load saved schema snapshot on mount
+  const [snapshotDate, setSnapshotDate] = useState<string | null>(null);
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`/api/webflow/schema-snapshot/${siteId}`);
+        const snapshot = await res.json();
+        if (snapshot && snapshot.results && snapshot.results.length > 0) {
+          setData(snapshot.results);
+          setSnapshotDate(snapshot.createdAt);
+          setStarted(true);
+        }
+      } catch { /* no saved data */ }
+    })();
+  }, [siteId]);
+
   // Stream partial results from background job via WebSocket
   useEffect(() => {
     if (!jobIdRef.current) return;
@@ -272,7 +288,10 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-zinc-500">{data.length} pages · {totalTypes} schema types generated{loading ? ' (so far)' : ''}</span>
+          <span className="text-xs text-zinc-500">
+            {data.length} pages · {totalTypes} schema types generated{loading ? ' (so far)' : ''}
+            {snapshotDate && !loading && <span className="text-zinc-600"> · saved {new Date(snapshotDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
+          </span>
         </div>
         <div className="flex items-center gap-2">
           {!loading && data.length > 0 && (

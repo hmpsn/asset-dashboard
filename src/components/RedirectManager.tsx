@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   Loader2, ArrowRight, AlertTriangle, AlertCircle, CheckCircle,
   RefreshCw, ChevronDown, ChevronRight, ExternalLink, Search as SearchIcon,
-  CornerDownRight, Ban, Link2,
+  CornerDownRight, Ban, Link2, Download, Copy, Check, Sparkles, Edit3, X,
 } from 'lucide-react';
 
 interface RedirectHop {
@@ -27,7 +27,16 @@ interface PageStatus {
   status: number | 'error';
   statusText: string;
   redirectsTo?: string;
+  recommendedTarget?: string;
+  recommendedReason?: string;
   source: 'static' | 'cms';
+}
+
+interface RedirectRule {
+  from: string;
+  to: string;
+  reason: string;
+  accepted: boolean;
 }
 
 interface RedirectScanResult {
@@ -58,10 +67,15 @@ export function RedirectManager({ siteId }: Props) {
   const [filter, setFilter] = useState<ViewFilter>('all');
   const [search, setSearch] = useState('');
   const [expandedChains, setExpandedChains] = useState<Set<number>>(new Set());
+  const [rules, setRules] = useState<RedirectRule[]>([]);
+  const [editingRule, setEditingRule] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState('');
+  const [copiedRules, setCopiedRules] = useState(false);
 
   const runScan = async () => {
     setLoading(true);
     setError(null);
+    setRules([]);
     try {
       const res = await fetch(`/api/webflow/redirect-scan/${siteId}`);
       const result = await res.json();
@@ -69,12 +83,54 @@ export function RedirectManager({ siteId }: Props) {
         setError(result.error);
       } else {
         setData(result);
+        // Build initial redirect rules from recommendations
+        const newRules: RedirectRule[] = [];
+        for (const ps of result.pageStatuses) {
+          if (ps.recommendedTarget) {
+            newRules.push({
+              from: ps.path,
+              to: ps.recommendedTarget,
+              reason: ps.recommendedReason || '',
+              accepted: false,
+            });
+          }
+        }
+        setRules(newRules);
       }
     } catch {
       setError('Failed to scan redirects');
     } finally {
       setLoading(false);
     }
+  };
+
+  const acceptRule = (from: string) => setRules(prev => prev.map(r => r.from === from ? { ...r, accepted: true } : r));
+  const rejectRule = (from: string) => setRules(prev => prev.filter(r => r.from !== from));
+  const updateRuleTo = (from: string, newTo: string) => {
+    setRules(prev => prev.map(r => r.from === from ? { ...r, to: newTo, accepted: true } : r));
+    setEditingRule(null);
+    setEditDraft('');
+  };
+
+  const acceptedRules = rules.filter(r => r.accepted);
+
+  const exportCSV = () => {
+    const rows = acceptedRules.map(r => `${r.from},${r.to}`);
+    const csv = 'Old Path,Redirect To\n' + rows.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'webflow-redirects.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const copyRulesToClipboard = () => {
+    const text = acceptedRules.map(r => `${r.from} → ${r.to}`).join('\n');
+    navigator.clipboard.writeText(text);
+    setCopiedRules(true);
+    setTimeout(() => setCopiedRules(false), 2000);
   };
 
   const toggleChain = (idx: number) => {
@@ -257,6 +313,85 @@ export function RedirectManager({ siteId }: Props) {
         </div>
       )}
 
+      {/* Redirect Recommendations */}
+      {rules.length > 0 && (
+        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+          <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
+            <div>
+              <h4 className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-violet-400" /> Redirect Recommendations
+              </h4>
+              <p className="text-[10px] text-zinc-600 mt-0.5">
+                {rules.filter(r => !r.accepted).length > 0
+                  ? `Review ${rules.filter(r => !r.accepted).length} suggested redirect target${rules.filter(r => !r.accepted).length !== 1 ? 's' : ''}. Accept, edit, or dismiss.`
+                  : `${acceptedRules.length} redirect rule${acceptedRules.length !== 1 ? 's' : ''} ready to export.`}
+              </p>
+            </div>
+            {acceptedRules.length > 0 && (
+              <div className="flex items-center gap-2">
+                <button onClick={copyRulesToClipboard} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-[10px] font-medium transition-colors">
+                  {copiedRules ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
+                  {copiedRules ? 'Copied!' : 'Copy All'}
+                </button>
+                <button onClick={exportCSV} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-[10px] font-medium transition-colors">
+                  <Download className="w-3 h-3" /> Export CSV
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="divide-y divide-zinc-800/50 max-h-[300px] overflow-y-auto">
+            {rules.map(rule => (
+              <div key={rule.from} className="px-4 py-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs text-zinc-300 font-mono">{rule.from}</span>
+                  <ArrowRight className="w-3 h-3 text-zinc-600 flex-shrink-0" />
+                  {editingRule === rule.from ? (
+                    <div className="flex items-center gap-1.5 flex-1">
+                      <input
+                        type="text"
+                        value={editDraft}
+                        onChange={e => setEditDraft(e.target.value)}
+                        className="flex-1 px-2 py-1 bg-zinc-800 border border-violet-500/50 rounded text-xs text-zinc-200 font-mono focus:outline-none focus:border-violet-400"
+                        autoFocus
+                        onKeyDown={e => { if (e.key === 'Enter') updateRuleTo(rule.from, editDraft); if (e.key === 'Escape') { setEditingRule(null); setEditDraft(''); } }}
+                      />
+                      <button onClick={() => updateRuleTo(rule.from, editDraft)} className="px-2 py-1 bg-violet-600 hover:bg-violet-500 rounded text-[10px] font-medium text-white transition-colors">Save</button>
+                      <button onClick={() => { setEditingRule(null); setEditDraft(''); }} className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 rounded text-[10px] text-zinc-400 transition-colors">Cancel</button>
+                    </div>
+                  ) : (
+                    <span className={`text-xs font-mono ${rule.accepted ? 'text-green-400' : 'text-violet-400'}`}>{rule.to}</span>
+                  )}
+                  {rule.accepted && !editingRule && (
+                    <Check className="w-3 h-3 text-green-400 flex-shrink-0" />
+                  )}
+                </div>
+                <div className="text-[10px] text-zinc-600 mb-2">{rule.reason}</div>
+                {!rule.accepted && editingRule !== rule.from && (
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => acceptRule(rule.from)} className="flex items-center gap-1 px-2.5 py-1 bg-green-600/80 hover:bg-green-500 rounded text-[10px] font-medium text-white transition-colors">
+                      <Check className="w-3 h-3" /> Accept
+                    </button>
+                    <button onClick={() => { setEditingRule(rule.from); setEditDraft(rule.to); }} className="flex items-center gap-1 px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-[10px] font-medium text-zinc-300 transition-colors">
+                      <Edit3 className="w-3 h-3" /> Edit Target
+                    </button>
+                    <button onClick={() => rejectRule(rule.from)} className="flex items-center gap-1 px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-[10px] font-medium text-red-400 transition-colors">
+                      <X className="w-3 h-3" /> Dismiss
+                    </button>
+                  </div>
+                )}
+                {rule.accepted && editingRule !== rule.from && (
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => { setEditingRule(rule.from); setEditDraft(rule.to); }} className="text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors">
+                      Change target
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Filter tabs + search */}
       <div className="flex items-center gap-2">
         <div className="flex items-center gap-0.5">
@@ -307,28 +442,43 @@ export function RedirectManager({ siteId }: Props) {
               {filter !== 'all' ? 'No pages match this filter' : 'No pages found'}
             </div>
           ) : (
-            filteredPages.map((page, idx) => (
-              <div key={idx} className="grid grid-cols-[auto_1fr_80px_1fr] gap-0 px-4 py-2 border-b border-zinc-800/30 items-center hover:bg-zinc-800/10">
-                {statusBadge(page.status)}
-                <div className="min-w-0 pl-3">
-                  <span className="text-xs text-zinc-300 font-mono truncate block">{page.path}</span>
-                  <span className="text-[10px] text-zinc-600 truncate block">{page.title}</span>
-                </div>
-                <span className={`text-[10px] ${page.source === 'cms' ? 'text-violet-400' : 'text-zinc-500'}`}>
-                  {page.source}
-                </span>
-                <div className="min-w-0">
-                  {page.redirectsTo ? (
-                    <a href={page.redirectsTo} target="_blank" rel="noopener noreferrer" className="text-[11px] text-amber-400 hover:underline truncate block flex items-center gap-0.5">
-                      {(() => { try { return new URL(page.redirectsTo).pathname; } catch { return page.redirectsTo; } })()}
-                      <ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
-                    </a>
-                  ) : (
-                    <span className="text-[10px] text-zinc-700">—</span>
+            filteredPages.map((page, idx) => {
+              const rule = rules.find(r => r.from === page.path);
+              return (
+                <div key={idx} className="border-b border-zinc-800/30 hover:bg-zinc-800/10">
+                  <div className="grid grid-cols-[auto_1fr_80px_1fr] gap-0 px-4 py-2 items-center">
+                    {statusBadge(page.status)}
+                    <div className="min-w-0 pl-3">
+                      <span className="text-xs text-zinc-300 font-mono truncate block">{page.path}</span>
+                      <span className="text-[10px] text-zinc-600 truncate block">{page.title}</span>
+                    </div>
+                    <span className={`text-[10px] ${page.source === 'cms' ? 'text-violet-400' : 'text-zinc-500'}`}>
+                      {page.source}
+                    </span>
+                    <div className="min-w-0">
+                      {page.redirectsTo ? (
+                        <a href={page.redirectsTo} target="_blank" rel="noopener noreferrer" className="text-[11px] text-amber-400 hover:underline truncate block flex items-center gap-0.5">
+                          {(() => { try { return new URL(page.redirectsTo).pathname; } catch { return page.redirectsTo; } })()}
+                          <ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
+                        </a>
+                      ) : (
+                        <span className="text-[10px] text-zinc-700">—</span>
+                      )}
+                    </div>
+                  </div>
+                  {rule && (
+                    <div className="px-4 pb-2 pl-[calc(auto+0.75rem)] ml-10">
+                      <div className="flex items-center gap-1.5 text-[10px]">
+                        <Sparkles className="w-3 h-3 text-violet-400 flex-shrink-0" />
+                        <span className="text-violet-400">Suggested redirect:</span>
+                        <span className="text-zinc-300 font-mono">{rule.to}</span>
+                        {rule.accepted && <Check className="w-3 h-3 text-green-400" />}
+                      </div>
+                    </div>
                   )}
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
@@ -344,6 +494,9 @@ export function RedirectManager({ siteId }: Props) {
               )}
               {summary.notFound > 0 && (
                 <p><strong className="text-zinc-400">404 pages:</strong> Set up 301 redirects in Webflow (Settings → Hosting → 301 Redirects) to preserve link equity and fix broken bookmarks.</p>
+              )}
+              {acceptedRules.length > 0 && (
+                <p><strong className="text-zinc-400">Ready to apply:</strong> You have {acceptedRules.length} accepted redirect rule{acceptedRules.length !== 1 ? 's' : ''}. Export as CSV and import in Webflow Settings → Hosting → 301 Redirects.</p>
               )}
             </div>
           </div>
