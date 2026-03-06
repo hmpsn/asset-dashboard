@@ -4676,8 +4676,7 @@ app.post('/api/jobs', async (req, res) => {
           try {
             updateJob(job.id, { status: 'running', message: 'Crawling site...' });
             const result = await runSalesAudit(url, maxPages || 25);
-            const reportsDir = path.join(IS_PROD ? '/tmp/asset-dashboard' : path.join(__dirname, '..'), 'sales-reports');
-            fs.mkdirSync(reportsDir, { recursive: true });
+            const reportsDir = getDataDir('sales-reports');
             const reportId = `sr_${Date.now()}`;
             const reportFile = path.join(reportsDir, `${reportId}.json`);
             fs.writeFileSync(reportFile, JSON.stringify({ id: reportId, ...result, createdAt: new Date().toISOString() }));
