@@ -4,6 +4,7 @@ import {
   BarChart3, ExternalLink, ArrowUpDown,
   Sparkles, Send, AlertTriangle, Target, Zap, Shield, MessageSquare, X,
 } from 'lucide-react';
+import { ChartPointDetail } from './ChartPointDetail';
 
 interface SearchQuery {
   query: string;
@@ -70,6 +71,7 @@ function MiniSparkline({ data, color }: { data: number[]; color: string }) {
 }
 
 function TrendChart({ data, metric, color, height = 80 }: { data: PerformanceTrend[]; metric: keyof PerformanceTrend; color: string; height?: number }) {
+  const [selected, setSelected] = useState<number | null>(null);
   if (data.length < 2) return null;
   const values = data.map(d => d[metric] as number);
   const max = Math.max(...values);
@@ -77,25 +79,51 @@ function TrendChart({ data, metric, color, height = 80 }: { data: PerformanceTre
   const range = max - min || 1;
   const w = 100;
 
-  const points = values.map((v, i) => {
-    const x = (i / (values.length - 1)) * w;
-    const y = 100 - ((v - min) / range) * 90 - 5;
-    return `${x},${y}`;
-  }).join(' ');
-
+  const pointCoords = values.map((v, i) => ({
+    x: (i / (values.length - 1)) * w,
+    y: 100 - ((v - min) / range) * 90 - 5,
+  }));
+  const points = pointCoords.map(p => `${p.x},${p.y}`).join(' ');
   const areaPoints = `0,100 ${points} ${w},100`;
+  const bandW = w / data.length;
 
   return (
-    <svg viewBox={`0 0 ${w} 100`} className="w-full" style={{ height }} preserveAspectRatio="none">
-      <defs>
-        <linearGradient id={`grad-${metric}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.2" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <polygon fill={`url(#grad-${metric})`} points={areaPoints} />
-      <polyline fill="none" stroke={color} strokeWidth="1.5" points={points} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
-    </svg>
+    <div className="relative">
+      <svg viewBox={`0 0 ${w} 100`} className="w-full" style={{ height }} preserveAspectRatio="none">
+        <defs>
+          <linearGradient id={`grad-${metric}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.2" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <polygon fill={`url(#grad-${metric})`} points={areaPoints} />
+        <polyline fill="none" stroke={color} strokeWidth="1.5" points={points} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+        {/* Clickable hit areas */}
+        {pointCoords.map((p, i) => (
+          <rect key={i} x={p.x - bandW / 2} y={0} width={bandW} height={100} fill="transparent" className="cursor-pointer" onClick={() => setSelected(selected === i ? null : i)} />
+        ))}
+        {/* Selected point indicator */}
+        {selected !== null && pointCoords[selected] && (
+          <>
+            <line x1={pointCoords[selected].x} y1={0} x2={pointCoords[selected].x} y2={100} stroke={color} strokeWidth="0.5" strokeDasharray="2,1.5" opacity="0.6" vectorEffect="non-scaling-stroke" />
+            <circle cx={pointCoords[selected].x} cy={pointCoords[selected].y} r="3" fill={color} stroke="#18181b" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+          </>
+        )}
+      </svg>
+      {selected !== null && data[selected] && (
+        <ChartPointDetail
+          date={data[selected].date}
+          xPct={(selected / (data.length - 1)) * 100}
+          onClose={() => setSelected(null)}
+          metrics={[
+            { label: 'Clicks', value: data[selected].clicks, color: '#60a5fa' },
+            { label: 'Impressions', value: data[selected].impressions, color: '#a78bfa' },
+            { label: 'CTR', value: `${data[selected].ctr}%`, color: '#34d399' },
+            { label: 'Position', value: data[selected].position, color: '#fbbf24' },
+          ]}
+        />
+      )}
+    </div>
   );
 }
 

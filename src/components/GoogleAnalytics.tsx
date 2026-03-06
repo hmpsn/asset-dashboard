@@ -3,6 +3,7 @@ import {
   Loader2, Users, Eye, Clock, ArrowUpDown, Globe, Monitor, Smartphone, Tablet,
   TrendingUp, TrendingDown, BarChart3,
 } from 'lucide-react';
+import { ChartPointDetail } from './ChartPointDetail';
 
 interface GA4Overview {
   totalUsers: number;
@@ -55,6 +56,7 @@ interface Props {
 
 // ── Mini trend chart (SVG) ──
 function TrendChart({ data, dataKey, color }: { data: GA4DailyTrend[]; dataKey: 'users' | 'sessions' | 'pageviews'; color: string }) {
+  const [selected, setSelected] = useState<number | null>(null);
   if (data.length < 2) return null;
   const values = data.map(d => d[dataKey]);
   const max = Math.max(...values, 1);
@@ -72,21 +74,47 @@ function TrendChart({ data, dataKey, color }: { data: GA4DailyTrend[]; dataKey: 
 
   const line = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
   const area = `${line} L${points[points.length - 1].x},${H - pad.bottom} L${points[0].x},${H - pad.bottom} Z`;
+  const bandW = W / data.length;
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[120px]">
-      <defs>
-        <linearGradient id={`grad-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.2" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={area} fill={`url(#grad-${dataKey})`} />
-      <path d={line} fill="none" stroke={color} strokeWidth="2" />
-      {/* First and last date labels */}
-      <text x={pad.left} y={H - 4} fill="#52525b" fontSize="10" textAnchor="start">{data[0].date}</text>
-      <text x={W - pad.right} y={H - 4} fill="#52525b" fontSize="10" textAnchor="end">{data[data.length - 1].date}</text>
-    </svg>
+    <div className="relative">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[120px]">
+        <defs>
+          <linearGradient id={`grad-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.2" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d={area} fill={`url(#grad-${dataKey})`} />
+        <path d={line} fill="none" stroke={color} strokeWidth="2" />
+        {/* Clickable hit areas */}
+        {points.map((p, i) => (
+          <rect key={i} x={p.x - bandW / 2} y={0} width={bandW} height={H - pad.bottom} fill="transparent" className="cursor-pointer" onClick={() => setSelected(selected === i ? null : i)} />
+        ))}
+        {/* Selected point indicator */}
+        {selected !== null && points[selected] && (
+          <>
+            <line x1={points[selected].x} y1={pad.top} x2={points[selected].x} y2={H - pad.bottom} stroke={color} strokeWidth="1" strokeDasharray="4,3" opacity="0.5" />
+            <circle cx={points[selected].x} cy={points[selected].y} r="4" fill={color} stroke="#18181b" strokeWidth="2" />
+          </>
+        )}
+        {/* First and last date labels */}
+        <text x={pad.left} y={H - 4} fill="#52525b" fontSize="10" textAnchor="start">{data[0].date}</text>
+        <text x={W - pad.right} y={H - 4} fill="#52525b" fontSize="10" textAnchor="end">{data[data.length - 1].date}</text>
+      </svg>
+      {selected !== null && data[selected] && (
+        <ChartPointDetail
+          date={data[selected].date}
+          xPct={(selected / (data.length - 1)) * 100}
+          onClose={() => setSelected(null)}
+          metrics={[
+            { label: 'Users', value: data[selected].users, color: '#60a5fa' },
+            { label: 'Sessions', value: data[selected].sessions, color: '#a78bfa' },
+            { label: 'Pageviews', value: data[selected].pageviews, color: '#34d399' },
+          ]}
+        />
+      )}
+    </div>
   );
 }
 

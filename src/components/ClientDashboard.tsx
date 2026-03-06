@@ -8,6 +8,7 @@ import {
   Sun, Moon, Plus, Paperclip, FileText, Download,
 } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
+import { ChartPointDetail } from './ChartPointDetail';
 
 interface SearchQuery { query: string; clicks: number; impressions: number; ctr: number; position: number; }
 interface SearchPage { page: string; clicks: number; impressions: number; ctr: number; position: number; }
@@ -136,30 +137,61 @@ function MiniSparkline({ data, color }: { data: number[]; color: string }) {
 }
 
 function TrendChart({ data, metric, color }: { data: PerformanceTrend[]; metric: keyof PerformanceTrend; color: string }) {
+  const [selected, setSelected] = useState<number | null>(null);
   if (data.length < 2) return null;
   const values = data.map(d => d[metric] as number);
   const max = Math.max(...values), min = Math.min(...values), range = max - min || 1, w = 100;
-  const points = values.map((v, i) => `${(i / (values.length - 1)) * w},${100 - ((v - min) / range) * 90 - 5}`).join(' ');
+  const pointCoords = values.map((v, i) => ({ x: (i / (values.length - 1)) * w, y: 100 - ((v - min) / range) * 90 - 5 }));
+  const points = pointCoords.map(p => `${p.x},${p.y}`).join(' ');
+  const bandW = w / data.length;
   return (
-    <svg viewBox={`0 0 ${w} 100`} className="w-full" style={{ height: 80 }} preserveAspectRatio="none">
-      <defs><linearGradient id={`cg-${metric}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={color} stopOpacity="0.2" /><stop offset="100%" stopColor={color} stopOpacity="0" /></linearGradient></defs>
-      <polygon fill={`url(#cg-${metric})`} points={`0,100 ${points} ${w},100`} />
-      <polyline fill="none" stroke={color} strokeWidth="1.5" points={points} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
-    </svg>
+    <div className="relative">
+      <svg viewBox={`0 0 ${w} 100`} className="w-full" style={{ height: 80 }} preserveAspectRatio="none">
+        <defs><linearGradient id={`cg-${metric}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={color} stopOpacity="0.2" /><stop offset="100%" stopColor={color} stopOpacity="0" /></linearGradient></defs>
+        <polygon fill={`url(#cg-${metric})`} points={`0,100 ${points} ${w},100`} />
+        <polyline fill="none" stroke={color} strokeWidth="1.5" points={points} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+        {pointCoords.map((p, i) => (
+          <rect key={i} x={p.x - bandW / 2} y={0} width={bandW} height={100} fill="transparent" className="cursor-pointer" onClick={() => setSelected(selected === i ? null : i)} />
+        ))}
+        {selected !== null && pointCoords[selected] && (
+          <>
+            <line x1={pointCoords[selected].x} y1={0} x2={pointCoords[selected].x} y2={100} stroke={color} strokeWidth="0.5" strokeDasharray="2,1.5" opacity="0.6" vectorEffect="non-scaling-stroke" />
+            <circle cx={pointCoords[selected].x} cy={pointCoords[selected].y} r="3" fill={color} stroke="#18181b" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+          </>
+        )}
+      </svg>
+      {selected !== null && data[selected] && (
+        <ChartPointDetail
+          date={data[selected].date}
+          xPct={(selected / (data.length - 1)) * 100}
+          onClose={() => setSelected(null)}
+          metrics={[
+            { label: 'Clicks', value: data[selected].clicks, color: '#60a5fa' },
+            { label: 'Impressions', value: data[selected].impressions, color: '#a78bfa' },
+            { label: 'CTR', value: `${data[selected].ctr}%`, color: '#34d399' },
+            { label: 'Position', value: data[selected].position, color: '#fbbf24' },
+          ]}
+        />
+      )}
+    </div>
   );
 }
 
 function DualTrendChart({ data, annotations: anns }: { data: PerformanceTrend[]; annotations?: { id: string; date: string; label: string; color?: string }[] }) {
+  const [selected, setSelected] = useState<number | null>(null);
   if (data.length < 2) return null;
   const clicks = data.map(d => d.clicks);
   const imps = data.map(d => d.impressions);
   const cMax = Math.max(...clicks), cMin = Math.min(...clicks), cRange = cMax - cMin || 1;
   const iMax = Math.max(...imps), iMin = Math.min(...imps), iRange = iMax - iMin || 1;
   const w = 100;
-  const cPoints = clicks.map((v, i) => `${(i / (clicks.length - 1)) * w},${100 - ((v - cMin) / cRange) * 85 - 7}`).join(' ');
-  const iPoints = imps.map((v, i) => `${(i / (imps.length - 1)) * w},${100 - ((v - iMin) / iRange) * 85 - 7}`).join(' ');
+  const cCoords = clicks.map((v, i) => ({ x: (i / (clicks.length - 1)) * w, y: 100 - ((v - cMin) / cRange) * 85 - 7 }));
+  const iCoords = imps.map((v, i) => ({ x: (i / (imps.length - 1)) * w, y: 100 - ((v - iMin) / iRange) * 85 - 7 }));
+  const cPoints = cCoords.map(p => `${p.x},${p.y}`).join(' ');
+  const iPoints = iCoords.map(p => `${p.x},${p.y}`).join(' ');
+  const bandW = w / data.length;
   return (
-    <div>
+    <div className="relative">
       <div className="flex items-center gap-4 mb-2">
         <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded bg-blue-400" /><span className="text-[10px] text-blue-400">Clicks</span></div>
         <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded bg-teal-400" /><span className="text-[10px] text-teal-400">Impressions</span></div>
@@ -179,7 +211,32 @@ function DualTrendChart({ data, annotations: anns }: { data: PerformanceTrend[];
           const x = (idx / (data.length - 1)) * w;
           return <g key={ann.id}><line x1={x} y1={2} x2={x} y2={98} stroke={ann.color || '#2dd4bf'} strokeWidth="0.8" strokeDasharray="2,1.5" opacity="0.7" vectorEffect="non-scaling-stroke" /><circle cx={x} cy={3} r="1.5" fill={ann.color || '#2dd4bf'} vectorEffect="non-scaling-stroke" /><title>{ann.label}</title></g>;
         })}
+        {/* Clickable hit areas */}
+        {cCoords.map((p, i) => (
+          <rect key={i} x={p.x - bandW / 2} y={0} width={bandW} height={100} fill="transparent" className="cursor-pointer" onClick={() => setSelected(selected === i ? null : i)} />
+        ))}
+        {/* Selected point indicators */}
+        {selected !== null && cCoords[selected] && (
+          <>
+            <line x1={cCoords[selected].x} y1={2} x2={cCoords[selected].x} y2={98} stroke="#a1a1aa" strokeWidth="0.5" strokeDasharray="2,1.5" opacity="0.5" vectorEffect="non-scaling-stroke" />
+            <circle cx={cCoords[selected].x} cy={cCoords[selected].y} r="3" fill="#60a5fa" stroke="#18181b" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+            <circle cx={iCoords[selected].x} cy={iCoords[selected].y} r="3" fill="#2dd4bf" stroke="#18181b" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+          </>
+        )}
       </svg>
+      {selected !== null && data[selected] && (
+        <ChartPointDetail
+          date={data[selected].date}
+          xPct={(selected / (data.length - 1)) * 100}
+          onClose={() => setSelected(null)}
+          metrics={[
+            { label: 'Clicks', value: data[selected].clicks, color: '#60a5fa' },
+            { label: 'Impressions', value: data[selected].impressions, color: '#2dd4bf' },
+            { label: 'CTR', value: `${data[selected].ctr}%`, color: '#34d399' },
+            { label: 'Position', value: data[selected].position, color: '#fbbf24' },
+          ]}
+        />
+      )}
     </div>
   );
 }
@@ -200,19 +257,42 @@ function ScoreRing({ score, size = 120 }: { score: number; size?: number }) {
 }
 
 function ScoreHistoryChart({ history }: { history: Array<{ id: string; createdAt: string; siteScore: number }> }) {
+  const [selected, setSelected] = useState<number | null>(null);
   if (history.length < 2) return null;
-  const scores = history.slice().reverse().map(h => h.siteScore);
+  const reversed = history.slice().reverse();
+  const scores = reversed.map(h => h.siteScore);
   const max = Math.max(...scores, 100), min = Math.min(...scores, 0), range = max - min || 1, w = 100;
-  const points = scores.map((v, i) => `${(i / (scores.length - 1)) * w},${100 - ((v - min) / range) * 85 - 5}`).join(' ');
+  const pointCoords = scores.map((v, i) => ({ x: (i / (scores.length - 1)) * w, y: 100 - ((v - min) / range) * 85 - 5 }));
+  const points = pointCoords.map(p => `${p.x},${p.y}`).join(' ');
+  const bandW = w / scores.length;
   return (
-    <div>
+    <div className="relative">
       <svg viewBox={`0 0 ${w} 100`} className="w-full" style={{ height: 60 }} preserveAspectRatio="none">
         <defs><linearGradient id="sh-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#34d399" stopOpacity="0.15" /><stop offset="100%" stopColor="#34d399" stopOpacity="0" /></linearGradient></defs>
         <polygon fill="url(#sh-g)" points={`0,100 ${points} ${w},100`} />
         <polyline fill="none" stroke="#34d399" strokeWidth="2" points={points} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+        {pointCoords.map((p, i) => (
+          <rect key={i} x={p.x - bandW / 2} y={0} width={bandW} height={100} fill="transparent" className="cursor-pointer" onClick={() => setSelected(selected === i ? null : i)} />
+        ))}
+        {selected !== null && pointCoords[selected] && (
+          <>
+            <line x1={pointCoords[selected].x} y1={0} x2={pointCoords[selected].x} y2={100} stroke="#34d399" strokeWidth="0.5" strokeDasharray="2,1.5" opacity="0.6" vectorEffect="non-scaling-stroke" />
+            <circle cx={pointCoords[selected].x} cy={pointCoords[selected].y} r="3" fill="#34d399" stroke="#18181b" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+          </>
+        )}
       </svg>
+      {selected !== null && reversed[selected] && (
+        <ChartPointDetail
+          date={new Date(reversed[selected].createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+          xPct={(selected / (scores.length - 1)) * 100}
+          onClose={() => setSelected(null)}
+          metrics={[
+            { label: 'Audit Score', value: `${reversed[selected].siteScore}/100`, color: reversed[selected].siteScore >= 80 ? '#34d399' : reversed[selected].siteScore >= 60 ? '#fbbf24' : '#f87171' },
+          ]}
+        />
+      )}
       <div className="flex justify-between text-[9px] text-zinc-600 mt-1">
-        {history.slice().reverse().map((h, i) => (i === 0 || i === history.length - 1)
+        {reversed.map((h, i) => (i === 0 || i === history.length - 1)
           ? <span key={h.id}>{new Date(h.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
           : <span key={h.id} />
         )}
