@@ -186,7 +186,7 @@ export function SalesReport() {
             <button
               onClick={runReport}
               disabled={loading || !url.trim()}
-              className="px-6 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-40"
+              className="px-6 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
               style={{ background: 'var(--brand-mint)', color: '#0f1219' }}
             >
               {loading ? (

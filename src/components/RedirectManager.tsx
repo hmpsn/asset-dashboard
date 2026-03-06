@@ -200,7 +200,7 @@ export function RedirectManager({ siteId }: Props) {
           <button
             onClick={runScan}
             disabled={loading}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium mx-auto transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-medium mx-auto transition-colors"
           >
             <RefreshCw className="w-3.5 h-3.5" /> Scan Redirects
           </button>
@@ -217,7 +217,7 @@ export function RedirectManager({ siteId }: Props) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-6 h-6 animate-spin text-violet-400" />
+        <Loader2 className="w-6 h-6 animate-spin text-teal-400" />
         <span className="ml-3 text-sm text-zinc-400">Scanning redirects... this may take a minute</span>
       </div>
     );
@@ -271,10 +271,10 @@ export function RedirectManager({ siteId }: Props) {
         </div>
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
           <div className="flex items-center gap-1.5 mb-1">
-            <Link2 className="w-3.5 h-3.5 text-violet-400" />
+            <Link2 className="w-3.5 h-3.5 text-teal-400" />
             <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Chains</span>
           </div>
-          <p className="text-xl font-bold text-violet-400">{summary.chainsDetected}</p>
+          <p className="text-xl font-bold text-teal-400">{summary.chainsDetected}</p>
           {summary.longestChain > 1 && (
             <p className="text-[10px] text-zinc-600">longest: {summary.longestChain} hops</p>
           )}
@@ -311,7 +311,7 @@ export function RedirectManager({ siteId }: Props) {
                     {chain.isLoop && (
                       <span className="text-[10px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">loop</span>
                     )}
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${chain.type === 'internal' ? 'bg-violet-500/10 text-violet-400' : 'bg-zinc-700 text-zinc-400'}`}>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${chain.type === 'internal' ? 'bg-teal-500/10 text-teal-400' : 'bg-zinc-700 text-zinc-400'}`}>
                       {chain.type}
                     </span>
                   </div>
@@ -329,7 +329,7 @@ export function RedirectManager({ siteId }: Props) {
                     </div>
                     <div className="mt-2 flex items-center gap-1.5 text-[10px] text-zinc-500">
                       <span>Final destination:</span>
-                      <a href={chain.finalUrl} target="_blank" rel="noopener noreferrer" className="text-violet-400 hover:underline flex items-center gap-0.5 truncate">
+                      <a href={chain.finalUrl} target="_blank" rel="noopener noreferrer" className="text-teal-400 hover:underline flex items-center gap-0.5 truncate">
                         {chain.finalUrl} <ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
                       </a>
                     </div>
@@ -347,7 +347,7 @@ export function RedirectManager({ siteId }: Props) {
           <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
             <div>
               <h4 className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-violet-400" /> Redirect Recommendations
+                <Sparkles className="w-3.5 h-3.5 text-teal-400" /> Redirect Recommendations
               </h4>
               <p className="text-[10px] text-zinc-600 mt-0.5">
                 {rules.filter(r => !r.accepted).length > 0
@@ -361,7 +361,7 @@ export function RedirectManager({ siteId }: Props) {
                   {copiedRules ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
                   {copiedRules ? 'Copied!' : 'Copy All'}
                 </button>
-                <button onClick={exportCSV} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-[10px] font-medium transition-colors">
+                <button onClick={exportCSV} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-[10px] font-medium transition-colors">
                   <Download className="w-3 h-3" /> Export CSV
                 </button>
               </div>
@@ -379,15 +379,15 @@ export function RedirectManager({ siteId }: Props) {
                         type="text"
                         value={editDraft}
                         onChange={e => setEditDraft(e.target.value)}
-                        className="flex-1 px-2 py-1 bg-zinc-800 border border-violet-500/50 rounded text-xs text-zinc-200 font-mono focus:outline-none focus:border-violet-400"
+                        className="flex-1 px-2 py-1 bg-zinc-800 border border-teal-500/50 rounded text-xs text-zinc-200 font-mono focus:outline-none focus:border-teal-400"
                         autoFocus
                         onKeyDown={e => { if (e.key === 'Enter') updateRuleTo(rule.from, editDraft); if (e.key === 'Escape') { setEditingRule(null); setEditDraft(''); } }}
                       />
-                      <button onClick={() => updateRuleTo(rule.from, editDraft)} className="px-2 py-1 bg-violet-600 hover:bg-violet-500 rounded text-[10px] font-medium text-white transition-colors">Save</button>
+                      <button onClick={() => updateRuleTo(rule.from, editDraft)} className="px-2 py-1 bg-teal-600 hover:bg-teal-500 rounded text-[10px] font-medium text-white transition-colors">Save</button>
                       <button onClick={() => { setEditingRule(null); setEditDraft(''); }} className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 rounded text-[10px] text-zinc-400 transition-colors">Cancel</button>
                     </div>
                   ) : (
-                    <span className={`text-xs font-mono ${rule.accepted ? 'text-green-400' : 'text-violet-400'}`}>{rule.to}</span>
+                    <span className={`text-xs font-mono ${rule.accepted ? 'text-green-400' : 'text-teal-400'}`}>{rule.to}</span>
                   )}
                   {rule.accepted && !editingRule && (
                     <Check className="w-3 h-3 text-green-400 flex-shrink-0" />
@@ -451,7 +451,7 @@ export function RedirectManager({ siteId }: Props) {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Filter pages..."
-            className="w-full pl-7 pr-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-500"
+            className="w-full pl-7 pr-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
           />
         </div>
       </div>
@@ -480,7 +480,7 @@ export function RedirectManager({ siteId }: Props) {
                       <span className="text-xs text-zinc-300 font-mono truncate block">{page.path}</span>
                       <span className="text-[10px] text-zinc-600 truncate block">{page.title}</span>
                     </div>
-                    <span className={`text-[10px] ${page.source === 'gsc' ? 'text-amber-400' : page.source === 'cms' ? 'text-violet-400' : 'text-zinc-500'}`}>
+                    <span className={`text-[10px] ${page.source === 'gsc' ? 'text-amber-400' : page.source === 'cms' ? 'text-teal-400' : 'text-zinc-500'}`}>
                       {page.source === 'gsc' ? 'GSC' : page.source}
                     </span>
                     <div className="min-w-0">
@@ -497,8 +497,8 @@ export function RedirectManager({ siteId }: Props) {
                   {rule && (
                     <div className="px-4 pb-2 pl-[calc(auto+0.75rem)] ml-10">
                       <div className="flex items-center gap-1.5 text-[10px]">
-                        <Sparkles className="w-3 h-3 text-violet-400 flex-shrink-0" />
-                        <span className="text-violet-400">Suggested redirect:</span>
+                        <Sparkles className="w-3 h-3 text-teal-400 flex-shrink-0" />
+                        <span className="text-teal-400">Suggested redirect:</span>
                         <span className="text-zinc-300 font-mono">{rule.to}</span>
                         {rule.accepted && <Check className="w-3 h-3 text-green-400" />}
                       </div>

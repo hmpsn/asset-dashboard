@@ -299,14 +299,14 @@ export function SeoEditor({ siteId, workspaceId }: Props) {
         <button
           onClick={() => handleBulkFix('title')}
           disabled={bulkFixing || missingTitles === 0}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600/80 hover:bg-teal-500 disabled:opacity-40 rounded-lg text-xs font-medium transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-lg text-xs font-medium transition-colors"
         >
           <Wand2 className="w-3 h-3" /> AI Fix Titles ({missingTitles})
         </button>
         <button
           onClick={() => handleBulkFix('description')}
           disabled={bulkFixing || missingDescs === 0}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600/80 hover:bg-teal-500 disabled:opacity-40 rounded-lg text-xs font-medium transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-lg text-xs font-medium transition-colors"
         >
           <Wand2 className="w-3 h-3" /> AI Fix Descriptions ({missingDescs})
         </button>
@@ -315,7 +315,7 @@ export function SeoEditor({ siteId, workspaceId }: Props) {
             onClick={sendForApproval}
             disabled={sendingApproval || approvalSelected.size === 0}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              approvalSent ? 'bg-green-600 text-white' : 'bg-violet-600/80 hover:bg-violet-500 disabled:opacity-40 text-white'
+              approvalSent ? 'bg-green-600 text-white' : 'bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white'
             }`}
           >
             {sendingApproval ? <Loader2 className="w-3 h-3 animate-spin" /> : approvalSent ? <Check className="w-3 h-3" /> : <Send className="w-3 h-3" />}
@@ -364,10 +364,10 @@ export function SeoEditor({ siteId, workspaceId }: Props) {
       {workspaceId && (
         <div className="flex items-center gap-2">
           <button onClick={selectAllForApproval} className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors">
-            {approvalSelected.size === filteredPages.length && filteredPages.length > 0 ? <CheckSquare className="w-3.5 h-3.5 text-violet-400" /> : <Square className="w-3.5 h-3.5" />}
+            {approvalSelected.size === filteredPages.length && filteredPages.length > 0 ? <CheckSquare className="w-3.5 h-3.5 text-teal-400" /> : <Square className="w-3.5 h-3.5" />}
             {approvalSelected.size === filteredPages.length && filteredPages.length > 0 ? 'Deselect all' : 'Select all for approval'}
           </button>
-          {approvalSelected.size > 0 && <span className="text-xs text-violet-400">{approvalSelected.size} selected</span>}
+          {approvalSelected.size > 0 && <span className="text-xs text-teal-400">{approvalSelected.size} selected</span>}
         </div>
       )}
 
@@ -384,14 +384,14 @@ export function SeoEditor({ siteId, workspaceId }: Props) {
           const isSelected = approvalSelected.has(page.id);
 
           return (
-            <div key={page.id} className={`rounded-lg border overflow-hidden ${isSelected ? 'border-violet-500/40 bg-violet-500/5' : 'border-zinc-800'}`}>
+            <div key={page.id} className={`rounded-lg border overflow-hidden ${isSelected ? 'border-teal-500/40 bg-teal-500/5' : 'border-zinc-800'}`}>
               <div className="flex items-center">
                 {workspaceId && (
                   <button
                     onClick={(e) => { e.stopPropagation(); toggleApprovalSelect(page.id); }}
-                    className="pl-4 pr-1 py-3 text-zinc-500 hover:text-violet-400 transition-colors"
+                    className="pl-4 pr-1 py-3 text-zinc-500 hover:text-teal-400 transition-colors"
                   >
-                    {isSelected ? <CheckSquare className="w-4 h-4 text-violet-400" /> : <Square className="w-4 h-4" />}
+                    {isSelected ? <CheckSquare className="w-4 h-4 text-teal-400" /> : <Square className="w-4 h-4" />}
                   </button>
                 )}
               <button
@@ -424,7 +424,7 @@ export function SeoEditor({ siteId, workspaceId }: Props) {
                         <button
                           onClick={() => aiRewrite(page.id, 'title')}
                           disabled={!!isAiLoading}
-                          className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-teal-600/50 hover:bg-teal-500/50 rounded transition-colors disabled:opacity-40"
+                          className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-teal-600/50 hover:bg-teal-500/50 rounded transition-colors disabled:opacity-50"
                           title="AI rewrite"
                         >
                           {isAiLoading === 'title' ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Sparkles className="w-2.5 h-2.5" />}
@@ -452,7 +452,7 @@ export function SeoEditor({ siteId, workspaceId }: Props) {
                         <button
                           onClick={() => aiRewrite(page.id, 'description')}
                           disabled={!!isAiLoading}
-                          className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-teal-600/50 hover:bg-teal-500/50 rounded transition-colors disabled:opacity-40"
+                          className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-teal-600/50 hover:bg-teal-500/50 rounded transition-colors disabled:opacity-50"
                           title="AI rewrite"
                         >
                           {isAiLoading === 'description' ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Sparkles className="w-2.5 h-2.5" />}
@@ -475,7 +475,7 @@ export function SeoEditor({ siteId, workspaceId }: Props) {
                       onClick={() => savePage(page.id)}
                       disabled={!edit.dirty || isSaving}
                       className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                        isSaved ? 'bg-green-600 text-white' : 'bg-white text-black hover:bg-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed'
+                        isSaved ? 'bg-green-600 text-white' : 'bg-white text-black hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed'
                       }`}
                     >
                       {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : isSaved ? <Check className="w-3 h-3" /> : <Save className="w-3 h-3" />}

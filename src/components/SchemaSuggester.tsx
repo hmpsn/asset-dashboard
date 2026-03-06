@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Loader2, ChevronDown, ChevronRight, Copy, CheckCircle,
-  AlertCircle, Info, Sparkles, RefreshCw, Upload, Send, Search, Plus,
+  AlertCircle, Info, Sparkles, RefreshCw, Upload, Send, Search, Plus, Database,
 } from 'lucide-react';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 
@@ -20,6 +20,23 @@ interface SchemaPageSuggestion {
   existingSchemas: string[];
   suggestedSchemas: SchemaSuggestion[];
   validationErrors?: string[];
+}
+
+interface CmsTemplatePage {
+  pageId: string;
+  pageTitle: string;
+  slug: string;
+  collectionId: string;
+  collectionName: string;
+  collectionSlug: string;
+}
+
+interface CmsTemplateResult {
+  templateString: string;
+  schemaTypes: string[];
+  fieldsUsed: string[];
+  collectionName: string;
+  collectionSlug: string;
 }
 
 interface Props {
@@ -41,6 +58,8 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
   const [confirmPublish, setConfirmPublish] = useState<string | null>(null);
   const [sendingToClient, setSendingToClient] = useState(false);
   const [sentToClient, setSentToClient] = useState(false);
+  const [sendingPage, setSendingPage] = useState<Set<string>>(new Set());
+  const [sentPages, setSentPages] = useState<Set<string>>(new Set());
   const [progressMsg, setProgressMsg] = useState<string | null>(null);
   const [showPagePicker, setShowPagePicker] = useState(false);
   const [availablePages, setAvailablePages] = useState<Array<{ id: string; title: string; slug: string }>>([]);
@@ -49,6 +68,18 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
   const [generatingSingle, setGeneratingSingle] = useState<string | null>(null);
   const { jobs, startJob, cancelJob } = useBackgroundTasks();
   const jobIdRef = useRef<string | null>(null);
+
+  // CMS template schema state
+  const [showCmsPanel, setShowCmsPanel] = useState(false);
+  const [cmsTemplatePages, setCmsTemplatePages] = useState<CmsTemplatePage[]>([]);
+  const [loadingCmsPages, setLoadingCmsPages] = useState(false);
+  const [generatingCmsTemplate, setGeneratingCmsTemplate] = useState<string | null>(null);
+  const [cmsTemplateResult, setCmsTemplateResult] = useState<CmsTemplateResult | null>(null);
+  const [cmsSelectedPage, setCmsSelectedPage] = useState<CmsTemplatePage | null>(null);
+  const [publishingCmsTemplate, setPublishingCmsTemplate] = useState(false);
+  const [cmsPublished, setCmsPublished] = useState(false);
+  const [cmsCopied, setCmsCopied] = useState(false);
+  const [cmsError, setCmsError] = useState<string | null>(null);
 
   // Load saved schema snapshot on mount
   const [snapshotDate, setSnapshotDate] = useState<string | null>(null);
@@ -255,11 +286,105 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const sendSingleSchemaToClient = async (page: SchemaPageSuggestion) => {
+    if (!workspaceId) return;
+    setSendingPage(prev => new Set(prev).add(page.pageId));
+    try {
+      const items = [{
+        pageId: page.pageId,
+        pageTitle: page.pageTitle,
+        pageSlug: page.slug,
+        field: 'schema',
+        currentValue: page.existingSchemas.length > 0 ? page.existingSchemas.join(', ') : '',
+        proposedValue: JSON.stringify(page.suggestedSchemas[0]?.template || {}, null, 2),
+      }];
+      const token = localStorage.getItem('auth_token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['x-auth-token'] = token;
+      const res = await fetch(`/api/approvals/${workspaceId}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ siteId, name: `Schema: ${page.pageTitle}`, items }),
+      });
+      if (res.ok) setSentPages(prev => new Set(prev).add(page.pageId));
+    } catch { /* skip */ }
+    setSendingPage(prev => {
+      const next = new Set(prev);
+      next.delete(page.pageId);
+      return next;
+    });
+  };
+
+  // CMS template functions
+  const fetchCmsTemplatePages = async () => {
+    if (cmsTemplatePages.length > 0) { setShowCmsPanel(true); return; }
+    setLoadingCmsPages(true);
+    setCmsError(null);
+    try {
+      const res = await fetch(`/api/webflow/cms-template-pages/${siteId}`);
+      const pages = await res.json();
+      if (Array.isArray(pages)) setCmsTemplatePages(pages);
+      setShowCmsPanel(true);
+    } catch { setCmsError('Failed to load CMS collections'); }
+    setLoadingCmsPages(false);
+  };
+
+  const generateCmsTemplate = async (page: CmsTemplatePage) => {
+    setCmsSelectedPage(page);
+    setGeneratingCmsTemplate(page.collectionId);
+    setCmsTemplateResult(null);
+    setCmsPublished(false);
+    setCmsError(null);
+    try {
+      const res = await fetch(`/api/webflow/schema-cms-template/${siteId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ collectionId: page.collectionId }),
+      });
+      if (!res.ok) throw new Error('Generation failed');
+      const result: CmsTemplateResult = await res.json();
+      setCmsTemplateResult(result);
+    } catch (err) {
+      setCmsError(err instanceof Error ? err.message : 'Failed to generate CMS template schema');
+    }
+    setGeneratingCmsTemplate(null);
+  };
+
+  const publishCmsTemplate = async () => {
+    if (!cmsSelectedPage || !cmsTemplateResult) return;
+    setPublishingCmsTemplate(true);
+    setCmsError(null);
+    try {
+      const res = await fetch(`/api/webflow/schema-cms-template/${siteId}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pageId: cmsSelectedPage.pageId,
+          templateString: cmsTemplateResult.templateString,
+          publishAfter: true,
+        }),
+      });
+      if (!res.ok) throw new Error('Publish failed');
+      setCmsPublished(true);
+    } catch (err) {
+      setCmsError(err instanceof Error ? err.message : 'Publish failed');
+    }
+    setPublishingCmsTemplate(false);
+  };
+
+  const copyCmsTemplate = () => {
+    if (!cmsTemplateResult) return;
+    const script = `<script type="application/ld+json">\n${cmsTemplateResult.templateString}\n</script>`;
+    navigator.clipboard.writeText(script);
+    setCmsCopied(true);
+    setTimeout(() => setCmsCopied(false), 2000);
+  };
+
   if (!started) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <div className="w-14 h-14 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
-          <Sparkles className="w-7 h-7 text-violet-400" />
+        <div className="w-14 h-14 rounded-2xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center">
+          <Sparkles className="w-7 h-7 text-teal-400" />
         </div>
         <div className="text-center space-y-1.5">
           <p className="text-sm font-medium text-zinc-200">Schema Generator</p>
@@ -268,7 +393,7 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
         <div className="flex items-center gap-3 mt-2">
           <button
             onClick={runScan}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-violet-600 hover:bg-violet-500 text-white transition-colors"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors"
           >
             <Sparkles className="w-4 h-4" /> All Pages
           </button>
@@ -278,6 +403,13 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
             className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition-colors disabled:opacity-50"
           >
             {loadingPages ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Single Page
+          </button>
+          <button
+            onClick={fetchCmsTemplatePages}
+            disabled={loadingCmsPages}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-zinc-800 hover:bg-zinc-700 text-amber-300 border border-amber-500/30 transition-colors disabled:opacity-50"
+          >
+            {loadingCmsPages ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />} CMS Templates
           </button>
         </div>
         {showPagePicker && (
@@ -290,7 +422,7 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
                   value={pageSearch}
                   onChange={e => setPageSearch(e.target.value)}
                   placeholder="Search pages..."
-                  className="w-full pl-7 pr-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-500"
+                  className="w-full pl-7 pr-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
                   autoFocus
                 />
               </div>
@@ -318,9 +450,95 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
             </div>
           </div>
         )}
+        {/* CMS Template Panel */}
+        {showCmsPanel && (
+          <div className="w-full max-w-lg bg-zinc-900 border border-amber-500/20 rounded-xl overflow-hidden mt-2">
+            <div className="px-4 py-2.5 border-b border-zinc-800 flex items-center justify-between">
+              <span className="text-xs font-medium text-amber-300">CMS Collection Templates</span>
+              <button onClick={() => setShowCmsPanel(false)} className="text-[10px] text-zinc-500 hover:text-zinc-400">Close</button>
+            </div>
+            {cmsTemplatePages.length === 0 ? (
+              <div className="px-4 py-6 text-xs text-zinc-600 text-center">No CMS collections found</div>
+            ) : (
+              <div className="max-h-[200px] overflow-y-auto">
+                {cmsTemplatePages.map(p => (
+                  <button
+                    key={p.collectionId}
+                    onClick={() => generateCmsTemplate(p)}
+                    disabled={generatingCmsTemplate === p.collectionId}
+                    className="w-full text-left px-4 py-2.5 hover:bg-zinc-800/50 transition-colors border-b border-zinc-800/30 last:border-b-0 disabled:opacity-50"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-zinc-300">{p.collectionName}</span>
+                      {generatingCmsTemplate === p.collectionId && <Loader2 className="w-3 h-3 animate-spin text-amber-400" />}
+                    </div>
+                    <span className="text-[10px] text-zinc-600">/{p.collectionSlug}/{'{'} slug {'}'} · Template: {p.pageTitle}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* CMS Template Result */}
+        {cmsTemplateResult && (
+          <div className="w-full max-w-2xl bg-zinc-900 border border-amber-500/20 rounded-xl overflow-hidden mt-2">
+            <div className="px-4 py-2.5 border-b border-zinc-800">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-medium text-amber-300">Template: {cmsTemplateResult.collectionName}</span>
+                  <div className="flex gap-1.5 mt-1">
+                    {cmsTemplateResult.schemaTypes.map((t, i) => (
+                      <span key={i} className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-amber-500/10 text-amber-300 border border-amber-500/20">{t}</span>
+                    ))}
+                  </div>
+                </div>
+                <span className="text-[10px] text-zinc-600">{cmsTemplateResult.fieldsUsed.length} CMS fields used</span>
+              </div>
+            </div>
+            <div className="px-4 py-3">
+              <div className="relative">
+                <pre className="text-xs font-mono bg-zinc-950 rounded-lg p-3 overflow-x-auto text-zinc-400 border border-zinc-800 max-h-64 overflow-y-auto whitespace-pre-wrap">
+                  {cmsTemplateResult.templateString}
+                </pre>
+                <div className="absolute top-2 right-2 flex items-center gap-1.5">
+                  <button
+                    onClick={copyCmsTemplate}
+                    className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors"
+                  >
+                    {cmsCopied ? <><CheckCircle className="w-3 h-3 text-green-400" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center gap-2">
+                {cmsPublished ? (
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
+                    <CheckCircle className="w-3.5 h-3.5" /> Published to Webflow
+                  </span>
+                ) : (
+                  <button
+                    onClick={publishCmsTemplate}
+                    disabled={publishingCmsTemplate}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 bg-gradient-to-r from-amber-600/80 to-orange-600/80 hover:from-amber-500 hover:to-orange-500 text-white"
+                  >
+                    {publishingCmsTemplate ? <><Loader2 className="w-3 h-3 animate-spin" /> Publishing...</> : <><Upload className="w-3.5 h-3.5" /> Publish to Template Page</>}
+                  </button>
+                )}
+                {cmsError && <span className="text-xs text-red-400">{cmsError}</span>}
+              </div>
+              <p className="text-[10px] text-zinc-600 mt-2">This template uses {'{{wf}}'} tags — each CMS item page gets unique schema with its own field values.</p>
+            </div>
+          </div>
+        )}
+
         {generatingSingle && (
           <div className="flex items-center gap-2 text-zinc-500 text-sm mt-2">
             <Loader2 className="w-4 h-4 animate-spin" /> Generating schema...
+          </div>
+        )}
+        {generatingCmsTemplate && !cmsTemplateResult && (
+          <div className="flex items-center gap-2 text-amber-400/70 text-sm mt-2">
+            <Loader2 className="w-4 h-4 animate-spin" /> Generating CMS template schema...
           </div>
         )}
       </div>
@@ -377,10 +595,10 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
     <div className="space-y-4">
       {/* Progress banner while streaming */}
       {loading && (
-        <div className="flex items-center gap-2.5 px-4 py-2.5 bg-violet-500/10 border border-violet-500/20 rounded-xl">
-          <Loader2 className="w-4 h-4 animate-spin text-violet-400 flex-shrink-0" />
-          <span className="text-xs text-violet-300 flex-1">{progressMsg || 'Generating schemas...'}</span>
-          <button onClick={stopScan} className="text-xs text-violet-400/60 hover:text-red-400 transition-colors">
+        <div className="flex items-center gap-2.5 px-4 py-2.5 bg-teal-500/10 border border-teal-500/20 rounded-xl">
+          <Loader2 className="w-4 h-4 animate-spin text-teal-400 flex-shrink-0" />
+          <span className="text-xs text-teal-300 flex-1">{progressMsg || 'Generating schemas...'}</span>
+          <button onClick={stopScan} className="text-xs text-teal-400/60 hover:text-red-400 transition-colors">
             Stop
           </button>
         </div>
@@ -399,7 +617,7 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
             <button
               onClick={sendSchemasToClient}
               disabled={sendingToClient || sentToClient}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs text-violet-400 hover:text-violet-300 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs text-teal-400 hover:text-teal-300 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Send className="w-3 h-3" /> {sentToClient ? 'Sent to Client' : sendingToClient ? 'Sending...' : 'Send to Client'}
             </button>
@@ -422,7 +640,7 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
                       value={pageSearch}
                       onChange={e => setPageSearch(e.target.value)}
                       placeholder="Search pages..."
-                      className="w-full pl-7 pr-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-500"
+                      className="w-full pl-7 pr-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
                       autoFocus
                     />
                   </div>
@@ -460,9 +678,9 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
         </div>
       </div>
       {generatingSingle && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-violet-500/10 border border-violet-500/20 rounded-xl">
-          <Loader2 className="w-3.5 h-3.5 animate-spin text-violet-400" />
-          <span className="text-xs text-violet-300">Generating schema for page...</span>
+        <div className="flex items-center gap-2 px-4 py-2 bg-teal-500/10 border border-teal-500/20 rounded-xl">
+          <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400" />
+          <span className="text-xs text-teal-300">Generating schema for page...</span>
         </div>
       )}
 
@@ -513,7 +731,7 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
                     </span>
                   )}
                   {graphTypes.length > 0 && (
-                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-violet-500/10 text-violet-400 border border-violet-500/20">
+                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-teal-500/10 text-teal-400 border border-teal-500/20">
                       <Sparkles className="w-3 h-3" /> {graphTypes.length} types
                     </span>
                   )}
@@ -564,7 +782,7 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
                     <div className="text-xs font-medium text-zinc-400 mb-1.5">@graph types</div>
                     <div className="flex flex-wrap gap-1.5">
                       {graphTypes.map((t, i) => (
-                        <span key={i} className="px-2 py-1 rounded-md text-xs font-mono bg-violet-500/10 text-violet-300 border border-violet-500/20">
+                        <span key={i} className="px-2 py-1 rounded-md text-xs font-mono bg-teal-500/10 text-teal-300 border border-teal-500/20">
                           {t}
                         </span>
                       ))}
@@ -621,7 +839,7 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
                           <button
                             onClick={() => setConfirmPublish(page.pageId)}
                             disabled={publishing.has(page.pageId)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 bg-gradient-to-r from-blue-600/80 to-indigo-600/80 hover:from-blue-500 hover:to-indigo-500 text-white"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white"
                           >
                             {publishing.has(page.pageId) ? (
                               <><Loader2 className="w-3 h-3 animate-spin" /> Publishing...</>
@@ -633,6 +851,25 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
                       )}
                       {publishError[page.pageId] && (
                         <span className="text-xs text-red-400">{publishError[page.pageId]}</span>
+                      )}
+                      {workspaceId && (
+                        sentPages.has(page.pageId) ? (
+                          <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                            <CheckCircle className="w-3.5 h-3.5" /> Sent for Approval
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => sendSingleSchemaToClient(page)}
+                            disabled={sendingPage.has(page.pageId)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/30"
+                          >
+                            {sendingPage.has(page.pageId) ? (
+                              <><Loader2 className="w-3 h-3 animate-spin" /> Sending...</>
+                            ) : (
+                              <><Send className="w-3.5 h-3.5" /> Send to Client</>
+                            )}
+                          </button>
+                        )
                       )}
                     </div>
                   </div>

@@ -482,7 +482,7 @@ function AssetBrowser({ siteId }: Props) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-zinc-500">
-        <Loader2 className="w-5 h-5 animate-spin mr-2" />
+        <Loader2 className="w-5 h-5 animate-spin text-teal-400 mr-2" />
         Loading assets...
       </div>
     );
@@ -511,7 +511,7 @@ function AssetBrowser({ siteId }: Props) {
         <button
           onClick={handleOrganizePreview}
           disabled={organizeLoading}
-          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-violet-700/60 hover:bg-violet-600/70 disabled:opacity-50 rounded-lg text-xs font-medium transition-colors"
+          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-teal-600/20 hover:bg-teal-600/30 border border-teal-500/30 text-teal-300 disabled:opacity-50 rounded-lg text-xs font-medium transition-colors"
         >
           {organizeLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <FolderOpen className="w-3 h-3" />}
           Organize into Folders
@@ -600,9 +600,9 @@ function AssetBrowser({ siteId }: Props) {
 
       {/* Organize into Folders modal */}
       {organizePreview && !organizeResult && (
-        <div className="p-4 bg-violet-950/40 border border-violet-800/50 rounded-lg space-y-3">
+        <div className="p-4 bg-teal-950/40 border border-teal-800/50 rounded-lg space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-violet-200 flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-teal-200 flex items-center gap-2">
               <FolderOpen className="w-4 h-4" /> Organization Plan
             </h3>
             <button onClick={() => setOrganizePreview(null)} className="text-zinc-500 hover:text-zinc-300">
@@ -613,7 +613,7 @@ function AssetBrowser({ siteId }: Props) {
           {/* Summary */}
           <div className="grid grid-cols-3 gap-3 text-center">
             <div className="bg-zinc-900/60 rounded-lg p-2">
-              <div className="text-lg font-bold text-violet-300">{organizePreview.summary.assetsToMove}</div>
+              <div className="text-lg font-bold text-teal-300">{organizePreview.summary.assetsToMove}</div>
               <div className="text-[10px] text-zinc-500">Assets to move</div>
             </div>
             <div className="bg-zinc-900/60 rounded-lg p-2">
@@ -638,7 +638,7 @@ function AssetBrowser({ siteId }: Props) {
               return [...byFolder.entries()].sort((a, b) => b[1].length - a[1].length).map(([folder, assetNames]) => (
                 <details key={folder} className="group">
                   <summary className="cursor-pointer flex items-center gap-2 px-2 py-1.5 bg-zinc-900/40 rounded hover:bg-zinc-900/60 transition-colors">
-                    <FolderOpen className="w-3 h-3 text-violet-400 shrink-0" />
+                    <FolderOpen className="w-3 h-3 text-teal-400 shrink-0" />
                     <span className="text-zinc-200 font-medium truncate">{folder}</span>
                     <span className="ml-auto text-zinc-500 shrink-0">{assetNames.length} assets</span>
                   </summary>
@@ -658,7 +658,7 @@ function AssetBrowser({ siteId }: Props) {
             <button
               onClick={handleOrganizeExecute}
               disabled={organizeExecuting}
-              className="flex items-center gap-1.5 px-4 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 rounded-lg text-xs font-semibold transition-colors"
+              className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-lg text-xs font-semibold transition-colors"
             >
               {organizeExecuting ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Organizing...</> : <><FolderOpen className="w-3.5 h-3.5" /> Apply Organization</>}
             </button>
@@ -683,10 +683,10 @@ function AssetBrowser({ siteId }: Props) {
 
       {/* Organize result */}
       {organizeResult && (
-        <div className="flex items-center gap-2 px-4 py-2.5 bg-violet-950/50 border border-violet-800/50 rounded-lg text-sm text-violet-300">
-          <FolderOpen className="w-4 h-4 text-violet-400 shrink-0" />
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-teal-950/50 border border-teal-800/50 rounded-lg text-sm text-teal-300">
+          <FolderOpen className="w-4 h-4 text-teal-400 shrink-0" />
           <span>Organized: {organizeResult.moved} moved{organizeResult.failed > 0 ? `, ${organizeResult.failed} failed` : ''} of {organizeResult.total} assets</span>
-          <button onClick={() => { setOrganizeResult(null); setOrganizePreview(null); }} className="ml-auto text-violet-400 hover:text-violet-300">
+          <button onClick={() => { setOrganizeResult(null); setOrganizePreview(null); }} className="ml-auto text-teal-400 hover:text-teal-300">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>

@@ -90,7 +90,7 @@ export function LinkChecker({ siteId }: Props) {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3 text-zinc-500">
-        <Loader2 className="w-6 h-6 animate-spin" />
+        <Loader2 className="w-6 h-6 animate-spin text-teal-400" />
         <p className="text-sm">Checking all links across the site...</p>
         <p className="text-xs text-zinc-600">This may take a few minutes for large sites</p>
       </div>

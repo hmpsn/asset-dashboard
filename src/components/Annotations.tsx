@@ -50,7 +50,7 @@ export function Annotations({ workspaceId }: { workspaceId: string }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-5 h-5 animate-spin text-zinc-500" />
+        <Loader2 className="w-5 h-5 animate-spin text-teal-400" />
       </div>
     );
   }
@@ -94,7 +94,7 @@ export function Annotations({ workspaceId }: { workspaceId: string }) {
             className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600" />
         </div>
         <button onClick={addAnnotation} disabled={!newAnn.date || !newAnn.label}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-40 transition-colors">
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 transition-colors">
           <Plus className="w-3.5 h-3.5" /> Add Annotation
         </button>
       </div>

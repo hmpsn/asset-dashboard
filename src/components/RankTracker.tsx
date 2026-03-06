@@ -98,7 +98,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-5 h-5 animate-spin text-zinc-500" />
+        <Loader2 className="w-5 h-5 animate-spin text-teal-400" />
       </div>
     );
   }
@@ -121,7 +121,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
           <button
             onClick={takeSnapshot}
             disabled={snapshotting || keywords.length === 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-40"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50"
           >
             {snapshotting ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
             {snapshotting ? 'Capturing...' : 'Capture Snapshot'}
@@ -150,7 +150,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
         <button
           onClick={addKeyword}
           disabled={!newKeyword.trim() || adding}
-          className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-40 transition-colors"
+          className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 transition-colors"
         >
           {adding ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
           Add

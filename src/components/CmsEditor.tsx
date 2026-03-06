@@ -239,7 +239,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-6 h-6 animate-spin text-violet-400" />
+        <Loader2 className="w-6 h-6 animate-spin text-teal-400" />
         <span className="ml-3 text-sm text-zinc-400">Loading CMS collections...</span>
       </div>
     );
@@ -283,7 +283,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
               onClick={sendForApproval}
               disabled={sendingApproval || approvalSelected.size === 0}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                approvalSent ? 'bg-green-600 text-white' : 'bg-violet-600/80 hover:bg-violet-500 disabled:opacity-40 text-white'
+                approvalSent ? 'bg-green-600 text-white' : 'bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white'
               }`}
             >
               {sendingApproval ? <Loader2 className="w-3 h-3 animate-spin" /> : approvalSent ? <Check className="w-3 h-3" /> : <Send className="w-3 h-3" />}
@@ -301,7 +301,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search items..."
-          className="w-full pl-9 pr-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-violet-500"
+          className="w-full pl-9 pr-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500"
         />
       </div>
 
@@ -332,7 +332,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                 <span className="text-[10px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">/{coll.collectionSlug}</span>
                 <span className="text-[10px] text-zinc-600">{coll.total} items</span>
                 {extraSeoFields.length > 0 && (
-                  <span className="text-[10px] text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded">
+                  <span className="text-[10px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded">
                     {extraSeoFields.map(f => f.displayName).join(', ')}
                   </span>
                 )}
@@ -381,7 +381,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                               checked={approvalSelected.has(item.id)}
                               onChange={e => { e.stopPropagation(); toggleApprovalItem(item.id); }}
                               onClick={e => e.stopPropagation()}
-                              className="w-3.5 h-3.5 rounded border-zinc-600 text-violet-500 focus:ring-violet-500 bg-zinc-800 flex-shrink-0 cursor-pointer"
+                              className="w-3.5 h-3.5 rounded border-zinc-600 text-teal-500 focus:ring-teal-500 bg-zinc-800 flex-shrink-0 cursor-pointer"
                             />
                           )}
                           {isItemExpanded ? <ChevronDown className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" />}
@@ -406,7 +406,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                                 <button
                                   onClick={() => aiRewrite(coll.collectionId, item.id, 'name')}
                                   disabled={!!aiLoading[`${item.id}-name`]}
-                                  className="p-0.5 text-violet-400 hover:text-violet-300 disabled:opacity-50"
+                                  className="p-0.5 text-teal-400 hover:text-teal-300 disabled:opacity-50"
                                   title="AI rewrite"
                                 >
                                   {aiLoading[`${item.id}-name`] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
@@ -417,7 +417,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                               type="text"
                               value={edits[item.id]?.['name'] || ''}
                               onChange={e => updateField(item.id, 'name', e.target.value)}
-                              className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-500"
+                              className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
                             />
                           </div>
 
@@ -428,7 +428,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                               type="text"
                               value={edits[item.id]?.['slug'] || ''}
                               onChange={e => updateField(item.id, 'slug', e.target.value)}
-                              className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 font-mono focus:outline-none focus:border-violet-500"
+                              className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 font-mono focus:outline-none focus:border-teal-500"
                             />
                           </div>
 
@@ -450,7 +450,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                                     <button
                                       onClick={() => aiRewrite(coll.collectionId, item.id, field.slug)}
                                       disabled={!!aiLoading[`${item.id}-${field.slug}`]}
-                                      className="p-0.5 text-violet-400 hover:text-violet-300 disabled:opacity-50"
+                                      className="p-0.5 text-teal-400 hover:text-teal-300 disabled:opacity-50"
                                       title="AI rewrite"
                                     >
                                       {aiLoading[`${item.id}-${field.slug}`] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
@@ -462,14 +462,14 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                                     type="text"
                                     value={val}
                                     onChange={e => updateField(item.id, field.slug, e.target.value)}
-                                    className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-500"
+                                    className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
                                   />
                                 ) : (
                                   <textarea
                                     value={val}
                                     onChange={e => updateField(item.id, field.slug, e.target.value)}
                                     rows={3}
-                                    className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-500 resize-none"
+                                    className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500 resize-none"
                                   />
                                 )}
                               </div>
@@ -485,7 +485,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                             <button
                               onClick={() => saveItem(coll.collectionId, item.id)}
                               disabled={!isDirty || isSaving}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-xs font-medium transition-colors"
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-xs font-medium transition-colors"
                             >
                               {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
                               Save
@@ -505,10 +505,10 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
       {/* Tip */}
       <div className="bg-zinc-800/30 rounded-lg border border-zinc-800 px-4 py-3">
         <div className="flex items-start gap-2">
-          <Sparkles className="w-3.5 h-3.5 text-violet-400 mt-0.5 flex-shrink-0" />
+          <Sparkles className="w-3.5 h-3.5 text-teal-400 mt-0.5 flex-shrink-0" />
           <div className="text-[11px] text-zinc-500">
             <strong className="text-zinc-400">How it works:</strong> Changes are saved as drafts first. Click <strong className="text-zinc-400">Publish</strong> on a collection to make changes live.
-            The <Wand2 className="w-3 h-3 inline text-violet-400" /> button generates AI-optimized rewrites.
+            The <Wand2 className="w-3 h-3 inline text-teal-400" /> button generates AI-optimized rewrites.
             {collections.some(c => c.seoFields.filter(f => f.slug !== 'name' && f.slug !== 'slug').length === 0) && (
               <span className="block mt-1 text-amber-400/80">
                 Tip: Some collections don't have dedicated SEO fields. Consider adding "SEO Title" and "Meta Description" text fields in Webflow's collection schema for better control.

@@ -297,7 +297,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-5 h-5 animate-spin text-zinc-500" />
+        <Loader2 className="w-5 h-5 animate-spin text-teal-400" />
       </div>
     );
   }
@@ -348,7 +348,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                 client_review: { icon: Clock, color: 'text-cyan-400', label: 'Client Review' },
                 approved: { icon: CheckCircle2, color: 'text-green-400', label: 'Approved' },
                 changes_requested: { icon: Clock, color: 'text-orange-400', label: 'Changes Requested' },
-                in_progress: { icon: Zap, color: 'text-violet-400', label: 'In Progress' },
+                in_progress: { icon: Zap, color: 'text-teal-400', label: 'In Progress' },
                 delivered: { icon: CheckCircle2, color: 'text-green-400', label: 'Delivered' },
                 declined: { icon: XCircle, color: 'text-zinc-500', label: 'Declined' },
               };
@@ -364,7 +364,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-medium text-zinc-200">{req.topic}</span>
-                          {req.source === 'client' && <span className="text-[8px] px-1 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">Client</span>}
+                          {req.source === 'client' && <span className="text-[8px] px-1 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20">Client</span>}
                           <span className={`text-[8px] px-1 py-0.5 rounded border ${(req.serviceType || 'brief_only') === 'full_post' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>{(req.serviceType || 'brief_only') === 'full_post' ? 'Full Post' : 'Brief Only'}</span>
                           {req.upgradedAt && <span className="text-[8px] px-1 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">Upgraded</span>}
                         </div>
@@ -399,7 +399,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                             <span className="text-[9px] text-cyan-400/60 italic">Awaiting client feedback</span>
                           )}
                           {req.status === 'approved' && (
-                            <button onClick={() => handleUpdateRequestStatus(req.id, 'in_progress')} className="px-2 py-1 rounded bg-violet-600/20 border border-violet-500/30 text-[10px] text-violet-300 hover:bg-violet-600/30 transition-colors">Start Production</button>
+                            <button onClick={() => handleUpdateRequestStatus(req.id, 'in_progress')} className="px-2 py-1 rounded bg-teal-600/20 border border-teal-500/30 text-[10px] text-teal-300 hover:bg-teal-600/30 transition-colors">Start Production</button>
                           )}
                           {req.status === 'changes_requested' && (
                             <button onClick={() => handleUpdateRequestStatus(req.id, 'client_review')} className="px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 text-[10px] text-cyan-300 hover:bg-cyan-600/30 transition-colors">Resubmit to Client</button>
@@ -439,7 +439,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                     <div className="border-t border-zinc-800 px-4 pb-4 space-y-4">
                       {/* Export buttons */}
                       <div className="pt-3 flex items-center gap-2">
-                        <button onClick={() => copyAsMarkdown(inlineBrief)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 transition-colors">
+                        <button onClick={() => copyAsMarkdown(inlineBrief)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
                           <Copy className="w-3 h-3" /> Copy for AI Tool
                         </button>
                         <button onClick={() => exportClientHTML(inlineBrief)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
@@ -534,7 +534,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                           <div className="flex items-center gap-1.5 mb-1.5"><Target className="w-3 h-3 text-zinc-500" /><span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Topical Entities to Cover</span></div>
                           <div className="flex flex-wrap gap-1.5">
                             {inlineBrief.topicalEntities.map((entity, i) => (
-                              <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-300">{entity}</span>
+                              <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-300">{entity}</span>
                             ))}
                           </div>
                         </div>
@@ -634,7 +634,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                             {[
                               { label: 'Experience', value: inlineBrief.eeatGuidance.experience, color: 'text-blue-400' },
                               { label: 'Expertise', value: inlineBrief.eeatGuidance.expertise, color: 'text-teal-400' },
-                              { label: 'Authority', value: inlineBrief.eeatGuidance.authority, color: 'text-violet-400' },
+                              { label: 'Authority', value: inlineBrief.eeatGuidance.authority, color: 'text-teal-400' },
                               { label: 'Trust', value: inlineBrief.eeatGuidance.trust, color: 'text-amber-400' },
                             ].filter(e => e.value).map((e, i) => (
                               <div key={i} className="bg-zinc-950 rounded-lg px-3 py-2.5 border border-zinc-800">
@@ -755,7 +755,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
         <button
           onClick={handleGenerate}
           disabled={!keyword.trim() || generating}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-40 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 transition-colors"
         >
           {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
           {generating ? 'Generating...' : 'Generate Brief'}
@@ -827,7 +827,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                 </div>
                 {/* Quick actions — always visible */}
                 <div className="flex items-center gap-0.5 flex-shrink-0 opacity-40 group-hover/brief:opacity-100 transition-opacity">
-                  <button onClick={(e) => { e.stopPropagation(); copyAsMarkdown(brief); }} title="Copy for AI tool" className="p-1.5 rounded hover:bg-violet-500/10 text-zinc-500 hover:text-violet-400 transition-colors">
+                  <button onClick={(e) => { e.stopPropagation(); copyAsMarkdown(brief); }} title="Copy for AI tool" className="p-1.5 rounded hover:bg-teal-500/10 text-zinc-500 hover:text-teal-400 transition-colors">
                     <Copy className="w-3.5 h-3.5" />
                   </button>
                   <button onClick={(e) => { e.stopPropagation(); exportClientHTML(brief); }} title="Export PDF" className="p-1.5 rounded hover:bg-teal-500/10 text-zinc-500 hover:text-teal-400 transition-colors">
@@ -849,7 +849,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                 <div className="px-4 pb-4 space-y-4 border-t border-zinc-800">
                   {/* Export buttons */}
                   <div className="pt-3 flex items-center gap-2">
-                    <button onClick={() => copyAsMarkdown(brief)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 transition-colors">
+                    <button onClick={() => copyAsMarkdown(brief)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
                       <Copy className="w-3 h-3" /> Copy for AI Tool
                     </button>
                     <button onClick={() => exportClientHTML(brief)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
@@ -944,7 +944,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                       <div className="flex items-center gap-1.5 mb-1.5"><Target className="w-3 h-3 text-zinc-500" /><span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Topical Entities to Cover</span></div>
                       <div className="flex flex-wrap gap-1.5">
                         {brief.topicalEntities.map((entity, i) => (
-                          <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-300">{entity}</span>
+                          <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-300">{entity}</span>
                         ))}
                       </div>
                     </div>
@@ -1044,7 +1044,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                         {[
                           { label: 'Experience', value: brief.eeatGuidance.experience, color: 'text-blue-400' },
                           { label: 'Expertise', value: brief.eeatGuidance.expertise, color: 'text-teal-400' },
-                          { label: 'Authority', value: brief.eeatGuidance.authority, color: 'text-violet-400' },
+                          { label: 'Authority', value: brief.eeatGuidance.authority, color: 'text-teal-400' },
                           { label: 'Trust', value: brief.eeatGuidance.trust, color: 'text-amber-400' },
                         ].filter(e => e.value).map((e, i) => (
                           <div key={i} className="bg-zinc-950 rounded-lg px-3 py-2.5 border border-zinc-800">

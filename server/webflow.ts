@@ -696,6 +696,48 @@ export async function publishSchemaToPage(
   return { success: true };
 }
 
+/**
+ * Publish a raw JSON-LD string (e.g. CMS template with {{wf}} tags) to a page.
+ * Same safety logic as publishSchemaToPage but takes a pre-formatted string.
+ */
+export async function publishRawSchemaToPage(
+  siteId: string,
+  pageId: string,
+  rawJsonLd: string,
+  tokenOverride?: string,
+): Promise<{ success: boolean; error?: string }> {
+  const sourceCode = `<script type="application/ld+json">\n${rawJsonLd}\n</script>`;
+  const version = `1.0.${Date.now()}`;
+  const displayName = `${SCHEMA_SCRIPT_PREFIX} (${pageId.slice(0, 8)})`;
+
+  const allScripts = await listRegisteredScripts(siteId, tokenOverride);
+  const ourPreviousScriptIds = new Set(
+    allScripts
+      .filter(s => s.displayName.startsWith(SCHEMA_SCRIPT_PREFIX))
+      .map(s => s.id)
+  );
+
+  const registered = await registerInlineScript(siteId, sourceCode, displayName, version, tokenOverride);
+  if (!registered) {
+    return { success: false, error: 'Failed to register schema script with Webflow' };
+  }
+
+  const existingBlocks = await getPageCustomCode(pageId, tokenOverride);
+  const preserved = existingBlocks.filter(block => !ourPreviousScriptIds.has(block.id));
+  const updatedBlocks: PageCustomCodeBlock[] = [
+    ...preserved,
+    { id: registered.id, location: 'header', version },
+  ];
+
+  const applied = await upsertPageCustomCode(pageId, updatedBlocks, tokenOverride);
+  if (!applied) {
+    return { success: false, error: 'Failed to apply CMS template schema to page custom code' };
+  }
+
+  console.log(`[schema-publish] Published CMS template schema to page ${pageId}`);
+  return { success: true };
+}
+
 export async function listSites(tokenOverride?: string): Promise<Array<{ id: string; displayName: string; shortName: string }>> {
   const token = tokenOverride || getToken();
   if (!token) return [];

@@ -196,7 +196,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
                         <button
                           onClick={(e) => { e.stopPropagation(); fetchSitesForToken(linkToken); }}
                           disabled={!linkToken.trim() || loadingSites}
-                          className="px-2 py-1 text-xs font-medium bg-white text-black rounded hover:bg-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                          className="px-2 py-1 text-xs font-medium bg-white text-black rounded hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                           {loadingSites ? '...' : 'Go'}
                         </button>

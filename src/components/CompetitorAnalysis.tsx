@@ -115,8 +115,8 @@ export function CompetitorAnalysis({ siteUrl }: Props) {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3 text-zinc-500">
-        <Loader2 className="w-6 h-6 animate-spin" />
-        <p className="text-sm">Scanning both sites...</p>
+        <Loader2 className="w-6 h-6 animate-spin text-teal-400" />
+        <p className="text-sm">Analyzing both sites...</p>
         <p className="text-xs text-zinc-600">This may take 30-60 seconds depending on site size</p>
       </div>
     );
@@ -166,7 +166,7 @@ export function CompetitorAnalysis({ siteUrl }: Props) {
             <button
               onClick={runComparison}
               disabled={!myUrl.trim() || !competitorUrl.trim()}
-              className="w-full px-4 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-40"
+              className="w-full px-4 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
               style={{ backgroundColor: 'var(--brand-mint)', color: '#0f1219' }}
             >
               Compare Sites

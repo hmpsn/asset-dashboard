@@ -1,4 +1,4 @@
-import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from './webflow.js';
+import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet, getCollectionSchema, listCollections } from './webflow.js';
 
 const WEBFLOW_API = 'https://api.webflow.com/v2';
 
@@ -179,6 +179,32 @@ function extractStructuredInfo(html: string) {
   return { emails, phones, images, questions, author, publishDate };
 }
 
+// Post-process AI output: strip empty arrays, empty strings, and empty objects
+function cleanSchema(obj: Record<string, unknown>): Record<string, unknown> {
+  const clean = (val: unknown): unknown => {
+    if (val === null || val === undefined) return undefined;
+    if (typeof val === 'string') return val.trim() === '' ? undefined : val;
+    if (Array.isArray(val)) {
+      const filtered = val.map(clean).filter(v => v !== undefined);
+      return filtered.length === 0 ? undefined : filtered;
+    }
+    if (typeof val === 'object') {
+      const cleaned: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(val as Record<string, unknown>)) {
+        const cv = clean(v);
+        if (cv !== undefined) cleaned[k] = cv;
+      }
+      // Keep objects that have at least one meaningful key (besides @type/@id)
+      const meaningfulKeys = Object.keys(cleaned).filter(k => k !== '@type' && k !== '@id');
+      if (Object.keys(cleaned).length === 0) return undefined;
+      if (meaningfulKeys.length === 0 && !cleaned['@type']) return undefined;
+      return cleaned;
+    }
+    return val;
+  };
+  return clean(obj) as Record<string, unknown>;
+}
+
 async function aiGenerateUnifiedSchema(
   pageTitle: string,
   slug: string,
@@ -253,6 +279,21 @@ REQUIREMENTS:
 15. Every @type must have all Google-required fields filled with REAL data from the page
 16. If you cannot determine a required value from the content, OMIT that @type entirely rather than using a placeholder or fabricating data
 
+QUALITY RULES — strict:
+17. NEVER include empty arrays or empty strings. If a property has no value (e.g. "sameAs": []), OMIT it entirely.
+18. NEVER include empty objects. If a nested object would have no meaningful properties, omit the parent property.
+19. Use CONSISTENT @id naming across all pages. Follow this exact convention:
+    - Organization: "${siteUrl}/#organization"
+    - WebSite (homepage only): "${siteUrl}/#website"
+    - WebPage: "{pageUrl}/#webpage"
+    - BreadcrumbList: "{pageUrl}/#breadcrumb"
+    - LocalBusiness: "{pageUrl}/#localbusiness"
+    - Service (mainEntity): "{pageUrl}/#service"
+    - FAQPage: "{pageUrl}/#faq"
+    - Article/BlogPosting: "{pageUrl}/#article"
+20. For openingHours, prefer the OpeningHoursSpecification format:
+    "openingHoursSpecification": [{"@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday","Tuesday",...], "opens": "08:00", "closes": "17:00"}]
+
 Return ONLY the JSON-LD object. No markdown, no explanation, no wrapping.`;
 
   const MAX_RETRIES = 4;
@@ -275,7 +316,8 @@ Return ONLY the JSON-LD object. No markdown, no explanation, no wrapping.`;
       const mdMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
       if (mdMatch) jsonStr = mdMatch[1].trim();
 
-      const schema = JSON.parse(jsonStr) as Record<string, unknown>;
+      const rawSchema = JSON.parse(jsonStr) as Record<string, unknown>;
+      const schema = cleanSchema(rawSchema);
 
       // Ensure it has @graph structure
       if (!schema['@graph'] && schema['@type']) {
@@ -660,4 +702,233 @@ export async function generateSchemaSuggestions(
   });
 
   return results;
+}
+
+// ── CMS Template Schema Generator ──
+// Generates a schema template for a CMS collection page using Webflow's
+// {{wf ...}} template tags so each collection item gets dynamic schema.
+
+export interface CmsTemplateSchemaResult {
+  templateString: string;           // Raw JSON-LD with {{wf}} tags (ready for custom code)
+  schemaTypes: string[];            // Schema.org types generated
+  fieldsUsed: string[];             // CMS field slugs referenced
+  collectionName: string;
+  collectionSlug: string;
+}
+
+// Convert placeholder __WF:path:Type__ to Webflow template tag
+function wfTag(fieldPath: string, fieldType: string): string {
+  return `{{wf {&quot;path&quot;:&quot;${fieldPath}&quot;,&quot;type&quot;:&quot;${fieldType}&quot;\\} }}`;
+}
+
+// Build a readable field list for the AI prompt
+function describeFields(fields: Array<{ slug: string; displayName: string; type: string }>): string {
+  return fields.map(f => `- ${f.slug} (${f.type}): "${f.displayName}"`).join('\n');
+}
+
+export async function generateCmsTemplateSchema(
+  siteId: string,
+  collectionId: string,
+  tokenOverride?: string,
+  ctx: SchemaContext = {},
+): Promise<CmsTemplateSchemaResult | null> {
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  // Fetch collection info
+  const [collections, collSchema] = await Promise.all([
+    listCollections(siteId, tokenOverride),
+    getCollectionSchema(collectionId, tokenOverride),
+  ]);
+  const collection = collections.find(c => c.id === collectionId);
+  if (!collection || collSchema.fields.length === 0) return null;
+
+  const siteUrl = ctx.liveDomain
+    ? (ctx.liveDomain.startsWith('http') ? ctx.liveDomain : `https://${ctx.liveDomain}`)
+    : '';
+  const companyName = ctx.companyName || '(company name)';
+
+  // Build the field descriptions for the AI
+  const fieldDescriptions = describeFields(collSchema.fields);
+
+  // If no AI, build a basic template
+  if (!apiKey) {
+    return buildFallbackCmsTemplate(collection, collSchema.fields, siteUrl, companyName);
+  }
+
+  const prompt = `You are a Google Structured Data expert. Generate a JSON-LD schema template for a Webflow CMS collection page.
+
+This schema will be injected into every page of the "${collection.displayName}" collection (slug: "${collection.slug}"). Instead of static values, use PLACEHOLDER tags for CMS field data.
+
+PLACEHOLDER FORMAT: Use exactly this syntax for dynamic CMS values:
+  __WF:field-slug:FieldType__
+
+For reference fields (fields from a linked collection), use:
+  __WF:ref-field-slug:sub-field-slug:FieldType__
+
+SITE INFO:
+- Company: ${companyName}
+- Site URL: ${siteUrl || '(not available)'}
+- Logo: ${ctx.logoUrl || '(not available)'}
+- Collection: ${collection.displayName} (slug: ${collection.slug})
+${ctx.businessContext ? `- Business Context: ${ctx.businessContext}` : ''}
+
+AVAILABLE CMS FIELDS:
+${fieldDescriptions}
+
+REQUIREMENTS:
+1. Return ONE JSON-LD object with "@context": "https://schema.org" and an "@graph" array
+2. Map CMS fields to the most appropriate schema.org properties based on field names and types
+3. Use __WF:slug:PlainText__ for the item slug in URLs: "${siteUrl}/${collection.slug}/__WF:slug:PlainText__"
+4. Use __WF:name:PlainText__ for the item name
+5. For Phone fields use __WF:field-slug:Phone__
+6. For ImageRef fields use __WF:field-slug:ImageRef__
+7. For Email fields use __WF:field-slug:Email__
+8. For Date fields use __WF:field-slug:Date__
+9. For Link fields use __WF:field-slug:Link__
+10. For reference fields pointing to another collection's field, use __WF:ref-field:sub-field:PlainText__
+11. Include Organization node with static company data (not dynamic)
+12. Include BreadcrumbList: Home → ${collection.displayName} → __WF:name:PlainText__
+13. Choose the most appropriate @type for collection items (Dentist, Article, BlogPosting, Product, Service, Event, Person, Place, etc.) based on the collection name and fields
+14. ONLY use fields that exist in the AVAILABLE CMS FIELDS list above
+15. If a field doesn't exist for a schema property, OMIT that property entirely — do not guess field names
+16. NEVER include empty arrays, empty strings, or empty objects
+17. Use consistent @id naming: "${siteUrl}/${collection.slug}/__WF:slug:PlainText__/#typename"
+
+Return ONLY the raw JSON-LD. No markdown, no explanation.`;
+
+  const OpenAI = (await import('openai')).default;
+  const client = new OpenAI({ apiKey });
+
+  try {
+    const response = await client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      max_tokens: 3000,
+      temperature: 0.2,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const content = response.choices[0]?.message?.content?.trim();
+    if (!content) return null;
+
+    let jsonStr = content;
+    const mdMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (mdMatch) jsonStr = mdMatch[1].trim();
+
+    // Validate it's parseable JSON (with placeholders as strings)
+    try { JSON.parse(jsonStr); } catch {
+      console.error('[cms-template] AI returned invalid JSON');
+      return null;
+    }
+
+    // Convert placeholders to Webflow template tags
+    const templateString = convertPlaceholders(jsonStr);
+
+    // Extract which fields were used
+    const fieldsUsed = extractUsedFields(jsonStr, collSchema.fields);
+
+    // Extract schema types
+    const typeMatches = jsonStr.match(/"@type"\s*:\s*"([^"]+)"/g) || [];
+    const schemaTypes = typeMatches
+      .map(m => m.match(/"@type"\s*:\s*"([^"]+)"/)?.[1])
+      .filter(Boolean) as string[];
+
+    return {
+      templateString,
+      schemaTypes: [...new Set(schemaTypes)],
+      fieldsUsed,
+      collectionName: collection.displayName,
+      collectionSlug: collection.slug,
+    };
+  } catch (err) {
+    console.error('[cms-template] AI generation failed:', err);
+    return null;
+  }
+}
+
+// Convert __WF:path:Type__ placeholders to {{wf {&quot;...&quot;} }} tags
+function convertPlaceholders(jsonStr: string): string {
+  // Match __WF:path:Type__ and __WF:ref:subfield:Type__
+  return jsonStr.replace(/__WF:([^_]+)__/g, (_match, inner: string) => {
+    const parts = inner.split(':');
+    if (parts.length === 3) {
+      // Reference field: __WF:ref-field:sub-field:Type__
+      const [refField, subField, type] = parts;
+      return wfTag(`${refField}:${subField}`, type);
+    } else if (parts.length === 2) {
+      // Direct field: __WF:field-slug:Type__
+      const [fieldSlug, type] = parts;
+      return wfTag(fieldSlug, type);
+    }
+    return _match; // leave unrecognized patterns as-is
+  });
+}
+
+// Figure out which CMS fields were referenced
+function extractUsedFields(jsonStr: string, allFields: Array<{ slug: string }>): string[] {
+  const used = new Set<string>();
+  const matches = jsonStr.matchAll(/__WF:([^:_]+)/g);
+  for (const m of matches) {
+    if (allFields.some(f => f.slug === m[1])) {
+      used.add(m[1]);
+    }
+  }
+  return [...used];
+}
+
+// Fallback template without AI
+function buildFallbackCmsTemplate(
+  collection: { displayName: string; slug: string },
+  fields: Array<{ slug: string; displayName: string; type: string }>,
+  siteUrl: string,
+  companyName: string,
+): CmsTemplateSchemaResult {
+  const baseItemUrl = `${siteUrl}/${collection.slug}/${wfTag('slug', 'PlainText')}`;
+  const nameTag = wfTag('name', 'PlainText');
+
+  const graph: string[] = [];
+
+  // Organization
+  graph.push(`    {
+      "@type": "Organization",
+      "@id": "${siteUrl}/#organization",
+      "name": "${companyName}",
+      "url": "${siteUrl}"
+    }`);
+
+  // WebPage
+  graph.push(`    {
+      "@type": "WebPage",
+      "@id": "${baseItemUrl}/#webpage",
+      "url": "${baseItemUrl}",
+      "name": "${nameTag}",
+      "inLanguage": "en"
+    }`);
+
+  // BreadcrumbList
+  graph.push(`    {
+      "@type": "BreadcrumbList",
+      "@id": "${baseItemUrl}/#breadcrumb",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "Home", "item": "${siteUrl}/"},
+        {"@type": "ListItem", "position": 2, "name": "${collection.displayName}", "item": "${siteUrl}/${collection.slug}"},
+        {"@type": "ListItem", "position": 3, "name": "${nameTag}", "item": "${baseItemUrl}"}
+      ]
+    }`);
+
+  const templateString = `{
+  "@context": "https://schema.org",
+  "@graph": [
+${graph.join(',\n')}
+  ]
+}`;
+
+  const fieldsUsed = ['name', 'slug'].filter(s => fields.some(f => f.slug === s));
+
+  return {
+    templateString,
+    schemaTypes: ['Organization', 'WebPage', 'BreadcrumbList'],
+    fieldsUsed,
+    collectionName: collection.displayName,
+    collectionSlug: collection.slug,
+  };
 }

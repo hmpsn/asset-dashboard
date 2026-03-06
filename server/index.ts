@@ -38,6 +38,7 @@ import {
   updatePageSeo,
   publishSite,
   publishSchemaToPage,
+  publishRawSchemaToPage,
   uploadAsset,
   listAssetFolders,
   createAssetFolder,
@@ -56,7 +57,7 @@ import {
   addActionItem, updateActionItem, deleteActionItem, getActionItems, extractSiteLogo,
 } from './reports.js';
 import { runSiteSpeed, runSinglePageSpeed } from './pagespeed.js';
-import { generateSchemaSuggestions, generateSchemaForPage, type SchemaContext } from './schema-suggester.js';
+import { generateSchemaSuggestions, generateSchemaForPage, generateCmsTemplateSchema, type SchemaContext } from './schema-suggester.js';
 import { saveSchemaSnapshot, getSchemaSnapshot } from './schema-store.js';
 import { runSalesAudit } from './sales-audit.js';
 import { initJobs, createJob, updateJob, getJob, listJobs, cancelJob, registerAbort, isJobCancelled } from './jobs.js';
@@ -1084,6 +1085,71 @@ app.post('/api/webflow/schema-publish/:siteId', async (req, res) => {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('Schema publish error:', msg, err);
     res.status(500).json({ error: `Schema publish failed: ${msg}` });
+  }
+});
+
+// --- CMS Template Schema ---
+app.post('/api/webflow/schema-cms-template/:siteId', async (req, res) => {
+  const { collectionId } = req.body;
+  if (!collectionId) return res.status(400).json({ error: 'collectionId required' });
+  try {
+    const token = getTokenForSite(req.params.siteId) || undefined;
+    const { ctx } = buildSchemaContext(req.params.siteId);
+    const result = await generateCmsTemplateSchema(req.params.siteId, collectionId, token, ctx);
+    if (!result) return res.status(500).json({ error: 'Failed to generate CMS template schema' });
+    res.json(result);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('CMS template schema error:', msg, err);
+    res.status(500).json({ error: `CMS template schema failed: ${msg}` });
+  }
+});
+
+app.post('/api/webflow/schema-cms-template/:siteId/publish', async (req, res) => {
+  const { pageId, templateString, publishAfter } = req.body;
+  if (!pageId || !templateString) return res.status(400).json({ error: 'pageId and templateString required' });
+  try {
+    const token = getTokenForSite(req.params.siteId) || undefined;
+    const result = await publishRawSchemaToPage(req.params.siteId, pageId, templateString, token);
+    if (!result.success) return res.status(500).json(result);
+
+    let published = false;
+    if (publishAfter) {
+      const pubResult = await publishSite(req.params.siteId, token);
+      published = pubResult.success;
+    }
+
+    res.json({ success: true, published });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('CMS template publish error:', msg, err);
+    res.status(500).json({ error: `CMS template publish failed: ${msg}` });
+  }
+});
+
+// --- List CMS template pages (pages with collectionId) ---
+app.get('/api/webflow/cms-template-pages/:siteId', async (req, res) => {
+  try {
+    const token = getTokenForSite(req.params.siteId) || undefined;
+    const allPages = await listPages(req.params.siteId, token);
+    const collections = await listCollections(req.params.siteId, token);
+    const collMap = new Map(collections.map(c => [c.id, c]));
+
+    const templatePages = allPages
+      .filter(p => p.collectionId)
+      .map(p => ({
+        pageId: p.id,
+        pageTitle: p.title,
+        slug: p.slug,
+        collectionId: p.collectionId,
+        collectionName: collMap.get(p.collectionId!)?.displayName || '',
+        collectionSlug: collMap.get(p.collectionId!)?.slug || '',
+      }));
+
+    res.json(templatePages);
+  } catch (err) {
+    console.error('CMS template pages error:', err);
+    res.json([]);
   }
 });
 

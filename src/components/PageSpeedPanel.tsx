@@ -341,7 +341,7 @@ export function PageSpeedPanel({ siteId }: Props) {
               <button
                 onClick={() => runSingleTest('mobile')}
                 disabled={!selectedPage}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors disabled:opacity-40"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors disabled:opacity-50"
                 style={{ background: 'var(--brand-mint)', color: '#0f1219' }}
               >
                 <Smartphone className="w-4 h-4" /> Test Mobile
@@ -349,7 +349,7 @@ export function PageSpeedPanel({ siteId }: Props) {
               <button
                 onClick={() => runSingleTest('desktop')}
                 disabled={!selectedPage}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors disabled:opacity-40"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors disabled:opacity-50"
               >
                 <Monitor className="w-4 h-4" /> Test Desktop
               </button>

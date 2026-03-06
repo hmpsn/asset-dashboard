@@ -200,7 +200,7 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
   if (loading && !overview) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3 text-zinc-500">
-        <Loader2 className="w-6 h-6 animate-spin" />
+        <Loader2 className="w-6 h-6 animate-spin text-teal-400" />
         <p className="text-sm">Loading analytics data...</p>
       </div>
     );
@@ -228,7 +228,7 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
     { label: 'Pageviews', value: formatNumber(overview.totalPageviews), icon: Eye, color: 'text-emerald-400' },
     { label: 'Avg. Duration', value: formatDuration(overview.avgSessionDuration), icon: Clock, color: 'text-amber-400' },
     { label: 'Bounce Rate', value: `${overview.bounceRate}%`, icon: overview.bounceRate > 60 ? TrendingDown : TrendingUp, color: overview.bounceRate > 60 ? 'text-red-400' : 'text-emerald-400' },
-    { label: 'New Users', value: `${overview.newUserPercentage}%`, icon: Users, color: 'text-pink-400' },
+    { label: 'New Users', value: `${overview.newUserPercentage}%`, icon: Users, color: 'text-cyan-400' },
   ];
 
   const trendColors: Record<string, string> = { users: '#14b8a6', sessions: '#3b82f6', pageviews: '#10b981' };

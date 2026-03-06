@@ -117,7 +117,7 @@ function TrendChart({ data, metric, color, height = 80 }: { data: PerformanceTre
           onClose={() => setSelected(null)}
           metrics={[
             { label: 'Clicks', value: data[selected].clicks, color: '#60a5fa' },
-            { label: 'Impressions', value: data[selected].impressions, color: '#a78bfa' },
+            { label: 'Impressions', value: data[selected].impressions, color: '#22d3ee' },
             { label: 'CTR', value: `${data[selected].ctr}%`, color: '#34d399' },
             { label: 'Position', value: data[selected].position, color: '#fbbf24' },
           ]}
@@ -318,7 +318,7 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
         <button
           onClick={() => setChatOpen(!chatOpen)}
           className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-            chatOpen ? 'bg-violet-600 text-white' : 'bg-gradient-to-r from-violet-600/80 to-fuchsia-600/80 hover:from-violet-500 hover:to-fuchsia-500 text-white'
+            chatOpen ? 'bg-teal-600 text-white' : 'bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white'
           }`}
         >
           <Sparkles className="w-3.5 h-3.5" /> Ask AI
@@ -354,7 +354,7 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-violet-400" />
+              <Sparkles className="w-4 h-4 text-teal-400" />
               <span className="text-sm font-medium text-zinc-200">SEO AI Assistant</span>
               <span className="text-[10px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">GPT-4o</span>
             </div>
@@ -372,7 +372,7 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
                     onClick={() => askAi(q)}
                     className="text-left px-3 py-2.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-800 text-[11px] text-zinc-300 transition-colors"
                   >
-                    <MessageSquare className="w-3 h-3 text-violet-400 mb-1" />
+                    <MessageSquare className="w-3 h-3 text-teal-400 mb-1" />
                     {q}
                   </button>
                 ))}
@@ -386,13 +386,13 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
               {chatMessages.map((msg, i) => (
                 <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
                   {msg.role === 'assistant' && (
-                    <div className="w-6 h-6 rounded-lg bg-violet-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Sparkles className="w-3 h-3 text-violet-400" />
+                    <div className="w-6 h-6 rounded-lg bg-teal-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Sparkles className="w-3 h-3 text-teal-400" />
                     </div>
                   )}
                   <div className={`max-w-[85%] rounded-xl px-3.5 py-2.5 ${
                     msg.role === 'user'
-                      ? 'bg-violet-600/20 border border-violet-500/20 text-xs text-zinc-200'
+                      ? 'bg-teal-600/20 border border-teal-500/20 text-xs text-zinc-200'
                       : 'bg-zinc-800/50 border border-zinc-800'
                   }`}>
                     {msg.role === 'assistant' ? <RenderMarkdown text={msg.content} /> : msg.content}
@@ -401,8 +401,8 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
               ))}
               {chatLoading && (
                 <div className="flex gap-3">
-                  <div className="w-6 h-6 rounded-lg bg-violet-500/10 flex items-center justify-center flex-shrink-0">
-                    <Loader2 className="w-3 h-3 text-violet-400 animate-spin" />
+                  <div className="w-6 h-6 rounded-lg bg-teal-500/10 flex items-center justify-center flex-shrink-0">
+                    <Loader2 className="w-3 h-3 text-teal-400 animate-spin" />
                   </div>
                   <div className="bg-zinc-800/50 border border-zinc-800 rounded-xl px-3.5 py-2.5">
                     <div className="flex gap-1">
@@ -426,13 +426,13 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
                 onChange={e => setChatInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && !e.shiftKey && askAi(chatInput)}
                 placeholder="Ask about your search data..."
-                className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-violet-500"
+                className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500"
                 disabled={chatLoading}
               />
               <button
                 onClick={() => askAi(chatInput)}
                 disabled={chatLoading || !chatInput.trim()}
-                className="px-3 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 rounded-lg transition-colors"
+                className="px-3 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-lg transition-colors"
               >
                 <Send className="w-3.5 h-3.5" />
               </button>
@@ -455,8 +455,8 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
             </div>
             <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
               <div className="flex items-center justify-between mb-1">
-                <Eye className="w-4 h-4 text-purple-400" />
-                <MiniSparkline data={trend.map(t => t.impressions)} color="#a78bfa" />
+                <Eye className="w-4 h-4 text-cyan-400" />
+                <MiniSparkline data={trend.map(t => t.impressions)} color="#22d3ee" />
               </div>
               <div className="text-2xl font-bold text-zinc-200">{overview.totalImpressions.toLocaleString()}</div>
               <div className="text-[10px] text-zinc-500 mt-0.5">Total Impressions</div>
@@ -492,8 +492,8 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
                   <TrendChart data={trend} metric="clicks" color="#60a5fa" />
                 </div>
                 <div>
-                  <div className="text-[10px] text-purple-400 mb-1">Impressions</div>
-                  <TrendChart data={trend} metric="impressions" color="#a78bfa" />
+                  <div className="text-[10px] text-cyan-400 mb-1">Impressions</div>
+                  <TrendChart data={trend} metric="impressions" color="#22d3ee" />
                 </div>
               </div>
             </div>
@@ -633,7 +633,7 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
                         <div key={i} className="flex items-center justify-between text-[11px] py-1 px-2 rounded bg-zinc-800/30">
                           <span className="text-zinc-300 truncate mr-2">{q.query}</span>
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className="text-purple-400">{q.impressions} imp</span>
+                            <span className="text-cyan-400">{q.impressions} imp</span>
                             <span className="text-orange-400">{q.clicks} clicks</span>
                           </div>
                         </div>

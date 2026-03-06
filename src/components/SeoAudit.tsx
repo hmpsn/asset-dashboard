@@ -32,8 +32,8 @@ interface SeoIssue {
 
 const CATEGORY_CONFIG: Record<CheckCategory, { label: string; color: string }> = {
   content: { label: 'Content', color: 'text-emerald-400' },
-  technical: { label: 'Technical', color: 'text-violet-400' },
-  social: { label: 'Social', color: 'text-pink-400' },
+  technical: { label: 'Technical', color: 'text-teal-400' },
+  social: { label: 'Social', color: 'text-cyan-400' },
   performance: { label: 'Performance', color: 'text-orange-400' },
   accessibility: { label: 'Accessibility', color: 'text-sky-400' },
 };
@@ -942,7 +942,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
           onClick={() => setAuditSubTab(t.id)}
           className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px ${
             auditSubTab === t.id
-              ? 'border-violet-500 text-violet-300'
+              ? 'border-teal-500 text-teal-300'
               : 'border-transparent text-zinc-500 hover:text-zinc-300'
           }`}
         >
@@ -1293,7 +1293,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
                 {(severityFilter !== 'all' || categoryFilter !== 'all') && (
                   <button
                     onClick={() => batchCreateTasks('filtered')}
-                    className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-violet-500/10 border border-violet-500/20 text-violet-400 hover:bg-violet-500/20 transition-colors"
+                    className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-teal-500/10 border border-teal-500/20 text-teal-400 hover:bg-teal-500/20 transition-colors"
                     title="Create tasks for currently filtered issues"
                   >
                     <ClipboardList className="w-3 h-3" /> Add Filtered

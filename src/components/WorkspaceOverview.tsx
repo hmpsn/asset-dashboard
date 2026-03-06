@@ -225,7 +225,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                   {ws.approvals.total > 0 ? (
                     <div className="space-y-0.5">
                       {ws.approvals.pending > 0 && (
-                        <div className="text-[10px] text-violet-400 font-medium">{ws.approvals.pending} pending</div>
+                        <div className="text-[10px] text-teal-400 font-medium">{ws.approvals.pending} pending</div>
                       )}
                       {ws.approvals.pending === 0 && (
                         <div className="flex items-center gap-1 text-[10px] text-green-400">

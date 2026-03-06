@@ -1111,12 +1111,12 @@ export function ClientDashboard({ workspaceId }: Props) {
                 <button key={t.id} onClick={() => t.locked ? setShowUpgradeModal(true) : setTab(t.id)}
                   className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium border-b-2 transition-colors ${
                     t.locked ? 'border-transparent text-zinc-600 cursor-default' :
-                    active ? 'border-teal-500 text-teal-400' :
+                    active ? 'border-teal-500 text-teal-300' :
                     'border-transparent text-zinc-500 hover:text-zinc-300 hover:border-zinc-700'
                   }`}>
                   <Icon className="w-3.5 h-3.5" /> {t.label}
                   {t.locked && <Lock className="w-3 h-3 ml-0.5 text-zinc-600" />}
-                  {t.id === 'approvals' && pendingApprovals > 0 && <span className="ml-1 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-violet-500 text-white">{pendingApprovals}</span>}
+                  {t.id === 'approvals' && pendingApprovals > 0 && <span className="ml-1 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-teal-500 text-white">{pendingApprovals}</span>}
                   {t.id === 'requests' && unreadTeamNotes > 0 && <span className="ml-1 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-teal-500 text-white">{unreadTeamNotes}</span>}
                   {t.id === 'content' && pendingReviews > 0 && <span className="ml-1 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-blue-500 text-white">{pendingReviews}</span>}
                   {!t.locked && hasData && !active && t.id !== 'approvals' && t.id !== 'requests' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" />}
@@ -1319,7 +1319,7 @@ export function ClientDashboard({ workspaceId }: Props) {
               {strategyData && (strategyData.quickWins?.length || strategyData.contentGaps?.length) ? (
                 <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                   <div className="flex items-center gap-2 mb-2.5">
-                    <Sparkles className="w-4 h-4 text-violet-400" />
+                    <Sparkles className="w-4 h-4 text-teal-400" />
                     <span className="text-xs font-medium text-zinc-300">Growth Insights</span>
                   </div>
                   <div className="space-y-2">
@@ -1342,8 +1342,8 @@ export function ClientDashboard({ workspaceId }: Props) {
                     {strategyData.opportunities && strategyData.opportunities.length > 0 && (
                       <button onClick={() => setTab('strategy')} className="w-full text-left px-3 py-2.5 rounded-lg bg-zinc-800/30 hover:bg-zinc-800/50 transition-colors">
                         <div className="flex items-center gap-2">
-                          <Target className="w-3 h-3 text-violet-400 flex-shrink-0" />
-                          <span className="text-[11px] text-zinc-300"><strong className="text-violet-300">{strategyData.opportunities.length} keyword {strategyData.opportunities.length === 1 ? 'opportunity' : 'opportunities'}</strong> identified</span>
+                          <Target className="w-3 h-3 text-teal-400 flex-shrink-0" />
+                          <span className="text-[11px] text-zinc-300"><strong className="text-teal-300">{strategyData.opportunities.length} keyword {strategyData.opportunities.length === 1 ? 'opportunity' : 'opportunities'}</strong> identified</span>
                         </div>
                       </button>
                     )}
@@ -1889,7 +1889,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                                   </button>
                                   <button
                                     onClick={() => setPricingModal({ serviceType: 'full_post', topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, source: 'strategy' })}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600/30 to-violet-600/30 border border-blue-500/30 text-[10px] text-blue-200 font-medium hover:from-blue-600/50 hover:to-violet-600/50 transition-all"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600/30 to-teal-600/30 border border-blue-500/30 text-[10px] text-blue-200 font-medium hover:from-blue-600/50 hover:to-teal-600/50 transition-all"
                                   >
                                     <Sparkles className="w-3 h-3" /> Get Full Post
                                     {ws?.contentPricing && <span className="text-[8px] opacity-70 ml-0.5">{new Intl.NumberFormat('en-US', { style: 'currency', currency: ws.contentPricing.currency || 'USD', minimumFractionDigits: 0 }).format(ws.contentPricing.fullPostPrice)}</span>}
@@ -1908,17 +1908,17 @@ export function ClientDashboard({ workspaceId }: Props) {
               {/* ── KEYWORD OPPORTUNITIES + TARGET KEYWORDS (side by side) ── */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 {strategyData.opportunities.length > 0 && (
-                  <div className="bg-gradient-to-br from-violet-950/30 to-zinc-900 rounded-xl border border-violet-500/20 p-5">
+                  <div className="bg-gradient-to-br from-teal-950/30 to-zinc-900 rounded-xl border border-teal-500/20 p-5">
                     <div className="flex items-center gap-2 mb-3">
-                      <div className="w-6 h-6 rounded-lg bg-violet-500/20 flex items-center justify-center">
-                        <Sparkles className="w-3.5 h-3.5 text-violet-400" />
+                      <div className="w-6 h-6 rounded-lg bg-teal-500/20 flex items-center justify-center">
+                        <Sparkles className="w-3.5 h-3.5 text-teal-400" />
                       </div>
-                      <div className="text-xs font-semibold text-violet-200">Keyword Opportunities</div>
+                      <div className="text-xs font-semibold text-teal-200">Keyword Opportunities</div>
                     </div>
                     <div className="space-y-2">
                       {strategyData.opportunities.map((opp, i) => (
                         <div key={i} className="flex items-start gap-2.5 text-[11px] text-zinc-300 px-3 py-2 rounded-lg bg-zinc-900/40 border border-zinc-800/50">
-                          <span className="w-5 h-5 rounded-full bg-violet-500/15 border border-violet-500/25 flex items-center justify-center flex-shrink-0 mt-0.5 text-[9px] text-violet-400 font-bold">{i + 1}</span>
+                          <span className="w-5 h-5 rounded-full bg-teal-500/15 border border-teal-500/25 flex items-center justify-center flex-shrink-0 mt-0.5 text-[9px] text-teal-400 font-bold">{i + 1}</span>
                           {opp}
                         </div>
                       ))}
@@ -2134,7 +2134,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                   <button onClick={() => setNewTopicServiceType('brief_only')} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border text-xs font-medium transition-all ${newTopicServiceType === 'brief_only' ? 'bg-teal-600/20 border-teal-500/40 text-teal-300' : 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}>
                     <FileText className="w-3.5 h-3.5" /> Content Brief
                   </button>
-                  <button onClick={() => setNewTopicServiceType('full_post')} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border text-xs font-medium transition-all ${newTopicServiceType === 'full_post' ? 'bg-gradient-to-r from-blue-600/20 to-violet-600/20 border-blue-500/40 text-blue-300' : 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}>
+                  <button onClick={() => setNewTopicServiceType('full_post')} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border text-xs font-medium transition-all ${newTopicServiceType === 'full_post' ? 'bg-gradient-to-r from-blue-600/20 to-teal-600/20 border-blue-500/40 text-blue-300' : 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}>
                     <Sparkles className="w-3.5 h-3.5" /> Full Blog Post
                   </button>
                 </div>
@@ -2195,7 +2195,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-semibold text-zinc-200">{req.topic}</span>
-                          <span className={`text-[8px] px-1.5 py-0.5 rounded border font-medium ${(req.serviceType || 'brief_only') === 'full_post' ? 'bg-gradient-to-r from-blue-500/10 to-violet-500/10 text-blue-300 border-blue-500/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
+                          <span className={`text-[8px] px-1.5 py-0.5 rounded border font-medium ${(req.serviceType || 'brief_only') === 'full_post' ? 'bg-gradient-to-r from-blue-500/10 to-teal-500/10 text-blue-300 border-blue-500/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
                             {(req.serviceType || 'brief_only') === 'full_post' ? '✦ Full Post' : 'Brief'}
                           </span>
                           {req.upgradedAt && <span className="text-[8px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 font-medium">Upgraded</span>}
@@ -2203,7 +2203,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                         <div className="text-xs text-teal-400 mt-0.5">&ldquo;{req.targetKeyword}&rdquo;</div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {req.source === 'client' && <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">You submitted</span>}
+                        {req.source === 'client' && <span className="text-[9px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20">You submitted</span>}
                         {req.status === 'changes_requested' && <span className="text-[9px] px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20">Changes Requested</span>}
                         {req.status === 'client_review' && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 animate-pulse">Needs Your Review</span>}
                         {isExpanded ? <ChevronUp className="w-4 h-4 text-zinc-500" /> : <ChevronDown className="w-4 h-4 text-zinc-500" />}
@@ -2348,7 +2348,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                                 <div className="text-[9px] text-zinc-600 mb-1.5">Topics to Reference</div>
                                 <div className="flex flex-wrap gap-1.5">
                                   {brief.topicalEntities.map((entity: string, i: number) => (
-                                    <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-300">{entity}</span>
+                                    <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-300">{entity}</span>
                                   ))}
                                 </div>
                               </div>
@@ -2397,7 +2397,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                                 {[
                                   { label: 'Experience', value: brief.eeatGuidance.experience, color: 'text-blue-400' },
                                   { label: 'Expertise', value: brief.eeatGuidance.expertise, color: 'text-teal-400' },
-                                  { label: 'Authority', value: brief.eeatGuidance.authority, color: 'text-violet-400' },
+                                  { label: 'Authority', value: brief.eeatGuidance.authority, color: 'text-teal-400' },
                                   { label: 'Trust', value: brief.eeatGuidance.trust, color: 'text-amber-400' },
                                 ].filter(e => e.value).map((e, i) => (
                                   <div key={i} className="bg-zinc-950 rounded-lg px-3 py-2.5 border border-zinc-800">
@@ -2467,8 +2467,8 @@ export function ClientDashboard({ workspaceId }: Props) {
 
                       {/* Upgrade CTA for brief_only items after approval */}
                       {canUpgrade && (
-                        <div className="bg-gradient-to-r from-blue-600/10 via-violet-600/10 to-blue-600/10 border border-blue-500/20 rounded-xl p-4 flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-violet-500/20 flex items-center justify-center flex-shrink-0">
+                        <div className="bg-gradient-to-r from-blue-600/10 via-teal-600/10 to-blue-600/10 border border-blue-500/20 rounded-xl p-4 flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-teal-500/20 flex items-center justify-center flex-shrink-0">
                             <Sparkles className="w-5 h-5 text-blue-400" />
                           </div>
                           <div className="flex-1">
@@ -2477,7 +2477,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                           </div>
                           <button
                             onClick={(e) => { e.stopPropagation(); setPricingModal({ serviceType: 'full_post', topic: req.topic, targetKeyword: req.targetKeyword, source: 'upgrade', upgradeReqId: req.id }); }}
-                            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-violet-600 text-xs text-white font-medium hover:from-blue-500 hover:to-violet-500 transition-all flex-shrink-0 shadow-lg shadow-blue-900/20"
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-teal-600 text-xs text-white font-medium hover:from-blue-500 hover:to-teal-500 transition-all flex-shrink-0 shadow-lg shadow-blue-900/20"
                           >
                             <Sparkles className="w-3.5 h-3.5" />
                             Upgrade to Full Post
@@ -2986,20 +2986,20 @@ export function ClientDashboard({ workspaceId }: Props) {
         {tab === 'approvals' && (<>
           <div className="space-y-6">
             <div className="flex items-center gap-3">
-              <ClipboardCheck className="w-5 h-5 text-violet-400" />
+              <ClipboardCheck className="w-5 h-5 text-teal-400" />
               <div>
                 <h2 className="text-sm font-semibold text-zinc-200">SEO Change Approvals</h2>
                 <p className="text-[10px] text-zinc-500 mt-0.5">Review proposed SEO changes, make edits if needed, then approve to push live.</p>
               </div>
               {pendingApprovals > 0 && (
-                <span className="ml-auto px-2 py-0.5 text-[10px] font-medium rounded-full bg-violet-500/20 border border-violet-500/30 text-violet-300">
+                <span className="ml-auto px-2 py-0.5 text-[10px] font-medium rounded-full bg-teal-500/20 border border-teal-500/30 text-teal-300">
                   {pendingApprovals} pending
                 </span>
               )}
             </div>
 
             {approvalsLoading && (
-              <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-zinc-500" /></div>
+              <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-teal-400" /></div>
             )}
 
             {!approvalsLoading && approvalBatches.length === 0 && (
@@ -3074,7 +3074,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                               {isSchema && schemaTypes.length > 0 && (
                                 <div className="flex items-center gap-1 mt-1">
                                   {schemaTypes.map(t => (
-                                    <span key={t} className="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/10 border border-violet-500/20 text-violet-300">{t}</span>
+                                    <span key={t} className="text-[9px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-300">{t}</span>
                                   ))}
                                 </div>
                               )}
@@ -3105,7 +3105,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                               <div>
                                 <div className="text-[10px] text-zinc-500 mb-1 flex items-center gap-1">
                                   Proposed
-                                  {item.clientValue && <span className="text-violet-400">(edited by you)</span>}
+                                  {item.clientValue && <span className="text-teal-400">(edited by you)</span>}
                                 </div>
                                 {isEditing ? (
                                   <div className="space-y-2">
@@ -3114,20 +3114,20 @@ export function ClientDashboard({ workspaceId }: Props) {
                                         type="text"
                                         value={editDraft}
                                         onChange={e => setEditDraft(e.target.value)}
-                                        className="w-full px-3 py-1.5 bg-zinc-800 border border-violet-500/50 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-400"
+                                        className="w-full px-3 py-1.5 bg-zinc-800 border border-teal-500/50 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-400"
                                       />
                                     ) : (
                                       <textarea
                                         value={editDraft}
                                         onChange={e => setEditDraft(e.target.value)}
                                         rows={2}
-                                        className="w-full px-3 py-1.5 bg-zinc-800 border border-violet-500/50 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-400 resize-none"
+                                        className="w-full px-3 py-1.5 bg-zinc-800 border border-teal-500/50 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-400 resize-none"
                                       />
                                     )}
                                     <div className="flex gap-1.5">
                                       <button
                                         onClick={() => updateApprovalItem(batch.id, item.id, { clientValue: editDraft })}
-                                        className="px-2.5 py-1 bg-violet-600 hover:bg-violet-500 rounded text-[10px] font-medium transition-colors"
+                                        className="px-2.5 py-1 bg-teal-600 hover:bg-teal-500 rounded text-[10px] font-medium transition-colors"
                                       >Save Edit</button>
                                       <button
                                         onClick={() => { setEditingApproval(null); setEditDraft(''); }}
@@ -3484,8 +3484,8 @@ export function ClientDashboard({ workspaceId }: Props) {
       {showUpgradeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowUpgradeModal(false)}>
           <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-8 max-w-md w-full mx-4 text-center shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="w-14 h-14 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center mx-auto mb-4">
-              <Sparkles className="w-7 h-7 text-violet-400" />
+            <div className="w-14 h-14 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center mx-auto mb-4">
+              <Sparkles className="w-7 h-7 text-teal-400" />
             </div>
             <h3 className="text-lg font-semibold text-zinc-100 mb-2">SEO Strategy — Premium Feature</h3>
             <p className="text-sm text-zinc-400 leading-relaxed mb-6">
@@ -3500,7 +3500,7 @@ export function ClientDashboard({ workspaceId }: Props) {
               ))}
             </div>
             <a href="mailto:josh@hmpsn.studio?subject=SEO%20Insights%20Upgrade&body=I'm%20interested%20in%20enabling%20SEO%20insights%20for%20my%20dashboard."
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition-colors">
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium transition-colors">
               <Sparkles className="w-4 h-4" /> Connect With Our Team
             </a>
             <button onClick={() => setShowUpgradeModal(false)} className="block mx-auto mt-3 text-xs text-zinc-500 hover:text-zinc-400 transition-colors">
@@ -3540,9 +3540,9 @@ export function ClientDashboard({ workspaceId }: Props) {
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => !pricingConfirming && setPricingModal(null)}>
             <div className="bg-zinc-900 border border-zinc-700/50 rounded-2xl shadow-2xl shadow-black/40 w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
               {/* Header */}
-              <div className={`px-6 pt-6 pb-4 ${isFull ? 'bg-gradient-to-br from-blue-600/10 via-violet-600/10 to-transparent' : 'bg-gradient-to-br from-teal-600/10 to-transparent'}`}>
+              <div className={`px-6 pt-6 pb-4 ${isFull ? 'bg-gradient-to-br from-blue-600/10 via-teal-600/10 to-transparent' : 'bg-gradient-to-br from-teal-600/10 to-transparent'}`}>
                 <div className="flex items-center gap-3 mb-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isFull ? 'bg-gradient-to-br from-blue-500/20 to-violet-500/20' : 'bg-teal-500/20'}`}>
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isFull ? 'bg-gradient-to-br from-blue-500/20 to-teal-500/20' : 'bg-teal-500/20'}`}>
                     {isFull ? <Sparkles className="w-5 h-5 text-blue-400" /> : <FileText className="w-5 h-5 text-teal-400" />}
                   </div>
                   <div>
@@ -3597,7 +3597,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                   <button
                     disabled={pricingConfirming}
                     onClick={confirmPricingAndSubmit}
-                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-50 shadow-lg ${isFull ? 'bg-gradient-to-r from-blue-600 to-violet-600 text-white hover:from-blue-500 hover:to-violet-500 shadow-blue-900/30' : 'bg-teal-600 text-white hover:bg-teal-500 shadow-teal-900/30'}`}
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-50 shadow-lg ${isFull ? 'bg-gradient-to-r from-blue-600 to-teal-600 text-white hover:from-blue-500 hover:to-teal-500 shadow-blue-900/30' : 'bg-teal-600 text-white hover:bg-teal-500 shadow-teal-900/30'}`}
                   >
                     {pricingConfirming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                     {pricingConfirming ? 'Submitting...' : displayPrice != null ? `Confirm & Pay ${fmt(displayPrice)}` : 'Confirm Request'}

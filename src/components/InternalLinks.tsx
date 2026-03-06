@@ -98,7 +98,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
           </p>
           <button
             onClick={runAnalysis}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium mx-auto transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-medium mx-auto transition-colors"
           >
             <ArrowUpRight className="w-3.5 h-3.5" /> Analyze Internal Links
           </button>
@@ -115,7 +115,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-2">
-        <Loader2 className="w-6 h-6 animate-spin text-violet-400" />
+        <Loader2 className="w-6 h-6 animate-spin text-teal-400" />
         <span className="text-sm text-zinc-400">Analyzing page content & finding link opportunities...</span>
         <span className="text-[11px] text-zinc-600">This fetches and reads every page — may take 30-60 seconds</span>
       </div>
@@ -190,7 +190,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Filter by page or anchor text..."
-            className="w-full pl-7 pr-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-500"
+            className="w-full pl-7 pr-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
           />
         </div>
       </div>
@@ -219,7 +219,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
                     <span className="text-xs text-zinc-300 font-mono truncate max-w-[140px]">{s.toPage}</span>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-[10px] text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded truncate max-w-[160px]">
+                    <span className="text-[10px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded truncate max-w-[160px]">
                       "{s.anchorText}"
                     </span>
                     <span className={`text-[10px] px-1.5 py-0.5 rounded border ${cfg.bg} ${cfg.color}`}>
@@ -243,7 +243,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
                     </div>
                     <div>
                       <span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Suggested Anchor Text</span>
-                      <p className="text-xs text-violet-300 mt-0.5 bg-violet-500/5 border border-violet-500/10 rounded px-2 py-1 inline-block">
+                      <p className="text-xs text-teal-300 mt-0.5 bg-teal-500/5 border border-teal-500/10 rounded px-2 py-1 inline-block">
                         {s.anchorText}
                       </p>
                     </div>
@@ -263,7 +263,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
       {data.suggestions.length > 0 && (
         <div className="bg-zinc-800/30 rounded-lg border border-zinc-800 px-4 py-3">
           <div className="flex items-start gap-2">
-            <AlertCircle className="w-3.5 h-3.5 text-violet-400 mt-0.5 flex-shrink-0" />
+            <AlertCircle className="w-3.5 h-3.5 text-teal-400 mt-0.5 flex-shrink-0" />
             <div className="text-[11px] text-zinc-500 space-y-1">
               <p><strong className="text-zinc-400">How to implement:</strong> Open each page in the Webflow Designer and add links using the suggested anchor text. Place links naturally within the page's body content where they make contextual sense.</p>
               <p><strong className="text-zinc-400">SEO impact:</strong> Internal links help search engines discover and understand page relationships. They also distribute page authority (PageRank) across your site, which can improve rankings for linked pages.</p>

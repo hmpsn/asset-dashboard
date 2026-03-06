@@ -347,8 +347,8 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
           {/* Client Portal Toggles */}
           <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
             <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid var(--brand-border)' }}>
-              <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
-                <SlidersHorizontal className="w-4 h-4 text-violet-400" />
+              <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
+                <SlidersHorizontal className="w-4 h-4 text-teal-400" />
               </div>
               <div className="flex-1">
                 <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Client Portal Features</h3>
@@ -500,8 +500,8 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
           {/* Branding */}
           <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
             <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid var(--brand-border)' }}>
-              <div className="w-8 h-8 rounded-lg bg-pink-500/10 flex items-center justify-center">
-                <ImageIcon className="w-4 h-4 text-pink-400" />
+              <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
+                <ImageIcon className="w-4 h-4 text-teal-400" />
               </div>
               <div className="flex-1">
                 <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>White-Label Branding</h3>
@@ -885,7 +885,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                             onKeyDown={e => e.key === 'Enter' && addGroup()}
                             className="flex-1 px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-teal-500" />
                           <button onClick={addGroup} disabled={!newGroupName.trim()}
-                            className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-teal-600 hover:bg-teal-500 disabled:opacity-40 text-white text-[10px] font-medium transition-colors">
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-[10px] font-medium transition-colors">
                             <Plus className="w-3 h-3" /> Add
                           </button>
                         </div>
