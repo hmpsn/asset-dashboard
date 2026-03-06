@@ -3451,6 +3451,15 @@ app.get('/api/public/content-requests/:workspaceId', (req, res) => {
 });
 
 // --- Storage Diagnostics (temporary) ---
+app.get('/api/debug/storage-overview', (_req, res) => {
+  const workspaces = listWorkspaces();
+  res.json(workspaces.map(ws => ({
+    id: ws.id, name: ws.name,
+    contentRequests: listContentRequests(ws.id).length,
+    pendingRequests: listContentRequests(ws.id).filter(r => r.status === 'requested').length,
+  })));
+});
+
 app.get('/api/debug/storage/:workspaceId', (req, res) => {
   const wsId = req.params.workspaceId;
   const dataBase = process.env.DATA_DIR || (IS_PROD ? '/tmp/asset-dashboard' : '');
