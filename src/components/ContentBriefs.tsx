@@ -38,10 +38,14 @@ interface ContentTopicRequest {
   intent: string;
   priority: string;
   rationale: string;
-  status: 'requested' | 'brief_generated' | 'in_progress' | 'delivered' | 'declined';
+  status: 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'delivered' | 'declined';
   briefId?: string;
   clientNote?: string;
   internalNote?: string;
+  declineReason?: string;
+  clientFeedback?: string;
+  source?: 'strategy' | 'client';
+  comments?: { id: string; author: 'client' | 'team'; content: string; createdAt: string }[];
   requestedAt: string;
   updatedAt: string;
 }
@@ -95,17 +99,8 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
   };
 
   const exportClientHTML = async (b: ContentBrief) => {
-    try {
-      const res = await fetch(`/api/content-briefs/${workspaceId}/${b.id}/export`);
-      if (!res.ok) throw new Error('Export failed');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `content-brief-${b.targetKeyword.replace(/\s+/g, '-').toLowerCase()}.html`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch { /* skip */ }
+    // Open in new tab with print-ready branded view (has "Save as PDF" button)
+    window.open(`/api/content-briefs/${workspaceId}/${b.id}/export`, '_blank');
   };
 
   useEffect(() => {
@@ -222,6 +217,9 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
               const statusConfig: Record<string, { icon: typeof Clock; color: string; label: string }> = {
                 requested: { icon: Clock, color: 'text-amber-400', label: 'Awaiting Review' },
                 brief_generated: { icon: FileText, color: 'text-blue-400', label: 'Brief Ready' },
+                client_review: { icon: Clock, color: 'text-cyan-400', label: 'Client Review' },
+                approved: { icon: CheckCircle2, color: 'text-green-400', label: 'Approved' },
+                changes_requested: { icon: Clock, color: 'text-orange-400', label: 'Changes Requested' },
                 in_progress: { icon: Zap, color: 'text-violet-400', label: 'In Progress' },
                 delivered: { icon: CheckCircle2, color: 'text-green-400', label: 'Delivered' },
                 declined: { icon: XCircle, color: 'text-zinc-500', label: 'Declined' },
@@ -270,10 +268,32 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                             View Brief
                           </button>
                           <button
-                            onClick={() => handleUpdateRequestStatus(req.id, 'delivered')}
-                            className="px-2 py-1 rounded bg-green-600/20 border border-green-500/30 text-[10px] text-green-300 hover:bg-green-600/30 transition-colors"
+                            onClick={() => handleUpdateRequestStatus(req.id, 'client_review')}
+                            className="px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 text-[10px] text-cyan-300 hover:bg-cyan-600/30 transition-colors"
                           >
-                            Mark Delivered
+                            Send to Client
+                          </button>
+                        </div>
+                      )}
+                      {req.status === 'client_review' && (
+                        <span className="text-[9px] text-cyan-400/60 italic">Awaiting client feedback</span>
+                      )}
+                      {req.status === 'approved' && (
+                        <button
+                          onClick={() => handleUpdateRequestStatus(req.id, 'in_progress')}
+                          className="px-2 py-1 rounded bg-violet-600/20 border border-violet-500/30 text-[10px] text-violet-300 hover:bg-violet-600/30 transition-colors"
+                        >
+                          Start Production
+                        </button>
+                      )}
+                      {req.status === 'changes_requested' && (
+                        <div className="space-y-1">
+                          {req.clientFeedback && <div className="text-[10px] text-orange-300/80 bg-orange-500/10 px-2 py-1 rounded border border-orange-500/20">{req.clientFeedback}</div>}
+                          <button
+                            onClick={() => handleUpdateRequestStatus(req.id, 'client_review')}
+                            className="px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 text-[10px] text-cyan-300 hover:bg-cyan-600/30 transition-colors"
+                          >
+                            Resubmit to Client
                           </button>
                         </div>
                       )}
@@ -285,6 +305,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                           Mark Delivered
                         </button>
                       )}
+                      {req.source === 'client' && <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">Client Submitted</span>}
                     </div>
                   </div>
                 </div>
@@ -377,7 +398,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                       <Copy className="w-3 h-3" /> Copy for AI Tool
                     </button>
                     <button onClick={() => exportClientHTML(brief)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
-                      <Download className="w-3 h-3" /> Export Client Brief
+                      <Download className="w-3 h-3" /> Export PDF
                     </button>
                     <button onClick={() => { navigator.clipboard.writeText(JSON.stringify(brief, null, 2)); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors">
                       <Copy className="w-3 h-3" /> Copy JSON

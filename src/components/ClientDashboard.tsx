@@ -45,6 +45,21 @@ interface GA4ConversionSummary { eventName: string; conversions: number; users: 
 interface GA4EventPageBreakdown { eventName: string; pagePath: string; eventCount: number; users: number; }
 interface Props { workspaceId: string; }
 
+interface ClientContentRequest {
+  id: string; topic: string; targetKeyword: string; intent: string; priority: string;
+  status: 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'delivered' | 'declined';
+  source?: 'strategy' | 'client'; briefId?: string;
+  comments?: { id: string; author: 'client' | 'team'; content: string; createdAt: string }[];
+  requestedAt: string; updatedAt: string;
+}
+
+interface ClientBriefPreview {
+  id: string; targetKeyword: string; suggestedTitle: string; suggestedMetaDesc: string;
+  wordCountTarget: number; intent: string; audience: string; contentFormat?: string;
+  executiveSummary?: string; outline: { heading: string; notes: string; wordCount?: number }[];
+  difficultyScore?: number; trafficPotential?: string;
+}
+
 type SortKey = 'clicks' | 'impressions' | 'ctr' | 'position';
 type ClientTab = 'overview' | 'search' | 'health' | 'strategy' | 'analytics' | 'approvals' | 'requests';
 
@@ -325,6 +340,21 @@ export function ClientDashboard({ workspaceId }: Props) {
   const noteFileRef = useRef<HTMLInputElement>(null);
   const [newReqFiles, setNewReqFiles] = useState<File[]>([]);
   const newReqFileRef = useRef<HTMLInputElement>(null);
+  // Content hub state
+  const [contentRequests, setContentRequests] = useState<ClientContentRequest[]>([]);
+  const [briefPreviews, setBriefPreviews] = useState<Record<string, ClientBriefPreview>>({});
+  const [showTopicForm, setShowTopicForm] = useState(false);
+  const [newTopicName, setNewTopicName] = useState('');
+  const [newTopicKeyword, setNewTopicKeyword] = useState('');
+  const [newTopicNotes, setNewTopicNotes] = useState('');
+  const [submittingTopic, setSubmittingTopic] = useState(false);
+  const [expandedContentReq, setExpandedContentReq] = useState<string | null>(null);
+  const [contentComment, setContentComment] = useState('');
+  const [sendingContentComment, setSendingContentComment] = useState(false);
+  const [declineReqId, setDeclineReqId] = useState<string | null>(null);
+  const [declineReason, setDeclineReason] = useState('');
+  const [feedbackReqId, setFeedbackReqId] = useState<string | null>(null);
+  const [feedbackText, setFeedbackText] = useState('');
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
 
@@ -449,9 +479,12 @@ export function ClientDashboard({ workspaceId }: Props) {
     // Load strategy if SEO view is enabled
     if (data.seoClientView) {
       fetch(`/api/public/seo-strategy/${data.id}`).then(r => r.ok ? r.json() : null).then(s => { if (s) setStrategyData(s); }).catch(() => {});
-      // Load existing content requests to mark already-requested topics
-      fetch(`/api/public/content-requests/${data.id}`).then(r => r.ok ? r.json() : []).then((reqs: { targetKeyword: string }[]) => {
-        if (Array.isArray(reqs) && reqs.length > 0) setRequestedTopics(new Set(reqs.map(r => r.targetKeyword)));
+      // Load existing content requests for the content hub + mark already-requested topics
+      fetch(`/api/public/content-requests/${data.id}`).then(r => r.ok ? r.json() : []).then((reqs: ClientContentRequest[]) => {
+        if (Array.isArray(reqs) && reqs.length > 0) {
+          setContentRequests(reqs);
+          setRequestedTopics(new Set(reqs.map(r => r.targetKeyword)));
+        }
       }).catch(() => {});
     }
   };
@@ -553,6 +586,95 @@ export function ClientDashboard({ workspaceId }: Props) {
       const data = await res.json();
       if (Array.isArray(data)) setGa4EventTrend(data);
     } catch { setGa4EventTrend([]); }
+  };
+
+  // Content hub handlers
+  const submitClientTopic = async () => {
+    if (!newTopicName.trim() || !newTopicKeyword.trim()) return;
+    setSubmittingTopic(true);
+    try {
+      const res = await fetch(`/api/public/content-request/${workspaceId}/submit`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic: newTopicName.trim(), targetKeyword: newTopicKeyword.trim(), notes: newTopicNotes.trim() || undefined }),
+      });
+      if (res.ok) {
+        const created = await res.json();
+        setContentRequests(prev => [created, ...prev]);
+        setRequestedTopics(prev => new Set(prev).add(created.targetKeyword));
+        setNewTopicName(''); setNewTopicKeyword(''); setNewTopicNotes(''); setShowTopicForm(false);
+        setToast({ message: 'Topic submitted! Your team will review it.', type: 'success' });
+        setTimeout(() => setToast(null), 5000);
+      }
+    } catch { /* skip */ }
+    setSubmittingTopic(false);
+  };
+
+  const declineTopic = async (reqId: string) => {
+    try {
+      const res = await fetch(`/api/public/content-request/${workspaceId}/${reqId}/decline`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: declineReason.trim() || undefined }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setContentRequests(prev => prev.map(r => r.id === reqId ? updated : r));
+        setDeclineReqId(null); setDeclineReason('');
+      }
+    } catch { /* skip */ }
+  };
+
+  const approveBrief = async (reqId: string) => {
+    try {
+      const res = await fetch(`/api/public/content-request/${workspaceId}/${reqId}/approve`, { method: 'POST' });
+      if (res.ok) {
+        const updated = await res.json();
+        setContentRequests(prev => prev.map(r => r.id === reqId ? updated : r));
+        setToast({ message: 'Brief approved! Your team will begin content production.', type: 'success' });
+        setTimeout(() => setToast(null), 5000);
+      }
+    } catch { /* skip */ }
+  };
+
+  const requestChanges = async (reqId: string) => {
+    try {
+      const res = await fetch(`/api/public/content-request/${workspaceId}/${reqId}/request-changes`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feedback: feedbackText.trim() }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setContentRequests(prev => prev.map(r => r.id === reqId ? updated : r));
+        setFeedbackReqId(null); setFeedbackText('');
+      }
+    } catch { /* skip */ }
+  };
+
+  const addContentComment = async (reqId: string) => {
+    if (!contentComment.trim()) return;
+    setSendingContentComment(true);
+    try {
+      const res = await fetch(`/api/public/content-request/${workspaceId}/${reqId}/comment`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: contentComment.trim(), author: 'client' }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setContentRequests(prev => prev.map(r => r.id === reqId ? updated : r));
+        setContentComment('');
+      }
+    } catch { /* skip */ }
+    setSendingContentComment(false);
+  };
+
+  const loadBriefPreview = async (briefId: string) => {
+    if (briefPreviews[briefId]) return;
+    try {
+      const res = await fetch(`/api/public/content-brief/${workspaceId}/${briefId}`);
+      if (res.ok) {
+        const brief = await res.json();
+        setBriefPreviews(prev => ({ ...prev, [briefId]: brief }));
+      }
+    } catch { /* skip */ }
   };
 
   const handlePasswordSubmit = async (e?: React.FormEvent) => {
@@ -1627,6 +1749,203 @@ export function ClientDashboard({ workspaceId }: Props) {
                                 </button>
                               )}
                             </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── YOUR CONTENT PIPELINE ── */}
+              {contentRequests.length > 0 && (
+                <div className="bg-gradient-to-br from-blue-950/30 to-zinc-900 rounded-xl border border-blue-500/20 p-5 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-40 h-40 bg-blue-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+                  <div className="relative">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                          <ClipboardCheck className="w-4 h-4 text-blue-400" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-semibold text-blue-200">Your Content Pipeline</div>
+                          <div className="text-[10px] text-blue-400/60">Track the status of your content requests</div>
+                        </div>
+                      </div>
+                      <button onClick={() => setShowTopicForm(!showTopicForm)} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600/20 border border-blue-500/30 text-[10px] text-blue-300 hover:bg-blue-600/30 transition-colors font-medium">
+                        <Plus className="w-3 h-3" /> Suggest a Topic
+                      </button>
+                    </div>
+
+                    {/* Topic submission form */}
+                    {showTopicForm && (
+                      <div className="bg-zinc-900/80 rounded-lg border border-blue-500/20 p-4 mb-4 space-y-3">
+                        <div className="text-xs font-medium text-zinc-300 mb-1">Suggest a Content Topic</div>
+                        <input type="text" value={newTopicName} onChange={e => setNewTopicName(e.target.value)} placeholder="Topic name (e.g. 'Benefits of sedation dentistry')" className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600" />
+                        <input type="text" value={newTopicKeyword} onChange={e => setNewTopicKeyword(e.target.value)} placeholder="Target keyword (e.g. 'sedation dentistry benefits')" className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600" />
+                        <textarea value={newTopicNotes} onChange={e => setNewTopicNotes(e.target.value)} placeholder="Any notes or context for this topic... (optional)" rows={2} className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 resize-none" />
+                        <div className="flex items-center gap-2">
+                          <button onClick={submitClientTopic} disabled={!newTopicName.trim() || !newTopicKeyword.trim() || submittingTopic} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 text-[10px] text-white font-medium hover:bg-blue-500 transition-colors disabled:opacity-50">
+                            {submittingTopic ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />} Submit
+                          </button>
+                          <button onClick={() => setShowTopicForm(false)} className="px-3 py-1.5 rounded-lg text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors">Cancel</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Pipeline items */}
+                    <div className="space-y-2">
+                      {contentRequests.filter(r => r.status !== 'declined').map(req => {
+                        const steps = ['requested', 'brief_generated', 'client_review', 'approved', 'in_progress', 'delivered'] as const;
+                        const stepLabels = ['Requested', 'Brief Ready', 'Your Review', 'Approved', 'In Production', 'Delivered'];
+                        const currentIdx = steps.indexOf(req.status as typeof steps[number]);
+                        const isExpanded = expandedContentReq === req.id;
+                        const brief = req.briefId ? briefPreviews[req.briefId] : null;
+
+                        return (
+                          <div key={req.id} className="bg-zinc-900/60 rounded-lg border border-zinc-800/80 overflow-hidden">
+                            <button onClick={() => {
+                              const next = isExpanded ? null : req.id;
+                              setExpandedContentReq(next);
+                              if (next && req.briefId) loadBriefPreview(req.briefId);
+                            }} className="w-full px-4 py-3 text-left hover:bg-zinc-800/30 transition-colors">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-xs font-semibold text-zinc-200">{req.topic}</div>
+                                  <div className="text-[10px] text-teal-400 mt-0.5">&ldquo;{req.targetKeyword}&rdquo;</div>
+                                </div>
+                                {req.source === 'client' && <span className="text-[8px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20 mr-2">You submitted</span>}
+                                {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />}
+                              </div>
+                              {/* Progress timeline */}
+                              <div className="flex items-center gap-0.5">
+                                {steps.map((step, i) => {
+                                  const isComplete = currentIdx >= i;
+                                  const isCurrent = currentIdx === i;
+                                  return (
+                                    <div key={step} className="flex items-center flex-1">
+                                      <div className="flex flex-col items-center flex-1">
+                                        <div className={`w-full h-1 rounded-full ${isComplete ? (isCurrent ? 'bg-teal-400' : 'bg-teal-500/40') : 'bg-zinc-800'}`} />
+                                        <span className={`text-[8px] mt-1 ${isCurrent ? 'text-teal-400 font-medium' : isComplete ? 'text-zinc-500' : 'text-zinc-700'}`}>{stepLabels[i]}</span>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </button>
+
+                            {/* Expanded detail */}
+                            {isExpanded && (
+                              <div className="px-4 pb-4 space-y-3 border-t border-zinc-800">
+                                {/* Brief preview */}
+                                {brief && (
+                                  <div className="mt-3 space-y-2">
+                                    <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
+                                      <div className="text-[10px] text-zinc-500 mb-0.5">Suggested Title</div>
+                                      <div className="text-xs text-teal-400 font-medium">{brief.suggestedTitle}</div>
+                                    </div>
+                                    {brief.executiveSummary && (
+                                      <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
+                                        <div className="text-[10px] text-zinc-500 mb-0.5">Summary</div>
+                                        <div className="text-[11px] text-zinc-400 leading-relaxed">{brief.executiveSummary}</div>
+                                      </div>
+                                    )}
+                                    <div className="grid grid-cols-3 gap-2">
+                                      <div className="bg-zinc-950 rounded-lg px-2 py-1.5 border border-zinc-800 text-center">
+                                        <div className="text-[9px] text-zinc-600">Words</div>
+                                        <div className="text-xs font-bold text-blue-400">{brief.wordCountTarget?.toLocaleString()}</div>
+                                      </div>
+                                      {brief.contentFormat && <div className="bg-zinc-950 rounded-lg px-2 py-1.5 border border-zinc-800 text-center"><div className="text-[9px] text-zinc-600">Format</div><div className="text-xs font-medium text-amber-400 capitalize">{brief.contentFormat}</div></div>}
+                                      {brief.difficultyScore != null && <div className="bg-zinc-950 rounded-lg px-2 py-1.5 border border-zinc-800 text-center"><div className="text-[9px] text-zinc-600">Difficulty</div><div className={`text-xs font-bold ${brief.difficultyScore <= 30 ? 'text-green-400' : brief.difficultyScore <= 60 ? 'text-amber-400' : 'text-red-400'}`}>{brief.difficultyScore}/100</div></div>}
+                                    </div>
+                                    {brief.outline?.length > 0 && (
+                                      <div>
+                                        <div className="text-[9px] text-zinc-600 mb-1">Content Outline</div>
+                                        <div className="space-y-1">
+                                          {brief.outline.map((s, i) => (
+                                            <div key={i} className="flex items-center gap-2 text-[10px] text-zinc-400 bg-zinc-950 rounded px-2 py-1 border border-zinc-800/50">
+                                              <span className="text-zinc-600 font-mono w-4 text-right flex-shrink-0">{i + 1}.</span>
+                                              <span className="flex-1">{s.heading}</span>
+                                              {s.wordCount && <span className="text-[8px] text-zinc-600">{s.wordCount}w</span>}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Action buttons for client_review */}
+                                {req.status === 'client_review' && (
+                                  <div className="flex items-center gap-2 mt-2">
+                                    <button onClick={() => approveBrief(req.id)} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-green-600/20 border border-green-500/30 text-[10px] text-green-300 font-medium hover:bg-green-600/30 transition-colors">
+                                      <Check className="w-3 h-3" /> Approve Brief
+                                    </button>
+                                    <button onClick={() => { setFeedbackReqId(req.id); setFeedbackText(''); }} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-orange-600/20 border border-orange-500/30 text-[10px] text-orange-300 font-medium hover:bg-orange-600/30 transition-colors">
+                                      <Edit3 className="w-3 h-3" /> Request Changes
+                                    </button>
+                                  </div>
+                                )}
+
+                                {/* Feedback modal */}
+                                {feedbackReqId === req.id && (
+                                  <div className="bg-orange-500/5 border border-orange-500/20 rounded-lg p-3 space-y-2">
+                                    <div className="text-[10px] text-orange-300 font-medium">What changes would you like?</div>
+                                    <textarea value={feedbackText} onChange={e => setFeedbackText(e.target.value)} placeholder="Describe what you'd like changed..." rows={3} className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 resize-none" />
+                                    <div className="flex items-center gap-2">
+                                      <button onClick={() => requestChanges(req.id)} disabled={!feedbackText.trim()} className="px-3 py-1.5 rounded-lg bg-orange-600 text-[10px] text-white font-medium hover:bg-orange-500 transition-colors disabled:opacity-50">Submit Feedback</button>
+                                      <button onClick={() => setFeedbackReqId(null)} className="px-3 py-1.5 rounded-lg text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors">Cancel</button>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Decline option for requested topics */}
+                                {req.status === 'requested' && (
+                                  <div>
+                                    {declineReqId === req.id ? (
+                                      <div className="bg-red-500/5 border border-red-500/20 rounded-lg p-3 space-y-2">
+                                        <div className="text-[10px] text-red-300 font-medium">Why are you declining this topic? (optional)</div>
+                                        <input type="text" value={declineReason} onChange={e => setDeclineReason(e.target.value)} placeholder="e.g. Not relevant to our current goals" className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600" />
+                                        <div className="flex items-center gap-2">
+                                          <button onClick={() => declineTopic(req.id)} className="px-3 py-1.5 rounded-lg bg-red-600/80 text-[10px] text-white font-medium hover:bg-red-600 transition-colors">Decline Topic</button>
+                                          <button onClick={() => setDeclineReqId(null)} className="px-3 py-1.5 rounded-lg text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors">Cancel</button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <button onClick={() => { setDeclineReqId(req.id); setDeclineReason(''); }} className="text-[10px] text-zinc-600 hover:text-red-400 transition-colors">Not interested in this topic</button>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Comments thread */}
+                                {req.comments && req.comments.length > 0 && (
+                                  <div>
+                                    <div className="text-[9px] text-zinc-600 uppercase tracking-wider mb-1.5">Comments</div>
+                                    <div className="space-y-1.5">
+                                      {req.comments.map(c => (
+                                        <div key={c.id} className={`text-[10px] px-2.5 py-1.5 rounded-lg ${c.author === 'client' ? 'bg-blue-500/10 border border-blue-500/15 text-blue-300 ml-4' : 'bg-zinc-800/60 border border-zinc-800 text-zinc-400 mr-4'}`}>
+                                          <div className="flex items-center justify-between mb-0.5">
+                                            <span className="font-medium">{c.author === 'client' ? 'You' : 'Team'}</span>
+                                            <span className="text-[8px] text-zinc-600">{new Date(c.createdAt).toLocaleDateString()}</span>
+                                          </div>
+                                          {c.content}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Add comment */}
+                                {!['delivered', 'declined'].includes(req.status) && (
+                                  <div className="flex items-center gap-2">
+                                    <input type="text" value={expandedContentReq === req.id ? contentComment : ''} onChange={e => setContentComment(e.target.value)} placeholder="Add a comment..." className="flex-1 px-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded-lg text-[10px] text-zinc-300 placeholder-zinc-600" onKeyDown={e => { if (e.key === 'Enter') addContentComment(req.id); }} />
+                                    <button onClick={() => addContentComment(req.id)} disabled={!contentComment.trim() || sendingContentComment} className="px-2 py-1.5 rounded-lg bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors disabled:opacity-50">
+                                      <Send className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         );
                       })}

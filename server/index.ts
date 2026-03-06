@@ -58,7 +58,7 @@ import { runSalesAudit } from './sales-audit.js';
 import { initJobs, createJob, updateJob, getJob, listJobs } from './jobs.js';
 import { createBatch, listBatches, getBatch, updateItem, markBatchApplied, deleteBatch } from './approvals.js';
 import { listRequests, createRequest, updateRequest, addNote, deleteRequest, getRequest, getAttachmentsDir, addAttachmentsToRequest, type RequestAttachment } from './requests.js';
-import { notifyTeamNewRequest, notifyClientTeamResponse, notifyClientStatusChange, notifyTeamContentRequest, isEmailConfigured } from './email.js';
+import { notifyTeamNewRequest, notifyClientTeamResponse, notifyClientStatusChange, notifyTeamContentRequest, notifyClientBriefReady, isEmailConfigured } from './email.js';
 import { addActivity, listActivity } from './activity-log.js';
 import { getSchedule, listSchedules, upsertSchedule, deleteSchedule, startScheduler } from './scheduled-audits.js';
 import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword, togglePinKeyword, storeRankSnapshot, getRankHistory, getLatestRanks } from './rank-tracking.js';
@@ -67,7 +67,7 @@ import { startApprovalReminders } from './approval-reminders.js';
 import { startMonthlyReports, triggerMonthlyReport } from './monthly-report.js';
 import { listBriefs, getBrief, deleteBrief, generateBrief } from './content-brief.js';
 import { renderBriefHTML } from './brief-export-html.js';
-import { listContentRequests, getContentRequest, createContentRequest, updateContentRequest } from './content-requests.js';
+import { listContentRequests, getContentRequest, createContentRequest, updateContentRequest, addComment } from './content-requests.js';
 import { isSemrushConfigured, getKeywordOverview, getDomainOrganicKeywords, getKeywordGap, getRelatedKeywords, estimateCreditCost, clearSemrushCache } from './semrush.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
@@ -3439,16 +3439,81 @@ app.post('/api/public/content-request/:workspaceId', (req, res) => {
   res.json(request);
 });
 
-// Client can see their own requests (status only, no briefs)
+// Client can see their own requests (with comments and brief access for review)
 app.get('/api/public/content-requests/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const requests = listContentRequests(req.params.workspaceId);
-  // Return client-safe view (no internalNote, no briefId)
   res.json(requests.map(r => ({
     id: r.id, topic: r.topic, targetKeyword: r.targetKeyword, intent: r.intent,
-    priority: r.priority, status: r.status, requestedAt: r.requestedAt,
+    priority: r.priority, status: r.status, source: r.source,
+    comments: r.comments || [], requestedAt: r.requestedAt, updatedAt: r.updatedAt,
+    // Include briefId only when in client_review or later
+    briefId: ['client_review', 'approved', 'changes_requested', 'in_progress', 'delivered'].includes(r.status) ? r.briefId : undefined,
   })));
+});
+
+// Client submits their own topic request
+app.post('/api/public/content-request/:workspaceId/submit', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const { topic, targetKeyword, notes } = req.body;
+  if (!topic || !targetKeyword) return res.status(400).json({ error: 'topic and targetKeyword are required' });
+  const request = createContentRequest(req.params.workspaceId, {
+    topic, targetKeyword, intent: 'informational', priority: 'medium',
+    rationale: notes || `Client-submitted topic: ${topic}`,
+    clientNote: notes, source: 'client',
+  });
+  addActivity(req.params.workspaceId, 'content_requested', `Client submitted topic: "${topic}"`, `Keyword: "${targetKeyword}"`, { requestId: request.id });
+  notifyTeamContentRequest({ workspaceName: ws.name, topic, targetKeyword, priority: 'medium', rationale: notes || '' }).catch(() => {});
+  res.json(request);
+});
+
+// Client declines a recommended topic
+app.post('/api/public/content-request/:workspaceId/:id/decline', (req, res) => {
+  const { reason } = req.body;
+  const updated = updateContentRequest(req.params.workspaceId, req.params.id, {
+    status: 'declined', declineReason: reason || '',
+  });
+  if (!updated) return res.status(404).json({ error: 'Request not found' });
+  addActivity(req.params.workspaceId, 'content_declined', `Client declined topic: "${updated.topic}"`, reason || 'No reason given', { requestId: updated.id });
+  res.json(updated);
+});
+
+// Client approves a brief
+app.post('/api/public/content-request/:workspaceId/:id/approve', (req, res) => {
+  const updated = updateContentRequest(req.params.workspaceId, req.params.id, { status: 'approved' });
+  if (!updated) return res.status(404).json({ error: 'Request not found' });
+  addActivity(req.params.workspaceId, 'brief_approved', `Client approved brief for "${updated.topic}"`, '', { requestId: updated.id, briefId: updated.briefId });
+  res.json(updated);
+});
+
+// Client requests changes on a brief
+app.post('/api/public/content-request/:workspaceId/:id/request-changes', (req, res) => {
+  const { feedback } = req.body;
+  const updated = updateContentRequest(req.params.workspaceId, req.params.id, {
+    status: 'changes_requested', clientFeedback: feedback || '',
+  });
+  if (!updated) return res.status(404).json({ error: 'Request not found' });
+  addActivity(req.params.workspaceId, 'changes_requested', `Client requested changes on "${updated.topic}"`, feedback || '', { requestId: updated.id });
+  res.json(updated);
+});
+
+// Client or team adds a comment
+app.post('/api/public/content-request/:workspaceId/:id/comment', (req, res) => {
+  const { content, author } = req.body;
+  if (!content) return res.status(400).json({ error: 'content is required' });
+  const updated = addComment(req.params.workspaceId, req.params.id, author || 'client', content);
+  if (!updated) return res.status(404).json({ error: 'Request not found' });
+  res.json(updated);
+});
+
+// Client can view a brief (for review)
+app.get('/api/public/content-brief/:workspaceId/:briefId', (req, res) => {
+  const brief = getBrief(req.params.workspaceId, req.params.briefId);
+  if (!brief) return res.status(404).json({ error: 'Brief not found' });
+  // Return client-safe view (exclude internal fields if any)
+  res.json(brief);
 });
 
 // --- Storage Diagnostics (temporary) ---
@@ -3504,6 +3569,16 @@ app.patch('/api/content-requests/:workspaceId/:id', (req, res) => {
   const { status, internalNote } = req.body;
   const updated = updateContentRequest(req.params.workspaceId, req.params.id, { status, internalNote });
   if (!updated) return res.status(404).json({ error: 'Request not found' });
+  // Send email when brief is sent to client review
+  if (status === 'client_review') {
+    const wsInfo = getWorkspace(req.params.workspaceId);
+    if (wsInfo?.clientEmail) {
+      const dashUrl = wsInfo.liveDomain
+        ? `${wsInfo.liveDomain}/dashboard/${req.params.workspaceId}?tab=strategy`
+        : undefined;
+      notifyClientBriefReady({ clientEmail: wsInfo.clientEmail, workspaceName: wsInfo.name, topic: updated.topic, targetKeyword: updated.targetKeyword, dashboardUrl: dashUrl }).catch(() => {});
+    }
+  }
   res.json(updated);
 });
 
@@ -4548,7 +4623,6 @@ app.get('/api/content-briefs/:workspaceId/:briefId/export', (req, res) => {
   if (!brief) return res.status(404).json({ error: 'Brief not found' });
   const html = renderBriefHTML(brief);
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.setHeader('Content-Disposition', `attachment; filename="content-brief-${brief.targetKeyword.replace(/\s+/g, '-').toLowerCase()}.html"`);
   res.send(html);
 });
 

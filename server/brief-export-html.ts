@@ -41,7 +41,12 @@ export function renderBriefHTML(brief: ContentBrief): string {
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0c10; color: #e4e4e7; line-height: 1.6; }
   .page { max-width: 820px; margin: 0 auto; padding: 48px 40px; }
-  @media print { body { background: #fff; color: #18181b; } .page { padding: 24px; } .section { border-color: #e4e4e7 !important; } .tag { background: #f4f4f5 !important; color: #3f3f46 !important; border-color: #d4d4d8 !important; } .metric-card { background: #f9fafb !important; border-color: #e4e4e7 !important; } .outline-card { background: #f9fafb !important; border-color: #e4e4e7 !important; } .summary-box { background: #f0fdfa !important; border-color: #99f6e4 !important; } }
+  @media print { body { background: #fff; color: #18181b; } .page { padding: 24px; } .section { border-color: #e4e4e7 !important; } .tag { background: #f4f4f5 !important; color: #3f3f46 !important; border-color: #d4d4d8 !important; } .metric-card { background: #f9fafb !important; border-color: #e4e4e7 !important; } .outline-card { background: #f9fafb !important; border-color: #e4e4e7 !important; } .summary-box { background: #f0fdfa !important; border-color: #99f6e4 !important; } .no-print { display: none !important; } }
+  .print-bar { position: fixed; top: 0; left: 0; right: 0; background: #18181b; border-bottom: 1px solid #27272a; padding: 10px 24px; display: flex; align-items: center; justify-content: space-between; z-index: 100; }
+  .print-bar button { background: #2ed9c3; color: #0a0c10; border: none; padding: 8px 24px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .print-bar button:hover { background: #5eead4; }
+  .print-bar .info { font-size: 12px; color: #71717a; }
+  body { padding-top: 52px; } @media print { body { padding-top: 0; } }
 
   .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 40px; padding-bottom: 24px; border-bottom: 1px solid #27272a; }
   .header-left h1 { font-size: 24px; font-weight: 700; color: #2ed9c3; margin-bottom: 4px; }
@@ -95,6 +100,10 @@ export function renderBriefHTML(brief: ContentBrief): string {
 </style>
 </head>
 <body>
+<div class="print-bar no-print">
+  <span class="info">HMPSN Studio &mdash; Content Brief Preview</span>
+  <button onclick="window.print()">Save as PDF</button>
+</div>
 <div class="page">
   <div class="header">
     <div class="header-left">
@@ -167,4 +176,8 @@ export function renderBriefHTML(brief: ContentBrief): string {
 </div>
 </body>
 </html>`;
+}
+
+export function renderBriefHTMLForPDF(brief: ContentBrief): string {
+  return renderBriefHTML(brief);
 }

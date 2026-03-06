@@ -156,6 +156,29 @@ export async function notifyTeamContentRequest(opts: {
   return sendEmail(to, subject, html);
 }
 
+export async function notifyClientBriefReady(opts: {
+  clientEmail: string;
+  workspaceName: string;
+  topic: string;
+  targetKeyword: string;
+  dashboardUrl?: string;
+}): Promise<boolean> {
+  const subject = `Content Brief Ready for Review: "${opts.topic}"`;
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto;">
+      <div style="background: #0f1219; color: #e4e4e7; padding: 24px; border-radius: 12px;">
+        <div style="font-size: 11px; color: #71717a; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Content Brief Ready — ${escHtml(opts.workspaceName)}</div>
+        <h2 style="margin: 0 0 4px; font-size: 16px; color: #f4f4f5;">${escHtml(opts.topic)}</h2>
+        <div style="font-size: 12px; color: #2dd4bf; margin-bottom: 16px;">Keyword: &ldquo;${escHtml(opts.targetKeyword)}&rdquo;</div>
+        <p style="font-size: 13px; line-height: 1.6; color: #a1a1aa; margin: 0 0 16px;">A content brief has been prepared for your review. Please review the proposed title, outline, and key details, then approve or request changes.</p>
+        ${opts.dashboardUrl ? `<div style="text-align: center;"><a href="${escHtml(opts.dashboardUrl)}" style="display: inline-block; background: #0d9488; color: white; padding: 10px 24px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 500;">Review Brief in Dashboard</a></div>` : ''}
+        <div style="margin-top: 20px; font-size: 11px; color: #52525b;">You can approve, request changes, or leave comments directly from your dashboard.</div>
+      </div>
+    </div>
+  `;
+  return sendEmail(opts.clientEmail, subject, html);
+}
+
 function escHtml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }

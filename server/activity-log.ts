@@ -17,7 +17,10 @@ export type ActivityType =
   | 'links_fixed'
   | 'content_updated'
   | 'content_requested'
+  | 'content_declined'
   | 'brief_generated'
+  | 'brief_approved'
+  | 'changes_requested'
   | 'note';
 
 export interface ActivityEntry {

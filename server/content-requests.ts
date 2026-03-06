@@ -17,6 +17,13 @@ function getOldFile(workspaceId: string): string {
   return path.join(UPLOAD_ROOT, workspaceId, '.content-requests.json');
 }
 
+export interface ContentRequestComment {
+  id: string;
+  author: 'client' | 'team';
+  content: string;
+  createdAt: string;
+}
+
 export interface ContentTopicRequest {
   id: string;
   workspaceId: string;
@@ -25,10 +32,14 @@ export interface ContentTopicRequest {
   intent: string;
   priority: string;
   rationale: string;
-  status: 'requested' | 'brief_generated' | 'in_progress' | 'delivered' | 'declined';
+  status: 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'delivered' | 'declined';
   briefId?: string;
   clientNote?: string;
   internalNote?: string;
+  declineReason?: string;
+  clientFeedback?: string;
+  source?: 'strategy' | 'client';
+  comments?: ContentRequestComment[];
   requestedAt: string;
   updatedAt: string;
 }
@@ -73,7 +84,7 @@ export function getContentRequest(workspaceId: string, id: string): ContentTopic
 
 export function createContentRequest(
   workspaceId: string,
-  data: { topic: string; targetKeyword: string; intent: string; priority: string; rationale: string; clientNote?: string }
+  data: { topic: string; targetKeyword: string; intent: string; priority: string; rationale: string; clientNote?: string; source?: 'strategy' | 'client' }
 ): ContentTopicRequest {
   const items = read(workspaceId);
 
@@ -90,6 +101,8 @@ export function createContentRequest(
     priority: data.priority,
     rationale: data.rationale,
     clientNote: data.clientNote,
+    source: data.source || 'strategy',
+    comments: [],
     status: 'requested',
     requestedAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -103,12 +116,33 @@ export function createContentRequest(
 export function updateContentRequest(
   workspaceId: string,
   id: string,
-  updates: Partial<Pick<ContentTopicRequest, 'status' | 'briefId' | 'internalNote'>>
+  updates: Partial<Pick<ContentTopicRequest, 'status' | 'briefId' | 'internalNote' | 'declineReason' | 'clientFeedback'>>
 ): ContentTopicRequest | null {
   const items = read(workspaceId);
   const idx = items.findIndex(r => r.id === id);
   if (idx === -1) return null;
   Object.assign(items[idx], updates, { updatedAt: new Date().toISOString() });
+  write(workspaceId, items);
+  return items[idx];
+}
+
+export function addComment(
+  workspaceId: string,
+  requestId: string,
+  author: 'client' | 'team',
+  content: string
+): ContentTopicRequest | null {
+  const items = read(workspaceId);
+  const idx = items.findIndex(r => r.id === requestId);
+  if (idx === -1) return null;
+  if (!items[idx].comments) items[idx].comments = [];
+  items[idx].comments!.push({
+    id: `cmt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    author,
+    content,
+    createdAt: new Date().toISOString(),
+  });
+  items[idx].updatedAt = new Date().toISOString();
   write(workspaceId, items);
   return items[idx];
 }
