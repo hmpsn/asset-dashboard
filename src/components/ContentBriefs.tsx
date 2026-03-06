@@ -60,9 +60,27 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
   const [businessCtx, setBusinessCtx] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
+  const [loadingBrief, setLoadingBrief] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   const getBriefById = (briefId: string) => briefs.find(b => b.id === briefId);
+
+  const toggleRequestBrief = async (reqId: string, briefId: string) => {
+    if (expandedRequest === reqId) { setExpandedRequest(null); return; }
+    // If brief already in local state, just expand
+    if (getBriefById(briefId)) { setExpandedRequest(reqId); return; }
+    // Fetch brief from server
+    setLoadingBrief(reqId);
+    try {
+      const res = await fetch(`/api/content-briefs/${workspaceId}/${briefId}`);
+      if (res.ok) {
+        const brief = await res.json();
+        setBriefs(prev => [brief, ...prev.filter(b => b.id !== brief.id)]);
+      }
+    } catch { /* skip */ }
+    setLoadingBrief(null);
+    setExpandedRequest(reqId);
+  };
 
   const copyAsMarkdown = (b: ContentBrief) => {
     const lines: string[] = [
@@ -252,8 +270,8 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                         <span className={`flex items-center gap-1 text-[10px] ${sc.color}`}><StatusIcon className="w-3 h-3" /> {sc.label}</span>
                         <div className="flex items-center gap-1 flex-wrap justify-end">
                           {hasBrief && req.status !== 'requested' && (
-                            <button onClick={() => setExpandedRequest(expandedRequest === req.id ? null : req.id)} className={`px-2 py-1 rounded border text-[10px] transition-colors ${expandedRequest === req.id ? 'bg-blue-600/30 border-blue-500/40 text-blue-200' : 'bg-blue-600/20 border-blue-500/30 text-blue-300 hover:bg-blue-600/30'}`}>
-                              {expandedRequest === req.id ? 'Hide Brief' : 'View Brief'}
+                            <button onClick={() => toggleRequestBrief(req.id, req.briefId!)} disabled={loadingBrief === req.id} className={`flex items-center gap-1 px-2 py-1 rounded border text-[10px] transition-colors ${expandedRequest === req.id ? 'bg-blue-600/30 border-blue-500/40 text-blue-200' : 'bg-blue-600/20 border-blue-500/30 text-blue-300 hover:bg-blue-600/30'}`}>
+                              {loadingBrief === req.id ? <><Loader2 className="w-3 h-3 animate-spin" /> Loading...</> : expandedRequest === req.id ? 'Hide Brief' : 'View Brief'}
                             </button>
                           )}
                           {req.status === 'requested' && (
