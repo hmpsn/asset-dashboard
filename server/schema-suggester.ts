@@ -446,6 +446,7 @@ export async function generateSchemaSuggestions(
   ctx: SchemaContext = {},
   pageKeywordMap?: { pagePath: string; primaryKeyword: string; secondaryKeywords: string[]; searchIntent?: string }[],
   onProgress?: (partial: SchemaPageSuggestion[], done: boolean, message: string) => void,
+  isCancelled?: () => boolean,
 ): Promise<SchemaPageSuggestion[]> {
   const subdomain = await getSiteSubdomain(siteId, tokenOverride);
   const liveDomain = ctx.liveDomain;
@@ -486,6 +487,7 @@ export async function generateSchemaSuggestions(
   };
 
   for (let i = 0; i < pages.length; i += batch) {
+    if (isCancelled?.()) { console.log('[schema] Cancelled by user'); return results; }
     if (i > 0 && hasAI) await new Promise(r => setTimeout(r, 1500));
     const chunk = pages.slice(i, i + batch);
     console.log(`[schema] Processing static pages ${i + 1}-${Math.min(i + batch, pages.length)} of ${pages.length}`);
@@ -570,6 +572,7 @@ export async function generateSchemaSuggestions(
   if (cmsUrls.length > 0) {
     console.log(`[schema] Also analyzing ${cmsUrls.length} CMS pages`);
     for (let i = 0; i < cmsUrls.length; i += batch) {
+      if (isCancelled?.()) { console.log('[schema] Cancelled by user'); return results; }
       if (i > 0 && hasAI) await new Promise(r => setTimeout(r, 1500));
       const chunk = cmsUrls.slice(i, i + batch);
       console.log(`[schema] Processing CMS pages ${i + 1}-${Math.min(i + batch, cmsUrls.length)} of ${cmsUrls.length}`);

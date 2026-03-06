@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Loader2, ChevronDown, ChevronRight, Copy, CheckCircle,
-  AlertCircle, Info, Sparkles, RefreshCw, Upload,
+  AlertCircle, Info, Sparkles, RefreshCw, Upload, Send,
 } from 'lucide-react';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 
@@ -39,8 +39,10 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
   const [publishError, setPublishError] = useState<Record<string, string>>({});
   const [scanError, setScanError] = useState<string | null>(null);
   const [confirmPublish, setConfirmPublish] = useState<string | null>(null);
+  const [sendingToClient, setSendingToClient] = useState(false);
+  const [sentToClient, setSentToClient] = useState(false);
   const [progressMsg, setProgressMsg] = useState<string | null>(null);
-  const { jobs, startJob } = useBackgroundTasks();
+  const { jobs, startJob, cancelJob } = useBackgroundTasks();
   const jobIdRef = useRef<string | null>(null);
 
   // Stream partial results from background job via WebSocket
@@ -64,8 +66,41 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
       setScanError(job.error || 'Schema generation failed');
       setProgressMsg(null);
       jobIdRef.current = null;
+    } else if (job.status === 'cancelled') {
+      setLoading(false);
+      setProgressMsg(null);
+      jobIdRef.current = null;
     }
   }, [jobs]);
+
+  const stopScan = () => {
+    if (jobIdRef.current) cancelJob(jobIdRef.current);
+  };
+
+  const sendSchemasToClient = async () => {
+    if (!data || !workspaceId) return;
+    setSendingToClient(true);
+    try {
+      const items = data.map(page => ({
+        pageId: page.pageId,
+        pageTitle: page.pageTitle,
+        pageSlug: page.slug,
+        field: 'schema',
+        currentValue: page.existingSchemas.length > 0 ? page.existingSchemas.join(', ') : '',
+        proposedValue: JSON.stringify(page.suggestedSchemas[0]?.template || {}, null, 2),
+      }));
+      const token = localStorage.getItem('auth_token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['x-auth-token'] = token;
+      const res = await fetch(`/api/approvals/${workspaceId}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ siteId, name: 'Schema Review', items }),
+      });
+      if (res.ok) setSentToClient(true);
+    } catch { /* skip */ }
+    setSendingToClient(false);
+  };
 
   const runScan = async () => {
     setStarted(true);
@@ -181,6 +216,9 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
         <Loader2 className="w-6 h-6 animate-spin" />
         <p className="text-sm">{progressMsg || 'Scanning pages for schema opportunities...'}</p>
         <p className="text-xs text-zinc-600">Results will appear as each batch completes</p>
+        <button onClick={stopScan} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-red-400 bg-zinc-800 hover:bg-zinc-800/80 transition-colors mt-2">
+          Stop
+        </button>
       </div>
     );
   }
@@ -224,7 +262,10 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
       {loading && (
         <div className="flex items-center gap-2.5 px-4 py-2.5 bg-violet-500/10 border border-violet-500/20 rounded-xl">
           <Loader2 className="w-4 h-4 animate-spin text-violet-400 flex-shrink-0" />
-          <span className="text-xs text-violet-300">{progressMsg || 'Generating schemas...'}</span>
+          <span className="text-xs text-violet-300 flex-1">{progressMsg || 'Generating schemas...'}</span>
+          <button onClick={stopScan} className="text-xs text-violet-400/60 hover:text-red-400 transition-colors">
+            Stop
+          </button>
         </div>
       )}
 
@@ -233,9 +274,20 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
         <div className="flex items-center gap-2">
           <span className="text-xs text-zinc-500">{data.length} pages · {totalTypes} schema types generated{loading ? ' (so far)' : ''}</span>
         </div>
-        <button onClick={runScan} disabled={loading} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-          <RefreshCw className="w-3 h-3" /> Re-generate All
-        </button>
+        <div className="flex items-center gap-2">
+          {!loading && data.length > 0 && (
+            <button
+              onClick={sendSchemasToClient}
+              disabled={sendingToClient || sentToClient}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs text-violet-400 hover:text-violet-300 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Send className="w-3 h-3" /> {sentToClient ? 'Sent to Client' : sendingToClient ? 'Sending...' : 'Send to Client'}
+            </button>
+          )}
+          <button onClick={runScan} disabled={loading} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            <RefreshCw className="w-3 h-3" /> Re-generate All
+          </button>
+        </div>
       </div>
 
       {/* Summary cards */}

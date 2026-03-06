@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 export interface Job {
   id: string;
   type: string;
-  status: 'pending' | 'running' | 'done' | 'error';
+  status: 'pending' | 'running' | 'done' | 'error' | 'cancelled';
   progress?: number;
   total?: number;
   message?: string;
@@ -17,6 +17,7 @@ export interface Job {
 type BroadcastFn = (event: string, data: unknown) => void;
 
 const jobs = new Map<string, Job>();
+const abortControllers = new Map<string, AbortController>();
 let broadcastFn: BroadcastFn | null = null;
 
 const MAX_JOBS = 200;
@@ -82,4 +83,26 @@ export function listJobs(workspaceId?: string): Job[] {
   );
   if (workspaceId) return all.filter(j => j.workspaceId === workspaceId);
   return all;
+}
+
+export function registerAbort(jobId: string): AbortController {
+  const ac = new AbortController();
+  abortControllers.set(jobId, ac);
+  return ac;
+}
+
+export function cancelJob(id: string): Job | undefined {
+  const ac = abortControllers.get(id);
+  if (ac) { ac.abort(); abortControllers.delete(id); }
+  const job = jobs.get(id);
+  if (job && (job.status === 'pending' || job.status === 'running')) {
+    Object.assign(job, { status: 'cancelled', message: 'Cancelled by user', updatedAt: new Date().toISOString() });
+    broadcastFn?.('job:update', job);
+  }
+  return job;
+}
+
+export function isJobCancelled(id: string): boolean {
+  const ac = abortControllers.get(id);
+  return ac?.signal.aborted ?? false;
 }

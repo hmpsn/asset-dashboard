@@ -3,7 +3,7 @@ import { createContext, useContext, useState, useCallback, useRef, useEffect, ty
 export interface BackgroundJob {
   id: string;
   type: string;
-  status: 'pending' | 'running' | 'done' | 'error';
+  status: 'pending' | 'running' | 'done' | 'error' | 'cancelled';
   progress?: number;
   total?: number;
   message?: string;
@@ -21,6 +21,7 @@ interface BackgroundTaskContextValue {
   activeJobs: BackgroundJob[];
   startJob: (type: string, params: Record<string, unknown>) => Promise<string | null>;
   getJobResult: (jobId: string) => unknown | undefined;
+  cancelJob: (jobId: string) => Promise<void>;
   dismissJob: (jobId: string) => void;
   clearDone: () => void;
 }
@@ -30,6 +31,7 @@ const BackgroundTaskContext = createContext<BackgroundTaskContextValue>({
   activeJobs: [],
   startJob: async () => null,
   getJobResult: () => undefined,
+  cancelJob: async () => {},
   dismissJob: () => {},
   clearDone: () => {},
 });
@@ -125,6 +127,17 @@ export function BackgroundTaskProvider({ children }: { children: ReactNode }) {
     setJobs(prev => prev.map(j => j.id === jobId ? { ...j, dismissed: true } : j));
   }, []);
 
+  const cancelJobFn = useCallback(async (jobId: string) => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const headers: Record<string, string> = {};
+      if (token) headers['x-auth-token'] = token;
+      await fetch(`/api/jobs/${jobId}`, { method: 'DELETE', headers });
+    } catch (err) {
+      console.error('Failed to cancel job:', err);
+    }
+  }, []);
+
   const clearDone = useCallback(() => {
     setJobs(prev => prev.filter(j => j.status === 'pending' || j.status === 'running'));
   }, []);
@@ -132,7 +145,7 @@ export function BackgroundTaskProvider({ children }: { children: ReactNode }) {
   const activeJobs = jobs.filter(j => j.status === 'pending' || j.status === 'running');
 
   return (
-    <BackgroundTaskContext.Provider value={{ jobs, activeJobs, startJob, getJobResult, dismissJob, clearDone }}>
+    <BackgroundTaskContext.Provider value={{ jobs, activeJobs, startJob, getJobResult, cancelJob: cancelJobFn, dismissJob, clearDone }}>
       {children}
     </BackgroundTaskContext.Provider>
   );

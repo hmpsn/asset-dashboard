@@ -57,7 +57,7 @@ import {
 import { runSiteSpeed, runSinglePageSpeed } from './pagespeed.js';
 import { generateSchemaSuggestions, generateSchemaForPage, type SchemaContext } from './schema-suggester.js';
 import { runSalesAudit } from './sales-audit.js';
-import { initJobs, createJob, updateJob, getJob, listJobs } from './jobs.js';
+import { initJobs, createJob, updateJob, getJob, listJobs, cancelJob, registerAbort, isJobCancelled } from './jobs.js';
 import { createBatch, listBatches, getBatch, updateItem, markBatchApplied, deleteBatch } from './approvals.js';
 import { listRequests, createRequest, updateRequest, addNote, deleteRequest, getRequest, getAttachmentsDir, addAttachmentsToRequest, type RequestAttachment } from './requests.js';
 import { notifyTeamNewRequest, notifyClientTeamResponse, notifyClientStatusChange, notifyTeamContentRequest, notifyClientBriefReady, isEmailConfigured } from './email.js';
@@ -3783,7 +3783,12 @@ app.post('/api/public/approvals/:workspaceId/:batchId/apply', async (req, res) =
   for (const item of approved) {
     try {
       const value = item.clientValue || item.proposedValue;
-      if (item.collectionId) {
+      if (item.field === 'schema') {
+        // Schema item — publish JSON-LD to page via schema publisher
+        const schema = JSON.parse(value);
+        const result = await publishSchemaToPage(ws.webflowSiteId, item.pageId, schema, token);
+        if (!result.success) throw new Error(result.error || 'Schema publish failed');
+      } else if (item.collectionId) {
         // CMS item — update via collection API
         const result = await updateCollectionItem(item.collectionId, item.pageId, { [item.field]: value }, token);
         if (!result.success) throw new Error(result.error || 'CMS update failed');
@@ -4316,6 +4321,12 @@ app.get('/api/jobs/:id', (req, res) => {
   res.json(job);
 });
 
+app.delete('/api/jobs/:id', (req, res) => {
+  const job = cancelJob(req.params.id);
+  if (!job) return res.status(404).json({ error: 'Job not found' });
+  res.json(job);
+});
+
 app.post('/api/jobs', async (req, res) => {
   const { type, params } = req.body as { type: string; params: Record<string, unknown> };
   if (!type) return res.status(400).json({ error: 'type required' });
@@ -4609,6 +4620,7 @@ app.post('/api/jobs', async (req, res) => {
         const schemaToken = getTokenForSite(schemaSiteId) || undefined;
         if (!schemaToken) return res.status(400).json({ error: 'No Webflow API token configured' });
         const job = createJob('schema-generator', { message: 'Generating schemas...', workspaceId: params.workspaceId as string });
+        registerAbort(job.id);
         res.json({ jobId: job.id });
         (async () => {
           try {
@@ -4616,16 +4628,22 @@ app.post('/api/jobs', async (req, res) => {
             const { ctx, pageKeywordMap } = buildSchemaContext(schemaSiteId);
             const result = await generateSchemaSuggestions(schemaSiteId, schemaToken, ctx, pageKeywordMap, (partial, _done, message) => {
               updateJob(job.id, { status: 'running', result: partial, message, progress: partial.length });
-            });
-            updateJob(job.id, {
-              status: 'done',
-              result,
-              message: `Done — ${result.length} page schemas generated`,
-              progress: result.length,
-              total: result.length,
-            });
+            }, () => isJobCancelled(job.id));
+            if (isJobCancelled(job.id)) {
+              updateJob(job.id, { status: 'cancelled', result, message: `Cancelled — ${result.length} pages completed before stop` });
+            } else {
+              updateJob(job.id, {
+                status: 'done',
+                result,
+                message: `Done — ${result.length} page schemas generated`,
+                progress: result.length,
+                total: result.length,
+              });
+            }
           } catch (err) {
-            updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Schema generation failed' });
+            if (!isJobCancelled(job.id)) {
+              updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Schema generation failed' });
+            }
           }
         })();
         break;

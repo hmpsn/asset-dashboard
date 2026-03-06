@@ -101,7 +101,7 @@ interface ClientRequest {
 
 interface ApprovalItem {
   id: string; pageId: string; pageTitle: string; pageSlug: string;
-  field: 'seoTitle' | 'seoDescription'; currentValue: string; proposedValue: string;
+  field: 'seoTitle' | 'seoDescription' | 'schema'; currentValue: string; proposedValue: string;
   clientValue?: string; status: 'pending' | 'approved' | 'rejected' | 'applied'; clientNote?: string;
 }
 interface ApprovalBatch {
@@ -3043,13 +3043,24 @@ export function ClientDashboard({ workspaceId }: Props) {
                     {batch.items.map(item => {
                       const isEditing = editingApproval === item.id;
                       const displayValue = item.clientValue || item.proposedValue;
-                      const fieldLabel = item.field === 'seoTitle' ? 'SEO Title' : 'Meta Description';
+                      const isSchema = item.field === 'schema';
+                      const fieldLabel = isSchema ? 'Structured Data (JSON-LD)' : item.field === 'seoTitle' ? 'SEO Title' : 'Meta Description';
                       const statusColors = {
                         pending: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
                         approved: 'bg-green-500/10 border-green-500/30 text-green-400',
                         rejected: 'bg-red-500/10 border-red-500/30 text-red-400',
                         applied: 'bg-blue-500/10 border-blue-500/30 text-blue-400',
                       };
+
+                      // Parse schema types for preview
+                      let schemaTypes: string[] = [];
+                      if (isSchema) {
+                        try {
+                          const parsed = JSON.parse(displayValue);
+                          const graph = parsed?.['@graph'] as Array<{ '@type'?: string }> | undefined;
+                          schemaTypes = graph?.map(n => String(n['@type'])).filter(Boolean) || [];
+                        } catch { /* ignore */ }
+                      }
 
                       return (
                         <div key={item.id} className="px-5 py-4">
@@ -3060,57 +3071,78 @@ export function ClientDashboard({ workspaceId }: Props) {
                                 <span className={`text-[9px] px-1.5 py-0.5 rounded border ${statusColors[item.status]}`}>{item.status}</span>
                               </div>
                               <span className="text-[10px] text-zinc-600">/{item.pageSlug} · {fieldLabel}</span>
-                            </div>
-                          </div>
-
-                          {/* Current vs proposed */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                            <div>
-                              <div className="text-[10px] text-zinc-500 mb-1">Current</div>
-                              <div className="text-[11px] text-zinc-400 bg-zinc-800/30 rounded-lg px-3 py-2 min-h-[2rem]">
-                                {item.currentValue || <span className="italic text-zinc-600">Empty</span>}
-                              </div>
-                            </div>
-                            <div>
-                              <div className="text-[10px] text-zinc-500 mb-1 flex items-center gap-1">
-                                Proposed
-                                {item.clientValue && <span className="text-violet-400">(edited by you)</span>}
-                              </div>
-                              {isEditing ? (
-                                <div className="space-y-2">
-                                  {item.field === 'seoTitle' ? (
-                                    <input
-                                      type="text"
-                                      value={editDraft}
-                                      onChange={e => setEditDraft(e.target.value)}
-                                      className="w-full px-3 py-1.5 bg-zinc-800 border border-violet-500/50 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-400"
-                                    />
-                                  ) : (
-                                    <textarea
-                                      value={editDraft}
-                                      onChange={e => setEditDraft(e.target.value)}
-                                      rows={2}
-                                      className="w-full px-3 py-1.5 bg-zinc-800 border border-violet-500/50 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-400 resize-none"
-                                    />
-                                  )}
-                                  <div className="flex gap-1.5">
-                                    <button
-                                      onClick={() => updateApprovalItem(batch.id, item.id, { clientValue: editDraft })}
-                                      className="px-2.5 py-1 bg-violet-600 hover:bg-violet-500 rounded text-[10px] font-medium transition-colors"
-                                    >Save Edit</button>
-                                    <button
-                                      onClick={() => { setEditingApproval(null); setEditDraft(''); }}
-                                      className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 rounded text-[10px] text-zinc-400 transition-colors"
-                                    >Cancel</button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="text-[11px] text-zinc-200 bg-zinc-800/30 rounded-lg px-3 py-2 min-h-[2rem]">
-                                  {displayValue}
+                              {isSchema && schemaTypes.length > 0 && (
+                                <div className="flex items-center gap-1 mt-1">
+                                  {schemaTypes.map(t => (
+                                    <span key={t} className="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/10 border border-violet-500/20 text-violet-300">{t}</span>
+                                  ))}
                                 </div>
                               )}
                             </div>
                           </div>
+
+                          {/* Schema preview or Current vs proposed */}
+                          {isSchema ? (
+                            <div className="mt-3">
+                              <div className="text-[10px] text-zinc-500 mb-1">Proposed Schema</div>
+                              <pre className="text-[10px] text-zinc-300 bg-zinc-800/50 rounded-lg px-3 py-2 overflow-x-auto max-h-[200px] overflow-y-auto border border-zinc-800 font-mono leading-relaxed">
+                                {displayValue}
+                              </pre>
+                              {item.currentValue && (
+                                <div className="mt-2">
+                                  <div className="text-[10px] text-zinc-600 mb-1">Existing on page: {item.currentValue}</div>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                              <div>
+                                <div className="text-[10px] text-zinc-500 mb-1">Current</div>
+                                <div className="text-[11px] text-zinc-400 bg-zinc-800/30 rounded-lg px-3 py-2 min-h-[2rem]">
+                                  {item.currentValue || <span className="italic text-zinc-600">Empty</span>}
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-[10px] text-zinc-500 mb-1 flex items-center gap-1">
+                                  Proposed
+                                  {item.clientValue && <span className="text-violet-400">(edited by you)</span>}
+                                </div>
+                                {isEditing ? (
+                                  <div className="space-y-2">
+                                    {item.field === 'seoTitle' ? (
+                                      <input
+                                        type="text"
+                                        value={editDraft}
+                                        onChange={e => setEditDraft(e.target.value)}
+                                        className="w-full px-3 py-1.5 bg-zinc-800 border border-violet-500/50 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-400"
+                                      />
+                                    ) : (
+                                      <textarea
+                                        value={editDraft}
+                                        onChange={e => setEditDraft(e.target.value)}
+                                        rows={2}
+                                        className="w-full px-3 py-1.5 bg-zinc-800 border border-violet-500/50 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-violet-400 resize-none"
+                                      />
+                                    )}
+                                    <div className="flex gap-1.5">
+                                      <button
+                                        onClick={() => updateApprovalItem(batch.id, item.id, { clientValue: editDraft })}
+                                        className="px-2.5 py-1 bg-violet-600 hover:bg-violet-500 rounded text-[10px] font-medium transition-colors"
+                                      >Save Edit</button>
+                                      <button
+                                        onClick={() => { setEditingApproval(null); setEditDraft(''); }}
+                                        className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 rounded text-[10px] text-zinc-400 transition-colors"
+                                      >Cancel</button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="text-[11px] text-zinc-200 bg-zinc-800/30 rounded-lg px-3 py-2 min-h-[2rem]">
+                                    {displayValue}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
 
                           {/* Actions */}
                           {item.status === 'pending' && !isEditing && (
@@ -3121,12 +3153,14 @@ export function ClientDashboard({ workspaceId }: Props) {
                               >
                                 <Check className="w-3 h-3" /> Approve
                               </button>
-                              <button
-                                onClick={() => { setEditingApproval(item.id); setEditDraft(displayValue); }}
-                                className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-[10px] font-medium text-zinc-300 transition-colors"
-                              >
-                                <Edit3 className="w-3 h-3" /> Edit
-                              </button>
+                              {!isSchema && (
+                                <button
+                                  onClick={() => { setEditingApproval(item.id); setEditDraft(displayValue); }}
+                                  className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-[10px] font-medium text-zinc-300 transition-colors"
+                                >
+                                  <Edit3 className="w-3 h-3" /> Edit
+                                </button>
+                              )}
                               <button
                                 onClick={() => updateApprovalItem(batch.id, item.id, { status: 'rejected' })}
                                 className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-[10px] font-medium text-red-400 transition-colors"
