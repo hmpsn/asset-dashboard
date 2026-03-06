@@ -351,7 +351,6 @@ function moveUploadedFiles(
   return paths;
 }
 
-// --- API Routes ---
 
 // Workspaces
 app.get('/api/workspaces', (_req, res) => {
@@ -406,6 +405,10 @@ app.get('/api/workspace-overview', (_req, res) => {
       contentRequests: { pending: pendingContentReqs, total: contentReqs.length },
     };
   });
+  // Debug: log audit status per workspace
+  for (const o of overview) {
+    console.log(`[overview] ${o.name}: audit=${o.audit ? `score=${o.audit.score}` : 'null'}`);
+  }
   res.json(overview);
 });
 
