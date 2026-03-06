@@ -912,7 +912,7 @@ export function ClientDashboard({ workspaceId }: Props) {
       { id: 'analytics' as ClientTab, label: 'Analytics', icon: LineChart, locked: false },
       { id: 'search' as ClientTab, label: 'Search', icon: Search, locked: false },
     ] : []),
-    ...(contentRequests.length > 0 ? [{ id: 'content' as ClientTab, label: 'Content', icon: FileText, locked: false }] : []),
+    ...(contentRequests.length > 0 || strategyData ? [{ id: 'content' as ClientTab, label: 'Content', icon: FileText, locked: false }] : []),
     { id: 'requests' as ClientTab, label: 'Requests', icon: MessageSquare, locked: false },
     ...(approvalBatches.length > 0 ? [{ id: 'approvals' as ClientTab, label: 'Approvals', icon: ClipboardCheck, locked: false }] : []),
   ];
@@ -955,7 +955,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                 (t.id === 'search' && !!overview) ||
                 (t.id === 'health' && !!audit) ||
                 (t.id === 'analytics' && !!ga4Overview) ||
-                (t.id === 'content' && contentRequests.length > 0) ||
+                (t.id === 'content' && (contentRequests.length > 0 || !!strategyData)) ||
                 (t.id === 'approvals' && approvalBatches.length > 0);
               const pendingReviews = contentRequests.filter(r => r.status === 'client_review').length;
               return (
@@ -1999,6 +1999,17 @@ export function ClientDashboard({ workspaceId }: Props) {
                 </button>
                 <button onClick={() => setShowTopicForm(false)} className="px-3 py-2 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Cancel</button>
               </div>
+            </div>
+          )}
+
+          {/* Empty state when no requests yet */}
+          {contentRequests.length === 0 && (
+            <div className="text-center py-16">
+              <FileText className="w-10 h-10 text-zinc-700 mx-auto mb-3" />
+              <p className="text-sm font-medium text-zinc-400">No content in the pipeline yet</p>
+              <p className="text-xs text-zinc-600 mt-1.5 max-w-sm mx-auto leading-relaxed">
+                Request topics from the <button onClick={() => setTab('strategy')} className="text-teal-400 hover:text-teal-300 underline underline-offset-2 transition-colors">SEO Strategy</button> tab, or click <strong className="text-zinc-400">Suggest a Topic</strong> above to get started.
+              </p>
             </div>
           )}
 
