@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import crypto from 'crypto';
 import express from 'express';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
@@ -87,8 +88,66 @@ for (const dir of [getUploadRoot(), getOptRoot()]) {
   fs.mkdirSync(dir, { recursive: true });
 }
 
+// --- Security utilities ---
+
+// In-memory rate limiter (per IP)
+const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
+function rateLimit(windowMs: number, maxRequests: number) {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    const key = `${ip}:${req.path}`;
+    const now = Date.now();
+    const bucket = rateLimitBuckets.get(key);
+    if (!bucket || now > bucket.resetAt) {
+      rateLimitBuckets.set(key, { count: 1, resetAt: now + windowMs });
+      return next();
+    }
+    bucket.count++;
+    if (bucket.count > maxRequests) {
+      return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+    }
+    next();
+  };
+}
+// Clean up stale rate limit entries every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, bucket] of rateLimitBuckets) {
+    if (now > bucket.resetAt) rateLimitBuckets.delete(key);
+  }
+}, 5 * 60 * 1000);
+
+// Session signing for client dashboard auth
+const SESSION_SECRET = process.env.SESSION_SECRET || process.env.APP_PASSWORD || crypto.randomBytes(32).toString('hex');
+function signClientSession(workspaceId: string): string {
+  return crypto.createHmac('sha256', SESSION_SECRET).update(`client:${workspaceId}`).digest('hex');
+}
+function verifyClientSession(workspaceId: string, token: string): boolean {
+  const expected = signClientSession(workspaceId);
+  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(token || ''.padEnd(expected.length)));
+}
+
+// Admin auth token (HMAC instead of raw password)
+function signAdminToken(): string {
+  return crypto.createHmac('sha256', SESSION_SECRET).update('admin').digest('hex');
+}
+function verifyAdminToken(token: string): boolean {
+  const expected = signAdminToken();
+  try { return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(token || '')); }
+  catch { return false; }
+}
+
 // --- Core middleware (must come before auth) ---
-app.use(cors());
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim())
+  : undefined; // undefined = allow all in dev
+app.use(cors(ALLOWED_ORIGINS ? {
+  origin: (origin, cb) => {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) cb(null, true);
+    else cb(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+} : undefined));
 app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 
@@ -96,11 +155,12 @@ app.use(express.json({ limit: '10mb' }));
 const APP_PASSWORD = process.env.APP_PASSWORD;
 if (APP_PASSWORD) {
   app.use((req, res, next) => {
-    // Allow health check without auth
-    if (req.path === '/api/health' || req.path === '/api/health/diag') return next();
-    // Check header or cookie
-    const token = req.headers['x-auth-token'] || req.cookies?.auth_token;
-    if (token === APP_PASSWORD) return next();
+    // Allow health check without auth (diag only in non-prod)
+    if (req.path === '/api/health') return next();
+    if (req.path === '/api/health/diag' && !IS_PROD) return next();
+    // Check header or cookie (support both legacy raw password and new HMAC token)
+    const token = (req.headers['x-auth-token'] || req.cookies?.auth_token || '') as string;
+    if (token === APP_PASSWORD || verifyAdminToken(token)) return next();
     // Allow auth endpoints through
     if (req.path === '/api/auth/login' && req.method === 'POST') return next();
     if (req.path === '/api/auth/check') return next();
@@ -119,18 +179,39 @@ if (APP_PASSWORD) {
   });
 }
 
+// --- Client dashboard session enforcement ---
+// For password-protected workspaces, public data endpoints require a valid session cookie
+app.use((req, res, next) => {
+  if (!req.path.startsWith('/api/public/')) return next();
+  // Extract workspace ID from path: /api/public/<resource>/<workspaceId>
+  const parts = req.path.split('/');
+  // Patterns: /api/public/workspace/:id, /api/public/auth/:id, /api/public/<resource>/:workspaceId/...
+  // Allow auth and workspace-info endpoints through (needed before login)
+  if (parts[3] === 'auth' || parts[3] === 'workspace') return next();
+  const workspaceId = parts[4]; // /api/public/<resource>/<workspaceId>
+  if (!workspaceId) return next();
+  const ws = getWorkspace(workspaceId);
+  if (!ws || !ws.clientPassword) return next(); // No password = open access
+  // Verify session cookie
+  const sessionToken = req.cookies?.[`client_session_${workspaceId}`];
+  if (sessionToken && verifyClientSession(workspaceId, sessionToken)) return next();
+  return res.status(401).json({ error: 'Authentication required. Please log in to the dashboard.' });
+});
+
 // Auth login endpoint
-app.post('/api/auth/login', express.json(), (req, res) => {
+const loginLimiter = rateLimit(60 * 1000, 5); // 5 attempts per minute
+app.post('/api/auth/login', loginLimiter, express.json(), (req, res) => {
   const { password } = req.body;
   if (!APP_PASSWORD) return res.json({ ok: true });
   if (password === APP_PASSWORD) {
-    res.cookie('auth_token', APP_PASSWORD, {
+    const token = signAdminToken();
+    res.cookie('auth_token', token, {
       httpOnly: true,
       sameSite: 'lax',
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       secure: IS_PROD,
     });
-    res.json({ ok: true, token: APP_PASSWORD });
+    res.json({ ok: true, token });
   } else {
     res.status(401).json({ error: 'Invalid password' });
   }
@@ -143,8 +224,8 @@ app.post('/api/auth/logout', (_req, res) => {
 
 app.get('/api/auth/check', (req, res) => {
   if (!APP_PASSWORD) return res.json({ required: false });
-  const token = req.headers['x-auth-token'] || req.cookies?.auth_token;
-  res.json({ required: true, authenticated: token === APP_PASSWORD });
+  const token = (req.headers['x-auth-token'] || req.cookies?.auth_token || '') as string;
+  res.json({ required: true, authenticated: token === APP_PASSWORD || verifyAdminToken(token) });
 });
 
 // Diagnostic endpoint - test Webflow API connection
@@ -156,14 +237,12 @@ app.get('/api/health/diag', async (_req, res) => {
     configFile: path.join(getUploadRoot(), '.workspaces.json'),
     configExists: fs.existsSync(path.join(getUploadRoot(), '.workspaces.json')),
     envTokenSet: !!envToken,
-    envTokenPrefix: envToken ? envToken.slice(0, 8) + '...' : null,
     workspaceCount: workspaces.length,
     workspaces: workspaces.map(ws => ({
       id: ws.id,
       name: ws.name,
       siteId: ws.webflowSiteId || null,
       hasToken: !!ws.webflowToken,
-      tokenPrefix: ws.webflowToken ? ws.webflowToken.slice(0, 8) + '...' : null,
     })),
   };
 
@@ -175,7 +254,7 @@ app.get('/api/health/diag', async (_req, res) => {
       const test: Record<string, unknown> = {
         workspace: ws.name,
         siteId: ws.webflowSiteId,
-        resolvedTokenPrefix: resolved ? resolved.slice(0, 8) + '...' : null,
+        hasResolvedToken: !!resolved,
         source: ws.webflowToken ? 'workspace' : (envToken ? 'env' : 'none'),
       };
       // Actually test the Webflow API with the resolved token
@@ -3361,9 +3440,9 @@ app.get('/api/public/workspace/:id', (req, res) => {
     eventGroups: ws.eventGroups || [],
     requiresPassword: !!ws.clientPassword,
     // Feature toggles
-    clientPortalEnabled: ws.clientPortalEnabled !== false,
+    clientPortalEnabled: ws.clientPortalEnabled != null ? !!ws.clientPortalEnabled : true,
     seoClientView: !!ws.seoClientView,
-    analyticsClientView: ws.analyticsClientView !== false,
+    analyticsClientView: !!ws.analyticsClientView,
     autoReports: !!ws.autoReports,
     // Branding
     brandLogoUrl: ws.brandLogoUrl || '',
@@ -3373,12 +3452,23 @@ app.get('/api/public/workspace/:id', (req, res) => {
   });
 });
 
-app.post('/api/public/auth/:id', (req, res) => {
+const clientLoginLimiter = rateLimit(60 * 1000, 5); // 5 attempts per minute per IP
+app.post('/api/public/auth/:id', clientLoginLimiter, (req, res) => {
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Not found' });
   if (!ws.clientPassword) return res.json({ ok: true });
   const { password } = req.body;
-  if (password === ws.clientPassword) return res.json({ ok: true });
+  if (password === ws.clientPassword) {
+    // Issue signed session cookie for server-side verification
+    const sessionToken = signClientSession(ws.id);
+    res.cookie(`client_session_${ws.id}`, sessionToken, {
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      secure: IS_PROD,
+    });
+    return res.json({ ok: true });
+  }
   return res.status(401).json({ error: 'Incorrect password' });
 });
 
