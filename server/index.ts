@@ -66,6 +66,7 @@ import { listAnnotations, addAnnotation, deleteAnnotation } from './annotations.
 import { startApprovalReminders } from './approval-reminders.js';
 import { startMonthlyReports, triggerMonthlyReport } from './monthly-report.js';
 import { listBriefs, getBrief, deleteBrief, generateBrief } from './content-brief.js';
+import { renderBriefHTML } from './brief-export-html.js';
 import { listContentRequests, getContentRequest, createContentRequest, updateContentRequest } from './content-requests.js';
 import { isSemrushConfigured, getKeywordOverview, getDomainOrganicKeywords, getKeywordGap, getRelatedKeywords, estimateCreditCost, clearSemrushCache } from './semrush.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
@@ -4539,6 +4540,16 @@ app.post('/api/content-briefs/:workspaceId/generate', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate brief' });
   }
+});
+
+// Export a brief as branded HTML
+app.get('/api/content-briefs/:workspaceId/:briefId/export', (req, res) => {
+  const brief = getBrief(req.params.workspaceId, req.params.briefId);
+  if (!brief) return res.status(404).json({ error: 'Brief not found' });
+  const html = renderBriefHTML(brief);
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="content-brief-${brief.targetKeyword.replace(/\s+/g, '-').toLowerCase()}.html"`);
+  res.send(html);
 });
 
 // Delete a brief

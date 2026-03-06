@@ -25,13 +25,23 @@ export interface ContentBrief {
   secondaryKeywords: string[];
   suggestedTitle: string;
   suggestedMetaDesc: string;
-  outline: { heading: string; notes: string }[];
+  outline: { heading: string; notes: string; wordCount?: number; keywords?: string[] }[];
   wordCountTarget: number;
   intent: string;
   audience: string;
   competitorInsights: string;
   internalLinkSuggestions: string[];
   createdAt: string;
+  // Enhanced fields (v2)
+  executiveSummary?: string;
+  contentFormat?: string;
+  toneAndStyle?: string;
+  peopleAlsoAsk?: string[];
+  topicalEntities?: string[];
+  serpAnalysis?: { contentType: string; avgWordCount: number; commonElements: string[]; gaps: string[] };
+  difficultyScore?: number;
+  trafficPotential?: string;
+  ctaRecommendations?: string[];
 }
 
 function getBriefFile(workspaceId: string): string {
@@ -103,7 +113,7 @@ export async function generateBrief(
   const kwMapContext = buildKeywordMapContext(workspaceId);
   const bizCtx = context.businessContext || stratBizCtx;
 
-  const prompt = `You are an expert content strategist and SEO specialist. Generate a comprehensive content brief for a new piece of content targeting the keyword "${targetKeyword}".
+  const prompt = `You are an expert content strategist and SEO specialist. Generate a comprehensive, production-ready content brief for a new piece of content targeting the keyword "${targetKeyword}".
 
 ${bizCtx ? `Business context: ${bizCtx}` : ''}
 
@@ -115,25 +125,43 @@ ${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}
 
 Generate a content brief in the following JSON format:
 {
+  "executiveSummary": "2-3 sentence plain-English summary of why this content matters, its strategic value, and expected impact",
   "suggestedTitle": "SEO-optimized title tag (50-60 chars)",
   "suggestedMetaDesc": "Compelling meta description (150-160 chars)",
-  "secondaryKeywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
+  "secondaryKeywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5", "keyword6", "keyword7", "keyword8"],
+  "contentFormat": "The recommended format: guide, listicle, how-to, comparison, FAQ, case-study, pillar-page, or landing-page",
+  "toneAndStyle": "Specific tone and style guidance for the writer (e.g., authoritative but approachable, data-driven, conversational)",
   "outline": [
-    { "heading": "H2 heading text", "notes": "What to cover in this section (2-3 sentences)" }
+    { "heading": "H2 heading text", "notes": "Detailed guidance for this section: what to cover, key points, data to include (3-5 sentences)", "wordCount": 250, "keywords": ["keywords to naturally include in this section"] }
   ],
-  "wordCountTarget": 1500,
+  "wordCountTarget": 1800,
   "intent": "Search intent (informational/transactional/navigational/commercial)",
-  "audience": "Target audience description",
-  "competitorInsights": "Brief analysis of what top-ranking content covers and how to differentiate",
-  "internalLinkSuggestions": ["page-slug-1", "page-slug-2"]
+  "audience": "Detailed target audience description including their pain points and what they need from this content",
+  "peopleAlsoAsk": ["Question 1 searchers commonly ask?", "Question 2?", "Question 3?", "Question 4?", "Question 5?"],
+  "topicalEntities": ["entity1", "entity2", "entity3", "entity4", "entity5", "entity6", "entity7", "entity8"],
+  "serpAnalysis": {
+    "contentType": "What type of content dominates the SERP for this keyword",
+    "avgWordCount": 1800,
+    "commonElements": ["Elements found in top-ranking content (e.g., comparison tables, images, expert quotes)"],
+    "gaps": ["Content angles missing from top results that represent an opportunity"]
+  },
+  "difficultyScore": 45,
+  "trafficPotential": "Estimated monthly search volume range and traffic potential (e.g., '500-1,000 monthly searches, moderate competition')",
+  "competitorInsights": "Detailed analysis of what top-ranking content covers, their strengths, weaknesses, and how to differentiate",
+  "ctaRecommendations": ["Primary CTA the content should drive", "Secondary CTA or micro-conversion"],
+  "internalLinkSuggestions": ["page-slug-1", "page-slug-2", "page-slug-3"]
 }
 
 Requirements:
-- The outline should have 5-8 sections with H2 headings
-- Secondary keywords should be naturally related to the target keyword
-- Word count target should be appropriate for the intent (800-2500)
+- The outline should have 6-10 sections with H2 headings, each with specific wordCount targets that sum to the total wordCountTarget
+- Each outline section must include keywords to weave naturally into that section
+- Secondary keywords: 6-8 naturally related terms including long-tail variations
+- People Also Ask: 5 real questions searchers ask about this topic
+- Topical entities: 8+ specific concepts, terms, or entities to cover for topical authority
+- SERP analysis should reflect realistic analysis of what ranks for this keyword
+- difficultyScore: 1-100 based on estimated keyword competition
+- Make every section actionable and specific — a copywriter or AI tool should be able to write directly from this brief
 - Internal link suggestions should reference existing pages where relevant
-- Make the brief actionable and specific, not generic
 
 Return ONLY valid JSON, no markdown fences, no explanation.`;
 
@@ -146,7 +174,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     body: JSON.stringify({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
-      max_tokens: 1500,
+      max_tokens: 3500,
       temperature: 0.7,
     }),
   });
@@ -174,13 +202,22 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     secondaryKeywords: (parsed.secondaryKeywords as string[]) || [],
     suggestedTitle: (parsed.suggestedTitle as string) || '',
     suggestedMetaDesc: (parsed.suggestedMetaDesc as string) || '',
-    outline: (parsed.outline as { heading: string; notes: string }[]) || [],
+    outline: (parsed.outline as ContentBrief['outline']) || [],
     wordCountTarget: (parsed.wordCountTarget as number) || 1500,
     intent: (parsed.intent as string) || 'informational',
     audience: (parsed.audience as string) || '',
     competitorInsights: (parsed.competitorInsights as string) || '',
     internalLinkSuggestions: (parsed.internalLinkSuggestions as string[]) || [],
     createdAt: new Date().toISOString(),
+    executiveSummary: (parsed.executiveSummary as string) || undefined,
+    contentFormat: (parsed.contentFormat as string) || undefined,
+    toneAndStyle: (parsed.toneAndStyle as string) || undefined,
+    peopleAlsoAsk: (parsed.peopleAlsoAsk as string[]) || undefined,
+    topicalEntities: (parsed.topicalEntities as string[]) || undefined,
+    serpAnalysis: (parsed.serpAnalysis as ContentBrief['serpAnalysis']) || undefined,
+    difficultyScore: (parsed.difficultyScore as number) || undefined,
+    trafficPotential: (parsed.trafficPotential as string) || undefined,
+    ctaRecommendations: (parsed.ctaRecommendations as string[]) || undefined,
   };
 
   const briefs = readBriefs(workspaceId);

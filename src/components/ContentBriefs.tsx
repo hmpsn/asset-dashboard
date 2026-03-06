@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Loader2, Clipboard, Trash2, ChevronDown, ChevronUp, Sparkles, FileText, Inbox, CheckCircle2, XCircle, Clock, Zap } from 'lucide-react';
+import {
+  Loader2, Clipboard, Trash2, ChevronDown, ChevronUp, Sparkles, FileText,
+  Inbox, CheckCircle2, XCircle, Clock, Zap, Download, Copy, Search,
+  Target, MessageSquare, BarChart3, BookOpen, Users, TrendingUp,
+} from 'lucide-react';
 
 interface ContentBrief {
   id: string;
@@ -8,13 +12,22 @@ interface ContentBrief {
   secondaryKeywords: string[];
   suggestedTitle: string;
   suggestedMetaDesc: string;
-  outline: { heading: string; notes: string }[];
+  outline: { heading: string; notes: string; wordCount?: number; keywords?: string[] }[];
   wordCountTarget: number;
   intent: string;
   audience: string;
   competitorInsights: string;
   internalLinkSuggestions: string[];
   createdAt: string;
+  executiveSummary?: string;
+  contentFormat?: string;
+  toneAndStyle?: string;
+  peopleAlsoAsk?: string[];
+  topicalEntities?: string[];
+  serpAnalysis?: { contentType: string; avgWordCount: number; commonElements: string[]; gaps: string[] };
+  difficultyScore?: number;
+  trafficPotential?: string;
+  ctaRecommendations?: string[];
 }
 
 interface ContentTopicRequest {
@@ -43,6 +56,57 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
   const [businessCtx, setBusinessCtx] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [error, setError] = useState('');
+
+  const copyAsMarkdown = (b: ContentBrief) => {
+    const lines: string[] = [
+      `# Content Brief: ${b.targetKeyword}`,
+      '',
+      `**Write a ${b.wordCountTarget}-word ${b.contentFormat || 'article'} targeting "${b.targetKeyword}".**`,
+      '',
+    ];
+    if (b.executiveSummary) lines.push(`## Strategic Context`, b.executiveSummary, '');
+    lines.push(`## Title`, b.suggestedTitle, '', `## Meta Description`, b.suggestedMetaDesc, '');
+    if (b.toneAndStyle) lines.push(`## Tone & Style`, b.toneAndStyle, '');
+    lines.push(`## Target Audience`, b.audience, '');
+    lines.push(`## Search Intent`, b.intent, '');
+    if (b.secondaryKeywords.length) lines.push(`## Keywords to Include`, b.secondaryKeywords.map(k => `- ${k}`).join('\n'), '');
+    if (b.topicalEntities?.length) lines.push(`## Topical Entities to Cover`, b.topicalEntities.map(e => `- ${e}`).join('\n'), '');
+    if (b.peopleAlsoAsk?.length) lines.push(`## Questions to Answer`, b.peopleAlsoAsk.map((q, i) => `${i + 1}. ${q}`).join('\n'), '');
+    if (b.outline.length) {
+      lines.push(`## Content Outline`);
+      b.outline.forEach(s => {
+        lines.push(`### ${s.heading}${s.wordCount ? ` (~${s.wordCount} words)` : ''}`);
+        lines.push(s.notes);
+        if (s.keywords?.length) lines.push(`*Keywords: ${s.keywords.join(', ')}*`);
+        lines.push('');
+      });
+    }
+    if (b.ctaRecommendations?.length) lines.push(`## CTAs`, b.ctaRecommendations.map((c, i) => `- **${i === 0 ? 'Primary' : 'Secondary'}:** ${c}`).join('\n'), '');
+    if (b.competitorInsights) lines.push(`## Competitor Insights`, b.competitorInsights, '');
+    if (b.internalLinkSuggestions.length) lines.push(`## Internal Links to Include`, b.internalLinkSuggestions.map(l => `- /${l}`).join('\n'), '');
+    if (b.serpAnalysis) {
+      lines.push(`## SERP Analysis`);
+      lines.push(`- Content type: ${b.serpAnalysis.contentType}`);
+      lines.push(`- Avg word count: ${b.serpAnalysis.avgWordCount}`);
+      if (b.serpAnalysis.gaps.length) lines.push(`- Gaps to exploit: ${b.serpAnalysis.gaps.join('; ')}`);
+      lines.push('');
+    }
+    navigator.clipboard.writeText(lines.join('\n'));
+  };
+
+  const exportClientHTML = async (b: ContentBrief) => {
+    try {
+      const res = await fetch(`/api/content-briefs/${workspaceId}/${b.id}/export`);
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `content-brief-${b.targetKeyword.replace(/\s+/g, '-').toLowerCase()}.html`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch { /* skip */ }
+  };
 
   useEffect(() => {
     let done = 0;
@@ -307,8 +371,29 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
               {/* Brief details */}
               {expanded === brief.id && (
                 <div className="px-4 pb-4 space-y-4 border-t border-zinc-800">
+                  {/* Export buttons */}
+                  <div className="pt-3 flex items-center gap-2">
+                    <button onClick={() => copyAsMarkdown(brief)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 transition-colors">
+                      <Copy className="w-3 h-3" /> Copy for AI Tool
+                    </button>
+                    <button onClick={() => exportClientHTML(brief)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
+                      <Download className="w-3 h-3" /> Export Client Brief
+                    </button>
+                    <button onClick={() => { navigator.clipboard.writeText(JSON.stringify(brief, null, 2)); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors">
+                      <Copy className="w-3 h-3" /> Copy JSON
+                    </button>
+                  </div>
+
+                  {/* Executive Summary */}
+                  {brief.executiveSummary && (
+                    <div className="bg-teal-500/5 border border-teal-500/20 rounded-lg px-4 py-3">
+                      <div className="flex items-center gap-1.5 mb-1.5"><BookOpen className="w-3.5 h-3.5 text-teal-400" /><span className="text-[10px] text-teal-400 font-medium uppercase tracking-wider">Executive Summary</span></div>
+                      <div className="text-xs text-zinc-300 leading-relaxed">{brief.executiveSummary}</div>
+                    </div>
+                  )}
+
                   {/* Title & Meta */}
-                  <div className="pt-3 space-y-2">
+                  <div className="space-y-2">
                     <div>
                       <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-1">Suggested Title</div>
                       <div className="text-xs text-teal-400 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">{brief.suggestedTitle}</div>
@@ -319,26 +404,56 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                     </div>
                   </div>
 
-                  {/* Keywords & Meta */}
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-1">Word Count</div>
+                  {/* Key Metrics Row */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
+                      <div className="text-[10px] text-zinc-500 mb-0.5">Word Count</div>
                       <div className="text-sm font-bold text-blue-400">{brief.wordCountTarget.toLocaleString()}</div>
                     </div>
-                    <div>
-                      <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-1">Search Intent</div>
-                      <div className="text-xs text-zinc-300 capitalize">{brief.intent}</div>
+                    <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
+                      <div className="text-[10px] text-zinc-500 mb-0.5">Intent</div>
+                      <div className="text-xs text-zinc-300 capitalize font-medium">{brief.intent}</div>
                     </div>
-                    <div>
-                      <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-1">Audience</div>
-                      <div className="text-xs text-zinc-300 truncate" title={brief.audience}>{brief.audience}</div>
+                    {brief.contentFormat && (
+                      <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
+                        <div className="text-[10px] text-zinc-500 mb-0.5">Format</div>
+                        <div className="text-xs text-amber-400 capitalize font-medium">{brief.contentFormat}</div>
+                      </div>
+                    )}
+                    {brief.difficultyScore != null && (
+                      <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
+                        <div className="text-[10px] text-zinc-500 mb-0.5">Difficulty</div>
+                        <div className={`text-sm font-bold ${brief.difficultyScore <= 30 ? 'text-green-400' : brief.difficultyScore <= 60 ? 'text-amber-400' : 'text-red-400'}`}>{brief.difficultyScore}/100</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Traffic Potential */}
+                  {brief.trafficPotential && (
+                    <div className="flex items-start gap-2 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
+                      <TrendingUp className="w-3.5 h-3.5 text-green-400 mt-0.5 flex-shrink-0" />
+                      <div><div className="text-[10px] text-zinc-500 mb-0.5">Traffic Potential</div><div className="text-xs text-zinc-300">{brief.trafficPotential}</div></div>
                     </div>
+                  )}
+
+                  {/* Audience & Tone */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-1"><Users className="w-3 h-3 text-zinc-500" /><span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Audience</span></div>
+                      <div className="text-xs text-zinc-400 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">{brief.audience}</div>
+                    </div>
+                    {brief.toneAndStyle && (
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-1"><MessageSquare className="w-3 h-3 text-zinc-500" /><span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Tone & Style</span></div>
+                        <div className="text-xs text-zinc-400 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">{brief.toneAndStyle}</div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Secondary Keywords */}
                   {brief.secondaryKeywords.length > 0 && (
                     <div>
-                      <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-1">Secondary Keywords</div>
+                      <div className="flex items-center gap-1.5 mb-1.5"><Search className="w-3 h-3 text-zinc-500" /><span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Secondary Keywords</span></div>
                       <div className="flex flex-wrap gap-1.5">
                         {brief.secondaryKeywords.map((kw, i) => (
                           <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">{kw}</span>
@@ -347,18 +462,81 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                     </div>
                   )}
 
-                  {/* Outline */}
+                  {/* Topical Entities */}
+                  {brief.topicalEntities && brief.topicalEntities.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-1.5"><Target className="w-3 h-3 text-zinc-500" /><span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Topical Entities to Cover</span></div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {brief.topicalEntities.map((entity, i) => (
+                          <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-300">{entity}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* People Also Ask */}
+                  {brief.peopleAlsoAsk && brief.peopleAlsoAsk.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-1.5"><MessageSquare className="w-3 h-3 text-zinc-500" /><span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Questions to Answer</span></div>
+                      <div className="space-y-1">
+                        {brief.peopleAlsoAsk.map((q, i) => (
+                          <div key={i} className="flex items-start gap-2 text-xs text-zinc-300 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
+                            <span className="text-amber-400 flex-shrink-0 font-medium">Q{i + 1}.</span> {q}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SERP Analysis */}
+                  {brief.serpAnalysis && (
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-1.5"><BarChart3 className="w-3 h-3 text-zinc-500" /><span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">SERP Analysis</span></div>
+                      <div className="bg-zinc-950 rounded-lg px-3 py-3 border border-zinc-800 space-y-2">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div><span className="text-[10px] text-zinc-500">Content Type:</span><span className="text-xs text-zinc-300 ml-1">{brief.serpAnalysis.contentType}</span></div>
+                          <div><span className="text-[10px] text-zinc-500">Avg Word Count:</span><span className="text-xs text-zinc-300 ml-1">{brief.serpAnalysis.avgWordCount.toLocaleString()}</span></div>
+                        </div>
+                        {brief.serpAnalysis.commonElements.length > 0 && (
+                          <div><span className="text-[10px] text-zinc-500 block mb-1">Common Elements:</span><div className="flex flex-wrap gap-1">{brief.serpAnalysis.commonElements.map((el, i) => <span key={i} className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400">{el}</span>)}</div></div>
+                        )}
+                        {brief.serpAnalysis.gaps.length > 0 && (
+                          <div><span className="text-[10px] text-green-400/80 block mb-1">Opportunities (gaps in existing content):</span><div className="space-y-1">{brief.serpAnalysis.gaps.map((g, i) => <div key={i} className="text-[11px] text-green-300/80 flex items-start gap-1.5"><span className="text-green-400 mt-0.5">→</span>{g}</div>)}</div></div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Content Outline */}
                   {brief.outline.length > 0 && (
                     <div>
                       <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-2">Content Outline</div>
                       <div className="space-y-2">
                         {brief.outline.map((section, i) => (
-                          <div key={i} className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
-                            <div className="text-xs font-medium text-zinc-200">{section.heading}</div>
-                            <div className="text-[11px] text-zinc-500 mt-0.5">{section.notes}</div>
+                          <div key={i} className="bg-zinc-950 rounded-lg px-3 py-2.5 border border-zinc-800">
+                            <div className="flex items-center justify-between">
+                              <div className="text-xs font-medium text-zinc-200">H2: {section.heading}</div>
+                              {section.wordCount && <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{section.wordCount} words</span>}
+                            </div>
+                            <div className="text-[11px] text-zinc-500 mt-1 leading-relaxed">{section.notes}</div>
+                            {section.keywords && section.keywords.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1.5">{section.keywords.map((kw, j) => <span key={j} className="text-[9px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400/80">{kw}</span>)}</div>
+                            )}
                           </div>
                         ))}
                       </div>
+                    </div>
+                  )}
+
+                  {/* CTA Recommendations */}
+                  {brief.ctaRecommendations && brief.ctaRecommendations.length > 0 && (
+                    <div>
+                      <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-1.5">CTA Recommendations</div>
+                      <div className="space-y-1">{brief.ctaRecommendations.map((cta, i) => (
+                        <div key={i} className="text-xs text-zinc-300 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800 flex items-start gap-2">
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${i === 0 ? 'bg-teal-500/20 text-teal-400' : 'bg-zinc-800 text-zinc-500'}`}>{i === 0 ? 'Primary' : 'Secondary'}</span>{cta}
+                        </div>
+                      ))}</div>
                     </div>
                   )}
 
@@ -366,7 +544,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                   {brief.competitorInsights && (
                     <div>
                       <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-1">Competitor Insights</div>
-                      <div className="text-xs text-zinc-400 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">{brief.competitorInsights}</div>
+                      <div className="text-xs text-zinc-400 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800 leading-relaxed">{brief.competitorInsights}</div>
                     </div>
                   )}
 
