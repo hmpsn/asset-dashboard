@@ -74,6 +74,12 @@ input::placeholder, textarea::placeholder {
 .text-zinc-600 { color: #78788a !important; }
 .text-zinc-500 { color: #9898a8 !important; }
 
+/* ─── Toast animation ─── */
+@keyframes slideUp {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
 /* ─── Client Dashboard Light Theme ─── */
 
 /* === Base === */

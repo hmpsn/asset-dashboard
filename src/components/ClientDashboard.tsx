@@ -258,6 +258,7 @@ export function ClientDashboard({ workspaceId }: Props) {
   const [strategyData, setStrategyData] = useState<ClientKeywordStrategy | null>(null);
   const [requestedTopics, setRequestedTopics] = useState<Set<string>>(new Set());
   const [requestingTopic, setRequestingTopic] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [mapSearch, setMapSearch] = useState('');
   const [mapSort, setMapSort] = useState<'default' | 'position' | 'impressions' | 'clicks'>('default');
   const [mapIntent, setMapIntent] = useState<string>('all');
@@ -1667,13 +1668,20 @@ export function ClientDashboard({ workspaceId }: Props) {
                                   onClick={async () => {
                                     setRequestingTopic(gap.targetKeyword);
                                     try {
-                                      await fetch(`/api/public/content-request/${workspaceId}`, {
+                                      const res = await fetch(`/api/public/content-request/${workspaceId}`, {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({ topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale }),
                                       });
+                                      if (!res.ok) throw new Error(`Server returned ${res.status}`);
                                       setRequestedTopics(prev => new Set(prev).add(gap.targetKeyword));
-                                    } catch { /* skip */ }
+                                      setToast({ message: `Topic "${gap.topic}" requested! Your team will prepare a content brief.`, type: 'success' });
+                                      setTimeout(() => setToast(null), 5000);
+                                    } catch (err) {
+                                      console.error('Content request failed:', err);
+                                      setToast({ message: 'Failed to submit request. Please try again.', type: 'error' });
+                                      setTimeout(() => setToast(null), 5000);
+                                    }
                                     setRequestingTopic(null);
                                   }}
                                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600/30 border border-teal-500/40 text-[11px] text-teal-200 font-medium hover:bg-teal-600/50 hover:border-teal-400/60 transition-all disabled:opacity-50 shadow-sm shadow-teal-900/20"
@@ -2778,6 +2786,15 @@ export function ClientDashboard({ workspaceId }: Props) {
               Maybe later
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Toast notification */}
+      {toast && (
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] px-5 py-3 rounded-xl border shadow-lg backdrop-blur-sm flex items-center gap-2.5 animate-[slideUp_0.3s_ease] ${toast.type === 'success' ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' : 'bg-red-500/15 border-red-500/30 text-red-300'}`}>
+          {toast.type === 'success' ? <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> : <AlertTriangle className="w-4 h-4 flex-shrink-0" />}
+          <span className="text-xs font-medium">{toast.message}</span>
+          <button onClick={() => setToast(null)} className="ml-2 text-zinc-400 hover:text-zinc-200"><X className="w-3.5 h-3.5" /></button>
         </div>
       )}
 
