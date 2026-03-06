@@ -3,6 +3,7 @@ import {
   Loader2, Clipboard, Trash2, ChevronDown, ChevronUp, Sparkles, FileText,
   Inbox, CheckCircle2, XCircle, Clock, Zap, Download, Copy, Search,
   Target, MessageSquare, BarChart3, BookOpen, Users, TrendingUp,
+  AlertTriangle, ArrowUpDown, X,
 } from 'lucide-react';
 
 interface ContentBrief {
@@ -66,6 +67,9 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
   const [loadingBrief, setLoadingBrief] = useState<string | null>(null);
   const [briefError, setBriefError] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [briefSearch, setBriefSearch] = useState('');
+  const [briefSort, setBriefSort] = useState<'date' | 'keyword' | 'difficulty'>('date');
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'brief' | 'request'; id: string; label: string } | null>(null);
 
   const getBriefById = (briefId: string) => briefs.find(b => b.id === briefId);
 
@@ -267,6 +271,25 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
     await fetch(`/api/content-briefs/${workspaceId}/${briefId}`, { method: 'DELETE' });
     setBriefs(prev => prev.filter(b => b.id !== briefId));
     if (expanded === briefId) setExpanded(null);
+    setDeleteConfirm(null);
+  };
+
+  const confirmDeleteBrief = (brief: ContentBrief) => {
+    setDeleteConfirm({ type: 'brief', id: brief.id, label: brief.targetKeyword });
+  };
+
+  const confirmDeleteRequest = (req: ContentTopicRequest) => {
+    setDeleteConfirm({ type: 'request', id: req.id, label: req.topic });
+  };
+
+  const executeDelete = async () => {
+    if (!deleteConfirm) return;
+    if (deleteConfirm.type === 'brief') {
+      await handleDelete(deleteConfirm.id);
+    } else {
+      await handleDeleteRequest(deleteConfirm.id);
+    }
+    setDeleteConfirm(null);
   };
 
   if (loading) {
@@ -279,6 +302,32 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
 
   return (
     <div className="space-y-4">
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-red-400" />
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-zinc-200">Delete {deleteConfirm.type === 'brief' ? 'Brief' : 'Request'}?</div>
+                <div className="text-xs text-zinc-500 mt-0.5">This action cannot be undone</div>
+              </div>
+            </div>
+            <div className="text-xs text-zinc-400 mb-4 pl-[52px]">
+              <span className="text-zinc-300 font-medium">&ldquo;{deleteConfirm.label}&rdquo;</span> will be permanently removed.
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 rounded-lg text-xs font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors">Cancel</button>
+              <button onClick={executeDelete} className="px-4 py-2 rounded-lg text-xs font-medium bg-red-600 text-white hover:bg-red-500 transition-colors flex items-center gap-1.5">
+                <Trash2 className="w-3.5 h-3.5" /> Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Client Requests */}
       {clientRequests.length > 0 && (
         <div className="bg-zinc-900 rounded-xl border border-amber-500/20 p-4 space-y-3">
@@ -364,7 +413,9 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                       <div className="mt-2 text-[10px] text-zinc-500 bg-zinc-800/50 px-2.5 py-1.5 rounded border border-zinc-800"><span className="text-zinc-400 font-medium">Reason:</span> {req.declineReason}</div>
                     )}
                     <div className="flex items-center justify-end mt-1.5">
-                      <button onClick={() => { if (confirm(`Delete request "${req.topic}"?`)) handleDeleteRequest(req.id); }} className="text-[9px] text-zinc-700 hover:text-red-400 transition-colors">Delete</button>
+                      <button onClick={(e) => { e.stopPropagation(); confirmDeleteRequest(req); }} className="flex items-center gap-1 text-[10px] text-zinc-600 hover:text-red-400 transition-colors px-1.5 py-0.5 rounded hover:bg-red-500/10">
+                        <Trash2 className="w-3 h-3" /> Delete Request
+                      </button>
                     </div>
                   </div>
                   {/* Brief error message */}
@@ -632,11 +683,38 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Clipboard className="w-5 h-5 text-teal-400" />
-          <h2 className="text-sm font-semibold text-zinc-200">Content Briefs</h2>
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{briefs.length}</span>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Clipboard className="w-5 h-5 text-teal-400" />
+            <h2 className="text-sm font-semibold text-zinc-200">Content Briefs</h2>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{briefs.length} total</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-zinc-600 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={briefSearch}
+                onChange={e => setBriefSearch(e.target.value)}
+                placeholder="Search briefs..."
+                className="w-48 pl-8 pr-7 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 focus:border-zinc-700 focus:outline-none"
+              />
+              {briefSearch && (
+                <button onClick={() => setBriefSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-zinc-400">
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-1 text-[10px] text-zinc-500">
+              <ArrowUpDown className="w-3 h-3" />
+              <select value={briefSort} onChange={e => setBriefSort(e.target.value as 'date' | 'keyword' | 'difficulty')} className="bg-zinc-900 border border-zinc-800 rounded px-1.5 py-1 text-[10px] text-zinc-400 focus:outline-none cursor-pointer">
+                <option value="date">Newest</option>
+                <option value="keyword">Keyword A-Z</option>
+                <option value="difficulty">Difficulty</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -683,31 +761,84 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
       {/* Briefs list (standalone — not linked to a request) */}
       {(() => {
         const linkedBriefIds = new Set(clientRequests.filter(r => r.briefId).map(r => r.briefId!));
-        const standaloneBriefs = briefs.filter(b => !linkedBriefIds.has(b.id));
-        if (standaloneBriefs.length === 0) return (
+        let standaloneBriefs = briefs.filter(b => !linkedBriefIds.has(b.id));
+
+        // Apply search filter
+        if (briefSearch.trim()) {
+          const q = briefSearch.toLowerCase();
+          standaloneBriefs = standaloneBriefs.filter(b =>
+            b.targetKeyword.toLowerCase().includes(q) ||
+            b.suggestedTitle.toLowerCase().includes(q) ||
+            b.intent.toLowerCase().includes(q) ||
+            b.secondaryKeywords.some(k => k.toLowerCase().includes(q))
+          );
+        }
+
+        // Apply sort
+        standaloneBriefs = [...standaloneBriefs].sort((a, b) => {
+          if (briefSort === 'keyword') return a.targetKeyword.localeCompare(b.targetKeyword);
+          if (briefSort === 'difficulty') return (b.difficultyScore ?? 0) - (a.difficultyScore ?? 0);
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+
+        if (standaloneBriefs.length === 0 && !briefSearch.trim()) return (
           <div className="text-center py-12">
             <FileText className="w-8 h-8 text-zinc-700 mx-auto mb-2" />
-            <p className="text-sm text-zinc-500">No standalone briefs</p>
+            <p className="text-sm text-zinc-500">No standalone briefs yet</p>
             <p className="text-xs text-zinc-600 mt-1">Generate a brief above, or briefs linked to requests will appear in the request cards</p>
           </div>
         );
+
+        if (standaloneBriefs.length === 0 && briefSearch.trim()) return (
+          <div className="text-center py-8">
+            <Search className="w-6 h-6 text-zinc-700 mx-auto mb-2" />
+            <p className="text-sm text-zinc-500">No briefs match &ldquo;{briefSearch}&rdquo;</p>
+            <button onClick={() => setBriefSearch('')} className="text-xs text-teal-400 mt-1 hover:underline">Clear search</button>
+          </div>
+        );
+
         return (
         <div className="space-y-2">
           {standaloneBriefs.map(brief => (
-            <div key={brief.id} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-              {/* Brief header */}
-              <button
-                onClick={() => setExpanded(expanded === brief.id ? null : brief.id)}
-                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-zinc-800/30 transition-colors"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium text-zinc-200 truncate">{brief.targetKeyword}</div>
+            <div key={brief.id} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden group/brief">
+              {/* Brief header row — metrics + quick actions visible at all times */}
+              <div className="flex items-center gap-3 px-4 py-3">
+                <button
+                  onClick={() => setExpanded(expanded === brief.id ? null : brief.id)}
+                  className="flex-1 min-w-0 text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-zinc-200 truncate">{brief.targetKeyword}</span>
+                    {brief.difficultyScore != null && (
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${brief.difficultyScore <= 30 ? 'bg-green-500/10 text-green-400 border border-green-500/20' : brief.difficultyScore <= 60 ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>{brief.difficultyScore}/100</span>
+                    )}
+                  </div>
                   <div className="text-[10px] text-zinc-500 mt-0.5 truncate">{brief.suggestedTitle}</div>
+                </button>
+                {/* At-a-glance metrics */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium">{brief.wordCountTarget.toLocaleString()} words</span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 capitalize">{brief.intent}</span>
+                  {brief.contentFormat && <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400/80 border border-amber-500/20 capitalize hidden sm:inline-block">{brief.contentFormat}</span>}
                 </div>
-                <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 flex-shrink-0">{brief.intent}</span>
+                {/* Quick actions — always visible */}
+                <div className="flex items-center gap-0.5 flex-shrink-0 opacity-40 group-hover/brief:opacity-100 transition-opacity">
+                  <button onClick={(e) => { e.stopPropagation(); copyAsMarkdown(brief); }} title="Copy for AI tool" className="p-1.5 rounded hover:bg-violet-500/10 text-zinc-500 hover:text-violet-400 transition-colors">
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); exportClientHTML(brief); }} title="Export PDF" className="p-1.5 rounded hover:bg-teal-500/10 text-zinc-500 hover:text-teal-400 transition-colors">
+                    <Download className="w-3.5 h-3.5" />
+                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); confirmDeleteBrief(brief); }} title="Delete brief" className="p-1.5 rounded hover:bg-red-500/10 text-zinc-500 hover:text-red-400 transition-colors">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                {/* Date + expand */}
                 <span className="text-[10px] text-zinc-600 flex-shrink-0">{new Date(brief.createdAt).toLocaleDateString()}</span>
-                {expanded === brief.id ? <ChevronUp className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />}
-              </button>
+                <button onClick={() => setExpanded(expanded === brief.id ? null : brief.id)} className="flex-shrink-0 p-1 rounded hover:bg-zinc-800 transition-colors">
+                  {expanded === brief.id ? <ChevronUp className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />}
+                </button>
+              </div>
 
               {/* Brief details */}
               {expanded === brief.id && (
@@ -954,13 +1085,14 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                   )}
 
                   {/* Delete */}
-                  <div className="pt-2 border-t border-zinc-800">
+                  <div className="pt-3 border-t border-zinc-800 flex items-center justify-between">
                     <button
-                      onClick={() => handleDelete(brief.id)}
-                      className="flex items-center gap-1.5 text-[10px] text-zinc-600 hover:text-red-400 transition-colors"
+                      onClick={() => confirmDeleteBrief(brief)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium text-red-400/70 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all"
                     >
-                      <Trash2 className="w-3 h-3" /> Delete Brief
+                      <Trash2 className="w-3.5 h-3.5" /> Delete Brief
                     </button>
+                    <span className="text-[9px] text-zinc-700">Created {new Date(brief.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
                   </div>
                 </div>
               )}
