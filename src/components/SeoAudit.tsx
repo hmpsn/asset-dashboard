@@ -70,6 +70,7 @@ interface Props {
   workspaceId?: string;
   siteName?: string;
   view?: string;
+  onRequestCountChange?: (pending: number) => void;
 }
 
 const SEVERITY_CONFIG: Record<Severity, { label: string; color: string; bg: string; icon: typeof AlertTriangle }> = {
@@ -485,7 +486,7 @@ function AuditHistory({ siteId, history, onRefresh }: { siteId: string; history:
 
 type AuditSubTab = 'audit' | 'links' | 'history';
 
-function SeoAudit({ siteId, workspaceId, siteName, view = 'audit' }: Props) {
+function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCountChange }: Props) {
   const { startJob, jobs } = useBackgroundTasks();
   const auditJobId = useRef<string | null>(null);
   const [data, setData] = useState<SeoAuditResult | null>(null);
@@ -912,7 +913,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit' }: Props) {
   if (view === 'redirects') return <RedirectManager siteId={siteId} />;
   if (view === 'internal') return <InternalLinks siteId={siteId} workspaceId={workspaceId} />;
   if (view === 'schema') return <SchemaSuggester siteId={siteId} />;
-  if (view === 'briefs') return <ContentBriefs workspaceId={workspaceId || ''} />;
+  if (view === 'briefs') return <ContentBriefs workspaceId={workspaceId || ''} onRequestCountChange={onRequestCountChange} />;
 
   // ── Audit view (default) — with sub-tabs ──
   const auditTabBar = (

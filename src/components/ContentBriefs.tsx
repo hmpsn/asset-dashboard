@@ -33,7 +33,7 @@ interface ContentTopicRequest {
   updatedAt: string;
 }
 
-export function ContentBriefs({ workspaceId }: { workspaceId: string }) {
+export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspaceId: string; onRequestCountChange?: (pending: number) => void }) {
   const [briefs, setBriefs] = useState<ContentBrief[]>([]);
   const [clientRequests, setClientRequests] = useState<ContentTopicRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,7 +50,10 @@ export function ContentBriefs({ workspaceId }: { workspaceId: string }) {
       fetch(`/api/content-requests/${workspaceId}`).then(r => r.json()),
     ]).then(([b, r]) => {
       if (Array.isArray(b)) setBriefs(b);
-      if (Array.isArray(r)) setClientRequests(r);
+      if (Array.isArray(r)) {
+        setClientRequests(r);
+        onRequestCountChange?.(r.filter((req: ContentTopicRequest) => req.status === 'requested').length);
+      }
     }).catch(() => {}).finally(() => setLoading(false));
   }, [workspaceId]);
 
@@ -61,7 +64,11 @@ export function ContentBriefs({ workspaceId }: { workspaceId: string }) {
       if (!res.ok) throw new Error('Failed');
       const brief = await res.json();
       setBriefs(prev => [brief, ...prev]);
-      setClientRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'brief_generated' as const, briefId: brief.id } : r));
+      setClientRequests(prev => {
+        const next = prev.map(r => r.id === req.id ? { ...r, status: 'brief_generated' as const, briefId: brief.id } : r);
+        onRequestCountChange?.(next.filter(r => r.status === 'requested').length);
+        return next;
+      });
       setExpanded(brief.id);
     } catch { /* skip */ }
     setGeneratingBriefFor(null);
@@ -76,7 +83,11 @@ export function ContentBriefs({ workspaceId }: { workspaceId: string }) {
       });
       if (res.ok) {
         const updated = await res.json();
-        setClientRequests(prev => prev.map(r => r.id === reqId ? updated : r));
+        setClientRequests(prev => {
+          const next = prev.map(r => r.id === reqId ? updated : r);
+          onRequestCountChange?.(next.filter(r => r.status === 'requested').length);
+          return next;
+        });
       }
     } catch { /* skip */ }
   };

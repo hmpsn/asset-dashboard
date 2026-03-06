@@ -66,6 +66,7 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
   const [connected, setConnected] = useState(false);
   const [tab, setTab] = useState<Page>('media');
   const [clipboardStatus, setClipboardStatus] = useState<string | null>(null);
+  const [pendingContentRequests, setPendingContentRequests] = useState(0);
 
   const refreshHealth = useCallback(() => {
     fetch('/api/health').then(r => r.json()).then(h => {
@@ -80,6 +81,19 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
     fetch('/api/queue').then(r => r.json()).then(setQueue).catch(() => {});
     refreshHealth();
   }, [refreshHealth]);
+
+  // Fetch pending content request count when workspace changes
+  useEffect(() => {
+    if (!selected) return;
+    let cancelled = false;
+    fetch(`/api/content-requests/${selected.id}`)
+      .then(r => r.ok ? r.json() : [])
+      .then((reqs: Array<{ status: string }>) => {
+        if (!cancelled) setPendingContentRequests(Array.isArray(reqs) ? reqs.filter(r => r.status === 'requested').length : 0);
+      })
+      .catch(() => { if (!cancelled) setPendingContentRequests(0); });
+    return () => { cancelled = true; };
+  }, [selected]);
 
   // Keyboard shortcuts (⌘1-5 for tabs, ⌘, for settings)
   useEffect(() => {
@@ -268,7 +282,7 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
     }
 
     if (tab === 'media') return <MediaTab key={selected.folder} siteId={selected.webflowSiteId} workspaceFolder={selected.folder} queue={workspaceQueue} />;
-    if (seoView) return <SeoAudit key={`seo-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} siteName={selected.webflowSiteName || selected.name} view={seoView} />;
+    if (seoView) return <SeoAudit key={`seo-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} siteName={selected.webflowSiteName || selected.name} view={seoView} onRequestCountChange={setPendingContentRequests} />;
     if (tab === 'search') return <SearchConsole key={`search-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} gscPropertyUrl={selected.gscPropertyUrl} />;
     if (tab === 'performance') return <Performance key={`perf-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
     if (tab === 'analytics') return <GoogleAnalytics key={`ga4-${selected.id}`} workspaceId={selected.id} ga4PropertyId={selected.ga4PropertyId} />;
@@ -334,6 +348,11 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
                   >
                     <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${active ? 'text-teal-400' : ''}`} />
                     <span className="truncate">{item.label}</span>
+                    {item.id === 'seo-briefs' && pendingContentRequests > 0 && (
+                      <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 tabular-nums">
+                        {pendingContentRequests}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -386,6 +405,22 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
         )}
         <main className="flex-1 overflow-auto p-6">
           <div className="max-w-5xl mx-auto">
+            {pendingContentRequests > 0 && selected && tab !== 'seo-briefs' && (
+              <button
+                onClick={() => setTab('seo-briefs')}
+                className="w-full mb-4 flex items-center gap-3 px-4 py-3 rounded-xl border transition-all hover:border-amber-400/40"
+                style={{ backgroundColor: 'rgba(245,158,11,0.06)', borderColor: 'rgba(245,158,11,0.2)' }}
+              >
+                <div className="w-7 h-7 rounded-lg bg-amber-500/15 flex items-center justify-center flex-shrink-0">
+                  <Clipboard className="w-3.5 h-3.5 text-amber-400" />
+                </div>
+                <div className="text-left flex-1">
+                  <span className="text-xs font-medium text-amber-300">{pendingContentRequests} new content {pendingContentRequests === 1 ? 'request' : 'requests'}</span>
+                  <span className="text-[10px] text-zinc-500 ml-2">from client portal</span>
+                </div>
+                <span className="text-[10px] text-zinc-500">View →</span>
+              </button>
+            )}
             {renderContent()}
           </div>
         </main>
