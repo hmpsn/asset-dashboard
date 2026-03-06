@@ -61,7 +61,7 @@ interface ClientBriefPreview {
 }
 
 type SortKey = 'clicks' | 'impressions' | 'ctr' | 'position';
-type ClientTab = 'overview' | 'search' | 'health' | 'strategy' | 'analytics' | 'approvals' | 'requests';
+type ClientTab = 'overview' | 'search' | 'health' | 'strategy' | 'analytics' | 'approvals' | 'requests' | 'content';
 
 interface ClientKeywordStrategy {
   siteKeywords: string[];
@@ -268,7 +268,12 @@ export function ClientDashboard({ workspaceId }: Props) {
   const [auditDetail, setAuditDetail] = useState<AuditDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<ClientTab>('overview');
+  const [tab, setTab] = useState<ClientTab>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get('tab');
+    if (t && ['overview','search','health','strategy','analytics','approvals','requests','content'].includes(t)) return t as ClientTab;
+    return 'overview';
+  });
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [strategyData, setStrategyData] = useState<ClientKeywordStrategy | null>(null);
   const [requestedTopics, setRequestedTopics] = useState<Set<string>>(new Set());
@@ -479,14 +484,14 @@ export function ClientDashboard({ workspaceId }: Props) {
     // Load strategy if SEO view is enabled
     if (data.seoClientView) {
       fetch(`/api/public/seo-strategy/${data.id}`).then(r => r.ok ? r.json() : null).then(s => { if (s) setStrategyData(s); }).catch(() => {});
-      // Load existing content requests for the content hub + mark already-requested topics
-      fetch(`/api/public/content-requests/${data.id}`).then(r => r.ok ? r.json() : []).then((reqs: ClientContentRequest[]) => {
-        if (Array.isArray(reqs) && reqs.length > 0) {
-          setContentRequests(reqs);
-          setRequestedTopics(new Set(reqs.map(r => r.targetKeyword)));
-        }
-      }).catch(() => {});
     }
+    // Always load content requests (powers the Content tab independently)
+    fetch(`/api/public/content-requests/${data.id}`).then(r => r.ok ? r.json() : []).then((reqs: ClientContentRequest[]) => {
+      if (Array.isArray(reqs) && reqs.length > 0) {
+        setContentRequests(reqs);
+        setRequestedTopics(new Set(reqs.map(r => r.targetKeyword)));
+      }
+    }).catch(() => {});
   };
 
   const loadGA4Data = async (wsId: string, numDays: number) => {
@@ -907,6 +912,7 @@ export function ClientDashboard({ workspaceId }: Props) {
       { id: 'analytics' as ClientTab, label: 'Analytics', icon: LineChart, locked: false },
       { id: 'search' as ClientTab, label: 'Search', icon: Search, locked: false },
     ] : []),
+    ...(contentRequests.length > 0 ? [{ id: 'content' as ClientTab, label: 'Content', icon: FileText, locked: false }] : []),
     { id: 'requests' as ClientTab, label: 'Requests', icon: MessageSquare, locked: false },
     ...(approvalBatches.length > 0 ? [{ id: 'approvals' as ClientTab, label: 'Approvals', icon: ClipboardCheck, locked: false }] : []),
   ];
@@ -949,7 +955,9 @@ export function ClientDashboard({ workspaceId }: Props) {
                 (t.id === 'search' && !!overview) ||
                 (t.id === 'health' && !!audit) ||
                 (t.id === 'analytics' && !!ga4Overview) ||
+                (t.id === 'content' && contentRequests.length > 0) ||
                 (t.id === 'approvals' && approvalBatches.length > 0);
+              const pendingReviews = contentRequests.filter(r => r.status === 'client_review').length;
               return (
                 <button key={t.id} onClick={() => t.locked ? setShowUpgradeModal(true) : setTab(t.id)}
                   className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium border-b-2 transition-colors ${
@@ -961,6 +969,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                   {t.locked && <Lock className="w-3 h-3 ml-0.5 text-zinc-600" />}
                   {t.id === 'approvals' && pendingApprovals > 0 && <span className="ml-1 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-violet-500 text-white">{pendingApprovals}</span>}
                   {t.id === 'requests' && unreadTeamNotes > 0 && <span className="ml-1 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-teal-500 text-white">{unreadTeamNotes}</span>}
+                  {t.id === 'content' && pendingReviews > 0 && <span className="ml-1 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-blue-500 text-white">{pendingReviews}</span>}
                   {!t.locked && hasData && !active && t.id !== 'approvals' && t.id !== 'requests' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" />}
                 </button>
               );
@@ -1757,203 +1766,6 @@ export function ClientDashboard({ workspaceId }: Props) {
                 </div>
               )}
 
-              {/* ── YOUR CONTENT PIPELINE ── */}
-              {contentRequests.length > 0 && (
-                <div className="bg-gradient-to-br from-blue-950/30 to-zinc-900 rounded-xl border border-blue-500/20 p-5 relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-40 h-40 bg-blue-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
-                  <div className="relative">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                          <ClipboardCheck className="w-4 h-4 text-blue-400" />
-                        </div>
-                        <div>
-                          <div className="text-sm font-semibold text-blue-200">Your Content Pipeline</div>
-                          <div className="text-[10px] text-blue-400/60">Track the status of your content requests</div>
-                        </div>
-                      </div>
-                      <button onClick={() => setShowTopicForm(!showTopicForm)} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600/20 border border-blue-500/30 text-[10px] text-blue-300 hover:bg-blue-600/30 transition-colors font-medium">
-                        <Plus className="w-3 h-3" /> Suggest a Topic
-                      </button>
-                    </div>
-
-                    {/* Topic submission form */}
-                    {showTopicForm && (
-                      <div className="bg-zinc-900/80 rounded-lg border border-blue-500/20 p-4 mb-4 space-y-3">
-                        <div className="text-xs font-medium text-zinc-300 mb-1">Suggest a Content Topic</div>
-                        <input type="text" value={newTopicName} onChange={e => setNewTopicName(e.target.value)} placeholder="Topic name (e.g. 'Benefits of sedation dentistry')" className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600" />
-                        <input type="text" value={newTopicKeyword} onChange={e => setNewTopicKeyword(e.target.value)} placeholder="Target keyword (e.g. 'sedation dentistry benefits')" className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600" />
-                        <textarea value={newTopicNotes} onChange={e => setNewTopicNotes(e.target.value)} placeholder="Any notes or context for this topic... (optional)" rows={2} className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 resize-none" />
-                        <div className="flex items-center gap-2">
-                          <button onClick={submitClientTopic} disabled={!newTopicName.trim() || !newTopicKeyword.trim() || submittingTopic} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 text-[10px] text-white font-medium hover:bg-blue-500 transition-colors disabled:opacity-50">
-                            {submittingTopic ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />} Submit
-                          </button>
-                          <button onClick={() => setShowTopicForm(false)} className="px-3 py-1.5 rounded-lg text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors">Cancel</button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Pipeline items */}
-                    <div className="space-y-2">
-                      {contentRequests.filter(r => r.status !== 'declined').map(req => {
-                        const steps = ['requested', 'brief_generated', 'client_review', 'approved', 'in_progress', 'delivered'] as const;
-                        const stepLabels = ['Requested', 'Brief Ready', 'Your Review', 'Approved', 'In Production', 'Delivered'];
-                        const currentIdx = steps.indexOf(req.status as typeof steps[number]);
-                        const isExpanded = expandedContentReq === req.id;
-                        const brief = req.briefId ? briefPreviews[req.briefId] : null;
-
-                        return (
-                          <div key={req.id} className="bg-zinc-900/60 rounded-lg border border-zinc-800/80 overflow-hidden">
-                            <button onClick={() => {
-                              const next = isExpanded ? null : req.id;
-                              setExpandedContentReq(next);
-                              if (next && req.briefId) loadBriefPreview(req.briefId);
-                            }} className="w-full px-4 py-3 text-left hover:bg-zinc-800/30 transition-colors">
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="flex-1 min-w-0">
-                                  <div className="text-xs font-semibold text-zinc-200">{req.topic}</div>
-                                  <div className="text-[10px] text-teal-400 mt-0.5">&ldquo;{req.targetKeyword}&rdquo;</div>
-                                </div>
-                                {req.source === 'client' && <span className="text-[8px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20 mr-2">You submitted</span>}
-                                {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />}
-                              </div>
-                              {/* Progress timeline */}
-                              <div className="flex items-center gap-0.5">
-                                {steps.map((step, i) => {
-                                  const isComplete = currentIdx >= i;
-                                  const isCurrent = currentIdx === i;
-                                  return (
-                                    <div key={step} className="flex items-center flex-1">
-                                      <div className="flex flex-col items-center flex-1">
-                                        <div className={`w-full h-1 rounded-full ${isComplete ? (isCurrent ? 'bg-teal-400' : 'bg-teal-500/40') : 'bg-zinc-800'}`} />
-                                        <span className={`text-[8px] mt-1 ${isCurrent ? 'text-teal-400 font-medium' : isComplete ? 'text-zinc-500' : 'text-zinc-700'}`}>{stepLabels[i]}</span>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </button>
-
-                            {/* Expanded detail */}
-                            {isExpanded && (
-                              <div className="px-4 pb-4 space-y-3 border-t border-zinc-800">
-                                {/* Brief preview */}
-                                {brief && (
-                                  <div className="mt-3 space-y-2">
-                                    <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
-                                      <div className="text-[10px] text-zinc-500 mb-0.5">Suggested Title</div>
-                                      <div className="text-xs text-teal-400 font-medium">{brief.suggestedTitle}</div>
-                                    </div>
-                                    {brief.executiveSummary && (
-                                      <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
-                                        <div className="text-[10px] text-zinc-500 mb-0.5">Summary</div>
-                                        <div className="text-[11px] text-zinc-400 leading-relaxed">{brief.executiveSummary}</div>
-                                      </div>
-                                    )}
-                                    <div className="grid grid-cols-3 gap-2">
-                                      <div className="bg-zinc-950 rounded-lg px-2 py-1.5 border border-zinc-800 text-center">
-                                        <div className="text-[9px] text-zinc-600">Words</div>
-                                        <div className="text-xs font-bold text-blue-400">{brief.wordCountTarget?.toLocaleString()}</div>
-                                      </div>
-                                      {brief.contentFormat && <div className="bg-zinc-950 rounded-lg px-2 py-1.5 border border-zinc-800 text-center"><div className="text-[9px] text-zinc-600">Format</div><div className="text-xs font-medium text-amber-400 capitalize">{brief.contentFormat}</div></div>}
-                                      {brief.difficultyScore != null && <div className="bg-zinc-950 rounded-lg px-2 py-1.5 border border-zinc-800 text-center"><div className="text-[9px] text-zinc-600">Difficulty</div><div className={`text-xs font-bold ${brief.difficultyScore <= 30 ? 'text-green-400' : brief.difficultyScore <= 60 ? 'text-amber-400' : 'text-red-400'}`}>{brief.difficultyScore}/100</div></div>}
-                                    </div>
-                                    {brief.outline?.length > 0 && (
-                                      <div>
-                                        <div className="text-[9px] text-zinc-600 mb-1">Content Outline</div>
-                                        <div className="space-y-1">
-                                          {brief.outline.map((s, i) => (
-                                            <div key={i} className="flex items-center gap-2 text-[10px] text-zinc-400 bg-zinc-950 rounded px-2 py-1 border border-zinc-800/50">
-                                              <span className="text-zinc-600 font-mono w-4 text-right flex-shrink-0">{i + 1}.</span>
-                                              <span className="flex-1">{s.heading}</span>
-                                              {s.wordCount && <span className="text-[8px] text-zinc-600">{s.wordCount}w</span>}
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-
-                                {/* Action buttons for client_review */}
-                                {req.status === 'client_review' && (
-                                  <div className="flex items-center gap-2 mt-2">
-                                    <button onClick={() => approveBrief(req.id)} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-green-600/20 border border-green-500/30 text-[10px] text-green-300 font-medium hover:bg-green-600/30 transition-colors">
-                                      <Check className="w-3 h-3" /> Approve Brief
-                                    </button>
-                                    <button onClick={() => { setFeedbackReqId(req.id); setFeedbackText(''); }} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-orange-600/20 border border-orange-500/30 text-[10px] text-orange-300 font-medium hover:bg-orange-600/30 transition-colors">
-                                      <Edit3 className="w-3 h-3" /> Request Changes
-                                    </button>
-                                  </div>
-                                )}
-
-                                {/* Feedback modal */}
-                                {feedbackReqId === req.id && (
-                                  <div className="bg-orange-500/5 border border-orange-500/20 rounded-lg p-3 space-y-2">
-                                    <div className="text-[10px] text-orange-300 font-medium">What changes would you like?</div>
-                                    <textarea value={feedbackText} onChange={e => setFeedbackText(e.target.value)} placeholder="Describe what you'd like changed..." rows={3} className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 resize-none" />
-                                    <div className="flex items-center gap-2">
-                                      <button onClick={() => requestChanges(req.id)} disabled={!feedbackText.trim()} className="px-3 py-1.5 rounded-lg bg-orange-600 text-[10px] text-white font-medium hover:bg-orange-500 transition-colors disabled:opacity-50">Submit Feedback</button>
-                                      <button onClick={() => setFeedbackReqId(null)} className="px-3 py-1.5 rounded-lg text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors">Cancel</button>
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Decline option for requested topics */}
-                                {req.status === 'requested' && (
-                                  <div>
-                                    {declineReqId === req.id ? (
-                                      <div className="bg-red-500/5 border border-red-500/20 rounded-lg p-3 space-y-2">
-                                        <div className="text-[10px] text-red-300 font-medium">Why are you declining this topic? (optional)</div>
-                                        <input type="text" value={declineReason} onChange={e => setDeclineReason(e.target.value)} placeholder="e.g. Not relevant to our current goals" className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600" />
-                                        <div className="flex items-center gap-2">
-                                          <button onClick={() => declineTopic(req.id)} className="px-3 py-1.5 rounded-lg bg-red-600/80 text-[10px] text-white font-medium hover:bg-red-600 transition-colors">Decline Topic</button>
-                                          <button onClick={() => setDeclineReqId(null)} className="px-3 py-1.5 rounded-lg text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors">Cancel</button>
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <button onClick={() => { setDeclineReqId(req.id); setDeclineReason(''); }} className="text-[10px] text-zinc-600 hover:text-red-400 transition-colors">Not interested in this topic</button>
-                                    )}
-                                  </div>
-                                )}
-
-                                {/* Comments thread */}
-                                {req.comments && req.comments.length > 0 && (
-                                  <div>
-                                    <div className="text-[9px] text-zinc-600 uppercase tracking-wider mb-1.5">Comments</div>
-                                    <div className="space-y-1.5">
-                                      {req.comments.map(c => (
-                                        <div key={c.id} className={`text-[10px] px-2.5 py-1.5 rounded-lg ${c.author === 'client' ? 'bg-blue-500/10 border border-blue-500/15 text-blue-300 ml-4' : 'bg-zinc-800/60 border border-zinc-800 text-zinc-400 mr-4'}`}>
-                                          <div className="flex items-center justify-between mb-0.5">
-                                            <span className="font-medium">{c.author === 'client' ? 'You' : 'Team'}</span>
-                                            <span className="text-[8px] text-zinc-600">{new Date(c.createdAt).toLocaleDateString()}</span>
-                                          </div>
-                                          {c.content}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Add comment */}
-                                {!['delivered', 'declined'].includes(req.status) && (
-                                  <div className="flex items-center gap-2">
-                                    <input type="text" value={expandedContentReq === req.id ? contentComment : ''} onChange={e => setContentComment(e.target.value)} placeholder="Add a comment..." className="flex-1 px-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded-lg text-[10px] text-zinc-300 placeholder-zinc-600" onKeyDown={e => { if (e.key === 'Enter') addContentComment(req.id); }} />
-                                    <button onClick={() => addContentComment(req.id)} disabled={!contentComment.trim() || sendingContentComment} className="px-2 py-1.5 rounded-lg bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors disabled:opacity-50">
-                                      <Send className="w-3 h-3" />
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* ── KEYWORD OPPORTUNITIES + TARGET KEYWORDS (side by side) ── */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 {strategyData.opportunities.length > 0 && (
@@ -2133,6 +1945,218 @@ export function ClientDashboard({ workspaceId }: Props) {
               <p className="text-sm text-zinc-500">SEO strategy is being prepared</p>
               <p className="text-xs text-zinc-600 mt-1">Your web team is building a keyword strategy for your site. Check back soon!</p>
             </div>
+          )}
+        </>)}
+
+        {/* ════════════ CONTENT TAB ════════════ */}
+        {tab === 'content' && (<>
+          <div className="flex items-center justify-between mb-1">
+            <div>
+              <h2 className="text-base font-semibold text-zinc-100">Content Pipeline</h2>
+              <p className="text-xs text-zinc-500 mt-0.5">Track and manage your content requests</p>
+            </div>
+            <button onClick={() => setShowTopicForm(!showTopicForm)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600/20 border border-blue-500/30 text-xs text-blue-300 hover:bg-blue-600/30 transition-colors font-medium">
+              <Plus className="w-3.5 h-3.5" /> Suggest a Topic
+            </button>
+          </div>
+
+          {/* Topic submission form */}
+          {showTopicForm && (
+            <div className="bg-zinc-900 rounded-xl border border-blue-500/20 p-5 space-y-3">
+              <div className="text-xs font-medium text-zinc-300">Suggest a Content Topic</div>
+              <input type="text" value={newTopicName} onChange={e => setNewTopicName(e.target.value)} placeholder="Topic name (e.g. 'Benefits of sedation dentistry')" className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600" />
+              <input type="text" value={newTopicKeyword} onChange={e => setNewTopicKeyword(e.target.value)} placeholder="Target keyword (e.g. 'sedation dentistry benefits')" className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600" />
+              <textarea value={newTopicNotes} onChange={e => setNewTopicNotes(e.target.value)} placeholder="Any notes or context for this topic... (optional)" rows={2} className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 resize-none" />
+              <div className="flex items-center gap-2">
+                <button onClick={submitClientTopic} disabled={!newTopicName.trim() || !newTopicKeyword.trim() || submittingTopic} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 text-xs text-white font-medium hover:bg-blue-500 transition-colors disabled:opacity-50">
+                  {submittingTopic ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Submit Topic
+                </button>
+                <button onClick={() => setShowTopicForm(false)} className="px-3 py-2 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Cancel</button>
+              </div>
+            </div>
+          )}
+
+          {/* Pipeline items */}
+          <div className="space-y-3">
+            {contentRequests.filter(r => r.status !== 'declined').map(req => {
+              const steps = ['requested', 'brief_generated', 'client_review', 'approved', 'in_progress', 'delivered'] as const;
+              const stepLabels = ['Requested', 'Brief Ready', 'Your Review', 'Approved', 'In Production', 'Delivered'];
+              // Map changes_requested back to client_review step for timeline display
+              const displayStatus = req.status === 'changes_requested' ? 'client_review' : req.status;
+              const currentIdx = steps.indexOf(displayStatus as typeof steps[number]);
+              const isExpanded = expandedContentReq === req.id;
+              const brief = req.briefId ? briefPreviews[req.briefId] : null;
+
+              return (
+                <div key={req.id} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+                  <button onClick={() => {
+                    const next = isExpanded ? null : req.id;
+                    setExpandedContentReq(next);
+                    if (next && req.briefId) loadBriefPreview(req.briefId);
+                  }} className="w-full px-5 py-4 text-left hover:bg-zinc-800/30 transition-colors">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold text-zinc-200">{req.topic}</div>
+                        <div className="text-xs text-teal-400 mt-0.5">&ldquo;{req.targetKeyword}&rdquo;</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {req.source === 'client' && <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">You submitted</span>}
+                        {req.status === 'changes_requested' && <span className="text-[9px] px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20">Changes Requested</span>}
+                        {req.status === 'client_review' && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 animate-pulse">Needs Your Review</span>}
+                        {isExpanded ? <ChevronUp className="w-4 h-4 text-zinc-500" /> : <ChevronDown className="w-4 h-4 text-zinc-500" />}
+                      </div>
+                    </div>
+                    {/* Progress timeline */}
+                    <div className="flex items-center gap-0.5">
+                      {steps.map((step, i) => {
+                        const isComplete = currentIdx >= i;
+                        const isCurrent = currentIdx === i;
+                        return (
+                          <div key={step} className="flex items-center flex-1">
+                            <div className="flex flex-col items-center flex-1">
+                              <div className={`w-full h-1.5 rounded-full ${isComplete ? (isCurrent ? (req.status === 'changes_requested' ? 'bg-orange-400' : 'bg-teal-400') : 'bg-teal-500/40') : 'bg-zinc-800'}`} />
+                              <span className={`text-[8px] mt-1 ${isCurrent ? (req.status === 'changes_requested' ? 'text-orange-400 font-medium' : 'text-teal-400 font-medium') : isComplete ? 'text-zinc-500' : 'text-zinc-700'}`}>{stepLabels[i]}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </button>
+
+                  {/* Expanded detail */}
+                  {isExpanded && (
+                    <div className="px-5 pb-5 space-y-4 border-t border-zinc-800">
+                      {/* Brief preview */}
+                      {brief && (
+                        <div className="mt-4 space-y-3">
+                          <div className="bg-zinc-950 rounded-lg px-4 py-3 border border-zinc-800">
+                            <div className="text-[10px] text-zinc-500 mb-1">Suggested Title</div>
+                            <div className="text-sm text-teal-400 font-medium">{brief.suggestedTitle}</div>
+                          </div>
+                          {brief.executiveSummary && (
+                            <div className="bg-zinc-950 rounded-lg px-4 py-3 border border-zinc-800">
+                              <div className="text-[10px] text-zinc-500 mb-1">Summary</div>
+                              <div className="text-xs text-zinc-400 leading-relaxed">{brief.executiveSummary}</div>
+                            </div>
+                          )}
+                          <div className="grid grid-cols-3 gap-3">
+                            <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800 text-center">
+                              <div className="text-[9px] text-zinc-600">Words</div>
+                              <div className="text-sm font-bold text-blue-400">{brief.wordCountTarget?.toLocaleString()}</div>
+                            </div>
+                            {brief.contentFormat && <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800 text-center"><div className="text-[9px] text-zinc-600">Format</div><div className="text-sm font-medium text-amber-400 capitalize">{brief.contentFormat}</div></div>}
+                            {brief.difficultyScore != null && <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800 text-center"><div className="text-[9px] text-zinc-600">Difficulty</div><div className={`text-sm font-bold ${brief.difficultyScore <= 30 ? 'text-green-400' : brief.difficultyScore <= 60 ? 'text-amber-400' : 'text-red-400'}`}>{brief.difficultyScore}/100</div></div>}
+                          </div>
+                          {brief.outline?.length > 0 && (
+                            <div>
+                              <div className="text-[10px] text-zinc-500 mb-1.5">Content Outline</div>
+                              <div className="space-y-1">
+                                {brief.outline.map((s, i) => (
+                                  <div key={i} className="flex items-center gap-2 text-xs text-zinc-400 bg-zinc-950 rounded-lg px-3 py-1.5 border border-zinc-800/50">
+                                    <span className="text-zinc-600 font-mono w-5 text-right flex-shrink-0">{i + 1}.</span>
+                                    <span className="flex-1">{s.heading}</span>
+                                    {s.wordCount && <span className="text-[9px] text-zinc-600">{s.wordCount}w</span>}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Action buttons for client_review */}
+                      {req.status === 'client_review' && (
+                        <div className="flex items-center gap-2 pt-1">
+                          <button onClick={() => approveBrief(req.id)} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-green-600/20 border border-green-500/30 text-xs text-green-300 font-medium hover:bg-green-600/30 transition-colors">
+                            <Check className="w-3.5 h-3.5" /> Approve Brief
+                          </button>
+                          <button onClick={() => { setFeedbackReqId(req.id); setFeedbackText(''); }} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-orange-600/20 border border-orange-500/30 text-xs text-orange-300 font-medium hover:bg-orange-600/30 transition-colors">
+                            <Edit3 className="w-3.5 h-3.5" /> Request Changes
+                          </button>
+                          <button onClick={() => { setDeclineReqId(req.id); setDeclineReason(''); }} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-zinc-800 text-xs text-zinc-500 hover:text-red-400 transition-colors">
+                            <X className="w-3.5 h-3.5" /> Decline
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Feedback modal */}
+                      {feedbackReqId === req.id && (
+                        <div className="bg-orange-500/5 border border-orange-500/20 rounded-lg p-4 space-y-3">
+                          <div className="text-xs text-orange-300 font-medium">What changes would you like?</div>
+                          <textarea value={feedbackText} onChange={e => setFeedbackText(e.target.value)} placeholder="Describe what you'd like changed..." rows={3} className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 resize-none" />
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => requestChanges(req.id)} disabled={!feedbackText.trim()} className="px-4 py-2 rounded-lg bg-orange-600 text-xs text-white font-medium hover:bg-orange-500 transition-colors disabled:opacity-50">Submit Feedback</button>
+                            <button onClick={() => setFeedbackReqId(null)} className="px-3 py-2 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Cancel</button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Decline modal (works for both requested topics and client_review briefs) */}
+                      {declineReqId === req.id && (
+                        <div className="bg-red-500/5 border border-red-500/20 rounded-lg p-4 space-y-3">
+                          <div className="text-xs text-red-300 font-medium">Why are you declining? (optional)</div>
+                          <input type="text" value={declineReason} onChange={e => setDeclineReason(e.target.value)} placeholder="e.g. Not relevant to our current goals" className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600" />
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => declineTopic(req.id)} className="px-4 py-2 rounded-lg bg-red-600/80 text-xs text-white font-medium hover:bg-red-600 transition-colors">Confirm Decline</button>
+                            <button onClick={() => setDeclineReqId(null)} className="px-3 py-2 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Cancel</button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Decline option for requested topics (not in review) */}
+                      {req.status === 'requested' && declineReqId !== req.id && (
+                        <button onClick={() => { setDeclineReqId(req.id); setDeclineReason(''); }} className="text-xs text-zinc-600 hover:text-red-400 transition-colors">Not interested in this topic</button>
+                      )}
+
+                      {/* Comments thread */}
+                      {req.comments && req.comments.length > 0 && (
+                        <div>
+                          <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-2">Comments</div>
+                          <div className="space-y-1.5">
+                            {req.comments.map(c => (
+                              <div key={c.id} className={`text-xs px-3 py-2 rounded-lg ${c.author === 'client' ? 'bg-blue-500/10 border border-blue-500/15 text-blue-300 ml-6' : 'bg-zinc-800/60 border border-zinc-800 text-zinc-400 mr-6'}`}>
+                                <div className="flex items-center justify-between mb-0.5">
+                                  <span className="font-medium text-[10px]">{c.author === 'client' ? 'You' : 'Team'}</span>
+                                  <span className="text-[9px] text-zinc-600">{new Date(c.createdAt).toLocaleDateString()}</span>
+                                </div>
+                                {c.content}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Add comment */}
+                      {!['delivered', 'declined'].includes(req.status) && (
+                        <div className="flex items-center gap-2">
+                          <input type="text" value={expandedContentReq === req.id ? contentComment : ''} onChange={e => setContentComment(e.target.value)} placeholder="Add a comment..." className="flex-1 px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600" onKeyDown={e => { if (e.key === 'Enter') addContentComment(req.id); }} />
+                          <button onClick={() => addContentComment(req.id)} disabled={!contentComment.trim() || sendingContentComment} className="px-3 py-2 rounded-lg bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors disabled:opacity-50">
+                            <Send className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Declined items (collapsed) */}
+          {contentRequests.filter(r => r.status === 'declined').length > 0 && (
+            <details className="mt-4">
+              <summary className="text-xs text-zinc-600 cursor-pointer hover:text-zinc-400 transition-colors">
+                {contentRequests.filter(r => r.status === 'declined').length} declined topic{contentRequests.filter(r => r.status === 'declined').length > 1 ? 's' : ''}
+              </summary>
+              <div className="mt-2 space-y-2">
+                {contentRequests.filter(r => r.status === 'declined').map(req => (
+                  <div key={req.id} className="bg-zinc-900/50 rounded-lg border border-zinc-800/50 px-4 py-3 opacity-60">
+                    <div className="text-xs text-zinc-400">{req.topic}</div>
+                    <div className="text-[10px] text-zinc-600 mt-0.5">&ldquo;{req.targetKeyword}&rdquo;</div>
+                  </div>
+                ))}
+              </div>
+            </details>
           )}
         </>)}
 

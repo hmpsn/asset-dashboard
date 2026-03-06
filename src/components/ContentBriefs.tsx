@@ -227,87 +227,61 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
               const sc = statusConfig[req.status] || statusConfig.requested;
               const StatusIcon = sc.icon;
               const isGenerating = generatingBriefFor === req.id;
+              const hasBrief = !!req.briefId;
               return (
                 <div key={req.id} className="px-3 py-2.5 rounded-lg bg-zinc-800/50 border border-zinc-800">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium text-zinc-200">{req.topic}</div>
-                      <div className="text-[10px] text-teal-400 mt-0.5">Keyword: "{req.targetKeyword}"</div>
-                      <div className="text-[10px] text-zinc-500 mt-0.5">{req.rationale}</div>
-                      <div className="flex items-center gap-3 mt-1.5">
-                        <span className="text-[9px] text-zinc-600 uppercase">{req.intent}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-zinc-200">{req.topic}</span>
+                        {req.source === 'client' && <span className="text-[8px] px-1 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">Client</span>}
+                      </div>
+                      <div className="text-[10px] text-teal-400 mt-0.5">"{req.targetKeyword}"</div>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-[9px] text-zinc-600 uppercase">{req.intent} · {req.priority}</span>
                         <span className="text-[9px] text-zinc-600">{new Date(req.requestedAt).toLocaleDateString()}</span>
+                        {req.comments && req.comments.length > 0 && <span className="flex items-center gap-0.5 text-[9px] text-zinc-500"><MessageSquare className="w-2.5 h-2.5" />{req.comments.length}</span>}
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
                       <span className={`flex items-center gap-1 text-[10px] ${sc.color}`}><StatusIcon className="w-3 h-3" /> {sc.label}</span>
-                      {req.status === 'requested' && (
-                        <div className="flex items-center gap-1">
-                          <button
-                            disabled={isGenerating}
-                            onClick={() => handleGenerateBriefForRequest(req)}
-                            className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/20 border border-teal-500/30 text-[10px] text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50"
-                          >
-                            {isGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                            {isGenerating ? 'Generating...' : 'Generate Brief'}
-                          </button>
-                          <button
-                            onClick={() => handleUpdateRequestStatus(req.id, 'declined')}
-                            className="px-2 py-1 rounded bg-zinc-800 text-[10px] text-zinc-500 hover:text-red-400 transition-colors"
-                          >
-                            Decline
-                          </button>
-                        </div>
-                      )}
-                      {req.status === 'brief_generated' && (
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => { if (req.briefId) setExpanded(req.briefId); }}
-                            className="px-2 py-1 rounded bg-blue-600/20 border border-blue-500/30 text-[10px] text-blue-300 hover:bg-blue-600/30 transition-colors"
-                          >
-                            View Brief
-                          </button>
-                          <button
-                            onClick={() => handleUpdateRequestStatus(req.id, 'client_review')}
-                            className="px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 text-[10px] text-cyan-300 hover:bg-cyan-600/30 transition-colors"
-                          >
-                            Send to Client
-                          </button>
-                        </div>
-                      )}
-                      {req.status === 'client_review' && (
-                        <span className="text-[9px] text-cyan-400/60 italic">Awaiting client feedback</span>
-                      )}
-                      {req.status === 'approved' && (
-                        <button
-                          onClick={() => handleUpdateRequestStatus(req.id, 'in_progress')}
-                          className="px-2 py-1 rounded bg-violet-600/20 border border-violet-500/30 text-[10px] text-violet-300 hover:bg-violet-600/30 transition-colors"
-                        >
-                          Start Production
-                        </button>
-                      )}
-                      {req.status === 'changes_requested' && (
-                        <div className="space-y-1">
-                          {req.clientFeedback && <div className="text-[10px] text-orange-300/80 bg-orange-500/10 px-2 py-1 rounded border border-orange-500/20">{req.clientFeedback}</div>}
-                          <button
-                            onClick={() => handleUpdateRequestStatus(req.id, 'client_review')}
-                            className="px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 text-[10px] text-cyan-300 hover:bg-cyan-600/30 transition-colors"
-                          >
-                            Resubmit to Client
-                          </button>
-                        </div>
-                      )}
-                      {req.status === 'in_progress' && (
-                        <button
-                          onClick={() => handleUpdateRequestStatus(req.id, 'delivered')}
-                          className="px-2 py-1 rounded bg-green-600/20 border border-green-500/30 text-[10px] text-green-300 hover:bg-green-600/30 transition-colors"
-                        >
-                          Mark Delivered
-                        </button>
-                      )}
-                      {req.source === 'client' && <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">Client Submitted</span>}
+                      <div className="flex items-center gap-1 flex-wrap justify-end">
+                        {hasBrief && req.status !== 'requested' && (
+                          <button onClick={() => setExpanded(req.briefId!)} className="px-2 py-1 rounded bg-blue-600/20 border border-blue-500/30 text-[10px] text-blue-300 hover:bg-blue-600/30 transition-colors">View Brief</button>
+                        )}
+                        {req.status === 'requested' && (
+                          <>
+                            <button disabled={isGenerating} onClick={() => handleGenerateBriefForRequest(req)} className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/20 border border-teal-500/30 text-[10px] text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50">
+                              {isGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                              {isGenerating ? 'Generating...' : 'Generate Brief'}
+                            </button>
+                            <button onClick={() => handleUpdateRequestStatus(req.id, 'declined')} className="px-2 py-1 rounded bg-zinc-800 text-[10px] text-zinc-500 hover:text-red-400 transition-colors">Decline</button>
+                          </>
+                        )}
+                        {req.status === 'brief_generated' && (
+                          <button onClick={() => handleUpdateRequestStatus(req.id, 'client_review')} className="px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 text-[10px] text-cyan-300 hover:bg-cyan-600/30 transition-colors">Send to Client</button>
+                        )}
+                        {req.status === 'client_review' && (
+                          <span className="text-[9px] text-cyan-400/60 italic">Awaiting client feedback</span>
+                        )}
+                        {req.status === 'approved' && (
+                          <button onClick={() => handleUpdateRequestStatus(req.id, 'in_progress')} className="px-2 py-1 rounded bg-violet-600/20 border border-violet-500/30 text-[10px] text-violet-300 hover:bg-violet-600/30 transition-colors">Start Production</button>
+                        )}
+                        {req.status === 'changes_requested' && (
+                          <button onClick={() => handleUpdateRequestStatus(req.id, 'client_review')} className="px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 text-[10px] text-cyan-300 hover:bg-cyan-600/30 transition-colors">Resubmit to Client</button>
+                        )}
+                        {req.status === 'in_progress' && (
+                          <button onClick={() => handleUpdateRequestStatus(req.id, 'delivered')} className="px-2 py-1 rounded bg-green-600/20 border border-green-500/30 text-[10px] text-green-300 hover:bg-green-600/30 transition-colors">Mark Delivered</button>
+                        )}
+                      </div>
                     </div>
                   </div>
+                  {req.status === 'changes_requested' && req.clientFeedback && (
+                    <div className="mt-2 text-[10px] text-orange-300/80 bg-orange-500/10 px-2.5 py-1.5 rounded border border-orange-500/20"><span className="text-orange-400 font-medium">Client feedback:</span> {req.clientFeedback}</div>
+                  )}
+                  {req.status === 'declined' && req.declineReason && (
+                    <div className="mt-2 text-[10px] text-zinc-500 bg-zinc-800/50 px-2.5 py-1.5 rounded border border-zinc-800"><span className="text-zinc-400 font-medium">Reason:</span> {req.declineReason}</div>
+                  )}
                 </div>
               );
             })}

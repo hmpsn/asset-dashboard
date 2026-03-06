@@ -3516,44 +3516,6 @@ app.get('/api/public/content-brief/:workspaceId/:briefId', (req, res) => {
   res.json(brief);
 });
 
-// --- Storage Diagnostics (temporary) ---
-app.get('/api/debug/storage-overview', (_req, res) => {
-  const workspaces = listWorkspaces();
-  res.json(workspaces.map(ws => ({
-    id: ws.id, name: ws.name,
-    contentRequests: listContentRequests(ws.id).length,
-    pendingRequests: listContentRequests(ws.id).filter(r => r.status === 'requested').length,
-  })));
-});
-
-app.get('/api/debug/storage/:workspaceId', (req, res) => {
-  const wsId = req.params.workspaceId;
-  const dataBase = process.env.DATA_DIR || (IS_PROD ? '/tmp/asset-dashboard' : '');
-  const uploadRoot = dataBase ? path.join(dataBase, 'uploads') : path.join(process.env.HOME || '', 'toUpload');
-  const crDir = dataBase ? path.join(dataBase, 'content-requests') : path.join(process.env.HOME || '', 'toUpload', 'content-requests');
-  const brDir = dataBase ? path.join(dataBase, 'content-briefs') : path.join(process.env.HOME || '', 'toUpload', 'content-briefs');
-  const newCrFile = path.join(crDir, `${wsId}.json`);
-  const oldCrFile = path.join(uploadRoot, wsId, '.content-requests.json');
-  const newBrFile = path.join(brDir, `${wsId}.json`);
-  const oldBrFile = path.join(uploadRoot, wsId, '.content-briefs', 'briefs.json');
-  const fileInfo = (f: string) => {
-    try { if (fs.existsSync(f)) { const s = fs.statSync(f); return { exists: true, size: s.size, modified: s.mtime }; } } catch {}
-    return { exists: false };
-  };
-  const dirFiles = (d: string) => { try { if (fs.existsSync(d)) return fs.readdirSync(d); } catch {} return []; };
-  res.json({
-    dataBase, uploadRoot, crDir, brDir,
-    newCrFile: { path: newCrFile, ...fileInfo(newCrFile) },
-    oldCrFile: { path: oldCrFile, ...fileInfo(oldCrFile) },
-    newBrFile: { path: newBrFile, ...fileInfo(newBrFile) },
-    oldBrFile: { path: oldBrFile, ...fileInfo(oldBrFile) },
-    crDirContents: dirFiles(crDir),
-    brDirContents: dirFiles(brDir),
-    uploadRootContents: dirFiles(uploadRoot),
-    contentRequests: listContentRequests(wsId),
-  });
-});
-
 // --- Internal Content Request Management ---
 app.get('/api/content-requests/:workspaceId', (req, res) => {
   res.json(listContentRequests(req.params.workspaceId));
@@ -3573,9 +3535,8 @@ app.patch('/api/content-requests/:workspaceId/:id', (req, res) => {
   if (status === 'client_review') {
     const wsInfo = getWorkspace(req.params.workspaceId);
     if (wsInfo?.clientEmail) {
-      const dashUrl = wsInfo.liveDomain
-        ? `${wsInfo.liveDomain}/dashboard/${req.params.workspaceId}?tab=strategy`
-        : undefined;
+      const origin = req.get('origin') || req.get('referer')?.replace(/\/[^/]*$/, '') || '';
+      const dashUrl = origin ? `${origin}/dashboard/${req.params.workspaceId}?tab=content` : undefined;
       notifyClientBriefReady({ clientEmail: wsInfo.clientEmail, workspaceName: wsInfo.name, topic: updated.topic, targetKeyword: updated.targetKeyword, dashboardUrl: dashUrl }).catch(() => {});
     }
   }
