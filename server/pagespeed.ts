@@ -245,7 +245,9 @@ export async function runSiteSpeed(
 
   // Run sequentially to avoid rate limiting
   for (const page of pagesToTest) {
-    const url = page.slug ? `${baseUrl}/${page.slug}` : baseUrl;
+    // Use publishedPath for full URL (handles nested pages like /about/team)
+    const pagePath = page.publishedPath || (page.slug ? `/${page.slug}` : '');
+    const url = pagePath ? `${baseUrl}${pagePath}` : baseUrl;
     console.log(`PageSpeed: testing ${url}...`);
 
     const data = await runPageSpeed(url, strategy);

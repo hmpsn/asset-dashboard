@@ -95,11 +95,15 @@ export async function analyzeInternalLinks(
   const allPages = await listPages(siteId, tokenOverride);
   const published = filterPublishedPages(allPages);
 
-  const pageUrls: Array<{ url: string; path: string; title: string }> = published.map(p => ({
-    url: p.slug ? `${baseUrl}/${p.slug}` : baseUrl,
-    path: p.slug ? `/${p.slug}` : '/',
-    title: p.title || p.slug || 'Home',
-  }));
+  const pageUrls: Array<{ url: string; path: string; title: string }> = published.map(p => {
+    // Use publishedPath for full URL (handles nested pages like /about/team)
+    const pagePath = p.publishedPath || (p.slug ? `/${p.slug}` : '');
+    return {
+      url: pagePath ? `${baseUrl}${pagePath}` : baseUrl,
+      path: pagePath || '/',
+      title: p.title || p.slug || 'Home',
+    };
+  });
 
   // Also discover CMS pages (limit to 30 for performance)
   const staticPaths = buildStaticPathSet(published);

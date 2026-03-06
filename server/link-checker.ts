@@ -111,7 +111,9 @@ export async function checkSiteLinks(siteId: string, tokenOverride?: string): Pr
     const chunk = pages.slice(i, i + batch);
     const htmls = await Promise.all(
       chunk.map(p => {
-        const url = p.slug ? `${baseUrl}/${p.slug}` : baseUrl;
+        // Use publishedPath for full URL (handles nested pages like /about/team)
+        const pagePath = p.publishedPath || (p.slug ? `/${p.slug}` : '');
+        const url = pagePath ? `${baseUrl}${pagePath}` : baseUrl;
         return fetchPublishedHtml(url);
       })
     );

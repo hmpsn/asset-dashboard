@@ -215,12 +215,16 @@ export async function scanRedirects(siteId: string, tokenOverride?: string, live
   const published = filterPublishedPages(allPages);
   console.log(`Redirect scanner: checking ${published.length} static pages on ${baseUrl}`);
 
-  const pageUrls: Array<{ url: string; path: string; title: string; source: 'static' | 'cms' }> = published.map(p => ({
-    url: p.slug ? `${baseUrl}/${p.slug}` : baseUrl,
-    path: p.slug ? `/${p.slug}` : '/',
-    title: p.title || p.slug || 'Home',
-    source: 'static' as const,
-  }));
+  const pageUrls: Array<{ url: string; path: string; title: string; source: 'static' | 'cms' }> = published.map(p => {
+    // Use publishedPath for full URL (handles nested pages like /about/team)
+    const pagePath = p.publishedPath || (p.slug ? `/${p.slug}` : '');
+    return {
+      url: pagePath ? `${baseUrl}${pagePath}` : baseUrl,
+      path: pagePath || '/',
+      title: p.title || p.slug || 'Home',
+      source: 'static' as const,
+    };
+  });
 
   // Also discover CMS pages
   const staticPaths = buildStaticPathSet(published);

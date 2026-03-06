@@ -470,20 +470,20 @@ export async function generateSchemaSuggestions(
   // gpt-4o-mini has ~200K TPM — batch 3 AI calls at a time safely
   const batch = hasAI ? 3 : 5;
 
-  // Helper: find keyword context for a page slug
-  const getPageKeywords = (slug: string): SchemaContext['pageKeywords'] => {
+  // Helper: find keyword context for a page path (supports nested paths like /about/team)
+  const getPageKeywords = (pathOrSlug: string): SchemaContext['pageKeywords'] => {
     if (!pageKeywordMap) return undefined;
-    const pagePath = `/${slug}`;
+    const normalized = pathOrSlug.startsWith('/') ? pathOrSlug : `/${pathOrSlug}`;
     const match = pageKeywordMap.find(p =>
-      p.pagePath === pagePath || p.pagePath === `/${slug}/` || p.pagePath === slug
+      p.pagePath === normalized || p.pagePath === `${normalized}/` || p.pagePath === pathOrSlug
     );
     if (match) return { primary: match.primaryKeyword, secondary: match.secondaryKeywords || [] };
     return undefined;
   };
-  const getPageIntent = (slug: string): string | undefined => {
+  const getPageIntent = (pathOrSlug: string): string | undefined => {
     if (!pageKeywordMap) return undefined;
-    const pagePath = `/${slug}`;
-    return pageKeywordMap.find(p => p.pagePath === pagePath || p.pagePath === `/${slug}/`)?.searchIntent;
+    const normalized = pathOrSlug.startsWith('/') ? pathOrSlug : `/${pathOrSlug}`;
+    return pageKeywordMap.find(p => p.pagePath === normalized || p.pagePath === `${normalized}/`)?.searchIntent;
   };
 
   for (let i = 0; i < pages.length; i += batch) {
@@ -493,7 +493,9 @@ export async function generateSchemaSuggestions(
     console.log(`[schema] Processing static pages ${i + 1}-${Math.min(i + batch, pages.length)} of ${pages.length}`);
     const chunkResults = await Promise.all(
       chunk.map(async (page) => {
-        const url = (!page.slug || page.slug === 'index') ? baseUrl : `${baseUrl}/${page.slug}`;
+        // Use publishedPath for full URL (handles nested pages like /about/team)
+        const pagePath = page.publishedPath || (page.slug ? `/${page.slug}` : '');
+        const url = (!pagePath || pagePath === '/' || page.slug === 'index') ? baseUrl : `${baseUrl}${pagePath}`;
         const isHomepage = !page.slug || page.slug === '' || page.slug === 'home' || page.slug === 'index';
         const [meta, html] = await Promise.all([
           fetchPageMeta(page.id, tokenOverride),
@@ -504,11 +506,12 @@ export async function generateSchemaSuggestions(
         const seoDesc = meta?.seo?.description || '';
         const existingSchemas = html ? extractExistingSchemas(html) : [];
 
-        // Build page-specific context
+        // Build page-specific context (use full path for nested pages)
+        const lookupPath = pagePath || `/${page.slug}`;
         const pageCtx: SchemaContext = {
           ...ctx,
-          pageKeywords: getPageKeywords(page.slug),
-          searchIntent: getPageIntent(page.slug),
+          pageKeywords: getPageKeywords(lookupPath),
+          searchIntent: getPageIntent(lookupPath),
         };
 
         let suggestedSchemas: SchemaSuggestion[];
@@ -554,7 +557,7 @@ export async function generateSchemaSuggestions(
         return {
           pageId: page.id,
           pageTitle: page.title,
-          slug: page.slug,
+          slug: pagePath ? pagePath.replace(/^\//, '') : page.slug,
           url,
           existingSchemas,
           suggestedSchemas,

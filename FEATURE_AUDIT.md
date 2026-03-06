@@ -29,9 +29,9 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 3. Site Health Audit
-**What it does:** Per-page SEO audit with 20+ checks: titles, meta descriptions, canonicals, H1s, heading hierarchy, content length, alt text, Open Graph, structured data, HTML size, orphan pages, indexability, and more. Weighted scoring prioritizes high-impact ranking factors.
+**What it does:** Per-page SEO audit with 20+ checks: titles, meta descriptions, canonicals, H1s, heading hierarchy, content length, alt text, Open Graph, structured data, HTML size, orphan pages, indexability, and more. Weighted scoring prioritizes high-impact ranking factors. Integrates redirect chain detection and homepage Core Web Vitals inline. Auto-saves snapshots for historical comparison. Scheduled recurring audits with email alerts on score drops.
 
-**Agency value:** Replaces paid tools for Webflow-specific checks. Catches issues Screaming Frog misses (Webflow API vs. published HTML discrepancies).
+**Agency value:** Replaces paid tools for Webflow-specific checks. Catches issues Screaming Frog misses (Webflow API vs. published HTML discrepancies). Historical snapshots track progress over time.
 
 **Client value:** A clear health score with specific, actionable recommendations — not a wall of jargon.
 
@@ -51,7 +51,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 5. PageSpeed / Performance
-**What it does:** Runs Google PageSpeed Insights on key pages. Reports Core Web Vitals (LCP, FID, CLS) with per-page breakdowns and optimization opportunities.
+**What it does:** Runs Google PageSpeed Insights on key pages. Reports Core Web Vitals (LCP, FID, CLS) with per-page breakdowns and optimization opportunities. Single-page on-demand testing by slug. Homepage CWV wired into the site audit for a unified health picture.
 
 **Agency value:** Performance data directly from Google's own tool. No "but my site feels fast" debates — the numbers are objective.
 
@@ -61,36 +61,36 @@ A brief value assessment of every feature in the platform, covering what it does
 
 ---
 
-### 6. Schema Suggester
-**What it does:** Analyzes every page's content and existing structured data, then suggests appropriate JSON-LD schemas (Organization, FAQ, Service, Article, etc.) with AI-generated markup.
+### 6. Schema Generator
+**What it does:** Analyzes every page's content and existing structured data, then generates unified `@graph` JSON-LD schemas (Organization, FAQ, Service, Article, BreadcrumbList, LocalBusiness, etc.) using AI. Validates against Google requirements. Supports **per-page generation** via a searchable page picker — generate for one page without scanning the whole site. Results stream incrementally with real-time progress via WebSocket. Schemas persist to disk and survive deploys (incremental saves every 10s during generation). One-click **Publish to Webflow** injects schema via the Custom Code API. **Send to Client** creates an approval batch for client review before publishing.
 
-**Agency value:** Schema implementation is time-consuming and error-prone. This generates production-ready JSON-LD in seconds.
+**Agency value:** Schema implementation is time-consuming and error-prone. This generates production-ready, validated JSON-LD in seconds — per-page or full-site. Direct Webflow publishing eliminates manual copy-paste.
 
-**Client value:** Rich snippets in search results (stars, FAQs, breadcrumbs) increase click-through rates significantly.
+**Client value:** Rich snippets in search results (stars, FAQs, breadcrumbs) increase click-through rates significantly. Client reviews and approves before anything goes live.
 
-**Mutual:** High-value SEO deliverable that's visible in search results. Clients see their listings stand out; agency delivers it efficiently.
+**Mutual:** High-value SEO deliverable that's visible in search results. Clients see their listings stand out; agency delivers it efficiently. The approval flow ensures nothing ships without sign-off.
 
 ---
 
 ### 7. SEO Strategy (Keyword Mapping)
-**What it does:** Maps every page to primary/secondary keywords using GSC data, competitor analysis, and AI. Identifies content gaps, quick wins, and keyword opportunities with volume/difficulty metrics.
+**What it does:** Maps every page to primary/secondary keywords using GSC data, competitor analysis, SEMRush metrics (volume, KD%, intent), and AI. Batched parallel AI processing for large sites. Identifies content gaps, quick wins, low-hanging fruit, and keyword opportunities. Summary dashboard with performance tiers, search intent badges, and sortable/filterable page map. Runs as a background job with real-time progress. Smart page filtering excludes utility pages.
 
-**Agency value:** Automates the most labor-intensive part of SEO — the keyword strategy document. Pulls real data instead of guesswork.
+**Agency value:** Automates the most labor-intensive part of SEO — the keyword strategy document. Pulls real data from GSC + SEMRush instead of guesswork. Batched processing handles 100+ page sites efficiently.
 
-**Client value:** A clear roadmap: which pages target which keywords, what content is missing, and where the quick wins are.
+**Client value:** A clear roadmap: which pages target which keywords, what content is missing, and where the quick wins are. Interactive strategy view with "Request This Topic" buttons.
 
 **Mutual:** Replaces static PDF strategy decks with a living, data-driven plan both sides can reference and act on.
 
 ---
 
 ### 8. Content Brief Generator
-**What it does:** AI-generates full content briefs from keyword strategy data — suggested titles, outlines, word count targets, internal linking opportunities, competitor analysis, and SEO requirements.
+**What it does:** AI-generates full content briefs from keyword strategy data — suggested titles, outlines, word count targets, internal linking opportunities, competitor analysis, E-E-A-T guidelines, content checklists, and schema recommendations. Supports **Brief vs. Full Post** service tiers with configurable pricing. Branded HTML export and AI tool export formats. Full client approval workflow: submit topic → generate brief → client reviews → approve/decline/request changes → upgrade to full post.
 
-**Agency value:** Briefs that used to take 1-2 hours each are generated in under a minute with real search data baked in.
+**Agency value:** Briefs that used to take 1-2 hours each are generated in under a minute with real search data baked in. Service tier pricing built in.
 
-**Client value:** Professional, research-backed content briefs they can review, approve, or request changes on directly from their portal.
+**Client value:** Professional, research-backed content briefs they can review, approve, decline, or request changes on directly from their portal. PDF export available.
 
-**Mutual:** Streamlines the entire content production pipeline from strategy → brief → review → approval → production.
+**Mutual:** Streamlines the entire content production pipeline from strategy → brief → review → approval → production. Pricing transparency builds trust.
 
 ---
 
@@ -106,9 +106,9 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 10. Approval Workflow
-**What it does:** Agency proposes SEO changes (titles, descriptions) as batches. Client reviews, approves/rejects, edits, and the approved changes push directly to Webflow via API.
+**What it does:** Agency proposes SEO changes (titles, descriptions, schemas) as batches. Client reviews, approves/rejects, edits, and the approved changes push directly to Webflow via API. Schema approvals show JSON-LD previews with @graph type badges. Supports both metadata and structured data changes in a single workflow.
 
-**Agency value:** No more email chains asking "is this title OK?" — structured workflow with clear status tracking.
+**Agency value:** No more email chains asking "is this title OK?" — structured workflow with clear status tracking. Schema changes go through the same flow.
 
 **Client value:** Full control over what goes live on their site. Can see proposed vs. current values and suggest edits.
 
@@ -139,9 +139,9 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 13. Google Analytics Integration
-**What it does:** Full GA4 integration — sessions, users, engagement, traffic sources, top pages, device breakdown, country data, event tracking, conversion summaries, and event explorer with page-level filtering.
+**What it does:** Full GA4 integration — sessions, users, engagement, traffic sources, top pages, device breakdown, country data, event tracking, conversion summaries, and event explorer with page-level filtering. Click-to-inspect detail popovers on all charts showing date + key metrics per data point.
 
-**Agency value:** Deep analytics without GA4's clunky interface. Custom event grouping and module-level page filtering tailored per client.
+**Agency value:** Deep analytics without GA4's clunky interface. Custom event grouping and module-level page filtering tailored per client. Interactive charts make data exploration effortless.
 
 **Client value:** Clean, curated analytics view showing the metrics that matter to their business — not the overwhelming GA4 default.
 
@@ -183,22 +183,22 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 17. Background Tasks
-**What it does:** Long-running operations (audits, compression, brief generation) run asynchronously with real-time WebSocket progress updates.
+**What it does:** Long-running operations (audits, compression, brief generation, schema generation, strategy analysis) run asynchronously with real-time WebSocket progress updates. Supports job cancellation (stop mid-generation and keep partial results). Job labels in TaskPanel identify what's running. Incremental persistence saves partial results to disk during long jobs.
 
-**Agency value:** No frozen screens or timeouts. Start an audit and keep working — a toast notification appears when it's done.
+**Agency value:** No frozen screens or timeouts. Start a schema generation across 50 pages and keep working — partial results stream in live. Cancel anytime and keep what's done.
 
 **Client value:** Invisible to the client, but ensures their dashboard always loads fast and never hangs.
 
-**Mutual:** Professional, responsive UX that handles heavy operations gracefully.
+**Mutual:** Professional, responsive UX that handles heavy operations gracefully. No lost work from server restarts.
 
 ---
 
 ## Client Dashboard (External)
 
 ### 18. Client Portal
-**What it does:** Password-protected, white-labeled dashboard for each client. Shows curated views of search data, site health, analytics, strategy, content, requests, and approvals. Supports dark/light theme and custom branding.
+**What it does:** Password-protected, white-labeled dashboard for each client. Shows curated views of search data, site health, analytics, strategy, content, requests, and approvals. Supports dark/light theme and custom branding. Custom favicon and dynamic browser tab title. HMAC-based auth tokens with server-side validation. Rate limiting and CORS lockdown for security.
 
-**Agency value:** Replaces monthly PDF reports and "let me pull up the numbers" calls. Clients self-serve their own data 24/7.
+**Agency value:** Replaces monthly PDF reports and "let me pull up the numbers" calls. Clients self-serve their own data 24/7. Security hardening means confident client-facing deployment.
 
 **Client value:** Real-time access to their site's performance without waiting for a report or scheduling a call.
 
@@ -272,17 +272,61 @@ A brief value assessment of every feature in the platform, covering what it does
 
 ---
 
+### 25. Redirect Manager
+**What it does:** Scans all published pages (static + CMS via sitemap) for redirect chains, 404s, loops, and routing issues. Traces multi-hop redirects and detects broken destinations. AI-powered **redirect target recommendations** match broken/404 slugs against healthy pages using keyword overlap and path similarity. Review panel with accept/edit target/dismiss workflow. **Export CSV** generates Webflow-compatible redirect rules for import in Settings → Hosting → 301 Redirects. Results persist to disk between deploys.
+
+**Agency value:** Finds redirect problems across the entire site in one scan — including CMS pages. Recommendations eliminate the guesswork of "where should this redirect to?"
+
+**Client value:** No more "page not found" dead ends. Redirect issues are caught and fixed proactively.
+
+**Mutual:** Export CSV → import in Webflow is a fast, repeatable workflow. The agency delivers concrete fixes; the client's visitors never hit dead pages.
+
+---
+
+### 26. Internal Linking Analyzer
+**What it does:** Analyzes internal link structure across the site, identifying orphan pages, under-linked content, and opportunities to strengthen topic clusters through better internal linking.
+
+**Agency value:** Internal linking is one of the highest-leverage SEO tactics and one of the most tedious to audit manually. This automates the discovery.
+
+**Client value:** Better internal linking means visitors find more content and stay longer. Search engines crawl more efficiently.
+
+**Mutual:** Actionable link suggestions that improve both user navigation and search engine crawlability.
+
+---
+
+### 27. SEMRush Integration
+**What it does:** Enriches keyword data with SEMRush metrics — search volume, keyword difficulty (KD%), search intent classification, CPC, and competitive density. Data feeds into the strategy engine and client-facing views.
+
+**Agency value:** Real market data layered on top of GSC actuals. Volume and difficulty numbers turn gut-feel prioritization into data-driven decisions.
+
+**Client value:** Sees the actual search demand behind every keyword recommendation. "This keyword gets 12,000 searches/month" is compelling.
+
+**Mutual:** Strategy conversations grounded in third-party market data both sides trust.
+
+---
+
+### 28. Security & Infrastructure
+**What it does:** Rate limiting on all API endpoints. CORS lockdown restricts origins to the app domain. Server-side client authentication with HMAC tokens. Graceful error handling (soft CORS deny prevents Express crashes). Persistent data storage on `/var/data/asset-dashboard` survives deploys.
+
+**Agency value:** Production-grade security for a client-facing application. No embarrassing data leaks or unauthorized access.
+
+**Client value:** Their data is protected. The portal feels professional and trustworthy.
+
+**Mutual:** Confidence in deploying to production without security concerns.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
 |----------|:---:|---|
-| SEO & Technical | 7 | Audit, fix, and optimize faster than manual tools |
-| Analytics & Tracking | 4 | Unified data view replaces platform-hopping |
+| SEO & Technical | 10 | Audit, fix, and optimize faster than manual tools |
+| Analytics & Tracking | 5 | Unified data view replaces platform-hopping |
 | Content & Strategy | 3 | Strategy → brief → approval → production pipeline |
 | Client Communication | 4 | Structured workflows replace email chaos |
 | Client Self-Service | 6 | 24/7 data access reduces reporting overhead |
 
-The platform's core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**28 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
 ---
 
@@ -295,21 +339,39 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - **SEO Audit AI → gpt-4o-mini savings**: The audit's AI recommendations (title/meta fixes) currently use gpt-4o. Could switch to mini to save cost with minimal quality loss since it's structured output.
 
 ### Schema Generator Enhancements
-- **Bulk publish**: One-click to publish all generated schemas to Webflow (currently per-page).
+- ~~Bulk publish~~: ✅ Shipped — Publish to Webflow per-page via Custom Code API.
+- ~~Per-page generation~~: ✅ Shipped — Page picker lets you generate for a single page.
+- ~~Persistence~~: ✅ Shipped — Incremental disk saves every 10s during generation.
+- ~~Client review flow~~: ✅ Shipped — Send to Client creates an approval batch.
 - **Schema diff view**: Show what changed between existing and suggested schema before publishing.
 - **Auto-schedule**: Re-generate schemas on a cadence (e.g., weekly) and flag pages where content changed but schema is stale.
+- **Bulk publish all**: One-click to publish all generated schemas at once (currently per-page).
+
+### Redirect Manager Enhancements
+- **Webflow Enterprise API**: The 301 Redirects API is Enterprise-only. If/when Enterprise access is available, push accepted rules directly via API instead of CSV export.
+- **Historical comparison**: Track redirect status over time — detect new 404s since last scan.
+- **Google Search Console 404 import**: Pull crawl errors from GSC to seed the redirect scanner with known broken URLs.
 
 ### Site Audit Enhancements
-- **Full-site PageSpeed**: Currently only runs homepage CWV inline. Could offer a deeper multi-page PSI scan as a separate background job.
+- ~~Redirect + CWV integration~~: ✅ Shipped — Redirect chains and homepage Core Web Vitals wired into audit.
+- **Full-site PageSpeed**: Offer a deeper multi-page PSI scan as a separate background job.
 - **Accessibility audit expansion**: Currently only checks img alt text. Could add WCAG contrast, ARIA, heading order, form label checks.
 - **Historical trend charts**: Track audit score over time per-page, not just site-wide.
 
 ### Background Job System
-- **WebSocket progress**: Push real-time progress updates to the frontend via WebSocket instead of polling.
-- **Job queue persistence**: Jobs are currently in-memory. Persist to disk/DB so they survive server restarts.
+- ~~WebSocket progress~~: ✅ Shipped — Real-time progress via WebSocket for all background jobs.
+- ~~Job cancellation~~: ✅ Shipped — Stop mid-generation, keep partial results.
+- ~~Incremental persistence~~: ✅ Shipped — Schema and redirect results save to disk during generation.
 - **Concurrent job limits**: Prevent multiple audits from running simultaneously on the same site.
 
 ### Client Dashboard
-- **Interactive inline charts**: The GA4 traffic overview and rank history charts in the client dashboard use inline SVGs that aren't yet click-to-inspect. Refactor to reusable interactive chart components.
-- **PDF export**: One-click PDF report generation from the client dashboard view.
+- ~~Interactive inline charts~~: ✅ Shipped — Click-to-inspect detail popovers on all charts.
+- ~~PDF export~~: ✅ Shipped — Professional PDF with TOC, page breaks, section numbers.
 - **Custom date range picker**: Replace preset buttons (7d/28d/90d) with a full calendar date range selector.
+- **White-label email templates**: Branded email notifications matching the client portal theme.
+
+### Content Pipeline
+- ~~Service tiers~~: ✅ Shipped — Brief vs. Full Post with configurable pricing.
+- ~~E-E-A-T guidelines~~: ✅ Shipped — Content briefs include E-E-A-T, content checklists, schema recs.
+- **Content calendar**: Visual calendar view of content in production with due dates.
+- **Writer assignment**: Assign content pieces to specific writers with notifications.
