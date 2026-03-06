@@ -2824,33 +2824,57 @@ Critical rules:
 - Cover ALL ${pathArray.length} pages in the pageMap — do not skip any, including CMS/blog pages${semrushInstructions}
 - Return ONLY valid JSON, no markdown fences, no explanation`;
 
-    sendProgress('ai', `Generating keyword strategy with AI (${pageInfo.length} pages)...`, 0.72);
-    const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${openaiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: 'You are an expert SEO strategist. You always return valid JSON only, no markdown, no explanation.' },
-          { role: 'user', content: prompt },
-        ],
-        max_tokens: 12000,
-        temperature: 0.3,
-      }),
+    const promptChars = prompt.length;
+    const estimatedTokens = Math.ceil(promptChars / 4);
+    console.log(`[Strategy] Prompt size: ${promptChars} chars (~${estimatedTokens} tokens)`);
+    sendProgress('ai', `Generating keyword strategy with AI (${pageInfo.length} pages, ~${estimatedTokens} tokens)...`, 0.72);
+
+    const aiBody = JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: 'You are an expert SEO strategist. You always return valid JSON only, no markdown, no explanation.' },
+        { role: 'user', content: prompt },
+      ],
+      max_tokens: 12000,
+      temperature: 0.3,
     });
 
-    if (!aiRes.ok) {
-      const errText = await aiRes.text();
+    // Retry once on network failure (Render can be flaky with long OpenAI calls)
+    let aiRes: Response | null = null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${openaiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: aiBody,
+          signal: AbortSignal.timeout(120_000), // 2 minute timeout
+        });
+        break; // success
+      } catch (fetchErr) {
+        const cause = fetchErr instanceof Error ? (fetchErr.cause || fetchErr.message) : String(fetchErr);
+        console.error(`[Strategy] OpenAI fetch attempt ${attempt} failed:`, cause);
+        if (attempt === 2) {
+          const errMsg = `OpenAI connection failed after 2 attempts: ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)}`;
+          if (wantsStream) { try { res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`); res.end(); } catch { /* closed */ } return; }
+          return res.status(500).json({ error: errMsg });
+        }
+        sendProgress('ai', 'AI request failed, retrying...', 0.74);
+        await new Promise(r => setTimeout(r, 2000)); // wait 2s before retry
+      }
+    }
+
+    if (!aiRes!.ok) {
+      const errText = await aiRes!.text();
       const errMsg = `OpenAI error: ${errText.slice(0, 200)}`;
-      if (wantsStream) { res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`); return res.end(); }
+      if (wantsStream) { try { res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`); res.end(); } catch { /* closed */ } return; }
       return res.status(500).json({ error: errMsg });
     }
 
     sendProgress('ai', 'AI strategy generated — processing results...', 0.88);
-    const aiData = await aiRes.json() as { choices?: Array<{ message?: { content?: string } }> };
+    const aiData = await aiRes!.json() as { choices?: Array<{ message?: { content?: string } }> };
     let raw = aiData.choices?.[0]?.message?.content?.trim() || '';
     raw = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
 
