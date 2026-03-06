@@ -2481,7 +2481,7 @@ app.get('/api/google/performance-trend/:siteId', async (req, res) => {
   }
 });
 
-// --- Keyword Strategy Generation ---
+// --- Keyword Strategy Generation (SSE progress) ---
 app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -2500,14 +2500,31 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     updateWorkspace(ws.id, { competitorDomains });
   }
 
+  // Check if client wants SSE streaming
+  const wantsStream = req.headers.accept === 'text/event-stream';
+  if (wantsStream) {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+    });
+  }
+  const sendProgress = (step: string, detail: string, progress: number) => {
+    if (wantsStream) {
+      res.write(`data: ${JSON.stringify({ step, detail, progress })}\n\n`);
+    }
+  };
+
   try {
     // 1. Resolve site base URL
+    sendProgress('discovery', 'Resolving site URL...', 0.02);
     const subdomain = await getSiteSubdomain(ws.webflowSiteId, token);
     const baseUrl = ws.liveDomain
-      ? `https://${ws.liveDomain}`
+      ? (ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`)
       : subdomain ? `https://${subdomain}.webflow.io` : '';
 
     // 2. Gather pages from BOTH Webflow API (static pages + metadata) AND sitemap (all pages including CMS)
+    sendProgress('discovery', 'Fetching pages from Webflow...', 0.05);
     const allPages = await listPages(ws.webflowSiteId, token);
     const published = filterPublishedPages(allPages);
 
@@ -2523,6 +2540,7 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     }
 
     // Discover ALL pages via sitemap (includes CMS collection pages, blog posts, etc.)
+    sendProgress('discovery', 'Crawling sitemap for all pages (including CMS)...', 0.08);
     const allPaths = new Set<string>(wfMetaByPath.keys());
     if (baseUrl) {
       try {
@@ -2538,14 +2556,18 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         console.log('[Strategy] Sitemap discovery failed, continuing with Webflow pages only');
       }
     }
+    sendProgress('discovery', `Found ${allPaths.size} pages (${wfMetaByPath.size} static, ${allPaths.size - wfMetaByPath.size} CMS)`, 0.12);
     console.log(`[Strategy] Total pages: ${allPaths.size} (${wfMetaByPath.size} from Webflow API, ${allPaths.size - wfMetaByPath.size} additional from sitemap)`);
 
     // 3. Fetch actual page content for ALL discovered pages (parallel, batched)
+    sendProgress('content', `Fetching content from ${allPaths.size} pages...`, 0.15);
     const pageInfo: Array<{ path: string; title: string; seoTitle: string; seoDesc: string; contentSnippet: string }> = [];
     const pathArray = Array.from(allPaths);
     const contentBatch = 6;
     for (let i = 0; i < pathArray.length; i += contentBatch) {
       const chunk = pathArray.slice(i, i + contentBatch);
+      const fetched = Math.min(i + contentBatch, pathArray.length);
+      sendProgress('content', `Fetching page content... ${fetched}/${pathArray.length}`, 0.15 + (fetched / pathArray.length) * 0.30);
       const contents = await Promise.all(chunk.map(async (pagePath) => {
         const wfMeta = wfMetaByPath.get(pagePath);
         let contentSnippet = '';
@@ -2594,13 +2616,18 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     }
 
     // 4. Try to gather GSC data if connected
+    sendProgress('search_data', 'Fetching Google Search Console data...', 0.48);
     let gscData: Array<{ query: string; page: string; clicks: number; impressions: number; position: number }> = [];
     if (ws.gscPropertyUrl) {
       try {
         gscData = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90);
+        sendProgress('search_data', `Got ${gscData.length} search query rows from GSC`, 0.52);
       } catch {
+        sendProgress('search_data', 'GSC unavailable — continuing without it', 0.52);
         console.log('Keyword strategy: GSC data unavailable, proceeding without it');
       }
+    } else {
+      sendProgress('search_data', 'No GSC connected — skipping', 0.52);
     }
 
     // 5. SEMRush data gathering (based on mode)
@@ -2610,7 +2637,9 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     const relatedKws: Awaited<ReturnType<typeof getRelatedKeywords>> = [];
 
     if (semrushMode !== 'none' && isSemrushConfigured()) {
-      const siteDomain = ws.liveDomain || (subdomain ? `${subdomain}.webflow.io` : '');
+      sendProgress('semrush', 'Fetching SEMRush keyword intelligence...', 0.55);
+      // Derive domain from baseUrl so SEMRush always hits the live site (not webflow.io staging)
+      const siteDomain = baseUrl ? new URL(baseUrl).hostname : '';
 
       if (siteDomain) {
         // Both quick and full: get domain organic keywords
@@ -2632,6 +2661,7 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         // Full mode: competitor gap analysis + related keywords
         if (semrushMode === 'full' && competitorDomains.length > 0) {
           try {
+            sendProgress('semrush', `Running competitor gap analysis vs ${competitorDomains.length} competitors...`, 0.60);
             console.log(`[SEMRush] Running keyword gap analysis vs ${competitorDomains.join(', ')}...`);
             keywordGaps = await getKeywordGap(siteDomain, competitorDomains, ws.id, 50);
             console.log(`[SEMRush] Found ${keywordGaps.length} keyword gaps`);
@@ -2648,6 +2678,7 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
 
           // Get related keywords for top 5 seed terms
           try {
+            sendProgress('semrush', 'Fetching related keyword ideas...', 0.65);
             const seedKeywords = semrushDomainData.slice(0, 5).map(k => k.keyword);
             for (const seed of seedKeywords) {
               const related = await getRelatedKeywords(seed, ws.id, 10);
@@ -2754,6 +2785,7 @@ Critical rules:
 - Cover ALL ${pathArray.length} pages in the pageMap — do not skip any, including CMS/blog pages${semrushInstructions}
 - Return ONLY valid JSON, no markdown fences, no explanation`;
 
+    sendProgress('ai', `Generating keyword strategy with AI (${pageInfo.length} pages)...`, 0.72);
     const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -2773,9 +2805,12 @@ Critical rules:
 
     if (!aiRes.ok) {
       const errText = await aiRes.text();
-      return res.status(500).json({ error: `OpenAI error: ${errText.slice(0, 200)}` });
+      const errMsg = `OpenAI error: ${errText.slice(0, 200)}`;
+      if (wantsStream) { res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`); return res.end(); }
+      return res.status(500).json({ error: errMsg });
     }
 
+    sendProgress('ai', 'AI strategy generated — processing results...', 0.88);
     const aiData = await aiRes.json() as { choices?: Array<{ message?: { content?: string } }> };
     let raw = aiData.choices?.[0]?.message?.content?.trim() || '';
     raw = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
@@ -2784,10 +2819,13 @@ Critical rules:
     try {
       strategy = JSON.parse(raw);
     } catch {
-      return res.status(500).json({ error: 'AI returned invalid JSON', raw: raw.slice(0, 500) });
+      const errMsg = 'AI returned invalid JSON';
+      if (wantsStream) { res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`); return res.end(); }
+      return res.status(500).json({ error: errMsg, raw: raw.slice(0, 500) });
     }
 
     // Enrich pageMap with GSC metrics if available
+    sendProgress('enrichment', 'Enriching strategy with ranking data...', 0.90);
     if (gscData.length > 0) {
       for (const pm of strategy.pageMap) {
         const matchingRows = gscData.filter(r => {
@@ -2863,6 +2901,7 @@ Critical rules:
     }
 
     // 7. Save to workspace
+    sendProgress('complete', 'Strategy complete!', 1.0);
     const keywordStrategy = {
       ...strategy,
       keywordGaps: keywordGaps.length > 0 ? keywordGaps.slice(0, 30) : undefined,
@@ -2872,10 +2911,18 @@ Critical rules:
     };
     updateWorkspace(ws.id, { keywordStrategy });
 
+    if (wantsStream) {
+      res.write(`data: ${JSON.stringify({ done: true, strategy: keywordStrategy })}\n\n`);
+      return res.end();
+    }
     res.json(keywordStrategy);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('Keyword strategy error:', msg);
+    if (wantsStream) {
+      res.write(`data: ${JSON.stringify({ error: msg })}\n\n`);
+      return res.end();
+    }
     res.status(500).json({ error: msg });
   }
 });

@@ -61,6 +61,19 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
   const [semrushMode, setSemrushMode] = useState<'none' | 'quick' | 'full'>('none');
   const [competitors, setCompetitors] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [progressStep, setProgressStep] = useState('');
+  const [progressDetail, setProgressDetail] = useState('');
+  const [progressPct, setProgressPct] = useState(0);
+
+  const stepLabels: Record<string, string> = {
+    discovery: 'Discovering pages',
+    content: 'Fetching page content',
+    search_data: 'Search Console data',
+    semrush: 'Keyword intelligence',
+    ai: 'AI analysis',
+    enrichment: 'Enriching data',
+    complete: 'Complete',
+  };
 
   const fetchStrategy = async () => {
     if (!workspaceId) return;
@@ -100,27 +113,55 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
   const generateStrategy = async () => {
     setGenerating(true);
     setError(null);
+    setProgressStep('');
+    setProgressDetail('');
+    setProgressPct(0);
     try {
       const compList = competitors.trim() ? competitors.split(/[,\n]+/).map(s => s.trim()).filter(Boolean) : undefined;
       const res = await fetch(`/api/webflow/keyword-strategy/${workspaceId}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
         body: JSON.stringify({
           businessContext: businessContext.trim() || undefined,
           semrushMode: semrushAvailable ? semrushMode : 'none',
           competitorDomains: compList,
         }),
       });
-      const data = await res.json();
-      if (data.error) {
-        setError(data.error);
-      } else {
-        setStrategy(data);
+
+      if (!res.body) {
+        // Fallback: no streaming support
+        const data = await res.json();
+        if (data.error) { setError(data.error); } else { setStrategy(data); }
+        return;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        // Parse SSE events from buffer
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const evt = JSON.parse(line.slice(6));
+            if (evt.error) { setError(evt.error); break; }
+            if (evt.done && evt.strategy) { setStrategy(evt.strategy); break; }
+            if (evt.step) { setProgressStep(evt.step); setProgressDetail(evt.detail || ''); setProgressPct(evt.progress || 0); }
+          } catch { /* skip malformed SSE */ }
+        }
       }
     } catch {
       setError('Failed to generate strategy');
     } finally {
       setGenerating(false);
+      setProgressStep('');
     }
   };
 
@@ -285,6 +326,26 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
           )}
         </button>
       </div>
+
+      {/* Progress Indicator */}
+      {generating && progressStep && (
+        <div className="bg-zinc-900 rounded-xl border border-violet-500/20 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-violet-400" />
+              <span className="text-xs font-medium text-zinc-200">{stepLabels[progressStep] || progressStep}</span>
+            </div>
+            <span className="text-[10px] text-zinc-500 font-mono">{Math.round(progressPct * 100)}%</span>
+          </div>
+          <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-violet-500 to-teal-400 rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${Math.round(progressPct * 100)}%` }}
+            />
+          </div>
+          <p className="text-[10px] text-zinc-500">{progressDetail}</p>
+        </div>
+      )}
 
       {/* Settings Panel */}
       <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
