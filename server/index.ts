@@ -320,6 +320,14 @@ function broadcast(event: string, data: unknown) {
   }
 }
 
+// --- Data directory helper (single source of truth) ---
+const DATA_ROOT = process.env.DATA_DIR || (IS_PROD ? '/tmp/asset-dashboard' : path.join(process.env.HOME || '', '.asset-dashboard'));
+function getDataDir(subdir: string): string {
+  const dir = path.join(DATA_ROOT, subdir);
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
 // --- Background Jobs ---
 initJobs(broadcast);
 
@@ -833,11 +841,7 @@ app.post('/api/sales-report', async (req, res) => {
     const result = await runSalesAudit(url, maxPages || 25);
 
     // Save to disk
-    const reportsDir = path.join(
-      process.env.DATA_DIR || (IS_PROD ? '/tmp/asset-dashboard' : path.join(process.env.HOME || '', '.asset-dashboard')),
-      'sales-reports'
-    );
-    fs.mkdirSync(reportsDir, { recursive: true });
+    const reportsDir = getDataDir('sales-reports');
     const id = `sr_${Date.now()}`;
     const report = { id, ...result };
     fs.writeFileSync(path.join(reportsDir, `${id}.json`), JSON.stringify(report, null, 2));
@@ -852,10 +856,7 @@ app.post('/api/sales-report', async (req, res) => {
 
 app.get('/api/sales-reports', (_req, res) => {
   try {
-    const reportsDir = path.join(
-      process.env.DATA_DIR || (IS_PROD ? '/tmp/asset-dashboard' : path.join(process.env.HOME || '', '.asset-dashboard')),
-      'sales-reports'
-    );
+    const reportsDir = getDataDir('sales-reports');
     if (!fs.existsSync(reportsDir)) return res.json([]);
     const files = fs.readdirSync(reportsDir).filter(f => f.endsWith('.json')).sort().reverse();
     const summaries = files.map(f => {
@@ -870,10 +871,7 @@ app.get('/api/sales-reports', (_req, res) => {
 
 app.get('/api/sales-report/:id', (req, res) => {
   try {
-    const reportsDir = path.join(
-      process.env.DATA_DIR || (IS_PROD ? '/tmp/asset-dashboard' : path.join(process.env.HOME || '', '.asset-dashboard')),
-      'sales-reports'
-    );
+    const reportsDir = getDataDir('sales-reports');
     const filePath = path.join(reportsDir, `${req.params.id}.json`);
     if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Report not found' });
     const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
@@ -883,10 +881,7 @@ app.get('/api/sales-report/:id', (req, res) => {
 
 app.get('/api/sales-report/:id/html', (req, res) => {
   try {
-    const reportsDir = path.join(
-      process.env.DATA_DIR || (IS_PROD ? '/tmp/asset-dashboard' : path.join(process.env.HOME || '', '.asset-dashboard')),
-      'sales-reports'
-    );
+    const reportsDir = getDataDir('sales-reports');
     const filePath = path.join(reportsDir, `${req.params.id}.json`);
     if (!fs.existsSync(filePath)) return res.status(404).send('Report not found');
     const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
@@ -1078,6 +1073,12 @@ app.post('/api/webflow/schema-publish/:siteId', async (req, res) => {
       if (!pubResult.success) {
         console.error('[schema-publish] Site publish failed:', pubResult.error);
       }
+    }
+
+    // Log to activity feed
+    const pubWs = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+    if (pubWs) {
+      addActivity(pubWs.id, 'schema_published', 'Schema published to Webflow', `Page ${pageId.slice(0, 8)}… — ${published ? 'site published' : 'saved as draft'}`, { pageId });
     }
 
     res.json({ success: true, published });
@@ -1406,6 +1407,12 @@ app.get('/api/webflow/redirect-scan/:siteId', async (req, res) => {
     const result = await scanRedirects(req.params.siteId, token, ws?.liveDomain, gscGhostUrls);
     // Persist to disk so results survive deploys
     saveRedirectSnapshot(req.params.siteId, result);
+
+    // Log to activity feed
+    if (ws) {
+      addActivity(ws.id, 'redirects_scanned', 'Redirect scan completed', `${result.summary.totalPages} pages scanned — ${result.summary.redirecting} redirects, ${result.summary.notFound} not found, ${result.chains.length} chains`);
+    }
+
     res.json(result);
   } catch (err) {
     console.error('Redirect scan error:', err);
@@ -4709,11 +4716,13 @@ app.post('/api/jobs', async (req, res) => {
               throw new Error(`Strategy generation failed: ${errText.slice(0, 200)}`);
             }
             const stratResult = await stratRes.json();
+            const pageCount = (stratResult as Record<string, unknown[]>).pageMap?.length || 0;
             updateJob(job.id, {
               status: 'done',
               result: stratResult,
-              message: `Strategy complete — ${(stratResult as Record<string, unknown[]>).pageMap?.length || 0} pages mapped`,
+              message: `Strategy complete — ${pageCount} pages mapped`,
             });
+            addActivity(wsId, 'strategy_generated', 'Keyword strategy generated', `${pageCount} pages mapped with keywords and search intent`);
           } catch (err) {
             updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Strategy generation failed' });
           }
@@ -4759,6 +4768,10 @@ app.post('/api/jobs', async (req, res) => {
                 progress: result.length,
                 total: result.length,
               });
+            }
+            // Log to activity feed
+            if (schemaWsId && result.length > 0) {
+              addActivity(schemaWsId, 'schema_generated', `Schema generated for ${result.length} pages`, isJobCancelled(job.id) ? 'Partially completed (cancelled)' : 'All pages processed');
             }
           } catch (err) {
             if (!isJobCancelled(job.id)) {
@@ -4846,6 +4859,7 @@ app.post('/api/rank-tracking/:workspaceId/snapshot', async (req, res) => {
       query: q.query, position: q.position, clicks: q.clicks, impressions: q.impressions, ctr: q.ctr,
     }));
     storeRankSnapshot(req.params.workspaceId, date, queries);
+    addActivity(req.params.workspaceId, 'rank_snapshot', 'Rank snapshot captured', `${queries.length} keyword positions recorded for ${date}`);
     res.json({ date, count: queries.length });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to capture snapshot' });
@@ -5002,8 +5016,7 @@ server.listen(PORT, '0.0.0.0', () => {
   // Startup diagnostics
   const workspaces = listWorkspaces();
   const hasEnvToken = !!process.env.WEBFLOW_API_TOKEN;
-  const dataDir = process.env.DATA_DIR || (IS_PROD ? '/tmp/asset-dashboard' : 'local');
-  console.log(`[startup] DATA_DIR=${dataDir}`);
+  console.log(`[startup] DATA_ROOT=${DATA_ROOT}`);
   console.log(`[startup] HOME=${process.env.HOME || 'unset'}`);
   console.log(`[startup] NODE_ENV=${process.env.NODE_ENV || 'unset'}`);
   console.log(`[startup] WEBFLOW_API_TOKEN env: ${hasEnvToken ? 'SET' : 'NOT SET'}`);
@@ -5014,7 +5027,7 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log(`[startup]   - ${ws.name}: siteId=${ws.webflowSiteId || 'none'}, hasToken=${!!ws.webflowToken}`);
   }
   // Reports directory check
-  const reportsDir = path.join(dataDir, 'reports');
+  const reportsDir = path.join(DATA_ROOT, 'reports');
   const reportsExists = fs.existsSync(reportsDir);
   const snapshotCount = reportsExists ? fs.readdirSync(reportsDir).reduce((sum, sd) => sum + fs.readdirSync(path.join(reportsDir, sd)).filter(f => f.endsWith('.json')).length, 0) : 0;
   console.log(`[startup] REPORTS_DIR=${reportsDir} exists=${reportsExists} snapshots=${snapshotCount}`);

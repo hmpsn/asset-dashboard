@@ -22,6 +22,11 @@ export type ActivityType =
   | 'brief_approved'
   | 'changes_requested'
   | 'content_upgraded'
+  | 'schema_generated'
+  | 'schema_published'
+  | 'redirects_scanned'
+  | 'strategy_generated'
+  | 'rank_snapshot'
   | 'note';
 
 export interface ActivityEntry {
