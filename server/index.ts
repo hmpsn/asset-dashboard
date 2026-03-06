@@ -49,6 +49,7 @@ import { generateAltText } from './alttext.js';
 import { runSeoAudit } from './seo-audit.js';
 import { checkSiteLinks } from './link-checker.js';
 import { scanRedirects } from './redirect-scanner.js';
+import { saveRedirectSnapshot, getRedirectSnapshot } from './redirect-store.js';
 import { analyzeInternalLinks } from './internal-links.js';
 import {
   saveSnapshot, getSnapshot, listSnapshots, getLatestSnapshot, renderReportHTML,
@@ -1317,11 +1318,20 @@ app.get('/api/webflow/redirect-scan/:siteId', async (req, res) => {
     const allWs = listWorkspaces();
     const ws = allWs.find(w => w.webflowSiteId === req.params.siteId);
     const result = await scanRedirects(req.params.siteId, token, ws?.liveDomain);
+    // Persist to disk so results survive deploys
+    saveRedirectSnapshot(req.params.siteId, result);
     res.json(result);
   } catch (err) {
     console.error('Redirect scan error:', err);
     res.status(500).json({ error: 'Redirect scan failed' });
   }
+});
+
+// Load previously saved redirect scan results from disk
+app.get('/api/webflow/redirect-snapshot/:siteId', (req, res) => {
+  const snapshot = getRedirectSnapshot(req.params.siteId);
+  if (!snapshot) return res.json(null);
+  res.json(snapshot);
 });
 
 // --- Internal Linking Suggestions ---

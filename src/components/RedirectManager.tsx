@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Loader2, ArrowRight, AlertTriangle, AlertCircle, CheckCircle,
   RefreshCw, ChevronDown, ChevronRight, ExternalLink, Search as SearchIcon,
@@ -71,6 +71,34 @@ export function RedirectManager({ siteId }: Props) {
   const [editingRule, setEditingRule] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
   const [copiedRules, setCopiedRules] = useState(false);
+  const [snapshotDate, setSnapshotDate] = useState<string | null>(null);
+
+  // Load saved redirect snapshot on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`/api/webflow/redirect-snapshot/${siteId}`);
+        const snapshot = await res.json();
+        if (snapshot && snapshot.result) {
+          setData(snapshot.result);
+          setSnapshotDate(snapshot.createdAt);
+          // Build rules from recommendations
+          const newRules: RedirectRule[] = [];
+          for (const ps of snapshot.result.pageStatuses) {
+            if (ps.recommendedTarget) {
+              newRules.push({
+                from: ps.path,
+                to: ps.recommendedTarget,
+                reason: ps.recommendedReason || '',
+                accepted: false,
+              });
+            }
+          }
+          setRules(newRules);
+        }
+      } catch { /* no saved data */ }
+    })();
+  }, [siteId]);
 
   const runScan = async () => {
     setLoading(true);
@@ -206,7 +234,7 @@ export function RedirectManager({ siteId }: Props) {
         <div>
           <h3 className="text-sm font-semibold text-zinc-200">Redirect Manager</h3>
           <p className="text-[11px] text-zinc-500 mt-0.5">
-            Scanned {new Date(data.scannedAt).toLocaleString()} · {summary.totalPages} pages checked
+            Scanned {new Date(snapshotDate || data.scannedAt).toLocaleString()} · {summary.totalPages} pages checked
           </p>
         </div>
         <button
