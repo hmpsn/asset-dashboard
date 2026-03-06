@@ -2871,87 +2871,115 @@ Rules:
     }
     console.log(`[Strategy] All batches complete: ${allPageMappings.length} total page mappings`);
 
-    // --- STEP 2: Master synthesis call ---
-    sendProgress('ai', 'Synthesizing master strategy from all page data...', 0.78);
+    // --- STEP 2: Master synthesis — site-level strategy only ---
+    // The batch results ARE the pageMap. Master only generates siteKeywords, contentGaps, quickWins, opportunities.
+    // This keeps output small (~2K tokens) and fast.
+    sendProgress('ai', 'Synthesizing site-level strategy...', 0.78);
 
-    // Build compact page mapping summary for master call
-    const pageSummary = allPageMappings.map(pm =>
-      `- ${pm.pagePath}: "${pm.primaryKeyword}" [${pm.searchIntent}] secondaries: ${(pm.secondaryKeywords || []).join(', ')}`
-    ).join('\n');
+    // Detect keyword conflicts from batch results (batches don't know about each other)
+    const kwCount = new Map<string, string[]>();
+    for (const pm of allPageMappings) {
+      const kw = pm.primaryKeyword.toLowerCase();
+      if (!kwCount.has(kw)) kwCount.set(kw, []);
+      kwCount.get(kw)!.push(pm.pagePath);
+    }
+    const conflicts = [...kwCount.entries()].filter(([, pages]) => pages.length > 1);
+    if (conflicts.length > 0) {
+      console.log(`[Strategy] Found ${conflicts.length} keyword conflicts to resolve`);
+    }
 
-    // GSC summary: top queries
+    // Compact summary: just keywords per page (no secondary details — keep prompt small)
+    const kwSummary = allPageMappings.map(pm => `${pm.pagePath}: "${pm.primaryKeyword}"`).join('\n');
+
+    // GSC: top queries only
     let gscSummary = '';
     if (gscData.length > 0) {
-      const topGsc = [...gscData].sort((a, b) => b.impressions - a.impressions).slice(0, 50);
+      const topGsc = [...gscData].sort((a, b) => b.impressions - a.impressions).slice(0, 30);
       gscSummary = `\n\nTop GSC queries (last 90 days):\n` +
-        topGsc.map(r => `- "${r.query}" → ${r.page} (pos: ${r.position.toFixed(1)}, clicks: ${r.clicks}, imp: ${r.impressions})`).join('\n');
+        topGsc.map(r => `- "${r.query}" → ${new URL(r.page).pathname} (pos: ${r.position.toFixed(1)}, clicks: ${r.clicks}, imp: ${r.impressions})`).join('\n');
     }
 
     const hasSemrush = semrushContext.length > 0;
-    const masterPrompt = `You are a senior SEO strategist. You've already analyzed every page individually. Now synthesize the complete strategy.
+    const conflictNote = conflicts.length > 0
+      ? `\n\nKEYWORD CONFLICTS to resolve (same keyword assigned to multiple pages):\n${conflicts.map(([kw, pages]) => `- "${kw}" → ${pages.join(', ')}`).join('\n')}\nFor each conflict, include a fix in "keywordFixes" — reassign one page to a different keyword.\n`
+      : '';
+
+    const masterPrompt = `You are a senior SEO strategist. Page-level keywords have already been assigned. Now provide the site-level strategy.
 ${businessSection}
-Page-level keyword mappings (already assigned):
-${pageSummary}
-${gscSummary}
+Current keyword assignments (${allPageMappings.length} pages):
+${kwSummary}
+${conflictNote}${gscSummary}
 ${semrushContext}
 
-Using the page mappings above, create the final keyword strategy as JSON:
+Return JSON with this EXACT structure (do NOT include a pageMap — it's already done):
 {
-  "siteKeywords": ["8-15 primary keywords this entire site should target, including location variants"],
-  "pageMap": [
-    {
-      "pagePath": "/exact-path",
-      "pageTitle": "Page Title",
-      "primaryKeyword": "from the mappings above (refine if needed to avoid cannibalization)",
-      "secondaryKeywords": ["refined 4-6 keywords"],
-      "searchIntent": "commercial|informational|transactional|navigational"
-    }
-  ],
+  "siteKeywords": ["8-15 primary keywords this site should target overall"],
   "opportunities": ["5-8 specific keyword opportunities the site is missing"],
   "contentGaps": [
     {
-      "topic": "Blog post or page topic",
-      "targetKeyword": "primary keyword to target",
+      "topic": "New content piece to create",
+      "targetKeyword": "primary keyword",
       "intent": "informational|commercial|transactional|navigational",
       "priority": "high|medium|low",
-      "rationale": "Why this content should be created"
+      "rationale": "Why and expected impact"
     }
   ],
   "quickWins": [
     {
-      "pagePath": "/exact-path",
+      "pagePath": "/exact-path-from-list-above",
       "action": "Specific actionable fix",
       "estimatedImpact": "high|medium|low",
-      "rationale": "Why this will improve rankings"
+      "rationale": "Why this improves rankings"
     }
-  ]
+  ]${conflicts.length > 0 ? `,
+  "keywordFixes": [
+    { "pagePath": "/path", "newPrimaryKeyword": "better unique keyword" }
+  ]` : ''}
 }
 
-Critical rules:
-- INCLUDE ALL ${allPageMappings.length} pages in pageMap — refine the mappings but do not drop any pages
-- Ensure NO keyword cannibalization — each primaryKeyword must be unique site-wide. Resolve any conflicts from the batch analysis.
-- Use GSC data: high impressions + poor position (5-20) = quick wins
-- contentGaps: 3-6 NEW content pieces with clear search demand${hasSemrush ? '. PRIORITIZE competitor gap keywords.' : ''}
-- quickWins: 3-5 existing pages where small changes boost rankings
-${hasSemrush ? '- Use SEMRush volume/difficulty to prioritize. KD < 40% = quick wins. Competitor gaps are highest priority.' : ''}
-- Return ONLY valid JSON, no markdown, no explanation`;
+Rules:
+- siteKeywords: 8-15 broad themes covering the full site
+- contentGaps: 3-6 NEW pages/posts to create${hasSemrush ? '. Prioritize competitor gap keywords.' : ''}
+- quickWins: 3-5 existing pages where small changes boost rankings. Use GSC data if available (high impressions + poor position = opportunity).
+${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.' : ''}
+- Return ONLY valid JSON, no markdown`;
 
     console.log(`[Strategy] Master prompt: ${masterPrompt.length} chars (~${Math.ceil(masterPrompt.length / 4)} tokens)`);
 
     const masterRaw = await callOpenAI([
       { role: 'system', content: 'You are an expert SEO strategist. Return valid JSON only.' },
       { role: 'user', content: masterPrompt },
-    ], 8000, 'master');
+    ], 3000, 'master');
 
+    let masterData;
     try {
-      strategy = JSON.parse(masterRaw);
+      masterData = JSON.parse(masterRaw);
     } catch {
-      console.error('[Strategy] Master call returned invalid JSON:', masterRaw.slice(0, 300));
+      console.error('[Strategy] Master returned invalid JSON:', masterRaw.slice(0, 300));
       const errMsg = 'AI returned invalid JSON in master synthesis';
       if (wantsStream) { try { res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`); res.end(); } catch { /* closed */ } return; }
       return res.status(500).json({ error: errMsg, raw: masterRaw.slice(0, 500) });
     }
-    console.log(`[Strategy] Master synthesis complete: ${strategy.pageMap?.length || 0} pages, ${strategy.siteKeywords?.length || 0} site keywords`);
+
+    // Apply keyword conflict fixes from master
+    if (masterData.keywordFixes?.length) {
+      const fixMap = new Map(masterData.keywordFixes.map((f: { pagePath: string; newPrimaryKeyword: string }) => [f.pagePath, f.newPrimaryKeyword]));
+      for (const pm of allPageMappings) {
+        const fix = fixMap.get(pm.pagePath);
+        if (fix) pm.primaryKeyword = fix as string;
+      }
+      console.log(`[Strategy] Applied ${masterData.keywordFixes.length} keyword conflict fixes`);
+    }
+
+    // Assemble final strategy: batch pageMap + master site-level data
+    strategy = {
+      siteKeywords: masterData.siteKeywords || [],
+      pageMap: allPageMappings,
+      opportunities: masterData.opportunities || [],
+      contentGaps: masterData.contentGaps || [],
+      quickWins: masterData.quickWins || [],
+    };
+    console.log(`[Strategy] Final strategy: ${strategy.pageMap.length} pages, ${strategy.siteKeywords.length} site keywords, ${strategy.contentGaps.length} content gaps, ${strategy.quickWins.length} quick wins`);
 
     } finally {
       if (keepalive) clearInterval(keepalive);
