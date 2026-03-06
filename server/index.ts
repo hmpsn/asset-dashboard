@@ -4647,12 +4647,21 @@ app.post('/api/jobs', async (req, res) => {
           try {
             updateJob(job.id, { status: 'running', message: 'Scanning pages and generating unified schemas...' });
             const { ctx, pageKeywordMap } = buildSchemaContext(schemaSiteId);
+            const schemaWsId = (params.workspaceId as string) || '';
+            // Debounced incremental save — persist partial results every 10s
+            let lastSaveTime = 0;
+            const SAVE_INTERVAL = 10_000;
             const result = await generateSchemaSuggestions(schemaSiteId, schemaToken, ctx, pageKeywordMap, (partial, _done, message) => {
               updateJob(job.id, { status: 'running', result: partial, message, progress: partial.length });
+              const now = Date.now();
+              if (partial.length > 0 && now - lastSaveTime >= SAVE_INTERVAL) {
+                lastSaveTime = now;
+                saveSchemaSnapshot(schemaSiteId, schemaWsId, partial);
+              }
             }, () => isJobCancelled(job.id));
-            // Persist to disk so results survive deploys
+            // Final save — always write the complete result
             if (result.length > 0) {
-              saveSchemaSnapshot(schemaSiteId, (params.workspaceId as string) || '', result);
+              saveSchemaSnapshot(schemaSiteId, schemaWsId, result);
             }
             if (isJobCancelled(job.id)) {
               updateJob(job.id, { status: 'cancelled', result, message: `Cancelled — ${result.length} pages completed before stop` });
