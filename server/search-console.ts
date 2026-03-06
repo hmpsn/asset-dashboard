@@ -202,6 +202,48 @@ export async function getQueryPageData(
   }));
 }
 
+/**
+ * Fetch ALL pages that GSC has data for (up to 1000).
+ * Used by the redirect scanner to find "ghost URLs" — pages Google
+ * is indexing/showing in search that may no longer exist on the site.
+ */
+export async function getAllGscPages(
+  siteId: string,
+  gscSiteUrl: string,
+  days: number = 90
+): Promise<SearchPage[]> {
+  const token = await getValidToken(siteId);
+  if (!token) throw new Error('Not connected to Google');
+
+  const endDate = new Date();
+  endDate.setDate(endDate.getDate() - 3);
+  const startDate = new Date(endDate);
+  startDate.setDate(startDate.getDate() - days);
+
+  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
+
+  const data = await gscFetch(
+    `${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`,
+    token,
+    {
+      startDate: fmt(startDate),
+      endDate: fmt(endDate),
+      dimensions: ['page'],
+      rowLimit: 1000,
+      type: 'web',
+    }
+  ) as { rows?: SearchAnalyticsRow[] };
+
+  return (data.rows || []).map(r => ({
+    page: r.keys[0],
+    clicks: r.clicks,
+    impressions: r.impressions,
+    ctr: +(r.ctr * 100).toFixed(1),
+    position: +r.position.toFixed(1),
+  }));
+}
+
 export async function getPerformanceTrend(
   siteId: string,
   gscSiteUrl: string,

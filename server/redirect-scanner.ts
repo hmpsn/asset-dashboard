@@ -38,7 +38,7 @@ export interface PageStatus {
   redirectsTo?: string;
   recommendedTarget?: string;
   recommendedReason?: string;
-  source: 'static' | 'cms';
+  source: 'static' | 'cms' | 'gsc';
 }
 
 export interface RedirectScanResult {
@@ -194,7 +194,14 @@ function findBestMatch(brokenPath: string, healthyPages: PageStatus[]): PageStat
   return bestScore >= 3 ? bestPage : null;
 }
 
-export async function scanRedirects(siteId: string, tokenOverride?: string, liveDomain?: string): Promise<RedirectScanResult> {
+export interface GscGhostUrl {
+  url: string;
+  path: string;
+  clicks: number;
+  impressions: number;
+}
+
+export async function scanRedirects(siteId: string, tokenOverride?: string, liveDomain?: string, gscGhostUrls?: GscGhostUrl[]): Promise<RedirectScanResult> {
   const token = tokenOverride || process.env.WEBFLOW_API_TOKEN || '';
   const subdomain = await getSiteSubdomain(siteId, token);
   const baseUrl = liveDomain
@@ -215,7 +222,7 @@ export async function scanRedirects(siteId: string, tokenOverride?: string, live
   const published = filterPublishedPages(allPages);
   console.log(`Redirect scanner: checking ${published.length} static pages on ${baseUrl}`);
 
-  const pageUrls: Array<{ url: string; path: string; title: string; source: 'static' | 'cms' }> = published.map(p => {
+  const pageUrls: Array<{ url: string; path: string; title: string; source: 'static' | 'cms' | 'gsc' }> = published.map(p => {
     // Use publishedPath for full URL (handles nested pages like /about/team)
     const pagePath = p.publishedPath || (p.slug ? `/${p.slug}` : '');
     return {
@@ -243,6 +250,29 @@ export async function scanRedirects(siteId: string, tokenOverride?: string, live
     }
   } catch {
     console.log('Redirect scanner: CMS discovery skipped');
+  }
+
+  // Also add GSC ghost URLs — pages Google knows about that aren't in our page list
+  if (gscGhostUrls && gscGhostUrls.length > 0) {
+    const knownPaths = new Set(pageUrls.map(p => p.path.toLowerCase()));
+    let added = 0;
+    for (const ghost of gscGhostUrls) {
+      if (!knownPaths.has(ghost.path.toLowerCase())) {
+        const lastSegment = ghost.path.replace(/^\//, '').split('/').pop() || '';
+        const pageName = lastSegment.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || ghost.path;
+        pageUrls.push({
+          url: ghost.url,
+          path: ghost.path,
+          title: `[GSC] ${pageName}`,
+          source: 'gsc' as const,
+        });
+        knownPaths.add(ghost.path.toLowerCase());
+        added++;
+      }
+    }
+    if (added > 0) {
+      console.log(`Redirect scanner: added ${added} GSC ghost URLs (pages Google indexes that aren't on the site)`);
+    }
   }
 
   // 2. Check each page's status

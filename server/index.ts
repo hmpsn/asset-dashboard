@@ -75,7 +75,7 @@ import { listContentRequests, getContentRequest, createContentRequest, updateCon
 import { isSemrushConfigured, getKeywordOverview, getDomainOrganicKeywords, getKeywordGap, getRelatedKeywords, estimateCreditCost, clearSemrushCache } from './semrush.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
-import { listGscSites, getSearchOverview, getPerformanceTrend, getQueryPageData } from './search-console.js';
+import { listGscSites, getSearchOverview, getPerformanceTrend, getQueryPageData, getAllGscPages } from './search-console.js';
 import { listGA4Properties, getGA4Overview, getGA4DailyTrend, getGA4TopPages, getGA4TopSources, getGA4DeviceBreakdown, getGA4Countries, getGA4KeyEvents, getGA4EventTrend, getGA4Conversions, getGA4EventsByPage } from './google-analytics.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -1314,10 +1314,30 @@ app.get('/api/webflow/link-check/:siteId', async (req, res) => {
 app.get('/api/webflow/redirect-scan/:siteId', async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
-    // Resolve live domain from workspace so we scan the real site, not .webflow.io
+    // Resolve live domain + GSC property from workspace
     const allWs = listWorkspaces();
     const ws = allWs.find(w => w.webflowSiteId === req.params.siteId);
-    const result = await scanRedirects(req.params.siteId, token, ws?.liveDomain);
+
+    // Fetch GSC ghost URLs — pages Google indexes that may no longer exist
+    let gscGhostUrls: Array<{ url: string; path: string; clicks: number; impressions: number }> | undefined;
+    if (ws?.gscPropertyUrl) {
+      try {
+        const gscPages = await getAllGscPages(ws.id, ws.gscPropertyUrl, 90);
+        if (gscPages.length > 0) {
+          gscGhostUrls = gscPages.map(p => {
+            try {
+              const parsed = new URL(p.page);
+              return { url: p.page, path: parsed.pathname, clicks: p.clicks, impressions: p.impressions };
+            } catch { return null; }
+          }).filter(Boolean) as typeof gscGhostUrls;
+          console.log(`[redirect-scan] Found ${gscPages.length} GSC pages to cross-check`);
+        }
+      } catch (err) {
+        console.log('[redirect-scan] GSC ghost URL fetch skipped:', err instanceof Error ? err.message : String(err));
+      }
+    }
+
+    const result = await scanRedirects(req.params.siteId, token, ws?.liveDomain, gscGhostUrls);
     // Persist to disk so results survive deploys
     saveRedirectSnapshot(req.params.siteId, result);
     res.json(result);

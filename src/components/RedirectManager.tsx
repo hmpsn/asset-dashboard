@@ -29,7 +29,7 @@ interface PageStatus {
   redirectsTo?: string;
   recommendedTarget?: string;
   recommendedReason?: string;
-  source: 'static' | 'cms';
+  source: 'static' | 'cms' | 'gsc';
 }
 
 interface RedirectRule {
@@ -480,8 +480,8 @@ export function RedirectManager({ siteId }: Props) {
                       <span className="text-xs text-zinc-300 font-mono truncate block">{page.path}</span>
                       <span className="text-[10px] text-zinc-600 truncate block">{page.title}</span>
                     </div>
-                    <span className={`text-[10px] ${page.source === 'cms' ? 'text-violet-400' : 'text-zinc-500'}`}>
-                      {page.source}
+                    <span className={`text-[10px] ${page.source === 'gsc' ? 'text-amber-400' : page.source === 'cms' ? 'text-violet-400' : 'text-zinc-500'}`}>
+                      {page.source === 'gsc' ? 'GSC' : page.source}
                     </span>
                     <div className="min-w-0">
                       {page.redirectsTo ? (
