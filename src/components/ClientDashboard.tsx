@@ -401,6 +401,7 @@ export function ClientDashboard({ workspaceId }: Props) {
       .then((data: WorkspaceInfo) => {
         if (!data.id) { setError('Workspace not found'); setLoading(false); return; }
         setWs(data);
+        document.title = `${data.name} — Dashboard`;
         // Check if already authenticated via sessionStorage
         if (data.requiresPassword) {
           const stored = sessionStorage.getItem(`dash_auth_${workspaceId}`);
