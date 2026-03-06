@@ -2737,174 +2737,226 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
       }
     }
 
-    // 6. Build rich context for AI — aggressively cap to stay under ~40K chars total prompt
-    const totalPages = pageInfo.length;
-    // For large sites: top N pages get full content, rest get path+title only
-    const fullContentPages = totalPages > 80 ? 40 : totalPages > 40 ? 60 : totalPages;
-    const maxContentChars = totalPages > 80 ? 150 : totalPages > 40 ? 300 : totalPages > 20 ? 600 : 1000;
-    const maxGscRows = totalPages > 60 ? 30 : totalPages > 30 ? 50 : 80;
+    // 6. BATCHED AI STRATEGY — parallel page analysis + master synthesis
+    //    Step 1: Split pages into batches, analyze each batch in parallel (per-page keyword mapping)
+    //    Step 2: Master synthesis call merges all mappings + GSC + SEMRush into final strategy
 
-    // Sort: pages with GSC data or longer content first (more valuable for strategy)
-    const gscPages = new Set(gscData.map(r => new URL(r.page).pathname).filter(Boolean));
-    const sortedPageInfo = [...pageInfo].sort((a, b) => {
-      const aHasGsc = gscPages.has(a.path) ? 1 : 0;
-      const bHasGsc = gscPages.has(b.path) ? 1 : 0;
-      if (aHasGsc !== bHasGsc) return bHasGsc - aHasGsc;
-      return (b.contentSnippet?.length || 0) - (a.contentSnippet?.length || 0);
-    });
-
-    const pageList = sortedPageInfo.map((p, i) => {
-      let entry = `- ${p.path}: "${p.title}"`;
-      if (i < fullContentPages) {
-        // Full detail for top pages
-        if (p.seoTitle) entry += ` | SEO: "${p.seoTitle}"`;
-        if (p.seoDesc) entry += ` | Desc: "${p.seoDesc.slice(0, 120)}"`;
-        if (p.contentSnippet) entry += `\n  Content: ${p.contentSnippet.slice(0, maxContentChars)}`;
+    // Helper: call OpenAI with retry + timeout
+    const callOpenAI = async (messages: Array<{ role: string; content: string }>, maxTokens: number, label: string): Promise<string> => {
+      const body = JSON.stringify({ model: 'gpt-4o-mini', messages, max_tokens: maxTokens, temperature: 0.3 });
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const r = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+            body,
+            signal: AbortSignal.timeout(90_000),
+          });
+          if (!r.ok) {
+            const errText = await r.text();
+            throw new Error(`OpenAI ${r.status}: ${errText.slice(0, 200)}`);
+          }
+          const data = await r.json() as { choices?: Array<{ message?: { content?: string } }> };
+          const raw = data.choices?.[0]?.message?.content?.trim() || '';
+          return raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+        } catch (err) {
+          console.error(`[Strategy][${label}] Attempt ${attempt} failed:`, err instanceof Error ? err.message : err);
+          if (attempt === 2) throw err;
+          await new Promise(r => setTimeout(r, 2000));
+        }
       }
-      return entry;
-    }).join('\n');
+      throw new Error('Unreachable');
+    };
 
-    let gscContext = '';
-    if (gscData.length > 0) {
-      const sorted = [...gscData].sort((a, b) => b.impressions - a.impressions).slice(0, maxGscRows);
-      gscContext = `\n\nGoogle Search Console data (last 90 days, top ${maxGscRows} by impressions):\n` +
-        sorted.map(r => `- "${r.query}" → ${r.page} (pos: ${r.position.toFixed(1)}, clicks: ${r.clicks}, imp: ${r.impressions})`).join('\n');
+    // Keepalive pings to prevent Render proxy from killing idle SSE connection
+    const keepalive = wantsStream ? setInterval(() => {
+      try { res.write(`: keepalive\n\n`); } catch { /* connection closed */ }
+    }, 10_000) : null;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let strategy: any;
+    try {
+    // --- STEP 1: Parallel page analysis batches ---
+    const BATCH_SIZE = 30;
+    const batches: typeof pageInfo[] = [];
+    for (let i = 0; i < pageInfo.length; i += BATCH_SIZE) {
+      batches.push(pageInfo.slice(i, i + BATCH_SIZE));
     }
+    console.log(`[Strategy] Splitting ${pageInfo.length} pages into ${batches.length} batches of ~${BATCH_SIZE}`);
+    sendProgress('ai', `Analyzing pages in ${batches.length} parallel batches...`, 0.55);
 
     let businessSection = '';
     if (businessContext) {
-      businessSection = `\n\nBUSINESS CONTEXT (critical — use this to shape the entire strategy):\n${businessContext}\n`;
+      businessSection = `\nBUSINESS CONTEXT: ${businessContext}\n`;
+    }
+
+    // Build per-page GSC context lookup
+    const gscByPath = new Map<string, Array<{ query: string; position: number; clicks: number; impressions: number }>>();
+    for (const r of gscData) {
+      try {
+        const p = new URL(r.page).pathname;
+        if (!gscByPath.has(p)) gscByPath.set(p, []);
+        gscByPath.get(p)!.push({ query: r.query, position: r.position, clicks: r.clicks, impressions: r.impressions });
+      } catch { /* skip */ }
+    }
+
+    const batchPromises = batches.map(async (batch, batchIdx) => {
+      const batchPages = batch.map(p => {
+        let entry = `- ${p.path}: "${p.title}"`;
+        if (p.seoTitle) entry += ` | SEO: "${p.seoTitle}"`;
+        if (p.seoDesc) entry += ` | Desc: "${p.seoDesc.slice(0, 150)}"`;
+        if (p.contentSnippet) entry += `\n  Content: ${p.contentSnippet.slice(0, 600)}`;
+        // Include GSC data for this specific page
+        const pageGsc = gscByPath.get(p.path);
+        if (pageGsc && pageGsc.length > 0) {
+          const topGsc = pageGsc.sort((a, b) => b.impressions - a.impressions).slice(0, 5);
+          entry += `\n  GSC: ${topGsc.map(g => `"${g.query}" pos:${g.position.toFixed(1)} clicks:${g.clicks} imp:${g.impressions}`).join(', ')}`;
+        }
+        return entry;
+      }).join('\n');
+
+      const batchPrompt = `You are an expert SEO strategist. Analyze these ${batch.length} web pages and assign optimal keyword targets for each.
+${businessSection}
+Pages to analyze:
+${batchPages}
+
+Return a JSON array with one entry per page:
+[
+  {
+    "pagePath": "/exact-path",
+    "pageTitle": "Page Title",
+    "primaryKeyword": "specific, high-intent keyword (unique per page, no cannibalization)",
+    "secondaryKeywords": ["4-6 supporting keywords: long-tail, question-based, location variants"],
+    "searchIntent": "commercial|informational|transactional|navigational"
+  }
+]
+
+Rules:
+- Each primaryKeyword must be UNIQUE across all pages — no keyword cannibalization
+- Keywords should be specific and high-intent, NOT generic
+- If business has locations, include location modifiers
+- If GSC data is available, leverage it: high impressions + poor position = opportunity
+- Cover ALL ${batch.length} pages — do not skip any
+- Return ONLY valid JSON array, no markdown, no explanation`;
+
+      console.log(`[Strategy] Batch ${batchIdx + 1}/${batches.length}: ${batch.length} pages, ${batchPrompt.length} chars`);
+      const raw = await callOpenAI([
+        { role: 'system', content: 'You are an expert SEO strategist. Return valid JSON only.' },
+        { role: 'user', content: batchPrompt },
+      ], 4000, `batch-${batchIdx + 1}`);
+
+      try {
+        const parsed = JSON.parse(raw);
+        console.log(`[Strategy] Batch ${batchIdx + 1} returned ${Array.isArray(parsed) ? parsed.length : 0} page mappings`);
+        sendProgress('ai', `Batch ${batchIdx + 1}/${batches.length} complete (${Array.isArray(parsed) ? parsed.length : 0} pages)`, 0.55 + ((batchIdx + 1) / batches.length) * 0.20);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        console.error(`[Strategy] Batch ${batchIdx + 1} returned invalid JSON:`, raw.slice(0, 200));
+        // Fallback: return minimal entries for this batch
+        return batch.map(p => ({
+          pagePath: p.path,
+          pageTitle: p.title,
+          primaryKeyword: p.title.toLowerCase(),
+          secondaryKeywords: [],
+          searchIntent: 'informational',
+        }));
+      }
+    });
+
+    const batchResults = await Promise.all(batchPromises);
+    const allPageMappings = batchResults.flat();
+    console.log(`[Strategy] All batches complete: ${allPageMappings.length} total page mappings`);
+
+    // --- STEP 2: Master synthesis call ---
+    sendProgress('ai', 'Synthesizing master strategy from all page data...', 0.78);
+
+    // Build compact page mapping summary for master call
+    const pageSummary = allPageMappings.map(pm =>
+      `- ${pm.pagePath}: "${pm.primaryKeyword}" [${pm.searchIntent}] secondaries: ${(pm.secondaryKeywords || []).join(', ')}`
+    ).join('\n');
+
+    // GSC summary: top queries
+    let gscSummary = '';
+    if (gscData.length > 0) {
+      const topGsc = [...gscData].sort((a, b) => b.impressions - a.impressions).slice(0, 50);
+      gscSummary = `\n\nTop GSC queries (last 90 days):\n` +
+        topGsc.map(r => `- "${r.query}" → ${r.page} (pos: ${r.position.toFixed(1)}, clicks: ${r.clicks}, imp: ${r.impressions})`).join('\n');
     }
 
     const hasSemrush = semrushContext.length > 0;
-    const semrushInstructions = hasSemrush ? `
-- PRIORITIZE keywords with proven search volume from SEMRush data. Do NOT invent keywords when real data is available.
-- Use SEMRush keyword difficulty (KD%) to prioritize: target KD < 40% for quick wins, KD 40-60% for medium-term, KD > 60% only if highly relevant.
-- For each page's primaryKeyword, prefer keywords with volume data. Include the volume and difficulty in your reasoning.
-- COMPETITOR GAPS are the highest-priority opportunities — these are proven keywords with traffic that you're missing.
-- Use related keywords from SEMRush to inform secondary keywords — these have verified search volume.` : '';
-
-    const prompt = `You are a senior SEO strategist with 15+ years of experience. Analyze this website deeply and create a comprehensive keyword strategy that a client can immediately act on.
+    const masterPrompt = `You are a senior SEO strategist. You've already analyzed every page individually. Now synthesize the complete strategy.
 ${businessSection}
-Site pages (with actual content excerpts):
-${pageList}
-${gscContext}
+Page-level keyword mappings (already assigned):
+${pageSummary}
+${gscSummary}
 ${semrushContext}
 
-Create a keyword strategy as a JSON object with this exact structure:
+Using the page mappings above, create the final keyword strategy as JSON:
 {
-  "siteKeywords": ["8-15 primary keywords this entire site should target, including location-specific variants if the business serves multiple areas"],
+  "siteKeywords": ["8-15 primary keywords this entire site should target, including location variants"],
   "pageMap": [
     {
       "pagePath": "/exact-path",
       "pageTitle": "Page Title",
-      "primaryKeyword": "specific, high-intent keyword for this page",
-      "secondaryKeywords": ["4-6 supporting keywords including long-tail and location variants"],
+      "primaryKeyword": "from the mappings above (refine if needed to avoid cannibalization)",
+      "secondaryKeywords": ["refined 4-6 keywords"],
       "searchIntent": "commercial|informational|transactional|navigational"
     }
   ],
-  "opportunities": ["5-8 specific, actionable keyword opportunities the site is missing"],
+  "opportunities": ["5-8 specific keyword opportunities the site is missing"],
   "contentGaps": [
     {
       "topic": "Blog post or page topic",
       "targetKeyword": "primary keyword to target",
       "intent": "informational|commercial|transactional|navigational",
       "priority": "high|medium|low",
-      "rationale": "Why this content should be created and the expected impact"
+      "rationale": "Why this content should be created"
     }
   ],
   "quickWins": [
     {
       "pagePath": "/exact-path",
-      "action": "Specific, actionable fix (e.g. 'Update title tag to include primary keyword')",
+      "action": "Specific actionable fix",
       "estimatedImpact": "high|medium|low",
-      "rationale": "Why this will improve rankings — reference specific data if available"
+      "rationale": "Why this will improve rankings"
     }
   ]
 }
 
 Critical rules:
-- READ THE BUSINESS CONTEXT CAREFULLY. If the business operates in multiple locations, EVERY service page needs location-specific keyword variants
-- Each page's primaryKeyword must be UNIQUE — no keyword cannibalization
-- Use GSC data to identify what's already ranking and what has untapped potential (high impressions but poor position = huge opportunity)
-- Primary keywords should be specific and high-intent, NOT generic (e.g. "commercial janitorial services Austin TX" not "cleaning services")
-- Secondary keywords must include: long-tail variants, question-based queries, location modifiers, and related terms
-- Opportunities should identify GAPS: missing location pages, unaddressed service combinations, missing comparison/vs content, missing FAQ content${hasSemrush ? ', and keywords from competitor gap analysis' : ''}
-- contentGaps: suggest 3-6 NEW content pieces (blog posts, landing pages, guides) the site should create. Prioritize topics with clear search demand and business relevance.
-- quickWins: identify 3-5 existing pages where small changes (title tag tweaks, adding keywords to H1, improving meta description) could boost rankings. Focus on pages already ranking positions 5-20 in GSC data if available.
-- If the site has location pages, each location needs its own keyword cluster
-- Consider searcher intent for EVERY page and label it
-- Cover ALL ${pathArray.length} pages in the pageMap — do not skip any, including CMS/blog pages${semrushInstructions}
-- Return ONLY valid JSON, no markdown fences, no explanation`;
+- INCLUDE ALL ${allPageMappings.length} pages in pageMap — refine the mappings but do not drop any pages
+- Ensure NO keyword cannibalization — each primaryKeyword must be unique site-wide. Resolve any conflicts from the batch analysis.
+- Use GSC data: high impressions + poor position (5-20) = quick wins
+- contentGaps: 3-6 NEW content pieces with clear search demand${hasSemrush ? '. PRIORITIZE competitor gap keywords.' : ''}
+- quickWins: 3-5 existing pages where small changes boost rankings
+${hasSemrush ? '- Use SEMRush volume/difficulty to prioritize. KD < 40% = quick wins. Competitor gaps are highest priority.' : ''}
+- Return ONLY valid JSON, no markdown, no explanation`;
 
-    const promptChars = prompt.length;
-    const estimatedTokens = Math.ceil(promptChars / 4);
-    console.log(`[Strategy] Prompt size: ${promptChars} chars (~${estimatedTokens} tokens)`);
-    sendProgress('ai', `Generating keyword strategy with AI (${pageInfo.length} pages, ~${estimatedTokens} tokens)...`, 0.72);
+    console.log(`[Strategy] Master prompt: ${masterPrompt.length} chars (~${Math.ceil(masterPrompt.length / 4)} tokens)`);
 
-    const aiBody = JSON.stringify({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: 'You are an expert SEO strategist. You always return valid JSON only, no markdown, no explanation.' },
-        { role: 'user', content: prompt },
-      ],
-      max_tokens: 8000,
-      temperature: 0.3,
-    });
+    const masterRaw = await callOpenAI([
+      { role: 'system', content: 'You are an expert SEO strategist. Return valid JSON only.' },
+      { role: 'user', content: masterPrompt },
+    ], 8000, 'master');
 
-    // Send keepalive pings during long OpenAI call to prevent Render proxy from killing idle SSE connection
-    const keepalive = wantsStream ? setInterval(() => {
-      try { res.write(`: keepalive\n\n`); } catch { /* connection closed */ }
-    }, 10_000) : null;
-
-    // Retry once on network failure (Render can be flaky with long OpenAI calls)
-    let aiRes: Response | null = null;
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${openaiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: aiBody,
-          signal: AbortSignal.timeout(180_000), // 3 minute timeout
-        });
-        break; // success
-      } catch (fetchErr) {
-        const cause = fetchErr instanceof Error ? (fetchErr.cause || fetchErr.message) : String(fetchErr);
-        console.error(`[Strategy] OpenAI fetch attempt ${attempt} failed:`, cause);
-        if (attempt === 2) {
-          if (keepalive) clearInterval(keepalive);
-          const errMsg = `OpenAI connection failed after 2 attempts: ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)}`;
-          if (wantsStream) { try { res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`); res.end(); } catch { /* closed */ } return; }
-          return res.status(500).json({ error: errMsg });
-        }
-        sendProgress('ai', 'AI request failed, retrying...', 0.74);
-        await new Promise(r => setTimeout(r, 2000)); // wait 2s before retry
-      }
+    try {
+      strategy = JSON.parse(masterRaw);
+    } catch {
+      console.error('[Strategy] Master call returned invalid JSON:', masterRaw.slice(0, 300));
+      const errMsg = 'AI returned invalid JSON in master synthesis';
+      if (wantsStream) { try { res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`); res.end(); } catch { /* closed */ } return; }
+      return res.status(500).json({ error: errMsg, raw: masterRaw.slice(0, 500) });
     }
-    if (keepalive) clearInterval(keepalive);
+    console.log(`[Strategy] Master synthesis complete: ${strategy.pageMap?.length || 0} pages, ${strategy.siteKeywords?.length || 0} site keywords`);
 
-    if (!aiRes!.ok) {
-      const errText = await aiRes!.text();
-      const errMsg = `OpenAI error: ${errText.slice(0, 200)}`;
+    } finally {
+      if (keepalive) clearInterval(keepalive);
+    }
+
+    if (!strategy?.pageMap) {
+      const errMsg = 'Strategy generation produced no results';
       if (wantsStream) { try { res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`); res.end(); } catch { /* closed */ } return; }
       return res.status(500).json({ error: errMsg });
-    }
-
-    sendProgress('ai', 'AI strategy generated — processing results...', 0.88);
-    const aiData = await aiRes!.json() as { choices?: Array<{ message?: { content?: string } }> };
-    let raw = aiData.choices?.[0]?.message?.content?.trim() || '';
-    raw = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
-
-    let strategy;
-    try {
-      strategy = JSON.parse(raw);
-    } catch {
-      const errMsg = 'AI returned invalid JSON';
-      if (wantsStream) { res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`); return res.end(); }
-      return res.status(500).json({ error: errMsg, raw: raw.slice(0, 500) });
     }
 
     // Enrich pageMap with GSC metrics if available
