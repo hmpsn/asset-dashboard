@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  Loader2, Search, TrendingDown, TrendingUp, Eye, MousePointer,
+  Loader2, Search, TrendingDown, TrendingUp, Eye, MousePointer, MousePointerClick,
   BarChart3, ArrowUpDown, Sparkles, Send, AlertTriangle,
   Target, Zap, Shield, MessageSquare, X, ChevronDown, ChevronUp,
-  CheckCircle2, Info, LayoutDashboard, LineChart, Lock,
+  CheckCircle2, Info, LayoutDashboard, LineChart, Lock, Trophy,
   Users, Globe, Activity, Filter, ClipboardCheck, Check, Edit3,
   Sun, Moon, Plus, Paperclip, FileText,
 } from 'lucide-react';
@@ -50,7 +50,8 @@ type ClientTab = 'overview' | 'search' | 'health' | 'strategy' | 'analytics' | '
 
 interface ClientKeywordStrategy {
   siteKeywords: string[];
-  pageMap: { pagePath: string; primaryKeyword: string; secondaryKeywords?: string[] }[];
+  siteKeywordMetrics?: { keyword: string; volume: number; difficulty: number }[];
+  pageMap: { pagePath: string; pageTitle?: string; primaryKeyword: string; secondaryKeywords?: string[]; searchIntent?: string; currentPosition?: number; impressions?: number; clicks?: number; volume?: number; difficulty?: number }[];
   opportunities: string[];
   contentGaps?: { topic: string; targetKeyword: string; intent: string; priority: string; rationale: string }[];
   quickWins?: { pagePath: string; action: string; estimatedImpact: string; rationale: string }[];
@@ -1497,19 +1498,58 @@ export function ClientDashboard({ workspaceId }: Props) {
                   <h2 className="text-sm font-semibold text-zinc-200">SEO Keyword Strategy</h2>
                   <p className="text-[10px] text-zinc-500 mt-0.5">Generated {new Date(strategyData.generatedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="px-2 py-1 rounded-md bg-teal-500/10 border border-teal-500/20 text-[10px] text-teal-400 font-medium">{strategyData.pageMap.length} pages mapped</span>
-                  <span className="px-2 py-1 rounded-md bg-violet-500/10 border border-violet-500/20 text-[10px] text-violet-400 font-medium">{strategyData.siteKeywords.length} target keywords</span>
-                </div>
               </div>
+
+              {/* Summary Cards */}
+              {(() => {
+                const ranked = strategyData.pageMap.filter(p => p.currentPosition);
+                const avgPos = ranked.length > 0 ? ranked.reduce((s, p) => s + (p.currentPosition || 0), 0) / ranked.length : 0;
+                const totalImp = strategyData.pageMap.reduce((s, p) => s + (p.impressions || 0), 0);
+                const totalClk = strategyData.pageMap.reduce((s, p) => s + (p.clicks || 0), 0);
+                return (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
+                      <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Pages Mapped</div>
+                      <div className="text-xl font-bold text-zinc-100">{strategyData.pageMap.length}</div>
+                      <div className="text-[10px] text-zinc-600">{strategyData.siteKeywords.length} target keywords</div>
+                    </div>
+                    <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
+                      <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Eye className="w-3 h-3" /> Impressions</div>
+                      <div className="text-xl font-bold text-zinc-100">{totalImp.toLocaleString()}</div>
+                      <div className="text-[10px] text-zinc-600">last 90 days</div>
+                    </div>
+                    <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
+                      <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><MousePointerClick className="w-3 h-3" /> Clicks</div>
+                      <div className="text-xl font-bold text-zinc-100">{totalClk.toLocaleString()}</div>
+                      <div className="text-[10px] text-zinc-600">{totalImp > 0 ? `${((totalClk / totalImp) * 100).toFixed(1)}% CTR` : ''}</div>
+                    </div>
+                    <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
+                      <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Trophy className="w-3 h-3" /> Avg Position</div>
+                      <div className={`text-xl font-bold ${ranked.length > 0 ? (avgPos <= 3 ? 'text-emerald-400' : avgPos <= 10 ? 'text-green-400' : avgPos <= 20 ? 'text-amber-400' : 'text-red-400') : 'text-zinc-500'}`}>{ranked.length > 0 ? `#${avgPos.toFixed(1)}` : '—'}</div>
+                      <div className="text-[10px] text-zinc-600">{ranked.length} pages ranking</div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Site-Level Target Keywords */}
               <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
                 <div className="text-xs font-medium text-zinc-400 mb-3">Site-Level Target Keywords</div>
                 <div className="flex flex-wrap gap-2">
-                  {strategyData.siteKeywords.map(kw => (
-                    <span key={kw} className="px-2.5 py-1 rounded-lg bg-teal-500/10 border border-teal-500/20 text-[11px] text-teal-300">{kw}</span>
-                  ))}
+                  {strategyData.siteKeywords.map(kw => {
+                    const metrics = strategyData.siteKeywordMetrics?.find(m => m.keyword.toLowerCase() === kw.toLowerCase());
+                    return (
+                      <span key={kw} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-teal-500/10 border border-teal-500/20 text-[11px] text-teal-300">
+                        {kw}
+                        {metrics && (
+                          <>
+                            <span className="text-[9px] text-zinc-500 font-mono">{metrics.volume.toLocaleString()}/mo</span>
+                            <span className={`text-[9px] font-mono ${metrics.difficulty <= 30 ? 'text-green-400' : metrics.difficulty <= 60 ? 'text-amber-400' : 'text-red-400'}`}>KD {metrics.difficulty}%</span>
+                          </>
+                        )}
+                      </span>
+                    );
+                  })}
                 </div>
                 {strategyData.businessContext && (
                   <div className="mt-4 pt-3 border-t border-zinc-800">
@@ -1527,18 +1567,41 @@ export function ClientDashboard({ workspaceId }: Props) {
                 </div>
                 <div className="divide-y divide-zinc-800/50">
                   {strategyData.pageMap.map(page => (
-                    <div key={page.pagePath} className="px-5 py-3 flex items-start gap-4 hover:bg-zinc-800/30 transition-colors">
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[11px] text-zinc-500 font-mono truncate">{page.pagePath}</div>
-                        <div className="text-xs font-medium text-zinc-200 mt-0.5">{page.primaryKeyword}</div>
-                      </div>
-                      {page.secondaryKeywords && page.secondaryKeywords.length > 0 && (
-                        <div className="flex flex-wrap gap-1 max-w-[260px]">
-                          {page.secondaryKeywords.slice(0, 4).map(sk => (
-                            <span key={sk} className="px-1.5 py-0.5 rounded bg-zinc-800 text-[9px] text-zinc-500">{sk}</span>
-                          ))}
+                    <div key={page.pagePath} className="px-5 py-3 hover:bg-zinc-800/30 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          {page.pageTitle && <div className="text-xs text-zinc-300 truncate">{page.pageTitle}</div>}
+                          <div className="text-[10px] text-zinc-600 font-mono truncate">{page.pagePath}</div>
                         </div>
-                      )}
+                        <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                          {page.searchIntent && (
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded-full border font-medium ${
+                              page.searchIntent === 'commercial' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' :
+                              page.searchIntent === 'transactional' ? 'text-green-400 bg-green-500/10 border-green-500/20' :
+                              page.searchIntent === 'informational' ? 'text-blue-400 bg-blue-500/10 border-blue-500/20' :
+                              'text-zinc-400 bg-zinc-700/30 border-zinc-600/20'
+                            }`}>{page.searchIntent}</span>
+                          )}
+                          {page.currentPosition ? (
+                            <span className={`text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-zinc-800 ${page.currentPosition <= 3 ? 'text-emerald-400' : page.currentPosition <= 10 ? 'text-green-400' : page.currentPosition <= 20 ? 'text-amber-400' : 'text-red-400'}`}>#{page.currentPosition.toFixed(0)}</span>
+                          ) : (
+                            <span className="text-[10px] text-zinc-600 bg-zinc-800 px-1.5 py-0.5 rounded font-mono">—</span>
+                          )}
+                          {page.impressions != null && page.impressions > 0 && (
+                            <span className="text-[9px] text-zinc-500 font-mono">{page.impressions.toLocaleString()} imp</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded">{page.primaryKeyword}</span>
+                        {page.volume != null && <span className="text-[9px] text-zinc-500 font-mono">{page.volume.toLocaleString()}/mo</span>}
+                        {page.difficulty != null && (
+                          <span className={`text-[9px] font-mono ${page.difficulty <= 30 ? 'text-green-400' : page.difficulty <= 60 ? 'text-amber-400' : 'text-red-400'}`}>KD {page.difficulty}%</span>
+                        )}
+                        {page.secondaryKeywords && page.secondaryKeywords.length > 0 && (
+                          <span className="text-[9px] text-zinc-600">+{page.secondaryKeywords.length} secondary</span>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

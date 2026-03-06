@@ -3098,10 +3098,36 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
       }
     }
 
+    // Enrich siteKeywords with volume/difficulty
+    let siteKeywordMetrics: { keyword: string; volume: number; difficulty: number }[] = [];
+    if (isSemrushConfigured() && semrushMode !== 'none' && strategy.siteKeywords?.length) {
+      const kwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k]));
+      const found: typeof siteKeywordMetrics = [];
+      const missing: string[] = [];
+      for (const kw of strategy.siteKeywords) {
+        const m = kwLookup.get(kw.toLowerCase());
+        if (m) {
+          found.push({ keyword: kw, volume: m.volume, difficulty: m.difficulty });
+        } else {
+          missing.push(kw);
+        }
+      }
+      if (missing.length > 0) {
+        try {
+          const extra = await getKeywordOverview(missing.slice(0, 15), ws.id);
+          for (const m of extra) {
+            found.push({ keyword: m.keyword, volume: m.volume, difficulty: m.difficulty });
+          }
+        } catch { /* non-critical */ }
+      }
+      siteKeywordMetrics = found;
+    }
+
     // 7. Save to workspace
     sendProgress('complete', 'Strategy complete!', 1.0);
     const keywordStrategy = {
       ...strategy,
+      siteKeywordMetrics: siteKeywordMetrics.length > 0 ? siteKeywordMetrics : undefined,
       keywordGaps: keywordGaps.length > 0 ? keywordGaps.slice(0, 30) : undefined,
       businessContext: businessContext || undefined,
       semrushMode: semrushMode as 'quick' | 'full' | 'none',

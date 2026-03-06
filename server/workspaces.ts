@@ -69,6 +69,7 @@ export interface QuickWin {
 
 export interface KeywordStrategy {
   siteKeywords: string[];        // top-level target keywords for the whole site
+  siteKeywordMetrics?: { keyword: string; volume: number; difficulty: number }[]; // SEMRush data for site keywords
   pageMap: PageKeywordMap[];     // keyword assignments per page
   opportunities: string[];       // keyword gaps / untapped opportunities
   contentGaps?: ContentGap[];    // specific content pieces that should be created

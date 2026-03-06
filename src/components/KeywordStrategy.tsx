@@ -47,6 +47,7 @@ interface QuickWin {
 
 interface KeywordStrategy {
   siteKeywords: string[];
+  siteKeywordMetrics?: { keyword: string; volume: number; difficulty: number }[];
   pageMap: PageKeywordMap[];
   opportunities: string[];
   contentGaps?: ContentGap[];
@@ -703,11 +704,20 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
               <Target className="w-3.5 h-3.5 text-violet-400" /> Site Target Keywords
             </h4>
             <div className="flex flex-wrap gap-1.5">
-              {strategy.siteKeywords.map((kw, i) => (
-                <span key={i} className="px-2 py-0.5 bg-violet-500/10 border border-violet-500/20 rounded text-[11px] text-violet-300">
-                  {kw}
-                </span>
-              ))}
+              {strategy.siteKeywords.map((kw, i) => {
+                const metrics = strategy.siteKeywordMetrics?.find(m => m.keyword.toLowerCase() === kw.toLowerCase());
+                return (
+                  <span key={i} className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-violet-500/10 border border-violet-500/20 rounded text-[11px] text-violet-300">
+                    {kw}
+                    {metrics && (
+                      <>
+                        <span className="text-[9px] text-zinc-500 font-mono">{metrics.volume.toLocaleString()}/mo</span>
+                        <span className={`text-[9px] font-mono ${difficultyColor(metrics.difficulty)}`}>KD {metrics.difficulty}%</span>
+                      </>
+                    )}
+                  </span>
+                );
+              })}
             </div>
           </div>
 
