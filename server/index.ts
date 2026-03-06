@@ -143,8 +143,9 @@ const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   : undefined; // undefined = allow all in dev
 app.use(cors(ALLOWED_ORIGINS ? {
   origin: (origin, cb) => {
+    // No origin = same-origin request (always allow)
     if (!origin || ALLOWED_ORIGINS.includes(origin)) cb(null, true);
-    else cb(new Error('Not allowed by CORS'));
+    else { console.warn(`[CORS] Blocked origin: ${origin}`); cb(null, false); }
   },
   credentials: true,
 } : undefined));
