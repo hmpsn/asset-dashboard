@@ -24,21 +24,35 @@ const CHECK_CATEGORY: Record<string, CheckCategory> = {
   // Content
   'title': 'content', 'meta-description': 'content', 'h1': 'content', 'heading-hierarchy': 'content',
   'content-length': 'content', 'internal-links': 'content', 'link-text': 'content',
-  'meta-keywords': 'content', 'h1-title-match': 'content', 'url': 'content',
+  'url': 'content',
   'duplicate-title': 'content', 'duplicate-description': 'content',
   // Technical
   'canonical': 'technical', 'viewport': 'technical', 'robots': 'technical', 'lang': 'technical',
-  'favicon': 'technical', 'mixed-content': 'technical', 'ssl': 'technical',
+  'mixed-content': 'technical', 'ssl': 'technical',
   'robots-txt': 'technical', 'sitemap': 'technical', 'response-time': 'technical',
-  'structured-data': 'technical',
+  'structured-data': 'technical', 'html-size': 'technical',
+  'orphan-pages': 'technical', 'indexability': 'technical',
   // Social
-  'og-tags': 'social', 'og-image': 'social', 'twitter-card': 'social',
+  'og-tags': 'social', 'og-image': 'social',
   // Performance
   'lazy-loading': 'performance', 'img-dimensions': 'performance',
   'inline-css': 'performance', 'inline-js': 'performance', 'render-blocking': 'performance',
+  'img-filesize': 'performance',
   // Accessibility
   'img-alt': 'accessibility',
 };
+
+// Scoring weights: higher-impact SEO checks get steeper deductions.
+// 'critical' errors (missing title, canonical, noindex) cost more than cosmetic issues.
+const CRITICAL_CHECKS = new Set([
+  'title', 'meta-description', 'canonical', 'h1', 'robots',
+  'duplicate-title', 'mixed-content', 'ssl', 'robots-txt',
+]);
+const MODERATE_CHECKS = new Set([
+  'content-length', 'heading-hierarchy', 'internal-links', 'img-alt',
+  'og-tags', 'og-image', 'link-text', 'url', 'lang', 'viewport',
+  'duplicate-description', 'img-filesize', 'html-size',
+]);
 
 export interface PageSeoResult {
   pageId: string;
@@ -376,25 +390,57 @@ function auditPage(
       }
     }
 
-    // 2. Twitter Card tags
-    const twitterCard = extractMetaContent(html, 'twitter:card');
-    if (!twitterCard) {
-      issues.push({ check: 'twitter-card', severity: 'info', message: 'Missing Twitter Card tags', recommendation: 'Add twitter:card, twitter:title, and twitter:description meta tags for better Twitter/X sharing previews.' });
+    // 2. Canonical tag
+    const canonical = html.match(/<link[^>]*rel=["']canonical["'][^>]*href=["']([^"']*)["']/i)
+      || html.match(/<link[^>]*href=["']([^"']*)["'][^>]*rel=["']canonical["']/i);
+    if (!canonical) {
+      issues.push({ check: 'canonical', severity: 'error', message: 'Missing canonical tag', recommendation: 'Add a <link rel="canonical"> tag to prevent duplicate content issues. This tells search engines the preferred URL for this page.' });
+    } else {
+      const canonicalUrl = canonical[1];
+      // Check for obviously wrong canonicals (pointing to a different domain, or empty)
+      if (!canonicalUrl || canonicalUrl.trim() === '') {
+        issues.push({ check: 'canonical', severity: 'error', message: 'Empty canonical tag', recommendation: 'The canonical tag exists but has no URL. Set it to the full URL of this page.', value: '(empty)' });
+      } else if (canonicalUrl.startsWith('http') && url.startsWith('http')) {
+        try {
+          const canonicalHost = new URL(canonicalUrl).hostname;
+          const pageHost = new URL(url).hostname;
+          // Only flag cross-domain canonicals if domains don't share a root (e.g. webflow.io → custom domain is fine)
+          const canonRoot = canonicalHost.split('.').slice(-2).join('.');
+          const pageRoot = pageHost.split('.').slice(-2).join('.');
+          if (canonRoot !== pageRoot && !canonicalHost.includes('webflow.io') && !pageHost.includes('webflow.io')) {
+            issues.push({ check: 'canonical', severity: 'warning', message: 'Canonical points to different domain', recommendation: `The canonical URL (${canonicalHost}) differs from the page domain (${pageHost}). Verify this is intentional.`, value: canonicalUrl });
+          }
+        } catch { /* skip malformed URLs */ }
+      }
     }
 
-    // 3. Language attribute
+    // 3. HTML document size
+    const htmlSizeKB = Math.round(html.length / 1024);
+    if (htmlSizeKB > 300) {
+      issues.push({ check: 'html-size', severity: 'error', message: `Very large HTML document (${htmlSizeKB}KB)`, recommendation: 'HTML over 300KB significantly impacts page load. Audit for bloated inline styles, unused scripts, or excessive DOM elements.' });
+    } else if (htmlSizeKB > 150) {
+      issues.push({ check: 'html-size', severity: 'warning', message: `Large HTML document (${htmlSizeKB}KB)`, recommendation: 'HTML over 150KB can slow initial rendering. Remove unused code, inline styles, or move content to external files.' });
+    }
+
+    // 4. Images missing width/height dimensions (causes CLS — layout shift)
+    let missingDimensionCount = 0;
+    for (const img of imgs) {
+      if (!img.src || img.src.startsWith('data:') || img.src.includes('.svg')) continue;
+      if (!img.hasWidth && !img.hasHeight) {
+        missingDimensionCount++;
+      }
+    }
+    if (missingDimensionCount > 2) {
+      issues.push({ check: 'img-filesize', severity: 'warning', message: `${missingDimensionCount} images missing width/height dimensions`, recommendation: 'Add explicit width and height attributes to images to prevent layout shift (CLS) and help browsers allocate space before loading.' });
+    }
+
+    // 5. Language attribute
     const htmlLang = html.match(/<html[^>]*\blang=["']([^"']*)["']/i);
     if (!htmlLang) {
       issues.push({ check: 'lang', severity: 'warning', message: 'Missing lang attribute on <html>', recommendation: 'Add a lang attribute (e.g., lang="en") to help search engines and assistive technology understand the page language.' });
     }
 
-    // 4. Favicon
-    const favicon = html.match(/<link[^>]*rel=["'](?:icon|shortcut icon|apple-touch-icon)["'][^>]*>/i);
-    if (!favicon) {
-      issues.push({ check: 'favicon', severity: 'info', message: 'No favicon detected', recommendation: 'Add a favicon for better brand recognition in browser tabs and bookmarks.' });
-    }
-
-    // 5. Image lazy loading (account for Webflow's JS-based lazy loading via data-src)
+    // 6. Image lazy loading (account for Webflow's JS-based lazy loading via data-src)
     const hasWebflowLazy = /data-src=/i.test(html) || /class="[^"]*w-lazy/i.test(html) || /Webflow/i.test(html.slice(0, 2000));
     if (!hasWebflowLazy) {
       const imgsWithoutLazy = imgs.filter(i => !i.loading || i.loading !== 'lazy');
@@ -422,20 +468,6 @@ function auditPage(
       issues.push({ check: 'render-blocking', severity: 'warning', message: `${resources.stylesheets} CSS + ${resources.scripts} JS files (${resources.stylesheets + resources.scripts} total)`, recommendation: 'Too many external resources can slow page rendering. Combine files, defer non-critical scripts, and lazy-load CSS where possible.' });
     }
 
-    // 10. Meta keywords (deprecated)
-    const metaKeywords = extractMetaContent(html, 'keywords');
-    if (metaKeywords) {
-      issues.push({ check: 'meta-keywords', severity: 'info', message: 'Using deprecated meta keywords tag', recommendation: 'The meta keywords tag is ignored by Google and most search engines. Focus on content quality instead.' });
-    }
-
-    // 11. H1 matches title exactly (missed optimization)
-    if (h1s.length === 1 && seoTitle) {
-      const h1Clean = h1s[0].replace(/<[^>]+>/g, '').trim().toLowerCase();
-      const titleClean = seoTitle.trim().toLowerCase();
-      if (h1Clean === titleClean && h1Clean.length > 0) {
-        issues.push({ check: 'h1-title-match', severity: 'info', message: 'H1 and title tag are identical', recommendation: 'Differentiate your H1 from the title tag slightly. The title targets search engines while H1 targets readers on the page.' });
-      }
-    }
   }
 
   // Auto-assign categories
@@ -443,12 +475,19 @@ function auditPage(
     issue.category = CHECK_CATEGORY[issue.check] || 'technical';
   }
 
-  // Score: start at 100, deduct per issue
+  // Score: start at 100, deduct per issue with weighted severity
+  // Critical SEO checks get heavier deductions than cosmetic ones
   let score = 100;
   for (const issue of issues) {
-    if (issue.severity === 'error') score -= 15;
-    else if (issue.severity === 'warning') score -= 7;
-    else score -= 2;
+    const isCritical = CRITICAL_CHECKS.has(issue.check);
+    const isModerate = MODERATE_CHECKS.has(issue.check);
+    if (issue.severity === 'error') {
+      score -= isCritical ? 20 : 12;
+    } else if (issue.severity === 'warning') {
+      score -= isCritical ? 10 : isModerate ? 6 : 4;
+    } else {
+      score -= 1;
+    }
   }
   score = Math.max(0, Math.min(100, score));
 
@@ -697,6 +736,53 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string): Promi
         value: desc.slice(0, 80) + (desc.length > 80 ? '...' : ''),
       });
     }
+  }
+
+  // --- Orphan pages: pages with no internal links pointing to them ---
+  // Build a map of all internal link targets across all audited pages
+  const internalLinkTargets = new Set<string>();
+  for (const r of results) {
+    // Find all internal links from each page's HTML (cached during audit)
+    const cachedHtml = htmlCache.get(r.pageId);
+    if (!cachedHtml) continue;
+    const pageLinks = extractLinks(cachedHtml);
+    for (const link of pageLinks) {
+      if (link.href.startsWith('/')) {
+        internalLinkTargets.add(link.href.replace(/\/$/, '').toLowerCase());
+      } else if (link.href.startsWith('http')) {
+        try {
+          const p = new URL(link.href).pathname.replace(/\/$/, '').toLowerCase();
+          internalLinkTargets.add(p);
+        } catch { /* skip */ }
+      }
+    }
+  }
+  // Check which audited pages receive zero inbound internal links
+  const orphanPages: string[] = [];
+  for (const r of results) {
+    const pagePath = `/${r.slug}`.replace(/\/$/, '').toLowerCase();
+    if (pagePath === '/' || pagePath === '') continue; // Homepage always linked
+    if (!internalLinkTargets.has(pagePath)) {
+      orphanPages.push(r.page || r.slug);
+    }
+  }
+  if (orphanPages.length > 0) {
+    siteWideIssues.push({
+      check: 'orphan-pages', severity: orphanPages.length > 3 ? 'error' : 'warning',
+      message: `${orphanPages.length} orphan page${orphanPages.length > 1 ? 's' : ''} with no internal links`,
+      recommendation: `These pages have no internal links pointing to them, making them hard for search engines to discover: ${orphanPages.slice(0, 10).join(', ')}${orphanPages.length > 10 ? ` (+${orphanPages.length - 10} more)` : ''}. Add internal links from related pages.`,
+    });
+  }
+
+  // --- Indexability summary ---
+  const noindexPages = results.filter(r => r.issues.some(i => i.check === 'robots' && i.message.includes('noindex')));
+  if (noindexPages.length > 0) {
+    const pct = Math.round((noindexPages.length / results.length) * 100);
+    siteWideIssues.push({
+      check: 'indexability', severity: pct > 20 ? 'error' : 'warning',
+      message: `${noindexPages.length} of ${results.length} pages (${pct}%) set to noindex`,
+      recommendation: `These pages won't appear in search results: ${noindexPages.slice(0, 8).map(p => p.page || p.slug).join(', ')}${noindexPages.length > 8 ? ` (+${noindexPages.length - 8} more)` : ''}. Review and remove noindex if they should be indexed.`,
+    });
   }
 
   // Auto-assign categories to site-wide issues
