@@ -45,16 +45,26 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
   const [error, setError] = useState('');
 
   useEffect(() => {
-    Promise.all([
-      fetch(`/api/content-briefs/${workspaceId}`).then(r => r.json()),
-      fetch(`/api/content-requests/${workspaceId}`).then(r => r.json()),
-    ]).then(([b, r]) => {
-      if (Array.isArray(b)) setBriefs(b);
-      if (Array.isArray(r)) {
-        setClientRequests(r);
-        onRequestCountChange?.(r.filter((req: ContentTopicRequest) => req.status === 'requested').length);
-      }
-    }).catch(() => {}).finally(() => setLoading(false));
+    let done = 0;
+    const checkDone = () => { if (++done >= 2) setLoading(false); };
+
+    fetch(`/api/content-briefs/${workspaceId}`)
+      .then(r => { console.log('[ContentBriefs] briefs response status:', r.status); return r.json(); })
+      .then(b => { console.log('[ContentBriefs] briefs data:', b); if (Array.isArray(b)) setBriefs(b); })
+      .catch(err => console.error('[ContentBriefs] briefs fetch error:', err))
+      .finally(checkDone);
+
+    fetch(`/api/content-requests/${workspaceId}`)
+      .then(r => { console.log('[ContentBriefs] requests response status:', r.status); return r.json(); })
+      .then(r => {
+        console.log('[ContentBriefs] requests data:', r);
+        if (Array.isArray(r)) {
+          setClientRequests(r);
+          onRequestCountChange?.(r.filter((req: ContentTopicRequest) => req.status === 'requested').length);
+        }
+      })
+      .catch(err => console.error('[ContentBriefs] requests fetch error:', err))
+      .finally(checkDone);
   }, [workspaceId]);
 
   const handleGenerateBriefForRequest = async (req: ContentTopicRequest) => {
