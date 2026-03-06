@@ -2510,8 +2510,9 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     });
   }
   const sendProgress = (step: string, detail: string, progress: number) => {
+    console.log(`[Strategy][${step}] ${detail} (${Math.round(progress * 100)}%)`);
     if (wantsStream) {
-      res.write(`data: ${JSON.stringify({ step, detail, progress })}\n\n`);
+      try { res.write(`data: ${JSON.stringify({ step, detail, progress })}\n\n`); } catch { /* connection dropped */ }
     }
   };
 
@@ -2543,41 +2544,51 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
       : subdomain ? `https://${subdomain}.webflow.io` : '';
     console.log(`[Strategy] Using baseUrl: ${baseUrl}`);
 
-    // 2. Gather pages from BOTH Webflow API (static pages + metadata) AND sitemap (all pages including CMS)
-    sendProgress('discovery', 'Fetching pages from Webflow...', 0.05);
-    const allPages = await listPages(ws.webflowSiteId, token);
-    const published = filterPublishedPages(allPages);
+    // 2. Discover pages: sitemap is the SOURCE OF TRUTH for live pages.
+    //    Webflow API is only used for metadata enrichment (SEO title, meta desc).
+    sendProgress('discovery', 'Crawling sitemap for live pages...', 0.05);
 
-    // Build lookup of Webflow page metadata by path
+    // Build Webflow API metadata lookup (for enrichment only, not page discovery)
     const wfMetaByPath = new Map<string, { title: string; seoTitle: string; seoDesc: string }>();
-    for (const p of published) {
-      const pagePath = p.publishedPath || `/${p.slug || ''}`;
-      wfMetaByPath.set(pagePath, {
-        title: p.title || p.slug || '',
-        seoTitle: p.seo?.title || '',
-        seoDesc: p.seo?.description || '',
-      });
+    try {
+      const allPages = await listPages(ws.webflowSiteId, token);
+      const published = filterPublishedPages(allPages);
+      for (const p of published) {
+        const pagePath = p.publishedPath || `/${p.slug || ''}`;
+        wfMetaByPath.set(pagePath, {
+          title: p.title || p.slug || '',
+          seoTitle: p.seo?.title || '',
+          seoDesc: p.seo?.description || '',
+        });
+      }
+      console.log(`[Strategy] Webflow API: ${wfMetaByPath.size} pages with metadata`);
+    } catch (err) {
+      console.log('[Strategy] Webflow API metadata fetch failed, continuing without it:', err);
     }
 
-    // Discover ALL pages via sitemap (includes CMS collection pages, blog posts, etc.)
-    sendProgress('discovery', 'Crawling sitemap for all pages (including CMS)...', 0.08);
-    const allPaths = new Set<string>(wfMetaByPath.keys());
+    // Sitemap = authoritative list of live pages
+    const allPaths = new Set<string>();
     if (baseUrl) {
       try {
         const sitemapUrls = await discoverSitemapUrls(baseUrl);
-        console.log(`[Strategy] Sitemap discovered ${sitemapUrls.length} URLs`);
+        console.log(`[Strategy] Sitemap discovered ${sitemapUrls.length} URLs from ${baseUrl}`);
         for (const url of sitemapUrls) {
           try {
             const path = new URL(url).pathname || '/';
             allPaths.add(path);
           } catch { /* skip invalid URLs */ }
         }
-      } catch {
-        console.log('[Strategy] Sitemap discovery failed, continuing with Webflow pages only');
+      } catch (err) {
+        console.log('[Strategy] Sitemap discovery failed:', err);
       }
     }
-    sendProgress('discovery', `Found ${allPaths.size} pages (${wfMetaByPath.size} static, ${allPaths.size - wfMetaByPath.size} CMS)`, 0.12);
-    console.log(`[Strategy] Total pages: ${allPaths.size} (${wfMetaByPath.size} from Webflow API, ${allPaths.size - wfMetaByPath.size} additional from sitemap)`);
+    // Fallback: if sitemap found nothing, use Webflow API pages
+    if (allPaths.size === 0 && wfMetaByPath.size > 0) {
+      console.log('[Strategy] Sitemap empty — falling back to Webflow API pages');
+      for (const path of wfMetaByPath.keys()) allPaths.add(path);
+    }
+    sendProgress('discovery', `Found ${allPaths.size} live pages`, 0.12);
+    console.log(`[Strategy] Total live pages: ${allPaths.size}`);
 
     // 3. Fetch actual page content for ALL discovered pages (parallel, batched)
     sendProgress('content', `Fetching content from ${allPaths.size} pages...`, 0.15);
@@ -2946,10 +2957,11 @@ Critical rules:
     res.json(keywordStrategy);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('Keyword strategy error:', msg);
+    const stack = err instanceof Error ? err.stack : '';
+    console.error('Keyword strategy error:', msg, stack);
     if (wantsStream) {
-      res.write(`data: ${JSON.stringify({ error: msg })}\n\n`);
-      return res.end();
+      try { res.write(`data: ${JSON.stringify({ error: msg })}\n\n`); res.end(); } catch { /* already closed */ }
+      return;
     }
     res.status(500).json({ error: msg });
   }
