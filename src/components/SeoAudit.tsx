@@ -486,12 +486,15 @@ function AuditHistory({ siteId, history, onRefresh }: { siteId: string; history:
   );
 }
 
+type AuditSubTab = 'audit' | 'links' | 'history';
+
 function SeoAudit({ siteId, workspaceId, siteName, view = 'audit' }: Props) {
   const { startJob, jobs } = useBackgroundTasks();
   const auditJobId = useRef<string | null>(null);
   const [data, setData] = useState<SeoAuditResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasRun, setHasRun] = useState(false);
+  const [auditSubTab, setAuditSubTab] = useState<AuditSubTab>('audit');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const [severityFilter, setSeverityFilter] = useState<Severity | 'all'>('all');
@@ -910,46 +913,81 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit' }: Props) {
   if (view === 'editor') return <SeoEditor siteId={siteId} workspaceId={workspaceId} />;
   if (view === 'cms') return <CmsEditor siteId={siteId} workspaceId={workspaceId} />;
   if (view === 'strategy') return <KeywordStrategyPanel workspaceId={workspaceId || ''} siteId={siteId} />;
-  if (view === 'links') return <LinkChecker siteId={siteId} />;
   if (view === 'redirects') return <RedirectManager siteId={siteId} />;
   if (view === 'internal') return <InternalLinks siteId={siteId} workspaceId={workspaceId} />;
   if (view === 'schema') return <SchemaSuggester siteId={siteId} />;
   if (view === 'briefs') return <ContentBriefs workspaceId={workspaceId || ''} />;
-  if (view === 'history') return <AuditHistory siteId={siteId} history={history} onRefresh={loadHistory} />;
 
-  // ── Audit view (default) ──
+  // ── Audit view (default) — with sub-tabs ──
+  const auditTabBar = (
+    <div className="flex items-center gap-1 border-b border-zinc-800 pb-0 mb-4">
+      {([
+        { id: 'audit' as const, label: 'Site Audit', icon: Globe },
+        { id: 'links' as const, label: 'Dead Links', icon: ExternalLink },
+        { id: 'history' as const, label: 'History', icon: Clock },
+      ]).map(t => (
+        <button
+          key={t.id}
+          onClick={() => setAuditSubTab(t.id)}
+          className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px ${
+            auditSubTab === t.id
+              ? 'border-violet-500 text-violet-300'
+              : 'border-transparent text-zinc-500 hover:text-zinc-300'
+          }`}
+        >
+          <t.icon className="w-3.5 h-3.5" />
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (auditSubTab === 'links') {
+    return <div>{auditTabBar}<LinkChecker siteId={siteId} /></div>;
+  }
+  if (auditSubTab === 'history') {
+    return <div>{auditTabBar}<AuditHistory siteId={siteId} history={history} onRefresh={loadHistory} /></div>;
+  }
+
   if (!hasRun) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-4">
-        <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center">
-          <Globe className="w-8 h-8 text-zinc-600" />
+      <div>
+        {auditTabBar}
+        <div className="flex flex-col items-center justify-center py-16 gap-4">
+          <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center">
+            <Globe className="w-8 h-8 text-zinc-600" />
+          </div>
+          <p className="text-zinc-400 text-sm">Comprehensive SEO audit for your Webflow site</p>
+          <p className="text-xs text-zinc-600 max-w-md text-center">
+            Checks titles, meta descriptions, headings, Open Graph, canonical tags, structured data, content length, and more
+          </p>
+          <button
+            onClick={runAudit}
+            className="px-5 py-2.5 bg-teal-600 hover:bg-teal-500 rounded-lg text-sm font-medium transition-colors"
+          >
+            Run SEO Audit
+          </button>
         </div>
-        <p className="text-zinc-400 text-sm">Comprehensive SEO audit for your Webflow site</p>
-        <p className="text-xs text-zinc-600 max-w-md text-center">
-          Checks titles, meta descriptions, headings, Open Graph, canonical tags, structured data, content length, and more
-        </p>
-        <button
-          onClick={runAudit}
-          className="px-5 py-2.5 bg-teal-600 hover:bg-teal-500 rounded-lg text-sm font-medium transition-colors"
-        >
-          Run SEO Audit
-        </button>
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-3 text-zinc-500">
-        <Loader2 className="w-6 h-6 animate-spin" />
-        <p className="text-sm">Scanning pages for SEO issues...</p>
-        <p className="text-xs text-zinc-600">Fetching metadata and published HTML for each page</p>
+      <div>
+        {auditTabBar}
+        <div className="flex flex-col items-center justify-center py-16 gap-3 text-zinc-500">
+          <Loader2 className="w-6 h-6 animate-spin" />
+          <p className="text-sm">Scanning pages for SEO issues...</p>
+          <p className="text-xs text-zinc-600">Fetching metadata and published HTML for each page</p>
+        </div>
       </div>
     );
   }
 
   if (!data) return (
-    <>
+    <div>
+      {auditTabBar}
       {auditError && (
         <div className="flex flex-col items-center justify-center py-16 gap-4">
           <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 max-w-md text-center">
@@ -961,7 +999,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit' }: Props) {
           </button>
         </div>
       )}
-    </>
+    </div>
   );
 
   const filteredPages = data.pages
@@ -982,6 +1020,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit' }: Props) {
 
   return (
     <div className="space-y-5">
+      {auditTabBar}
       {/* Summary cards */}
       <div className="grid grid-cols-5 gap-3">
         <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800 col-span-1">

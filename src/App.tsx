@@ -4,9 +4,8 @@ import { type QueueItem } from './components/ProcessingQueue';
 import { StatusBar } from './components/StatusBar';
 import { SettingsPanel } from './components/SettingsPanel';
 import { MediaTab } from './components/MediaTab';
-import { PageWeight } from './components/PageWeight';
 import { SeoAudit } from './components/SeoAudit';
-import { PageSpeedPanel } from './components/PageSpeedPanel';
+import { Performance } from './components/Performance';
 import { SalesReport } from './components/SalesReport';
 import { GoogleAnalytics } from './components/GoogleAnalytics';
 import { WorkspaceSettings } from './components/WorkspaceSettings';
@@ -22,16 +21,16 @@ import { BackgroundTaskProvider } from './hooks/useBackgroundTasks';
 import { TaskPanel } from './components/TaskPanel';
 import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, FileSearch, Search,
-  Pencil, ListChecks, Link2Off, CornerDownRight, Share2, Target, Code2, Clock, LogOut,
+  Pencil, ListChecks, CornerDownRight, Share2, Target, Code2, LogOut,
 } from 'lucide-react';
 
 type Page =
   | 'media'
-  | 'seo-audit' | 'seo-history' | 'seo-editor' | 'seo-cms'
-  | 'seo-links' | 'seo-redirects' | 'seo-internal'
+  | 'seo-audit' | 'seo-editor' | 'seo-cms'
+  | 'seo-redirects' | 'seo-internal'
   | 'seo-strategy' | 'seo-schema' | 'seo-briefs'
   | 'search' | 'analytics'
-  | 'page-weight' | 'page-speed'
+  | 'performance'
   | 'workspace-settings'
   | 'prospect'
   | 'requests'
@@ -87,7 +86,7 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!e.metaKey && !e.ctrlKey) return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
-      const tabMap: Record<string, Page> = { '1': 'media', '2': 'seo-audit', '3': 'search', '4': 'page-speed' };
+      const tabMap: Record<string, Page> = { '1': 'media', '2': 'seo-audit', '3': 'search', '4': 'performance' };
       if (tabMap[e.key] && selected) { e.preventDefault(); setTab(tabMap[e.key]); }
       if (e.key === ',') { e.preventDefault(); setTab('settings'); }
     };
@@ -214,16 +213,14 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
 
   // ── Sidebar navigation groups ──
   const navGroups: Array<{ label: string; items: Array<{ id: Page; label: string; icon: typeof Globe; needsSite?: boolean }> }> = [
-    { label: 'MEDIA', items: [
+    { label: '', items: [
       { id: 'media', label: 'Assets', icon: Image },
+      { id: 'requests', label: 'Requests', icon: Clipboard },
     ]},
     { label: 'SITE HEALTH', items: [
       { id: 'seo-audit', label: 'Site Audit', icon: Globe, needsSite: true },
-      { id: 'seo-links', label: 'Dead Links', icon: Link2Off, needsSite: true },
       { id: 'seo-redirects', label: 'Redirects', icon: CornerDownRight, needsSite: true },
-      { id: 'page-weight', label: 'Page Weight', icon: BarChart3, needsSite: true },
-      { id: 'page-speed', label: 'Page Speed', icon: Gauge, needsSite: true },
-      { id: 'seo-history', label: 'History', icon: Clock, needsSite: true },
+      { id: 'performance', label: 'Performance', icon: Gauge, needsSite: true },
     ]},
     { label: 'SEO', items: [
       { id: 'seo-strategy', label: 'Strategy', icon: Target, needsSite: true },
@@ -237,14 +234,11 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
       { id: 'search', label: 'Search Console', icon: Search, needsSite: true },
       { id: 'analytics', label: 'Google Analytics', icon: BarChart3, needsSite: true },
     ]},
-    { label: 'CLIENT', items: [
-      { id: 'requests', label: 'Requests', icon: Pencil },
-    ]},
   ];
 
   // ── Content renderer ──
   const seoView = tab.startsWith('seo-') ? tab.replace('seo-', '') : null;
-  const needsSite = !!(seoView || tab === 'search' || tab === 'analytics' || tab === 'page-weight' || tab === 'page-speed');
+  const needsSite = !!(seoView || tab === 'search' || tab === 'analytics' || tab === 'performance');
 
   const renderContent = () => {
     if (tab === 'settings') return <SettingsPanel />;
@@ -277,8 +271,7 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
     if (tab === 'media') return <MediaTab key={selected.folder} siteId={selected.webflowSiteId} workspaceFolder={selected.folder} queue={workspaceQueue} />;
     if (seoView) return <SeoAudit key={`seo-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} siteName={selected.webflowSiteName || selected.name} view={seoView} />;
     if (tab === 'search') return <SearchConsole key={`search-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} gscPropertyUrl={selected.gscPropertyUrl} />;
-    if (tab === 'page-weight') return <PageWeight key={`weight-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
-    if (tab === 'page-speed') return <PageSpeedPanel key={`speed-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
+    if (tab === 'performance') return <Performance key={`perf-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
     if (tab === 'analytics') return <GoogleAnalytics key={`ga4-${selected.id}`} workspaceId={selected.id} ga4PropertyId={selected.ga4PropertyId} />;
     if (tab === 'requests') return <RequestManager key={`requests-${selected.id}`} workspaceId={selected.id} />;
 
@@ -321,9 +314,9 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
-          {navGroups.map(group => (
-            <div key={group.label}>
-              <div className="text-[9px] text-zinc-600 font-semibold tracking-widest px-2.5 mb-1">{group.label}</div>
+          {navGroups.map((group, gi) => (
+            <div key={group.label || `group-${gi}`}>
+              {group.label && <div className="text-[9px] text-zinc-600 font-semibold tracking-widest px-2.5 mb-1">{group.label}</div>}
               {group.items.map(item => {
                 const Icon = item.icon;
                 const active = tab === item.id;
