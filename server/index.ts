@@ -18,6 +18,7 @@ import {
   getOptRoot,
   getTokenForSite,
 } from './workspaces.js';
+import { buildSeoContext, buildKeywordMapContext } from './seo-context.js';
 import { startWatcher, getQueue, triggerOptimize, getMetadata } from './processor.js';
 import {
   listSites,
@@ -1196,30 +1197,8 @@ app.post('/api/webflow/seo-rewrite', async (req, res) => {
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
-  // Look up keyword strategy if workspaceId provided
-  let keywordContext = '';
-  if (workspaceId) {
-    const ws = getWorkspace(workspaceId);
-    const strategy = ws?.keywordStrategy;
-    if (strategy) {
-      const siteKw = strategy.siteKeywords?.slice(0, 5).join(', ');
-      if (siteKw) keywordContext += `\nSite target keywords: ${siteKw}`;
-      if (pagePath) {
-        const pageKw = strategy.pageMap?.find(
-          (p: { pagePath: string }) => p.pagePath === pagePath || pagePath.includes(p.pagePath)
-        );
-        if (pageKw) {
-          keywordContext += `\nThis page's primary keyword: "${pageKw.primaryKeyword}"`;
-          if (pageKw.secondaryKeywords?.length) {
-            keywordContext += `\nSecondary keywords: ${pageKw.secondaryKeywords.join(', ')}`;
-          }
-        }
-      }
-      if (keywordContext) {
-        keywordContext = `\n\nKEYWORD STRATEGY (incorporate these naturally):${keywordContext}`;
-      }
-    }
-  }
+  // Build shared keyword strategy context
+  const { keywordBlock: keywordContext } = buildSeoContext(workspaceId, pagePath);
 
   try {
     let prompt: string;
@@ -1298,7 +1277,7 @@ Return ONLY the title tag text, nothing else.`;
 
 // --- Bulk AI SEO Fix ---
 app.post('/api/webflow/seo-bulk-fix/:siteId', async (req, res) => {
-  const { pages, field } = req.body as { pages: Array<{ pageId: string; title: string; currentSeoTitle?: string; currentDescription?: string }>; field: 'title' | 'description' };
+  const { pages, field, workspaceId } = req.body as { pages: Array<{ pageId: string; title: string; slug?: string; currentSeoTitle?: string; currentDescription?: string }>; field: 'title' | 'description'; workspaceId?: string };
   if (!pages?.length) return res.status(400).json({ error: 'pages required' });
 
   const openaiKey = process.env.OPENAI_API_KEY;
@@ -1310,9 +1289,10 @@ app.post('/api/webflow/seo-bulk-fix/:siteId', async (req, res) => {
   const results = [];
   for (const page of pages) {
     try {
+      const { keywordBlock } = buildSeoContext(workspaceId, page.slug ? `/${page.slug}` : undefined);
       const prompt = field === 'description'
-        ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}". Return ONLY the text.`
-        : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}". Return ONLY the text.`;
+        ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}".${keywordBlock}\nReturn ONLY the text.`
+        : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}".${keywordBlock}\nReturn ONLY the text.`;
 
       const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -1387,11 +1367,14 @@ app.get('/api/webflow/page-html/:siteId', async (req, res) => {
 
 // --- AI Keyword Analysis ---
 app.post('/api/webflow/keyword-analysis', async (req, res) => {
-  const { pageTitle, seoTitle, metaDescription, pageContent, slug, siteContext } = req.body;
+  const { pageTitle, seoTitle, metaDescription, pageContent, slug, siteContext, workspaceId } = req.body;
   if (!pageTitle) return res.status(400).json({ error: 'pageTitle required' });
 
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
+
+  const { keywordBlock } = buildSeoContext(workspaceId, slug ? `/${slug}` : undefined);
+  const kwMapContext = buildKeywordMapContext(workspaceId);
 
   try {
     const prompt = `You are an expert SEO strategist and keyword researcher. Analyze this web page and provide a comprehensive keyword analysis.
@@ -1401,7 +1384,7 @@ SEO title: ${seoTitle || '(same as page title)'}
 Meta description: ${metaDescription || '(none)'}
 URL slug: /${slug || ''}
 Site context: ${siteContext || 'N/A'}
-Page content excerpt: ${pageContent ? pageContent.slice(0, 3000) : 'N/A'}
+Page content excerpt: ${pageContent ? pageContent.slice(0, 3000) : 'N/A'}${keywordBlock}${kwMapContext}
 
 Provide your analysis as a JSON object with exactly these fields:
 {
@@ -3657,9 +3640,9 @@ app.post('/api/jobs', async (req, res) => {
       }
 
       case 'bulk-seo-fix': {
-        const { siteId: seoSiteId, pages, field } = params as { siteId: string; pages: Array<{ pageId: string; title: string; currentSeoTitle?: string; currentDescription?: string }>; field: 'title' | 'description' };
+        const { siteId: seoSiteId, pages, field, workspaceId: bwsId } = params as { siteId: string; pages: Array<{ pageId: string; title: string; slug?: string; currentSeoTitle?: string; currentDescription?: string }>; field: 'title' | 'description'; workspaceId?: string };
         if (!seoSiteId || !pages?.length || !field) return res.status(400).json({ error: 'siteId, pages, field required' });
-        const job = createJob('bulk-seo-fix', { message: `Fixing ${field}s for ${pages.length} pages...`, total: pages.length, workspaceId: params.workspaceId as string });
+        const job = createJob('bulk-seo-fix', { message: `Fixing ${field}s for ${pages.length} pages...`, total: pages.length, workspaceId: bwsId });
         res.json({ jobId: job.id });
         (async () => {
           try {
@@ -3671,9 +3654,10 @@ app.post('/api/jobs', async (req, res) => {
             for (let i = 0; i < pages.length; i++) {
               const page = pages[i];
               try {
+                const { keywordBlock } = buildSeoContext(bwsId, page.slug ? `/${page.slug}` : undefined);
                 const prompt = field === 'description'
-                  ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}". Return ONLY the text.`
-                  : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}". Return ONLY the text.`;
+                  ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}".${keywordBlock}\nReturn ONLY the text.`
+                  : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}".${keywordBlock}\nReturn ONLY the text.`;
                 const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
                   method: 'POST',
                   headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },

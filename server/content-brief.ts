@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { buildSeoContext, buildKeywordMapContext } from './seo-context.js';
 
 const DATA_BASE = process.env.DATA_DIR
   || (process.env.NODE_ENV === 'production' ? '/tmp/asset-dashboard' : '');
@@ -80,15 +81,20 @@ export async function generateBrief(
 
   const pagesStr = context.existingPages?.slice(0, 15).join('\n') || 'No existing pages provided';
 
+  // Pull in keyword strategy context for alignment
+  const { keywordBlock, businessContext: stratBizCtx } = buildSeoContext(workspaceId);
+  const kwMapContext = buildKeywordMapContext(workspaceId);
+  const bizCtx = context.businessContext || stratBizCtx;
+
   const prompt = `You are an expert content strategist and SEO specialist. Generate a comprehensive content brief for a new piece of content targeting the keyword "${targetKeyword}".
 
-${context.businessContext ? `Business context: ${context.businessContext}` : ''}
+${bizCtx ? `Business context: ${bizCtx}` : ''}
 
 Related search queries from Google Search Console:
 ${relatedStr}
 
 Existing pages on the site:
-${pagesStr}
+${pagesStr}${keywordBlock}${kwMapContext}
 
 Generate a content brief in the following JSON format:
 {
