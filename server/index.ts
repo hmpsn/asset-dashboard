@@ -2902,6 +2902,32 @@ app.post('/api/public/auth/:id', (req, res) => {
   return res.status(401).json({ error: 'Incorrect password' });
 });
 
+// --- Public SEO Strategy (client dashboard, gated behind seoClientView) ---
+app.get('/api/public/seo-strategy/:workspaceId', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (!ws.seoClientView) return res.status(403).json({ error: 'SEO strategy view is not enabled' });
+  const strategy = ws.keywordStrategy;
+  if (!strategy) return res.json(null);
+  // Return client-safe subset (no semrushMode, no internal-only fields)
+  res.json({
+    siteKeywords: strategy.siteKeywords || [],
+    pageMap: (strategy.pageMap || []).map(p => ({
+      pagePath: p.pagePath,
+      primaryKeyword: p.primaryKeyword,
+      secondaryKeywords: p.secondaryKeywords || [],
+    })),
+    opportunities: strategy.opportunities || [],
+    keywordGaps: (strategy.keywordGaps || []).slice(0, 20).map(g => ({
+      keyword: g.keyword,
+      volume: g.volume,
+      difficulty: g.difficulty,
+    })),
+    businessContext: strategy.businessContext || '',
+    generatedAt: strategy.generatedAt,
+  });
+});
+
 // --- Public Approvals (client dashboard, no auth required) ---
 app.get('/api/public/approvals/:workspaceId', (req, res) => {
   res.json(listBatches(req.params.workspaceId));

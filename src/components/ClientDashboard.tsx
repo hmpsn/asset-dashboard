@@ -46,7 +46,16 @@ interface GA4EventPageBreakdown { eventName: string; pagePath: string; eventCoun
 interface Props { workspaceId: string; }
 
 type SortKey = 'clicks' | 'impressions' | 'ctr' | 'position';
-type ClientTab = 'overview' | 'search' | 'health' | 'analytics' | 'approvals' | 'requests';
+type ClientTab = 'overview' | 'search' | 'health' | 'strategy' | 'analytics' | 'approvals' | 'requests';
+
+interface ClientKeywordStrategy {
+  siteKeywords: string[];
+  pageMap: { pagePath: string; primaryKeyword: string; secondaryKeywords?: string[] }[];
+  opportunities: string[];
+  keywordGaps?: { keyword: string; volume?: number; difficulty?: number }[];
+  businessContext?: string;
+  generatedAt: string;
+}
 
 type RequestCategory = 'bug' | 'content' | 'design' | 'seo' | 'feature' | 'other';
 type RequestStatus = 'new' | 'in_review' | 'in_progress' | 'on_hold' | 'completed' | 'closed';
@@ -243,6 +252,7 @@ export function ClientDashboard({ workspaceId }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<ClientTab>('overview');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [strategyData, setStrategyData] = useState<ClientKeywordStrategy | null>(null);
   const [days, setDays] = useState(28);
   const [sortKey, setSortKey] = useState<SortKey>('clicks');
   const [sortAsc, setSortAsc] = useState(false);
@@ -432,6 +442,10 @@ export function ClientDashboard({ workspaceId }: Props) {
     fetch(`/api/public/rank-tracking/${data.id}/history`).then(r => r.json()).then(h => { if (Array.isArray(h)) setRankHistory(h); }).catch(() => {});
     fetch(`/api/public/rank-tracking/${data.id}/latest`).then(r => r.json()).then(l => { if (Array.isArray(l)) setLatestRanks(l); }).catch(() => {});
     fetch(`/api/public/annotations/${data.id}`).then(r => r.json()).then(a => { if (Array.isArray(a)) setAnnotations(a); }).catch(() => {});
+    // Load strategy if SEO view is enabled
+    if (data.seoClientView) {
+      fetch(`/api/public/seo-strategy/${data.id}`).then(r => r.ok ? r.json() : null).then(s => { if (s) setStrategyData(s); }).catch(() => {});
+    }
   };
 
   const loadGA4Data = async (wsId: string, numDays: number) => {
@@ -754,10 +768,11 @@ export function ClientDashboard({ workspaceId }: Props) {
   const pendingApprovals = approvalBatches.reduce((sum, b) => sum + b.items.filter(i => i.status === 'pending').length, 0);
   const unreadTeamNotes = requests.filter(r => r.notes.length > 0 && r.notes[r.notes.length - 1].author === 'team' && r.status !== 'completed' && r.status !== 'closed').length;
 
-  const seoLocked = !ws?.seoClientView;
+  const strategyLocked = !ws?.seoClientView;
   const NAV = [
     { id: 'overview' as ClientTab, label: 'Overview', icon: LayoutDashboard, locked: false },
-    { id: 'health' as ClientTab, label: 'Site Health', icon: Shield, locked: seoLocked },
+    { id: 'health' as ClientTab, label: 'Site Health', icon: Shield, locked: false },
+    { id: 'strategy' as ClientTab, label: 'SEO Strategy', icon: Target, locked: strategyLocked },
     ...(ws?.analyticsClientView !== false ? [
       { id: 'analytics' as ClientTab, label: 'Analytics', icon: LineChart, locked: false },
       { id: 'search' as ClientTab, label: 'Search', icon: Search, locked: false },
@@ -1460,6 +1475,110 @@ export function ClientDashboard({ workspaceId }: Props) {
               <Shield className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
               <p className="text-sm text-zinc-500">No site audit available yet</p>
               <p className="text-xs text-zinc-600 mt-1">Ask your team to run a site audit for detailed health metrics.</p>
+            </div>
+          )}
+        </>)}
+
+        {/* ════════════ SEO STRATEGY TAB ════════════ */}
+        {tab === 'strategy' && (<>
+          {strategyData ? (
+            <div className="space-y-5">
+              {/* Header + Generated date */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-semibold text-zinc-200">SEO Keyword Strategy</h2>
+                  <p className="text-[10px] text-zinc-500 mt-0.5">Generated {new Date(strategyData.generatedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-1 rounded-md bg-teal-500/10 border border-teal-500/20 text-[10px] text-teal-400 font-medium">{strategyData.pageMap.length} pages mapped</span>
+                  <span className="px-2 py-1 rounded-md bg-violet-500/10 border border-violet-500/20 text-[10px] text-violet-400 font-medium">{strategyData.siteKeywords.length} target keywords</span>
+                </div>
+              </div>
+
+              {/* Site-Level Target Keywords */}
+              <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+                <div className="text-xs font-medium text-zinc-400 mb-3">Site-Level Target Keywords</div>
+                <div className="flex flex-wrap gap-2">
+                  {strategyData.siteKeywords.map(kw => (
+                    <span key={kw} className="px-2.5 py-1 rounded-lg bg-teal-500/10 border border-teal-500/20 text-[11px] text-teal-300">{kw}</span>
+                  ))}
+                </div>
+                {strategyData.businessContext && (
+                  <div className="mt-4 pt-3 border-t border-zinc-800">
+                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Business Context</div>
+                    <p className="text-xs text-zinc-400 leading-relaxed">{strategyData.businessContext}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Page Keyword Map */}
+              <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+                <div className="px-5 py-3 border-b border-zinc-800">
+                  <span className="text-xs font-medium text-zinc-300">Page Keyword Map</span>
+                  <span className="text-[10px] text-zinc-600 ml-2">Primary keyword target per page</span>
+                </div>
+                <div className="divide-y divide-zinc-800/50">
+                  {strategyData.pageMap.map(page => (
+                    <div key={page.pagePath} className="px-5 py-3 flex items-start gap-4 hover:bg-zinc-800/30 transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[11px] text-zinc-500 font-mono truncate">{page.pagePath}</div>
+                        <div className="text-xs font-medium text-zinc-200 mt-0.5">{page.primaryKeyword}</div>
+                      </div>
+                      {page.secondaryKeywords && page.secondaryKeywords.length > 0 && (
+                        <div className="flex flex-wrap gap-1 max-w-[260px]">
+                          {page.secondaryKeywords.slice(0, 4).map(sk => (
+                            <span key={sk} className="px-1.5 py-0.5 rounded bg-zinc-800 text-[9px] text-zinc-500">{sk}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Opportunities + Keyword Gaps side by side */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {strategyData.opportunities.length > 0 && (
+                  <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+                    <div className="text-xs font-medium text-zinc-400 mb-3 flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-amber-400" /> Keyword Opportunities</div>
+                    <div className="space-y-2">
+                      {strategyData.opportunities.map((opp, i) => (
+                        <div key={i} className="flex items-start gap-2 text-[11px] text-zinc-300">
+                          <span className="w-4 h-4 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center flex-shrink-0 mt-0.5 text-[9px] text-amber-400 font-bold">{i + 1}</span>
+                          {opp}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {strategyData.keywordGaps && strategyData.keywordGaps.length > 0 && (
+                  <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+                    <div className="text-xs font-medium text-zinc-400 mb-3 flex items-center gap-1.5"><Target className="w-3.5 h-3.5 text-violet-400" /> Competitor Keyword Gaps</div>
+                    <div className="space-y-1.5">
+                      {strategyData.keywordGaps.map((gap, i) => (
+                        <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg bg-zinc-800/30">
+                          <span className="text-[11px] text-zinc-300">{gap.keyword}</span>
+                          <div className="flex items-center gap-3">
+                            {gap.volume != null && <span className="text-[10px] text-zinc-500">{gap.volume.toLocaleString()} vol</span>}
+                            {gap.difficulty != null && (
+                              <span className={`text-[10px] font-medium ${gap.difficulty <= 30 ? 'text-green-400' : gap.difficulty <= 60 ? 'text-amber-400' : 'text-red-400'}`}>
+                                KD {gap.difficulty}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-16">
+              <Target className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
+              <p className="text-sm text-zinc-500">SEO strategy is being prepared</p>
+              <p className="text-xs text-zinc-600 mt-1">Your web team is building a keyword strategy for your site. Check back soon!</p>
             </div>
           )}
         </>)}
@@ -2350,12 +2469,12 @@ export function ClientDashboard({ workspaceId }: Props) {
             <div className="w-14 h-14 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center mx-auto mb-4">
               <Sparkles className="w-7 h-7 text-violet-400" />
             </div>
-            <h3 className="text-lg font-semibold text-zinc-100 mb-2">SEO Insights — Premium Feature</h3>
+            <h3 className="text-lg font-semibold text-zinc-100 mb-2">SEO Strategy — Premium Feature</h3>
             <p className="text-sm text-zinc-400 leading-relaxed mb-6">
-              Get detailed site health audits, page-level SEO scoring, and actionable recommendations to improve your search rankings.
+              Unlock your full keyword strategy with page-level keyword targets, competitor gap analysis, and growth opportunities tailored to your business.
             </p>
             <div className="space-y-2 text-left mb-6">
-              {['Real-time site health monitoring', 'Page-by-page SEO audit scores', 'Actionable fix recommendations', 'Score trend tracking over time'].map(f => (
+              {['Target keywords mapped to every page', 'Competitor keyword gap analysis', 'Content opportunity recommendations', 'Ongoing strategy refinement by your web team'].map(f => (
                 <div key={f} className="flex items-center gap-2 text-xs text-zinc-300">
                   <CheckCircle2 className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" />
                   {f}
