@@ -2777,7 +2777,7 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     let strategy: any;
     try {
     // --- STEP 1: Parallel page analysis batches ---
-    const BATCH_SIZE = 30;
+    const BATCH_SIZE = 20;
     const batches: typeof pageInfo[] = [];
     for (let i = 0; i < pageInfo.length; i += BATCH_SIZE) {
       batches.push(pageInfo.slice(i, i + BATCH_SIZE));
@@ -2800,13 +2800,12 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
       } catch { /* skip */ }
     }
 
-    const batchPromises = batches.map(async (batch, batchIdx) => {
+    const runBatch = async (batch: typeof pageInfo, batchIdx: number) => {
       const batchPages = batch.map(p => {
         let entry = `- ${p.path}: "${p.title}"`;
         if (p.seoTitle) entry += ` | SEO: "${p.seoTitle}"`;
         if (p.seoDesc) entry += ` | Desc: "${p.seoDesc.slice(0, 150)}"`;
-        if (p.contentSnippet) entry += `\n  Content: ${p.contentSnippet.slice(0, 600)}`;
-        // Include GSC data for this specific page
+        if (p.contentSnippet) entry += `\n  Content: ${p.contentSnippet.slice(0, 400)}`;
         const pageGsc = gscByPath.get(p.path);
         if (pageGsc && pageGsc.length > 0) {
           const topGsc = pageGsc.sort((a, b) => b.impressions - a.impressions).slice(0, 5);
@@ -2843,7 +2842,7 @@ Rules:
       const raw = await callOpenAI([
         { role: 'system', content: 'You are an expert SEO strategist. Return valid JSON only.' },
         { role: 'user', content: batchPrompt },
-      ], 4000, `batch-${batchIdx + 1}`);
+      ], 3000, `batch-${batchIdx + 1}`);
 
       try {
         const parsed = JSON.parse(raw);
@@ -2852,7 +2851,6 @@ Rules:
         return Array.isArray(parsed) ? parsed : [];
       } catch {
         console.error(`[Strategy] Batch ${batchIdx + 1} returned invalid JSON:`, raw.slice(0, 200));
-        // Fallback: return minimal entries for this batch
         return batch.map(p => ({
           pagePath: p.path,
           pageTitle: p.title,
@@ -2861,10 +2859,16 @@ Rules:
           searchIntent: 'informational',
         }));
       }
-    });
+    };
 
-    const batchResults = await Promise.all(batchPromises);
-    const allPageMappings = batchResults.flat();
+    // Run batches with limited concurrency (3 at a time)
+    const CONCURRENCY = 3;
+    const allPageMappings: Array<{ pagePath: string; pageTitle: string; primaryKeyword: string; secondaryKeywords: string[]; searchIntent: string }> = [];
+    for (let i = 0; i < batches.length; i += CONCURRENCY) {
+      const chunk = batches.slice(i, i + CONCURRENCY);
+      const results = await Promise.all(chunk.map((batch, ci) => runBatch(batch, i + ci)));
+      allPageMappings.push(...results.flat());
+    }
     console.log(`[Strategy] All batches complete: ${allPageMappings.length} total page mappings`);
 
     // --- STEP 2: Master synthesis call ---
