@@ -376,42 +376,193 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                       </button>
                     </div>
                   )}
-                  {/* Inline brief preview */}
+                  {/* Full inline brief detail */}
                   {inlineBrief && (
-                    <div className="border-t border-zinc-700/50 px-3 pb-3 pt-2 bg-zinc-900/50 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Brief Preview</span>
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => copyAsMarkdown(inlineBrief)} className="flex items-center gap-1 px-2 py-0.5 rounded text-[9px] bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 transition-colors"><Copy className="w-2.5 h-2.5" /> Copy AI</button>
-                          <button onClick={() => exportClientHTML(inlineBrief)} className="flex items-center gap-1 px-2 py-0.5 rounded text-[9px] bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors"><Download className="w-2.5 h-2.5" /> PDF</button>
-                          <button onClick={() => setExpanded(expanded === inlineBrief.id ? null : inlineBrief.id)} className="flex items-center gap-1 px-2 py-0.5 rounded text-[9px] bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors">Full Detail</button>
-                        </div>
+                    <div className="border-t border-zinc-800 px-4 pb-4 space-y-4">
+                      {/* Export buttons */}
+                      <div className="pt-3 flex items-center gap-2">
+                        <button onClick={() => copyAsMarkdown(inlineBrief)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 transition-colors">
+                          <Copy className="w-3 h-3" /> Copy for AI Tool
+                        </button>
+                        <button onClick={() => exportClientHTML(inlineBrief)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
+                          <Download className="w-3 h-3" /> Export PDF
+                        </button>
+                        <button onClick={() => { navigator.clipboard.writeText(JSON.stringify(inlineBrief, null, 2)); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors">
+                          <Copy className="w-3 h-3" /> Copy JSON
+                        </button>
                       </div>
+
+                      {/* Executive Summary */}
                       {inlineBrief.executiveSummary && (
-                        <div className="text-[11px] text-zinc-400 leading-relaxed bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">{inlineBrief.executiveSummary}</div>
-                      )}
-                      <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
-                        <div className="text-[9px] text-zinc-600 mb-0.5">Suggested Title</div>
-                        <div className="text-xs text-teal-400 font-medium">{inlineBrief.suggestedTitle}</div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="bg-zinc-950 rounded px-2 py-1.5 border border-zinc-800 text-center">
-                          <div className="text-[8px] text-zinc-600">Words</div>
-                          <div className="text-xs font-bold text-blue-400">{inlineBrief.wordCountTarget?.toLocaleString()}</div>
+                        <div className="bg-teal-500/5 border border-teal-500/20 rounded-lg px-4 py-3">
+                          <div className="flex items-center gap-1.5 mb-1.5"><BookOpen className="w-3.5 h-3.5 text-teal-400" /><span className="text-[10px] text-teal-400 font-medium uppercase tracking-wider">Executive Summary</span></div>
+                          <div className="text-xs text-zinc-300 leading-relaxed">{inlineBrief.executiveSummary}</div>
                         </div>
-                        {inlineBrief.contentFormat && <div className="bg-zinc-950 rounded px-2 py-1.5 border border-zinc-800 text-center"><div className="text-[8px] text-zinc-600">Format</div><div className="text-xs font-medium text-amber-400 capitalize">{inlineBrief.contentFormat}</div></div>}
-                        {inlineBrief.difficultyScore != null && <div className="bg-zinc-950 rounded px-2 py-1.5 border border-zinc-800 text-center"><div className="text-[8px] text-zinc-600">Difficulty</div><div className={`text-xs font-bold ${inlineBrief.difficultyScore <= 30 ? 'text-green-400' : inlineBrief.difficultyScore <= 60 ? 'text-amber-400' : 'text-red-400'}`}>{inlineBrief.difficultyScore}/100</div></div>}
+                      )}
+
+                      {/* Title & Meta */}
+                      <div className="space-y-2">
+                        <div>
+                          <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-1">Suggested Title</div>
+                          <div className="text-xs text-teal-400 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">{inlineBrief.suggestedTitle}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-1">Meta Description</div>
+                          <div className="text-xs text-zinc-300 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">{inlineBrief.suggestedMetaDesc}</div>
+                        </div>
                       </div>
+
+                      {/* Key Metrics Row */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
+                          <div className="text-[10px] text-zinc-500 mb-0.5">Word Count</div>
+                          <div className="text-sm font-bold text-blue-400">{inlineBrief.wordCountTarget?.toLocaleString()}</div>
+                        </div>
+                        <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
+                          <div className="text-[10px] text-zinc-500 mb-0.5">Intent</div>
+                          <div className="text-xs text-zinc-300 capitalize font-medium">{inlineBrief.intent}</div>
+                        </div>
+                        {inlineBrief.contentFormat && (
+                          <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
+                            <div className="text-[10px] text-zinc-500 mb-0.5">Format</div>
+                            <div className="text-xs text-amber-400 capitalize font-medium">{inlineBrief.contentFormat}</div>
+                          </div>
+                        )}
+                        {inlineBrief.difficultyScore != null && (
+                          <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
+                            <div className="text-[10px] text-zinc-500 mb-0.5">Difficulty</div>
+                            <div className={`text-sm font-bold ${inlineBrief.difficultyScore <= 30 ? 'text-green-400' : inlineBrief.difficultyScore <= 60 ? 'text-amber-400' : 'text-red-400'}`}>{inlineBrief.difficultyScore}/100</div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Traffic Potential */}
+                      {inlineBrief.trafficPotential && (
+                        <div className="flex items-start gap-2 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
+                          <TrendingUp className="w-3.5 h-3.5 text-green-400 mt-0.5 flex-shrink-0" />
+                          <div><div className="text-[10px] text-zinc-500 mb-0.5">Traffic Potential</div><div className="text-xs text-zinc-300">{inlineBrief.trafficPotential}</div></div>
+                        </div>
+                      )}
+
+                      {/* Audience & Tone */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <div className="flex items-center gap-1.5 mb-1"><Users className="w-3 h-3 text-zinc-500" /><span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Audience</span></div>
+                          <div className="text-xs text-zinc-400 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">{inlineBrief.audience}</div>
+                        </div>
+                        {inlineBrief.toneAndStyle && (
+                          <div>
+                            <div className="flex items-center gap-1.5 mb-1"><MessageSquare className="w-3 h-3 text-zinc-500" /><span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Tone & Style</span></div>
+                            <div className="text-xs text-zinc-400 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">{inlineBrief.toneAndStyle}</div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Secondary Keywords */}
+                      {inlineBrief.secondaryKeywords?.length > 0 && (
+                        <div>
+                          <div className="flex items-center gap-1.5 mb-1.5"><Search className="w-3 h-3 text-zinc-500" /><span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Secondary Keywords</span></div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {inlineBrief.secondaryKeywords.map((kw, i) => (
+                              <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">{kw}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Topical Entities */}
+                      {inlineBrief.topicalEntities && inlineBrief.topicalEntities.length > 0 && (
+                        <div>
+                          <div className="flex items-center gap-1.5 mb-1.5"><Target className="w-3 h-3 text-zinc-500" /><span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Topical Entities to Cover</span></div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {inlineBrief.topicalEntities.map((entity, i) => (
+                              <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-300">{entity}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* People Also Ask */}
+                      {inlineBrief.peopleAlsoAsk && inlineBrief.peopleAlsoAsk.length > 0 && (
+                        <div>
+                          <div className="flex items-center gap-1.5 mb-1.5"><MessageSquare className="w-3 h-3 text-zinc-500" /><span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Questions to Answer</span></div>
+                          <div className="space-y-1">
+                            {inlineBrief.peopleAlsoAsk.map((q, i) => (
+                              <div key={i} className="flex items-start gap-2 text-xs text-zinc-300 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
+                                <span className="text-amber-400 flex-shrink-0 font-medium">Q{i + 1}.</span> {q}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* SERP Analysis */}
+                      {inlineBrief.serpAnalysis && (
+                        <div>
+                          <div className="flex items-center gap-1.5 mb-1.5"><BarChart3 className="w-3 h-3 text-zinc-500" /><span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">SERP Analysis</span></div>
+                          <div className="bg-zinc-950 rounded-lg px-3 py-3 border border-zinc-800 space-y-2">
+                            <div className="grid grid-cols-2 gap-3">
+                              <div><span className="text-[10px] text-zinc-500">Content Type:</span><span className="text-xs text-zinc-300 ml-1">{inlineBrief.serpAnalysis.contentType}</span></div>
+                              <div><span className="text-[10px] text-zinc-500">Avg Word Count:</span><span className="text-xs text-zinc-300 ml-1">{inlineBrief.serpAnalysis.avgWordCount.toLocaleString()}</span></div>
+                            </div>
+                            {inlineBrief.serpAnalysis.commonElements.length > 0 && (
+                              <div><span className="text-[10px] text-zinc-500 block mb-1">Common Elements:</span><div className="flex flex-wrap gap-1">{inlineBrief.serpAnalysis.commonElements.map((el, i) => <span key={i} className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400">{el}</span>)}</div></div>
+                            )}
+                            {inlineBrief.serpAnalysis.gaps.length > 0 && (
+                              <div><span className="text-[10px] text-green-400/80 block mb-1">Opportunities (gaps in existing content):</span><div className="space-y-1">{inlineBrief.serpAnalysis.gaps.map((g, i) => <div key={i} className="text-[11px] text-green-300/80 flex items-start gap-1.5"><span className="text-green-400 mt-0.5">→</span>{g}</div>)}</div></div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Content Outline */}
                       {inlineBrief.outline?.length > 0 && (
                         <div>
-                          <div className="text-[9px] text-zinc-600 mb-1">Outline ({inlineBrief.outline.length} sections)</div>
-                          <div className="space-y-0.5">
-                            {inlineBrief.outline.map((s, i) => (
-                              <div key={i} className="flex items-center gap-2 text-[10px] text-zinc-400 px-2 py-0.5">
-                                <span className="text-zinc-600 font-mono w-3 text-right">{i + 1}.</span>
-                                <span className="flex-1">{s.heading}</span>
-                                {s.wordCount && <span className="text-[8px] text-zinc-600">{s.wordCount}w</span>}
+                          <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-2">Content Outline</div>
+                          <div className="space-y-2">
+                            {inlineBrief.outline.map((section, i) => (
+                              <div key={i} className="bg-zinc-950 rounded-lg px-3 py-2.5 border border-zinc-800">
+                                <div className="flex items-center justify-between">
+                                  <div className="text-xs font-medium text-zinc-200">H2: {section.heading}</div>
+                                  {section.wordCount && <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{section.wordCount} words</span>}
+                                </div>
+                                <div className="text-[11px] text-zinc-500 mt-1 leading-relaxed">{section.notes}</div>
+                                {section.keywords && section.keywords.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 mt-1.5">{section.keywords.map((kw, j) => <span key={j} className="text-[9px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400/80">{kw}</span>)}</div>
+                                )}
                               </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* CTA Recommendations */}
+                      {inlineBrief.ctaRecommendations && inlineBrief.ctaRecommendations.length > 0 && (
+                        <div>
+                          <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-1.5">CTA Recommendations</div>
+                          <div className="space-y-1">{inlineBrief.ctaRecommendations.map((cta, i) => (
+                            <div key={i} className="text-xs text-zinc-300 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800 flex items-start gap-2">
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${i === 0 ? 'bg-teal-500/20 text-teal-400' : 'bg-zinc-800 text-zinc-500'}`}>{i === 0 ? 'Primary' : 'Secondary'}</span>{cta}
+                            </div>
+                          ))}</div>
+                        </div>
+                      )}
+
+                      {/* Competitor Insights */}
+                      {inlineBrief.competitorInsights && (
+                        <div>
+                          <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-1">Competitor Insights</div>
+                          <div className="text-xs text-zinc-400 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800 leading-relaxed">{inlineBrief.competitorInsights}</div>
+                        </div>
+                      )}
+
+                      {/* Internal Links */}
+                      {inlineBrief.internalLinkSuggestions?.length > 0 && (
+                        <div>
+                          <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-1">Internal Link Suggestions</div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {inlineBrief.internalLinkSuggestions.map((link, i) => (
+                              <span key={i} className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-blue-400">/{link}</span>
                             ))}
                           </div>
                         </div>
