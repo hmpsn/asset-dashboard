@@ -66,6 +66,7 @@ import { listAnnotations, addAnnotation, deleteAnnotation } from './annotations.
 import { startApprovalReminders } from './approval-reminders.js';
 import { startMonthlyReports, triggerMonthlyReport } from './monthly-report.js';
 import { listBriefs, getBrief, deleteBrief, generateBrief } from './content-brief.js';
+import { listContentRequests, getContentRequest, createContentRequest, updateContentRequest } from './content-requests.js';
 import { isSemrushConfigured, getKeywordOverview, getDomainOrganicKeywords, getKeywordGap, getRelatedKeywords, estimateCreditCost, clearSemrushCache } from './semrush.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
@@ -3002,6 +3003,86 @@ app.get('/api/public/seo-strategy/:workspaceId', (req, res) => {
     businessContext: strategy.businessContext || '',
     generatedAt: strategy.generatedAt,
   });
+});
+
+// --- Public Content Topic Requests (client picks topics from strategy) ---
+app.post('/api/public/content-request/:workspaceId', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const { topic, targetKeyword, intent, priority, rationale, clientNote } = req.body;
+  if (!topic || !targetKeyword) return res.status(400).json({ error: 'topic and targetKeyword are required' });
+  const request = createContentRequest(req.params.workspaceId, { topic, targetKeyword, intent, priority, rationale, clientNote });
+  res.json(request);
+});
+
+// Client can see their own requests (status only, no briefs)
+app.get('/api/public/content-requests/:workspaceId', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const requests = listContentRequests(req.params.workspaceId);
+  // Return client-safe view (no internalNote, no briefId)
+  res.json(requests.map(r => ({
+    id: r.id, topic: r.topic, targetKeyword: r.targetKeyword, intent: r.intent,
+    priority: r.priority, status: r.status, requestedAt: r.requestedAt,
+  })));
+});
+
+// --- Internal Content Request Management ---
+app.get('/api/content-requests/:workspaceId', (req, res) => {
+  res.json(listContentRequests(req.params.workspaceId));
+});
+
+app.get('/api/content-requests/:workspaceId/:id', (req, res) => {
+  const request = getContentRequest(req.params.workspaceId, req.params.id);
+  if (!request) return res.status(404).json({ error: 'Request not found' });
+  res.json(request);
+});
+
+app.patch('/api/content-requests/:workspaceId/:id', (req, res) => {
+  const { status, internalNote } = req.body;
+  const updated = updateContentRequest(req.params.workspaceId, req.params.id, { status, internalNote });
+  if (!updated) return res.status(404).json({ error: 'Request not found' });
+  res.json(updated);
+});
+
+// Generate a brief for a content request
+app.post('/api/content-requests/:workspaceId/:id/generate-brief', async (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const request = getContentRequest(req.params.workspaceId, req.params.id);
+  if (!request) return res.status(404).json({ error: 'Request not found' });
+
+  try {
+    // Gather GSC context if available
+    let relatedQueries: { query: string; position: number; clicks: number; impressions: number }[] = [];
+    if (ws.gscPropertyUrl && ws.webflowSiteId) {
+      try {
+        const gscData = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90);
+        relatedQueries = gscData
+          .filter(r => r.query.toLowerCase().includes(request.targetKeyword.split(' ')[0].toLowerCase()))
+          .slice(0, 20)
+          .map(r => ({ query: r.query, position: r.position, clicks: r.clicks, impressions: r.impressions }));
+      } catch { /* GSC unavailable */ }
+    }
+
+    const existingPages = ws.keywordStrategy?.pageMap?.map(p => p.pagePath) || [];
+    const brief = await generateBrief(req.params.workspaceId, request.targetKeyword, {
+      relatedQueries,
+      businessContext: ws.keywordStrategy?.businessContext || '',
+      existingPages,
+    });
+
+    // Link brief to request and update status
+    updateContentRequest(req.params.workspaceId, req.params.id, {
+      status: 'brief_generated',
+      briefId: brief.id,
+    });
+
+    res.json(brief);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    res.status(500).json({ error: msg });
+  }
 });
 
 // --- Public Approvals (client dashboard, no auth required) ---

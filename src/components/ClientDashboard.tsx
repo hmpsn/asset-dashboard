@@ -255,6 +255,8 @@ export function ClientDashboard({ workspaceId }: Props) {
   const [tab, setTab] = useState<ClientTab>('overview');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [strategyData, setStrategyData] = useState<ClientKeywordStrategy | null>(null);
+  const [requestedTopics, setRequestedTopics] = useState<Set<string>>(new Set());
+  const [requestingTopic, setRequestingTopic] = useState<string | null>(null);
   const [days, setDays] = useState(28);
   const [sortKey, setSortKey] = useState<SortKey>('clicks');
   const [sortAsc, setSortAsc] = useState(false);
@@ -447,6 +449,10 @@ export function ClientDashboard({ workspaceId }: Props) {
     // Load strategy if SEO view is enabled
     if (data.seoClientView) {
       fetch(`/api/public/seo-strategy/${data.id}`).then(r => r.ok ? r.json() : null).then(s => { if (s) setStrategyData(s); }).catch(() => {});
+      // Load existing content requests to mark already-requested topics
+      fetch(`/api/public/content-requests/${data.id}`).then(r => r.ok ? r.json() : []).then((reqs: { targetKeyword: string }[]) => {
+        if (Array.isArray(reqs) && reqs.length > 0) setRequestedTopics(new Set(reqs.map(r => r.targetKeyword)));
+      }).catch(() => {});
     }
   };
 
@@ -1563,10 +1569,15 @@ export function ClientDashboard({ workspaceId }: Props) {
               {/* Content Gaps */}
               {strategyData.contentGaps && strategyData.contentGaps.length > 0 && (
                 <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
-                  <div className="text-xs font-medium text-zinc-400 mb-3 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-blue-400" /> Content Opportunities</div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-xs font-medium text-zinc-400 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-blue-400" /> Content Opportunities</div>
+                    <span className="text-[10px] text-zinc-600">Select a topic to request a content brief from our team</span>
+                  </div>
                   <div className="space-y-2">
                     {strategyData.contentGaps.map((gap, i) => {
                       const prioColor = gap.priority === 'high' ? 'text-red-400 bg-red-500/10 border-red-500/20' : gap.priority === 'medium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
+                      const alreadyRequested = requestedTopics.has(gap.targetKeyword);
+                      const isRequesting = requestingTopic === gap.targetKeyword;
                       return (
                         <div key={i} className="px-3 py-2.5 rounded-lg bg-zinc-800/30 border border-zinc-800">
                           <div className="flex items-center justify-between">
@@ -1576,8 +1587,32 @@ export function ClientDashboard({ workspaceId }: Props) {
                               <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded border ${prioColor}`}>{gap.priority}</span>
                             </div>
                           </div>
-                          <div className="text-[10px] text-teal-400 mt-0.5">Target: "{gap.targetKeyword}"</div>
+                          <div className="text-[10px] text-teal-400 mt-0.5">Target: &ldquo;{gap.targetKeyword}&rdquo;</div>
                           <div className="text-[10px] text-zinc-500 mt-0.5">{gap.rationale}</div>
+                          <div className="mt-2 flex items-center justify-end">
+                            {alreadyRequested ? (
+                              <span className="flex items-center gap-1 text-[10px] text-teal-400"><CheckCircle2 className="w-3 h-3" /> Requested</span>
+                            ) : (
+                              <button
+                                disabled={isRequesting}
+                                onClick={async () => {
+                                  setRequestingTopic(gap.targetKeyword);
+                                  try {
+                                    await fetch(`/api/public/content-request/${workspaceId}`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale }),
+                                    });
+                                    setRequestedTopics(prev => new Set(prev).add(gap.targetKeyword));
+                                  } catch { /* skip */ }
+                                  setRequestingTopic(null);
+                                }}
+                                className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-teal-600/20 border border-teal-500/30 text-[10px] text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50"
+                              >
+                                {isRequesting ? <><span className="w-3 h-3 border border-teal-400 border-t-transparent rounded-full animate-spin" /> Requesting...</> : <><Plus className="w-3 h-3" /> Request This Topic</>}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
