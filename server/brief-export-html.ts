@@ -23,9 +23,9 @@ function esc(s: string): string {
 }
 
 function diffColor(score: number): string {
-  if (score <= 30) return '#4ade80';
-  if (score <= 60) return '#fbbf24';
-  return '#f87171';
+  if (score <= 30) return '#16a34a';
+  if (score <= 60) return '#b45309';
+  return '#dc2626';
 }
 
 export function renderBriefHTML(brief: ContentBrief): string {
@@ -39,76 +39,76 @@ export function renderBriefHTML(brief: ContentBrief): string {
 <title>Content Brief: ${esc(b.targetKeyword)} — HMPSN Studio</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0c10; color: #e4e4e7; line-height: 1.6; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #ffffff; color: #1e293b; line-height: 1.6; }
   .page { max-width: 820px; margin: 0 auto; padding: 48px 40px; }
-  @media print { body { background: #fff; color: #18181b; } .page { padding: 24px; } .section { border-color: #e4e4e7 !important; } .tag { background: #f4f4f5 !important; color: #3f3f46 !important; border-color: #d4d4d8 !important; } .metric-card { background: #f9fafb !important; border-color: #e4e4e7 !important; } .outline-card { background: #f9fafb !important; border-color: #e4e4e7 !important; } .summary-box { background: #f0fdfa !important; border-color: #99f6e4 !important; } .no-print { display: none !important; } }
-  .print-bar { position: fixed; top: 0; left: 0; right: 0; background: #18181b; border-bottom: 1px solid #27272a; padding: 10px 24px; display: flex; align-items: center; justify-content: space-between; z-index: 100; }
-  .print-bar button { background: #2ed9c3; color: #0a0c10; border: none; padding: 8px 24px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
-  .print-bar button:hover { background: #5eead4; }
-  .print-bar .info { font-size: 12px; color: #71717a; }
-  body { padding-top: 52px; } @media print { body { padding-top: 0; } }
+  @media print { .no-print { display: none !important; } body { padding-top: 0; } .page { padding: 24px; } }
+  .print-bar { position: fixed; top: 0; left: 0; right: 0; background: #0f172a; border-bottom: 1px solid #1e293b; padding: 10px 24px; display: flex; align-items: center; justify-content: space-between; z-index: 100; }
+  .print-bar button { background: #0d9488; color: #fff; border: none; padding: 8px 24px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .print-bar button:hover { background: #0f766e; }
+  .print-bar .info { font-size: 12px; color: #94a3b8; }
+  body { padding-top: 52px; }
 
-  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 40px; padding-bottom: 24px; border-bottom: 1px solid #27272a; }
-  .header-left h1 { font-size: 24px; font-weight: 700; color: #2ed9c3; margin-bottom: 4px; }
-  .header-left .subtitle { font-size: 13px; color: #71717a; }
-  .logo { opacity: 0.9; }
+  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 40px; padding-bottom: 24px; border-bottom: 1px solid #e2e8f0; }
+  .header-left h1 { font-size: 24px; font-weight: 700; color: #0d9488; margin-bottom: 4px; }
+  .header-left .subtitle { font-size: 13px; color: #64748b; }
+  .logo { opacity: 0.9; filter: brightness(0) saturate(100%) invert(25%) sepia(10%) saturate(500%) hue-rotate(180deg); }
 
-  .summary-box { background: rgba(46,217,195,0.05); border: 1px solid rgba(46,217,195,0.2); border-radius: 12px; padding: 20px 24px; margin-bottom: 28px; }
-  .summary-box .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #2ed9c3; font-weight: 600; margin-bottom: 8px; }
-  .summary-box p { font-size: 14px; color: #d4d4d8; }
+  .summary-box { background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 12px; padding: 20px 24px; margin-bottom: 28px; }
+  .summary-box .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #0d9488; font-weight: 600; margin-bottom: 8px; }
+  .summary-box p { font-size: 14px; color: #334155; }
 
   .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px; }
-  .metric-card { background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 14px 16px; }
-  .metric-card .mc-label { font-size: 10px; color: #71717a; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .metric-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; }
+  .metric-card .mc-label { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
   .metric-card .mc-value { font-size: 18px; font-weight: 700; }
 
   .section { margin-bottom: 28px; }
-  .section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #71717a; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-  .section-title::after { content: ''; flex: 1; height: 1px; background: #27272a; }
+  .section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: #e2e8f0; }
 
-  .field { background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 14px 18px; margin-bottom: 10px; }
-  .field .fl { font-size: 10px; color: #71717a; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-  .field .fv { font-size: 13px; color: #d4d4d8; }
-  .field .fv.highlight { color: #2ed9c3; font-weight: 600; }
+  .field { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 18px; margin-bottom: 10px; }
+  .field .fl { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .field .fv { font-size: 13px; color: #334155; }
+  .field .fv.highlight { color: #0d9488; font-weight: 600; }
 
   .tags { display: flex; flex-wrap: wrap; gap: 6px; }
-  .tag { display: inline-block; font-size: 11px; padding: 4px 12px; border-radius: 20px; background: #27272a; color: #a1a1aa; border: 1px solid #3f3f46; }
-  .tag.entity { background: rgba(139,92,246,0.1); border-color: rgba(139,92,246,0.3); color: #a78bfa; }
-  .tag.kw-section { background: rgba(46,217,195,0.08); border-color: rgba(46,217,195,0.2); color: #5eead4; font-size: 10px; }
+  .tag { display: inline-block; font-size: 11px; padding: 4px 12px; border-radius: 20px; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+  .tag.entity { background: #f5f3ff; border-color: #c4b5fd; color: #6d28d9; }
+  .tag.kw-section { background: #f0fdfa; border-color: #99f6e4; color: #0f766e; font-size: 10px; }
 
-  .outline-card { background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 16px 18px; margin-bottom: 10px; }
-  .outline-card .oh { font-size: 14px; font-weight: 600; color: #e4e4e7; display: flex; align-items: center; justify-content: space-between; }
-  .outline-card .oh .wc { font-size: 10px; background: #27272a; color: #71717a; padding: 3px 10px; border-radius: 6px; font-weight: 500; }
-  .outline-card .on { font-size: 12px; color: #a1a1aa; margin-top: 6px; line-height: 1.5; }
+  .outline-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px 18px; margin-bottom: 10px; }
+  .outline-card .oh { font-size: 14px; font-weight: 600; color: #0f172a; display: flex; align-items: center; justify-content: space-between; }
+  .outline-card .oh .wc { font-size: 10px; background: #e2e8f0; color: #64748b; padding: 3px 10px; border-radius: 6px; font-weight: 500; }
+  .outline-card .on { font-size: 12px; color: #475569; margin-top: 6px; line-height: 1.5; }
   .outline-card .okw { margin-top: 8px; }
 
-  .question { display: flex; gap: 10px; align-items: flex-start; background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 12px 16px; margin-bottom: 6px; }
-  .question .qn { color: #fbbf24; font-weight: 700; font-size: 12px; flex-shrink: 0; }
-  .question .qt { font-size: 13px; color: #d4d4d8; }
+  .question { display: flex; gap: 10px; align-items: flex-start; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 16px; margin-bottom: 6px; }
+  .question .qn { color: #b45309; font-weight: 700; font-size: 12px; flex-shrink: 0; }
+  .question .qt { font-size: 13px; color: #334155; }
 
   .serp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px; }
-  .gap-item { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; color: #86efac; margin-bottom: 4px; }
-  .gap-item .arrow { color: #4ade80; flex-shrink: 0; }
+  .gap-item { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; color: #15803d; margin-bottom: 4px; }
+  .gap-item .arrow { color: #16a34a; flex-shrink: 0; }
 
-  .cta-item { display: flex; gap: 10px; align-items: flex-start; background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 12px 16px; margin-bottom: 6px; }
+  .cta-item { display: flex; gap: 10px; align-items: flex-start; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 16px; margin-bottom: 6px; }
   .cta-badge { font-size: 9px; padding: 3px 10px; border-radius: 6px; font-weight: 600; flex-shrink: 0; }
-  .cta-badge.primary { background: rgba(46,217,195,0.15); color: #2ed9c3; }
-  .cta-badge.secondary { background: #27272a; color: #71717a; }
+  .cta-badge.primary { background: #f0fdfa; color: #0d9488; border: 1px solid #99f6e4; }
+  .cta-badge.secondary { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
 
   .eeat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .eeat-card { background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 14px 16px; }
+  .eeat-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; }
   .eeat-card .eeat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-bottom: 6px; }
-  .eeat-card .eeat-value { font-size: 12px; color: #a1a1aa; line-height: 1.6; }
-  .checklist-wrap { background: #18181b; border: 1px solid #27272a; border-radius: 10px; overflow: hidden; }
-  .checklist-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 16px; border-bottom: 1px solid rgba(39,39,42,0.5); font-size: 12px; color: #a1a1aa; line-height: 1.5; }
+  .eeat-card .eeat-value { font-size: 12px; color: #475569; line-height: 1.6; }
+  .checklist-wrap { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; }
+  .checklist-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 16px; border-bottom: 1px solid #e2e8f0; font-size: 12px; color: #475569; line-height: 1.5; }
   .checklist-item:last-child { border-bottom: none; }
-  .checklist-box { width: 14px; height: 14px; border: 1.5px solid #52525b; border-radius: 3px; flex-shrink: 0; margin-top: 2px; }
-  .schema-card { background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 14px 16px; margin-bottom: 8px; }
-  .schema-badge { display: inline-block; font-size: 10px; padding: 3px 10px; border-radius: 6px; background: rgba(34,211,238,0.1); border: 1px solid rgba(34,211,238,0.25); color: #22d3ee; font-weight: 600; margin-bottom: 6px; }
-  .schema-notes { font-size: 12px; color: #a1a1aa; line-height: 1.5; }
+  .checklist-box { width: 14px; height: 14px; border: 1.5px solid #94a3b8; border-radius: 3px; flex-shrink: 0; margin-top: 2px; }
+  .schema-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; margin-bottom: 8px; }
+  .schema-badge { display: inline-block; font-size: 10px; padding: 3px 10px; border-radius: 6px; background: #ecfeff; border: 1px solid #a5f3fc; color: #0e7490; font-weight: 600; margin-bottom: 6px; }
+  .schema-notes { font-size: 12px; color: #475569; line-height: 1.5; }
 
-  .footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid #27272a; text-align: center; font-size: 11px; color: #52525b; }
-  .footer a { color: #2ed9c3; text-decoration: none; }
+  .footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 11px; color: #94a3b8; }
+  .footer a { color: #0d9488; text-decoration: none; }
 </style>
 </head>
 <body>
@@ -133,9 +133,9 @@ export function renderBriefHTML(brief: ContentBrief): string {
   </div>
 
   <div class="metrics">
-    <div class="metric-card"><div class="mc-label">Word Count</div><div class="mc-value" style="color:#60a5fa">${b.wordCountTarget.toLocaleString()}</div></div>
-    <div class="metric-card"><div class="mc-label">Intent</div><div class="mc-value" style="color:#d4d4d8;font-size:14px;text-transform:capitalize">${esc(b.intent)}</div></div>
-    ${b.contentFormat ? `<div class="metric-card"><div class="mc-label">Format</div><div class="mc-value" style="color:#fbbf24;font-size:14px;text-transform:capitalize">${esc(b.contentFormat)}</div></div>` : ''}
+    <div class="metric-card"><div class="mc-label">Word Count</div><div class="mc-value" style="color:#2563eb">${b.wordCountTarget.toLocaleString()}</div></div>
+    <div class="metric-card"><div class="mc-label">Intent</div><div class="mc-value" style="color:#334155;font-size:14px;text-transform:capitalize">${esc(b.intent)}</div></div>
+    ${b.contentFormat ? `<div class="metric-card"><div class="mc-label">Format</div><div class="mc-value" style="color:#b45309;font-size:14px;text-transform:capitalize">${esc(b.contentFormat)}</div></div>` : ''}
     ${b.difficultyScore != null ? `<div class="metric-card"><div class="mc-label">Difficulty</div><div class="mc-value" style="color:${diffColor(b.difficultyScore)}">${b.difficultyScore}/100</div></div>` : ''}
   </div>
 
@@ -160,7 +160,7 @@ export function renderBriefHTML(brief: ContentBrief): string {
       <div class="field"><div class="fl">Avg Word Count</div><div class="fv">${b.serpAnalysis.avgWordCount.toLocaleString()}</div></div>
     </div>
     ${b.serpAnalysis.commonElements.length ? `<div class="field"><div class="fl">Common Elements</div><div class="tags" style="margin-top:6px">${b.serpAnalysis.commonElements.map(el => `<span class="tag">${esc(el)}</span>`).join('')}</div></div>` : ''}
-    ${b.serpAnalysis.gaps.length ? `<div class="field"><div class="fl" style="color:#86efac">Content Gaps &amp; Opportunities</div><div style="margin-top:6px">${b.serpAnalysis.gaps.map(g => `<div class="gap-item"><span class="arrow">&rarr;</span>${esc(g)}</div>`).join('')}</div></div>` : ''}
+    ${b.serpAnalysis.gaps.length ? `<div class="field"><div class="fl" style="color:#15803d">Content Gaps &amp; Opportunities</div><div style="margin-top:6px">${b.serpAnalysis.gaps.map(g => `<div class="gap-item"><span class="arrow">&rarr;</span>${esc(g)}</div>`).join('')}</div></div>` : ''}
   </div>` : ''}
 
   ${b.outline.length > 0 ? `<div class="section">
@@ -179,15 +179,15 @@ export function renderBriefHTML(brief: ContentBrief): string {
 
   ${b.competitorInsights ? `<div class="section"><div class="section-title">Competitor Insights</div><div class="field"><div class="fv">${esc(b.competitorInsights)}</div></div></div>` : ''}
 
-  ${b.internalLinkSuggestions.length > 0 ? `<div class="section"><div class="section-title">Internal Link Suggestions</div><div class="tags">${b.internalLinkSuggestions.map(l => `<span class="tag" style="color:#60a5fa">/${esc(l)}</span>`).join('')}</div></div>` : ''}
+  ${b.internalLinkSuggestions.length > 0 ? `<div class="section"><div class="section-title">Internal Link Suggestions</div><div class="tags">${b.internalLinkSuggestions.map(l => `<span class="tag" style="color:#2563eb">/${esc(l)}</span>`).join('')}</div></div>` : ''}
 
   ${b.eeatGuidance ? `<div class="section">
     <div class="section-title">E-E-A-T Signals</div>
     <div class="eeat-grid">
-      ${b.eeatGuidance.experience ? `<div class="eeat-card"><div class="eeat-label" style="color:#60a5fa">Experience</div><div class="eeat-value">${esc(b.eeatGuidance.experience)}</div></div>` : ''}
-      ${b.eeatGuidance.expertise ? `<div class="eeat-card"><div class="eeat-label" style="color:#2ed9c3">Expertise</div><div class="eeat-value">${esc(b.eeatGuidance.expertise)}</div></div>` : ''}
-      ${b.eeatGuidance.authority ? `<div class="eeat-card"><div class="eeat-label" style="color:#a78bfa">Authority</div><div class="eeat-value">${esc(b.eeatGuidance.authority)}</div></div>` : ''}
-      ${b.eeatGuidance.trust ? `<div class="eeat-card"><div class="eeat-label" style="color:#fbbf24">Trust</div><div class="eeat-value">${esc(b.eeatGuidance.trust)}</div></div>` : ''}
+      ${b.eeatGuidance.experience ? `<div class="eeat-card"><div class="eeat-label" style="color:#2563eb">Experience</div><div class="eeat-value">${esc(b.eeatGuidance.experience)}</div></div>` : ''}
+      ${b.eeatGuidance.expertise ? `<div class="eeat-card"><div class="eeat-label" style="color:#0d9488">Expertise</div><div class="eeat-value">${esc(b.eeatGuidance.expertise)}</div></div>` : ''}
+      ${b.eeatGuidance.authority ? `<div class="eeat-card"><div class="eeat-label" style="color:#7c3aed">Authority</div><div class="eeat-value">${esc(b.eeatGuidance.authority)}</div></div>` : ''}
+      ${b.eeatGuidance.trust ? `<div class="eeat-card"><div class="eeat-label" style="color:#b45309">Trust</div><div class="eeat-value">${esc(b.eeatGuidance.trust)}</div></div>` : ''}
     </div>
   </div>` : ''}
 
@@ -204,7 +204,7 @@ export function renderBriefHTML(brief: ContentBrief): string {
   </div>` : ''}
 
   <div class="footer">
-    <div style="margin-bottom:8px">${LOGO_SVG.replace('width="160" height="51"', 'width="100" height="32"')}</div>
+    <div style="margin-bottom:8px;filter:brightness(0) saturate(100%) invert(25%) sepia(10%) saturate(500%) hue-rotate(180deg)">${LOGO_SVG.replace('width="160" height="51"', 'width="100" height="32"')}</div>
     Prepared by <a href="https://hmpsn.studio">HMPSN Studio</a> &mdash; ${date}
   </div>
 </div>
