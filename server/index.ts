@@ -4749,4 +4749,16 @@ server.listen(PORT, '0.0.0.0', () => {
   for (const ws of workspaces) {
     console.log(`[startup]   - ${ws.name}: siteId=${ws.webflowSiteId || 'none'}, hasToken=${!!ws.webflowToken}`);
   }
+  // Reports directory diagnostics
+  const reportsDir = path.join(dataDir, 'reports');
+  const reportsExists = fs.existsSync(reportsDir);
+  console.log(`[startup] REPORTS_DIR=${reportsDir} exists=${reportsExists}`);
+  if (reportsExists) {
+    const siteDirs = fs.readdirSync(reportsDir);
+    console.log(`[startup] Report site dirs: ${siteDirs.length > 0 ? siteDirs.join(', ') : '(empty)'}`);
+    for (const sd of siteDirs) {
+      const files = fs.readdirSync(path.join(reportsDir, sd)).filter(f => f.endsWith('.json'));
+      console.log(`[startup]   ${sd}: ${files.length} snapshot(s)`);
+    }
+  }
 });
