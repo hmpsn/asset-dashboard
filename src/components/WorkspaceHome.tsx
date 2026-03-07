@@ -61,13 +61,20 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const f = async (url: string): Promise<any> => {
-      try { const r = await fetch(url); if (!r.ok) return null; return r.json(); } catch { return null; }
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 15000);
+        const r = await fetch(url, { signal: controller.signal });
+        clearTimeout(timer);
+        if (!r.ok) return null;
+        return r.json();
+      } catch { return null; }
     };
 
     const urls: Array<{ key: string; url: string }> = [
-      { key: 'audit', url: `/api/public/audit/${workspaceId}` },
+      { key: 'audit', url: `/api/public/audit-summary/${workspaceId}` },
       { key: 'ranks', url: `/api/rank-tracking/${workspaceId}/latest` },
-      { key: 'requests', url: `/api/requests/${workspaceId}` },
+      { key: 'requests', url: `/api/requests?workspaceId=${workspaceId}` },
       { key: 'content', url: `/api/content-requests/${workspaceId}` },
       { key: 'activity', url: `/api/activity?workspaceId=${workspaceId}&limit=8` },
       { key: 'annotations', url: `/api/annotations/${workspaceId}` },
@@ -93,7 +100,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
         if (key === 'annotations' && Array.isArray(d)) setAnnotations(d.slice(0, 5));
       }
       setLoading(false);
-    });
+    }).catch(() => { if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; };
   }, [workspaceId, gscPropertyUrl, ga4PropertyId]);
