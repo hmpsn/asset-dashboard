@@ -74,16 +74,21 @@ Inter loaded from Google Fonts: 300–700.
 
 ### Accent Colors
 
-| Name | Dark Mode | Light Mode | Usage |
-|------|-----------|------------|-------|
-| Teal (brand) | #2dd4bf | #0d9488 | Primary accent, active states, CTAs |
-| Blue | #60a5fa | #2563eb | Clicks, links, info |
-| Emerald | #34d399 | #047857 | Success, good scores (80+) |
-| Green | #4ade80 | #15803d | Positive deltas |
-| Amber | #fbbf24 | #b45309 | Warnings, medium scores (60-79) |
-| Red | #f87171 | #dc2626 | Errors, bad scores (<60) |
-| Orange | #fb923c | #c2410c | Attention, urgent |
-| Purple | #a78bfa | #7c3aed | Sessions, secondary metrics |
+| Name | Dark Mode | Light Mode | Contrast | Usage |
+|------|-----------|------------|----------|-------|
+| Teal (brand) | #2dd4bf | #0d9488 | 4.5:1 | Primary accent, active states, CTAs |
+| Blue | #60a5fa | #2563eb | 4.6:1 | Clicks, links, info |
+| Emerald | #34d399 | #047857 | 5.5:1 | Success, good scores (80+) |
+| Green | #4ade80 | #15803d | 5.2:1 | Positive deltas |
+| Amber | #fbbf24 | #b45309 | 5.4:1 | Warnings, medium scores (60-79) |
+| Red | #f87171 | #dc2626 | 4.6:1 | Errors, bad scores (<60) |
+| Orange | #fb923c | #c2410c | 5.2:1 | Attention, urgent |
+| Cyan | #22d3ee | #0e7490 | 5.6:1 | Asset tools, social, navigational intent |
+| Sky | #38bdf8 | #0369a1 | 7.0:1 | Accessibility category |
+| Yellow | #eab308 | #a16207 | 5.2:1 | Warnings (SalesReport, AssetAudit) |
+| Purple | #a78bfa | #7c3aed | 4.6:1 | Sessions, secondary metrics |
+
+> **Contrast column** = ratio against white (#fff) in light mode. All meet WCAG AA (≥4.5:1).
 
 ---
 
@@ -319,6 +324,45 @@ src/components/ui/
 ├── EmptyState.tsx       # Placeholder for empty/unconfigured states
 ├── TabBar.tsx           # Sub-navigation tabs
 ```
+
+---
+
+## Text Casing Conventions
+
+| Context | Casing | CSS Classes |
+|---------|--------|-------------|
+| **Stat card labels** | ALL CAPS (via CSS) | `uppercase tracking-wider font-medium` |
+| **Table column headers** | ALL CAPS (via CSS) | `uppercase tracking-wider font-medium` |
+| **Section card titles** | Title Case | (no uppercase class) |
+| **Tab labels** | Title Case | (no uppercase class) |
+| **Badge text** | As-provided | (no uppercase class) |
+| **Button text** | Title Case | (no uppercase class) |
+| **Page headers** | Title Case | (no uppercase class) |
+
+**Rule**: If it's a small label beneath or beside a metric number, use `uppercase tracking-wider`. If it's a section header, tab, or button, use Title Case.
+
+---
+
+## WCAG Accessibility
+
+### Text Contrast (AA = ≥4.5:1 for normal text, ≥3:1 for large text)
+
+- All accent text colors in light mode are mapped to darker shades that meet AA on white
+- Dark mode text is boosted (zinc-500 → #a1a1aa, zinc-400 → #b4b4bc) for readability
+- Minimum font size enforced at 12px (text-[11px] overridden to 12px)
+
+### Interactive Elements
+
+- All buttons have `transition-colors` for hover feedback
+- Focus rings: `2px solid teal` with `2px offset` on `:focus-visible`
+- Clickable cards: `hover:border-zinc-700` + subtle shadow lift
+- Tinted pill buttons (bg-X-600/20 text-X-300): text color maps to ≥4.5:1 shade in light mode
+
+### Color-Only Indicators
+
+- Score rings use both color AND numeric value
+- Severity badges use both color AND icon (AlertTriangle, Info, CheckCircle)
+- Delta indicators use both color AND directional arrow (↑/↓)
 
 ---
 

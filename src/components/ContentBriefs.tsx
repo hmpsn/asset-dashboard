@@ -473,22 +473,22 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                       {/* Key Metrics Row */}
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
-                          <div className="text-[11px] text-zinc-500 mb-0.5">Word Count</div>
+                          <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-0.5">Word Count</div>
                           <div className="text-sm font-bold text-blue-400">{inlineBrief.wordCountTarget?.toLocaleString()}</div>
                         </div>
                         <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
-                          <div className="text-[11px] text-zinc-500 mb-0.5">Intent</div>
+                          <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-0.5">Intent</div>
                           <div className="text-xs text-zinc-300 capitalize font-medium">{inlineBrief.intent}</div>
                         </div>
                         {inlineBrief.contentFormat && (
                           <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
-                            <div className="text-[11px] text-zinc-500 mb-0.5">Format</div>
+                            <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-0.5">Format</div>
                             <div className="text-xs text-amber-400 capitalize font-medium">{inlineBrief.contentFormat}</div>
                           </div>
                         )}
                         {inlineBrief.difficultyScore != null && (
                           <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
-                            <div className="text-[11px] text-zinc-500 mb-0.5">Difficulty</div>
+                            <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-0.5">Difficulty</div>
                             <div className={`text-sm font-bold ${inlineBrief.difficultyScore <= 30 ? 'text-green-400' : inlineBrief.difficultyScore <= 60 ? 'text-amber-400' : 'text-red-400'}`}>{inlineBrief.difficultyScore}/100</div>
                           </div>
                         )}
@@ -498,7 +498,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                       {inlineBrief.trafficPotential && (
                         <div className="flex items-start gap-2 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
                           <TrendingUp className="w-3.5 h-3.5 text-green-400 mt-0.5 flex-shrink-0" />
-                          <div><div className="text-[11px] text-zinc-500 mb-0.5">Traffic Potential</div><div className="text-xs text-zinc-300">{inlineBrief.trafficPotential}</div></div>
+                          <div><div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-0.5">Traffic Potential</div><div className="text-xs text-zinc-300">{inlineBrief.trafficPotential}</div></div>
                         </div>
                       )}
 
@@ -883,22 +883,22 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                   {/* Key Metrics Row */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
-                      <div className="text-[11px] text-zinc-500 mb-0.5">Word Count</div>
+                      <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-0.5">Word Count</div>
                       <div className="text-sm font-bold text-blue-400">{brief.wordCountTarget.toLocaleString()}</div>
                     </div>
                     <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
-                      <div className="text-[11px] text-zinc-500 mb-0.5">Intent</div>
+                      <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-0.5">Intent</div>
                       <div className="text-xs text-zinc-300 capitalize font-medium">{brief.intent}</div>
                     </div>
                     {brief.contentFormat && (
                       <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
-                        <div className="text-[11px] text-zinc-500 mb-0.5">Format</div>
+                        <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-0.5">Format</div>
                         <div className="text-xs text-amber-400 capitalize font-medium">{brief.contentFormat}</div>
                       </div>
                     )}
                     {brief.difficultyScore != null && (
                       <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
-                        <div className="text-[11px] text-zinc-500 mb-0.5">Difficulty</div>
+                        <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-0.5">Difficulty</div>
                         <div className={`text-sm font-bold ${brief.difficultyScore <= 30 ? 'text-green-400' : brief.difficultyScore <= 60 ? 'text-amber-400' : 'text-red-400'}`}>{brief.difficultyScore}/100</div>
                       </div>
                     )}
@@ -908,7 +908,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                   {brief.trafficPotential && (
                     <div className="flex items-start gap-2 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
                       <TrendingUp className="w-3.5 h-3.5 text-green-400 mt-0.5 flex-shrink-0" />
-                      <div><div className="text-[11px] text-zinc-500 mb-0.5">Traffic Potential</div><div className="text-xs text-zinc-300">{brief.trafficPotential}</div></div>
+                      <div><div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-0.5">Traffic Potential</div><div className="text-xs text-zinc-300">{brief.trafficPotential}</div></div>
                     </div>
                   )}
 
