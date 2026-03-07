@@ -393,6 +393,28 @@ A brief value assessment of every feature in the platform, covering what it does
 
 ---
 
+### 36. Roadmap Dashboard
+**What it does:** Interactive admin-side roadmap tracker with 34 items across 7 prioritized sprints. Each item shows title, effort estimate, source document, priority tier (P0–P4), and a click-to-cycle status toggle (pending → in_progress → done). Status persists to server via `/api/roadmap-status`. Priority filter dropdown. Overall + per-sprint progress bars. Collapsible sprint sections.
+
+**Agency value:** A single place to see what's next, what's in progress, and what's done — without digging through markdown files. Status tracking survives sessions.
+
+**Client value:** N/A — internal agency tool.
+
+**Mutual:** Keeps development focused and accountable. No lost context between work sessions.
+
+---
+
+### 37. Command Center Cockpit
+**What it does:** Upgraded Workspace Overview that serves as the platform's home screen when no workspace is selected. Shows: **Needs Attention** alerts (new requests, pending approvals, low health scores, unlinked workspaces), **Global Stats** bar (StatCard primitives for requests, approvals, content, health), **Roadmap Progress** panel (overall bar + sprint list with "Current" badge and "View Full →" link), **Platform Health** panel (API connection status for OpenAI, Webflow, Google Auth, Email; workspace counts; feature count), workspace cards, and recent activity feed. All using shared UI primitives (PageHeader, SectionCard, StatCard, Badge).
+
+**Agency value:** Instant situational awareness on login — see what needs attention across all clients without clicking into each workspace. Roadmap progress visible at a glance.
+
+**Client value:** N/A — admin-only view.
+
+**Mutual:** Reduces the "what should I work on next?" friction. Everything important is surfaced in one screen.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
@@ -402,9 +424,9 @@ A brief value assessment of every feature in the platform, covering what it does
 | Content & Strategy | 3 | Strategy → brief → approval → production pipeline |
 | Client Communication | 5 | Structured workflows replace email chaos |
 | Client Self-Service | 6 | 24/7 data access reduces reporting overhead |
-| Platform & UX | 4 | Design system, styleguide, cross-linking, sales tooling |
+| Platform & UX | 6 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit |
 
-**35 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**37 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
 ---
 
@@ -505,4 +527,4 @@ When the user asks to update this document with recent features, follow this pro
 7. **Update Summary table**: Adjust category counts and total feature count.
 8. **Commit**: `git add FEATURE_AUDIT.md && git commit -m "docs: update FEATURE_AUDIT with recent features"`
 
-Current feature count: **35**. Last updated: March 2026.
+Current feature count: **37**. Last updated: March 2026.
