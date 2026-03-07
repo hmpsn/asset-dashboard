@@ -22,6 +22,7 @@
       "hours": "26-37",
       "rationale": "Monetize content deliverables and establish user identity. Revenue + infrastructure.",
       "items": [
+        { "id": 78, "title": "Pre-Stripe security hardening", "source": "Security Audit", "est": "1h", "priority": "P0", "notes": "Helmet security headers (CSP whitelists Stripe domains), HTTPS enforcement in production, rate limiting on all public routes (60/min read, 10/min write, 5/min checkout), input sanitization (sanitizeString + validateEnum) on content request endpoints, Stripe webhook raw body placeholder", "status": "done" },
         { "id": 4, "title": "Stripe integration: content payments", "source": "MONETIZATION.md Phase 1", "est": "5-7h", "priority": "P0", "notes": "Stripe Checkout for briefs, posts, schemas, strategies. Webhook handler, payment tracking per workspace. server/stripe.ts + server/payments.ts", "status": "pending" },
         { "id": 65, "title": "Workspace tier field + TierGate component", "source": "MONETIZATION.md UX Spec", "est": "1-2h", "priority": "P0", "notes": "Add tier: free|growth|premium to Workspace interface. Create <TierGate> component with blur overlay + upgrade CTA. GET /api/public/tier/:wsId endpoint", "status": "pending" },
         { "id": 66, "title": "Soft-gate dashboard sections", "source": "MONETIZATION.md UX Spec", "est": "1.5-2h", "priority": "P0", "notes": "Wrap ~10-15 sections in TierGate: Strategy page map, content gaps, brief generation, approve/reject buttons, custom date ranges, chat input after limit", "status": "pending" },

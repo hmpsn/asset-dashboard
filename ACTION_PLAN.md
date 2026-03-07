@@ -41,6 +41,7 @@ Priority tiers:
 
 | # | Item | Source | Est. | Priority | Notes |
 |---|------|--------|:----:|:--------:|-------|
+| 78 | ~~**Pre-Stripe security hardening**~~ — Helmet security headers (CSP whitelists Stripe), HTTPS enforcement, rate limiting (60/min read, 10/min write, 5/min checkout), input sanitization on content endpoints | Security Audit | 1h | 🔴 P0 | ✅ Shipped — foundation for payment routes |
 | 4 | **Stripe integration: content payments** — Stripe Checkout for briefs, posts, schemas, strategies. Webhook handler, payment tracking per workspace. `server/stripe.ts` + `server/payments.ts` | MONETIZATION.md Phase 1 | 5-7h | 🔴 P0 | Direct revenue from existing content pipeline |
 | 65 | **Workspace tier field + TierGate component** — Add `tier: free\|growth\|premium` to Workspace. Create `<TierGate>` with blur overlay + upgrade CTA. `GET /api/public/tier/:wsId` | MONETIZATION.md UX Spec | 1-2h | 🔴 P0 | Foundation for all tier gating |
 | 66 | **Soft-gate dashboard sections** — Wrap ~10-15 sections in TierGate: Strategy page map, content gaps, brief generation, approve/reject, custom date ranges, chat input after limit | MONETIZATION.md UX Spec | 1.5-2h | 🔴 P0 | Depends on #65 |
@@ -166,12 +167,12 @@ Priority tiers:
 
 | Bucket | Items | Total Hours |
 |--------|:-----:|:-----------:|
-| 🔴 P0 — Do now | 15 items (#1-7, #25-26, #65-70, #72) | 54-75h |
+| 🔴 P0 — Do now | 16 items (#1-7, #25-26, #65-70, #72, #78) | 55-76h |
 | 🟠 P1 — Do next | 12 items (#8-13, #27-30, #71, #73-75) | 30-44h |
 | 🟡 P2 — Do soon | 14 items (#14-17, #18-19, #31-37, #76-77) | 33-48h |
 | 🟢 P3 — Backlog | 13 items (#20-24, #38-44) | 32-46h |
 | ⚪ P4 — Someday | 8 items (#45-52) | 19-26h |
-| **Total** | **65 items** | **168-239h** |
+| **Total** | **66 items** | **169-240h** |
 
 ### Critical path (first 4 sprints)
 
@@ -187,7 +188,7 @@ Sprint 3:  Data Quality + Dashboard  ✅       →   8-12 hrs  →  Shipped
 ### Recommended execution cadence
 
 - **Sprint 1**: ✅ Shipped.
-- **Sprint 2**: Start tonight (Stripe). Tier gating + auth can interleave.
+- **Sprint 2**: Security hardening shipped. Stripe next. Tier gating + auth can interleave.
 - **Sprint 2b**: Immediately after Sprint 2. Trial + pricing + page types maximize conversion.
 - **Sprint 3**: ✅ Shipped.
 - **Sprint 4/4b**: ✅ Shipped.
@@ -220,6 +221,7 @@ Track key decisions here as they're made:
 | 2026-03-07 | Page-type content products expanded | 8 brief types + 8 full content types: blog, landing, service, location, product, pillar, resource/guide. Mapped to strategy engine content opportunities. |
 | 2026-03-07 | Revenue Intelligence sprint added | ROI dashboard (Premium), churn prevention signals, credits system, usage tracking. Sprint 5 in roadmap. |
 | 2026-03-07 | 13 new items added to roadmap | 52 → 65 total items. New sprints: 2b (Monetization UX), 5 (Revenue Intelligence). Items #65-77. |
+| 2026-03-07 | Pre-Stripe security hardening shipped | Helmet (CSP for Stripe domains), HTTPS enforcement, 3-tier rate limiting on public routes, input sanitization on all content endpoints. Item #78. |
 | | | |
 
 ---
@@ -227,5 +229,5 @@ Track key decisions here as they're made:
 *Compiled: March 7, 2026*
 *Last updated: March 7, 2026 (Monetization strategy: tiers, trial, page types, ROI, churn, credits wired into roadmap)*
 *Next review: During Sprint 2 (Stripe integration)*
-*Total items tracked: 65*
+*Total items tracked: 66*
 *Data source: Server-side roadmap.json (managed via /api/roadmap)*

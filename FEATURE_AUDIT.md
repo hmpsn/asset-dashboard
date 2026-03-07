@@ -446,7 +446,18 @@ A brief value assessment of every feature in the platform, covering what it does
 
 **Mutual:** Eliminates the "let me pull up the data" delay. Every workspace conversation starts from a position of full awareness.
 
-### 41. Automated Monthly Reports
+### 42. Security Hardening
+**What it does:** Pre-payment security layer across the Express server. **Helmet** adds security headers on all responses (X-Content-Type-Options, X-Frame-Options, Strict-Transport-Security, CSP whitelisting Stripe domains in production). **HTTPS enforcement** redirects all HTTP traffic to HTTPS in production via `X-Forwarded-Proto` proxy trust. **3-tier rate limiting** on all public API routes: 60 req/min general reads, 10/min writes (POST/PATCH/DELETE), 5/min checkout (pre-wired for Stripe). **Input sanitization** via `sanitizeString()` (trim, length cap, control character stripping) and `validateEnum()` applied to all content request write endpoints. **Stripe webhook placeholder** marks the correct mount point before `express.json()` for raw body parsing.
+
+**Agency value:** Production-grade security posture before accepting payments. Prevents abuse of public APIs, protects against XSS/clickjacking, and ensures Stripe integration has a secure foundation.
+
+**Client value:** Payment data handled securely. Dashboard protected against common web attacks. Rate limiting prevents service degradation.
+
+**Mutual:** Security is invisible when done right — clients trust the platform, agency avoids liability. Foundation for PCI-compliant payment flows.
+
+---
+
+### 43. Automated Monthly Reports
 **What it does:** Auto-generated monthly report emails sent to clients on a configurable schedule. `gatherMonthlyData` aggregates site health audit (score, delta, errors, warnings), requests completed/open, approvals applied/pending, activity log, and now **traffic trends**: GSC period comparison (clicks, impressions with % change vs previous 28 days) and GA4 period comparison (users, sessions, pageviews with % change). **Chat topic summaries**: `listSessions` fetches recent client chat sessions with AI-generated summaries from the current month; up to 5 displayed in a "Topics You Asked About" section with green-tinted cards showing conversation title + summary. `renderMonthlyReport` in `email-templates.ts` generates a branded HTML email with a health score ring, traffic trends grid (each metric shows current value + arrow + % change vs previous period), metrics grid (requests, approvals, activities), recent activity feed, chat topics section, and pending approval alerts. Manual trigger via `triggerMonthlyReport()` or automatic via `startMonthlyReports()` scheduler.
 
 **Agency value:** Monthly reporting that writes itself. Traffic trends show clients their site is growing (or flag problems) without manual data pulls. Chat topic summaries show the agency what clients care about. Positions the agency as proactive — clients get a polished, personalized report without anyone remembering to send it.
@@ -467,9 +478,10 @@ A brief value assessment of every feature in the platform, covering what it does
 | Client Communication | 6 | Structured workflows + automated reports replace email chaos |
 | Client Self-Service | 6 | 24/7 data access reduces reporting overhead |
 | AI & Intelligence | 3 | Full-spectrum AI advisor + revenue engine + knowledge base + memory |
+| Security | 1 | Helmet, HTTPS, rate limiting, input sanitization |
 | Platform & UX | 7 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home |
 
-**42 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**43 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
 ---
 
@@ -585,4 +597,4 @@ When the user asks to update this document with recent features, follow this pro
 7. **Update Summary table**: Adjust category counts and total feature count.
 8. **Commit**: `git add FEATURE_AUDIT.md && git commit -m "docs: update FEATURE_AUDIT with recent features"`
 
-Current feature count: **42**. Last updated: March 7, 2026.
+Current feature count: **43**. Last updated: March 7, 2026.

@@ -83,6 +83,16 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 - Keyword strategy context (`buildSeoContext`), brand voice, keyword map
 - Supports 8 page types: blog post, landing page, service page, location page, product page, pillar/hub page, resource/guide *(page-type-specific prompts planned)*
 
+## Security Layer
+
+- **Helmet**: Security headers on all responses. CSP whitelists `js.stripe.com`, `api.stripe.com`, `hooks.stripe.com` in production. Disabled in dev for Vite HMR.
+- **HTTPS enforcement**: 301 redirect for non-HTTPS in production. Trusts `X-Forwarded-Proto` from proxy (Render/Heroku).
+- **Rate limiting**: In-memory per-IP+path. 3 tiers: 60 req/min on all public routes, 10/min on writes (POST/PATCH/DELETE), 5/min on checkout (pre-wired).
+- **Auth**: Admin — `APP_PASSWORD` env → HMAC token in httpOnly cookie. Client — per-workspace password → HMAC session cookie. Both use timing-safe compare.
+- **Session enforcement**: `/api/public/*` routes check client session cookie for password-protected workspaces.
+- **Input sanitization**: `sanitizeString()` (trim, length limit, strip control chars) + `validateEnum()` on all content request write endpoints.
+- **CORS**: Configurable via `ALLOWED_ORIGINS` env var. Defaults to allow-all in dev.
+
 ## Data Flow Patterns
 
 1. **Cached helpers**: `getAuditTrafficForWorkspace` caches GSC+GA4 traffic per workspace for 5 min
@@ -94,8 +104,8 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 
 - `FEATURE_AUDIT.md` — Comprehensive feature inventory (42 features) with agency/client/mutual value
 - `MONETIZATION.md` — Full monetization strategy: tiers, products (8 page types), bundles, UX soft-gating spec, trial strategy, inline pricing, ROI dashboard, churn signals, credits system, white-label resale, Stripe integration spec
-- `ACTION_PLAN.md` — Prioritized execution plan, 65 items across 10 sprints, decision log
+- `ACTION_PLAN.md` — Prioritized execution plan, 66 items across 10 sprints, decision log
 - `AI_CHATBOT_ROADMAP.md` — Chatbot phases, shipped and planned
 - `AUTH_ROADMAP.md` — Authentication/authorization phases
 - `DESIGN_SYSTEM.md` — UI primitives and design tokens
-- `data/roadmap.json` — Sprint-level tracking with item statuses (65 items, managed via /api/roadmap)
+- `data/roadmap.json` — Sprint-level tracking with item statuses (66 items, managed via /api/roadmap)

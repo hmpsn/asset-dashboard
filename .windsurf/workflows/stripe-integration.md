@@ -6,6 +6,12 @@ description: Implement Stripe payments for content deliverables — Phase 1 of m
 
 ## Prerequisites
 
+0. **Security hardening is already in place** (Item #78, shipped):
+   - Helmet with CSP whitelisting Stripe domains
+   - HTTPS enforcement in production
+   - Rate limiting: 60/min reads, 10/min writes, `checkoutLimiter` (5/min) pre-wired
+   - Input sanitization helpers (`sanitizeString`, `validateEnum`) ready to use
+   - Webhook raw body placeholder comment at correct mount point in `server/index.ts`
 1. User must have a Stripe account and the following env vars ready:
 ```
 STRIPE_SECRET_KEY=sk_test_...        # or sk_live_...
