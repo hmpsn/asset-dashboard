@@ -334,8 +334,8 @@ export function InsightsDigest(props: InsightsDigestProps) {
         <div className="w-5 h-5 rounded-md bg-teal-500/15 flex items-center justify-center">
           <Sparkles className="w-3 h-3 text-teal-400" />
         </div>
-        <span className="text-xs font-medium text-zinc-300">Insights</span>
-        <span className="text-[11px] text-zinc-500">{all.length} things to know</span>
+        <span className="text-sm font-semibold text-zinc-200">Insights</span>
+        <span className="text-xs text-zinc-500">{all.length} things to know</span>
       </div>
 
       <div className="space-y-3">
@@ -346,7 +346,7 @@ export function InsightsDigest(props: InsightsDigestProps) {
             <button
               key={insight.id}
               onClick={() => insight.action && props.onNavigate(insight.action.tab)}
-              className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 text-left hover:border-zinc-700 transition-colors cursor-pointer group"
+              className="w-full bg-zinc-900 rounded-xl border border-zinc-800 p-4 text-left hover:border-zinc-700 transition-colors cursor-pointer group"
             >
               {/* Header */}
               <div className="flex items-center gap-1.5 mb-2">

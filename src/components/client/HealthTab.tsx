@@ -40,6 +40,10 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity = 'a
 
   if (auditDetail) return (
     <div className="space-y-5">
+      <div className="mb-2">
+        <h2 className="text-xl font-semibold text-zinc-100">Site Health</h2>
+        <p className="text-sm text-zinc-500 mt-1">{auditDetail.audit.totalPages} pages · Last scanned {new Date(auditDetail.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+      </div>
       <div className="grid grid-cols-3 gap-5">
         {/* Score ring */}
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6 flex flex-col items-center justify-center">

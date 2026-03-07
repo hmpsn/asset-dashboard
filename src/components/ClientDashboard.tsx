@@ -968,9 +968,9 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         {/* ════════════ OVERVIEW TAB ════════════ */}
         {tab === 'overview' && (<>
           {/* Welcome header */}
-          <div className="mb-1">
-            <h2 className="text-base font-semibold text-zinc-100">Welcome back</h2>
-            <p className="text-xs text-zinc-500 mt-0.5">Here are your latest insights</p>
+          <div className="mb-2">
+            <h2 className="text-xl font-semibold text-zinc-100">Welcome back</h2>
+            <p className="text-sm text-zinc-500 mt-1">Here are your latest insights</p>
           </div>
 
           {/* Action-needed banner */}
@@ -1165,6 +1165,11 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         {/* ════════════ SEARCH TAB ════════════ */}
         {tab === 'search' && (<>
           {overview ? (<>
+            <div className="mb-2">
+              <h2 className="text-xl font-semibold text-zinc-100">Search Performance</h2>
+              <p className="text-sm text-zinc-500 mt-1">{overview.dateRange.start} — {overview.dateRange.end}</p>
+            </div>
+
             {/* Compact metrics bar */}
             <CompactStatBar items={[
               { label: 'Clicks', value: overview.totalClicks.toLocaleString(), valueColor: 'text-blue-400', sub: searchComparison ? `${searchComparison.changePercent.clicks > 0 ? '+' : ''}${searchComparison.changePercent.clicks}%` : undefined, subColor: searchComparison ? (searchComparison.changePercent.clicks >= 0 ? 'text-emerald-400' : 'text-red-400') : undefined },
@@ -1176,7 +1181,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
             {trend.length > 2 && (
               <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-medium text-zinc-400">Performance Trend</span>
+                  <span className="text-sm font-medium text-zinc-400">Performance Trend</span>
                   <span className="text-[11px] text-zinc-500">{overview.dateRange.start} — {overview.dateRange.end}</span>
                 </div>
                 <DualTrendChart data={trend} annotations={annotations} />
@@ -1186,7 +1191,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
             {insights && (
               <div className="space-y-3">
                 <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                  <div className="text-xs font-medium text-zinc-300 mb-3">Search Health Summary</div>
+                  <div className="text-sm font-semibold text-zinc-200 mb-3">Search Health Summary</div>
                   <div className="grid grid-cols-4 gap-3">
                     <div className="text-center"><div className={`text-lg font-bold ${insights.page1 > 5 ? 'text-green-400' : 'text-amber-400'}`}>{insights.page1}</div><div className="text-[11px] text-zinc-500">Page 1 Rankings</div></div>
                     <div className="text-center"><div className={`text-lg font-bold ${insights.top3 > 2 ? 'text-green-400' : 'text-amber-400'}`}>{insights.top3}</div><div className="text-[11px] text-zinc-500">Top 3 Rankings</div></div>
@@ -1208,7 +1213,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
               <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <TrendingUp className="w-4 h-4 text-teal-400" />
-                  <span className="text-xs font-semibold text-zinc-200">Keyword Rank Tracking</span>
+                  <span className="text-sm font-semibold text-zinc-200">Keyword Rank Tracking</span>
                   <span className="text-[11px] text-zinc-500 ml-auto">{rankHistory.length} snapshots</span>
                 </div>
                 {/* Rank history chart */}
@@ -1367,8 +1372,8 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
               {/* Header + Generated date */}
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-sm font-semibold text-zinc-200">SEO Keyword Strategy</h2>
-                  <p className="text-[11px] text-zinc-500 mt-0.5">Generated {new Date(strategyData.generatedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                  <h2 className="text-xl font-semibold text-zinc-100">SEO Keyword Strategy</h2>
+                  <p className="text-sm text-zinc-500 mt-1">Generated {new Date(strategyData.generatedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
                 </div>
               </div>
 
@@ -1702,8 +1707,8 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
 
           <div className="flex items-center justify-between mb-1">
             <div>
-              <h2 className="text-base font-semibold text-zinc-100">Content Pipeline</h2>
-              <p className="text-xs text-zinc-500 mt-0.5">Track and manage your content requests</p>
+              <h2 className="text-xl font-semibold text-zinc-100">Content Pipeline</h2>
+              <p className="text-sm text-zinc-500 mt-1">Track and manage your content requests</p>
             </div>
             <button onClick={() => setShowTopicForm(!showTopicForm)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600/20 border border-blue-500/30 text-xs text-blue-300 hover:bg-blue-600/30 transition-colors font-medium">
               <Plus className="w-3.5 h-3.5" /> Suggest a Topic
@@ -2179,6 +2184,11 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
               <p className="text-xs text-zinc-500 mt-1 max-w-sm mx-auto">Once Google Analytics is connected, you'll see visitor trends, traffic sources, top pages, and conversion events — all in one place.</p>
             </div>
           ) : (<>
+            <div className="mb-2">
+              <h2 className="text-xl font-semibold text-zinc-100">Analytics</h2>
+              <p className="text-sm text-zinc-500 mt-1">{ga4Overview.dateRange ? `${ga4Overview.dateRange.start} — ${ga4Overview.dateRange.end}` : 'Google Analytics overview'}</p>
+            </div>
+
             {/* GA4 Overview Cards */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
               {[
@@ -2213,7 +2223,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
                 {/* Traffic Trend (2/3) */}
                 <div className="lg:col-span-2 bg-zinc-900 rounded-xl border border-zinc-800 p-5">
-                  <h3 className="text-sm font-semibold text-zinc-300 mb-4">Traffic Trend</h3>
+                  <h3 className="text-sm font-semibold text-zinc-200 mb-4">Traffic Trend</h3>
                   <svg viewBox={`0 0 800 200`} className="w-full h-48">
                     {(() => {
                       const maxV = Math.max(...ga4Trend.map(d => d.users), 1);
@@ -2240,7 +2250,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                 {/* Devices Pie Chart (1/3) */}
                 {ga4Devices.length > 0 && (
                   <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5 flex flex-col">
-                    <h3 className="text-sm font-semibold text-zinc-300 mb-4">Devices</h3>
+                    <h3 className="text-sm font-semibold text-zinc-200 mb-4">Devices</h3>
                     <div className="flex-1 flex flex-col items-center justify-center">
                       {(() => {
                         const PIE_COLORS = ['#14b8a6', '#60a5fa', '#34d399', '#fbbf24'];
@@ -2284,7 +2294,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
               {/* Top Pages */}
               <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
-                <h3 className="text-sm font-semibold text-zinc-300 mb-3">Top Pages</h3>
+                <h3 className="text-sm font-semibold text-zinc-200 mb-3">Top Pages</h3>
                 <div className="space-y-1 max-h-[350px] overflow-y-auto">
                   {ga4Pages.slice(0, 15).map((p, i) => (
                     <div key={i} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-zinc-800/50">
@@ -2299,7 +2309,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
 
               {/* Traffic Sources */}
               <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
-                <h3 className="text-sm font-semibold text-zinc-300 mb-3">Traffic Sources</h3>
+                <h3 className="text-sm font-semibold text-zinc-200 mb-3">Traffic Sources</h3>
                 <div className="space-y-2">
                   {ga4Sources.slice(0, 10).map((s, i) => {
                     const totalSessions = ga4Sources.reduce((sum, x) => sum + x.sessions, 0);
@@ -2647,8 +2657,8 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
             <div className="flex items-center gap-3">
               <ClipboardCheck className="w-5 h-5 text-teal-400" />
               <div>
-                <h2 className="text-sm font-semibold text-zinc-200">SEO Change Approvals</h2>
-                <p className="text-[11px] text-zinc-500 mt-0.5">Review proposed SEO changes, make edits if needed, then approve to push live.</p>
+                <h2 className="text-xl font-semibold text-zinc-100">SEO Change Approvals</h2>
+                <p className="text-sm text-zinc-500 mt-1">Review proposed SEO changes, make edits if needed, then approve to push live.</p>
               </div>
               {pendingApprovals > 0 && (
                 <span className="ml-auto px-2 py-0.5 text-[11px] font-medium rounded-full bg-teal-500/20 border border-teal-500/30 text-teal-300">
@@ -2872,8 +2882,8 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
               <div className="flex items-center gap-3">
                 <MessageSquare className="w-5 h-5 text-teal-400" />
                 <div>
-                  <h2 className="text-sm font-semibold text-zinc-200">Requests</h2>
-                  <p className="text-[11px] text-zinc-500 mt-0.5">Submit requests for your web team to action on.</p>
+                  <h2 className="text-xl font-semibold text-zinc-100">Requests</h2>
+                  <p className="text-sm text-zinc-500 mt-1">Submit requests for your web team to action on.</p>
                 </div>
               </div>
               <button onClick={() => setShowNewRequest(!showNewRequest)}
