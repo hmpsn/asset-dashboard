@@ -78,8 +78,8 @@ import { isSemrushConfigured, getKeywordOverview, getDomainOrganicKeywords, getK
 import { callOpenAI, getTokenUsage } from './openai-helpers.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
-import { listGscSites, getSearchOverview, getPerformanceTrend, getQueryPageData, getAllGscPages } from './search-console.js';
-import { listGA4Properties, getGA4Overview, getGA4DailyTrend, getGA4TopPages, getGA4TopSources, getGA4DeviceBreakdown, getGA4Countries, getGA4KeyEvents, getGA4EventTrend, getGA4Conversions, getGA4EventsByPage } from './google-analytics.js';
+import { listGscSites, getSearchOverview, getPerformanceTrend, getQueryPageData, getAllGscPages, getSearchDeviceBreakdown, getSearchCountryBreakdown, getSearchTypeBreakdown, getSearchPeriodComparison } from './search-console.js';
+import { listGA4Properties, getGA4Overview, getGA4DailyTrend, getGA4TopPages, getGA4TopSources, getGA4DeviceBreakdown, getGA4Countries, getGA4KeyEvents, getGA4EventTrend, getGA4Conversions, getGA4EventsByPage, getGA4LandingPages, getGA4OrganicOverview, getGA4PeriodComparison, getGA4NewVsReturning } from './google-analytics.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_ROOT = DATA_BASE || path.join(process.env.HOME || '', '.asset-dashboard');
@@ -3006,6 +3006,51 @@ app.get('/api/google/performance-trend/:siteId', async (req, res) => {
   }
 });
 
+app.get('/api/google/search-devices/:siteId', async (req, res) => {
+  const gscSiteUrl = req.query.gscSiteUrl as string;
+  const days = parseInt(req.query.days as string) || 28;
+  if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
+  try {
+    res.json(await getSearchDeviceBreakdown(req.params.siteId, gscSiteUrl, days));
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.get('/api/google/search-countries/:siteId', async (req, res) => {
+  const gscSiteUrl = req.query.gscSiteUrl as string;
+  const days = parseInt(req.query.days as string) || 28;
+  const limit = parseInt(req.query.limit as string) || 20;
+  if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
+  try {
+    res.json(await getSearchCountryBreakdown(req.params.siteId, gscSiteUrl, days, limit));
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.get('/api/google/search-types/:siteId', async (req, res) => {
+  const gscSiteUrl = req.query.gscSiteUrl as string;
+  const days = parseInt(req.query.days as string) || 28;
+  if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
+  try {
+    res.json(await getSearchTypeBreakdown(req.params.siteId, gscSiteUrl, days));
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.get('/api/google/search-comparison/:siteId', async (req, res) => {
+  const gscSiteUrl = req.query.gscSiteUrl as string;
+  const days = parseInt(req.query.days as string) || 28;
+  if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
+  try {
+    res.json(await getSearchPeriodComparison(req.params.siteId, gscSiteUrl, days));
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 // --- Keyword Strategy Generation (SSE progress) ---
 app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
@@ -4336,6 +4381,51 @@ app.get('/api/public/performance-trend/:workspaceId', async (req, res) => {
   }
 });
 
+app.get('/api/public/search-devices/:workspaceId', async (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws?.webflowSiteId || !ws.gscPropertyUrl) return res.status(400).json({ error: 'Search Console not configured' });
+  const days = parseInt(req.query.days as string) || 28;
+  try {
+    res.json(await getSearchDeviceBreakdown(ws.webflowSiteId, ws.gscPropertyUrl, days));
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.get('/api/public/search-countries/:workspaceId', async (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws?.webflowSiteId || !ws.gscPropertyUrl) return res.status(400).json({ error: 'Search Console not configured' });
+  const days = parseInt(req.query.days as string) || 28;
+  const limit = parseInt(req.query.limit as string) || 20;
+  try {
+    res.json(await getSearchCountryBreakdown(ws.webflowSiteId, ws.gscPropertyUrl, days, limit));
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.get('/api/public/search-types/:workspaceId', async (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws?.webflowSiteId || !ws.gscPropertyUrl) return res.status(400).json({ error: 'Search Console not configured' });
+  const days = parseInt(req.query.days as string) || 28;
+  try {
+    res.json(await getSearchTypeBreakdown(ws.webflowSiteId, ws.gscPropertyUrl, days));
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.get('/api/public/search-comparison/:workspaceId', async (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws?.webflowSiteId || !ws.gscPropertyUrl) return res.status(400).json({ error: 'Search Console not configured' });
+  const days = parseInt(req.query.days as string) || 28;
+  try {
+    res.json(await getSearchPeriodComparison(ws.webflowSiteId, ws.gscPropertyUrl, days));
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 app.get('/api/public/audit-summary/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.webflowSiteId) return res.status(400).json({ error: 'No site linked' });
@@ -4574,6 +4664,53 @@ app.get('/api/public/analytics-event-explorer/:workspaceId', async (req, res) =>
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: msg });
+  }
+});
+
+// --- GA4 Phase 3: Landing Pages, Organic, Comparison, New vs Returning ---
+app.get('/api/public/analytics-landing-pages/:workspaceId', async (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
+  const days = parseInt(req.query.days as string) || 28;
+  const organicOnly = req.query.organic === 'true';
+  const limit = parseInt(req.query.limit as string) || 25;
+  try {
+    res.json(await getGA4LandingPages(ws.ga4PropertyId, days, limit, organicOnly));
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.get('/api/public/analytics-organic/:workspaceId', async (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
+  const days = parseInt(req.query.days as string) || 28;
+  try {
+    res.json(await getGA4OrganicOverview(ws.ga4PropertyId, days));
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.get('/api/public/analytics-comparison/:workspaceId', async (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
+  const days = parseInt(req.query.days as string) || 28;
+  try {
+    res.json(await getGA4PeriodComparison(ws.ga4PropertyId, days));
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.get('/api/public/analytics-new-vs-returning/:workspaceId', async (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
+  const days = parseInt(req.query.days as string) || 28;
+  try {
+    res.json(await getGA4NewVsReturning(ws.ga4PropertyId, days));
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 

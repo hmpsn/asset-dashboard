@@ -490,6 +490,277 @@ export async function getGA4EventsByPage(
   }));
 }
 
+// ─── Phase 3: Landing Pages, Organic Filter, Period Comparison, Engagement ───
+
+export interface GA4LandingPage {
+  landingPage: string;
+  sessions: number;
+  users: number;
+  bounceRate: number;
+  avgEngagementTime: number;
+  conversions: number;
+}
+
+/**
+ * Get top landing pages — the first page users see when they arrive.
+ * Critical for SEO: shows which pages drive organic entry traffic.
+ */
+export async function getGA4LandingPages(
+  propertyId: string,
+  days: number = 28,
+  limit: number = 25,
+  organicOnly: boolean = false,
+): Promise<GA4LandingPage[]> {
+  const startDate = dateStr(days);
+  const endDate = dateStr(1);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const body: Record<string, any> = {
+    dateRanges: [{ startDate, endDate }],
+    dimensions: [{ name: 'landingPage' }],
+    metrics: [
+      { name: 'sessions' },
+      { name: 'totalUsers' },
+      { name: 'bounceRate' },
+      { name: 'userEngagementDuration' },
+      { name: 'conversions' },
+    ],
+    orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+    limit,
+  };
+
+  if (organicOnly) {
+    body.dimensionFilter = {
+      filter: {
+        fieldName: 'sessionDefaultChannelGroup',
+        stringFilter: { matchType: 'EXACT', value: 'Organic Search' },
+      },
+    };
+  }
+
+  const data = await runReport(propertyId, body) as {
+    rows?: Array<{
+      dimensionValues: Array<{ value: string }>;
+      metricValues: Array<{ value: string }>;
+    }>;
+  };
+
+  return (data.rows || []).map(r => {
+    const sessions = parseInt(r.metricValues[0].value);
+    return {
+      landingPage: r.dimensionValues[0].value,
+      sessions,
+      users: parseInt(r.metricValues[1].value),
+      bounceRate: parseFloat(parseFloat(r.metricValues[2].value).toFixed(1)),
+      avgEngagementTime: sessions > 0
+        ? parseFloat(r.metricValues[3].value) / sessions
+        : 0,
+      conversions: parseInt(r.metricValues[4].value),
+    };
+  });
+}
+
+export interface GA4OrganicOverview {
+  organicUsers: number;
+  organicSessions: number;
+  organicPageviews: number;
+  organicBounceRate: number;
+  engagementRate: number;
+  avgEngagementTime: number;
+  shareOfTotalUsers: number;   // organic users as % of all users
+  dateRange: { start: string; end: string };
+}
+
+/**
+ * Get overview metrics filtered to Organic Search channel only.
+ * Includes engagement rate (GA4's preferred metric over bounce rate).
+ */
+export async function getGA4OrganicOverview(
+  propertyId: string,
+  days: number = 28,
+): Promise<GA4OrganicOverview> {
+  const startDate = dateStr(days);
+  const endDate = dateStr(1);
+
+  // Get organic metrics
+  const organicData = await runReport(propertyId, {
+    dateRanges: [{ startDate, endDate }],
+    metrics: [
+      { name: 'totalUsers' },
+      { name: 'sessions' },
+      { name: 'screenPageViews' },
+      { name: 'bounceRate' },
+      { name: 'engagementRate' },
+      { name: 'userEngagementDuration' },
+    ],
+    dimensionFilter: {
+      filter: {
+        fieldName: 'sessionDefaultChannelGroup',
+        stringFilter: { matchType: 'EXACT', value: 'Organic Search' },
+      },
+    },
+  }) as { rows?: Array<{ metricValues: Array<{ value: string }> }> };
+
+  // Get total users for share calculation
+  const totalData = await runReport(propertyId, {
+    dateRanges: [{ startDate, endDate }],
+    metrics: [{ name: 'totalUsers' }],
+  }) as { rows?: Array<{ metricValues: Array<{ value: string }> }> };
+
+  const row = organicData.rows?.[0]?.metricValues;
+  const totalUsers = parseInt(totalData.rows?.[0]?.metricValues[0]?.value || '0');
+  const organicUsers = parseInt(row?.[0]?.value || '0');
+  const organicSessions = parseInt(row?.[1]?.value || '0');
+
+  return {
+    organicUsers,
+    organicSessions,
+    organicPageviews: parseInt(row?.[2]?.value || '0'),
+    organicBounceRate: parseFloat(parseFloat(row?.[3]?.value || '0').toFixed(1)),
+    engagementRate: parseFloat(parseFloat(row?.[4]?.value || '0').toFixed(1)),
+    avgEngagementTime: organicSessions > 0
+      ? parseFloat(row?.[5]?.value || '0') / organicSessions
+      : 0,
+    shareOfTotalUsers: totalUsers > 0
+      ? parseFloat(((organicUsers / totalUsers) * 100).toFixed(1))
+      : 0,
+    dateRange: { start: startDate, end: endDate },
+  };
+}
+
+export interface GA4PeriodComparison {
+  current: GA4Overview;
+  previous: GA4Overview;
+  change: {
+    users: number; sessions: number; pageviews: number;
+    bounceRate: number; avgSessionDuration: number;
+  };
+  changePercent: {
+    users: number; sessions: number; pageviews: number;
+  };
+}
+
+/**
+ * Compare current period vs previous period for GA4 overview metrics.
+ * Uses GA4's native dual date range support (single API call).
+ */
+export async function getGA4PeriodComparison(
+  propertyId: string,
+  days: number = 28,
+): Promise<GA4PeriodComparison> {
+  const curStart = dateStr(days);
+  const curEnd = dateStr(1);
+  const prevStart = dateStr(days * 2);
+  const prevEnd = dateStr(days + 1);
+
+  const data = await runReport(propertyId, {
+    dateRanges: [
+      { startDate: curStart, endDate: curEnd },
+      { startDate: prevStart, endDate: prevEnd },
+    ],
+    metrics: [
+      { name: 'totalUsers' },
+      { name: 'sessions' },
+      { name: 'screenPageViews' },
+      { name: 'averageSessionDuration' },
+      { name: 'bounceRate' },
+      { name: 'newUsers' },
+    ],
+  }) as { rows?: Array<{ metricValues: Array<{ value: string }> }> };
+
+  const parse = (rowIdx: number) => {
+    const row = data.rows?.[rowIdx]?.metricValues;
+    const totalUsers = parseInt(row?.[0]?.value || '0');
+    const newUsers = parseInt(row?.[5]?.value || '0');
+    return {
+      totalUsers,
+      totalSessions: parseInt(row?.[1]?.value || '0'),
+      totalPageviews: parseInt(row?.[2]?.value || '0'),
+      avgSessionDuration: parseFloat(row?.[3]?.value || '0'),
+      bounceRate: parseFloat(parseFloat(row?.[4]?.value || '0').toFixed(1)),
+      newUserPercentage: totalUsers > 0 ? parseFloat(((newUsers / totalUsers) * 100).toFixed(1)) : 0,
+      dateRange: { start: '', end: '' },
+    };
+  };
+
+  const current = { ...parse(0), dateRange: { start: curStart, end: curEnd } };
+  const previous = { ...parse(1), dateRange: { start: prevStart, end: prevEnd } };
+
+  const pct = (c: number, p: number) => p === 0 ? (c > 0 ? 100 : 0) : parseFloat((((c - p) / p) * 100).toFixed(1));
+
+  return {
+    current,
+    previous,
+    change: {
+      users: current.totalUsers - previous.totalUsers,
+      sessions: current.totalSessions - previous.totalSessions,
+      pageviews: current.totalPageviews - previous.totalPageviews,
+      bounceRate: parseFloat((current.bounceRate - previous.bounceRate).toFixed(1)),
+      avgSessionDuration: parseFloat((current.avgSessionDuration - previous.avgSessionDuration).toFixed(1)),
+    },
+    changePercent: {
+      users: pct(current.totalUsers, previous.totalUsers),
+      sessions: pct(current.totalSessions, previous.totalSessions),
+      pageviews: pct(current.totalPageviews, previous.totalPageviews),
+    },
+  };
+}
+
+export interface GA4NewVsReturning {
+  segment: string;   // 'new' | 'returning'
+  users: number;
+  sessions: number;
+  bounceRate: number;
+  engagementRate: number;
+  avgEngagementTime: number;
+  percentage: number;
+}
+
+/**
+ * New vs returning user comparison.
+ */
+export async function getGA4NewVsReturning(
+  propertyId: string,
+  days: number = 28,
+): Promise<GA4NewVsReturning[]> {
+  const startDate = dateStr(days);
+  const endDate = dateStr(1);
+
+  const data = await runReport(propertyId, {
+    dateRanges: [{ startDate, endDate }],
+    dimensions: [{ name: 'newVsReturning' }],
+    metrics: [
+      { name: 'totalUsers' },
+      { name: 'sessions' },
+      { name: 'bounceRate' },
+      { name: 'engagementRate' },
+      { name: 'userEngagementDuration' },
+    ],
+    orderBys: [{ metric: { metricName: 'totalUsers' }, desc: true }],
+  }) as {
+    rows?: Array<{
+      dimensionValues: Array<{ value: string }>;
+      metricValues: Array<{ value: string }>;
+    }>;
+  };
+
+  const rows = (data.rows || []).map(r => {
+    const sessions = parseInt(r.metricValues[1].value);
+    return {
+      segment: r.dimensionValues[0].value,
+      users: parseInt(r.metricValues[0].value),
+      sessions,
+      bounceRate: parseFloat(parseFloat(r.metricValues[2].value).toFixed(1)),
+      engagementRate: parseFloat(parseFloat(r.metricValues[3].value).toFixed(1)),
+      avgEngagementTime: sessions > 0 ? parseFloat(r.metricValues[4].value) / sessions : 0,
+      percentage: 0,
+    };
+  });
+  const totalUsers = rows.reduce((s, r) => s + r.users, 0);
+  rows.forEach(r => r.percentage = totalUsers > 0 ? parseFloat(((r.users / totalUsers) * 100).toFixed(1)) : 0);
+  return rows;
+}
+
 export async function getGA4Countries(propertyId: string, days: number = 28, limit: number = 10): Promise<GA4CountryBreakdown[]> {
   const startDate = dateStr(days);
   const endDate = dateStr(1);
