@@ -3,7 +3,7 @@ import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import {
   Loader2, Search as SearchIcon, ChevronDown, ChevronRight, Download,
   AlertTriangle, AlertCircle, Info, CheckCircle, Globe, FileText,
-  RefreshCw, X, Clock, Share2, Copy, ExternalLink,
+  RefreshCw, X, Clock, Share2, Copy, ExternalLink, Flag, Send, Wrench,
   TrendingUp, TrendingDown, Minus, Plus, ListChecks, Trash2, Circle, ClipboardList,
 } from 'lucide-react';
 import { StatCard, scoreColorClass, scoreBgBarClass } from './ui';
@@ -45,6 +45,26 @@ const CATEGORY_CONFIG: Record<CheckCategory, { label: string; color: string }> =
   accessibility: { label: 'Accessibility', color: 'text-sky-400' },
 };
 
+const ISSUE_FIX_MAP: Record<string, string> = {
+  'title': 'seo-editor', 'title_length': 'seo-editor', 'missing_title': 'seo-editor',
+  'meta-description': 'seo-editor', 'meta_length': 'seo-editor', 'missing_meta': 'seo-editor',
+  'missing_h1': 'seo-editor', 'duplicate_h1': 'seo-editor', 'og-tags': 'seo-editor',
+  'missing_schema': 'seo-schema', 'schema_errors': 'seo-schema',
+  'redirect_chain': 'seo-redirects', 'broken_link': 'seo-redirects', 'missing_canonical': 'seo-redirects',
+  'thin_content': 'seo-briefs', 'low_word_count': 'seo-briefs',
+};
+
+const FIX_TAB_LABELS: Record<string, string> = {
+  'seo-editor': 'SEO Editor', 'seo-schema': 'Schema Generator', 'seo-redirects': 'Redirects',
+  'seo-briefs': 'Content Briefs', 'seo-internal': 'Internal Links', 'performance': 'Performance',
+};
+
+function getFixTab(issue: SeoIssue): string | null {
+  if (ISSUE_FIX_MAP[issue.check]) return ISSUE_FIX_MAP[issue.check];
+  if (issue.category === 'performance') return 'performance';
+  return null;
+}
+
 interface PageSeoResult {
   pageId: string;
   page: string;
@@ -80,6 +100,7 @@ interface Props {
   siteName?: string;
   view?: string;
   onRequestCountChange?: (pending: number) => void;
+  onNavigate?: (tab: string) => void;
 }
 
 const SEVERITY_CONFIG: Record<Severity, { label: string; color: string; bg: string; icon: typeof AlertTriangle }> = {
@@ -481,7 +502,7 @@ function AuditHistory({ siteId, history, onRefresh }: { siteId: string; history:
 
 type AuditSubTab = 'audit' | 'links' | 'history';
 
-function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCountChange }: Props) {
+function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCountChange, onNavigate }: Props) {
   const { startJob, jobs } = useBackgroundTasks();
   const auditJobId = useRef<string | null>(null);
   const [data, setData] = useState<SeoAuditResult | null>(null);
@@ -539,6 +560,40 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
   const [creatingTask, setCreatingTask] = useState<string | null>(null);
   const [batchCreating, setBatchCreating] = useState(false);
   const [batchResult, setBatchResult] = useState<{ count: number; timestamp: number } | null>(null);
+
+  // Flag-for-client state
+  const [flaggingKey, setFlaggingKey] = useState<string | null>(null);
+  const [flagNote, setFlagNote] = useState('');
+  const [flaggedIssues, setFlaggedIssues] = useState<Set<string>>(new Set());
+  const [flagSending, setFlagSending] = useState(false);
+
+  const flagForClient = async (page: PageSeoResult, issue: SeoIssue, note: string) => {
+    if (!workspaceId) return;
+    const key = issueToTaskKey(page, issue);
+    setFlagSending(true);
+    try {
+      const res = await fetch('/api/requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workspaceId,
+          title: `[Review Needed] ${issue.message.slice(0, 80)}`,
+          description: `**Page:** /${page.slug}\n**Issue:** ${issue.message}\n**Severity:** ${issue.severity}\n\n**Recommendation:** ${issue.recommendation}${issue.value ? `\n\n**Current value:** ${issue.value}` : ''}${note ? `\n\n**Note from your SEO team:**\n${note}` : ''}`,
+          category: 'seo',
+          priority: issue.severity === 'error' ? 'high' : 'medium',
+          status: 'new',
+          pageUrl: `/${page.slug}`,
+          submittedBy: 'team',
+        }),
+      });
+      if (res.ok) {
+        setFlaggedIssues(prev => new Set(prev).add(key));
+        setFlaggingKey(null);
+        setFlagNote('');
+      }
+    } catch { /* skip */ }
+    finally { setFlagSending(false); }
+  };
 
   const issueToTaskKey = (page: PageSeoResult, issue: SeoIssue) =>
     `${page.pageId}-${issue.check}-${issue.message.slice(0, 30)}`;
@@ -1028,6 +1083,15 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
       const q = search.toLowerCase();
       return p.page.toLowerCase().includes(q) || p.slug.toLowerCase().includes(q) ||
         p.issues.some(i => i.message.toLowerCase().includes(q) || i.check.toLowerCase().includes(q));
+    })
+    .sort((a, b) => {
+      const aErrors = a.issues.filter(i => i.severity === 'error').length;
+      const bErrors = b.issues.filter(i => i.severity === 'error').length;
+      if (bErrors !== aErrors) return bErrors - aErrors;
+      const aWarnings = a.issues.filter(i => i.severity === 'warning').length;
+      const bWarnings = b.issues.filter(i => i.severity === 'warning').length;
+      if (bWarnings !== aWarnings) return bWarnings - aWarnings;
+      return a.score - b.score;
     });
 
   return (
@@ -1394,8 +1458,71 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
                                   </div>
                                 );
                               })()}
+                              {/* Inline flag-for-client form */}
+                              {workspaceId && flaggingKey === issueToTaskKey(page, issue) && (
+                                <div className="mt-2 flex items-center gap-2">
+                                  <input
+                                    type="text"
+                                    value={flagNote}
+                                    onChange={e => setFlagNote(e.target.value)}
+                                    placeholder="Note for client (optional)..."
+                                    className="flex-1 px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-purple-500/50"
+                                    onKeyDown={e => e.key === 'Enter' && flagForClient(page, issue, flagNote)}
+                                    autoFocus
+                                  />
+                                  <button
+                                    onClick={() => flagForClient(page, issue, flagNote)}
+                                    disabled={flagSending}
+                                    className="flex items-center gap-1 px-2 py-1.5 rounded bg-purple-600/80 hover:bg-purple-600 text-xs font-medium text-white transition-colors disabled:opacity-50"
+                                  >
+                                    {flagSending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                                    Send
+                                  </button>
+                                  <button onClick={() => { setFlaggingKey(null); setFlagNote(''); }} className="p-1 rounded hover:bg-zinc-800 text-zinc-500">
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              )}
                             </div>
                             <div className="flex items-center gap-1 flex-shrink-0">
+                              {/* Fix → button */}
+                              {onNavigate && (() => {
+                                const fixTab = getFixTab(issue);
+                                if (!fixTab) return null;
+                                return (
+                                  <button
+                                    onClick={() => onNavigate(fixTab)}
+                                    className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 flex items-center gap-0.5 transition-colors"
+                                    title={`Open ${FIX_TAB_LABELS[fixTab] || fixTab}`}
+                                  >
+                                    <Wrench className="w-2.5 h-2.5" /> Fix
+                                  </button>
+                                );
+                              })()}
+                              {/* Flag for client review */}
+                              {workspaceId && (() => {
+                                const taskKey = issueToTaskKey(page, issue);
+                                const isFlagged = flaggedIssues.has(taskKey);
+                                if (isFlagged) return (
+                                  <span className="text-[11px] px-1 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center gap-0.5">
+                                    <Flag className="w-2.5 h-2.5" /> Flagged
+                                  </span>
+                                );
+                                return (
+                                  <button
+                                    onClick={() => { setFlaggingKey(flaggingKey === taskKey ? null : taskKey); setFlagNote(''); }}
+                                    className={`text-[11px] px-1 py-0.5 rounded border flex items-center gap-0.5 transition-colors ${
+                                      flaggingKey === taskKey
+                                        ? 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                                        : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 border-zinc-700'
+                                    }`}
+                                    title="Flag this issue for client review"
+                                  >
+                                    <Flag className="w-2.5 h-2.5" /> Flag
+                                  </button>
+                                );
+                              })()}
+                              {/* Create task */}
                               {workspaceId && (() => {
                                 const taskKey = `${page.pageId}-${issue.check}-${issue.message.slice(0, 30)}`;
                                 const isCreated = createdTasks.has(taskKey);
