@@ -2525,7 +2525,7 @@ export function ClientDashboard({ workspaceId }: Props) {
               </summary>
               <div className="mt-2 space-y-2">
                 {contentRequests.filter(r => r.status === 'declined').map(req => (
-                  <div key={req.id} className="bg-zinc-900/50 rounded-lg border border-zinc-800/50 px-4 py-3 opacity-60">
+                  <div key={req.id} className="bg-zinc-900/50 rounded-xl border border-zinc-800/50 px-4 py-3 opacity-60">
                     <div className="text-xs text-zinc-400">{req.topic}</div>
                     <div className="text-[11px] text-zinc-500 mt-0.5">&ldquo;{req.targetKeyword}&rdquo;</div>
                   </div>
