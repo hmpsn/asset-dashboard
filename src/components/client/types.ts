@@ -62,6 +62,30 @@ export interface ClientBriefPreview {
   schemaRecommendations?: { type: string; notes: string }[];
 }
 
+export interface SearchComparison {
+  current: { clicks: number; impressions: number; ctr: number; position: number };
+  previous: { clicks: number; impressions: number; ctr: number; position: number };
+  change: { clicks: number; impressions: number; ctr: number; position: number };
+  changePercent: { clicks: number; impressions: number; ctr: number; position: number };
+}
+
+export interface GA4Comparison {
+  current: GA4Overview;
+  previous: GA4Overview;
+  change: { users: number; sessions: number; pageviews: number; bounceRate: number; avgSessionDuration: number };
+  changePercent: { users: number; sessions: number; pageviews: number };
+}
+
+export interface GA4NewVsReturning {
+  segment: string;
+  users: number;
+  sessions: number;
+  bounceRate: number;
+  engagementRate: number;
+  avgEngagementTime: number;
+  percentage: number;
+}
+
 export type SortKey = 'clicks' | 'impressions' | 'ctr' | 'position';
 export type ClientTab = 'overview' | 'search' | 'health' | 'strategy' | 'analytics' | 'approvals' | 'requests' | 'content';
 

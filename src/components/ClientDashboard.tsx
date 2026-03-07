@@ -11,6 +11,7 @@ import SearchableSelect from './SearchableSelect';
 import { StatCard, CompactStatBar, EmptyState } from './ui';
 import { TrendChart, DualTrendChart, RenderMarkdown, InsightCard } from './client/helpers';
 import { HealthTab } from './client/HealthTab';
+import { SearchSnapshot, AnalyticsSnapshot } from './client/DataSnapshots';
 import {
   QUICK_QUESTIONS,
   type SearchOverview, type PerformanceTrend, type WorkspaceInfo, type AuditSummary,
@@ -19,6 +20,7 @@ import {
   type GA4EventTrend, type GA4ConversionSummary, type GA4EventPageBreakdown,
   type ClientContentRequest, type ClientBriefPreview, type ClientKeywordStrategy,
   type ClientRequest, type ApprovalBatch,
+  type SearchComparison, type GA4Comparison, type GA4NewVsReturning,
   type SortKey, type ClientTab, type RequestCategory,
 } from './client/types';
 
@@ -85,6 +87,10 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
   const [modulePageFilters, setModulePageFilters] = useState<Record<string, string>>({});
   const [modulePageData, setModulePageData] = useState<Record<string, GA4ConversionSummary[]>>({});
   const [modulePageLoading, setModulePageLoading] = useState<Record<string, boolean>>({});
+  const [searchComparison, setSearchComparison] = useState<SearchComparison | null>(null);
+  const [searchDevices, setSearchDevices] = useState<{ device: string; clicks: number; impressions: number; ctr: number; position: number }[]>([]);
+  const [ga4Comparison, setGa4Comparison] = useState<GA4Comparison | null>(null);
+  const [ga4NewVsReturning, setGa4NewVsReturning] = useState<GA4NewVsReturning[]>([]);
   const [authenticated, setAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [authError, setAuthError] = useState('');
@@ -284,7 +290,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
 
   const loadGA4Data = async (wsId: string, numDays: number) => {
     try {
-      const [ovRes, trRes, pgRes, srcRes, devRes, ctryRes, evtRes, convRes] = await Promise.all([
+      const [ovRes, trRes, pgRes, srcRes, devRes, ctryRes, evtRes, convRes, cmpRes, nvrRes] = await Promise.all([
         fetch(`/api/public/analytics-overview/${wsId}?days=${numDays}`),
         fetch(`/api/public/analytics-trend/${wsId}?days=${numDays}`),
         fetch(`/api/public/analytics-top-pages/${wsId}?days=${numDays}`),
@@ -293,8 +299,10 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         fetch(`/api/public/analytics-countries/${wsId}?days=${numDays}`),
         fetch(`/api/public/analytics-events/${wsId}?days=${numDays}`),
         fetch(`/api/public/analytics-conversions/${wsId}?days=${numDays}`),
+        fetch(`/api/public/analytics-comparison/${wsId}?days=${numDays}`),
+        fetch(`/api/public/analytics-new-vs-returning/${wsId}?days=${numDays}`),
       ]);
-      const [ov, tr, pg, src, dev, ctry, evt, conv] = await Promise.all([ovRes.json(), trRes.json(), pgRes.json(), srcRes.json(), devRes.json(), ctryRes.json(), evtRes.json(), convRes.json()]);
+      const [ov, tr, pg, src, dev, ctry, evt, conv, cmp, nvr] = await Promise.all([ovRes.json(), trRes.json(), pgRes.json(), srcRes.json(), devRes.json(), ctryRes.json(), evtRes.json(), convRes.json(), cmpRes.json(), nvrRes.json()]);
       if (!ov.error) setGa4Overview(ov);
       if (Array.isArray(tr)) setGa4Trend(tr);
       if (Array.isArray(pg)) setGa4Pages(pg);
@@ -303,6 +311,8 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
       if (Array.isArray(ctry)) setGa4Countries(ctry);
       if (Array.isArray(evt)) setGa4Events(evt);
       if (Array.isArray(conv)) setGa4Conversions(conv);
+      if (cmp && !cmp.error) setGa4Comparison(cmp);
+      if (Array.isArray(nvr)) setGa4NewVsReturning(nvr);
     } catch (err) {
       console.error('GA4 data load error:', err);
     }
@@ -535,14 +545,18 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
 
   const loadSearchData = async (wsId: string, numDays: number) => {
     try {
-      const [ovRes, trRes] = await Promise.all([
+      const [ovRes, trRes, cmpRes, devRes] = await Promise.all([
         fetch(`/api/public/search-overview/${wsId}?days=${numDays}`),
         fetch(`/api/public/performance-trend/${wsId}?days=${numDays}`),
+        fetch(`/api/public/search-comparison/${wsId}?days=${numDays}`),
+        fetch(`/api/public/search-devices/${wsId}?days=${numDays}`),
       ]);
-      const [ovData, trData] = await Promise.all([ovRes.json(), trRes.json()]);
+      const [ovData, trData, cmpData, devData] = await Promise.all([ovRes.json(), trRes.json(), cmpRes.json(), devRes.json()]);
       if (ovData.error) throw new Error(ovData.error);
       setOverview(ovData);
       setTrend(Array.isArray(trData) ? trData : []);
+      if (cmpData && !cmpData.error) setSearchComparison(cmpData);
+      if (Array.isArray(devData)) setSearchDevices(devData);
     } catch (err) {
       console.error('Search data load error:', err);
     }
@@ -964,6 +978,29 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                 </div>
               )}
 
+              {/* Simplified search snapshot */}
+              {overview && (
+                <SearchSnapshot
+                  overview={overview}
+                  trend={trend}
+                  comparison={searchComparison}
+                  devices={searchDevices}
+                  onViewMore={() => setTab('search')}
+                />
+              )}
+
+              {/* Simplified analytics snapshot */}
+              {ga4Overview && (
+                <AnalyticsSnapshot
+                  overview={ga4Overview}
+                  trend={ga4Trend}
+                  topPages={ga4Pages}
+                  comparison={ga4Comparison}
+                  newVsReturning={ga4NewVsReturning}
+                  onViewMore={() => setTab('analytics')}
+                />
+              )}
+
               {/* Top search wins — celebrate what's working */}
               {insights && insights.topPerformers.length > 0 && (
                 <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
@@ -1141,10 +1178,10 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
           {overview ? (<>
             {/* Compact metrics bar */}
             <CompactStatBar items={[
-              { label: 'Clicks', value: overview.totalClicks.toLocaleString(), valueColor: 'text-blue-400' },
-              { label: 'Impressions', value: overview.totalImpressions.toLocaleString(), valueColor: 'text-teal-400' },
-              { label: 'CTR', value: `${overview.avgCtr}%`, valueColor: 'text-emerald-400' },
-              { label: 'Avg Position', value: String(overview.avgPosition), valueColor: 'text-amber-400' },
+              { label: 'Clicks', value: overview.totalClicks.toLocaleString(), valueColor: 'text-blue-400', sub: searchComparison ? `${searchComparison.changePercent.clicks > 0 ? '+' : ''}${searchComparison.changePercent.clicks}%` : undefined, subColor: searchComparison ? (searchComparison.changePercent.clicks >= 0 ? 'text-emerald-400' : 'text-red-400') : undefined },
+              { label: 'Impressions', value: overview.totalImpressions.toLocaleString(), valueColor: 'text-teal-400', sub: searchComparison ? `${searchComparison.changePercent.impressions > 0 ? '+' : ''}${searchComparison.changePercent.impressions}%` : undefined, subColor: searchComparison ? (searchComparison.changePercent.impressions >= 0 ? 'text-emerald-400' : 'text-red-400') : undefined },
+              { label: 'CTR', value: `${overview.avgCtr}%`, valueColor: 'text-emerald-400', sub: searchComparison ? `${searchComparison.change.ctr > 0 ? '+' : ''}${searchComparison.change.ctr}pp` : undefined, subColor: searchComparison ? (searchComparison.change.ctr >= 0 ? 'text-emerald-400' : 'text-red-400') : undefined },
+              { label: 'Avg Position', value: String(overview.avgPosition), valueColor: 'text-amber-400', sub: searchComparison ? `${searchComparison.change.position < 0 ? '↑' : searchComparison.change.position > 0 ? '↓' : ''}${Math.abs(searchComparison.change.position)}` : undefined, subColor: searchComparison ? (searchComparison.change.position <= 0 ? 'text-emerald-400' : 'text-red-400') : undefined },
             ]} />
 
             {trend.length > 2 && (
@@ -2156,16 +2193,28 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
             {/* GA4 Overview Cards */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
               {[
-                { label: 'Users', value: ga4Overview.totalUsers.toLocaleString(), color: 'text-teal-400' },
-                { label: 'Sessions', value: ga4Overview.totalSessions.toLocaleString(), color: 'text-blue-400' },
-                { label: 'Page Views', value: ga4Overview.totalPageviews.toLocaleString(), color: 'text-teal-400' },
+                { label: 'Users', value: ga4Overview.totalUsers.toLocaleString(), color: 'text-teal-400', changePct: ga4Comparison?.changePercent.users },
+                { label: 'Sessions', value: ga4Overview.totalSessions.toLocaleString(), color: 'text-blue-400', changePct: ga4Comparison?.changePercent.sessions },
+                { label: 'Page Views', value: ga4Overview.totalPageviews.toLocaleString(), color: 'text-teal-400', changePct: ga4Comparison?.changePercent.pageviews },
                 { label: 'Avg Duration', value: `${Math.floor(ga4Overview.avgSessionDuration / 60)}m ${Math.floor(ga4Overview.avgSessionDuration % 60)}s`, color: 'text-amber-400' },
-                { label: 'Bounce Rate', value: `${ga4Overview.bounceRate}%`, color: ga4Overview.bounceRate > 60 ? 'text-red-400' : 'text-emerald-400' },
+                { label: 'Bounce Rate', value: `${ga4Overview.bounceRate}%`, color: ga4Overview.bounceRate > 60 ? 'text-red-400' : 'text-emerald-400', changeAbs: ga4Comparison?.change.bounceRate, invert: true },
                 { label: 'New Users', value: `${ga4Overview.newUserPercentage}%`, color: 'text-teal-400' },
               ].map(c => (
                 <div key={c.label} className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                   <div className="text-[11px] uppercase tracking-wider text-zinc-500 mb-1">{c.label}</div>
-                  <div className={`text-xl font-bold ${c.color}`}>{c.value}</div>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`text-xl font-bold ${c.color}`}>{c.value}</span>
+                    {c.changePct !== undefined && c.changePct !== 0 && (
+                      <span className={`text-[11px] font-medium ${c.changePct > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {c.changePct > 0 ? '+' : ''}{c.changePct}%
+                      </span>
+                    )}
+                    {c.changeAbs !== undefined && c.changeAbs !== 0 && (
+                      <span className={`text-[11px] font-medium ${(c.invert ? c.changeAbs < 0 : c.changeAbs > 0) ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {c.changeAbs > 0 ? '+' : ''}{c.changeAbs}pp
+                      </span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

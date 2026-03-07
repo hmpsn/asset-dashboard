@@ -73,6 +73,8 @@ interface CompactStatProps {
   label: string;
   value: string | number;
   valueColor?: string;
+  sub?: string;
+  subColor?: string;
 }
 
 export function CompactStatBar({ items, className }: { items: CompactStatProps[]; className?: string }) {
@@ -82,6 +84,7 @@ export function CompactStatBar({ items, className }: { items: CompactStatProps[]
         <div key={m.label} className="flex items-center gap-2">
           <span className="text-xs text-zinc-500 uppercase tracking-wider">{m.label}</span>
           <span className={`text-base font-bold ${m.valueColor ?? 'text-zinc-200'}`}>{m.value}</span>
+          {m.sub && <span className={`text-[11px] font-medium ${m.subColor ?? 'text-zinc-500'}`}>{m.sub}</span>}
         </div>
       ))}
     </div>
