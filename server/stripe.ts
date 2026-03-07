@@ -2,18 +2,25 @@ import Stripe from 'stripe';
 import { createPayment, updatePayment, getPaymentBySession, type ProductType } from './payments.js';
 import { updateContentRequest } from './content-requests.js';
 import { addActivity } from './activity-log.js';
+import { getStripeSecretKey, getStripeWebhookSecret, getStripePriceId } from './stripe-config.js';
 
-// --- Stripe SDK init ---
+// --- Stripe SDK (lazy init — picks up keys saved via admin UI or env vars) ---
 
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || '';
-const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || '';
+let _stripe: Stripe | null = null;
+let _lastKey = '';
 
-export const stripe = STRIPE_SECRET_KEY
-  ? new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2026-02-25.clover' })
-  : null;
+function getStripe(): Stripe | null {
+  const key = getStripeSecretKey();
+  if (!key) { _stripe = null; _lastKey = ''; return null; }
+  if (key !== _lastKey) {
+    _stripe = new Stripe(key, { apiVersion: '2026-02-25.clover' });
+    _lastKey = key;
+  }
+  return _stripe;
+}
 
 export function isStripeConfigured(): boolean {
-  return !!stripe;
+  return !!getStripe();
 }
 
 // --- Product Configuration ---
@@ -47,7 +54,7 @@ const PRODUCT_MAP: Record<ProductType, { displayName: string; category: ProductC
 export function getProductConfig(type: ProductType): ProductConfig | null {
   const entry = PRODUCT_MAP[type];
   if (!entry) return null;
-  const stripePriceId = process.env[entry.envKey] || '';
+  const stripePriceId = getStripePriceId(type, entry.envKey);
   return {
     type,
     stripePriceId,
@@ -74,11 +81,12 @@ export interface CheckoutParams {
 }
 
 export async function createCheckoutSession(params: CheckoutParams): Promise<{ sessionId: string; url: string }> {
-  if (!stripe) throw new Error('Stripe is not configured. Set STRIPE_SECRET_KEY in environment.');
+  const stripe = getStripe();
+  if (!stripe) throw new Error('Stripe is not configured. Add your Secret Key in Command Center → Payments.');
 
   const config = getProductConfig(params.productType);
   if (!config) throw new Error(`Unknown product type: ${params.productType}`);
-  if (!config.stripePriceId) throw new Error(`No Stripe Price ID configured for ${params.productType}. Set ${PRODUCT_MAP[params.productType].envKey} in environment.`);
+  if (!config.stripePriceId) throw new Error(`No Stripe Price ID configured for ${params.productType}. Configure it in Command Center → Payments.`);
 
   const metadata: Record<string, string> = {
     workspaceId: params.workspaceId,
@@ -114,9 +122,11 @@ export async function createCheckoutSession(params: CheckoutParams): Promise<{ s
 // --- Webhook Handler ---
 
 export function constructWebhookEvent(rawBody: Buffer, signature: string): Stripe.Event {
+  const stripe = getStripe();
   if (!stripe) throw new Error('Stripe is not configured');
-  if (!STRIPE_WEBHOOK_SECRET) throw new Error('STRIPE_WEBHOOK_SECRET is not set');
-  return stripe.webhooks.constructEvent(rawBody, signature, STRIPE_WEBHOOK_SECRET);
+  const webhookSecret = getStripeWebhookSecret();
+  if (!webhookSecret) throw new Error('Stripe webhook secret is not set');
+  return stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
 }
 
 export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {

@@ -81,6 +81,7 @@ import { addMessage, buildConversationContext, listSessions, getSession as getCh
 import { renderSalesReportHTML } from './sales-report-html.js';
 import { isStripeConfigured, createCheckoutSession, constructWebhookEvent, handleWebhookEvent, getProductConfig, listProducts } from './stripe.js';
 import { listPayments, getPayment } from './payments.js';
+import { getStripeConfigSafe, saveStripeKeys, saveStripeProducts, clearStripeConfig, type StripeProductPrice } from './stripe-config.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
 import { listGscSites, getSearchOverview, getPerformanceTrend, getQueryPageData, getAllGscPages, getSearchDeviceBreakdown, getSearchCountryBreakdown, getSearchTypeBreakdown, getSearchPeriodComparison } from './search-console.js';
 import { listGA4Properties, getGA4Overview, getGA4DailyTrend, getGA4TopPages, getGA4TopSources, getGA4DeviceBreakdown, getGA4Countries, getGA4KeyEvents, getGA4EventTrend, getGA4Conversions, getGA4EventsByPage, getGA4LandingPages, getGA4OrganicOverview, getGA4PeriodComparison, getGA4NewVsReturning, type CustomDateRange } from './google-analytics.js';
@@ -5823,6 +5824,7 @@ app.get('/api/health', (_req, res) => {
     hasWebflowToken: !!process.env.WEBFLOW_API_TOKEN,
     hasGoogleAuth: !!getGoogleCredentials(),
     hasEmailConfig: isEmailConfigured(),
+    hasStripe: isStripeConfigured(),
     notificationEmail: process.env.NOTIFICATION_EMAIL || null,
     emailQueue: getQueueStats(),
   });
@@ -6028,6 +6030,35 @@ app.get('/api/content-briefs/:workspaceId/:briefId/export', (req, res) => {
 // Delete a brief
 app.delete('/api/content-briefs/:workspaceId/:briefId', (req, res) => {
   deleteBrief(req.params.workspaceId, req.params.briefId);
+  res.json({ ok: true });
+});
+
+// --- Stripe Config (admin) ---
+
+// Get current Stripe config (keys masked)
+app.get('/api/stripe/config', (_req, res) => {
+  res.json(getStripeConfigSafe());
+});
+
+// Save Stripe API keys
+app.post('/api/stripe/config/keys', (req, res) => {
+  const { secretKey, webhookSecret } = req.body;
+  if (!secretKey && !webhookSecret) return res.status(400).json({ error: 'Provide secretKey and/or webhookSecret' });
+  saveStripeKeys(secretKey, webhookSecret);
+  res.json({ ok: true, ...getStripeConfigSafe() });
+});
+
+// Save product price mappings
+app.post('/api/stripe/config/products', (req, res) => {
+  const { products } = req.body;
+  if (!Array.isArray(products)) return res.status(400).json({ error: 'products must be an array' });
+  saveStripeProducts(products as StripeProductPrice[]);
+  res.json({ ok: true, products });
+});
+
+// Clear all Stripe config
+app.delete('/api/stripe/config', (_req, res) => {
+  clearStripeConfig();
   res.json({ ok: true });
 });
 

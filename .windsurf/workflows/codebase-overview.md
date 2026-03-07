@@ -42,7 +42,8 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 | `server/openai-helpers.ts` | `callOpenAI` with retry/backoff/timeout, `parseAIJson`, token usage tracking |
 | `server/schema-suggester.ts` | JSON-LD schema generation per page |
 | `server/rank-tracking.ts` | Keyword position tracking over time |
-| `server/stripe.ts` | Stripe SDK setup, product config (14 types), checkout session creation, webhook handler (checkout.session.completed, payment_intent.payment_failed) |
+| `server/stripe.ts` | Stripe SDK setup (lazy init from config), product config (14 types), checkout session creation, webhook handler (checkout.session.completed, payment_intent.payment_failed) |
+| `server/stripe-config.ts` | Encrypted on-disk persistence for Stripe keys + product Price IDs. AES-256-GCM encryption. Falls back to env vars for CI/Docker. |
 | `server/payments.ts` | Payment record CRUD (JSON on disk), per-workspace payment history, lookup by session ID |
 
 ## Key Frontend Components
@@ -52,6 +53,7 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 | `src/App.tsx` | Router, workspace selector, admin tabs (lazy-loaded) |
 | `src/components/ClientDashboard.tsx` | Full client portal with chat (proactive insights greeting), custom date range picker, analytics snapshots, approvals, requests |
 | `src/components/AdminChat.tsx` | Floating admin chat panel with conversation memory + history UI |
+| `src/components/StripeSettings.tsx` | Stripe admin settings in Command Center: API keys (masked), product Price ID mapping, connection status |
 | `src/components/SeoStrategy.tsx` | Keyword strategy viewer/generator |
 | `src/components/SeoAudit.tsx` | Site health audit viewer |
 

@@ -468,6 +468,17 @@ A brief value assessment of every feature in the platform, covering what it does
 
 ---
 
+### 44. Stripe Payment Integration
+**What it does:** Full Stripe Checkout integration for content deliverables. **Server:** `server/stripe.ts` lazily initializes the Stripe SDK (picks up keys from admin UI or env vars), defines 14 product types (7 brief types, 3 post tiers, 2 schema, 2 strategy), creates Checkout sessions with workspace/content-request metadata, handles webhooks (`checkout.session.completed` → marks payment paid + logs activity, `payment_intent.payment_failed` → logs failure). `server/payments.ts` provides PaymentRecord CRUD with JSON-on-disk persistence per workspace. `server/stripe-config.ts` stores Stripe keys encrypted at rest (AES-256-GCM) on disk — no env vars needed. **Admin UI:** `StripeSettings.tsx` in the Command Center lets you paste API keys (masked inputs), map Stripe Price IDs to each product, enable/disable individual products, and see connection status. **Frontend:** `ClientDashboard.tsx` `confirmPricingAndSubmit()` creates the content request first, then redirects to Stripe Checkout when `stripeEnabled`. Payment success/cancel detected via URL params on return with toast + URL cleanup. Falls back to direct submit when Stripe isn't configured. **Workspace:** `tier` (free/growth/premium), `trialEndsAt`, `stripeCustomerId` fields added.
+
+**Agency value:** Direct revenue from content deliverables without invoicing friction. Admin manages everything from the dashboard — no code deploys needed to change keys or products. Encrypted key storage meets security requirements.
+
+**Client value:** Professional checkout experience via Stripe. Clear pricing, instant payment confirmation, content request linked to payment automatically.
+
+**Mutual:** Monetization infrastructure that works out of the box. Agency earns revenue, client gets a seamless purchase-to-delivery pipeline.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
@@ -479,9 +490,10 @@ A brief value assessment of every feature in the platform, covering what it does
 | Client Self-Service | 6 | 24/7 data access reduces reporting overhead |
 | AI & Intelligence | 3 | Full-spectrum AI advisor + revenue engine + knowledge base + memory |
 | Security | 1 | Helmet, HTTPS, rate limiting, input sanitization |
+| Monetization | 1 | Stripe Checkout, admin settings, payment tracking, encrypted config |
 | Platform & UX | 7 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home |
 
-**43 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**44 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
 ---
 

@@ -3,9 +3,10 @@ import {
   Globe, Shield, MessageSquare, ClipboardCheck, AlertTriangle,
   CheckCircle2, ArrowUpRight, ArrowDownRight, Minus, Loader2,
   Search, BarChart3, Lock, ExternalLink, Bell, Activity, FileText, Zap,
-  Map, Clock, Circle, Rocket, Wifi, WifiOff, Key, Mail, FileSearch,
+  Map, Clock, Circle, Rocket, Wifi, WifiOff, Key, Mail, FileSearch, CreditCard,
 } from 'lucide-react';
 import { MetricRingSvg, PageHeader, SectionCard, Badge, StatCard } from './ui';
+import { StripeSettings } from './StripeSettings';
 
 interface ActivityEntry {
   id: string;
@@ -42,6 +43,7 @@ interface HealthStatus {
   hasWebflowToken: boolean;
   hasGoogleAuth: boolean;
   hasEmailConfig: boolean;
+  hasStripe: boolean;
 }
 
 // ScoreRing replaced by unified <MetricRingSvg /> from ./ui
@@ -144,6 +146,7 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
     { label: 'Webflow', ok: health?.hasWebflowToken, icon: Globe },
     { label: 'Google Auth', ok: health?.hasGoogleAuth, icon: Search },
     { label: 'Email', ok: health?.hasEmailConfig, icon: Mail },
+    { label: 'Stripe', ok: health?.hasStripe, icon: CreditCard },
   ];
 
   return (
@@ -423,6 +426,9 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
           </div>
         </SectionCard>
       </div>
+
+      {/* ── Stripe Payments ── */}
+      <StripeSettings />
 
       {/* ── Recent Activity ── */}
       {recentActivity.length > 0 && (
