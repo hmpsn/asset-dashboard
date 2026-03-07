@@ -1783,6 +1783,22 @@ export function ClientDashboard({ workspaceId }: Props) {
                 );
               })()}
 
+              {/* ── BRAND VOICE & BUSINESS CONTEXT (prominent placement) ── */}
+              {strategyData.businessContext && (
+                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-7 h-7 rounded-lg bg-teal-500/20 flex items-center justify-center">
+                      <FileText className="w-4 h-4 text-teal-400" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-zinc-200">Brand Voice & Style Guidelines</div>
+                      <div className="text-[11px] text-zinc-500">Strategic context that shapes all content and keyword decisions</div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-zinc-300 leading-relaxed">{strategyData.businessContext}</p>
+                </div>
+              )}
+
               {/* ── QUICK WINS (urgency builder) ── */}
               {strategyData.quickWins && strategyData.quickWins.length > 0 && (
                 <div className="bg-gradient-to-br from-amber-950/30 to-zinc-900 rounded-xl border border-amber-500/30 p-5 relative overflow-hidden">
@@ -1924,12 +1940,6 @@ export function ClientDashboard({ workspaceId }: Props) {
                       );
                     })}
                   </div>
-                  {strategyData.businessContext && (
-                    <div className="mt-4 pt-3 border-t border-zinc-800">
-                      <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Business Context</div>
-                      <p className="text-xs text-zinc-400 leading-relaxed">{strategyData.businessContext}</p>
-                    </div>
-                  )}
                 </div>
               </div>
 
