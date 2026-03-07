@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import crypto from 'crypto';
 import express from 'express';
+import helmet from 'helmet';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import multer from 'multer';
@@ -153,6 +154,31 @@ function verifyAdminToken(token: string): boolean {
 }
 
 // --- Core middleware (must come before auth) ---
+
+// HTTPS enforcement in production (trust proxy for Render/Heroku/etc.)
+if (IS_PROD) {
+  app.set('trust proxy', 1);
+  app.use((req, res, next) => {
+    if (req.secure || req.headers['x-forwarded-proto'] === 'https') return next();
+    res.redirect(301, `https://${req.headers.host}${req.url}`);
+  });
+}
+
+// Security headers via Helmet
+app.use(helmet({
+  contentSecurityPolicy: IS_PROD ? {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", 'https://js.stripe.com'],
+      frameSrc: ["'self'", 'https://js.stripe.com', 'https://hooks.stripe.com'],
+      connectSrc: ["'self'", 'https://api.stripe.com', 'wss:', 'ws:'],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+    },
+  } : false, // Disable CSP in dev (Vite HMR needs inline scripts)
+  crossOriginEmbedderPolicy: false, // Allow loading external images/resources
+}));
+
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim())
   : undefined; // undefined = allow all in dev
@@ -165,7 +191,38 @@ app.use(cors(ALLOWED_ORIGINS ? {
   credentials: true,
 } : undefined));
 app.use(cookieParser());
+
+// NOTE: Stripe webhook endpoint needs raw body — mount it BEFORE express.json().
+// When adding Stripe, mount: app.post('/api/stripe/webhook', express.raw({type:'application/json'}), ...)
+// before the next line.
 app.use(express.json({ limit: '10mb' }));
+
+// --- Rate limiting for public API routes ---
+// General public API rate limit: 60 requests per minute per IP
+const publicApiLimiter = rateLimit(60 * 1000, 60);
+// Stricter limit for write operations: 10 per minute per IP
+const publicWriteLimiter = rateLimit(60 * 1000, 10);
+// Checkout-specific limit (when Stripe is added): 5 per minute per IP
+const checkoutLimiter = rateLimit(60 * 1000, 5);
+
+app.use('/api/public/', publicApiLimiter);
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/public/') && (req.method === 'POST' || req.method === 'PATCH' || req.method === 'DELETE')) {
+    return publicWriteLimiter(req, res, next);
+  }
+  next();
+});
+
+// --- Input validation helpers ---
+/** Sanitize a string field: trim, limit length, strip control characters */
+function sanitizeString(val: unknown, maxLen = 500): string {
+  if (typeof val !== 'string') return '';
+  return val.trim().slice(0, maxLen).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+}
+/** Validate that a value is one of the allowed options */
+function validateEnum<T extends string>(val: unknown, allowed: T[], fallback: T): T {
+  return allowed.includes(val as T) ? (val as T) : fallback;
+}
 
 // --- Auth middleware (password gate) ---
 const APP_PASSWORD = process.env.APP_PASSWORD;
@@ -4250,7 +4307,13 @@ app.get('/api/public/seo-strategy/:workspaceId', (req, res) => {
 app.post('/api/public/content-request/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const { topic, targetKeyword, intent, priority, rationale, clientNote, serviceType } = req.body;
+  const topic = sanitizeString(req.body.topic, 200);
+  const targetKeyword = sanitizeString(req.body.targetKeyword, 200);
+  const intent = sanitizeString(req.body.intent, 50);
+  const priority = validateEnum(req.body.priority, ['low', 'medium', 'high', 'critical'], 'medium');
+  const rationale = sanitizeString(req.body.rationale, 1000);
+  const clientNote = sanitizeString(req.body.clientNote, 1000);
+  const serviceType = validateEnum(req.body.serviceType, ['brief_only', 'full_post'], 'brief_only');
   if (!topic || !targetKeyword) return res.status(400).json({ error: 'topic and targetKeyword are required' });
   const request = createContentRequest(req.params.workspaceId, { topic, targetKeyword, intent, priority, rationale, clientNote, serviceType });
   addActivity(req.params.workspaceId, 'content_requested', `Content topic requested: "${topic}"`, `Keyword: "${targetKeyword}" · Priority: ${priority}`, { requestId: request.id });
@@ -4277,12 +4340,15 @@ app.get('/api/public/content-requests/:workspaceId', (req, res) => {
 app.post('/api/public/content-request/:workspaceId/submit', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const { topic, targetKeyword, notes, serviceType } = req.body;
+  const topic = sanitizeString(req.body.topic, 200);
+  const targetKeyword = sanitizeString(req.body.targetKeyword, 200);
+  const notes = sanitizeString(req.body.notes, 1000);
+  const serviceType = validateEnum(req.body.serviceType, ['brief_only', 'full_post'], 'brief_only');
   if (!topic || !targetKeyword) return res.status(400).json({ error: 'topic and targetKeyword are required' });
   const request = createContentRequest(req.params.workspaceId, {
     topic, targetKeyword, intent: 'informational', priority: 'medium',
     rationale: notes || `Client-submitted topic: ${topic}`,
-    clientNote: notes, source: 'client', serviceType: serviceType || 'brief_only',
+    clientNote: notes, source: 'client', serviceType,
   });
   addActivity(req.params.workspaceId, 'content_requested', `Client submitted topic: "${topic}"`, `Keyword: "${targetKeyword}"`, { requestId: request.id });
   notifyTeamContentRequest({ workspaceName: ws.name, workspaceId: req.params.workspaceId, topic, targetKeyword, priority: 'medium', rationale: notes || '' });
@@ -4291,9 +4357,9 @@ app.post('/api/public/content-request/:workspaceId/submit', (req, res) => {
 
 // Client declines a recommended topic
 app.post('/api/public/content-request/:workspaceId/:id/decline', (req, res) => {
-  const { reason } = req.body;
+  const reason = sanitizeString(req.body.reason, 1000);
   const updated = updateContentRequest(req.params.workspaceId, req.params.id, {
-    status: 'declined', declineReason: reason || '',
+    status: 'declined', declineReason: reason,
   });
   if (!updated) return res.status(404).json({ error: 'Request not found' });
   addActivity(req.params.workspaceId, 'content_declined', `Client declined topic: "${updated.topic}"`, reason || 'No reason given', { requestId: updated.id });
@@ -4310,9 +4376,9 @@ app.post('/api/public/content-request/:workspaceId/:id/approve', (req, res) => {
 
 // Client requests changes on a brief
 app.post('/api/public/content-request/:workspaceId/:id/request-changes', (req, res) => {
-  const { feedback } = req.body;
+  const feedback = sanitizeString(req.body.feedback, 2000);
   const updated = updateContentRequest(req.params.workspaceId, req.params.id, {
-    status: 'changes_requested', clientFeedback: feedback || '',
+    status: 'changes_requested', clientFeedback: feedback,
   });
   if (!updated) return res.status(404).json({ error: 'Request not found' });
   addActivity(req.params.workspaceId, 'changes_requested', `Client requested changes on "${updated.topic}"`, feedback || '', { requestId: updated.id });
@@ -4332,9 +4398,10 @@ app.post('/api/public/content-request/:workspaceId/:id/upgrade', (req, res) => {
 
 // Client or team adds a comment
 app.post('/api/public/content-request/:workspaceId/:id/comment', (req, res) => {
-  const { content, author } = req.body;
+  const content = sanitizeString(req.body.content, 2000);
+  const author = validateEnum(req.body.author, ['client', 'team'], 'client');
   if (!content) return res.status(400).json({ error: 'content is required' });
-  const updated = addComment(req.params.workspaceId, req.params.id, author || 'client', content);
+  const updated = addComment(req.params.workspaceId, req.params.id, author, content);
   if (!updated) return res.status(404).json({ error: 'Request not found' });
   res.json(updated);
 });
