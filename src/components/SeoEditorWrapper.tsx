@@ -2,15 +2,17 @@ import { useState } from 'react';
 import { Pencil, Database } from 'lucide-react';
 import { SeoEditor } from './SeoEditor';
 import { CmsEditor } from './CmsEditor';
+import type { FixContext } from '../App';
 
 type EditorTab = 'pages' | 'cms';
 
 interface Props {
   siteId: string;
   workspaceId?: string;
+  fixContext?: FixContext | null;
 }
 
-export function SeoEditorWrapper({ siteId, workspaceId }: Props) {
+export function SeoEditorWrapper({ siteId, workspaceId, fixContext }: Props) {
   const [tab, setTab] = useState<EditorTab>('pages');
 
   return (
@@ -34,7 +36,7 @@ export function SeoEditorWrapper({ siteId, workspaceId }: Props) {
           </button>
         ))}
       </div>
-      {tab === 'pages' && <SeoEditor siteId={siteId} workspaceId={workspaceId} />}
+      {tab === 'pages' && <SeoEditor siteId={siteId} workspaceId={workspaceId} fixContext={fixContext} />}
       {tab === 'cms' && <CmsEditor siteId={siteId} workspaceId={workspaceId} />}
     </div>
   );

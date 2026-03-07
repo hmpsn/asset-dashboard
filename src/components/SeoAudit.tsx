@@ -7,6 +7,7 @@ import {
   TrendingUp, TrendingDown, Minus, Plus, ListChecks, Trash2, Circle, ClipboardList,
 } from 'lucide-react';
 import { StatCard, scoreColorClass, scoreBgBarClass } from './ui';
+import type { FixContext } from '../App';
 
 // ── Lazy-loaded sub-tool chunks ──
 const SeoEditorWrapper = lazy(() => import('./SeoEditorWrapper').then(m => ({ default: m.SeoEditorWrapper })));
@@ -100,7 +101,8 @@ interface Props {
   siteName?: string;
   view?: string;
   onRequestCountChange?: (pending: number) => void;
-  onNavigate?: (tab: string) => void;
+  onNavigate?: (tab: string, context?: FixContext) => void;
+  fixContext?: FixContext | null;
 }
 
 const SEVERITY_CONFIG: Record<Severity, { label: string; color: string; bg: string; icon: typeof AlertTriangle }> = {
@@ -502,7 +504,7 @@ function AuditHistory({ siteId, history, onRefresh }: { siteId: string; history:
 
 type AuditSubTab = 'audit' | 'links' | 'history';
 
-function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCountChange, onNavigate }: Props) {
+function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCountChange, onNavigate, fixContext }: Props) {
   const { startJob, jobs } = useBackgroundTasks();
   const auditJobId = useRef<string | null>(null);
   const [data, setData] = useState<SeoAuditResult | null>(null);
@@ -976,12 +978,12 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
   };
 
   // ── View-based routing (controlled by parent) ──
-  if (view === 'editor') return <Suspense fallback={<SubToolFallback />}><SeoEditorWrapper siteId={siteId} workspaceId={workspaceId} /></Suspense>;
+  if (view === 'editor') return <Suspense fallback={<SubToolFallback />}><SeoEditorWrapper siteId={siteId} workspaceId={workspaceId} fixContext={fixContext} /></Suspense>;
   if (view === 'strategy') return <Suspense fallback={<SubToolFallback />}><KeywordStrategyPanel workspaceId={workspaceId || ''} siteId={siteId} /></Suspense>;
   if (view === 'redirects') return <Suspense fallback={<SubToolFallback />}><RedirectManager siteId={siteId} /></Suspense>;
   if (view === 'internal') return <Suspense fallback={<SubToolFallback />}><InternalLinks siteId={siteId} workspaceId={workspaceId} /></Suspense>;
-  if (view === 'schema') return <Suspense fallback={<SubToolFallback />}><SchemaSuggester siteId={siteId} workspaceId={workspaceId} /></Suspense>;
-  if (view === 'briefs') return <Suspense fallback={<SubToolFallback />}><ContentBriefs workspaceId={workspaceId || ''} onRequestCountChange={onRequestCountChange} /></Suspense>;
+  if (view === 'schema') return <Suspense fallback={<SubToolFallback />}><SchemaSuggester siteId={siteId} workspaceId={workspaceId} fixContext={fixContext} /></Suspense>;
+  if (view === 'briefs') return <Suspense fallback={<SubToolFallback />}><ContentBriefs workspaceId={workspaceId || ''} onRequestCountChange={onRequestCountChange} fixContext={fixContext} /></Suspense>;
   if (view === 'competitors') return <Suspense fallback={<SubToolFallback />}><CompetitorAnalysis siteId={siteId} /></Suspense>;
   if (view === 'ranks') return <Suspense fallback={<SubToolFallback />}><RankTracker workspaceId={workspaceId || ''} hasGsc={!!workspaceId} /></Suspense>;
 
@@ -1491,7 +1493,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
                                 if (!fixTab) return null;
                                 return (
                                   <button
-                                    onClick={() => onNavigate(fixTab)}
+                                    onClick={() => onNavigate(fixTab, { pageId: page.pageId, pageSlug: page.slug, pageName: page.page, issueCheck: issue.check, issueMessage: issue.message })}
                                     className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 flex items-center gap-0.5 transition-colors"
                                     title={`Open ${FIX_TAB_LABELS[fixTab] || fixTab}`}
                                   >

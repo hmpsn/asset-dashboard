@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import type { FixContext } from '../App';
 import {
   Loader2, ChevronDown, ChevronRight, Copy, CheckCircle,
   AlertCircle, Info, Sparkles, RefreshCw, Upload, Send, Search, Plus, Database,
@@ -44,9 +45,10 @@ interface CmsTemplateResult {
 interface Props {
   siteId: string;
   workspaceId?: string;
+  fixContext?: FixContext | null;
 }
 
-export function SchemaSuggester({ siteId, workspaceId }: Props) {
+export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
   const [data, setData] = useState<SchemaPageSuggestion[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [started, setStarted] = useState(false);
@@ -70,6 +72,19 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
   const [generatingSingle, setGeneratingSingle] = useState<string | null>(null);
   const { jobs, startJob, cancelJob } = useBackgroundTasks();
   const jobIdRef = useRef<string | null>(null);
+
+  // Auto-generate for a specific page when arriving from audit Fix→
+  const fixConsumed = useRef(false);
+  useEffect(() => {
+    if (fixContext?.pageId && !fixConsumed.current) {
+      fixConsumed.current = true;
+      // Small delay to let snapshot load finish first
+      const timer = setTimeout(() => {
+        generateSinglePage(fixContext.pageId!);
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [fixContext]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // CMS template schema state
   const [showCmsPanel, setShowCmsPanel] = useState(false);

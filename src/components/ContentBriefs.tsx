@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Loader2, Clipboard, Trash2, ChevronDown, ChevronUp, Sparkles, FileText,
   Inbox, CheckCircle2, XCircle, Clock, Zap, Download, Copy, Search,
   Target, MessageSquare, BarChart3, BookOpen, Users, TrendingUp,
   AlertTriangle, ArrowUpDown, X, Pencil, Check, ExternalLink, Link2,
 } from 'lucide-react';
+import type { FixContext } from '../App';
 
 interface ContentBrief {
   id: string;
@@ -58,7 +59,7 @@ interface ContentTopicRequest {
   updatedAt: string;
 }
 
-export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspaceId: string; onRequestCountChange?: (pending: number) => void }) {
+export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }: { workspaceId: string; onRequestCountChange?: (pending: number) => void; fixContext?: FixContext | null }) {
   const [briefs, setBriefs] = useState<ContentBrief[]>([]);
   const [clientRequests, setClientRequests] = useState<ContentTopicRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,6 +73,16 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
   const [briefError, setBriefError] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [briefSearch, setBriefSearch] = useState('');
+
+  // Auto-fill keyword from audit Fix→
+  const fixConsumed = useRef(false);
+  useEffect(() => {
+    if (fixContext && !fixConsumed.current) {
+      fixConsumed.current = true;
+      const prefill = fixContext.pageName || fixContext.pageSlug || '';
+      if (prefill) setKeyword(prefill.replace(/-/g, ' '));
+    }
+  }, [fixContext]);
   const [briefSort, setBriefSort] = useState<'date' | 'keyword' | 'difficulty'>('date');
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'brief' | 'request'; id: string; label: string } | null>(null);
   const [editingBrief, setEditingBrief] = useState<string | null>(null);

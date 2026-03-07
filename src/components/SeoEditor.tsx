@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Loader2, Save, Sparkles, Upload, ChevronDown, ChevronRight,
   Check, AlertCircle, Wand2, Send, CheckSquare, Square,
 } from 'lucide-react';
+import type { FixContext } from '../App';
 
 interface PageMeta {
   id: string;
@@ -21,9 +22,10 @@ interface EditState {
 interface Props {
   siteId: string;
   workspaceId?: string;
+  fixContext?: FixContext | null;
 }
 
-export function SeoEditor({ siteId, workspaceId }: Props) {
+export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const [pages, setPages] = useState<PageMeta[]>([]);
   const [loading, setLoading] = useState(false);
   const [edits, setEdits] = useState<Record<string, EditState>>({});
@@ -64,7 +66,24 @@ export function SeoEditor({ siteId, workspaceId }: Props) {
     }
   };
 
-  useEffect(() => { fetchPages(); }, [siteId]);
+  useEffect(() => { fetchPages(); }, [siteId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-expand target page from audit Fix→
+  const fixConsumed = useRef(false);
+  useEffect(() => {
+    if (fixContext?.pageId && pages.length > 0 && !fixConsumed.current) {
+      const match = pages.find(p => p.id === fixContext.pageId || p.slug === fixContext.pageSlug);
+      if (match) {
+        fixConsumed.current = true;
+        setExpanded(new Set([match.id]));
+        // Scroll to the page after a tick
+        setTimeout(() => {
+          const el = document.getElementById(`seo-editor-page-${match.id}`);
+          el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+      }
+    }
+  }, [fixContext, pages]);
 
   useEffect(() => {
     setHasUnsaved(Object.values(edits).some(e => e.dirty));
@@ -390,7 +409,7 @@ export function SeoEditor({ siteId, workspaceId }: Props) {
           const isSelected = approvalSelected.has(page.id);
 
           return (
-            <div key={page.id} className={`bg-zinc-900 rounded-xl border overflow-hidden ${isSelected ? 'border-teal-500/40 bg-teal-500/5' : 'border-zinc-800'}`}>
+            <div key={page.id} id={`seo-editor-page-${page.id}`} className={`bg-zinc-900 rounded-xl border overflow-hidden ${isSelected ? 'border-teal-500/40 bg-teal-500/5' : 'border-zinc-800'}`}>
               <div className="flex items-center">
                 {workspaceId && (
                   <button
