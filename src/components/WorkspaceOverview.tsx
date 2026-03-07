@@ -80,7 +80,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--brand-text-muted)' }} />
+        <Loader2 className="w-5 h-5 animate-spin text-teal-400" />
       </div>
     );
   }
@@ -122,7 +122,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
           { label: 'New Requests', value: totalNewRequests, color: totalNewRequests > 0 ? '#f87171' : 'var(--brand-text-muted)', icon: Bell },
           { label: 'Active Requests', value: totalActiveRequests, color: totalActiveRequests > 0 ? '#fbbf24' : 'var(--brand-text-muted)', icon: MessageSquare },
           { label: 'Content Briefs', value: totalPendingContent, color: totalPendingContent > 0 ? '#f59e0b' : 'var(--brand-text-muted)', icon: ClipboardCheck },
-          { label: 'Pending Approvals', value: totalPendingApprovals, color: totalPendingApprovals > 0 ? '#a78bfa' : 'var(--brand-text-muted)', icon: ClipboardCheck },
+          { label: 'Pending Approvals', value: totalPendingApprovals, color: totalPendingApprovals > 0 ? '#2dd4bf' : 'var(--brand-text-muted)', icon: ClipboardCheck },
           { label: 'Avg Health Score', value: avgScore !== null ? avgScore : '—', color: avgScore !== null ? (avgScore >= 80 ? '#4ade80' : avgScore >= 60 ? '#fbbf24' : '#f87171') : 'var(--brand-text-muted)', icon: Shield },
         ].map(stat => (
           <div key={stat.label} className="rounded-xl px-4 py-3" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
@@ -260,6 +260,11 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                 request_resolved: CheckCircle2,
                 approval_applied: ClipboardCheck,
                 seo_updated: Globe,
+                schema_generated: Shield,
+                schema_published: Shield,
+                redirects_scanned: AlertTriangle,
+                strategy_generated: BarChart3,
+                rank_snapshot: Search,
               };
               const Icon = iconMap[entry.type] || Activity;
               return (

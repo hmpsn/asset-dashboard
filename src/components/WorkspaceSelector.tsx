@@ -87,18 +87,17 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
       <button
         onClick={() => setOpen(!open)}
         className={cn(
-          'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-          'hover:bg-zinc-700 border',
-          'bg-[#0c0c3a] border-[rgba(165,186,201,0.15)]',
-          open && 'bg-zinc-700'
+          'flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm font-medium transition-all',
+          open ? 'bg-teal-500/10 ring-1 ring-teal-500/20' : 'hover:bg-zinc-800/60'
         )}
+        style={{ border: '1px solid var(--brand-border)' }}
       >
         <div className={cn(
-          'w-2 h-2 rounded-full',
-          selected ? 'bg-emerald-400' : 'bg-zinc-500'
+          'w-2 h-2 rounded-full shrink-0',
+          selected ? 'bg-emerald-400' : 'bg-zinc-600'
         )} />
-        <span>{selected?.name || 'Select workspace'}</span>
-        <ChevronDown className={cn('w-4 h-4 text-zinc-400 transition-transform', open && 'rotate-180')} />
+        <span className="truncate flex-1 text-left" style={{ color: selected ? 'var(--brand-text-bright)' : 'var(--brand-text-muted)' }}>{selected?.name || 'Select workspace'}</span>
+        <ChevronDown className={cn('w-3.5 h-3.5 shrink-0 transition-transform', open ? 'rotate-180 text-teal-400' : 'text-zinc-500')} />
       </button>
 
       {open && (
@@ -196,7 +195,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
                         <button
                           onClick={(e) => { e.stopPropagation(); fetchSitesForToken(linkToken); }}
                           disabled={!linkToken.trim() || loadingSites}
-                          className="px-2 py-1 text-xs font-medium bg-white text-black rounded hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          className="px-2 py-1 text-xs font-medium bg-teal-600 text-white rounded hover:bg-teal-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                           {loadingSites ? '...' : 'Go'}
                         </button>
@@ -248,7 +247,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
                 />
                 <button
                   onClick={handleCreate}
-                  className="px-3 py-1.5 bg-white text-black text-sm font-medium rounded-lg hover:bg-zinc-200 transition-colors"
+                  className="px-3 py-1.5 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-500 transition-colors"
                 >
                   Add
                 </button>
