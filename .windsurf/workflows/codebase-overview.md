@@ -12,6 +12,16 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 - **Backend**: Express server in `server/index.ts` (~6000 lines). All API endpoints defined here. No database — JSON files on disk via `data/` and per-workspace upload folders.
 - **AI**: OpenAI GPT-4o/4o-mini via `server/openai-helpers.ts` (`callOpenAI` wrapper with retry, timeout, token tracking).
 
+## Monetization Model
+
+- **3 tiers**: Free (dashboard only), Growth ($149-249/mo), Premium ($349-499/mo)
+- **UX soft-gating**: All tabs visible at every tier; gated content shown as blurred preview + upgrade CTA overlay (`<TierGate>` component)
+- **Products**: Content briefs (8 page types), full content (8 page types), schemas, keyword strategies — purchased via Stripe Checkout
+- **Trial**: 14-day Growth trial for new workspaces, auto-downgrade to Free
+- **Bundles**: Content Starter ($500/mo), Content Engine ($1,500-2,000/mo), Full Service SEO ($3,000-5,000/mo)
+- **Credits**: Prepaid credit packs as alternative to per-item checkout
+- **Key docs**: `MONETIZATION.md` (full strategy + specs), `ACTION_PLAN.md` (execution roadmap)
+
 ## Key Server Modules
 
 | Module | Purpose |
@@ -32,6 +42,8 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 | `server/openai-helpers.ts` | `callOpenAI` with retry/backoff/timeout, `parseAIJson`, token usage tracking |
 | `server/schema-suggester.ts` | JSON-LD schema generation per page |
 | `server/rank-tracking.ts` | Keyword position tracking over time |
+| `server/stripe.ts` | *(Planned)* Stripe SDK setup, checkout session creation, webhook handler |
+| `server/payments.ts` | *(Planned)* Payment record persistence (JSON on disk), per-workspace payment history |
 
 ## Key Frontend Components
 
@@ -69,6 +81,7 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 ### Content Briefs (`generateBrief` in `content-brief.ts`)
 - GSC related queries, SEMRush metrics + related keywords
 - Keyword strategy context (`buildSeoContext`), brand voice, keyword map
+- Supports 8 page types: blog post, landing page, service page, location page, product page, pillar/hub page, resource/guide *(page-type-specific prompts planned)*
 
 ## Data Flow Patterns
 
@@ -80,8 +93,9 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 ## Documentation
 
 - `FEATURE_AUDIT.md` — Comprehensive feature inventory (42 features) with agency/client/mutual value
+- `MONETIZATION.md` — Full monetization strategy: tiers, products (8 page types), bundles, UX soft-gating spec, trial strategy, inline pricing, ROI dashboard, churn signals, credits system, white-label resale, Stripe integration spec
+- `ACTION_PLAN.md` — Prioritized execution plan, 65 items across 10 sprints, decision log
 - `AI_CHATBOT_ROADMAP.md` — Chatbot phases, shipped and planned
-- `ACTION_PLAN.md` — Prioritized execution plan across all roadmaps
 - `AUTH_ROADMAP.md` — Authentication/authorization phases
 - `DESIGN_SYSTEM.md` — UI primitives and design tokens
-- `data/roadmap.json` — Sprint-level tracking with item statuses
+- `data/roadmap.json` — Sprint-level tracking with item statuses (65 items, managed via /api/roadmap)
