@@ -11,7 +11,7 @@ import SearchableSelect from './SearchableSelect';
 import { StatCard, CompactStatBar, EmptyState } from './ui';
 import { TrendChart, DualTrendChart, RenderMarkdown, InsightCard } from './client/helpers';
 import { HealthTab } from './client/HealthTab';
-import { SearchSnapshot, AnalyticsSnapshot } from './client/DataSnapshots';
+import { SearchSnapshot, AnalyticsSnapshot, OrganicInsight } from './client/DataSnapshots';
 import {
   QUICK_QUESTIONS,
   type SearchOverview, type PerformanceTrend, type WorkspaceInfo, type AuditSummary,
@@ -20,7 +20,7 @@ import {
   type GA4EventTrend, type GA4ConversionSummary, type GA4EventPageBreakdown,
   type ClientContentRequest, type ClientBriefPreview, type ClientKeywordStrategy,
   type ClientRequest, type ApprovalBatch,
-  type SearchComparison, type GA4Comparison, type GA4NewVsReturning,
+  type SearchComparison, type GA4Comparison, type GA4NewVsReturning, type GA4OrganicOverview, type GA4LandingPage,
   type SortKey, type ClientTab, type RequestCategory,
 } from './client/types';
 
@@ -91,6 +91,8 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
   const [searchDevices, setSearchDevices] = useState<{ device: string; clicks: number; impressions: number; ctr: number; position: number }[]>([]);
   const [ga4Comparison, setGa4Comparison] = useState<GA4Comparison | null>(null);
   const [ga4NewVsReturning, setGa4NewVsReturning] = useState<GA4NewVsReturning[]>([]);
+  const [ga4Organic, setGa4Organic] = useState<GA4OrganicOverview | null>(null);
+  const [ga4LandingPages, setGa4LandingPages] = useState<GA4LandingPage[]>([]);
   const [authenticated, setAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [authError, setAuthError] = useState('');
@@ -290,7 +292,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
 
   const loadGA4Data = async (wsId: string, numDays: number) => {
     try {
-      const [ovRes, trRes, pgRes, srcRes, devRes, ctryRes, evtRes, convRes, cmpRes, nvrRes] = await Promise.all([
+      const [ovRes, trRes, pgRes, srcRes, devRes, ctryRes, evtRes, convRes, cmpRes, nvrRes, orgRes, lpRes] = await Promise.all([
         fetch(`/api/public/analytics-overview/${wsId}?days=${numDays}`),
         fetch(`/api/public/analytics-trend/${wsId}?days=${numDays}`),
         fetch(`/api/public/analytics-top-pages/${wsId}?days=${numDays}`),
@@ -301,8 +303,10 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         fetch(`/api/public/analytics-conversions/${wsId}?days=${numDays}`),
         fetch(`/api/public/analytics-comparison/${wsId}?days=${numDays}`),
         fetch(`/api/public/analytics-new-vs-returning/${wsId}?days=${numDays}`),
+        fetch(`/api/public/analytics-organic/${wsId}?days=${numDays}`),
+        fetch(`/api/public/analytics-landing-pages/${wsId}?days=${numDays}&organic=true&limit=15`),
       ]);
-      const [ov, tr, pg, src, dev, ctry, evt, conv, cmp, nvr] = await Promise.all([ovRes.json(), trRes.json(), pgRes.json(), srcRes.json(), devRes.json(), ctryRes.json(), evtRes.json(), convRes.json(), cmpRes.json(), nvrRes.json()]);
+      const [ov, tr, pg, src, dev, ctry, evt, conv, cmp, nvr, org, lp] = await Promise.all([ovRes.json(), trRes.json(), pgRes.json(), srcRes.json(), devRes.json(), ctryRes.json(), evtRes.json(), convRes.json(), cmpRes.json(), nvrRes.json(), orgRes.json(), lpRes.json()]);
       if (!ov.error) setGa4Overview(ov);
       if (Array.isArray(tr)) setGa4Trend(tr);
       if (Array.isArray(pg)) setGa4Pages(pg);
@@ -313,6 +317,8 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
       if (Array.isArray(conv)) setGa4Conversions(conv);
       if (cmp && !cmp.error) setGa4Comparison(cmp);
       if (Array.isArray(nvr)) setGa4NewVsReturning(nvr);
+      if (org && !org.error) setGa4Organic(org);
+      if (Array.isArray(lp)) setGa4LandingPages(lp);
     } catch (err) {
       console.error('GA4 data load error:', err);
     }
@@ -2329,6 +2335,13 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                 </div>
               </div>
             </div>
+
+            {/* Organic Search + New vs Returning + Landing Pages */}
+            {ga4Organic && (
+              <div className="mb-6">
+                <OrganicInsight organic={ga4Organic} landingPages={ga4LandingPages} newVsReturning={ga4NewVsReturning} />
+              </div>
+            )}
 
             {/* ── Event Modules (Grouped) ── */}
             {(ga4Conversions.length > 0 || ga4Events.length > 0) && (() => {

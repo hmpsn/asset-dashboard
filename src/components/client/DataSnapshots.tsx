@@ -5,6 +5,7 @@ import {
 import type {
   SearchOverview, PerformanceTrend, SearchComparison,
   GA4Overview, GA4DailyTrend, GA4TopPage, GA4Comparison, GA4NewVsReturning,
+  GA4OrganicOverview, GA4LandingPage,
 } from './types';
 
 // ─── Helpers ───
@@ -257,6 +258,126 @@ export function AnalyticsSnapshot({ overview, trend, topPages, comparison, newVs
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Organic Insight Panel (for Analytics tab) ───
+
+interface OrganicInsightProps {
+  organic: GA4OrganicOverview;
+  landingPages: GA4LandingPage[];
+  newVsReturning: GA4NewVsReturning[];
+}
+
+export function OrganicInsight({ organic, landingPages, newVsReturning }: OrganicInsightProps) {
+  const newSeg = newVsReturning.find(s => s.segment === 'new');
+  const retSeg = newVsReturning.find(s => s.segment === 'returning');
+
+  return (
+    <div className="space-y-6">
+      {/* Organic overview row */}
+      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-6 h-6 rounded-lg bg-emerald-500/15 flex items-center justify-center">
+            <Globe className="w-3.5 h-3.5 text-emerald-400" />
+          </div>
+          <h3 className="text-sm font-semibold text-zinc-300">Organic Search Traffic</h3>
+          <span className="text-[11px] text-zinc-500 ml-auto">{organic.dateRange.start} — {organic.dateRange.end}</span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="bg-zinc-800/40 rounded-lg px-3 py-2.5">
+            <div className="text-[11px] text-zinc-500 mb-0.5">Organic visitors</div>
+            <div className="text-lg font-bold text-emerald-400">{formatNum(organic.organicUsers)}</div>
+            <div className="text-[11px] text-zinc-500 mt-0.5">{organic.shareOfTotalUsers}% of all traffic</div>
+          </div>
+          <div className="bg-zinc-800/40 rounded-lg px-3 py-2.5">
+            <div className="text-[11px] text-zinc-500 mb-0.5">Organic sessions</div>
+            <div className="text-lg font-bold text-blue-400">{formatNum(organic.organicSessions)}</div>
+          </div>
+          <div className="bg-zinc-800/40 rounded-lg px-3 py-2.5">
+            <div className="text-[11px] text-zinc-500 mb-0.5">Engagement rate</div>
+            <div className="text-lg font-bold text-teal-400">{organic.engagementRate}%</div>
+          </div>
+          <div className="bg-zinc-800/40 rounded-lg px-3 py-2.5">
+            <div className="text-[11px] text-zinc-500 mb-0.5">Avg time on site</div>
+            <div className="text-lg font-bold text-amber-400">
+              {Math.floor(organic.avgEngagementTime / 60)}m {Math.floor(organic.avgEngagementTime % 60)}s
+            </div>
+          </div>
+        </div>
+
+        {/* Organic share bar */}
+        <div className="mt-4">
+          <div className="text-[11px] text-zinc-500 mb-1.5">Share of total traffic from organic search</div>
+          <div className="h-3 rounded-full overflow-hidden bg-zinc-800 flex">
+            <div className="h-full bg-emerald-500 rounded-l-full transition-all" style={{ width: `${organic.shareOfTotalUsers}%` }} />
+          </div>
+          <div className="flex items-center justify-between mt-1">
+            <span className="text-[11px] text-emerald-400">Organic {organic.shareOfTotalUsers}%</span>
+            <span className="text-[11px] text-zinc-500">Other {(100 - organic.shareOfTotalUsers).toFixed(1)}%</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* New vs returning */}
+        {newSeg && retSeg && (
+          <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+            <h3 className="text-sm font-semibold text-zinc-300 mb-4">New vs Returning Visitors</h3>
+            <div className="flex items-center gap-6 mb-4">
+              <div className="flex-1">
+                <div className="text-[11px] text-teal-400 mb-0.5">New visitors</div>
+                <div className="text-2xl font-bold text-teal-400">{newSeg.percentage}%</div>
+                <div className="text-[11px] text-zinc-500">{formatNum(newSeg.users)} users</div>
+              </div>
+              <div className="flex-1">
+                <div className="text-[11px] text-blue-400 mb-0.5">Returning visitors</div>
+                <div className="text-2xl font-bold text-blue-400">{retSeg.percentage}%</div>
+                <div className="text-[11px] text-zinc-500">{formatNum(retSeg.users)} users</div>
+              </div>
+            </div>
+            <div className="h-4 rounded-full overflow-hidden bg-zinc-800 flex">
+              <div className="h-full bg-teal-500 rounded-l-full" style={{ width: `${newSeg.percentage}%` }} />
+              <div className="h-full bg-blue-500 rounded-r-full" style={{ width: `${retSeg.percentage}%` }} />
+            </div>
+            <div className="grid grid-cols-2 gap-3 mt-4">
+              <div className="bg-zinc-800/30 rounded-lg px-3 py-2">
+                <div className="text-[11px] text-zinc-500 mb-0.5">New bounce rate</div>
+                <div className={`text-sm font-bold ${newSeg.bounceRate > 60 ? 'text-red-400' : 'text-emerald-400'}`}>{newSeg.bounceRate}%</div>
+              </div>
+              <div className="bg-zinc-800/30 rounded-lg px-3 py-2">
+                <div className="text-[11px] text-zinc-500 mb-0.5">Returning bounce rate</div>
+                <div className={`text-sm font-bold ${retSeg.bounceRate > 60 ? 'text-red-400' : 'text-emerald-400'}`}>{retSeg.bounceRate}%</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Top organic landing pages */}
+        {landingPages.length > 0 && (
+          <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+            <h3 className="text-sm font-semibold text-zinc-300 mb-3">Top Organic Landing Pages</h3>
+            <div className="space-y-1 max-h-[350px] overflow-y-auto">
+              {landingPages.slice(0, 15).map((lp, i) => {
+                const label = lp.landingPage === '/' ? 'Homepage' : lp.landingPage;
+                return (
+                  <div key={i} className="flex items-center gap-2 py-1.5 px-2.5 rounded-lg hover:bg-zinc-800/50 transition-colors">
+                    <span className="text-[11px] text-zinc-600 w-4 text-right">{i + 1}</span>
+                    <span className="text-xs text-zinc-300 flex-1 truncate font-mono">{label}</span>
+                    <span className="text-xs text-emerald-400 font-medium tabular-nums flex-shrink-0">{formatNum(lp.sessions)}</span>
+                    <span className={`text-[11px] flex-shrink-0 w-12 text-right ${lp.bounceRate > 70 ? 'text-red-400' : 'text-zinc-500'}`}>{lp.bounceRate}%</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex items-center justify-end gap-4 mt-2 text-[11px] text-zinc-600">
+              <span>Sessions</span>
+              <span>Bounce</span>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

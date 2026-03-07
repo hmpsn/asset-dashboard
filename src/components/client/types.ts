@@ -86,6 +86,26 @@ export interface GA4NewVsReturning {
   percentage: number;
 }
 
+export interface GA4OrganicOverview {
+  organicUsers: number;
+  organicSessions: number;
+  organicPageviews: number;
+  organicBounceRate: number;
+  engagementRate: number;
+  avgEngagementTime: number;
+  shareOfTotalUsers: number;
+  dateRange: { start: string; end: string };
+}
+
+export interface GA4LandingPage {
+  landingPage: string;
+  sessions: number;
+  users: number;
+  bounceRate: number;
+  avgEngagementTime: number;
+  conversions: number;
+}
+
 export type SortKey = 'clicks' | 'impressions' | 'ctr' | 'position';
 export type ClientTab = 'overview' | 'search' | 'health' | 'strategy' | 'analytics' | 'approvals' | 'requests' | 'content';
 
