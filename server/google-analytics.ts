@@ -130,12 +130,14 @@ function dateStr(daysAgo: number): string {
   return d.toISOString().split('T')[0];
 }
 
+export interface CustomDateRange { startDate: string; endDate: string; }
+
 /**
  * Get overview metrics for a GA4 property.
  */
-export async function getGA4Overview(propertyId: string, days: number = 28): Promise<GA4Overview> {
-  const startDate = dateStr(days);
-  const endDate = dateStr(1);
+export async function getGA4Overview(propertyId: string, days: number = 28, dateRange?: CustomDateRange): Promise<GA4Overview> {
+  const startDate = dateRange?.startDate || dateStr(days);
+  const endDate = dateRange?.endDate || dateStr(1);
 
   const data = await runReport(propertyId, {
     dateRanges: [{ startDate, endDate }],
@@ -169,9 +171,9 @@ export async function getGA4Overview(propertyId: string, days: number = 28): Pro
 /**
  * Get daily trend data.
  */
-export async function getGA4DailyTrend(propertyId: string, days: number = 28): Promise<GA4DailyTrend[]> {
-  const startDate = dateStr(days);
-  const endDate = dateStr(1);
+export async function getGA4DailyTrend(propertyId: string, days: number = 28, dateRange?: CustomDateRange): Promise<GA4DailyTrend[]> {
+  const startDate = dateRange?.startDate || dateStr(days);
+  const endDate = dateRange?.endDate || dateStr(1);
 
   const data = await runReport(propertyId, {
     dateRanges: [{ startDate, endDate }],
@@ -200,9 +202,9 @@ export async function getGA4DailyTrend(propertyId: string, days: number = 28): P
 /**
  * Get top pages by pageviews.
  */
-export async function getGA4TopPages(propertyId: string, days: number = 28, limit: number = 20): Promise<GA4TopPage[]> {
-  const startDate = dateStr(days);
-  const endDate = dateStr(1);
+export async function getGA4TopPages(propertyId: string, days: number = 28, limit: number = 20, dateRange?: CustomDateRange): Promise<GA4TopPage[]> {
+  const startDate = dateRange?.startDate || dateStr(days);
+  const endDate = dateRange?.endDate || dateStr(1);
 
   const data = await runReport(propertyId, {
     dateRanges: [{ startDate, endDate }],
@@ -232,9 +234,9 @@ export async function getGA4TopPages(propertyId: string, days: number = 28, limi
 /**
  * Get top traffic sources.
  */
-export async function getGA4TopSources(propertyId: string, days: number = 28, limit: number = 10): Promise<GA4TopSource[]> {
-  const startDate = dateStr(days);
-  const endDate = dateStr(1);
+export async function getGA4TopSources(propertyId: string, days: number = 28, limit: number = 10, dateRange?: CustomDateRange): Promise<GA4TopSource[]> {
+  const startDate = dateRange?.startDate || dateStr(days);
+  const endDate = dateRange?.endDate || dateStr(1);
 
   const data = await runReport(propertyId, {
     dateRanges: [{ startDate, endDate }],
@@ -263,9 +265,9 @@ export async function getGA4TopSources(propertyId: string, days: number = 28, li
 /**
  * Get device category breakdown.
  */
-export async function getGA4DeviceBreakdown(propertyId: string, days: number = 28): Promise<GA4DeviceBreakdown[]> {
-  const startDate = dateStr(days);
-  const endDate = dateStr(1);
+export async function getGA4DeviceBreakdown(propertyId: string, days: number = 28, dateRange?: CustomDateRange): Promise<GA4DeviceBreakdown[]> {
+  const startDate = dateRange?.startDate || dateStr(days);
+  const endDate = dateRange?.endDate || dateStr(1);
 
   const data = await runReport(propertyId, {
     dateRanges: [{ startDate, endDate }],
@@ -319,9 +321,9 @@ export interface GA4ConversionSummary {
 /**
  * Get top events by count.
  */
-export async function getGA4KeyEvents(propertyId: string, days: number = 28, limit: number = 20): Promise<GA4Event[]> {
-  const startDate = dateStr(days);
-  const endDate = dateStr(1);
+export async function getGA4KeyEvents(propertyId: string, days: number = 28, limit: number = 20, dateRange?: CustomDateRange): Promise<GA4Event[]> {
+  const startDate = dateRange?.startDate || dateStr(days);
+  const endDate = dateRange?.endDate || dateStr(1);
 
   const data = await runReport(propertyId, {
     dateRanges: [{ startDate, endDate }],
@@ -349,9 +351,9 @@ export async function getGA4KeyEvents(propertyId: string, days: number = 28, lim
 /**
  * Get daily trend for a specific event.
  */
-export async function getGA4EventTrend(propertyId: string, eventName: string, days: number = 28): Promise<GA4EventTrend[]> {
-  const startDate = dateStr(days);
-  const endDate = dateStr(1);
+export async function getGA4EventTrend(propertyId: string, eventName: string, days: number = 28, dateRange?: CustomDateRange): Promise<GA4EventTrend[]> {
+  const startDate = dateRange?.startDate || dateStr(days);
+  const endDate = dateRange?.endDate || dateStr(1);
 
   const data = await runReport(propertyId, {
     dateRanges: [{ startDate, endDate }],
@@ -382,9 +384,9 @@ export async function getGA4EventTrend(propertyId: string, eventName: string, da
  * GA4 marks certain events as "key events" (formerly conversions).
  * We calculate rate as: users who triggered event / total users.
  */
-export async function getGA4Conversions(propertyId: string, days: number = 28): Promise<GA4ConversionSummary[]> {
-  const startDate = dateStr(days);
-  const endDate = dateStr(1);
+export async function getGA4Conversions(propertyId: string, days: number = 28, dateRange?: CustomDateRange): Promise<GA4ConversionSummary[]> {
+  const startDate = dateRange?.startDate || dateStr(days);
+  const endDate = dateRange?.endDate || dateStr(1);
 
   // First get total users for the period
   const overviewData = await runReport(propertyId, {
@@ -443,9 +445,10 @@ export async function getGA4EventsByPage(
   propertyId: string,
   days: number = 28,
   options: { eventName?: string; pagePath?: string; limit?: number } = {},
+  dateRange?: CustomDateRange,
 ): Promise<GA4EventPageBreakdown[]> {
-  const startDate = dateStr(days);
-  const endDate = dateStr(1);
+  const startDate = dateRange?.startDate || dateStr(days);
+  const endDate = dateRange?.endDate || dateStr(1);
   const limit = options.limit || 50;
 
   // Build dimension filters
@@ -510,9 +513,10 @@ export async function getGA4LandingPages(
   days: number = 28,
   limit: number = 25,
   organicOnly: boolean = false,
+  dateRange?: CustomDateRange,
 ): Promise<GA4LandingPage[]> {
-  const startDate = dateStr(days);
-  const endDate = dateStr(1);
+  const startDate = dateRange?.startDate || dateStr(days);
+  const endDate = dateRange?.endDate || dateStr(1);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const body: Record<string, any> = {
@@ -578,9 +582,10 @@ export interface GA4OrganicOverview {
 export async function getGA4OrganicOverview(
   propertyId: string,
   days: number = 28,
+  dateRange?: CustomDateRange,
 ): Promise<GA4OrganicOverview> {
-  const startDate = dateStr(days);
-  const endDate = dateStr(1);
+  const startDate = dateRange?.startDate || dateStr(days);
+  const endDate = dateRange?.endDate || dateStr(1);
 
   // Get organic metrics
   const organicData = await runReport(propertyId, {
@@ -647,16 +652,21 @@ export interface GA4PeriodComparison {
 export async function getGA4PeriodComparison(
   propertyId: string,
   days: number = 28,
+  dateRange?: CustomDateRange,
 ): Promise<GA4PeriodComparison> {
-  const curStart = dateStr(days);
-  const curEnd = dateStr(1);
-  const prevStart = dateStr(days * 2);
-  const prevEnd = dateStr(days + 1);
+  const curStart = dateRange?.startDate || dateStr(days);
+  const curEnd = dateRange?.endDate || dateStr(1);
+  // Compute previous period from the span of the current period
+  const curSpanMs = new Date(curEnd).getTime() - new Date(curStart).getTime();
+  const curSpanDays = Math.round(curSpanMs / (1000 * 60 * 60 * 24));
+  const prevEnd = new Date(curStart); prevEnd.setDate(prevEnd.getDate() - 1);
+  const prevStart = new Date(prevEnd); prevStart.setDate(prevStart.getDate() - curSpanDays + 1);
+  const fmtD = (d: Date) => d.toISOString().split('T')[0];
 
   const data = await runReport(propertyId, {
     dateRanges: [
       { startDate: curStart, endDate: curEnd },
-      { startDate: prevStart, endDate: prevEnd },
+      { startDate: fmtD(prevStart), endDate: fmtD(prevEnd) },
     ],
     metrics: [
       { name: 'totalUsers' },
@@ -684,7 +694,7 @@ export async function getGA4PeriodComparison(
   };
 
   const current = { ...parse(0), dateRange: { start: curStart, end: curEnd } };
-  const previous = { ...parse(1), dateRange: { start: prevStart, end: prevEnd } };
+  const previous = { ...parse(1), dateRange: { start: fmtD(prevStart), end: fmtD(prevEnd) } };
 
   const pct = (c: number, p: number) => p === 0 ? (c > 0 ? 100 : 0) : parseFloat((((c - p) / p) * 100).toFixed(1));
 
@@ -722,9 +732,10 @@ export interface GA4NewVsReturning {
 export async function getGA4NewVsReturning(
   propertyId: string,
   days: number = 28,
+  dateRange?: CustomDateRange,
 ): Promise<GA4NewVsReturning[]> {
-  const startDate = dateStr(days);
-  const endDate = dateStr(1);
+  const startDate = dateRange?.startDate || dateStr(days);
+  const endDate = dateRange?.endDate || dateStr(1);
 
   const data = await runReport(propertyId, {
     dateRanges: [{ startDate, endDate }],
@@ -761,9 +772,9 @@ export async function getGA4NewVsReturning(
   return rows;
 }
 
-export async function getGA4Countries(propertyId: string, days: number = 28, limit: number = 10): Promise<GA4CountryBreakdown[]> {
-  const startDate = dateStr(days);
-  const endDate = dateStr(1);
+export async function getGA4Countries(propertyId: string, days: number = 28, limit: number = 10, dateRange?: CustomDateRange): Promise<GA4CountryBreakdown[]> {
+  const startDate = dateRange?.startDate || dateStr(days);
+  const endDate = dateRange?.endDate || dateStr(1);
 
   const data = await runReport(propertyId, {
     dateRanges: [{ startDate, endDate }],

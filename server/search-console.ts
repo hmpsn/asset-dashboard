@@ -4,6 +4,7 @@
  */
 
 import { getValidToken } from './google-auth.js';
+import type { CustomDateRange } from './google-analytics.js';
 
 const GSC_API = 'https://www.googleapis.com/webmasters/v3';
 
@@ -83,14 +84,21 @@ export async function getSearchOverview(
   gscSiteUrl: string,
   days: number = 28,
   options: { queryLimit?: number; pageLimit?: number; startRow?: number; searchType?: string } = {},
+  dateRange?: CustomDateRange,
 ): Promise<SearchOverview> {
   const token = await getValidToken(siteId);
   if (!token) throw new Error('Not connected to Google');
 
-  const endDate = new Date();
-  endDate.setDate(endDate.getDate() - 3); // GSC data has ~3 day delay
-  const startDate = new Date(endDate);
-  startDate.setDate(startDate.getDate() - days);
+  let endDate: Date, startDate: Date;
+  if (dateRange) {
+    startDate = new Date(dateRange.startDate);
+    endDate = new Date(dateRange.endDate);
+  } else {
+    endDate = new Date();
+    endDate.setDate(endDate.getDate() - 3); // GSC data has ~3 day delay
+    startDate = new Date(endDate);
+    startDate.setDate(startDate.getDate() - days);
+  }
 
   const fmt = (d: Date) => d.toISOString().split('T')[0];
   const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
@@ -261,7 +269,8 @@ export async function getAllGscPages(
 }
 
 /** Shared date range helper (GSC has ~3 day data delay) */
-function gscDateRange(days: number) {
+function gscDateRange(days: number, dateRange?: CustomDateRange) {
+  if (dateRange) return { startDate: dateRange.startDate, endDate: dateRange.endDate };
   const endDate = new Date();
   endDate.setDate(endDate.getDate() - 3);
   const startDate = new Date(endDate);
@@ -273,12 +282,13 @@ function gscDateRange(days: number) {
 export async function getPerformanceTrend(
   siteId: string,
   gscSiteUrl: string,
-  days: number = 28
+  days: number = 28,
+  dateRange?: CustomDateRange,
 ): Promise<PerformanceTrend[]> {
   const token = await getValidToken(siteId);
   if (!token) throw new Error('Not connected to Google');
 
-  const { startDate, endDate } = gscDateRange(days);
+  const { startDate, endDate } = gscDateRange(days, dateRange);
   const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
 
   const data = await gscFetch(
@@ -315,11 +325,12 @@ export async function getSearchDeviceBreakdown(
   siteId: string,
   gscSiteUrl: string,
   days: number = 28,
+  dateRange?: CustomDateRange,
 ): Promise<DeviceBreakdown[]> {
   const token = await getValidToken(siteId);
   if (!token) throw new Error('Not connected to Google');
 
-  const { startDate, endDate } = gscDateRange(days);
+  const { startDate, endDate } = gscDateRange(days, dateRange);
   const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
 
   const data = await gscFetch(
@@ -350,11 +361,12 @@ export async function getSearchCountryBreakdown(
   gscSiteUrl: string,
   days: number = 28,
   limit: number = 20,
+  dateRange?: CustomDateRange,
 ): Promise<CountryBreakdown[]> {
   const token = await getValidToken(siteId);
   if (!token) throw new Error('Not connected to Google');
 
-  const { startDate, endDate } = gscDateRange(days);
+  const { startDate, endDate } = gscDateRange(days, dateRange);
   const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
 
   const data = await gscFetch(
@@ -389,11 +401,12 @@ export async function getSearchTypeBreakdown(
   siteId: string,
   gscSiteUrl: string,
   days: number = 28,
+  dateRange?: CustomDateRange,
 ): Promise<SearchTypeBreakdown[]> {
   const token = await getValidToken(siteId);
   if (!token) throw new Error('Not connected to Google');
 
-  const { startDate, endDate } = gscDateRange(days);
+  const { startDate, endDate } = gscDateRange(days, dateRange);
   const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
   const types = ['web', 'image', 'video', 'news', 'discover'];
 
@@ -438,13 +451,14 @@ export async function getSearchPeriodComparison(
   siteId: string,
   gscSiteUrl: string,
   days: number = 28,
+  dateRange?: CustomDateRange,
 ): Promise<PeriodComparison> {
   const token = await getValidToken(siteId);
   if (!token) throw new Error('Not connected to Google');
 
   const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
 
-  const { startDate: curStart, endDate: curEnd } = gscDateRange(days);
+  const { startDate: curStart, endDate: curEnd } = gscDateRange(days, dateRange);
 
   // Previous period: shift both dates back by `days`
   const prevEnd = new Date(curStart);

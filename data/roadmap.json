@@ -83,8 +83,8 @@
       "hours": "10-15",
       "rationale": "Quality-of-life improvements. Do in batches.",
       "items": [
-        { "id": 18, "title": "AI chatbot: proactive insights", "source": "AI_CHATBOT_ROADMAP Phase 5", "est": "4-5h", "priority": "P2", "notes": "Auto-surface 2-3 contextual insights on dashboard load", "status": "pending" },
-        { "id": 19, "title": "Custom date range picker", "source": "FEATURE_AUDIT", "est": "2-3h", "priority": "P2", "notes": "Replace preset buttons with full calendar selector", "status": "pending" },
+        { "id": 18, "title": "AI chatbot: proactive insights", "source": "AI_CHATBOT_ROADMAP Phase 5", "est": "4-5h", "priority": "P2", "notes": "Auto-surface 2-3 contextual insights on dashboard load. Proactive greeting with data-driven bullets, quick question follow-ups", "status": "done" },
+        { "id": 19, "title": "Custom date range picker", "source": "FEATURE_AUDIT", "est": "2-3h", "priority": "P2", "notes": "Preset buttons + Custom calendar popover with start/end date inputs. Backend: all GSC + GA4 routes accept startDate/endDate query params", "status": "done" },
         { "id": 20, "title": "Notification preferences", "source": "AUTH_ROADMAP Phase 6", "est": "2-3h", "priority": "P3", "notes": "Per-user email settings, digest frequency, in-app bell", "status": "pending" },
         { "id": 21, "title": "Content calendar", "source": "FEATURE_AUDIT", "est": "3-4h", "priority": "P3", "notes": "Visual calendar of content in production with due dates", "status": "pending" }
       ]

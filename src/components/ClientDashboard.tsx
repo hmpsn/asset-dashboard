@@ -5,7 +5,7 @@ import {
   Target, Zap, Shield, MessageSquare, X, ChevronDown, ChevronUp,
   CheckCircle2, LineChart, Lock, Trophy, Users,
   Activity, Filter, ClipboardCheck, Check, Edit3,
-  Sun, Moon, Plus, Paperclip, FileText, Download, ExternalLink,
+  Sun, Moon, Plus, Paperclip, FileText, Download, ExternalLink, Calendar,
 } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 import { StatCard, CompactStatBar, EmptyState } from './ui';
@@ -62,6 +62,8 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
   const [mapSort, setMapSort] = useState<'default' | 'position' | 'impressions' | 'clicks'>('default');
   const [mapIntent, setMapIntent] = useState<string>('all');
   const [days, setDays] = useState(28);
+  const [customDateRange, setCustomDateRange] = useState<{ startDate: string; endDate: string } | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('clicks');
   const [sortAsc, setSortAsc] = useState(false);
   const [searchSubTab, setSearchSubTab] = useState<'queries' | 'pages'>('queries');
@@ -70,6 +72,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const proactiveInsightSent = useRef(false);
   const [chatSessionId, setChatSessionId] = useState<string>(() => `cs-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
   const [chatSessions, setChatSessions] = useState<Array<{ id: string; title: string; messageCount: number; updatedAt: string }>>([]);
   const [showChatHistory, setShowChatHistory] = useState(false);
@@ -294,21 +297,22 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
     }).catch(() => {});
   };
 
-  const loadGA4Data = async (wsId: string, numDays: number) => {
+  const loadGA4Data = async (wsId: string, numDays: number, dateRange?: { startDate: string; endDate: string }) => {
     try {
+      const drParams = dateRange ? `&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}` : '';
       const [ovRes, trRes, pgRes, srcRes, devRes, ctryRes, evtRes, convRes, cmpRes, nvrRes, orgRes, lpRes] = await Promise.all([
-        fetch(`/api/public/analytics-overview/${wsId}?days=${numDays}`),
-        fetch(`/api/public/analytics-trend/${wsId}?days=${numDays}`),
-        fetch(`/api/public/analytics-top-pages/${wsId}?days=${numDays}`),
-        fetch(`/api/public/analytics-sources/${wsId}?days=${numDays}`),
-        fetch(`/api/public/analytics-devices/${wsId}?days=${numDays}`),
-        fetch(`/api/public/analytics-countries/${wsId}?days=${numDays}`),
-        fetch(`/api/public/analytics-events/${wsId}?days=${numDays}`),
-        fetch(`/api/public/analytics-conversions/${wsId}?days=${numDays}`),
-        fetch(`/api/public/analytics-comparison/${wsId}?days=${numDays}`),
-        fetch(`/api/public/analytics-new-vs-returning/${wsId}?days=${numDays}`),
-        fetch(`/api/public/analytics-organic/${wsId}?days=${numDays}`),
-        fetch(`/api/public/analytics-landing-pages/${wsId}?days=${numDays}&organic=true&limit=15`),
+        fetch(`/api/public/analytics-overview/${wsId}?days=${numDays}${drParams}`),
+        fetch(`/api/public/analytics-trend/${wsId}?days=${numDays}${drParams}`),
+        fetch(`/api/public/analytics-top-pages/${wsId}?days=${numDays}${drParams}`),
+        fetch(`/api/public/analytics-sources/${wsId}?days=${numDays}${drParams}`),
+        fetch(`/api/public/analytics-devices/${wsId}?days=${numDays}${drParams}`),
+        fetch(`/api/public/analytics-countries/${wsId}?days=${numDays}${drParams}`),
+        fetch(`/api/public/analytics-events/${wsId}?days=${numDays}${drParams}`),
+        fetch(`/api/public/analytics-conversions/${wsId}?days=${numDays}${drParams}`),
+        fetch(`/api/public/analytics-comparison/${wsId}?days=${numDays}${drParams}`),
+        fetch(`/api/public/analytics-new-vs-returning/${wsId}?days=${numDays}${drParams}`),
+        fetch(`/api/public/analytics-organic/${wsId}?days=${numDays}${drParams}`),
+        fetch(`/api/public/analytics-landing-pages/${wsId}?days=${numDays}${drParams}&organic=true&limit=15`),
       ]);
       const [ov, tr, pg, src, dev, ctry, evt, conv, cmp, nvr, org, lp] = await Promise.all([ovRes.json(), trRes.json(), pgRes.json(), srcRes.json(), devRes.json(), ctryRes.json(), evtRes.json(), convRes.json(), cmpRes.json(), nvrRes.json(), orgRes.json(), lpRes.json()]);
       if (!ov.error) setGa4Overview(ov);
@@ -553,13 +557,14 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
     } finally { setAuthLoading(false); }
   };
 
-  const loadSearchData = async (wsId: string, numDays: number) => {
+  const loadSearchData = async (wsId: string, numDays: number, dateRange?: { startDate: string; endDate: string }) => {
     try {
+      const drParams = dateRange ? `&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}` : '';
       const [ovRes, trRes, cmpRes, devRes] = await Promise.all([
-        fetch(`/api/public/search-overview/${wsId}?days=${numDays}`),
-        fetch(`/api/public/performance-trend/${wsId}?days=${numDays}`),
-        fetch(`/api/public/search-comparison/${wsId}?days=${numDays}`),
-        fetch(`/api/public/search-devices/${wsId}?days=${numDays}`),
+        fetch(`/api/public/search-overview/${wsId}?days=${numDays}${drParams}`),
+        fetch(`/api/public/performance-trend/${wsId}?days=${numDays}${drParams}`),
+        fetch(`/api/public/search-comparison/${wsId}?days=${numDays}${drParams}`),
+        fetch(`/api/public/search-devices/${wsId}?days=${numDays}${drParams}`),
       ]);
       const [ovData, trData, cmpData, devData] = await Promise.all([ovRes.json(), trRes.json(), cmpRes.json(), devRes.json()]);
       if (ovData.error) throw new Error(ovData.error);
@@ -574,10 +579,91 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
 
   const changeDays = (d: number) => {
     setDays(d);
+    setCustomDateRange(null);
+    setShowDatePicker(false);
     if (ws) {
       loadSearchData(ws.id, d);
       if (ws.ga4PropertyId) loadGA4Data(ws.id, d);
     }
+  };
+
+  const applyCustomRange = (startDate: string, endDate: string) => {
+    const dr = { startDate, endDate };
+    const spanDays = Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24));
+    setCustomDateRange(dr);
+    setDays(spanDays);
+    setShowDatePicker(false);
+    if (ws) {
+      loadSearchData(ws.id, spanDays, dr);
+      if (ws.ga4PropertyId) loadGA4Data(ws.id, spanDays, dr);
+    }
+  };
+
+  const buildChatContext = () => {
+    const context: Record<string, unknown> = { days };
+    if (overview) {
+      context.search = {
+        dateRange: overview.dateRange, totalClicks: overview.totalClicks,
+        totalImpressions: overview.totalImpressions, avgCtr: overview.avgCtr,
+        avgPosition: overview.avgPosition, topQueries: overview.topQueries.slice(0, 15), topPages: overview.topPages.slice(0, 10),
+      };
+    }
+    if (trend.length > 1) {
+      context.searchTrend = { firstDay: trend[0], lastDay: trend[trend.length - 1], totalDays: trend.length };
+    }
+    if (ga4Overview) {
+      context.ga4 = {
+        overview: ga4Overview,
+        topPages: ga4Pages.slice(0, 10),
+        sources: ga4Sources.slice(0, 8),
+        devices: ga4Devices,
+        events: ga4Events.slice(0, 15),
+        conversions: ga4Conversions.slice(0, 10),
+        countries: ga4Countries.slice(0, 8),
+      };
+    }
+    if (searchComparison) context.searchComparison = searchComparison;
+    if (ga4Comparison) context.ga4Comparison = ga4Comparison;
+    if (ga4Organic) context.ga4Organic = ga4Organic;
+    if (ga4NewVsReturning && ga4NewVsReturning.length > 0) context.ga4NewVsReturning = ga4NewVsReturning;
+    if (audit) {
+      context.siteHealth = {
+        score: audit.siteScore, totalPages: audit.totalPages,
+        errors: audit.errors, warnings: audit.warnings,
+        previousScore: audit.previousScore,
+      };
+    }
+    if (auditDetail) {
+      context.siteHealthDetail = {
+        siteWideIssues: auditDetail.audit.siteWideIssues.slice(0, 10),
+        scoreHistory: auditDetail.scoreHistory?.slice(0, 5),
+        topIssuePages: auditDetail.audit.pages
+          .filter(p => p.issues.length > 0)
+          .sort((a, b) => b.issues.length - a.issues.length)
+          .slice(0, 5)
+          .map(p => ({ page: p.page, score: p.score, issueCount: p.issues.length, topIssues: p.issues.slice(0, 3).map(i => ({ check: i.check, severity: i.severity, message: i.message })) })),
+      };
+    }
+    if (strategyData) {
+      context.seoStrategy = {
+        pageMap: strategyData.pageMap?.slice(0, 10),
+        opportunities: strategyData.opportunities?.slice(0, 5),
+        contentGaps: strategyData.contentGaps?.slice(0, 5),
+        quickWins: strategyData.quickWins?.slice(0, 5),
+      };
+    }
+    if (latestRanks.length > 0) context.rankings = latestRanks.slice(0, 15);
+    if (activityLog.length > 0) context.recentActivity = activityLog.slice(0, 10);
+    if (annotations.length > 0) context.annotations = annotations.slice(0, 10);
+    if (approvalBatches.length > 0) {
+      const pending = approvalBatches.filter(b => b.status === 'pending');
+      if (pending.length > 0) context.pendingApprovals = pending.length;
+    }
+    if (requests.length > 0) {
+      const active = requests.filter(r => r.status !== 'closed');
+      if (active.length > 0) context.activeRequests = active.slice(0, 5).map(r => ({ title: r.title, category: r.category, status: r.status }));
+    }
+    return context;
   };
 
   const askAi = async (question: string) => {
@@ -587,83 +673,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
     setChatInput('');
     setChatLoading(true);
     try {
-      const context: Record<string, unknown> = { days };
-      if (overview) {
-        context.search = {
-          dateRange: overview.dateRange, totalClicks: overview.totalClicks,
-          totalImpressions: overview.totalImpressions, avgCtr: overview.avgCtr,
-          avgPosition: overview.avgPosition, topQueries: overview.topQueries.slice(0, 15), topPages: overview.topPages.slice(0, 10),
-        };
-      }
-      if (trend.length > 1) {
-        context.searchTrend = { firstDay: trend[0], lastDay: trend[trend.length - 1], totalDays: trend.length };
-      }
-      if (ga4Overview) {
-        context.ga4 = {
-          overview: ga4Overview,
-          topPages: ga4Pages.slice(0, 10),
-          sources: ga4Sources.slice(0, 8),
-          devices: ga4Devices,
-          events: ga4Events.slice(0, 15),
-          conversions: ga4Conversions.slice(0, 10),
-          countries: ga4Countries.slice(0, 8),
-        };
-      }
-      if (searchComparison) {
-        context.searchComparison = searchComparison;
-      }
-      if (ga4Comparison) {
-        context.ga4Comparison = ga4Comparison;
-      }
-      if (ga4Organic) {
-        context.ga4Organic = ga4Organic;
-      }
-      if (ga4NewVsReturning && ga4NewVsReturning.length > 0) {
-        context.ga4NewVsReturning = ga4NewVsReturning;
-      }
-      if (audit) {
-        context.siteHealth = {
-          score: audit.siteScore, totalPages: audit.totalPages,
-          errors: audit.errors, warnings: audit.warnings,
-          previousScore: audit.previousScore,
-        };
-      }
-      if (auditDetail) {
-        context.siteHealthDetail = {
-          siteWideIssues: auditDetail.audit.siteWideIssues.slice(0, 10),
-          scoreHistory: auditDetail.scoreHistory?.slice(0, 5),
-          topIssuePages: auditDetail.audit.pages
-            .filter(p => p.issues.length > 0)
-            .sort((a, b) => b.issues.length - a.issues.length)
-            .slice(0, 5)
-            .map(p => ({ page: p.page, score: p.score, issueCount: p.issues.length, topIssues: p.issues.slice(0, 3).map(i => ({ check: i.check, severity: i.severity, message: i.message })) })),
-        };
-      }
-      if (strategyData) {
-        context.seoStrategy = {
-          pageMap: strategyData.pageMap?.slice(0, 10),
-          opportunities: strategyData.opportunities?.slice(0, 5),
-          contentGaps: strategyData.contentGaps?.slice(0, 5),
-          quickWins: strategyData.quickWins?.slice(0, 5),
-        };
-      }
-      if (latestRanks.length > 0) {
-        context.rankings = latestRanks.slice(0, 15);
-      }
-      if (activityLog.length > 0) {
-        context.recentActivity = activityLog.slice(0, 10);
-      }
-      if (annotations.length > 0) {
-        context.annotations = annotations.slice(0, 10);
-      }
-      if (approvalBatches.length > 0) {
-        const pending = approvalBatches.filter(b => b.status === 'pending');
-        if (pending.length > 0) context.pendingApprovals = pending.length;
-      }
-      if (requests.length > 0) {
-        const active = requests.filter(r => r.status !== 'closed');
-        if (active.length > 0) context.activeRequests = active.slice(0, 5).map(r => ({ title: r.title, category: r.category, status: r.status }));
-      }
+      const context = buildChatContext();
       const res = await fetch(`/api/public/search-chat/${ws.id}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: question.trim(), context, sessionId: chatSessionId }),
@@ -674,6 +684,33 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
       setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong.' }]);
     } finally { setChatLoading(false); }
   };
+
+  const fetchProactiveInsight = async () => {
+    if (!ws || (!overview && !ga4Overview)) return;
+    setChatLoading(true);
+    try {
+      const context = buildChatContext();
+      const proactivePrompt = 'You are proactively greeting me as I open the Insights Engine. In 2-3 concise bullet points, tell me the most important things happening with my site data right now. Be specific with numbers. Highlight anything that needs attention first, then wins, then opportunities. Keep it brief and actionable. Do not ask me questions.';
+      const res = await fetch(`/api/public/search-chat/${ws.id}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: proactivePrompt, context, sessionId: chatSessionId }),
+      });
+      const data = await res.json();
+      if (!data.error) {
+        setChatMessages([{ role: 'assistant', content: data.answer }]);
+      }
+    } catch { /* silent fail — user can still ask manually */ }
+    finally { setChatLoading(false); }
+  };
+
+  // Auto-fire proactive insight when chat opens for first time
+  useEffect(() => {
+    if (chatOpen && chatMessages.length === 0 && !proactiveInsightSent.current && (overview || ga4Overview) && ws) {
+      proactiveInsightSent.current = true;
+      fetchProactiveInsight();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatOpen]);
 
   const handleSort = (key: SortKey) => { if (sortKey === key) setSortAsc(!sortAsc); else { setSortKey(key); setSortAsc(false); } };
   const sortedQueries = () => {
@@ -830,12 +867,66 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
               {theme === 'dark' ? <Sun className="w-4 h-4 text-zinc-400" /> : <Moon className="w-4 h-4 text-zinc-400" />}
             </button>
             {(overview || ga4Overview) && (
-              <div className="flex items-center gap-1 bg-zinc-900 rounded-lg border border-zinc-800 p-0.5">
+              <div className="relative flex items-center gap-1 bg-zinc-900 rounded-lg border border-zinc-800 p-0.5">
                 {[7, 28, 90, 180, 365].map(d => (
                   <button key={d} onClick={() => changeDays(d)}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${days === d ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${!customDateRange && days === d ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}
                   >{d >= 365 ? '1y' : d >= 180 ? '6mo' : `${d}d`}</button>
                 ))}
+                <button onClick={() => setShowDatePicker(p => !p)}
+                  className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${customDateRange ? 'bg-teal-600/20 text-teal-300 border border-teal-500/30' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  title="Custom date range"
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  {customDateRange ? (
+                    <span className="text-[10px]">
+                      {new Date(customDateRange.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      {' – '}
+                      {new Date(customDateRange.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
+                  ) : (
+                    <span className="hidden sm:inline">Custom</span>
+                  )}
+                </button>
+                {showDatePicker && (<>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowDatePicker(false)} />
+                  <div className="absolute right-0 top-full mt-2 z-50 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl p-4 w-72"
+                    onClick={e => e.stopPropagation()}>
+                    <p className="text-xs font-medium text-zinc-400 mb-3">Custom date range</p>
+                    <div className="space-y-2">
+                      <label className="block">
+                        <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Start date</span>
+                        <input type="date" id="custom-start"
+                          defaultValue={customDateRange?.startDate || new Date(Date.now() - 28 * 86400000).toISOString().split('T')[0]}
+                          max={new Date().toISOString().split('T')[0]}
+                          className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-[10px] text-zinc-500 uppercase tracking-wider">End date</span>
+                        <input type="date" id="custom-end"
+                          defaultValue={customDateRange?.endDate || new Date().toISOString().split('T')[0]}
+                          max={new Date().toISOString().split('T')[0]}
+                          className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
+                        />
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-2 mt-3">
+                      <button onClick={() => setShowDatePicker(false)}
+                        className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors">
+                        Cancel
+                      </button>
+                      <button onClick={() => {
+                        const s = (document.getElementById('custom-start') as HTMLInputElement)?.value;
+                        const e = (document.getElementById('custom-end') as HTMLInputElement)?.value;
+                        if (s && e && s <= e) applyCustomRange(s, e);
+                      }}
+                        className="flex-1 px-3 py-1.5 text-xs rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-medium transition-colors">
+                        Apply
+                      </button>
+                    </div>
+                  </div>
+                </>)}
               </div>
             )}
           </div>
@@ -2523,6 +2614,17 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                   {chatLoading && (
                     <div className="flex gap-3"><div className="w-6 h-6 rounded-lg bg-teal-500/10 flex items-center justify-center"><Loader2 className="w-3 h-3 text-teal-400 animate-spin" /></div>
                       <div className="bg-zinc-800/50 border border-zinc-800 rounded-xl px-3.5 py-2.5"><div className="flex gap-1"><div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" /><div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '150ms' }} /><div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '300ms' }} /></div></div>
+                    </div>
+                  )}
+                  {/* Show quick questions as follow-ups after proactive greeting */}
+                  {chatMessages.length === 1 && chatMessages[0].role === 'assistant' && !chatLoading && (
+                    <div className="space-y-1.5 pt-1">
+                      <p className="text-[10px] text-zinc-600 uppercase tracking-wider font-medium">Ask a follow-up</p>
+                      {QUICK_QUESTIONS.slice(0, 3).map((q, i) => (
+                        <button key={i} onClick={() => askAi(q)} className="w-full text-left px-3 py-2 rounded-lg bg-zinc-800/30 hover:bg-zinc-800/60 border border-zinc-800/50 text-[11px] text-zinc-400 hover:text-zinc-300 transition-colors">
+                          {q}
+                        </button>
+                      ))}
                     </div>
                   )}
                   <div ref={chatEndRef} />

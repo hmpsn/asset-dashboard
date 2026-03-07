@@ -80,7 +80,14 @@ import { addMessage, buildConversationContext, listSessions, getSession as getCh
 import { renderSalesReportHTML } from './sales-report-html.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
 import { listGscSites, getSearchOverview, getPerformanceTrend, getQueryPageData, getAllGscPages, getSearchDeviceBreakdown, getSearchCountryBreakdown, getSearchTypeBreakdown, getSearchPeriodComparison } from './search-console.js';
-import { listGA4Properties, getGA4Overview, getGA4DailyTrend, getGA4TopPages, getGA4TopSources, getGA4DeviceBreakdown, getGA4Countries, getGA4KeyEvents, getGA4EventTrend, getGA4Conversions, getGA4EventsByPage, getGA4LandingPages, getGA4OrganicOverview, getGA4PeriodComparison, getGA4NewVsReturning } from './google-analytics.js';
+import { listGA4Properties, getGA4Overview, getGA4DailyTrend, getGA4TopPages, getGA4TopSources, getGA4DeviceBreakdown, getGA4Countries, getGA4KeyEvents, getGA4EventTrend, getGA4Conversions, getGA4EventsByPage, getGA4LandingPages, getGA4OrganicOverview, getGA4PeriodComparison, getGA4NewVsReturning, type CustomDateRange } from './google-analytics.js';
+
+/** Parse optional startDate/endDate query params into a CustomDateRange (or undefined). */
+function parseDateRange(query: Record<string, unknown>): CustomDateRange | undefined {
+  const s = query.startDate as string | undefined;
+  const e = query.endDate as string | undefined;
+  return (s && e) ? { startDate: s, endDate: e } : undefined;
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_ROOT = DATA_BASE || path.join(process.env.HOME || '', '.asset-dashboard');
@@ -4723,8 +4730,9 @@ app.get('/api/public/search-overview/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.webflowSiteId || !ws.gscPropertyUrl) return res.status(400).json({ error: 'Search Console not configured for this workspace' });
   const days = parseInt(req.query.days as string) || 28;
+  const dr = parseDateRange(req.query);
   try {
-    const overview = await getSearchOverview(ws.webflowSiteId, ws.gscPropertyUrl, days);
+    const overview = await getSearchOverview(ws.webflowSiteId, ws.gscPropertyUrl, days, {}, dr);
     res.json(overview);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -4737,7 +4745,7 @@ app.get('/api/public/performance-trend/:workspaceId', async (req, res) => {
   if (!ws?.webflowSiteId || !ws.gscPropertyUrl) return res.status(400).json({ error: 'Search Console not configured' });
   const days = parseInt(req.query.days as string) || 28;
   try {
-    const trend = await getPerformanceTrend(ws.webflowSiteId, ws.gscPropertyUrl, days);
+    const trend = await getPerformanceTrend(ws.webflowSiteId, ws.gscPropertyUrl, days, parseDateRange(req.query));
     res.json(trend);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -4750,7 +4758,7 @@ app.get('/api/public/search-devices/:workspaceId', async (req, res) => {
   if (!ws?.webflowSiteId || !ws.gscPropertyUrl) return res.status(400).json({ error: 'Search Console not configured' });
   const days = parseInt(req.query.days as string) || 28;
   try {
-    res.json(await getSearchDeviceBreakdown(ws.webflowSiteId, ws.gscPropertyUrl, days));
+    res.json(await getSearchDeviceBreakdown(ws.webflowSiteId, ws.gscPropertyUrl, days, parseDateRange(req.query)));
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -4762,7 +4770,7 @@ app.get('/api/public/search-countries/:workspaceId', async (req, res) => {
   const days = parseInt(req.query.days as string) || 28;
   const limit = parseInt(req.query.limit as string) || 20;
   try {
-    res.json(await getSearchCountryBreakdown(ws.webflowSiteId, ws.gscPropertyUrl, days, limit));
+    res.json(await getSearchCountryBreakdown(ws.webflowSiteId, ws.gscPropertyUrl, days, limit, parseDateRange(req.query)));
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -4773,7 +4781,7 @@ app.get('/api/public/search-types/:workspaceId', async (req, res) => {
   if (!ws?.webflowSiteId || !ws.gscPropertyUrl) return res.status(400).json({ error: 'Search Console not configured' });
   const days = parseInt(req.query.days as string) || 28;
   try {
-    res.json(await getSearchTypeBreakdown(ws.webflowSiteId, ws.gscPropertyUrl, days));
+    res.json(await getSearchTypeBreakdown(ws.webflowSiteId, ws.gscPropertyUrl, days, parseDateRange(req.query)));
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -4784,7 +4792,7 @@ app.get('/api/public/search-comparison/:workspaceId', async (req, res) => {
   if (!ws?.webflowSiteId || !ws.gscPropertyUrl) return res.status(400).json({ error: 'Search Console not configured' });
   const days = parseInt(req.query.days as string) || 28;
   try {
-    res.json(await getSearchPeriodComparison(ws.webflowSiteId, ws.gscPropertyUrl, days));
+    res.json(await getSearchPeriodComparison(ws.webflowSiteId, ws.gscPropertyUrl, days, parseDateRange(req.query)));
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -5013,7 +5021,7 @@ app.get('/api/public/analytics-overview/:workspaceId', async (req, res) => {
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured for this workspace' });
   const days = parseInt(req.query.days as string) || 28;
   try {
-    const overview = await getGA4Overview(ws.ga4PropertyId, days);
+    const overview = await getGA4Overview(ws.ga4PropertyId, days, parseDateRange(req.query));
     res.json(overview);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -5026,7 +5034,7 @@ app.get('/api/public/analytics-trend/:workspaceId', async (req, res) => {
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
   const days = parseInt(req.query.days as string) || 28;
   try {
-    const trend = await getGA4DailyTrend(ws.ga4PropertyId, days);
+    const trend = await getGA4DailyTrend(ws.ga4PropertyId, days, parseDateRange(req.query));
     res.json(trend);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -5039,7 +5047,7 @@ app.get('/api/public/analytics-top-pages/:workspaceId', async (req, res) => {
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
   const days = parseInt(req.query.days as string) || 28;
   try {
-    const pages = await getGA4TopPages(ws.ga4PropertyId, days, 200);
+    const pages = await getGA4TopPages(ws.ga4PropertyId, days, 200, parseDateRange(req.query));
     res.json(pages);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -5052,7 +5060,7 @@ app.get('/api/public/analytics-sources/:workspaceId', async (req, res) => {
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
   const days = parseInt(req.query.days as string) || 28;
   try {
-    const sources = await getGA4TopSources(ws.ga4PropertyId, days);
+    const sources = await getGA4TopSources(ws.ga4PropertyId, days, 10, parseDateRange(req.query));
     res.json(sources);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -5065,7 +5073,7 @@ app.get('/api/public/analytics-devices/:workspaceId', async (req, res) => {
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
   const days = parseInt(req.query.days as string) || 28;
   try {
-    const devices = await getGA4DeviceBreakdown(ws.ga4PropertyId, days);
+    const devices = await getGA4DeviceBreakdown(ws.ga4PropertyId, days, parseDateRange(req.query));
     res.json(devices);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -5078,7 +5086,7 @@ app.get('/api/public/analytics-countries/:workspaceId', async (req, res) => {
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
   const days = parseInt(req.query.days as string) || 28;
   try {
-    const countries = await getGA4Countries(ws.ga4PropertyId, days);
+    const countries = await getGA4Countries(ws.ga4PropertyId, days, 10, parseDateRange(req.query));
     res.json(countries);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -5091,7 +5099,7 @@ app.get('/api/public/analytics-comparison/:workspaceId', async (req, res) => {
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
   const days = parseInt(req.query.days as string) || 28;
   try {
-    res.json(await getGA4PeriodComparison(ws.ga4PropertyId, days));
+    res.json(await getGA4PeriodComparison(ws.ga4PropertyId, days, parseDateRange(req.query)));
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -5102,7 +5110,7 @@ app.get('/api/public/analytics-new-vs-returning/:workspaceId', async (req, res) 
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
   const days = parseInt(req.query.days as string) || 28;
   try {
-    res.json(await getGA4NewVsReturning(ws.ga4PropertyId, days));
+    res.json(await getGA4NewVsReturning(ws.ga4PropertyId, days, parseDateRange(req.query)));
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -5114,7 +5122,7 @@ app.get('/api/public/analytics-events/:workspaceId', async (req, res) => {
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
   const days = parseInt(req.query.days as string) || 28;
   try {
-    const events = await getGA4KeyEvents(ws.ga4PropertyId, days);
+    const events = await getGA4KeyEvents(ws.ga4PropertyId, days, 20, parseDateRange(req.query));
     res.json(events);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -5129,7 +5137,7 @@ app.get('/api/public/analytics-event-trend/:workspaceId', async (req, res) => {
   const eventName = req.query.event as string;
   if (!eventName) return res.status(400).json({ error: 'event query param required' });
   try {
-    const trend = await getGA4EventTrend(ws.ga4PropertyId, eventName, days);
+    const trend = await getGA4EventTrend(ws.ga4PropertyId, eventName, days, parseDateRange(req.query));
     res.json(trend);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -5142,7 +5150,7 @@ app.get('/api/public/analytics-conversions/:workspaceId', async (req, res) => {
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
   const days = parseInt(req.query.days as string) || 28;
   try {
-    const conversions = await getGA4Conversions(ws.ga4PropertyId, days);
+    const conversions = await getGA4Conversions(ws.ga4PropertyId, days, parseDateRange(req.query));
     res.json(conversions);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -5158,7 +5166,7 @@ app.get('/api/public/analytics-event-explorer/:workspaceId', async (req, res) =>
   const eventName = req.query.event as string | undefined;
   const pagePath = req.query.page as string | undefined;
   try {
-    const data = await getGA4EventsByPage(ws.ga4PropertyId, days, { eventName, pagePath });
+    const data = await getGA4EventsByPage(ws.ga4PropertyId, days, { eventName, pagePath }, parseDateRange(req.query));
     res.json(data);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -5174,7 +5182,7 @@ app.get('/api/public/analytics-landing-pages/:workspaceId', async (req, res) => 
   const organicOnly = req.query.organic === 'true';
   const limit = parseInt(req.query.limit as string) || 25;
   try {
-    res.json(await getGA4LandingPages(ws.ga4PropertyId, days, limit, organicOnly));
+    res.json(await getGA4LandingPages(ws.ga4PropertyId, days, limit, organicOnly, parseDateRange(req.query)));
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -5185,7 +5193,7 @@ app.get('/api/public/analytics-organic/:workspaceId', async (req, res) => {
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
   const days = parseInt(req.query.days as string) || 28;
   try {
-    res.json(await getGA4OrganicOverview(ws.ga4PropertyId, days));
+    res.json(await getGA4OrganicOverview(ws.ga4PropertyId, days, parseDateRange(req.query)));
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -5196,7 +5204,7 @@ app.get('/api/public/analytics-comparison/:workspaceId', async (req, res) => {
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
   const days = parseInt(req.query.days as string) || 28;
   try {
-    res.json(await getGA4PeriodComparison(ws.ga4PropertyId, days));
+    res.json(await getGA4PeriodComparison(ws.ga4PropertyId, days, parseDateRange(req.query)));
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -5207,7 +5215,7 @@ app.get('/api/public/analytics-new-vs-returning/:workspaceId', async (req, res) 
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
   const days = parseInt(req.query.days as string) || 28;
   try {
-    res.json(await getGA4NewVsReturning(ws.ga4PropertyId, days));
+    res.json(await getGA4NewVsReturning(ws.ga4PropertyId, days, parseDateRange(req.query)));
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
