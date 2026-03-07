@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Loader2, ChevronDown, ChevronRight, Copy, CheckCircle,
   AlertCircle, Info, Sparkles, RefreshCw, Upload, Send, Search, Plus, Database,
+  ArrowRight, GitCompareArrows,
 } from 'lucide-react';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 
@@ -18,6 +19,7 @@ interface SchemaPageSuggestion {
   slug: string;
   url: string;
   existingSchemas: string[];
+  existingSchemaJson?: Record<string, unknown>[];
   suggestedSchemas: SchemaSuggestion[];
   validationErrors?: string[];
 }
@@ -78,6 +80,9 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
   const [cmsSelectedPage, setCmsSelectedPage] = useState<CmsTemplatePage | null>(null);
   const [publishingCmsTemplate, setPublishingCmsTemplate] = useState(false);
   const [cmsPublished, setCmsPublished] = useState(false);
+  const [bulkPublishing, setBulkPublishing] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
+  const [showDiff, setShowDiff] = useState<Set<string>>(new Set());
   const [cmsCopied, setCmsCopied] = useState(false);
   const [cmsError, setCmsError] = useState<string | null>(null);
 
@@ -380,6 +385,29 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
     setTimeout(() => setCmsCopied(false), 2000);
   };
 
+  const publishAllToWebflow = async () => {
+    if (!data) return;
+    const publishable = data.filter(p => !p.pageId.startsWith('cms-') && !published.has(p.pageId) && p.suggestedSchemas[0]?.template);
+    if (publishable.length === 0) return;
+    setBulkPublishing(true);
+    setBulkProgress({ done: 0, total: publishable.length });
+    for (let i = 0; i < publishable.length; i++) {
+      const page = publishable[i];
+      await publishToWebflow(page.pageId, page.suggestedSchemas[0].template);
+      setBulkProgress({ done: i + 1, total: publishable.length });
+    }
+    setBulkPublishing(false);
+    setBulkProgress(null);
+  };
+
+  const toggleDiff = (pageId: string) => {
+    setShowDiff(prev => {
+      const next = new Set(prev);
+      if (next.has(pageId)) next.delete(pageId); else next.add(pageId);
+      return next;
+    });
+  };
+
   if (!started) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
@@ -614,13 +642,31 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
         </div>
         <div className="flex items-center gap-2">
           {!loading && data.length > 0 && (
-            <button
-              onClick={sendSchemasToClient}
-              disabled={sendingToClient || sentToClient}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs text-teal-400 hover:text-teal-300 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Send className="w-3 h-3" /> {sentToClient ? 'Sent to Client' : sendingToClient ? 'Sending...' : 'Send to Client'}
-            </button>
+            <>
+              {(() => {
+                const unpublished = data.filter(p => !p.pageId.startsWith('cms-') && !published.has(p.pageId) && p.suggestedSchemas[0]?.template).length;
+                return unpublished > 0 ? (
+                  <button
+                    onClick={publishAllToWebflow}
+                    disabled={bulkPublishing}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white"
+                  >
+                    {bulkPublishing ? (
+                      <><Loader2 className="w-3 h-3 animate-spin" /> Publishing {bulkProgress?.done}/{bulkProgress?.total}...</>
+                    ) : (
+                      <><Upload className="w-3 h-3" /> Publish All ({unpublished})</>
+                    )}
+                  </button>
+                ) : null;
+              })()}
+              <button
+                onClick={sendSchemasToClient}
+                disabled={sendingToClient || sentToClient}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs text-teal-400 hover:text-teal-300 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Send className="w-3 h-3" /> {sentToClient ? 'Sent to Client' : sendingToClient ? 'Sending...' : 'Send to Client'}
+              </button>
+            </>
           )}
           <div className="relative">
             <button
@@ -790,25 +836,61 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
                     <p className="text-[11px] text-zinc-500 mt-1.5">{schema.reason}</p>
                   </div>
 
-                  {/* Unified schema preview */}
+                  {/* Schema preview / diff */}
                   <div className="px-4 py-3">
-                    <div className="relative">
+                    {/* Diff toggle + copy buttons */}
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        {page.existingSchemaJson && page.existingSchemaJson.length > 0 && (
+                          <button
+                            onClick={() => toggleDiff(page.pageId)}
+                            className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+                              showDiff.has(page.pageId)
+                                ? 'bg-purple-500/15 text-purple-400 border border-purple-500/30'
+                                : 'bg-zinc-800 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700'
+                            }`}
+                          >
+                            <GitCompareArrows className="w-3 h-3" />
+                            {showDiff.has(page.pageId) ? 'Hide Diff' : 'Show Diff'}
+                          </button>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => copyTemplate(schema, page.pageId)}
+                        className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors"
+                      >
+                        {copiedId === `${page.pageId}-${schema.type}` ? (
+                          <><CheckCircle className="w-3 h-3 text-green-400" /> Copied</>
+                        ) : (
+                          <><Copy className="w-3 h-3" /> Copy</>
+                        )}
+                      </button>
+                    </div>
+
+                    {showDiff.has(page.pageId) && page.existingSchemaJson ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <div className="text-[11px] font-medium text-red-400/80 mb-1 flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-red-400/60" /> Current (on page)
+                          </div>
+                          <pre className="text-xs font-mono bg-zinc-950 rounded-lg p-3 overflow-x-auto text-zinc-500 border border-red-500/20 max-h-64 overflow-y-auto whitespace-pre-wrap">
+                            {JSON.stringify(page.existingSchemaJson.length === 1 ? page.existingSchemaJson[0] : page.existingSchemaJson, null, 2)}
+                          </pre>
+                        </div>
+                        <div>
+                          <div className="text-[11px] font-medium text-green-400/80 mb-1 flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-green-400/60" /> Suggested <ArrowRight className="w-3 h-3" />
+                          </div>
+                          <pre className="text-xs font-mono bg-zinc-950 rounded-lg p-3 overflow-x-auto text-zinc-400 border border-green-500/20 max-h-64 overflow-y-auto whitespace-pre-wrap">
+                            {JSON.stringify(schema.template, null, 2)}
+                          </pre>
+                        </div>
+                      </div>
+                    ) : (
                       <pre className="text-xs font-mono bg-zinc-950 rounded-lg p-3 overflow-x-auto text-zinc-400 border border-zinc-800 max-h-64 overflow-y-auto">
                         {JSON.stringify(schema.template, null, 2)}
                       </pre>
-                      <div className="absolute top-2 right-2 flex items-center gap-1.5">
-                        <button
-                          onClick={() => copyTemplate(schema, page.pageId)}
-                          className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors"
-                        >
-                          {copiedId === `${page.pageId}-${schema.type}` ? (
-                            <><CheckCircle className="w-3 h-3 text-green-400" /> Copied</>
-                          ) : (
-                            <><Copy className="w-3 h-3" /> Copy</>
-                          )}
-                        </button>
-                      </div>
-                    </div>
+                    )}
 
                     {/* Publish to Webflow */}
                     <div className="mt-3 flex items-center gap-2">

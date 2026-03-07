@@ -412,9 +412,9 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - ~~Client review flow~~: ✅ Shipped — Send to Client creates an approval batch.
 - ~~CMS template schemas~~: ✅ Shipped — Dynamic schemas for collection pages using Webflow `{{wf}}` template syntax.
 - ~~Prompt tightening~~: ✅ Shipped — No empty arrays/objects, consistent `@id`, omit empty properties.
-- **Schema diff view**: Show what changed between existing and suggested schema before publishing.
+- ~~Schema diff view~~: ✅ Shipped — Side-by-side comparison of existing vs. suggested JSON-LD with toggle button. Shows full existing schema JSON extracted from published HTML.
 - **Auto-schedule**: Re-generate schemas on a cadence (e.g., weekly) and flag pages where content changed but schema is stale.
-- **Bulk publish all**: One-click to publish all generated schemas at once (currently per-page).
+- ~~Bulk publish all~~: ✅ Shipped — One-click "Publish All" button with sequential publishing and live progress counter.
 
 ### Redirect Manager Enhancements
 - ~~GSC ghost URL detection~~: ✅ Shipped — Identifies old/renamed pages Google still indexes but no longer exist on site.
@@ -459,9 +459,8 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - **Responsive mobile layout**: Sidebar collapses to bottom nav, cards stack vertically on small screens.
 
 ### Performance & Bundle Size
-- **Current bundle**: 929KB minified (206KB gzip). Approaching the recommended 500KB threshold for initial load.
-- **Code-splitting**: Use dynamic `import()` for tab-level components (Search Console, Analytics, SEO Audit, etc.) so only the active tab's code is loaded.
-- **Route-based splitting**: Lazy-load `/styleguide`, `/client/:id`, and admin routes as separate chunks.
+- ~~Code-splitting~~: ✅ Shipped — All routes and tabs lazy-loaded via `React.lazy()` + `Suspense`. Initial bundle: 929KB → 256KB (72% reduction). 25+ separate chunks for route-level, admin tab, and sub-tool splitting.
+- ~~Route-based splitting~~: ✅ Shipped — `/styleguide`, `/client/:id`, and all admin tabs are separate lazy chunks.
 - **Heavy dependency audit**: Identify if any large libraries (chart libs, PDF generators) can be loaded on-demand.
 - **Tree-shaking**: Verify Lucide icons are tree-shaken (only used icons in bundle, not the full set).
 

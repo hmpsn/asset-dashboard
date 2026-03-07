@@ -12,6 +12,7 @@ export interface SchemaPageSuggestion {
   slug: string;
   url: string;
   existingSchemas: string[];
+  existingSchemaJson?: Record<string, unknown>[];
   suggestedSchemas: SchemaSuggestion[];
   validationErrors?: string[];
 }
@@ -126,22 +127,24 @@ async function getSiteSubdomain(siteId: string, tokenOverride?: string): Promise
 }
 
 // Detect existing JSON-LD schemas in HTML
-function extractExistingSchemas(html: string): string[] {
-  const schemas: string[] = [];
+function extractExistingSchemas(html: string): { types: string[]; json: Record<string, unknown>[] } {
+  const types: string[] = [];
+  const json: Record<string, unknown>[] = [];
   const regex = /<script[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
   let match;
   while ((match = regex.exec(html)) !== null) {
     try {
       const data = JSON.parse(match[1].trim());
-      if (data['@type']) schemas.push(data['@type']);
+      json.push(data);
+      if (data['@type']) types.push(data['@type']);
       if (Array.isArray(data['@graph'])) {
         for (const item of data['@graph']) {
-          if (item['@type']) schemas.push(item['@type']);
+          if (item['@type']) types.push(item['@type']);
         }
       }
     } catch { /* malformed JSON-LD */ }
   }
-  return schemas;
+  return { types, json };
 }
 
 // --- AI-Powered Unified Schema Generation ---
@@ -438,7 +441,7 @@ export async function generateSchemaForPage(
   const html = await fetchPublishedHtml(url);
   const seoTitle = meta.seo?.title || meta.title || '';
   const seoDesc = meta.seo?.description || '';
-  const existingSchemas = html ? extractExistingSchemas(html) : [];
+  const { types: existingSchemas, json: existingSchemaJson } = html ? extractExistingSchemas(html) : { types: [], json: [] };
 
   // Try AI unified schema first
   const aiResult = await aiGenerateUnifiedSchema(
@@ -477,6 +480,7 @@ export async function generateSchemaForPage(
     slug,
     url,
     existingSchemas,
+    existingSchemaJson: existingSchemaJson.length > 0 ? existingSchemaJson : undefined,
     suggestedSchemas,
     validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
   };
@@ -546,7 +550,7 @@ export async function generateSchemaSuggestions(
 
         const seoTitle = meta?.seo?.title || page.title || '';
         const seoDesc = meta?.seo?.description || '';
-        const existingSchemas = html ? extractExistingSchemas(html) : [];
+        const { types: existingSchemas, json: existingSchemaJson } = html ? extractExistingSchemas(html) : { types: [], json: [] };
 
         // Build page-specific context (use full path for nested pages)
         const lookupPath = pagePath || `/${page.slug}`;
@@ -602,6 +606,7 @@ export async function generateSchemaSuggestions(
           slug: pagePath ? pagePath.replace(/^\//, '') : page.slug,
           url,
           existingSchemas,
+          existingSchemaJson: existingSchemaJson.length > 0 ? existingSchemaJson : undefined,
           suggestedSchemas,
           validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
         } as SchemaPageSuggestion;
@@ -627,7 +632,7 @@ export async function generateSchemaSuggestions(
           const isHomepage = false;
           const html = await fetchPublishedHtml(item.url);
           const htmlTitle = html ? (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || '') : '';
-          const existingSchemas = html ? extractExistingSchemas(html) : [];
+          const { types: existingSchemas, json: existingSchemaJson } = html ? extractExistingSchemas(html) : { types: [], json: [] };
 
           const pageCtx: SchemaContext = {
             ...ctx,
@@ -681,6 +686,7 @@ export async function generateSchemaSuggestions(
             slug,
             url: item.url,
             existingSchemas,
+            existingSchemaJson: existingSchemaJson.length > 0 ? existingSchemaJson : undefined,
             suggestedSchemas,
             validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
           } as SchemaPageSuggestion;
