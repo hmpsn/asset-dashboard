@@ -87,7 +87,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
       <button
         onClick={() => setOpen(!open)}
         className={cn(
-          'flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm font-medium transition-all border border-zinc-800',
+          'flex items-center gap-2 w-full px-3 py-2 rounded-lg text-xs font-medium transition-all border border-zinc-800',
           open ? 'bg-teal-500/10 ring-1 ring-teal-500/20' : 'hover:bg-zinc-800/60'
         )}
       >
