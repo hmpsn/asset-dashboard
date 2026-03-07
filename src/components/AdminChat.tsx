@@ -153,15 +153,15 @@ export function AdminChat({ workspaceId, workspaceName, ga4PropertyId, gscProper
     <>
       {!open && (
         <button onClick={handleOpen}
-          className="fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-sm font-medium shadow-lg shadow-indigo-900/30 transition-all z-50">
+          className="fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 rounded-full bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white text-sm font-medium shadow-lg shadow-purple-900/30 transition-all z-50">
           <Bot className="w-4 h-4" /> Admin Insights
         </button>
       )}
       {open && (
         <div className="fixed bottom-6 right-6 w-[420px] bg-zinc-900 rounded-2xl border border-zinc-800 shadow-2xl shadow-black/40 overflow-hidden z-50 flex flex-col max-h-[550px]">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 flex-shrink-0 bg-gradient-to-r from-indigo-500/5 to-violet-500/5">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 flex-shrink-0 bg-gradient-to-r from-purple-500/5 to-purple-400/5">
             <div className="flex items-center gap-2">
-              <Bot className="w-4 h-4 text-indigo-400" />
+              <Bot className="w-4 h-4 text-purple-400" />
               <span className="text-sm font-medium text-zinc-200">Admin Insights</span>
               <span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">{workspaceName}</span>
             </div>
@@ -180,7 +180,7 @@ export function AdminChat({ workspaceId, workspaceName, ga4PropertyId, gscProper
                 <div className="grid grid-cols-1 gap-2">
                   {ADMIN_QUICK_QUESTIONS.map((q, i) => (
                     <button key={i} onClick={() => askAi(q)} className="text-left px-3 py-2.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-800 text-[11px] text-zinc-300 transition-colors">
-                      <MessageSquare className="w-3 h-3 text-indigo-400 mb-1" />{q}
+                      <MessageSquare className="w-3 h-3 text-purple-400 mb-1" />{q}
                     </button>
                   ))}
                 </div>
@@ -190,14 +190,14 @@ export function AdminChat({ workspaceId, workspaceName, ga4PropertyId, gscProper
               <div className="p-4 space-y-4">
                 {messages.map((msg, i) => (
                   <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
-                    {msg.role === 'assistant' && <div className="w-6 h-6 rounded-lg bg-indigo-500/10 flex items-center justify-center flex-shrink-0 mt-0.5"><Sparkles className="w-3 h-3 text-indigo-400" /></div>}
-                    <div className={`max-w-[85%] rounded-xl px-3.5 py-2.5 ${msg.role === 'user' ? 'bg-indigo-600/20 border border-indigo-500/20 text-xs text-zinc-200' : 'bg-zinc-800/50 border border-zinc-800'}`}>
+                    {msg.role === 'assistant' && <div className="w-6 h-6 rounded-lg bg-purple-500/10 flex items-center justify-center flex-shrink-0 mt-0.5"><Sparkles className="w-3 h-3 text-purple-400" /></div>}
+                    <div className={`max-w-[85%] rounded-xl px-3.5 py-2.5 ${msg.role === 'user' ? 'bg-purple-600/20 border border-purple-500/20 text-xs text-zinc-200' : 'bg-zinc-800/50 border border-zinc-800'}`}>
                       {msg.role === 'assistant' ? <RenderMarkdown text={msg.content} /> : msg.content}
                     </div>
                   </div>
                 ))}
                 {loading && (
-                  <div className="flex gap-3"><div className="w-6 h-6 rounded-lg bg-indigo-500/10 flex items-center justify-center"><Loader2 className="w-3 h-3 text-indigo-400 animate-spin" /></div>
+                  <div className="flex gap-3"><div className="w-6 h-6 rounded-lg bg-purple-500/10 flex items-center justify-center"><Loader2 className="w-3 h-3 text-purple-400 animate-spin" /></div>
                     <div className="bg-zinc-800/50 border border-zinc-800 rounded-xl px-3.5 py-2.5"><div className="flex gap-1"><div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" /><div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '150ms' }} /><div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '300ms' }} /></div></div>
                   </div>
                 )}
@@ -208,8 +208,8 @@ export function AdminChat({ workspaceId, workspaceName, ga4PropertyId, gscProper
 
           <div className="px-4 py-3 border-t border-zinc-800 flex gap-2 flex-shrink-0">
             <input type="text" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && askAi(input)}
-              placeholder="Ask about this workspace..." className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500" disabled={loading || contextLoading} />
-            <button onClick={() => askAi(input)} disabled={loading || contextLoading || !input.trim()} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded-lg transition-colors"><Send className="w-3.5 h-3.5" /></button>
+              placeholder="Ask about this workspace..." className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-purple-500" disabled={loading || contextLoading} />
+            <button onClick={() => askAi(input)} disabled={loading || contextLoading || !input.trim()} className="px-3 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-lg transition-colors"><Send className="w-3.5 h-3.5" /></button>
           </div>
         </div>
       )}

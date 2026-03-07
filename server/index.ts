@@ -5294,9 +5294,11 @@ function getDefaultRoadmap() {
         id: 'sprint-1', name: 'AI Chatbot Revenue Engine', hours: '10-13',
         rationale: 'Fastest path to visible client value and upsell potential. No dependencies.',
         items: [
-          { id: 1, title: 'Client AI: Full dashboard context', source: 'AI_CHATBOT_ROADMAP Phase 1', est: '3-4h', priority: 'P0', notes: 'Feed audit, strategy, ranks, content pipeline, approvals, activity, annotations into chatbot', status: 'pending' },
-          { id: 2, title: 'Client AI: Global knowledge base', source: 'AI_CHATBOT_ROADMAP Phase 2', est: '4-5h', priority: 'P0', notes: 'SEO fundamentals, industry benchmarks, per-workspace business context', status: 'pending' },
-          { id: 3, title: 'Client AI: Sales engine behavior', source: 'AI_CHATBOT_ROADMAP Phase 3', est: '3-4h', priority: 'P0', notes: 'Opportunity detection, soft upsell prompts, action deep-links', status: 'pending' },
+          { id: 1, title: 'Client AI: Full dashboard context', source: 'AI_CHATBOT_ROADMAP Phase 1', est: '3-4h', priority: 'P0', notes: 'Feed audit, strategy, ranks, content pipeline, approvals, activity, annotations into chatbot', status: 'done' },
+          { id: 2, title: 'Client AI: Global knowledge base', source: 'AI_CHATBOT_ROADMAP Phase 2', est: '4-5h', priority: 'P0', notes: 'Per-workspace knowledgeBase field + knowledge-docs/ folder, injected into both chatbots', status: 'done' },
+          { id: 3, title: 'Client AI: Sales engine behavior', source: 'AI_CHATBOT_ROADMAP Phase 3', est: '3-4h', priority: 'P0', notes: '8 revenue hooks, Insights Engine branding, warm handoff pattern', status: 'done' },
+          { id: 53, title: 'Admin AI chat panel', source: 'Sprint 1 addition', est: '2-3h', priority: 'P0', notes: '/api/admin-chat endpoint + AdminChat.tsx with internal analyst persona', status: 'done' },
+          { id: 54, title: 'Admin GA4 dashboard upgrade', source: 'Memory/Roadmap', est: '3-4h', priority: 'P1', notes: 'Sparklines, period comparison, organic, new vs returning, conversions', status: 'done' },
         ],
       },
       {
@@ -5315,7 +5317,7 @@ function getDefaultRoadmap() {
         items: [
           { id: 8, title: 'Admin Search Console: primitives audit', source: 'Memory/Roadmap', est: '1-2h', priority: 'P1', notes: 'Verify new panels use shared UI primitives', status: 'pending' },
           { id: 9, title: 'Client dashboard: simplified search data', source: 'Memory/Roadmap', est: '3-4h', priority: 'P1', notes: 'Traffic growth direction, top pages (plain language), device split', status: 'pending' },
-          { id: 10, title: 'Admin GA4 dashboard upgrade', source: 'Memory/Roadmap', est: '3-4h', priority: 'P1', notes: 'Add landing pages, organic overview, period comparison, new vs returning', status: 'pending' },
+          { id: 10, title: 'Admin GA4 dashboard upgrade', source: 'Memory/Roadmap', est: '3-4h', priority: 'P1', notes: 'Shipped in Sprint 1', status: 'done' },
           { id: 11, title: 'Client dashboard: simplified analytics data', source: 'Memory/Roadmap', est: '2-3h', priority: 'P1', notes: 'Simplified GA4 organic overview for client portal', status: 'pending' },
         ],
       },
