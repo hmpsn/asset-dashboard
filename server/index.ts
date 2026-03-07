@@ -79,6 +79,8 @@ import { isSemrushConfigured, getKeywordOverview, getDomainOrganicKeywords, getK
 import { callOpenAI, getTokenUsage } from './openai-helpers.js';
 import { addMessage, buildConversationContext, listSessions, getSession as getChatSession, deleteSession as deleteChatSession, generateSessionSummary } from './chat-memory.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
+import { isStripeConfigured, createCheckoutSession, constructWebhookEvent, handleWebhookEvent, getProductConfig, listProducts } from './stripe.js';
+import { listPayments, getPayment } from './payments.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
 import { listGscSites, getSearchOverview, getPerformanceTrend, getQueryPageData, getAllGscPages, getSearchDeviceBreakdown, getSearchCountryBreakdown, getSearchTypeBreakdown, getSearchPeriodComparison } from './search-console.js';
 import { listGA4Properties, getGA4Overview, getGA4DailyTrend, getGA4TopPages, getGA4TopSources, getGA4DeviceBreakdown, getGA4Countries, getGA4KeyEvents, getGA4EventTrend, getGA4Conversions, getGA4EventsByPage, getGA4LandingPages, getGA4OrganicOverview, getGA4PeriodComparison, getGA4NewVsReturning, type CustomDateRange } from './google-analytics.js';
@@ -192,9 +194,20 @@ app.use(cors(ALLOWED_ORIGINS ? {
 } : undefined));
 app.use(cookieParser());
 
-// NOTE: Stripe webhook endpoint needs raw body — mount it BEFORE express.json().
-// When adding Stripe, mount: app.post('/api/stripe/webhook', express.raw({type:'application/json'}), ...)
-// before the next line.
+// Stripe webhook must receive raw body (before express.json parses it)
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const sig = req.headers['stripe-signature'] as string;
+  if (!sig) return res.status(400).json({ error: 'Missing stripe-signature header' });
+  try {
+    const event = constructWebhookEvent(req.body, sig);
+    await handleWebhookEvent(event);
+    res.json({ received: true });
+  } catch (err) {
+    console.error('[stripe] Webhook error:', err instanceof Error ? err.message : err);
+    res.status(400).json({ error: 'Webhook verification failed' });
+  }
+});
+
 app.use(express.json({ limit: '10mb' }));
 
 // --- Rate limiting for public API routes ---
@@ -4233,6 +4246,9 @@ app.get('/api/public/workspace/:id', (req, res) => {
     brandAccentColor: ws.brandAccentColor || '',
     // Content pricing
     contentPricing: ws.contentPricing || null,
+    // Monetization
+    tier: ws.tier || 'free',
+    stripeEnabled: isStripeConfigured(),
   });
 });
 
@@ -6013,6 +6029,65 @@ app.get('/api/content-briefs/:workspaceId/:briefId/export', (req, res) => {
 app.delete('/api/content-briefs/:workspaceId/:briefId', (req, res) => {
   deleteBrief(req.params.workspaceId, req.params.briefId);
   res.json({ ok: true });
+});
+
+// --- Stripe Payments ---
+
+// Create a Stripe Checkout session
+app.post('/api/stripe/create-checkout', checkoutLimiter, async (req, res) => {
+  if (!isStripeConfigured()) return res.status(503).json({ error: 'Stripe is not configured' });
+  const { workspaceId, productType, contentRequestId, topic, targetKeyword } = req.body;
+  if (!workspaceId || !productType) return res.status(400).json({ error: 'workspaceId and productType are required' });
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const config = getProductConfig(productType);
+  if (!config) return res.status(400).json({ error: `Unknown product type: ${productType}` });
+
+  // Build redirect URLs
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  const successUrl = `${baseUrl}/client/${workspaceId}?tab=content&payment=success&session_id={CHECKOUT_SESSION_ID}`;
+  const cancelUrl = `${baseUrl}/client/${workspaceId}?tab=content&payment=cancelled`;
+
+  try {
+    const { sessionId, url } = await createCheckoutSession({
+      workspaceId,
+      productType: sanitizeString(productType, 50) as import('./payments.js').ProductType,
+      contentRequestId: contentRequestId ? sanitizeString(contentRequestId, 100) : undefined,
+      topic: topic ? sanitizeString(topic, 200) : undefined,
+      targetKeyword: targetKeyword ? sanitizeString(targetKeyword, 200) : undefined,
+      successUrl,
+      cancelUrl,
+    });
+    res.json({ sessionId, url });
+  } catch (err) {
+    console.error('[stripe] Checkout error:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to create checkout session' });
+  }
+});
+
+// List payments for a workspace (admin)
+app.get('/api/stripe/payments/:workspaceId', (req, res) => {
+  res.json(listPayments(req.params.workspaceId));
+});
+
+// Client checks payment status after redirect
+app.get('/api/public/stripe/status/:workspaceId/:sessionId', (req, res) => {
+  const payments = listPayments(req.params.workspaceId);
+  const payment = payments.find(p => p.stripeSessionId === req.params.sessionId);
+  if (!payment) return res.status(404).json({ error: 'Payment not found' });
+  res.json({ id: payment.id, status: payment.status, productType: payment.productType, paidAt: payment.paidAt });
+});
+
+// List available products with prices
+app.get('/api/stripe/products', (_req, res) => {
+  res.json({ configured: isStripeConfigured(), products: listProducts() });
+});
+
+// Get a single payment record (admin)
+app.get('/api/stripe/payments/:workspaceId/:paymentId', (req, res) => {
+  const payment = getPayment(req.params.workspaceId, req.params.paymentId);
+  if (!payment) return res.status(404).json({ error: 'Payment not found' });
+  res.json(payment);
 });
 
 // --- Monthly Reports ---

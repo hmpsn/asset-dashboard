@@ -189,6 +189,25 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
           loadDashboardData(data);
         }
         setLoading(false);
+
+        // Detect Stripe payment redirect
+        const params = new URLSearchParams(window.location.search);
+        const paymentStatus = params.get('payment');
+        if (paymentStatus === 'success') {
+          setToast({ message: 'Payment successful! Your content request is being processed.', type: 'success' });
+          setTimeout(() => setToast(null), 8000);
+          // Clean up URL params without reload
+          const url = new URL(window.location.href);
+          url.searchParams.delete('payment');
+          url.searchParams.delete('session_id');
+          window.history.replaceState({}, '', url.toString());
+        } else if (paymentStatus === 'cancelled') {
+          setToast({ message: 'Payment was cancelled. You can try again anytime.', type: 'error' });
+          setTimeout(() => setToast(null), 6000);
+          const url = new URL(window.location.href);
+          url.searchParams.delete('payment');
+          window.history.replaceState({}, '', url.toString());
+        }
       })
       .catch(() => { setError('Failed to load dashboard'); setLoading(false); });
   }, [workspaceId]);
@@ -450,11 +469,53 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
     if (!pricingModal) return;
     setPricingConfirming(true);
     try {
+      // --- Stripe checkout redirect (when configured) ---
+      if (ws?.stripeEnabled) {
+        // First, create the content request so we have an ID to link the payment to
+        let contentRequestId: string | undefined;
+        if (pricingModal.source === 'upgrade' && pricingModal.upgradeReqId) {
+          contentRequestId = pricingModal.upgradeReqId;
+        } else if (pricingModal.source === 'strategy') {
+          const res = await fetch(`/api/public/content-request/${workspaceId}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, intent: pricingModal.intent, priority: pricingModal.priority, rationale: pricingModal.rationale, serviceType: pricingModal.serviceType }),
+          });
+          if (!res.ok) throw new Error(`Server returned ${res.status}`);
+          const created = await res.json();
+          contentRequestId = created.id;
+        } else {
+          const res = await fetch(`/api/public/content-request/${workspaceId}/submit`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, notes: pricingModal.notes || undefined, serviceType: pricingModal.serviceType }),
+          });
+          if (!res.ok) throw new Error(`Server returned ${res.status}`);
+          const created = await res.json();
+          contentRequestId = created.id;
+        }
+
+        // Map serviceType to Stripe product type
+        const productType = pricingModal.serviceType === 'full_post' ? 'post_polished' : 'brief_blog';
+
+        // Create Stripe Checkout session and redirect
+        const checkoutRes = await fetch('/api/stripe/create-checkout', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ workspaceId, productType, contentRequestId, topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword }),
+        });
+        if (!checkoutRes.ok) {
+          const err = await checkoutRes.json().catch(() => ({ error: 'Checkout failed' }));
+          throw new Error(err.error || 'Failed to create checkout session');
+        }
+        const { url } = await checkoutRes.json();
+        if (url) {
+          window.location.href = url; // Redirect to Stripe Checkout
+          return; // Don't close modal — page is navigating away
+        }
+      }
+
+      // --- Fallback: direct submit (no Stripe) ---
       if (pricingModal.source === 'upgrade' && pricingModal.upgradeReqId) {
-        // Upgrade flow
         await upgradeToFullPost(pricingModal.upgradeReqId);
       } else if (pricingModal.source === 'strategy') {
-        // Strategy-based request
         setRequestingTopic(pricingModal.targetKeyword);
         const res = await fetch(`/api/public/content-request/${workspaceId}`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -470,7 +531,6 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         setTimeout(() => setToast(null), 5000);
         setRequestingTopic(null);
       } else {
-        // Client topic submission
         const res = await fetch(`/api/public/content-request/${workspaceId}/submit`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, notes: pricingModal.notes || undefined, serviceType: pricingModal.serviceType }),
@@ -486,7 +546,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
       }
     } catch (err) {
       console.error('Content request failed:', err);
-      setToast({ message: 'Failed to submit request. Please try again.', type: 'error' });
+      setToast({ message: err instanceof Error ? err.message : 'Failed to submit request. Please try again.', type: 'error' });
       setTimeout(() => setToast(null), 5000);
     }
     setPricingConfirming(false);

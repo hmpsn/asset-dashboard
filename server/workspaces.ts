@@ -101,6 +101,10 @@ export interface Workspace {
   knowledgeBase?: string;          // business knowledge: services, capabilities, FAQs, platform info
   brandLogoUrl?: string;
   brandAccentColor?: string;
+  // Monetization
+  tier?: 'free' | 'growth' | 'premium';
+  trialEndsAt?: string;              // ISO date — 14-day Growth trial
+  stripeCustomerId?: string;         // Stripe Customer ID for subscriptions
   // Content pricing (per-workspace, exposed to client portal)
   contentPricing?: {
     briefPrice: number;       // e.g. 150 (in dollars)

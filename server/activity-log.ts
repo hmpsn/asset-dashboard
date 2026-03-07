@@ -25,6 +25,8 @@ export type ActivityType =
   | 'strategy_generated'
   | 'rank_snapshot'
   | 'chat_session'
+  | 'payment_received'
+  | 'payment_failed'
   | 'note';
 
 export interface ActivityEntry {
