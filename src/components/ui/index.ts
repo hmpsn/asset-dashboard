@@ -11,6 +11,7 @@ export {
   scoreColor,
   scoreColorClass,
   scoreBgClass,
+  scoreBgBarClass,
   DATE_PRESETS_SHORT,
   DATE_PRESETS_FULL,
   DATE_PRESETS_SEARCH,

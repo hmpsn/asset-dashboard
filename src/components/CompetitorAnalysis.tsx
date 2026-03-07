@@ -3,6 +3,7 @@ import {
   Loader2, TrendingUp, TrendingDown, Target, Zap, AlertTriangle,
   CheckCircle, ArrowRight, Globe, BarChart3, Shield,
 } from 'lucide-react';
+import { scoreColorClass, scoreBgBarClass } from './ui';
 
 interface SiteMetrics {
   score: number;
@@ -46,19 +47,6 @@ interface Props {
   siteUrl?: string;
 }
 
-function scoreColor(score: number): string {
-  if (score >= 80) return 'text-green-400';
-  if (score >= 60) return 'text-amber-400';
-  if (score >= 40) return 'text-orange-400';
-  return 'text-red-400';
-}
-
-function scoreBg(score: number): string {
-  if (score >= 80) return 'bg-green-500';
-  if (score >= 60) return 'bg-amber-500';
-  if (score >= 40) return 'bg-orange-500';
-  return 'bg-red-500';
-}
 
 function MetricRow({ label, myVal, theirVal, suffix = '', higher = true }: {
   label: string; myVal: number; theirVal: number; suffix?: string; higher?: boolean;
@@ -186,10 +174,10 @@ export function CompetitorAnalysis({ siteUrl }: Props) {
         {/* My site score */}
         <div className="bg-zinc-900 rounded-xl p-5 border border-zinc-800 text-center">
           <div className="text-[11px] uppercase tracking-wider text-zinc-500 mb-2">Your Site</div>
-          <div className={`text-4xl font-bold ${scoreColor(mySite.metrics.score)}`}>{mySite.metrics.score}</div>
+          <div className={`text-4xl font-bold ${scoreColorClass(mySite.metrics.score)}`}>{mySite.metrics.score}</div>
           <div className="text-xs text-zinc-400 mt-1 truncate" title={mySite.url}>{mySite.name}</div>
           <div className="mt-2 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-            <div className={`h-full rounded-full ${scoreBg(mySite.metrics.score)}`} style={{ width: `${mySite.metrics.score}%` }} />
+            <div className={`h-full rounded-full ${scoreBgBarClass(mySite.metrics.score)}`} style={{ width: `${mySite.metrics.score}%` }} />
           </div>
           <div className="text-xs text-zinc-500 mt-2">{mySite.metrics.totalPages} pages scanned</div>
         </div>
@@ -214,10 +202,10 @@ export function CompetitorAnalysis({ siteUrl }: Props) {
         {/* Competitor score */}
         <div className="bg-zinc-900 rounded-xl p-5 border border-zinc-800 text-center">
           <div className="text-[11px] uppercase tracking-wider text-zinc-500 mb-2">Competitor</div>
-          <div className={`text-4xl font-bold ${scoreColor(competitor.metrics.score)}`}>{competitor.metrics.score}</div>
+          <div className={`text-4xl font-bold ${scoreColorClass(competitor.metrics.score)}`}>{competitor.metrics.score}</div>
           <div className="text-xs text-zinc-400 mt-1 truncate" title={competitor.url}>{competitor.name}</div>
           <div className="mt-2 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-            <div className={`h-full rounded-full ${scoreBg(competitor.metrics.score)}`} style={{ width: `${competitor.metrics.score}%` }} />
+            <div className={`h-full rounded-full ${scoreBgBarClass(competitor.metrics.score)}`} style={{ width: `${competitor.metrics.score}%` }} />
           </div>
           <div className="text-xs text-zinc-500 mt-2">{competitor.metrics.totalPages} pages scanned</div>
         </div>

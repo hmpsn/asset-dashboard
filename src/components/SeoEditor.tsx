@@ -372,7 +372,7 @@ export function SeoEditor({ siteId, workspaceId }: Props) {
       )}
 
       {/* Page list */}
-      <div className="space-y-1">
+      <div className="space-y-2">
         {filteredPages.map(page => {
           const isExpanded = expanded.has(page.id);
           const edit = edits[page.id];
@@ -384,7 +384,7 @@ export function SeoEditor({ siteId, workspaceId }: Props) {
           const isSelected = approvalSelected.has(page.id);
 
           return (
-            <div key={page.id} className={`rounded-lg border overflow-hidden ${isSelected ? 'border-teal-500/40 bg-teal-500/5' : 'border-zinc-800'}`}>
+            <div key={page.id} className={`bg-zinc-900 rounded-xl border overflow-hidden ${isSelected ? 'border-teal-500/40 bg-teal-500/5' : 'border-zinc-800'}`}>
               <div className="flex items-center">
                 {workspaceId && (
                   <button
@@ -400,7 +400,7 @@ export function SeoEditor({ siteId, workspaceId }: Props) {
               >
                 {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500" />}
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm text-zinc-300 truncate">{page.title}</div>
+                  <div className="text-sm font-medium text-zinc-200 truncate">{page.title}</div>
                   <div className="text-xs text-zinc-500 truncate">/{page.slug}</div>
                 </div>
                 <div className="flex items-center gap-2">

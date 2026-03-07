@@ -190,12 +190,12 @@ function PageWeight({ siteId }: Props) {
       </div>
 
       {/* Page list */}
-      <div className="space-y-1">
+      <div className="space-y-2">
         {filteredPages.map(page => (
-          <div key={page.page}>
+          <div key={page.page} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
             <button
               onClick={() => toggleExpand(page.page)}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-zinc-900/50 transition-colors text-left"
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/50 transition-colors text-left"
             >
               {expanded.has(page.page) ? (
                 <ChevronDown className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
@@ -203,7 +203,7 @@ function PageWeight({ siteId }: Props) {
                 <ChevronRight className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
               )}
               <div className="flex-1 min-w-0">
-                <div className="text-sm text-zinc-300 truncate">{page.page}</div>
+                <div className="text-sm font-medium text-zinc-200 truncate">{page.page}</div>
                 <div className="mt-1.5 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${getBarColor(page.totalSize)}`}

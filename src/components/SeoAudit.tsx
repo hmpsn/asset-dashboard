@@ -15,7 +15,7 @@ import { InternalLinks } from './InternalLinks';
 import { ContentBriefs } from './ContentBriefs';
 import { CompetitorAnalysis } from './CompetitorAnalysis';
 import { RankTracker } from './RankTracker';
-import { StatCard } from './ui';
+import { StatCard, scoreColorClass, scoreBgBarClass } from './ui';
 
 type Severity = 'error' | 'warning' | 'info';
 
@@ -82,19 +82,6 @@ const SEVERITY_CONFIG: Record<Severity, { label: string; color: string; bg: stri
   info: { label: 'Info', color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/30', icon: Info },
 };
 
-function scoreColor(score: number): string {
-  if (score >= 80) return 'text-green-400';
-  if (score >= 60) return 'text-amber-400';
-  if (score >= 40) return 'text-orange-400';
-  return 'text-red-400';
-}
-
-function scoreBg(score: number): string {
-  if (score >= 80) return 'bg-green-500';
-  if (score >= 60) return 'bg-amber-500';
-  if (score >= 40) return 'bg-orange-500';
-  return 'bg-red-500';
-}
 
 function ScoreTrendChart({ history }: { history: SnapshotSummary[] }) {
   const points = [...history].reverse().slice(-12); // last 12, chronological
@@ -371,7 +358,7 @@ function AuditHistory({ siteId, history, onRefresh }: { siteId: string; history:
         <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
           <div className="text-xs text-zinc-500 mb-1">Latest Score</div>
           <div className="flex items-end gap-2">
-            <span className={`text-3xl font-bold ${scoreColor(latest.siteScore)}`}>{latest.siteScore}</span>
+            <span className={`text-3xl font-bold ${scoreColorClass(latest.siteScore)}`}>{latest.siteScore}</span>
             {scoreDelta !== 0 && (
               <span className={`flex items-center gap-0.5 text-xs font-medium pb-1 ${scoreDelta > 0 ? 'text-green-400' : 'text-red-400'}`}>
                 {scoreDelta > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
@@ -446,7 +433,7 @@ function AuditHistory({ siteId, history, onRefresh }: { siteId: string; history:
             const delta = prev ? snap.siteScore - prev.siteScore : 0;
             return (
               <div key={snap.id} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-zinc-900/50 transition-colors group">
-                <div className={`text-lg font-bold tabular-nums w-10 ${scoreColor(snap.siteScore)}`}>{snap.siteScore}</div>
+                <div className={`text-lg font-bold tabular-nums w-10 ${scoreColorClass(snap.siteScore)}`}>{snap.siteScore}</div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm text-zinc-300">
                     {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -1038,9 +1025,9 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
           <div className="flex items-center gap-1.5 mb-1.5">
             <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Site Score</span>
           </div>
-          <div className={`text-3xl font-bold ${scoreColor(data.siteScore)}`}>{data.siteScore}</div>
+          <div className={`text-3xl font-bold ${scoreColorClass(data.siteScore)}`}>{data.siteScore}</div>
           <div className="mt-2 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-            <div className={`h-full rounded-full ${scoreBg(data.siteScore)}`} style={{ width: `${data.siteScore}%` }} />
+            <div className={`h-full rounded-full ${scoreBgBarClass(data.siteScore)}`} style={{ width: `${data.siteScore}%` }} />
           </div>
         </div>
         <StatCard label="Pages Scanned" value={data.totalPages} />
@@ -1318,17 +1305,17 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
       </div>
 
       {/* Page list */}
-      <div className="space-y-1">
+      <div className="space-y-2">
         {filteredPages.map(page => {
           const isExpanded = expanded.has(page.page);
           const errorCount = page.issues.filter(i => i.severity === 'error').length;
           const warningCount = page.issues.filter(i => i.severity === 'warning').length;
 
           return (
-            <div key={page.slug || page.page}>
+            <div key={page.slug || page.page} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
               <button
                 onClick={() => toggleExpand(page.page)}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-zinc-900/50 transition-colors text-left"
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/50 transition-colors text-left"
               >
                 {isExpanded ? (
                   <ChevronDown className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
@@ -1336,14 +1323,14 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
                   <ChevronRight className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
                 )}
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm text-zinc-300 truncate">{page.page}</div>
+                  <div className="text-sm font-medium text-zinc-200 truncate">{page.page}</div>
                   <div className="text-xs text-zinc-500 truncate">/{page.slug}</div>
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
                   {errorCount > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400">{errorCount} error{errorCount > 1 ? 's' : ''}</span>}
                   {warningCount > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">{warningCount} warn</span>}
                   {page.issues.length === 0 && <CheckCircle className="w-4 h-4 text-green-500" />}
-                  <span className={`text-sm font-bold tabular-nums ${scoreColor(page.score)}`}>{page.score}</span>
+                  <span className={`text-sm font-bold tabular-nums ${scoreColorClass(page.score)}`}>{page.score}</span>
                 </div>
               </button>
 

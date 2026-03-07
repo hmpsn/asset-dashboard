@@ -506,7 +506,7 @@ function AssetAudit({ siteId }: Props) {
       </div>
 
       {/* Issue list */}
-      <div className="space-y-1">
+      <div className="space-y-2">
         {filteredIssues.length === 0 ? (
           <div className="flex flex-col items-center py-10 text-zinc-500 gap-2">
             <CheckCircle className="w-8 h-8 text-green-500" />
@@ -514,7 +514,7 @@ function AssetAudit({ siteId }: Props) {
           </div>
         ) : (
           filteredIssues.map(issue => (
-            <div key={issue.assetId} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-zinc-900/50 transition-colors group">
+            <div key={issue.assetId} className="flex items-center gap-3 px-4 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800/50 border border-zinc-800 transition-colors group">
               {/* Thumbnail — click for lightbox */}
               <button
                 className="w-10 h-10 rounded bg-zinc-800 overflow-hidden flex-shrink-0 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-zinc-600 transition-all"
@@ -529,7 +529,7 @@ function AssetAudit({ siteId }: Props) {
 
               {/* Info */}
               <div className="flex-1 min-w-0">
-                <div className="text-sm text-zinc-300 truncate">{issue.fileName}</div>
+                <div className="text-sm font-medium text-zinc-200 truncate">{issue.fileName}</div>
                 <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                   {issue.issues.map(issueType => {
                     const info = ISSUE_LABELS[issueType];

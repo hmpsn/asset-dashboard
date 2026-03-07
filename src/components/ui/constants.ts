@@ -18,6 +18,11 @@ export function scoreBgClass(score: number): string {
   return score >= 80 ? 'bg-green-500/10' : score >= 60 ? 'bg-amber-500/10' : 'bg-red-500/10';
 }
 
+/** Solid score background class (for progress bar fills) */
+export function scoreBgBarClass(score: number): string {
+  return score >= 80 ? 'bg-green-500' : score >= 60 ? 'bg-amber-500' : score >= 40 ? 'bg-orange-500' : 'bg-red-500';
+}
+
 /** Date range presets */
 export const DATE_PRESETS_SHORT = [
   { label: '7d', value: 7 },

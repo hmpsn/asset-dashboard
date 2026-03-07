@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { Globe, Search, ExternalLink, ChevronDown, ChevronRight, AlertTriangle, CheckCircle, Info, Zap, FileText } from 'lucide-react';
+import { scoreColorClass } from './ui';
 
 interface SalesIssue {
   check: string;
@@ -46,16 +47,9 @@ interface ReportSummary {
   generatedAt: string;
 }
 
-function scoreColor(score: number): string {
-  if (score >= 80) return 'text-emerald-400';
-  if (score >= 60) return 'text-yellow-400';
-  if (score >= 40) return 'text-orange-400';
-  return 'text-red-400';
-}
-
-function scoreBg(score: number): string {
-  if (score >= 80) return 'bg-emerald-500/10 border-emerald-500/30';
-  if (score >= 60) return 'bg-yellow-500/10 border-yellow-500/30';
+function scoreBorderClass(score: number): string {
+  if (score >= 80) return 'bg-green-500/10 border-green-500/30';
+  if (score >= 60) return 'bg-amber-500/10 border-amber-500/30';
   if (score >= 40) return 'bg-orange-500/10 border-orange-500/30';
   return 'bg-red-500/10 border-red-500/30';
 }
@@ -178,15 +172,13 @@ export function SalesReport() {
                 onChange={(e) => setUrl(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && !loading && runReport()}
                 placeholder="Enter website URL (e.g. swishsmiles.com)"
-                className="w-full pl-10 pr-4 py-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                className="bg-zinc-900 border border-zinc-800 text-zinc-200"
+                className="w-full pl-10 pr-4 py-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 bg-zinc-900 border border-zinc-800 text-zinc-200"
                 disabled={loading}
               />
             </div>
             <button
               onClick={runReport}
               disabled={loading || !url.trim()}
-              className="px-6 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
               className="px-6 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 bg-teal-400 text-[#0f1219]"
             >
               {loading ? (
@@ -220,12 +212,11 @@ export function SalesReport() {
               {history.map((h) => (
                 <div
                   key={h.id}
-                  className="flex items-center justify-between px-4 py-3 rounded-xl cursor-pointer transition-colors hover:bg-white/5"
-                  className="bg-zinc-900 border border-zinc-800"
+                  className="flex items-center justify-between px-4 py-3 rounded-xl cursor-pointer transition-colors hover:bg-zinc-800/50 bg-zinc-900 border border-zinc-800"
                   onClick={() => loadReport(h.id)}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className={`text-lg font-bold ${scoreColor(h.siteScore)}`}>{h.siteScore}</div>
+                    <div className={`text-lg font-bold ${scoreColorClass(h.siteScore)}`}>{h.siteScore}</div>
                     <div className="min-w-0">
                       <div className="text-sm font-medium truncate text-zinc-200">{h.siteName}</div>
                       <div className="text-xs truncate text-zinc-500">{h.url}</div>
@@ -261,8 +252,7 @@ export function SalesReport() {
       <div className="flex items-center justify-between">
         <button
           onClick={() => { setView('input'); setReport(null); }}
-          className="text-sm px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
-          className="text-zinc-500"
+          className="text-sm px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors text-zinc-500"
         >
           ← Back
         </button>
@@ -270,7 +260,6 @@ export function SalesReport() {
           {r.id && (
             <button
               onClick={() => openHtmlReport(r.id!)}
-              className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors"
               className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors bg-teal-400 text-[#0f1219]"
             >
               <ExternalLink className="w-3.5 h-3.5" />
@@ -286,9 +275,9 @@ export function SalesReport() {
         <p className="text-xs mt-0.5 text-zinc-500">{r.url}</p>
 
         <div className="flex justify-center mt-4">
-          <div className={`w-28 h-28 rounded-full border-4 flex flex-col items-center justify-center ${scoreBg(r.siteScore)}`}>
-            <span className={`text-3xl font-black ${scoreColor(r.siteScore)}`}>{r.siteScore}</span>
-            <span className={`text-xs font-semibold ${scoreColor(r.siteScore)}`}>{scoreLabel(r.siteScore)}</span>
+          <div className={`w-28 h-28 rounded-full border-4 flex flex-col items-center justify-center ${scoreBorderClass(r.siteScore)}`}>
+            <span className={`text-3xl font-black ${scoreColorClass(r.siteScore)}`}>{r.siteScore}</span>
+            <span className={`text-xs font-semibold ${scoreColorClass(r.siteScore)}`}>{scoreLabel(r.siteScore)}</span>
           </div>
         </div>
 
@@ -387,19 +376,18 @@ export function SalesReport() {
         <h3 className="text-sm font-semibold mb-3 text-zinc-200">
           Page-by-Page Breakdown
         </h3>
-        <div className="space-y-1">
+        <div className="space-y-2">
           {r.pages.map((page) => (
             <div key={page.url}>
               <div
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors hover:bg-white/5"
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors hover:bg-white/5 bg-zinc-900"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors hover:bg-zinc-800/50 bg-zinc-900 border border-zinc-800"
                 onClick={() => setExpandedPage(expandedPage === page.url ? null : page.url)}
               >
                 {expandedPage === page.url
                   ? <ChevronDown className="w-4 h-4 shrink-0 text-zinc-500" />
                   : <ChevronRight className="w-4 h-4 shrink-0 text-zinc-500" />
                 }
-                <div className={`text-sm font-bold w-8 text-center ${scoreColor(page.score)}`}>{page.score}</div>
+                <div className={`text-sm font-bold w-8 text-center ${scoreColorClass(page.score)}`}>{page.score}</div>
                 <div className="min-w-0 flex-1">
                   <span className="text-sm font-medium text-zinc-200">{page.page}</span>
                 </div>

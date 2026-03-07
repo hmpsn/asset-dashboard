@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import {
-  Loader2, ChevronDown, ChevronRight, Sparkles, Target, TrendingUp,
-  AlertCircle, CheckCircle, BarChart3, BookOpen, Search as SearchIcon,
-  Zap, Tag,
+  Loader2, ChevronDown, ChevronRight, Target, AlertCircle,
+  BarChart3, Sparkles, Search as SearchIcon, TrendingUp,
+  CheckCircle, Tag, Zap, BookOpen,
 } from 'lucide-react';
+import { scoreColorClass, scoreBgBarClass } from './ui';
 
 interface PageMeta {
   id: string;
@@ -54,19 +55,6 @@ interface Props {
   siteId: string;
 }
 
-function scoreColor(score: number): string {
-  if (score >= 80) return 'text-green-400';
-  if (score >= 60) return 'text-amber-400';
-  if (score >= 40) return 'text-orange-400';
-  return 'text-red-400';
-}
-
-function scoreBg(score: number): string {
-  if (score >= 80) return 'bg-green-500';
-  if (score >= 60) return 'bg-amber-500';
-  if (score >= 40) return 'bg-orange-500';
-  return 'bg-red-500';
-}
 
 function difficultyColor(d: string): string {
   if (d === 'low') return 'text-green-400';
@@ -216,7 +204,7 @@ export function KeywordAnalysis({ siteId }: Props) {
       </div>
 
       {/* Page list */}
-      <div className="space-y-1">
+      <div className="space-y-2">
         {filtered.map(page => {
           const isExpanded = expanded === page.id;
           const isAnalyzing = analyzing.has(page.id);
@@ -224,7 +212,7 @@ export function KeywordAnalysis({ siteId }: Props) {
           const cs = contentScores[page.id];
 
           return (
-            <div key={page.id} className="rounded-lg border border-zinc-800 overflow-hidden">
+            <div key={page.id} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
               <button
                 onClick={() => toggleExpand(page.id, page)}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-900/50 transition-colors text-left"
@@ -237,7 +225,7 @@ export function KeywordAnalysis({ siteId }: Props) {
                   <ChevronRight className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
                 )}
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm text-zinc-300 truncate">{page.title}</div>
+                  <div className="text-sm font-medium text-zinc-200 truncate">{page.title}</div>
                   <div className="text-xs text-zinc-500 truncate">/{page.slug}</div>
                 </div>
                 {kw && (
@@ -245,7 +233,7 @@ export function KeywordAnalysis({ siteId }: Props) {
                     <span className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-400">
                       {kw.primaryKeyword}
                     </span>
-                    <span className={`text-xs font-bold tabular-nums ${scoreColor(kw.optimizationScore)}`}>
+                    <span className={`text-xs font-bold tabular-nums ${scoreColorClass(kw.optimizationScore)}`}>
                       {kw.optimizationScore}
                     </span>
                   </div>
@@ -265,17 +253,17 @@ export function KeywordAnalysis({ siteId }: Props) {
                     <div className="space-y-4 pt-2">
                       {/* Top row: Score + Intent + Difficulty */}
                       <div className="grid grid-cols-3 gap-3">
-                        <div className="bg-zinc-900 rounded-lg p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
                           <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Optimization</div>
-                          <div className={`text-2xl font-bold ${scoreColor(kw.optimizationScore)}`}>
+                          <div className={`text-2xl font-bold ${scoreColorClass(kw.optimizationScore)}`}>
                             {kw.optimizationScore}
                             <span className="text-xs font-normal text-zinc-500">/100</span>
                           </div>
                           <div className="mt-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
-                            <div className={`h-full rounded-full ${scoreBg(kw.optimizationScore)}`} style={{ width: `${kw.optimizationScore}%` }} />
+                            <div className={`h-full rounded-full ${scoreBgBarClass(kw.optimizationScore)}`} style={{ width: `${kw.optimizationScore}%` }} />
                           </div>
                         </div>
-                        <div className="bg-zinc-900 rounded-lg p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
                           <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Search Intent</div>
                           <div className="flex items-center gap-2">
                             <span className="w-6 h-6 rounded-full bg-teal-500/20 text-teal-400 flex items-center justify-center text-xs font-bold">
@@ -287,7 +275,7 @@ export function KeywordAnalysis({ siteId }: Props) {
                             </div>
                           </div>
                         </div>
-                        <div className="bg-zinc-900 rounded-lg p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
                           <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Difficulty</div>
                           <div className={`text-lg font-bold capitalize ${difficultyColor(kw.estimatedDifficulty)}`}>
                             {kw.estimatedDifficulty}
@@ -297,7 +285,7 @@ export function KeywordAnalysis({ siteId }: Props) {
                       </div>
 
                       {/* Primary keyword */}
-                      <div className="bg-zinc-900 rounded-lg p-3 border border-zinc-800">
+                      <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
                         <div className="flex items-center gap-2 mb-2">
                           <Target className="w-3.5 h-3.5 text-teal-400" />
                           <span className="text-xs font-medium text-zinc-300">Primary Keyword</span>
@@ -325,7 +313,7 @@ export function KeywordAnalysis({ siteId }: Props) {
 
                       {/* Keywords grid */}
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-zinc-900 rounded-lg p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
                           <div className="flex items-center gap-2 mb-2">
                             <Tag className="w-3.5 h-3.5 text-blue-400" />
                             <span className="text-xs font-medium text-zinc-300">Secondary Keywords</span>
@@ -338,7 +326,7 @@ export function KeywordAnalysis({ siteId }: Props) {
                             ))}
                           </div>
                         </div>
-                        <div className="bg-zinc-900 rounded-lg p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
                           <div className="flex items-center gap-2 mb-2">
                             <TrendingUp className="w-3.5 h-3.5 text-green-400" />
                             <span className="text-xs font-medium text-zinc-300">Long-Tail Keywords</span>
@@ -355,7 +343,7 @@ export function KeywordAnalysis({ siteId }: Props) {
 
                       {/* Competitor keywords */}
                       {kw.competitorKeywords.length > 0 && (
-                        <div className="bg-zinc-900 rounded-lg p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
                           <div className="flex items-center gap-2 mb-2">
                             <Zap className="w-3.5 h-3.5 text-amber-400" />
                             <span className="text-xs font-medium text-zinc-300">Competitor Keywords</span>
@@ -372,7 +360,7 @@ export function KeywordAnalysis({ siteId }: Props) {
 
                       {/* Content gaps */}
                       {kw.contentGaps.length > 0 && (
-                        <div className="bg-zinc-900 rounded-lg p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
                           <div className="flex items-center gap-2 mb-2">
                             <AlertCircle className="w-3.5 h-3.5 text-orange-400" />
                             <span className="text-xs font-medium text-zinc-300">Content Gaps</span>
@@ -419,7 +407,7 @@ export function KeywordAnalysis({ siteId }: Props) {
 
                       {/* Content metrics */}
                       {cs && (
-                        <div className="bg-zinc-900 rounded-lg p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
                           <div className="flex items-center gap-2 mb-3">
                             <BarChart3 className="w-3.5 h-3.5 text-cyan-400" />
                             <span className="text-xs font-medium text-zinc-300">Content Metrics</span>

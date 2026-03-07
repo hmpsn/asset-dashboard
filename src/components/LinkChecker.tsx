@@ -177,14 +177,14 @@ export function LinkChecker({ siteId }: Props) {
       </div>
 
       {/* Link list */}
-      <div className="space-y-1">
+      <div className="space-y-2">
         {filtered.length === 0 ? (
           <div className="text-sm text-zinc-500 text-center py-8">
             {tab === 'dead' ? 'No broken links found' : 'No redirect chains found'}
           </div>
         ) : (
           filtered.map((link, idx) => (
-            <div key={idx} className="flex items-start gap-3 px-4 py-3 rounded-lg bg-zinc-900/50 hover:bg-zinc-900 border border-zinc-800/50 transition-colors">
+            <div key={idx} className="flex items-start gap-3 px-4 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800/50 border border-zinc-800 transition-colors">
               {tab === 'dead' ? (
                 <AlertCircle className="w-4 h-4 mt-0.5 text-red-400 shrink-0" />
               ) : (

@@ -358,7 +358,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
               const hasBrief = !!req.briefId;
               const inlineBrief = hasBrief && expandedRequest === req.id ? getBriefById(req.briefId!) : null;
               return (
-                <div key={req.id} className="rounded-lg bg-zinc-800/50 border border-zinc-800 overflow-hidden">
+                <div key={req.id} className="rounded-xl bg-zinc-900 border border-zinc-800 overflow-hidden">
                   <div className="px-3 py-2.5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
