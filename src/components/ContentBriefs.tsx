@@ -3,7 +3,7 @@ import {
   Loader2, Clipboard, Trash2, ChevronDown, ChevronUp, Sparkles, FileText,
   Inbox, CheckCircle2, XCircle, Clock, Zap, Download, Copy, Search,
   Target, MessageSquare, BarChart3, BookOpen, Users, TrendingUp,
-  AlertTriangle, ArrowUpDown, X,
+  AlertTriangle, ArrowUpDown, X, Pencil, Check,
 } from 'lucide-react';
 
 interface ContentBrief {
@@ -72,6 +72,21 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
   const [briefSearch, setBriefSearch] = useState('');
   const [briefSort, setBriefSort] = useState<'date' | 'keyword' | 'difficulty'>('date');
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'brief' | 'request'; id: string; label: string } | null>(null);
+  const [editingBrief, setEditingBrief] = useState<string | null>(null);
+
+  const saveBriefField = async (briefId: string, updates: Partial<ContentBrief>) => {
+    try {
+      const res = await fetch(`/api/content-briefs/${workspaceId}/${briefId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setBriefs(prev => prev.map(b => b.id === briefId ? updated : b));
+      }
+    } catch { /* skip */ }
+  };
 
   const getBriefById = (briefId: string) => briefs.find(b => b.id === briefId);
 
@@ -849,6 +864,9 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                 <div className="px-4 pb-4 space-y-4 border-t border-zinc-800">
                   {/* Export buttons */}
                   <div className="pt-3 flex items-center gap-2">
+                    <button onClick={() => setEditingBrief(editingBrief === brief.id ? null : brief.id)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${editingBrief === brief.id ? 'bg-amber-600/20 border border-amber-500/30 text-amber-300 hover:bg-amber-600/30' : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-700'}`}>
+                      {editingBrief === brief.id ? <><Check className="w-3 h-3" /> Done Editing</> : <><Pencil className="w-3 h-3" /> Edit Brief</>}
+                    </button>
                     <button onClick={() => copyAsMarkdown(brief)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
                       <Copy className="w-3 h-3" /> Copy for AI Tool
                     </button>
@@ -864,7 +882,11 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                   {brief.executiveSummary && (
                     <div className="bg-teal-500/5 border border-teal-500/20 rounded-lg px-4 py-3">
                       <div className="flex items-center gap-1.5 mb-1.5"><BookOpen className="w-3.5 h-3.5 text-teal-400" /><span className="text-[11px] text-teal-400 font-medium uppercase tracking-wider">Executive Summary</span></div>
-                      <div className="text-xs text-zinc-300 leading-relaxed">{brief.executiveSummary}</div>
+                      {editingBrief === brief.id ? (
+                        <textarea defaultValue={brief.executiveSummary} onBlur={e => { if (e.target.value !== brief.executiveSummary) saveBriefField(brief.id, { executiveSummary: e.target.value }); }} className="w-full text-xs text-zinc-300 leading-relaxed bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 focus:border-teal-500/50 focus:outline-none resize-y min-h-[60px]" rows={3} />
+                      ) : (
+                        <div className="text-xs text-zinc-300 leading-relaxed">{brief.executiveSummary}</div>
+                      )}
                     </div>
                   )}
 
@@ -872,11 +894,19 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                   <div className="space-y-2">
                     <div>
                       <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-1">Suggested Title</div>
-                      <div className="text-xs text-teal-400 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">{brief.suggestedTitle}</div>
+                      {editingBrief === brief.id ? (
+                        <input type="text" defaultValue={brief.suggestedTitle} onBlur={e => { if (e.target.value !== brief.suggestedTitle) saveBriefField(brief.id, { suggestedTitle: e.target.value }); }} className="w-full text-xs text-teal-400 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-700 focus:border-teal-500/50 focus:outline-none" />
+                      ) : (
+                        <div className="text-xs text-teal-400 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">{brief.suggestedTitle}</div>
+                      )}
                     </div>
                     <div>
                       <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-1">Meta Description</div>
-                      <div className="text-xs text-zinc-300 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">{brief.suggestedMetaDesc}</div>
+                      {editingBrief === brief.id ? (
+                        <textarea defaultValue={brief.suggestedMetaDesc} onBlur={e => { if (e.target.value !== brief.suggestedMetaDesc) saveBriefField(brief.id, { suggestedMetaDesc: e.target.value }); }} className="w-full text-xs text-zinc-300 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-700 focus:border-teal-500/50 focus:outline-none resize-y" rows={2} />
+                      ) : (
+                        <div className="text-xs text-zinc-300 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">{brief.suggestedMetaDesc}</div>
+                      )}
                     </div>
                   </div>
 
@@ -884,16 +914,30 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
                       <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-0.5">Word Count</div>
-                      <div className="text-sm font-bold text-blue-400">{brief.wordCountTarget.toLocaleString()}</div>
+                      {editingBrief === brief.id ? (
+                        <input type="number" defaultValue={brief.wordCountTarget} onBlur={e => { const v = parseInt(e.target.value, 10); if (!isNaN(v) && v !== brief.wordCountTarget) saveBriefField(brief.id, { wordCountTarget: v }); }} className="w-full text-sm font-bold text-blue-400 bg-transparent border-b border-zinc-700 focus:border-blue-400 focus:outline-none py-0.5" />
+                      ) : (
+                        <div className="text-sm font-bold text-blue-400">{brief.wordCountTarget.toLocaleString()}</div>
+                      )}
                     </div>
                     <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
                       <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-0.5">Intent</div>
-                      <div className="text-xs text-zinc-300 capitalize font-medium">{brief.intent}</div>
+                      {editingBrief === brief.id ? (
+                        <input type="text" defaultValue={brief.intent} onBlur={e => { if (e.target.value !== brief.intent) saveBriefField(brief.id, { intent: e.target.value }); }} className="w-full text-xs text-zinc-300 capitalize font-medium bg-transparent border-b border-zinc-700 focus:border-teal-500/50 focus:outline-none py-0.5" />
+                      ) : (
+                        <div className="text-xs text-zinc-300 capitalize font-medium">{brief.intent}</div>
+                      )}
                     </div>
                     {brief.contentFormat && (
                       <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
                         <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-0.5">Format</div>
-                        <div className="text-xs text-amber-400 capitalize font-medium">{brief.contentFormat}</div>
+                        {editingBrief === brief.id ? (
+                          <select defaultValue={brief.contentFormat} onChange={e => saveBriefField(brief.id, { contentFormat: e.target.value })} className="w-full text-xs text-amber-400 capitalize font-medium bg-transparent border-b border-zinc-700 focus:border-teal-500/50 focus:outline-none py-0.5 cursor-pointer">
+                            {['guide', 'listicle', 'how-to', 'comparison', 'FAQ', 'case-study', 'pillar-page', 'landing-page', 'blog-post'].map(f => <option key={f} value={f}>{f}</option>)}
+                          </select>
+                        ) : (
+                          <div className="text-xs text-amber-400 capitalize font-medium">{brief.contentFormat}</div>
+                        )}
                       </div>
                     )}
                     {brief.difficultyScore != null && (
@@ -916,12 +960,20 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <div className="flex items-center gap-1.5 mb-1"><Users className="w-3 h-3 text-zinc-500" /><span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Audience</span></div>
-                      <div className="text-xs text-zinc-400 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">{brief.audience}</div>
+                      {editingBrief === brief.id ? (
+                        <textarea defaultValue={brief.audience} onBlur={e => { if (e.target.value !== brief.audience) saveBriefField(brief.id, { audience: e.target.value }); }} className="w-full text-xs text-zinc-400 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-700 focus:border-teal-500/50 focus:outline-none resize-y" rows={2} />
+                      ) : (
+                        <div className="text-xs text-zinc-400 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">{brief.audience}</div>
+                      )}
                     </div>
                     {brief.toneAndStyle && (
                       <div>
                         <div className="flex items-center gap-1.5 mb-1"><MessageSquare className="w-3 h-3 text-zinc-500" /><span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Tone & Style</span></div>
-                        <div className="text-xs text-zinc-400 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">{brief.toneAndStyle}</div>
+                        {editingBrief === brief.id ? (
+                          <textarea defaultValue={brief.toneAndStyle} onBlur={e => { if (e.target.value !== brief.toneAndStyle) saveBriefField(brief.id, { toneAndStyle: e.target.value }); }} className="w-full text-xs text-zinc-400 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-700 focus:border-teal-500/50 focus:outline-none resize-y" rows={2} />
+                        ) : (
+                          <div className="text-xs text-zinc-400 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">{brief.toneAndStyle}</div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -990,11 +1042,24 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                       <div className="space-y-2">
                         {brief.outline.map((section, i) => (
                           <div key={i} className="bg-zinc-950 rounded-lg px-3 py-2.5 border border-zinc-800">
-                            <div className="flex items-center justify-between">
-                              <div className="text-xs font-medium text-zinc-200">H2: {section.heading}</div>
-                              {section.wordCount && <span className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{section.wordCount} words</span>}
-                            </div>
-                            <div className="text-[11px] text-zinc-500 mt-1 leading-relaxed">{section.notes}</div>
+                            {editingBrief === brief.id ? (
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[11px] text-zinc-600 flex-shrink-0">H2:</span>
+                                  <input type="text" defaultValue={section.heading} onBlur={e => { if (e.target.value !== section.heading) { const newOutline = [...brief.outline]; newOutline[i] = { ...newOutline[i], heading: e.target.value }; saveBriefField(brief.id, { outline: newOutline }); } }} className="flex-1 text-xs font-medium text-zinc-200 bg-transparent border-b border-zinc-700 focus:border-teal-500/50 focus:outline-none py-0.5" />
+                                  <input type="number" defaultValue={section.wordCount || ''} placeholder="words" onBlur={e => { const v = parseInt(e.target.value, 10); const newOutline = [...brief.outline]; newOutline[i] = { ...newOutline[i], wordCount: isNaN(v) ? undefined : v }; saveBriefField(brief.id, { outline: newOutline }); }} className="w-20 text-[11px] text-zinc-500 bg-transparent border-b border-zinc-700 focus:border-teal-500/50 focus:outline-none py-0.5 text-right" />
+                                </div>
+                                <textarea defaultValue={section.notes} onBlur={e => { if (e.target.value !== section.notes) { const newOutline = [...brief.outline]; newOutline[i] = { ...newOutline[i], notes: e.target.value }; saveBriefField(brief.id, { outline: newOutline }); } }} className="w-full text-[11px] text-zinc-500 leading-relaxed bg-zinc-900/50 border border-zinc-800 rounded px-2 py-1.5 focus:border-teal-500/50 focus:outline-none resize-y" rows={2} />
+                              </div>
+                            ) : (
+                              <>
+                                <div className="flex items-center justify-between">
+                                  <div className="text-xs font-medium text-zinc-200">H2: {section.heading}</div>
+                                  {section.wordCount && <span className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{section.wordCount} words</span>}
+                                </div>
+                                <div className="text-[11px] text-zinc-500 mt-1 leading-relaxed">{section.notes}</div>
+                              </>
+                            )}
                             {section.keywords && section.keywords.length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-1.5">{section.keywords.map((kw, j) => <span key={j} className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400/80">{kw}</span>)}</div>
                             )}
@@ -1010,7 +1075,10 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                       <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-1.5">CTA Recommendations</div>
                       <div className="space-y-1">{brief.ctaRecommendations.map((cta, i) => (
                         <div key={i} className="text-xs text-zinc-300 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800 flex items-start gap-2">
-                          <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${i === 0 ? 'bg-teal-500/20 text-teal-400' : 'bg-zinc-800 text-zinc-500'}`}>{i === 0 ? 'Primary' : 'Secondary'}</span>{cta}
+                          <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${i === 0 ? 'bg-teal-500/20 text-teal-400' : 'bg-zinc-800 text-zinc-500'}`}>{i === 0 ? 'Primary' : 'Secondary'}</span>
+                          {editingBrief === brief.id ? (
+                            <input type="text" defaultValue={cta} onBlur={e => { if (e.target.value !== cta) { const newCtas = [...(brief.ctaRecommendations || [])]; newCtas[i] = e.target.value; saveBriefField(brief.id, { ctaRecommendations: newCtas }); } }} className="flex-1 text-xs text-zinc-300 bg-transparent border-b border-zinc-700 focus:border-teal-500/50 focus:outline-none" />
+                          ) : cta}
                         </div>
                       ))}</div>
                     </div>
@@ -1020,7 +1088,11 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                   {brief.competitorInsights && (
                     <div>
                       <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-1">Competitor Insights</div>
-                      <div className="text-xs text-zinc-400 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800 leading-relaxed">{brief.competitorInsights}</div>
+                      {editingBrief === brief.id ? (
+                        <textarea defaultValue={brief.competitorInsights} onBlur={e => { if (e.target.value !== brief.competitorInsights) saveBriefField(brief.id, { competitorInsights: e.target.value }); }} className="w-full text-xs text-zinc-400 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-700 focus:border-teal-500/50 focus:outline-none resize-y leading-relaxed" rows={3} />
+                      ) : (
+                        <div className="text-xs text-zinc-400 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800 leading-relaxed">{brief.competitorInsights}</div>
+                      )}
                     </div>
                   )}
 

@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { buildSeoContext, buildKeywordMapContext } from './seo-context.js';
 import { getUploadRoot, getDataDir } from './data-dir.js';
+import type { KeywordMetrics, RelatedKeyword } from './semrush.js';
 
 const UPLOAD_ROOT = getUploadRoot();
 const BRIEFS_DIR = getDataDir('content-briefs');
@@ -80,6 +81,15 @@ export function getBrief(workspaceId: string, briefId: string): ContentBrief | u
   return readBriefs(workspaceId).find(b => b.id === briefId);
 }
 
+export function updateBrief(workspaceId: string, briefId: string, updates: Partial<Omit<ContentBrief, 'id' | 'workspaceId' | 'createdAt'>>): ContentBrief | null {
+  const briefs = readBriefs(workspaceId);
+  const idx = briefs.findIndex(b => b.id === briefId);
+  if (idx === -1) return null;
+  Object.assign(briefs[idx], updates);
+  writeBriefs(workspaceId, briefs);
+  return briefs[idx];
+}
+
 export function deleteBrief(workspaceId: string, briefId: string): boolean {
   const briefs = readBriefs(workspaceId);
   const idx = briefs.findIndex(b => b.id === briefId);
@@ -96,6 +106,8 @@ export async function generateBrief(
     relatedQueries?: { query: string; position: number; clicks: number; impressions: number }[];
     businessContext?: string;
     existingPages?: string[];
+    semrushMetrics?: KeywordMetrics;
+    semrushRelated?: RelatedKeyword[];
   }
 ): Promise<ContentBrief> {
   const openaiKey = process.env.OPENAI_API_KEY;
@@ -112,6 +124,27 @@ export async function generateBrief(
   const kwMapContext = buildKeywordMapContext(workspaceId);
   const bizCtx = context.businessContext || stratBizCtx;
 
+  // Build SEMRush data block (real metrics replace hallucinated data)
+  let semrushBlock = '';
+  if (context.semrushMetrics) {
+    const m = context.semrushMetrics;
+    semrushBlock += `\n\nREAL KEYWORD DATA (from SEMRush — use these exact numbers, do NOT hallucinate different values):
+- Monthly search volume: ${m.volume.toLocaleString()}
+- Keyword difficulty: ${m.difficulty}/100
+- CPC: $${m.cpc.toFixed(2)}
+- Competition: ${m.competition.toFixed(2)}
+- Total results: ${m.results.toLocaleString()}`;
+    if (m.trend?.length) {
+      semrushBlock += `\n- 12-month volume trend: ${m.trend.join(', ')}`;
+    }
+  }
+  if (context.semrushRelated?.length) {
+    semrushBlock += `\n\nRELATED KEYWORDS (from SEMRush — real data, use for secondary keywords and topical entities):\n`;
+    semrushBlock += context.semrushRelated.slice(0, 15)
+      .map(r => `"${r.keyword}" (vol: ${r.volume.toLocaleString()}, KD: ${r.difficulty}, CPC: $${r.cpc.toFixed(2)})`)
+      .join('\n');
+  }
+
   const prompt = `You are an expert content strategist and SEO specialist. Generate a comprehensive, production-ready content brief for a new piece of content targeting the keyword "${targetKeyword}".
 
 ${bizCtx ? `Business context: ${bizCtx}` : ''}
@@ -120,7 +153,7 @@ Related search queries from Google Search Console:
 ${relatedStr}
 
 Existing pages on the site:
-${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}
+${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${semrushBlock}
 
 Generate a content brief in the following JSON format:
 {

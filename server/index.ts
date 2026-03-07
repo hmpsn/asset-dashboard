@@ -71,7 +71,7 @@ import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword, togglePinK
 import { listAnnotations, addAnnotation, deleteAnnotation } from './annotations.js';
 import { startApprovalReminders } from './approval-reminders.js';
 import { startMonthlyReports, triggerMonthlyReport } from './monthly-report.js';
-import { listBriefs, getBrief, deleteBrief, generateBrief } from './content-brief.js';
+import { listBriefs, getBrief, updateBrief, deleteBrief, generateBrief } from './content-brief.js';
 import { renderBriefHTML } from './brief-export-html.js';
 import { listContentRequests, getContentRequest, createContentRequest, updateContentRequest, deleteContentRequest, addComment } from './content-requests.js';
 import { isSemrushConfigured, getKeywordOverview, getDomainOrganicKeywords, getKeywordGap, getRelatedKeywords, estimateCreditCost, clearSemrushCache } from './semrush.js';
@@ -3889,10 +3889,24 @@ app.post('/api/content-requests/:workspaceId/:id/generate-brief', async (req, re
       try {
         const gscData = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90);
         relatedQueries = gscData
-          .filter(r => r.query.toLowerCase().includes(request.targetKeyword.split(' ')[0].toLowerCase()))
+          .filter(r => { const q = r.query.toLowerCase(); return request.targetKeyword.toLowerCase().split(' ').some(w => w.length > 2 && q.includes(w)); })
           .slice(0, 20)
           .map(r => ({ query: r.query, position: r.position, clicks: r.clicks, impressions: r.impressions }));
       } catch { /* GSC unavailable */ }
+    }
+
+    // Gather SEMRush data if configured
+    let semrushMetrics: import('./semrush.js').KeywordMetrics | undefined;
+    let semrushRelated: import('./semrush.js').RelatedKeyword[] | undefined;
+    if (isSemrushConfigured()) {
+      try {
+        const [metrics, related] = await Promise.all([
+          getKeywordOverview([request.targetKeyword], req.params.workspaceId),
+          getRelatedKeywords(request.targetKeyword, req.params.workspaceId, 15),
+        ]);
+        if (metrics.length > 0) semrushMetrics = metrics[0];
+        if (related.length > 0) semrushRelated = related;
+      } catch (e) { console.error('SEMRush brief enrichment error:', e); }
     }
 
     const existingPages = ws.keywordStrategy?.pageMap?.map(p => p.pagePath) || [];
@@ -3900,6 +3914,8 @@ app.post('/api/content-requests/:workspaceId/:id/generate-brief', async (req, re
       relatedQueries,
       businessContext: ws.keywordStrategy?.businessContext || '',
       existingPages,
+      semrushMetrics,
+      semrushRelated,
     });
 
     // Link brief to request and update status
@@ -4988,6 +5004,13 @@ app.get('/api/content-briefs/:workspaceId/:briefId', (req, res) => {
   res.json(brief);
 });
 
+// Update a content brief (inline editing)
+app.patch('/api/content-briefs/:workspaceId/:briefId', (req, res) => {
+  const updated = updateBrief(req.params.workspaceId, req.params.briefId, req.body);
+  if (!updated) return res.status(404).json({ error: 'Brief not found' });
+  res.json(updated);
+});
+
 // Generate a new content brief
 app.post('/api/content-briefs/:workspaceId/generate', async (req, res) => {
   try {
@@ -5003,7 +5026,7 @@ app.post('/api/content-briefs/:workspaceId/generate', async (req, res) => {
       try {
         const overview = await getSearchOverview(ws.id, ws.gscPropertyUrl, 28);
         relatedQueries = overview.topQueries
-          .filter(q => q.query.toLowerCase().includes(targetKeyword.toLowerCase().split(' ')[0]))
+          .filter(q => { const ql = q.query.toLowerCase(); return targetKeyword.toLowerCase().split(' ').some((w: string) => w.length > 2 && ql.includes(w)); })
           .slice(0, 20);
         existingPages = overview.topPages.map(p => {
           try { return new URL(p.page).pathname; } catch { return p.page; }
@@ -5011,10 +5034,26 @@ app.post('/api/content-briefs/:workspaceId/generate', async (req, res) => {
       } catch { /* GSC not available */ }
     }
 
+    // Gather SEMRush data if configured
+    let semrushMetrics: import('./semrush.js').KeywordMetrics | undefined;
+    let semrushRelated: import('./semrush.js').RelatedKeyword[] | undefined;
+    if (isSemrushConfigured()) {
+      try {
+        const [metrics, related] = await Promise.all([
+          getKeywordOverview([targetKeyword], req.params.workspaceId),
+          getRelatedKeywords(targetKeyword, req.params.workspaceId, 15),
+        ]);
+        if (metrics.length > 0) semrushMetrics = metrics[0];
+        if (related.length > 0) semrushRelated = related;
+      } catch (e) { console.error('SEMRush brief enrichment error:', e); }
+    }
+
     const brief = await generateBrief(req.params.workspaceId, targetKeyword, {
       relatedQueries,
       businessContext: businessContext || ws?.keywordStrategy?.businessContext,
       existingPages,
+      semrushMetrics,
+      semrushRelated,
     });
     res.json(brief);
   } catch (err) {
