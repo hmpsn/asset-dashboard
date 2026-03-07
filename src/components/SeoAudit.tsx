@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import {
   Loader2, Search as SearchIcon, ChevronDown, ChevronRight, Download,
@@ -6,16 +6,22 @@ import {
   RefreshCw, X, Clock, Share2, Copy, ExternalLink,
   TrendingUp, TrendingDown, Minus, Plus, ListChecks, Trash2, Circle, ClipboardList,
 } from 'lucide-react';
-import { SeoEditorWrapper } from './SeoEditorWrapper';
-import { LinkChecker } from './LinkChecker';
-import { SchemaSuggester } from './SchemaSuggester';
-import { KeywordStrategyPanel } from './KeywordStrategy';
-import { RedirectManager } from './RedirectManager';
-import { InternalLinks } from './InternalLinks';
-import { ContentBriefs } from './ContentBriefs';
-import { CompetitorAnalysis } from './CompetitorAnalysis';
-import { RankTracker } from './RankTracker';
 import { StatCard, scoreColorClass, scoreBgBarClass } from './ui';
+
+// ── Lazy-loaded sub-tool chunks ──
+const SeoEditorWrapper = lazy(() => import('./SeoEditorWrapper').then(m => ({ default: m.SeoEditorWrapper })));
+const LinkChecker = lazy(() => import('./LinkChecker').then(m => ({ default: m.LinkChecker })));
+const SchemaSuggester = lazy(() => import('./SchemaSuggester').then(m => ({ default: m.SchemaSuggester })));
+const KeywordStrategyPanel = lazy(() => import('./KeywordStrategy').then(m => ({ default: m.KeywordStrategyPanel })));
+const RedirectManager = lazy(() => import('./RedirectManager').then(m => ({ default: m.RedirectManager })));
+const InternalLinks = lazy(() => import('./InternalLinks').then(m => ({ default: m.InternalLinks })));
+const ContentBriefs = lazy(() => import('./ContentBriefs').then(m => ({ default: m.ContentBriefs })));
+const CompetitorAnalysis = lazy(() => import('./CompetitorAnalysis').then(m => ({ default: m.CompetitorAnalysis })));
+const RankTracker = lazy(() => import('./RankTracker').then(m => ({ default: m.RankTracker })));
+
+function SubToolFallback() {
+  return <div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>;
+}
 
 type Severity = 'error' | 'warning' | 'info';
 
@@ -907,14 +913,14 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
   };
 
   // ── View-based routing (controlled by parent) ──
-  if (view === 'editor') return <SeoEditorWrapper siteId={siteId} workspaceId={workspaceId} />;
-  if (view === 'strategy') return <KeywordStrategyPanel workspaceId={workspaceId || ''} siteId={siteId} />;
-  if (view === 'redirects') return <RedirectManager siteId={siteId} />;
-  if (view === 'internal') return <InternalLinks siteId={siteId} workspaceId={workspaceId} />;
-  if (view === 'schema') return <SchemaSuggester siteId={siteId} workspaceId={workspaceId} />;
-  if (view === 'briefs') return <ContentBriefs workspaceId={workspaceId || ''} onRequestCountChange={onRequestCountChange} />;
-  if (view === 'competitors') return <CompetitorAnalysis siteId={siteId} />;
-  if (view === 'ranks') return <RankTracker workspaceId={workspaceId || ''} hasGsc={!!workspaceId} />;
+  if (view === 'editor') return <Suspense fallback={<SubToolFallback />}><SeoEditorWrapper siteId={siteId} workspaceId={workspaceId} /></Suspense>;
+  if (view === 'strategy') return <Suspense fallback={<SubToolFallback />}><KeywordStrategyPanel workspaceId={workspaceId || ''} siteId={siteId} /></Suspense>;
+  if (view === 'redirects') return <Suspense fallback={<SubToolFallback />}><RedirectManager siteId={siteId} /></Suspense>;
+  if (view === 'internal') return <Suspense fallback={<SubToolFallback />}><InternalLinks siteId={siteId} workspaceId={workspaceId} /></Suspense>;
+  if (view === 'schema') return <Suspense fallback={<SubToolFallback />}><SchemaSuggester siteId={siteId} workspaceId={workspaceId} /></Suspense>;
+  if (view === 'briefs') return <Suspense fallback={<SubToolFallback />}><ContentBriefs workspaceId={workspaceId || ''} onRequestCountChange={onRequestCountChange} /></Suspense>;
+  if (view === 'competitors') return <Suspense fallback={<SubToolFallback />}><CompetitorAnalysis siteId={siteId} /></Suspense>;
+  if (view === 'ranks') return <Suspense fallback={<SubToolFallback />}><RankTracker workspaceId={workspaceId || ''} hasGsc={!!workspaceId} /></Suspense>;
 
   // ── Audit view (default) — with sub-tabs ──
   const auditTabBar = (
@@ -941,7 +947,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
   );
 
   if (auditSubTab === 'links') {
-    return <div>{auditTabBar}<LinkChecker siteId={siteId} /></div>;
+    return <div>{auditTabBar}<Suspense fallback={<SubToolFallback />}><LinkChecker siteId={siteId} /></Suspense></div>;
   }
   if (auditSubTab === 'history') {
     return <div>{auditTabBar}<AuditHistory siteId={siteId} history={history} onRefresh={loadHistory} /></div>;

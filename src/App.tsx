@@ -1,20 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { WorkspaceSelector, type Workspace } from './components/WorkspaceSelector';
 import { type QueueItem } from './components/ProcessingQueue';
 import { StatusBar } from './components/StatusBar';
-import { SettingsPanel } from './components/SettingsPanel';
-import { MediaTab } from './components/MediaTab';
-import { SeoAudit } from './components/SeoAudit';
-import { Performance } from './components/Performance';
-import { SalesReport } from './components/SalesReport';
-import { GoogleAnalytics } from './components/GoogleAnalytics';
-import { Annotations } from './components/Annotations';
-import { WorkspaceSettings } from './components/WorkspaceSettings';
-import { SearchConsole } from './components/SearchConsole';
-import { RequestManager } from './components/RequestManager';
-import { WorkspaceOverview } from './components/WorkspaceOverview';
-import { ClientDashboard } from './components/ClientDashboard';
-import { Styleguide } from './components/Styleguide';
 import { LoginScreen } from './components/LoginScreen';
 import { useAuth } from './hooks/useAuth';
 import { useWebSocket } from './hooks/useWebSocket';
@@ -26,6 +13,27 @@ import {
   Pencil, CornerDownRight, Share2, Target, Code2, LogOut, Swords, TrendingUp, Flag,
   Sun, Moon,
 } from 'lucide-react';
+
+// ── Lazy-loaded route-level chunks ──
+const ClientDashboard = lazy(() => import('./components/ClientDashboard').then(m => ({ default: m.ClientDashboard })));
+const Styleguide = lazy(() => import('./components/Styleguide').then(m => ({ default: m.Styleguide })));
+
+// ── Lazy-loaded admin tab chunks ──
+const SettingsPanel = lazy(() => import('./components/SettingsPanel').then(m => ({ default: m.SettingsPanel })));
+const WorkspaceSettings = lazy(() => import('./components/WorkspaceSettings').then(m => ({ default: m.WorkspaceSettings })));
+const WorkspaceOverview = lazy(() => import('./components/WorkspaceOverview').then(m => ({ default: m.WorkspaceOverview })));
+const MediaTab = lazy(() => import('./components/MediaTab').then(m => ({ default: m.MediaTab })));
+const SeoAudit = lazy(() => import('./components/SeoAudit').then(m => ({ default: m.SeoAudit })));
+const SearchConsole = lazy(() => import('./components/SearchConsole').then(m => ({ default: m.SearchConsole })));
+const Performance = lazy(() => import('./components/Performance').then(m => ({ default: m.Performance })));
+const GoogleAnalytics = lazy(() => import('./components/GoogleAnalytics').then(m => ({ default: m.GoogleAnalytics })));
+const Annotations = lazy(() => import('./components/Annotations').then(m => ({ default: m.Annotations })));
+const RequestManager = lazy(() => import('./components/RequestManager').then(m => ({ default: m.RequestManager })));
+const SalesReport = lazy(() => import('./components/SalesReport').then(m => ({ default: m.SalesReport })));
+
+function ChunkFallback() {
+  return <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>;
+}
 
 type Page =
   | 'media'
@@ -42,12 +50,12 @@ type Page =
 function App() {
   // Styleguide route: /styleguide (no auth)
   if (window.location.pathname === '/styleguide') {
-    return <Styleguide />;
+    return <Suspense fallback={<ChunkFallback />}><Styleguide /></Suspense>;
   }
   // Client dashboard route: /client/:workspaceId (public, no auth)
   const clientMatch = window.location.pathname.match(/^\/client\/([\w_]+)/);
   if (clientMatch) {
-    return <ClientDashboard workspaceId={clientMatch[1]} />;
+    return <Suspense fallback={<ChunkFallback />}><ClientDashboard workspaceId={clientMatch[1]} /></Suspense>;
   }
   return <ToastProvider><BackgroundTaskProvider><AdminApp /></BackgroundTaskProvider></ToastProvider>;
 }
@@ -449,7 +457,9 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
                 <span className="text-[11px] text-zinc-500">View →</span>
               </button>
             )}
-            {renderContent()}
+            <Suspense fallback={<ChunkFallback />}>
+              {renderContent()}
+            </Suspense>
           </div>
         </main>
         <StatusBar
