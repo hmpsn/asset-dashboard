@@ -145,7 +145,7 @@ function RenderMarkdown({ text }: { text: string }) {
         if (line.trim() === '') return <div key={i} className="h-1" />;
         // Bold inline
         const boldParsed = line.replace(/\*\*(.+?)\*\*/g, '<b class="text-zinc-200">$1</b>');
-        const codeParsed = boldParsed.replace(/`(.+?)`/g, '<code class="bg-zinc-800 px-1 rounded text-zinc-300 text-[10px]">$1</code>');
+        const codeParsed = boldParsed.replace(/`(.+?)`/g, '<code class="bg-zinc-800 px-1 rounded text-zinc-300 text-[11px]">$1</code>');
         return <p key={i} className="text-[11px] text-zinc-400 leading-relaxed" dangerouslySetInnerHTML={{ __html: codeParsed }} />;
       })}
     </div>
@@ -294,10 +294,10 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-3">
         <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center">
-          <Search className="w-8 h-8 text-zinc-600" />
+          <Search className="w-8 h-8 text-zinc-500" />
         </div>
         <p className="text-sm text-zinc-400">Search Console not configured</p>
-        <p className="text-xs text-zinc-600 max-w-md text-center">
+        <p className="text-xs text-zinc-500 max-w-md text-center">
           Select a Search Console property in the workspace settings (gear icon) to view search data.
         </p>
       </div>
@@ -356,7 +356,7 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-teal-400" />
               <span className="text-sm font-medium text-zinc-200">SEO AI Assistant</span>
-              <span className="text-[10px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">GPT-4o</span>
+              <span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">GPT-4o</span>
             </div>
             <button onClick={() => setChatOpen(false)} className="text-zinc-500 hover:text-zinc-300"><X className="w-4 h-4" /></button>
           </div>
@@ -451,7 +451,7 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
                 <MiniSparkline data={trend.map(t => t.clicks)} color="#60a5fa" />
               </div>
               <div className="text-2xl font-bold text-zinc-200">{overview.totalClicks.toLocaleString()}</div>
-              <div className="text-[10px] text-zinc-500 mt-0.5">Total Clicks</div>
+              <div className="text-[11px] text-zinc-500 mt-0.5">Total Clicks</div>
             </div>
             <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
               <div className="flex items-center justify-between mb-1">
@@ -459,7 +459,7 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
                 <MiniSparkline data={trend.map(t => t.impressions)} color="#22d3ee" />
               </div>
               <div className="text-2xl font-bold text-zinc-200">{overview.totalImpressions.toLocaleString()}</div>
-              <div className="text-[10px] text-zinc-500 mt-0.5">Total Impressions</div>
+              <div className="text-[11px] text-zinc-500 mt-0.5">Total Impressions</div>
             </div>
             <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
               <div className="flex items-center justify-between mb-1">
@@ -467,7 +467,7 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
                 <MiniSparkline data={trend.map(t => t.ctr)} color="#34d399" />
               </div>
               <div className="text-2xl font-bold text-zinc-200">{overview.avgCtr}%</div>
-              <div className="text-[10px] text-zinc-500 mt-0.5">Avg CTR</div>
+              <div className="text-[11px] text-zinc-500 mt-0.5">Avg CTR</div>
             </div>
             <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
               <div className="flex items-center justify-between mb-1">
@@ -475,7 +475,7 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
                 <MiniSparkline data={trend.map(t => t.position)} color="#fbbf24" />
               </div>
               <div className="text-2xl font-bold text-zinc-200">{overview.avgPosition}</div>
-              <div className="text-[10px] text-zinc-500 mt-0.5">Avg Position</div>
+              <div className="text-[11px] text-zinc-500 mt-0.5">Avg Position</div>
             </div>
           </div>
 
@@ -484,15 +484,15 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
             <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-medium text-zinc-400">Performance Trend</span>
-                <span className="text-[10px] text-zinc-600">{overview.dateRange.start} — {overview.dateRange.end}</span>
+                <span className="text-[11px] text-zinc-500">{overview.dateRange.start} — {overview.dateRange.end}</span>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <div className="text-[10px] text-blue-400 mb-1">Clicks</div>
+                  <div className="text-[11px] text-blue-400 mb-1">Clicks</div>
                   <TrendChart data={trend} metric="clicks" color="#60a5fa" />
                 </div>
                 <div>
-                  <div className="text-[10px] text-cyan-400 mb-1">Impressions</div>
+                  <div className="text-[11px] text-cyan-400 mb-1">Impressions</div>
                   <TrendChart data={trend} metric="impressions" color="#22d3ee" />
                 </div>
               </div>
@@ -556,9 +556,9 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
                     <div className="flex items-center gap-1.5 mb-3">
                       <Target className="w-4 h-4 text-amber-400" />
                       <span className="text-xs font-medium text-amber-400">Low-Hanging Fruit</span>
-                      <span className="text-[10px] text-zinc-600 ml-auto">{insights.lowHanging.length} queries</span>
+                      <span className="text-[11px] text-zinc-500 ml-auto">{insights.lowHanging.length} queries</span>
                     </div>
-                    <p className="text-[10px] text-zinc-500 mb-2">Ranking 5-20 with impressions — small optimizations could push these to page 1</p>
+                    <p className="text-[11px] text-zinc-500 mb-2">Ranking 5-20 with impressions — small optimizations could push these to page 1</p>
                     <div className="space-y-1.5">
                       {insights.lowHanging.slice(0, 8).map((q, i) => (
                         <div key={i} className="flex items-center justify-between text-[11px] py-1 px-2 rounded bg-zinc-800/30">
@@ -579,9 +579,9 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
                     <div className="flex items-center gap-1.5 mb-3">
                       <Shield className="w-4 h-4 text-green-400" />
                       <span className="text-xs font-medium text-green-400">Top Performers</span>
-                      <span className="text-[10px] text-zinc-600 ml-auto">{insights.topPerformers.length} queries</span>
+                      <span className="text-[11px] text-zinc-500 ml-auto">{insights.topPerformers.length} queries</span>
                     </div>
-                    <p className="text-[10px] text-zinc-500 mb-2">Top 3 positions with real clicks — protect these rankings</p>
+                    <p className="text-[11px] text-zinc-500 mb-2">Top 3 positions with real clicks — protect these rankings</p>
                     <div className="space-y-1.5">
                       {insights.topPerformers.slice(0, 8).map((q, i) => (
                         <div key={i} className="flex items-center justify-between text-[11px] py-1 px-2 rounded bg-zinc-800/30">
@@ -602,9 +602,9 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
                     <div className="flex items-center gap-1.5 mb-3">
                       <TrendingDown className="w-4 h-4 text-red-400" />
                       <span className="text-xs font-medium text-red-400">CTR Opportunities</span>
-                      <span className="text-[10px] text-zinc-600 ml-auto">{insights.ctrOpps.length} queries</span>
+                      <span className="text-[11px] text-zinc-500 ml-auto">{insights.ctrOpps.length} queries</span>
                     </div>
-                    <p className="text-[10px] text-zinc-500 mb-2">Ranking on page 1 but CTR under 3% — improve titles & meta descriptions</p>
+                    <p className="text-[11px] text-zinc-500 mb-2">Ranking on page 1 but CTR under 3% — improve titles & meta descriptions</p>
                     <div className="space-y-1.5">
                       {insights.ctrOpps.slice(0, 8).map((q, i) => (
                         <div key={i} className="flex items-center justify-between text-[11px] py-1 px-2 rounded bg-zinc-800/30">
@@ -625,9 +625,9 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
                     <div className="flex items-center gap-1.5 mb-3">
                       <AlertTriangle className="w-4 h-4 text-orange-400" />
                       <span className="text-xs font-medium text-orange-400">Visibility Without Clicks</span>
-                      <span className="text-[10px] text-zinc-600 ml-auto">{insights.highImpLowClick.length} queries</span>
+                      <span className="text-[11px] text-zinc-500 ml-auto">{insights.highImpLowClick.length} queries</span>
                     </div>
-                    <p className="text-[10px] text-zinc-500 mb-2">100+ impressions but under 5 clicks — being seen but not clicked</p>
+                    <p className="text-[11px] text-zinc-500 mb-2">100+ impressions but under 5 clicks — being seen but not clicked</p>
                     <div className="space-y-1.5">
                       {insights.highImpLowClick.slice(0, 8).map((q, i) => (
                         <div key={i} className="flex items-center justify-between text-[11px] py-1 px-2 rounded bg-zinc-800/30">
@@ -651,25 +651,25 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
                     <div className={`text-lg font-bold ${overview.topQueries.filter(q => q.position <= 10).length > 5 ? 'text-green-400' : 'text-amber-400'}`}>
                       {overview.topQueries.filter(q => q.position <= 10).length}
                     </div>
-                    <div className="text-[10px] text-zinc-500">Page 1 Rankings</div>
+                    <div className="text-[11px] text-zinc-500">Page 1 Rankings</div>
                   </div>
                   <div className="text-center">
                     <div className={`text-lg font-bold ${overview.topQueries.filter(q => q.position <= 3).length > 2 ? 'text-green-400' : 'text-amber-400'}`}>
                       {overview.topQueries.filter(q => q.position <= 3).length}
                     </div>
-                    <div className="text-[10px] text-zinc-500">Top 3 Rankings</div>
+                    <div className="text-[11px] text-zinc-500">Top 3 Rankings</div>
                   </div>
                   <div className="text-center">
                     <div className={`text-lg font-bold ${overview.avgCtr > 3 ? 'text-green-400' : overview.avgCtr > 1.5 ? 'text-amber-400' : 'text-red-400'}`}>
                       {overview.avgCtr}%
                     </div>
-                    <div className="text-[10px] text-zinc-500">Avg CTR</div>
+                    <div className="text-[11px] text-zinc-500">Avg CTR</div>
                   </div>
                   <div className="text-center">
                     <div className={`text-lg font-bold ${insights.lowHanging.length > 0 ? 'text-amber-400' : 'text-green-400'}`}>
                       {insights.lowHanging.length}
                     </div>
-                    <div className="text-[10px] text-zinc-500">Opportunities</div>
+                    <div className="text-[11px] text-zinc-500">Opportunities</div>
                   </div>
                 </div>
               </div>
@@ -720,7 +720,7 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
                         <td className="py-2.5 px-4 text-zinc-300 font-medium max-w-xs truncate">
                           <a href={p.page} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-blue-400 transition-colors">
                             {pagePath}
-                            <ExternalLink className="w-3 h-3 flex-shrink-0 text-zinc-600" />
+                            <ExternalLink className="w-3 h-3 flex-shrink-0 text-zinc-500" />
                           </a>
                         </td>
                         <td className="py-2.5 px-3 text-right text-blue-400 font-semibold">{p.clicks}</td>

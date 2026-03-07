@@ -170,11 +170,11 @@ export function RedirectManager({ siteId }: Props) {
   };
 
   const statusBadge = (status: number | 'error') => {
-    if (status === 'error') return <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-red-500/15 text-red-400">ERR</span>;
-    if (status >= 200 && status < 300) return <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-500/15 text-emerald-400">{status}</span>;
-    if (status >= 300 && status < 400) return <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-amber-500/15 text-amber-400">{status}</span>;
-    if (status >= 400) return <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-red-500/15 text-red-400">{status}</span>;
-    return <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-500/15 text-zinc-400">{status}</span>;
+    if (status === 'error') return <span className="px-1.5 py-0.5 rounded text-[11px] font-mono bg-red-500/15 text-red-400">ERR</span>;
+    if (status >= 200 && status < 300) return <span className="px-1.5 py-0.5 rounded text-[11px] font-mono bg-emerald-500/15 text-emerald-400">{status}</span>;
+    if (status >= 300 && status < 400) return <span className="px-1.5 py-0.5 rounded text-[11px] font-mono bg-amber-500/15 text-amber-400">{status}</span>;
+    if (status >= 400) return <span className="px-1.5 py-0.5 rounded text-[11px] font-mono bg-red-500/15 text-red-400">{status}</span>;
+    return <span className="px-1.5 py-0.5 rounded text-[11px] font-mono bg-zinc-500/15 text-zinc-400">{status}</span>;
   };
 
   const filteredPages = data?.pageStatuses.filter(p => {
@@ -191,9 +191,9 @@ export function RedirectManager({ siteId }: Props) {
     return (
       <div className="space-y-4">
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 px-6 py-12 text-center">
-          <CornerDownRight className="w-10 h-10 text-zinc-600 mx-auto mb-3" />
+          <CornerDownRight className="w-10 h-10 text-zinc-500 mx-auto mb-3" />
           <p className="text-sm text-zinc-400 mb-1">Redirect Scanner</p>
-          <p className="text-[11px] text-zinc-600 max-w-md mx-auto mb-4">
+          <p className="text-[11px] text-zinc-500 max-w-md mx-auto mb-4">
             Scan your site for redirect chains, 404 pages, and routing issues.
             Detects multi-hop redirects, loops, and pages that need attention.
           </p>
@@ -251,32 +251,32 @@ export function RedirectManager({ siteId }: Props) {
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
           <div className="flex items-center gap-1.5 mb-1">
             <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Healthy</span>
+            <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Healthy</span>
           </div>
           <p className="text-xl font-bold text-emerald-400">{summary.healthy}</p>
         </div>
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
           <div className="flex items-center gap-1.5 mb-1">
             <ArrowRight className="w-3.5 h-3.5 text-amber-400" />
-            <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Redirecting</span>
+            <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Redirecting</span>
           </div>
           <p className="text-xl font-bold text-amber-400">{summary.redirecting}</p>
         </div>
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
           <div className="flex items-center gap-1.5 mb-1">
             <Ban className="w-3.5 h-3.5 text-red-400" />
-            <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">404s</span>
+            <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">404s</span>
           </div>
           <p className="text-xl font-bold text-red-400">{summary.notFound}</p>
         </div>
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
           <div className="flex items-center gap-1.5 mb-1">
             <Link2 className="w-3.5 h-3.5 text-teal-400" />
-            <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Chains</span>
+            <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Chains</span>
           </div>
           <p className="text-xl font-bold text-teal-400">{summary.chainsDetected}</p>
           {summary.longestChain > 1 && (
-            <p className="text-[10px] text-zinc-600">longest: {summary.longestChain} hops</p>
+            <p className="text-[11px] text-zinc-500">longest: {summary.longestChain} hops</p>
           )}
         </div>
       </div>
@@ -288,7 +288,7 @@ export function RedirectManager({ siteId }: Props) {
             <h4 className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
               <AlertTriangle className="w-3.5 h-3.5 text-amber-400" /> Redirect Chains
             </h4>
-            <p className="text-[10px] text-zinc-600 mt-0.5">
+            <p className="text-[11px] text-zinc-500 mt-0.5">
               Multi-hop redirects slow down page load and waste crawl budget. Aim for single-hop redirects.
             </p>
           </div>
@@ -301,17 +301,17 @@ export function RedirectManager({ siteId }: Props) {
                   className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-zinc-800/20 transition-colors text-left"
                 >
                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                    {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" />}
+                    {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />}
                     <span className="text-xs text-zinc-300 truncate font-mono">{new URL(chain.originalUrl).pathname}</span>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                    <span className="text-[11px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
                       {chain.totalHops} hop{chain.totalHops !== 1 ? 's' : ''}
                     </span>
                     {chain.isLoop && (
-                      <span className="text-[10px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">loop</span>
+                      <span className="text-[11px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">loop</span>
                     )}
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${chain.type === 'internal' ? 'bg-teal-500/10 text-teal-400' : 'bg-zinc-700 text-zinc-400'}`}>
+                    <span className={`text-[11px] px-1.5 py-0.5 rounded ${chain.type === 'internal' ? 'bg-teal-500/10 text-teal-400' : 'bg-zinc-700 text-zinc-400'}`}>
                       {chain.type}
                     </span>
                   </div>
@@ -323,11 +323,11 @@ export function RedirectManager({ siteId }: Props) {
                         <div key={i} className="flex items-center gap-2 text-[11px]">
                           {statusBadge(hop.status)}
                           <span className="text-zinc-400 font-mono truncate">{hop.url}</span>
-                          {i < chain.hops.length - 1 && <ArrowRight className="w-3 h-3 text-zinc-600 flex-shrink-0" />}
+                          {i < chain.hops.length - 1 && <ArrowRight className="w-3 h-3 text-zinc-500 flex-shrink-0" />}
                         </div>
                       ))}
                     </div>
-                    <div className="mt-2 flex items-center gap-1.5 text-[10px] text-zinc-500">
+                    <div className="mt-2 flex items-center gap-1.5 text-[11px] text-zinc-500">
                       <span>Final destination:</span>
                       <a href={chain.finalUrl} target="_blank" rel="noopener noreferrer" className="text-teal-400 hover:underline flex items-center gap-0.5 truncate">
                         {chain.finalUrl} <ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
@@ -349,7 +349,7 @@ export function RedirectManager({ siteId }: Props) {
               <h4 className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-teal-400" /> Redirect Recommendations
               </h4>
-              <p className="text-[10px] text-zinc-600 mt-0.5">
+              <p className="text-[11px] text-zinc-500 mt-0.5">
                 {rules.filter(r => !r.accepted).length > 0
                   ? `Review ${rules.filter(r => !r.accepted).length} suggested redirect target${rules.filter(r => !r.accepted).length !== 1 ? 's' : ''}. Accept, edit, or dismiss.`
                   : `${acceptedRules.length} redirect rule${acceptedRules.length !== 1 ? 's' : ''} ready to export.`}
@@ -357,11 +357,11 @@ export function RedirectManager({ siteId }: Props) {
             </div>
             {acceptedRules.length > 0 && (
               <div className="flex items-center gap-2">
-                <button onClick={copyRulesToClipboard} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-[10px] font-medium transition-colors">
+                <button onClick={copyRulesToClipboard} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-[11px] font-medium transition-colors">
                   {copiedRules ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
                   {copiedRules ? 'Copied!' : 'Copy All'}
                 </button>
-                <button onClick={exportCSV} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-[10px] font-medium transition-colors">
+                <button onClick={exportCSV} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-[11px] font-medium transition-colors">
                   <Download className="w-3 h-3" /> Export CSV
                 </button>
               </div>
@@ -372,7 +372,7 @@ export function RedirectManager({ siteId }: Props) {
               <div key={rule.from} className="px-4 py-3">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-xs text-zinc-300 font-mono">{rule.from}</span>
-                  <ArrowRight className="w-3 h-3 text-zinc-600 flex-shrink-0" />
+                  <ArrowRight className="w-3 h-3 text-zinc-500 flex-shrink-0" />
                   {editingRule === rule.from ? (
                     <div className="flex items-center gap-1.5 flex-1">
                       <input
@@ -383,8 +383,8 @@ export function RedirectManager({ siteId }: Props) {
                         autoFocus
                         onKeyDown={e => { if (e.key === 'Enter') updateRuleTo(rule.from, editDraft); if (e.key === 'Escape') { setEditingRule(null); setEditDraft(''); } }}
                       />
-                      <button onClick={() => updateRuleTo(rule.from, editDraft)} className="px-2 py-1 bg-teal-600 hover:bg-teal-500 rounded text-[10px] font-medium text-white transition-colors">Save</button>
-                      <button onClick={() => { setEditingRule(null); setEditDraft(''); }} className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 rounded text-[10px] text-zinc-400 transition-colors">Cancel</button>
+                      <button onClick={() => updateRuleTo(rule.from, editDraft)} className="px-2 py-1 bg-teal-600 hover:bg-teal-500 rounded text-[11px] font-medium text-white transition-colors">Save</button>
+                      <button onClick={() => { setEditingRule(null); setEditDraft(''); }} className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 rounded text-[11px] text-zinc-400 transition-colors">Cancel</button>
                     </div>
                   ) : (
                     <span className={`text-xs font-mono ${rule.accepted ? 'text-green-400' : 'text-teal-400'}`}>{rule.to}</span>
@@ -393,23 +393,23 @@ export function RedirectManager({ siteId }: Props) {
                     <Check className="w-3 h-3 text-green-400 flex-shrink-0" />
                   )}
                 </div>
-                <div className="text-[10px] text-zinc-600 mb-2">{rule.reason}</div>
+                <div className="text-[11px] text-zinc-500 mb-2">{rule.reason}</div>
                 {!rule.accepted && editingRule !== rule.from && (
                   <div className="flex items-center gap-1.5">
-                    <button onClick={() => acceptRule(rule.from)} className="flex items-center gap-1 px-2.5 py-1 bg-green-600/80 hover:bg-green-500 rounded text-[10px] font-medium text-white transition-colors">
+                    <button onClick={() => acceptRule(rule.from)} className="flex items-center gap-1 px-2.5 py-1 bg-green-600/80 hover:bg-green-500 rounded text-[11px] font-medium text-white transition-colors">
                       <Check className="w-3 h-3" /> Accept
                     </button>
-                    <button onClick={() => { setEditingRule(rule.from); setEditDraft(rule.to); }} className="flex items-center gap-1 px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-[10px] font-medium text-zinc-300 transition-colors">
+                    <button onClick={() => { setEditingRule(rule.from); setEditDraft(rule.to); }} className="flex items-center gap-1 px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-[11px] font-medium text-zinc-300 transition-colors">
                       <Edit3 className="w-3 h-3" /> Edit Target
                     </button>
-                    <button onClick={() => rejectRule(rule.from)} className="flex items-center gap-1 px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-[10px] font-medium text-red-400 transition-colors">
+                    <button onClick={() => rejectRule(rule.from)} className="flex items-center gap-1 px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-[11px] font-medium text-red-400 transition-colors">
                       <X className="w-3 h-3" /> Dismiss
                     </button>
                   </div>
                 )}
                 {rule.accepted && editingRule !== rule.from && (
                   <div className="flex items-center gap-1.5">
-                    <button onClick={() => { setEditingRule(rule.from); setEditDraft(rule.to); }} className="text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors">
+                    <button onClick={() => { setEditingRule(rule.from); setEditDraft(rule.to); }} className="text-[11px] text-zinc-500 hover:text-zinc-400 transition-colors">
                       Change target
                     </button>
                   </div>
@@ -458,7 +458,7 @@ export function RedirectManager({ siteId }: Props) {
 
       {/* Page status table */}
       <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-        <div className="grid grid-cols-[auto_1fr_80px_1fr] gap-0 text-[10px] text-zinc-500 uppercase tracking-wider font-medium px-4 py-2 border-b border-zinc-800">
+        <div className="grid grid-cols-[auto_1fr_80px_1fr] gap-0 text-[11px] text-zinc-500 uppercase tracking-wider font-medium px-4 py-2 border-b border-zinc-800">
           <span className="pr-3">Status</span>
           <span>Path</span>
           <span>Source</span>
@@ -466,7 +466,7 @@ export function RedirectManager({ siteId }: Props) {
         </div>
         <div className="max-h-[400px] overflow-y-auto">
           {filteredPages.length === 0 ? (
-            <div className="px-4 py-8 text-center text-xs text-zinc-600">
+            <div className="px-4 py-8 text-center text-xs text-zinc-500">
               {filter !== 'all' ? 'No pages match this filter' : 'No pages found'}
             </div>
           ) : (
@@ -478,9 +478,9 @@ export function RedirectManager({ siteId }: Props) {
                     {statusBadge(page.status)}
                     <div className="min-w-0 pl-3">
                       <span className="text-xs text-zinc-300 font-mono truncate block">{page.path}</span>
-                      <span className="text-[10px] text-zinc-600 truncate block">{page.title}</span>
+                      <span className="text-[11px] text-zinc-500 truncate block">{page.title}</span>
                     </div>
-                    <span className={`text-[10px] ${page.source === 'gsc' ? 'text-amber-400' : page.source === 'cms' ? 'text-teal-400' : 'text-zinc-500'}`}>
+                    <span className={`text-[11px] ${page.source === 'gsc' ? 'text-amber-400' : page.source === 'cms' ? 'text-teal-400' : 'text-zinc-500'}`}>
                       {page.source === 'gsc' ? 'GSC' : page.source}
                     </span>
                     <div className="min-w-0">
@@ -490,13 +490,13 @@ export function RedirectManager({ siteId }: Props) {
                           <ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
                         </a>
                       ) : (
-                        <span className="text-[10px] text-zinc-700">—</span>
+                        <span className="text-[11px] text-zinc-700">—</span>
                       )}
                     </div>
                   </div>
                   {rule && (
                     <div className="px-4 pb-2 pl-[calc(auto+0.75rem)] ml-10">
-                      <div className="flex items-center gap-1.5 text-[10px]">
+                      <div className="flex items-center gap-1.5 text-[11px]">
                         <Sparkles className="w-3 h-3 text-teal-400 flex-shrink-0" />
                         <span className="text-teal-400">Suggested redirect:</span>
                         <span className="text-zinc-300 font-mono">{rule.to}</span>

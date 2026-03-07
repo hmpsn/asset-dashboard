@@ -614,15 +614,15 @@ function AssetBrowser({ siteId }: Props) {
           <div className="grid grid-cols-3 gap-3 text-center">
             <div className="bg-zinc-900/60 rounded-lg p-2">
               <div className="text-lg font-bold text-teal-300">{organizePreview.summary.assetsToMove}</div>
-              <div className="text-[10px] text-zinc-500">Assets to move</div>
+              <div className="text-[11px] text-zinc-500">Assets to move</div>
             </div>
             <div className="bg-zinc-900/60 rounded-lg p-2">
               <div className="text-lg font-bold text-cyan-300">{organizePreview.summary.foldersToCreate}</div>
-              <div className="text-[10px] text-zinc-500">New folders</div>
+              <div className="text-[11px] text-zinc-500">New folders</div>
             </div>
             <div className="bg-zinc-900/60 rounded-lg p-2">
               <div className="text-lg font-bold text-zinc-400">{organizePreview.summary.alreadyOrganized}</div>
-              <div className="text-[10px] text-zinc-500">Already organized</div>
+              <div className="text-[11px] text-zinc-500">Already organized</div>
             </div>
           </div>
 
@@ -646,7 +646,7 @@ function AssetBrowser({ siteId }: Props) {
                     {assetNames.slice(0, 10).map((name, i) => (
                       <div key={i} className="truncate">{name}</div>
                     ))}
-                    {assetNames.length > 10 && <div className="text-zinc-600">...and {assetNames.length - 10} more</div>}
+                    {assetNames.length > 10 && <div className="text-zinc-500">...and {assetNames.length - 10} more</div>}
                   </div>
                 </details>
               ));
@@ -669,7 +669,7 @@ function AssetBrowser({ siteId }: Props) {
               Cancel
             </button>
             {(organizePreview.summary.unused > 0 || organizePreview.summary.ogImages > 0) && (
-              <span className="ml-auto text-[10px] text-zinc-600">
+              <span className="ml-auto text-[11px] text-zinc-500">
                 {organizePreview.summary.ogImages > 0 && <>{organizePreview.summary.ogImages} OG images → _Social / OG Images</>}
                 {organizePreview.summary.ogImages > 0 && organizePreview.summary.unused > 0 && ' · '}
                 {organizePreview.summary.unused > 0 && <>{organizePreview.summary.unused} unused → _Unused Assets</>}
@@ -863,18 +863,18 @@ function AssetBrowser({ siteId }: Props) {
                     {asset.displayName || asset.originalFileName}
                   </span>
                   {(!asset.altText || asset.altText.trim() === '') && (
-                    <span className="shrink-0 px-1 py-0.5 rounded text-[9px] font-semibold bg-amber-900/40 text-amber-400 leading-none">No Alt</span>
+                    <span className="shrink-0 px-1 py-0.5 rounded text-[11px] font-semibold bg-amber-900/40 text-amber-400 leading-none">No Alt</span>
                   )}
                   {asset.size > 500 * 1024 && (
-                    <span className="shrink-0 px-1 py-0.5 rounded text-[9px] font-semibold bg-orange-900/40 text-orange-400 leading-none">Oversized</span>
+                    <span className="shrink-0 px-1 py-0.5 rounded text-[11px] font-semibold bg-orange-900/40 text-orange-400 leading-none">Oversized</span>
                   )}
                   {unusedIds?.has(asset.id) && (
-                    <span className="shrink-0 px-1 py-0.5 rounded text-[9px] font-semibold bg-red-900/40 text-red-400 leading-none">Unused</span>
+                    <span className="shrink-0 px-1 py-0.5 rounded text-[11px] font-semibold bg-red-900/40 text-red-400 leading-none">Unused</span>
                   )}
                   <button
                     onClick={() => handleSmartRename(asset)}
                     disabled={renameLoading.has(asset.id)}
-                    className="shrink-0 p-0.5 rounded text-zinc-600 hover:text-cyan-400 transition-colors"
+                    className="shrink-0 p-0.5 rounded text-zinc-500 hover:text-cyan-400 transition-colors"
                     title="Smart rename"
                   >
                     {renameLoading.has(asset.id) ? (
@@ -966,7 +966,7 @@ function AssetBrowser({ siteId }: Props) {
         ))}
 
         {filtered.length === 0 && (
-          <div className="text-center py-10 text-zinc-600 text-sm">
+          <div className="text-center py-10 text-zinc-500 text-sm">
             {search ? 'No assets match your search' : 'No assets found'}
           </div>
         )}

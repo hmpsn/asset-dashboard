@@ -32,7 +32,7 @@ function copyToClipboard(text: string) {
 export function ProcessingQueue({ items }: Props) {
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-zinc-600">
+      <div className="flex flex-col items-center justify-center py-12 text-zinc-500">
         <p className="text-sm">No files processed yet</p>
         <p className="text-xs mt-1">Drop files above to get started</p>
       </div>
@@ -61,7 +61,7 @@ export function ProcessingQueue({ items }: Props) {
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium truncate">{item.fileName}</span>
                 <span className={cn(
-                  'text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-medium',
+                  'text-[11px] uppercase tracking-wider px-1.5 py-0.5 rounded font-medium',
                   item.type === 'meta'
                     ? 'bg-amber-500/10 text-amber-400'
                     : 'bg-blue-500/10 text-blue-400'

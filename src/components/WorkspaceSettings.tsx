@@ -259,11 +259,11 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                 <p className="text-xs text-zinc-500">Linked via workspace dropdown</p>
               </div>
               {webflowSiteId ? (
-                <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full flex items-center gap-1">
+                <span className="text-[11px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full flex items-center gap-1">
                   <Check className="w-3 h-3" /> {webflowSiteName}
                 </span>
               ) : (
-                <span className="text-[10px] text-zinc-500 bg-zinc-800 px-2 py-1 rounded-full flex items-center gap-1">
+                <span className="text-[11px] text-zinc-500 bg-zinc-800 px-2 py-1 rounded-full flex items-center gap-1">
                   <Unplug className="w-3 h-3" /> Not linked
                 </span>
               )}
@@ -282,7 +282,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
               </div>
               {googleStatus?.connected ? (
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full">Connected</span>
+                  <span className="text-[11px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full">Connected</span>
                   <button onClick={disconnectGoogle} className="p-1.5 rounded-lg hover:bg-white/5 transition-colors" title="Disconnect">
                     <LogOut className="w-4 h-4 text-zinc-500" />
                   </button>
@@ -292,7 +292,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                   <LogIn className="w-3.5 h-3.5" /> Connect
                 </button>
               ) : (
-                <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-1 rounded-full">Not configured</span>
+                <span className="text-[11px] text-amber-400 bg-amber-500/10 px-2 py-1 rounded-full">Not configured</span>
               )}
             </div>
           </section>
@@ -362,7 +362,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                   <Users className="w-4 h-4 text-zinc-500" />
                   <div>
                     <div className="text-xs font-medium text-zinc-200">Client Portal</div>
-                    <div className="text-[10px] text-zinc-500">Master toggle — enable or disable the client dashboard entirely</div>
+                    <div className="text-[11px] text-zinc-500">Master toggle — enable or disable the client dashboard entirely</div>
                   </div>
                 </div>
                 <button onClick={async () => {
@@ -384,7 +384,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                   <Shield className="w-4 h-4 text-zinc-500" />
                   <div>
                     <div className="text-xs font-medium text-zinc-200">SEO Health View</div>
-                    <div className="text-[10px] text-zinc-500">Show SEO audit scores and detailed findings to the client (paid upgrade)</div>
+                    <div className="text-[11px] text-zinc-500">Show SEO audit scores and detailed findings to the client (paid upgrade)</div>
                   </div>
                 </div>
                 <button onClick={async () => {
@@ -406,7 +406,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                   <BarChart3 className="w-4 h-4 text-zinc-500" />
                   <div>
                     <div className="text-xs font-medium text-zinc-200">Analytics View</div>
-                    <div className="text-[10px] text-zinc-500">Show Google Analytics and Search Console data to the client</div>
+                    <div className="text-[11px] text-zinc-500">Show Google Analytics and Search Console data to the client</div>
                   </div>
                 </div>
                 <button onClick={async () => {
@@ -442,7 +442,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                   <Mail className="w-4 h-4 text-zinc-500" />
                   <div>
                     <div className="text-xs font-medium text-zinc-200">Enable Auto-Reports</div>
-                    <div className="text-[10px] text-zinc-500">Send scheduled SEO audit reports to the client email{ws?.clientEmail ? ` (${ws.clientEmail})` : ' — set email in Client Dashboard tab'}</div>
+                    <div className="text-[11px] text-zinc-500">Send scheduled SEO audit reports to the client email{ws?.clientEmail ? ` (${ws.clientEmail})` : ' — set email in Client Dashboard tab'}</div>
                   </div>
                 </div>
                 <button onClick={async () => {
@@ -510,7 +510,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
             </div>
             <div className="px-5 py-4 space-y-4">
               <div>
-                <div className="text-[10px] font-medium mb-1.5 text-zinc-500">Logo URL</div>
+                <div className="text-[11px] font-medium mb-1.5 text-zinc-500">Logo URL</div>
                 <div className="flex items-center gap-2">
                   <input type="url" defaultValue={ws?.brandLogoUrl || ''}
                     placeholder="https://example.com/logo.svg"
@@ -526,7 +526,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                 </div>
               </div>
               <div>
-                <div className="text-[10px] font-medium mb-1.5 text-zinc-500">Accent Color</div>
+                <div className="text-[11px] font-medium mb-1.5 text-zinc-500">Accent Color</div>
                 <div className="flex items-center gap-2">
                   <input type="color" defaultValue={ws?.brandAccentColor || '#2dd4bf'}
                     onChange={async (e) => {
@@ -535,7 +535,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                     }}
                     className="w-8 h-8 rounded-lg border border-zinc-700 cursor-pointer bg-transparent" />
                   <code className="text-xs text-zinc-400">{ws?.brandAccentColor || '#2dd4bf'}</code>
-                  <span className="text-[10px] text-zinc-500">Used in reports and the client portal header</span>
+                  <span className="text-[11px] text-zinc-500">Used in reports and the client portal header</span>
                 </div>
               </div>
             </div>
@@ -548,7 +548,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
         <div className="space-y-5">
           {!webflowSiteId ? (
             <div className="flex flex-col items-center justify-center py-12 gap-3">
-              <Users className="w-8 h-8 text-zinc-600" />
+              <Users className="w-8 h-8 text-zinc-500" />
               <p className="text-sm text-zinc-400">Link a Webflow site first to enable the client dashboard</p>
             </div>
           ) : (<>
@@ -582,17 +582,17 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                 <div className="flex items-center gap-2">
                   {ws?.hasPassword ? (
                     <>
-                      <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full flex items-center gap-1">
+                      <span className="text-[11px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full flex items-center gap-1">
                         <Lock className="w-3 h-3" /> Password Protected
                       </span>
                       <button onClick={() => { setEditingPassword(true); setNewPassword(''); }}
-                        className="text-[10px] text-zinc-500 hover:text-zinc-300 px-1.5 py-1 rounded transition-colors">Change</button>
+                        className="text-[11px] text-zinc-500 hover:text-zinc-300 px-1.5 py-1 rounded transition-colors">Change</button>
                       <button onClick={removePassword} disabled={savingPassword}
-                        className="text-[10px] text-red-400/60 hover:text-red-400 px-1.5 py-1 rounded transition-colors">Remove</button>
+                        className="text-[11px] text-red-400/60 hover:text-red-400 px-1.5 py-1 rounded transition-colors">Remove</button>
                     </>
                   ) : (
                     <button onClick={() => { setEditingPassword(true); setNewPassword(''); }}
-                      className="flex items-center gap-1 text-[10px] text-amber-400/70 bg-amber-500/10 px-2 py-1 rounded-full hover:bg-amber-500/15 transition-colors">
+                      className="flex items-center gap-1 text-[11px] text-amber-400/70 bg-amber-500/10 px-2 py-1 rounded-full hover:bg-amber-500/15 transition-colors">
                       <KeyRound className="w-3 h-3" /> Set Password
                     </button>
                   )}
@@ -615,8 +615,8 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                 )}
                 {/* Client notification email */}
                 <div className="pt-2 border-t border-zinc-800">
-                  <div className="text-[10px] font-medium mb-1.5 text-zinc-500">Client Notification Email</div>
-                  <p className="text-[10px] mb-2 text-zinc-600">We'll email this address when your team responds to requests or changes status.</p>
+                  <div className="text-[11px] font-medium mb-1.5 text-zinc-500">Client Notification Email</div>
+                  <p className="text-[11px] mb-2 text-zinc-500">We'll email this address when your team responds to requests or changes status.</p>
                   <div className="flex items-center gap-2">
                     <input type="email" value={clientEmail} onChange={e => setClientEmail(e.target.value)}
                       placeholder="client@company.com"
@@ -666,17 +666,17 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                   {ws?.contentPricing ? (
                     <>
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-medium text-zinc-500">Brief:</span>
+                        <span className="text-[11px] font-medium text-zinc-500">Brief:</span>
                         <span className="text-xs font-semibold text-teal-400">${ws.contentPricing.briefPrice}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-medium text-zinc-500">Full Post:</span>
+                        <span className="text-[11px] font-medium text-zinc-500">Full Post:</span>
                         <span className="text-xs font-semibold text-blue-400">${ws.contentPricing.fullPostPrice}</span>
                       </div>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Active</span>
+                      <span className="text-[11px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Active</span>
                     </>
                   ) : (
-                    <span className="text-[10px] text-zinc-600">No pricing set — clients will see "Pricing confirmed after submission"</span>
+                    <span className="text-[11px] text-zinc-500">No pricing set — clients will see "Pricing confirmed after submission"</span>
                   )}
                 </div>
               )}
@@ -686,7 +686,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                 <div className="px-5 py-4 space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <div className="text-[10px] font-medium mb-1.5 text-zinc-500">Content Brief Price</div>
+                      <div className="text-[11px] font-medium mb-1.5 text-zinc-500">Content Brief Price</div>
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500">$</span>
                         <input type="number" min={0} value={pricingBrief || ''} onChange={e => setPricingBrief(Number(e.target.value))}
@@ -695,7 +695,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                       </div>
                     </div>
                     <div>
-                      <div className="text-[10px] font-medium mb-1.5 text-zinc-500">Full Blog Post Price</div>
+                      <div className="text-[11px] font-medium mb-1.5 text-zinc-500">Full Blog Post Price</div>
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500">$</span>
                         <input type="number" min={0} value={pricingFull || ''} onChange={e => setPricingFull(Number(e.target.value))}
@@ -705,7 +705,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                     </div>
                   </div>
                   <div>
-                    <div className="text-[10px] font-medium mb-1.5 text-zinc-500">Currency</div>
+                    <div className="text-[11px] font-medium mb-1.5 text-zinc-500">Currency</div>
                     <select value={pricingCurrency} onChange={e => setPricingCurrency(e.target.value)}
                       className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-teal-500">
                       <option value="USD">USD ($)</option>
@@ -751,7 +751,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                       </button>
                     )}
                   </div>
-                  <div className="text-[9px] leading-relaxed text-zinc-600">
+                  <div className="text-[11px] leading-relaxed text-zinc-500">
                     Clients will see these prices in a confirmation dialog before submitting content requests. Stripe integration for direct payments is coming soon.
                   </div>
                 </div>
@@ -796,21 +796,21 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                         <div className="flex items-center gap-2 mb-2">
                           <Palette className="w-3.5 h-3.5 text-teal-400" />
                           <span className="text-xs font-medium text-zinc-200">Event Groups</span>
-                          <span className="text-[10px] text-zinc-600 ml-auto">{localGroups.length} groups</span>
+                          <span className="text-[11px] text-zinc-500 ml-auto">{localGroups.length} groups</span>
                         </div>
                         {localGroups.sort((a, b) => a.order - b.order).map((g, idx) => (
                           <div key={g.id} className="rounded-lg hover:bg-white/5 mb-1">
                             <div className="flex items-center gap-2 px-2 py-1.5">
                               <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: g.color }} />
                               <span className="text-xs flex-1 text-zinc-400">{g.name}</span>
-                              <span className="text-[10px] text-zinc-600">{localEventConfig.filter(c => c.group === g.id).length} events</span>
-                              <button onClick={() => moveGroup(g.id, -1)} disabled={idx === 0} className="p-0.5 text-zinc-600 hover:text-zinc-400 disabled:opacity-30"><ArrowUp className="w-3 h-3" /></button>
-                              <button onClick={() => moveGroup(g.id, 1)} disabled={idx === localGroups.length - 1} className="p-0.5 text-zinc-600 hover:text-zinc-400 disabled:opacity-30"><ArrowDown className="w-3 h-3" /></button>
+                              <span className="text-[11px] text-zinc-500">{localEventConfig.filter(c => c.group === g.id).length} events</span>
+                              <button onClick={() => moveGroup(g.id, -1)} disabled={idx === 0} className="p-0.5 text-zinc-500 hover:text-zinc-400 disabled:opacity-30"><ArrowUp className="w-3 h-3" /></button>
+                              <button onClick={() => moveGroup(g.id, 1)} disabled={idx === localGroups.length - 1} className="p-0.5 text-zinc-500 hover:text-zinc-400 disabled:opacity-30"><ArrowDown className="w-3 h-3" /></button>
                               <button onClick={() => removeGroup(g.id)} className="p-0.5 text-red-400/50 hover:text-red-400"><Trash2 className="w-3 h-3" /></button>
                             </div>
                             <div className="px-2 pb-2 space-y-2">
                               <div className="flex items-center gap-1.5">
-                                <label className="text-[10px] text-zinc-600 whitespace-nowrap">Default page:</label>
+                                <label className="text-[11px] text-zinc-500 whitespace-nowrap">Default page:</label>
                                 <SearchableSelect
                                   options={(() => {
                                     const allowed = g.allowedPages || [];
@@ -828,10 +828,10 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                               </div>
                               <div>
                                 <div className="flex items-center gap-1.5 mb-1">
-                                  <label className="text-[10px] text-zinc-600 whitespace-nowrap">Allowed pages:</label>
-                                  <span className="text-[10px] text-zinc-600">{(g.allowedPages || []).length ? `${g.allowedPages!.length} selected` : 'All pages'}</span>
+                                  <label className="text-[11px] text-zinc-500 whitespace-nowrap">Allowed pages:</label>
+                                  <span className="text-[11px] text-zinc-500">{(g.allowedPages || []).length ? `${g.allowedPages!.length} selected` : 'All pages'}</span>
                                   <button onClick={() => { setExpandedGroupPages(expandedGroupPages === g.id ? null : g.id); setGroupPageSearch(''); }}
-                                    className="text-[10px] text-teal-400 hover:text-teal-300 ml-auto">{expandedGroupPages === g.id ? 'Close' : 'Edit'}</button>
+                                    className="text-[11px] text-teal-400 hover:text-teal-300 ml-auto">{expandedGroupPages === g.id ? 'Close' : 'Edit'}</button>
                                 </div>
                                 {expandedGroupPages === g.id && (
                                   <div className="bg-zinc-800/50 border border-zinc-700/50 rounded-lg p-2 mt-1">
@@ -839,10 +839,10 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                                       <Search className="w-3 h-3 text-zinc-500" />
                                       <input value={groupPageSearch} onChange={e => setGroupPageSearch(e.target.value)}
                                         placeholder="Filter pages..."
-                                        className="flex-1 bg-transparent text-[10px] text-zinc-300 placeholder:text-zinc-600 focus:outline-none" />
+                                        className="flex-1 bg-transparent text-[11px] text-zinc-300 placeholder:text-zinc-500 focus:outline-none" />
                                       {(g.allowedPages || []).length > 0 && (
                                         <button onClick={() => setLocalGroups(prev => prev.map(gr => gr.id === g.id ? { ...gr, allowedPages: undefined } : gr))}
-                                          className="text-[10px] text-zinc-500 hover:text-zinc-300">Clear all</button>
+                                          className="text-[11px] text-zinc-500 hover:text-zinc-300">Clear all</button>
                                       )}
                                     </div>
                                     <div className="max-h-[150px] overflow-y-auto space-y-0.5">
@@ -864,12 +864,12 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                                                   }));
                                                 }}
                                                 className="w-3 h-3 rounded border-zinc-600 bg-zinc-800 text-teal-500 focus:ring-0 focus:ring-offset-0 accent-teal-500" />
-                                              <span className="text-[10px] text-zinc-300 truncate">{p.path}</span>
+                                              <span className="text-[11px] text-zinc-300 truncate">{p.path}</span>
                                             </label>
                                           );
                                         })}
                                       {ga4Pages.filter(p => !groupPageSearch || p.path.toLowerCase().includes(groupPageSearch.toLowerCase())).length === 0 && (
-                                        <p className="text-[10px] text-zinc-600 text-center py-2">No pages found</p>
+                                        <p className="text-[11px] text-zinc-500 text-center py-2">No pages found</p>
                                       )}
                                     </div>
                                   </div>
@@ -884,7 +884,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                             onKeyDown={e => e.key === 'Enter' && addGroup()}
                             className="flex-1 px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-teal-500" />
                           <button onClick={addGroup} disabled={!newGroupName.trim()}
-                            className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-[10px] font-medium transition-colors">
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-[11px] font-medium transition-colors">
                             <Plus className="w-3 h-3" /> Add
                           </button>
                         </div>
@@ -900,7 +900,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                           return (
                             <div key={ev.eventName} className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${pinned ? 'bg-teal-500/10 border border-teal-500/20' : 'hover:bg-white/5'}`}>
                               <button onClick={() => togglePin(ev.eventName)} className="shrink-0" title={pinned ? 'Unpin' : 'Pin'}>
-                                {pinned ? <Pin className="w-3.5 h-3.5 text-teal-400" /> : <PinOff className="w-3.5 h-3.5 text-zinc-600 hover:text-zinc-400" />}
+                                {pinned ? <Pin className="w-3.5 h-3.5 text-teal-400" /> : <PinOff className="w-3.5 h-3.5 text-zinc-500 hover:text-zinc-400" />}
                               </button>
                               <div className="flex-1 min-w-0">
                                 {isEditing ? (
@@ -916,20 +916,20 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                                     <span className={`text-xs font-medium truncate ${displayName !== ev.eventName ? 'text-zinc-200' : 'text-zinc-400'}`}>
                                       {displayName !== ev.eventName ? displayName : ev.eventName.replace(/_/g, ' ')}
                                     </span>
-                                    {displayName !== ev.eventName && <span className="text-[10px] text-zinc-600 font-mono">{ev.eventName}</span>}
+                                    {displayName !== ev.eventName && <span className="text-[11px] text-zinc-500 font-mono">{ev.eventName}</span>}
                                   </div>
                                 )}
                               </div>
                               {localGroups.length > 0 && (
                                 <select value={evGroup || ''} onChange={e => assignGroup(ev.eventName, e.target.value || undefined)}
-                                  className="px-1.5 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-400 focus:outline-none focus:border-teal-500 max-w-[100px]">
+                                  className="px-1.5 py-1 bg-zinc-800 border border-zinc-700 rounded text-[11px] text-zinc-400 focus:outline-none focus:border-teal-500 max-w-[100px]">
                                   <option value="">No group</option>
                                   {localGroups.sort((a, b) => a.order - b.order).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                                 </select>
                               )}
-                              <span className="text-[10px] text-zinc-500 tabular-nums shrink-0">{ev.eventCount.toLocaleString()}</span>
+                              <span className="text-[11px] text-zinc-500 tabular-nums shrink-0">{ev.eventCount.toLocaleString()}</span>
                               <button onClick={() => { setEditingEventName(ev.eventName); setEditingDisplayName(getDisplayName(ev.eventName) !== ev.eventName ? getDisplayName(ev.eventName) : ''); }}
-                                className="shrink-0" title="Rename"><Pencil className="w-3 h-3 text-zinc-600 hover:text-zinc-400" /></button>
+                                className="shrink-0" title="Rename"><Pencil className="w-3 h-3 text-zinc-500 hover:text-zinc-400" /></button>
                             </div>
                           );
                         })}

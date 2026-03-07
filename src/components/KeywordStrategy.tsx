@@ -484,7 +484,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
               <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400" />
               <span className="text-xs font-medium text-zinc-200">{stepLabels[progressStep] || progressStep}</span>
             </div>
-            <span className="text-[10px] text-zinc-500 font-mono">{Math.round(progressPct * 100)}%</span>
+            <span className="text-[11px] text-zinc-500 font-mono">{Math.round(progressPct * 100)}%</span>
           </div>
           <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
             <div
@@ -492,7 +492,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
               style={{ width: `${Math.round(progressPct * 100)}%` }}
             />
           </div>
-          <p className="text-[10px] text-zinc-500">{progressDetail}</p>
+          <p className="text-[11px] text-zinc-500">{progressDetail}</p>
         </div>
       )}
 
@@ -506,14 +506,14 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
             <Briefcase className="w-3.5 h-3.5 text-teal-400" />
             <span className="text-xs font-semibold text-zinc-300">Strategy Settings</span>
             {!settingsOpen && (
-              <span className="text-[10px] text-zinc-500">
+              <span className="text-[11px] text-zinc-500">
                 {semrushMode !== 'none' ? `SEMRush: ${semrushMode}` : ''}
                 {businessContext ? ` · Context set` : ''}
                 {competitors.trim() ? ` · ${competitors.split(/[,\n]+/).filter(Boolean).length} competitors` : ''}
               </span>
             )}
           </div>
-          {settingsOpen ? <ChevronDown className="w-3.5 h-3.5 text-zinc-600" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-600" />}
+          {settingsOpen ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500" />}
         </button>
         {settingsOpen && (
           <div className="px-4 pb-4 space-y-4">
@@ -522,7 +522,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
               <div>
                 <div className="flex items-center gap-1.5 mb-2">
                   <BarChart3 className="w-3.5 h-3.5 text-orange-400" />
-                  <span className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider">SEMRush Data Mode</span>
+                  <span className="text-[11px] text-zinc-400 font-semibold uppercase tracking-wider">SEMRush Data Mode</span>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   {(['none', 'quick', 'full'] as const).map(mode => (
@@ -536,7 +536,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                       }`}
                     >
                       <div className="font-semibold capitalize">{mode === 'none' ? 'Off' : mode}</div>
-                      <div className="text-[9px] mt-0.5 opacity-70">
+                      <div className="text-[11px] mt-0.5 opacity-70">
                         {mode === 'none' && 'AI + GSC only'}
                         {mode === 'quick' && '~500 credits'}
                         {mode === 'full' && '~7,500 credits'}
@@ -544,7 +544,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                     </button>
                   ))}
                 </div>
-                <p className="text-[10px] text-zinc-600 mt-1.5">
+                <p className="text-[11px] text-zinc-500 mt-1.5">
                   {semrushMode === 'quick' && 'Enriches keywords with real search volume + difficulty scores from SEMRush.'}
                   {semrushMode === 'full' && 'Full competitive analysis: domain keywords, competitor gaps, related keywords, volume + difficulty.'}
                   {semrushMode === 'none' && 'Uses AI + Google Search Console data only. No SEMRush API credits used.'}
@@ -557,16 +557,16 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
               <div>
                 <div className="flex items-center gap-1.5 mb-1">
                   <Users className="w-3.5 h-3.5 text-orange-400" />
-                  <span className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider">Competitor Domains</span>
+                  <span className="text-[11px] text-zinc-400 font-semibold uppercase tracking-wider">Competitor Domains</span>
                 </div>
                 <input
                   type="text"
                   value={competitors}
                   onChange={e => setCompetitors(e.target.value)}
                   placeholder="e.g. competitor1.com, competitor2.com"
-                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-orange-500"
+                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-orange-500"
                 />
-                <p className="text-[10px] text-zinc-600 mt-1">Comma-separated. SEMRush will find keywords they rank for that you don't (max 3).</p>
+                <p className="text-[11px] text-zinc-500 mt-1">Comma-separated. SEMRush will find keywords they rank for that you don't (max 3).</p>
               </div>
             )}
 
@@ -577,8 +577,8 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                 className="flex items-center gap-1.5 mb-1"
               >
                 <Briefcase className="w-3.5 h-3.5 text-teal-400" />
-                <span className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider">Business Context</span>
-                {contextOpen ? <ChevronDown className="w-3 h-3 text-zinc-600" /> : <ChevronRight className="w-3 h-3 text-zinc-600" />}
+                <span className="text-[11px] text-zinc-400 font-semibold uppercase tracking-wider">Business Context</span>
+                {contextOpen ? <ChevronDown className="w-3 h-3 text-zinc-500" /> : <ChevronRight className="w-3 h-3 text-zinc-500" />}
               </button>
               {contextOpen && (
                 <div className="space-y-1.5">
@@ -587,9 +587,9 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                     onChange={e => setBusinessContext(e.target.value)}
                     placeholder={`Example: We are a dental practice in Austin, TX. We offer general, cosmetic, and pediatric dentistry. Target audience: families 25-55. Competitors: Aspen Dental, local practices.`}
                     rows={3}
-                    className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-teal-500 resize-y"
+                    className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-teal-500 resize-y"
                   />
-                  <p className="text-[10px] text-zinc-600">Saved with your strategy. Include: locations, services, audience, differentiators.</p>
+                  <p className="text-[11px] text-zinc-500">Saved with your strategy. Include: locations, services, audience, differentiators.</p>
                 </div>
               )}
             </div>
@@ -605,9 +605,9 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
 
       {!strategy && !generating && (
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 px-6 py-12 text-center">
-          <Target className="w-10 h-10 text-zinc-600 mx-auto mb-3" />
+          <Target className="w-10 h-10 text-zinc-500 mx-auto mb-3" />
           <p className="text-sm text-zinc-400 mb-1">No keyword strategy yet</p>
-          <p className="text-[11px] text-zinc-600 max-w-md mx-auto">
+          <p className="text-[11px] text-zinc-500 max-w-md mx-auto">
             Generate an AI-powered keyword strategy based on your site's pages and Google Search Console data.
             This will map target keywords to each page and guide all future AI rewrites.
           </p>
@@ -619,30 +619,30 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
           {/* ── Summary Dashboard ── */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-              <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Pages Mapped</div>
+              <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Pages Mapped</div>
               <div className="text-xl font-bold text-zinc-100">{strategy.pageMap.length}</div>
             </div>
             <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-              <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Eye className="w-3 h-3" /> Impressions</div>
+              <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Eye className="w-3 h-3" /> Impressions</div>
               <div className="text-xl font-bold text-zinc-100">{totalImpressions.toLocaleString()}</div>
-              <div className="text-[10px] text-zinc-600">last 90 days</div>
+              <div className="text-[11px] text-zinc-500">last 90 days</div>
             </div>
             <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-              <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><MousePointerClick className="w-3 h-3" /> Clicks</div>
+              <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><MousePointerClick className="w-3 h-3" /> Clicks</div>
               <div className="text-xl font-bold text-zinc-100">{totalClicks.toLocaleString()}</div>
-              <div className="text-[10px] text-zinc-600">{totalImpressions > 0 ? `${((totalClicks / totalImpressions) * 100).toFixed(1)}% CTR` : ''}</div>
+              <div className="text-[11px] text-zinc-500">{totalImpressions > 0 ? `${((totalClicks / totalImpressions) * 100).toFixed(1)}% CTR` : ''}</div>
             </div>
             <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-              <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Trophy className="w-3 h-3" /> Avg Position</div>
+              <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Trophy className="w-3 h-3" /> Avg Position</div>
               <div className={`text-xl font-bold ${positionColor(avgPos)}`}>{ranked.length > 0 ? `#${avgPos.toFixed(1)}` : '—'}</div>
-              <div className="text-[10px] text-zinc-600">{ranked.length} pages ranking</div>
+              <div className="text-[11px] text-zinc-500">{ranked.length} pages ranking</div>
             </div>
             <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-              <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Ranking Tiers</div>
+              <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Ranking Tiers</div>
               <div className="flex items-center gap-1 mt-1 flex-wrap">
-                {top3.length > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium">{top3.length} top 3</span>}
-                {top10.length > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 font-medium">{top10.length} top 10</span>}
-                {notRankingCount > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-700/50 text-zinc-500 font-medium">{notRankingCount} unranked</span>}
+                {top3.length > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium">{top3.length} top 3</span>}
+                {top10.length > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 font-medium">{top10.length} top 10</span>}
+                {notRankingCount > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-700/50 text-zinc-500 font-medium">{notRankingCount} unranked</span>}
               </div>
             </div>
           </div>
@@ -652,7 +652,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
             <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-xs font-semibold text-zinc-300">Ranking Distribution</h4>
-                <span className="text-[10px] text-zinc-600">{ranked.length} of {strategy.pageMap.length} pages with ranking data</span>
+                <span className="text-[11px] text-zinc-500">{ranked.length} of {strategy.pageMap.length} pages with ranking data</span>
               </div>
               <div className="flex h-4 rounded-full overflow-hidden bg-zinc-800">
                 {top3.length > 0 && <div className="bg-emerald-500 h-full transition-all" style={{ width: `${(top3.length / strategy.pageMap.length) * 100}%` }} />}
@@ -662,18 +662,18 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                 {notRankingCount > 0 && <div className="bg-zinc-700 h-full transition-all" style={{ width: `${(notRankingCount / strategy.pageMap.length) * 100}%` }} />}
               </div>
               <div className="flex items-center gap-4 mt-2 flex-wrap">
-                <span className="flex items-center gap-1.5 text-[10px]"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" /> <span className="text-emerald-400 font-medium">{top3.length}</span> <span className="text-zinc-500">Top 3</span></span>
-                <span className="flex items-center gap-1.5 text-[10px]"><span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" /> <span className="text-green-400 font-medium">{top10.length}</span> <span className="text-zinc-500">4–10</span></span>
-                <span className="flex items-center gap-1.5 text-[10px]"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" /> <span className="text-amber-400 font-medium">{top20.length}</span> <span className="text-zinc-500">11–20</span></span>
-                <span className="flex items-center gap-1.5 text-[10px]"><span className="w-2.5 h-2.5 rounded-full bg-red-500/60 inline-block" /> <span className="text-red-400 font-medium">{beyond20.length}</span> <span className="text-zinc-500">20+</span></span>
-                <span className="flex items-center gap-1.5 text-[10px]"><span className="w-2.5 h-2.5 rounded-full bg-zinc-700 inline-block" /> <span className="text-zinc-500 font-medium">{notRankingCount}</span> <span className="text-zinc-600">Not ranking</span></span>
+                <span className="flex items-center gap-1.5 text-[11px]"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" /> <span className="text-emerald-400 font-medium">{top3.length}</span> <span className="text-zinc-500">Top 3</span></span>
+                <span className="flex items-center gap-1.5 text-[11px]"><span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" /> <span className="text-green-400 font-medium">{top10.length}</span> <span className="text-zinc-500">4–10</span></span>
+                <span className="flex items-center gap-1.5 text-[11px]"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" /> <span className="text-amber-400 font-medium">{top20.length}</span> <span className="text-zinc-500">11–20</span></span>
+                <span className="flex items-center gap-1.5 text-[11px]"><span className="w-2.5 h-2.5 rounded-full bg-red-500/60 inline-block" /> <span className="text-red-400 font-medium">{beyond20.length}</span> <span className="text-zinc-500">20+</span></span>
+                <span className="flex items-center gap-1.5 text-[11px]"><span className="w-2.5 h-2.5 rounded-full bg-zinc-700 inline-block" /> <span className="text-zinc-500 font-medium">{notRankingCount}</span> <span className="text-zinc-500">Not ranking</span></span>
               </div>
               {Object.keys(intentCounts).length > 1 && (
                 <div className="mt-3 pt-3 border-t border-zinc-800">
-                  <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">Search Intent Mix</div>
+                  <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1.5">Search Intent Mix</div>
                   <div className="flex items-center gap-2 flex-wrap">
                     {Object.entries(intentCounts).sort((a, b) => b[1] - a[1]).map(([intent, count]) => (
-                      <span key={intent} className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${intentColor(intent)}`}>
+                      <span key={intent} className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${intentColor(intent)}`}>
                         {intent} ({count})
                       </span>
                     ))}
@@ -689,19 +689,19 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
               <h4 className="text-xs font-semibold text-amber-300 mb-1 flex items-center gap-1.5">
                 <Zap className="w-3.5 h-3.5" /> Low-Hanging Fruit
               </h4>
-              <p className="text-[10px] text-zinc-500 mb-3">Pages ranking #4–20 with significant impressions — small improvements here drive major traffic gains.</p>
+              <p className="text-[11px] text-zinc-500 mb-3">Pages ranking #4–20 with significant impressions — small improvements here drive major traffic gains.</p>
               <div className="space-y-1.5">
                 {lowHangingFruit.map((page, i) => (
                   <div key={i} className="flex items-center justify-between px-3 py-2 bg-zinc-800/50 rounded-lg">
                     <div className="flex-1 min-w-0">
                       <div className="text-[11px] text-zinc-300 truncate">{page.pageTitle}</div>
-                      <div className="text-[10px] text-zinc-600 font-mono">{page.pagePath}</div>
+                      <div className="text-[11px] text-zinc-500 font-mono">{page.pagePath}</div>
                     </div>
                     <div className="flex items-center gap-3 flex-shrink-0 ml-3">
-                      <span className="text-[10px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded truncate max-w-[160px]">{page.primaryKeyword}</span>
-                      <span className={`text-[10px] font-mono font-medium ${positionColor(page.currentPosition)}`}>#{page.currentPosition?.toFixed(0)}</span>
-                      <span className="text-[10px] text-zinc-500">{(page.impressions || 0).toLocaleString()} imp</span>
-                      {page.clicks !== undefined && page.clicks > 0 && <span className="text-[10px] text-zinc-500">{page.clicks} clicks</span>}
+                      <span className="text-[11px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded truncate max-w-[160px]">{page.primaryKeyword}</span>
+                      <span className={`text-[11px] font-mono font-medium ${positionColor(page.currentPosition)}`}>#{page.currentPosition?.toFixed(0)}</span>
+                      <span className="text-[11px] text-zinc-500">{(page.impressions || 0).toLocaleString()} imp</span>
+                      {page.clicks !== undefined && page.clicks > 0 && <span className="text-[11px] text-zinc-500">{page.clicks} clicks</span>}
                     </div>
                   </div>
                 ))}
@@ -715,7 +715,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
               <h4 className="text-xs font-semibold text-emerald-300 mb-1 flex items-center gap-1.5">
                 <TrendingUp className="w-3.5 h-3.5" /> Quick Wins
               </h4>
-              <p className="text-[10px] text-zinc-500 mb-3">High-impact changes that can be implemented immediately.</p>
+              <p className="text-[11px] text-zinc-500 mb-3">High-impact changes that can be implemented immediately.</p>
               <div className="space-y-2">
                 {strategy.quickWins.map((qw, i) => {
                   const impactColor = qw.estimatedImpact === 'high' ? 'text-green-400 bg-green-500/10 border-green-500/20' : qw.estimatedImpact === 'medium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
@@ -723,10 +723,10 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                     <div key={i} className="px-3 py-2.5 bg-zinc-800/40 rounded-lg border border-zinc-800">
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] font-mono text-zinc-500">{qw.pagePath}</span>
-                        <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded border ${impactColor}`}>{qw.estimatedImpact} impact</span>
+                        <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded border ${impactColor}`}>{qw.estimatedImpact} impact</span>
                       </div>
                       <div className="text-[11px] text-zinc-200 mt-1 font-medium">{qw.action}</div>
-                      <div className="text-[10px] text-zinc-500 mt-0.5">{qw.rationale}</div>
+                      <div className="text-[11px] text-zinc-500 mt-0.5">{qw.rationale}</div>
                     </div>
                   );
                 })}
@@ -740,7 +740,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
               <h4 className="text-xs font-semibold text-blue-300 mb-1 flex items-center gap-1.5">
                 <FileText className="w-3.5 h-3.5" /> Content Gaps
               </h4>
-              <p className="text-[10px] text-zinc-500 mb-3">New content to create — topics with search demand but no page on the site.</p>
+              <p className="text-[11px] text-zinc-500 mb-3">New content to create — topics with search demand but no page on the site.</p>
               <div className="space-y-2">
                 {strategy.contentGaps.map((gap, i) => {
                   const prioColor = gap.priority === 'high' ? 'text-red-400 bg-red-500/10 border-red-500/20' : gap.priority === 'medium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
@@ -749,12 +749,12 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-medium text-zinc-200">{gap.topic}</span>
                         <div className="flex items-center gap-2">
-                          <span className={`text-[9px] uppercase px-1.5 py-0.5 rounded-full border font-medium ${intentColor(gap.intent)}`}>{gap.intent}</span>
-                          <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded border ${prioColor}`}>{gap.priority}</span>
+                          <span className={`text-[11px] uppercase px-1.5 py-0.5 rounded-full border font-medium ${intentColor(gap.intent)}`}>{gap.intent}</span>
+                          <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded border ${prioColor}`}>{gap.priority}</span>
                         </div>
                       </div>
-                      <div className="text-[10px] text-teal-400 mt-1">Target keyword: &ldquo;{gap.targetKeyword}&rdquo;</div>
-                      <div className="text-[10px] text-zinc-500 mt-0.5">{gap.rationale}</div>
+                      <div className="text-[11px] text-teal-400 mt-1">Target keyword: &ldquo;{gap.targetKeyword}&rdquo;</div>
+                      <div className="text-[11px] text-zinc-500 mt-0.5">{gap.rationale}</div>
                     </div>
                   );
                 })}
@@ -775,8 +775,8 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                     {kw}
                     {metrics && (
                       <>
-                        <span className="text-[9px] text-zinc-500 font-mono">{metrics.volume.toLocaleString()}/mo</span>
-                        <span className={`text-[9px] font-mono ${difficultyColor(metrics.difficulty)}`}>KD {metrics.difficulty}%</span>
+                        <span className="text-[11px] text-zinc-500 font-mono">{metrics.volume.toLocaleString()}/mo</span>
+                        <span className={`text-[11px] font-mono ${difficultyColor(metrics.difficulty)}`}>KD {metrics.difficulty}%</span>
                       </>
                     )}
                   </span>
@@ -794,7 +794,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
               <div className="space-y-1.5">
                 {strategy.opportunities.map((opp, i) => (
                   <div key={i} className="flex items-start gap-2 text-[11px] text-zinc-400">
-                    <span className="w-4 h-4 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center flex-shrink-0 mt-0.5 text-[9px] text-teal-400 font-bold">{i + 1}</span>
+                    <span className="w-4 h-4 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center flex-shrink-0 mt-0.5 text-[11px] text-teal-400 font-bold">{i + 1}</span>
                     {opp}
                   </div>
                 ))}
@@ -808,18 +808,18 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
               <div className="flex items-center justify-between">
                 <div>
                   <h4 className="text-xs font-semibold text-zinc-300">Page Keyword Map</h4>
-                  <p className="text-[10px] text-zinc-600 mt-0.5">{filteredPages.length} pages · Click to expand · Pencil to edit</p>
+                  <p className="text-[11px] text-zinc-500 mt-0.5">{filteredPages.length} pages · Click to expand · Pencil to edit</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 mt-2">
                 <div className="relative flex-1">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-600" />
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
                   <input
                     type="text"
                     value={pageSearch}
                     onChange={e => setPageSearch(e.target.value)}
                     placeholder="Search pages, keywords..."
-                    className="w-full pl-8 pr-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-[11px] text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-teal-500"
+                    className="w-full pl-8 pr-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-[11px] text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-teal-500"
                   />
                 </div>
                 <div className="flex items-center gap-1">
@@ -827,7 +827,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                     <button
                       key={s}
                       onClick={() => { if (sortBy === s) setSortDir(d => d === 'desc' ? 'asc' : 'desc'); else { setSortBy(s); setSortDir('desc'); } }}
-                      className={`px-2 py-1 rounded text-[10px] font-medium transition-colors flex items-center gap-0.5 ${
+                      className={`px-2 py-1 rounded text-[11px] font-medium transition-colors flex items-center gap-0.5 ${
                         sortBy === s ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' : 'bg-zinc-800 text-zinc-500 border border-zinc-700 hover:text-zinc-300'
                       }`}
                     >
@@ -850,40 +850,40 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                     className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-zinc-800/20 transition-colors text-left"
                   >
                     <div className="flex items-center gap-2 min-w-0 flex-1">
-                      {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" />}
+                      {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />}
                       <div className="min-w-0 flex-1">
                         <span className="text-xs text-zinc-300 truncate block">{page.pageTitle}</span>
-                        <span className="text-[10px] text-zinc-600 font-mono">{page.pagePath}</span>
+                        <span className="text-[11px] text-zinc-500 font-mono">{page.pagePath}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                       {page.searchIntent && (
-                        <span className={`text-[9px] px-1.5 py-0.5 rounded-full border font-medium ${intentColor(page.searchIntent)}`}>
+                        <span className={`text-[11px] px-1.5 py-0.5 rounded-full border font-medium ${intentColor(page.searchIntent)}`}>
                           {page.searchIntent}
                         </span>
                       )}
-                      <span className="text-[10px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded max-w-[180px] truncate">
+                      <span className="text-[11px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded max-w-[180px] truncate">
                         {page.primaryKeyword}
                       </span>
                       {page.volume !== undefined && (
-                        <span className="text-[9px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded font-mono">
+                        <span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded font-mono">
                           {page.volume.toLocaleString()}/mo
                         </span>
                       )}
                       {page.difficulty !== undefined && (
-                        <span className={`text-[9px] ${difficultyColor(page.difficulty)} bg-zinc-800 px-1.5 py-0.5 rounded font-mono`}>
+                        <span className={`text-[11px] ${difficultyColor(page.difficulty)} bg-zinc-800 px-1.5 py-0.5 rounded font-mono`}>
                           KD {page.difficulty}%
                         </span>
                       )}
                       {page.currentPosition ? (
-                        <span className={`text-[10px] ${positionColor(page.currentPosition)} font-mono font-medium bg-zinc-800 px-1.5 py-0.5 rounded`}>
+                        <span className={`text-[11px] ${positionColor(page.currentPosition)} font-mono font-medium bg-zinc-800 px-1.5 py-0.5 rounded`}>
                           #{page.currentPosition.toFixed(0)}
                         </span>
                       ) : (
-                        <span className="text-[10px] text-zinc-600 bg-zinc-800 px-1.5 py-0.5 rounded font-mono">—</span>
+                        <span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded font-mono">—</span>
                       )}
                       {page.impressions !== undefined && page.impressions > 0 && (
-                        <span className="text-[9px] text-zinc-500 font-mono">{page.impressions.toLocaleString()} imp</span>
+                        <span className="text-[11px] text-zinc-500 font-mono">{page.impressions.toLocaleString()} imp</span>
                       )}
                     </div>
                   </button>
@@ -894,7 +894,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                         <>
                           <div className="flex items-center justify-between">
                             <div>
-                              <span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Primary Keyword</span>
+                              <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Primary Keyword</span>
                               <p className="text-xs text-zinc-200 mt-0.5">{page.primaryKeyword}</p>
                             </div>
                             <button
@@ -906,10 +906,10 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                             </button>
                           </div>
                           <div>
-                            <span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Secondary Keywords</span>
+                            <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Secondary Keywords</span>
                             <div className="flex flex-wrap gap-1 mt-1">
                               {page.secondaryKeywords.map((kw, i) => (
-                                <span key={i} className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-400">
+                                <span key={i} className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-[11px] text-zinc-400">
                                   {kw}
                                 </span>
                               ))}
@@ -918,36 +918,36 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                           {/* Metrics row */}
                           <div className="flex flex-wrap gap-3 mt-1">
                             {page.volume !== undefined && (
-                              <div className="text-[10px] text-zinc-500 flex items-center gap-1">
+                              <div className="text-[11px] text-zinc-500 flex items-center gap-1">
                                 <BarChart3 className="w-3 h-3 text-orange-400" />
                                 <span className="text-zinc-300 font-medium">{page.volume.toLocaleString()}</span>/mo
                               </div>
                             )}
                             {page.difficulty !== undefined && (
-                              <div className="text-[10px] text-zinc-500 flex items-center gap-1">
+                              <div className="text-[11px] text-zinc-500 flex items-center gap-1">
                                 <Shield className="w-3 h-3" />
                                 KD: <span className={`font-medium ${difficultyColor(page.difficulty)}`}>{page.difficulty}%</span>
-                                <span className={`text-[9px] ${difficultyColor(page.difficulty)}`}>({difficultyLabel(page.difficulty)})</span>
+                                <span className={`text-[11px] ${difficultyColor(page.difficulty)}`}>({difficultyLabel(page.difficulty)})</span>
                               </div>
                             )}
                             {page.cpc !== undefined && page.cpc > 0 && (
-                              <div className="text-[10px] text-zinc-500 flex items-center gap-1">
+                              <div className="text-[11px] text-zinc-500 flex items-center gap-1">
                                 <DollarSign className="w-3 h-3 text-green-400" />
                                 CPC: <span className="text-green-400 font-medium">${page.cpc.toFixed(2)}</span>
                               </div>
                             )}
                             {page.impressions !== undefined && (
-                              <div className="text-[10px] text-zinc-500">
+                              <div className="text-[11px] text-zinc-500">
                                 <span className="text-zinc-400 font-medium">{page.impressions.toLocaleString()}</span> impressions
                               </div>
                             )}
                             {page.clicks !== undefined && (
-                              <div className="text-[10px] text-zinc-500">
+                              <div className="text-[11px] text-zinc-500">
                                 <span className="text-zinc-400 font-medium">{page.clicks.toLocaleString()}</span> clicks
                               </div>
                             )}
                             {page.currentPosition && (
-                              <div className="text-[10px] text-zinc-500">
+                              <div className="text-[11px] text-zinc-500">
                                 Avg position: <span className={`font-medium ${positionColor(page.currentPosition)}`}>#{page.currentPosition.toFixed(1)}</span>
                               </div>
                             )}
@@ -955,10 +955,10 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                           {/* Secondary keyword metrics */}
                           {page.secondaryMetrics && page.secondaryMetrics.length > 0 && (
                             <div className="mt-1">
-                              <span className="text-[9px] text-zinc-600 uppercase tracking-wider">Secondary keyword data</span>
+                              <span className="text-[11px] text-zinc-500 uppercase tracking-wider">Secondary keyword data</span>
                               <div className="flex flex-wrap gap-1 mt-0.5">
                                 {page.secondaryMetrics.map((sm, si) => (
-                                  <span key={si} className="text-[9px] px-1.5 py-0.5 bg-zinc-800/80 border border-zinc-700/50 rounded text-zinc-500">
+                                  <span key={si} className="text-[11px] px-1.5 py-0.5 bg-zinc-800/80 border border-zinc-700/50 rounded text-zinc-500">
                                     {sm.keyword} <span className="text-zinc-400">{sm.volume}/mo</span> <span className={difficultyColor(sm.difficulty)}>KD {sm.difficulty}%</span>
                                   </span>
                                 ))}
@@ -983,13 +983,13 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                             ) : (
                               <div className="space-y-2">
                                 <div className="flex items-center justify-between">
-                                  <h5 className="text-[10px] font-semibold text-teal-300 uppercase tracking-wider flex items-center gap-1">
+                                  <h5 className="text-[11px] font-semibold text-teal-300 uppercase tracking-wider flex items-center gap-1">
                                     <Wand2 className="w-3 h-3" /> Generated SEO Copy
                                   </h5>
                                   <button
                                     onClick={(e) => { e.stopPropagation(); generateSeoCopy(page); }}
                                     disabled={generatingCopy === page.pagePath}
-                                    className="flex items-center gap-1 text-[9px] text-zinc-500 hover:text-teal-400 transition-colors"
+                                    className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-teal-400 transition-colors"
                                   >
                                     {generatingCopy === page.pagePath ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <RefreshCw className="w-2.5 h-2.5" />} Regenerate
                                   </button>
@@ -1001,32 +1001,32 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                                       {/* SEO Title */}
                                       <div className="bg-zinc-800/60 rounded-lg p-2.5">
                                         <div className="flex items-center justify-between mb-1">
-                                          <span className="text-[9px] text-zinc-500 font-medium uppercase tracking-wider">SEO Title</span>
-                                          <button onClick={(e) => { e.stopPropagation(); copyText(copy.seoTitle, 'seoTitle'); }} className="flex items-center gap-0.5 text-[9px] text-zinc-500 hover:text-teal-400">
+                                          <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">SEO Title</span>
+                                          <button onClick={(e) => { e.stopPropagation(); copyText(copy.seoTitle, 'seoTitle'); }} className="flex items-center gap-0.5 text-[11px] text-zinc-500 hover:text-teal-400">
                                             {copiedField === 'seoTitle' ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : <Copy className="w-2.5 h-2.5" />}
                                             {copiedField === 'seoTitle' ? 'Copied!' : 'Copy'}
                                           </button>
                                         </div>
                                         <p className="text-xs text-zinc-200">{copy.seoTitle}</p>
-                                        <span className="text-[9px] text-zinc-600 mt-0.5 block">{copy.seoTitle.length} chars</span>
+                                        <span className="text-[11px] text-zinc-500 mt-0.5 block">{copy.seoTitle.length} chars</span>
                                       </div>
                                       {/* Meta Description */}
                                       <div className="bg-zinc-800/60 rounded-lg p-2.5">
                                         <div className="flex items-center justify-between mb-1">
-                                          <span className="text-[9px] text-zinc-500 font-medium uppercase tracking-wider">Meta Description</span>
-                                          <button onClick={(e) => { e.stopPropagation(); copyText(copy.metaDescription, 'metaDesc'); }} className="flex items-center gap-0.5 text-[9px] text-zinc-500 hover:text-teal-400">
+                                          <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Meta Description</span>
+                                          <button onClick={(e) => { e.stopPropagation(); copyText(copy.metaDescription, 'metaDesc'); }} className="flex items-center gap-0.5 text-[11px] text-zinc-500 hover:text-teal-400">
                                             {copiedField === 'metaDesc' ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : <Copy className="w-2.5 h-2.5" />}
                                             {copiedField === 'metaDesc' ? 'Copied!' : 'Copy'}
                                           </button>
                                         </div>
                                         <p className="text-xs text-zinc-300">{copy.metaDescription}</p>
-                                        <span className="text-[9px] text-zinc-600 mt-0.5 block">{copy.metaDescription.length} chars</span>
+                                        <span className="text-[11px] text-zinc-500 mt-0.5 block">{copy.metaDescription.length} chars</span>
                                       </div>
                                       {/* H1 */}
                                       <div className="bg-zinc-800/60 rounded-lg p-2.5">
                                         <div className="flex items-center justify-between mb-1">
-                                          <span className="text-[9px] text-zinc-500 font-medium uppercase tracking-wider">Suggested H1</span>
-                                          <button onClick={(e) => { e.stopPropagation(); copyText(copy.h1, 'h1'); }} className="flex items-center gap-0.5 text-[9px] text-zinc-500 hover:text-teal-400">
+                                          <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Suggested H1</span>
+                                          <button onClick={(e) => { e.stopPropagation(); copyText(copy.h1, 'h1'); }} className="flex items-center gap-0.5 text-[11px] text-zinc-500 hover:text-teal-400">
                                             {copiedField === 'h1' ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : <Copy className="w-2.5 h-2.5" />}
                                             {copiedField === 'h1' ? 'Copied!' : 'Copy'}
                                           </button>
@@ -1036,8 +1036,8 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                                       {/* Intro Paragraph */}
                                       <div className="bg-zinc-800/60 rounded-lg p-2.5">
                                         <div className="flex items-center justify-between mb-1">
-                                          <span className="text-[9px] text-zinc-500 font-medium uppercase tracking-wider">Intro Paragraph</span>
-                                          <button onClick={(e) => { e.stopPropagation(); copyText(copy.introParagraph, 'intro'); }} className="flex items-center gap-0.5 text-[9px] text-zinc-500 hover:text-teal-400">
+                                          <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Intro Paragraph</span>
+                                          <button onClick={(e) => { e.stopPropagation(); copyText(copy.introParagraph, 'intro'); }} className="flex items-center gap-0.5 text-[11px] text-zinc-500 hover:text-teal-400">
                                             {copiedField === 'intro' ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : <Copy className="w-2.5 h-2.5" />}
                                             {copiedField === 'intro' ? 'Copied!' : 'Copy'}
                                           </button>
@@ -1047,15 +1047,15 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                                       {/* Internal Link Suggestions */}
                                       {copy.internalLinkSuggestions && copy.internalLinkSuggestions.length > 0 && (
                                         <div className="bg-zinc-800/60 rounded-lg p-2.5">
-                                          <span className="text-[9px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-1 mb-1.5">
+                                          <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-1 mb-1.5">
                                             <Link className="w-2.5 h-2.5" /> Internal Link Suggestions
                                           </span>
                                           <div className="space-y-1">
                                             {copy.internalLinkSuggestions.map((link, li) => (
-                                              <div key={li} className="flex items-start gap-2 text-[10px]">
+                                              <div key={li} className="flex items-start gap-2 text-[11px]">
                                                 <span className="text-teal-400 font-mono shrink-0">{link.targetPath}</span>
                                                 <span className="text-zinc-400">"{link.anchorText}"</span>
-                                                <span className="text-zinc-600 italic">{link.context}</span>
+                                                <span className="text-zinc-500 italic">{link.context}</span>
                                               </div>
                                             ))}
                                           </div>
@@ -1064,12 +1064,12 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                                       {/* Changes Rationale */}
                                       {copy.changes && copy.changes.length > 0 && (
                                         <div className="bg-zinc-800/40 rounded-lg p-2.5">
-                                          <span className="text-[9px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-1 mb-1.5">
+                                          <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-1 mb-1.5">
                                             <MessageSquare className="w-2.5 h-2.5" /> Why These Changes
                                           </span>
                                           <ul className="space-y-0.5">
                                             {copy.changes.map((c, ci) => (
-                                              <li key={ci} className="text-[10px] text-zinc-400 flex items-start gap-1">
+                                              <li key={ci} className="text-[11px] text-zinc-400 flex items-start gap-1">
                                                 <span className="text-teal-400 mt-0.5">•</span> {c}
                                               </li>
                                             ))}
@@ -1086,7 +1086,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                       ) : (
                         <div className="space-y-2">
                           <div>
-                            <label className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider block mb-1">Primary Keyword</label>
+                            <label className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider block mb-1">Primary Keyword</label>
                             <input
                               type="text"
                               value={editDraft.primary}
@@ -1095,7 +1095,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                             />
                           </div>
                           <div>
-                            <label className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider block mb-1">Secondary Keywords (comma-separated)</label>
+                            <label className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider block mb-1">Secondary Keywords (comma-separated)</label>
                             <input
                               type="text"
                               value={editDraft.secondary}
@@ -1133,15 +1133,15 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
               <h4 className="text-xs font-semibold text-orange-300 mb-2 flex items-center gap-1.5">
                 <Users className="w-3.5 h-3.5" /> Competitor Keyword Gaps
               </h4>
-              <p className="text-[10px] text-zinc-500 mb-2">Keywords your competitors rank for that you don't — high-priority opportunities.</p>
+              <p className="text-[11px] text-zinc-500 mb-2">Keywords your competitors rank for that you don't — high-priority opportunities.</p>
               <div className="space-y-1">
                 {strategy.keywordGaps.map((gap, i) => (
                   <div key={i} className="flex items-center justify-between px-2.5 py-1.5 bg-zinc-800/50 rounded-lg">
                     <span className="text-[11px] text-zinc-300">{gap.keyword}</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-[9px] text-zinc-500 font-mono">{gap.volume.toLocaleString()}/mo</span>
-                      <span className={`text-[9px] font-mono ${difficultyColor(gap.difficulty)}`}>KD {gap.difficulty}%</span>
-                      <span className="text-[9px] text-zinc-600">{gap.competitorDomain} #{gap.competitorPosition}</span>
+                      <span className="text-[11px] text-zinc-500 font-mono">{gap.volume.toLocaleString()}/mo</span>
+                      <span className={`text-[11px] font-mono ${difficultyColor(gap.difficulty)}`}>KD {gap.difficulty}%</span>
+                      <span className="text-[11px] text-zinc-500">{gap.competitorDomain} #{gap.competitorPosition}</span>
                     </div>
                   </div>
                 ))}
@@ -1157,13 +1157,13 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
             >
               <h4 className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
                 <MessageSquare className="w-3.5 h-3.5 text-teal-400" /> Brand Voice & Style Guidelines
-                {brandVoice && <span className="text-[9px] text-emerald-400 font-normal ml-1">(configured)</span>}
+                {brandVoice && <span className="text-[11px] text-emerald-400 font-normal ml-1">(configured)</span>}
               </h4>
               {brandVoiceOpen ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500" />}
             </button>
             {brandVoiceOpen && (
               <div className="mt-3 space-y-2">
-                <p className="text-[10px] text-zinc-500">
+                <p className="text-[11px] text-zinc-500">
                   Define your brand's voice and tone. This will be used in ALL AI-generated copy — SEO rewrites, content briefs, and SEO copy generation.
                   You can also drop <code className="text-teal-400">.txt</code> or <code className="text-teal-400">.md</code> files into the <code className="text-teal-400">brand-docs/</code> folder in your workspace uploads.
                 </p>

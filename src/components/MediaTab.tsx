@@ -50,7 +50,7 @@ export function MediaTab({ siteId, workspaceFolder, queue }: Props) {
           </div>
           <div className="flex items-center justify-center gap-2 text-[11px] text-zinc-500">
             <Clipboard className="w-3 h-3" />
-            <span>Press <kbd className="px-1.5 py-0.5 rounded font-mono text-[10px] bg-zinc-900 text-zinc-400">⌘V</kbd> to paste images from clipboard</span>
+            <span>Press <kbd className="px-1.5 py-0.5 rounded font-mono text-[11px] bg-zinc-900 text-zinc-400">⌘V</kbd> to paste images from clipboard</span>
           </div>
           <div>
             <h2 className="text-xs font-medium mb-2.5 px-0.5 text-zinc-500 uppercase tracking-wider">Processing Queue</h2>

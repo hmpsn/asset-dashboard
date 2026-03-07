@@ -87,10 +87,10 @@ function PageWeight({ siteId }: Props) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
         <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center">
-          <BarChart3 className="w-8 h-8 text-zinc-600" />
+          <BarChart3 className="w-8 h-8 text-zinc-500" />
         </div>
         <p className="text-zinc-400 text-sm">Analyze image weight per page</p>
-        <p className="text-xs text-zinc-600">See which pages load the most image data</p>
+        <p className="text-xs text-zinc-500">See which pages load the most image data</p>
         <button
           onClick={runAnalysis}
           className="px-5 py-2.5 bg-teal-600 hover:bg-teal-500 rounded-lg text-sm font-medium transition-colors"
@@ -106,7 +106,7 @@ function PageWeight({ siteId }: Props) {
       <div className="flex flex-col items-center justify-center py-16 gap-3 text-zinc-500">
         <Loader2 className="w-6 h-6 animate-spin text-teal-400" />
         <p className="text-sm">Scanning published pages for image weight...</p>
-        <p className="text-xs text-zinc-600">This may take 30–60 seconds</p>
+        <p className="text-xs text-zinc-500">This may take 30–60 seconds</p>
       </div>
     );
   }
@@ -224,7 +224,7 @@ function PageWeight({ siteId }: Props) {
                 {page.assets.map(asset => (
                   <div key={asset.id} className="flex items-center gap-3 px-4 py-1.5 text-xs">
                     <div className="flex-1 min-w-0 text-zinc-500 truncate">{asset.name}</div>
-                    <span className="text-zinc-600 flex-shrink-0">{asset.contentType.split('/')[1] || ''}</span>
+                    <span className="text-zinc-500 flex-shrink-0">{asset.contentType.split('/')[1] || ''}</span>
                     <span className={`tabular-nums flex-shrink-0 ${asset.size > 500 * 1024 ? 'text-orange-400' : 'text-zinc-500'}`}>
                       {formatSize(asset.size)}
                     </span>

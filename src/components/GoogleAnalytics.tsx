@@ -187,10 +187,10 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-3">
         <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center">
-          <BarChart3 className="w-8 h-8 text-zinc-600" />
+          <BarChart3 className="w-8 h-8 text-zinc-500" />
         </div>
         <p className="text-sm text-zinc-400">Google Analytics not configured</p>
-        <p className="text-xs text-zinc-600 max-w-md text-center">
+        <p className="text-xs text-zinc-500 max-w-md text-center">
           Connect Google in Settings and select a GA4 property for this workspace to view analytics data.
         </p>
       </div>
@@ -269,7 +269,7 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
             <div key={m.label} className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
               <div className="flex items-center gap-1.5 mb-1.5">
                 <Icon className={`w-3.5 h-3.5 ${m.color}`} />
-                <span className="text-[10px] text-zinc-500 font-medium">{m.label}</span>
+                <span className="text-[11px] text-zinc-500 font-medium">{m.label}</span>
               </div>
               <div className="text-xl font-bold text-zinc-200">{m.value}</div>
             </div>
@@ -287,7 +287,7 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
                 <button
                   key={k}
                   onClick={() => setTrendMetric(k)}
-                  className={`px-2 py-0.5 text-[10px] font-medium capitalize transition-colors ${
+                  className={`px-2 py-0.5 text-[11px] font-medium capitalize transition-colors ${
                     trendMetric === k ? 'bg-zinc-700 text-zinc-200' : 'bg-zinc-800 text-zinc-500 hover:text-zinc-300'
                   }`}
                 >
@@ -308,12 +308,12 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
           <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
             {topPages.slice(0, 15).map((page, i) => (
               <div key={page.path} className="flex items-center gap-2 text-xs py-1">
-                <span className="text-zinc-600 w-4 text-right flex-shrink-0">{i + 1}</span>
+                <span className="text-zinc-500 w-4 text-right flex-shrink-0">{i + 1}</span>
                 <span className="text-zinc-300 truncate flex-1 min-w-0" title={page.path}>{page.path}</span>
                 <span className="text-zinc-500 flex-shrink-0 tabular-nums">{formatNumber(page.pageviews)}</span>
               </div>
             ))}
-            {topPages.length === 0 && <p className="text-xs text-zinc-600">No data</p>}
+            {topPages.length === 0 && <p className="text-xs text-zinc-500">No data</p>}
           </div>
         </div>
 
@@ -325,11 +325,11 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
               const maxSessions = sources[0]?.sessions || 1;
               return (
                 <div key={`${src.source}-${src.medium}`} className="flex items-center gap-2 text-xs py-1">
-                  <span className="text-zinc-600 w-4 text-right flex-shrink-0">{i + 1}</span>
+                  <span className="text-zinc-500 w-4 text-right flex-shrink-0">{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className="text-zinc-300 truncate">{src.source || '(direct)'}</span>
-                      <span className="text-zinc-600">/</span>
+                      <span className="text-zinc-500">/</span>
                       <span className="text-zinc-500 truncate">{src.medium || '(none)'}</span>
                     </div>
                     <div className="mt-0.5 h-1 bg-zinc-800 rounded-full overflow-hidden">
@@ -343,7 +343,7 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
                 </div>
               );
             })}
-            {sources.length === 0 && <p className="text-xs text-zinc-600">No data</p>}
+            {sources.length === 0 && <p className="text-xs text-zinc-500">No data</p>}
           </div>
         </div>
       </div>
@@ -372,7 +372,7 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
                 <span className="text-xs text-zinc-500 tabular-nums w-10 text-right">{formatNumber(d.users)}</span>
               </div>
             ))}
-            {devices.length === 0 && <p className="text-xs text-zinc-600">No data</p>}
+            {devices.length === 0 && <p className="text-xs text-zinc-500">No data</p>}
           </div>
         </div>
 
@@ -384,7 +384,7 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
               const maxUsers = countries[0]?.users || 1;
               return (
                 <div key={c.country} className="flex items-center gap-2 text-xs py-0.5">
-                  <span className="text-zinc-600 w-4 text-right flex-shrink-0">{i + 1}</span>
+                  <span className="text-zinc-500 w-4 text-right flex-shrink-0">{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-0.5">
                       <span className="text-zinc-300 truncate">{c.country}</span>
@@ -400,7 +400,7 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
                 </div>
               );
             })}
-            {countries.length === 0 && <p className="text-xs text-zinc-600">No data</p>}
+            {countries.length === 0 && <p className="text-xs text-zinc-500">No data</p>}
           </div>
         </div>
       </div>

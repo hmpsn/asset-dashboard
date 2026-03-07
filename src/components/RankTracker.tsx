@@ -115,7 +115,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
         <div className="flex items-center gap-2">
           <Target className="w-5 h-5 text-teal-400" />
           <h2 className="text-sm font-semibold text-zinc-200">Rank Tracker</h2>
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{keywords.length} keywords</span>
+          <span className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{keywords.length} keywords</span>
         </div>
         {hasGsc && (
           <button
@@ -160,7 +160,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
       {/* Rankings table */}
       {sorted.length > 0 ? (
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-          <div className="grid grid-cols-[1fr,80px,80px,80px,80px,60px] gap-2 px-4 py-2 text-[10px] font-medium text-zinc-500 uppercase tracking-wider border-b border-zinc-800">
+          <div className="grid grid-cols-[1fr,80px,80px,80px,80px,60px] gap-2 px-4 py-2 text-[11px] font-medium text-zinc-500 uppercase tracking-wider border-b border-zinc-800">
             <span>Keyword</span>
             <span className="text-right">Position</span>
             <span className="text-right">Change</span>
@@ -183,12 +183,12 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
               </div>
               <div className="text-right">
                 {rank.change != null ? (
-                  <span className={`flex items-center justify-end gap-0.5 text-xs font-medium ${rank.change < 0 ? 'text-green-400' : rank.change > 0 ? 'text-red-400' : 'text-zinc-600'}`}>
+                  <span className={`flex items-center justify-end gap-0.5 text-xs font-medium ${rank.change < 0 ? 'text-green-400' : rank.change > 0 ? 'text-red-400' : 'text-zinc-500'}`}>
                     {rank.change < 0 ? <ArrowUp className="w-3 h-3" /> : rank.change > 0 ? <ArrowDown className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
                     {rank.change !== 0 ? Math.abs(Math.round(rank.change * 10) / 10) : '—'}
                   </span>
                 ) : (
-                  <span className="text-[10px] text-zinc-600">—</span>
+                  <span className="text-[11px] text-zinc-500">—</span>
                 )}
               </div>
               <div className="text-right text-xs text-zinc-400">{rank.clicks}</div>
@@ -205,25 +205,25 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
         <div className="text-center py-8">
           <TrendingUp className="w-7 h-7 text-zinc-700 mx-auto mb-2" />
           <p className="text-xs text-zinc-500">Keywords added but no rank data yet</p>
-          <p className="text-[10px] text-zinc-600 mt-1">Capture a snapshot to start tracking</p>
+          <p className="text-[11px] text-zinc-500 mt-1">Capture a snapshot to start tracking</p>
         </div>
       ) : (
         <div className="text-center py-8">
           <Target className="w-7 h-7 text-zinc-700 mx-auto mb-2" />
           <p className="text-xs text-zinc-500">No keywords tracked yet</p>
-          <p className="text-[10px] text-zinc-600 mt-1">Add keywords above to start monitoring positions</p>
+          <p className="text-[11px] text-zinc-500 mt-1">Add keywords above to start monitoring positions</p>
         </div>
       )}
 
       {/* Keywords without rank data */}
       {keywords.filter(k => !latestRanks.find(r => r.query === k.query)).length > 0 && (
         <div className="bg-zinc-900/50 rounded-xl border border-zinc-800 p-3">
-          <div className="text-[10px] text-zinc-500 mb-2">Tracked but no rank data:</div>
+          <div className="text-[11px] text-zinc-500 mb-2">Tracked but no rank data:</div>
           <div className="flex flex-wrap gap-1.5">
             {keywords.filter(k => !latestRanks.find(r => r.query === k.query)).map(k => (
-              <span key={k.query} className="flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-zinc-800 text-zinc-400">
+              <span key={k.query} className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-zinc-800 text-zinc-400">
                 {k.query}
-                <button onClick={() => removeKeyword(k.query)} className="text-zinc-600 hover:text-red-400"><Trash2 className="w-2.5 h-2.5" /></button>
+                <button onClick={() => removeKeyword(k.query)} className="text-zinc-500 hover:text-red-400"><Trash2 className="w-2.5 h-2.5" /></button>
               </span>
             ))}
           </div>

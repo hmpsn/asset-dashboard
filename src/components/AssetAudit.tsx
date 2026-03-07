@@ -243,10 +243,10 @@ function AssetAudit({ siteId }: Props) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
         <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center">
-          <AlertTriangle className="w-8 h-8 text-zinc-600" />
+          <AlertTriangle className="w-8 h-8 text-zinc-500" />
         </div>
         <p className="text-zinc-400 text-sm">Scan your Webflow site for asset issues</p>
-        <p className="text-xs text-zinc-600">Checks for missing alt text, oversized files, unused assets, and more</p>
+        <p className="text-xs text-zinc-500">Checks for missing alt text, oversized files, unused assets, and more</p>
         <button
           onClick={runAudit}
           className="px-5 py-2.5 bg-teal-600 hover:bg-teal-500 rounded-lg text-sm font-medium transition-colors"
@@ -262,7 +262,7 @@ function AssetAudit({ siteId }: Props) {
       <div className="flex flex-col items-center justify-center py-16 gap-3 text-zinc-500">
         <Loader2 className="w-6 h-6 animate-spin text-teal-400" />
         <p className="text-sm">Scanning published pages, CMS collections, CSS, and assets...</p>
-        <p className="text-xs text-zinc-600">This may take 30–60 seconds for large sites</p>
+        <p className="text-xs text-zinc-500">This may take 30–60 seconds for large sites</p>
       </div>
     );
   }
@@ -284,7 +284,7 @@ function AssetAudit({ siteId }: Props) {
         >
           <div className={`text-3xl font-bold ${scoreColor}`}>{score}</div>
           <div className="text-xs text-zinc-500 mt-1">Health Score</div>
-          <div className="text-[10px] text-zinc-600 mt-0.5">{audit.totalAssets} total · {audit.issueCount} with issues</div>
+          <div className="text-[11px] text-zinc-500 mt-0.5">{audit.totalAssets} total · {audit.issueCount} with issues</div>
         </button>
 
         <button
@@ -296,7 +296,7 @@ function AssetAudit({ siteId }: Props) {
           <div className="text-3xl font-bold text-amber-400">{audit.missingAlt}</div>
           <div className="text-xs text-zinc-500 mt-1">Missing Alt Text</div>
           {((audit.lowQualityAlt || 0) + (audit.duplicateAlt || 0)) > 0 && (
-            <div className="text-[10px] text-yellow-500 mt-0.5">+{(audit.lowQualityAlt || 0) + (audit.duplicateAlt || 0)} low quality</div>
+            <div className="text-[11px] text-yellow-500 mt-0.5">+{(audit.lowQualityAlt || 0) + (audit.duplicateAlt || 0)} low quality</div>
           )}
         </button>
 
@@ -309,7 +309,7 @@ function AssetAudit({ siteId }: Props) {
           <div className="text-3xl font-bold text-orange-400">{audit.oversized}</div>
           <div className="text-xs text-zinc-500 mt-1">Oversized</div>
           {unoptimizedPngCount > 0 && (
-            <div className="text-[10px] text-orange-300 mt-0.5">+{unoptimizedPngCount} unoptimized PNG</div>
+            <div className="text-[11px] text-orange-300 mt-0.5">+{unoptimizedPngCount} unoptimized PNG</div>
           )}
         </button>
 
@@ -322,7 +322,7 @@ function AssetAudit({ siteId }: Props) {
           <div className="text-3xl font-bold text-zinc-400">{audit.unused}</div>
           <div className="text-xs text-zinc-500 mt-1">Unused</div>
           {(audit.duplicates || 0) > 0 && (
-            <div className="text-[10px] text-cyan-400 mt-0.5">{audit.duplicates} possible duplicates</div>
+            <div className="text-[11px] text-cyan-400 mt-0.5">{audit.duplicates} possible duplicates</div>
           )}
         </button>
       </div>
@@ -496,7 +496,7 @@ function AssetAudit({ siteId }: Props) {
       </div>
 
       {/* Showing count */}
-      <div className="text-xs text-zinc-600 px-1">
+      <div className="text-xs text-zinc-500 px-1">
         Showing {filteredIssues.length} of {audit.issues.length} issues
         {activeFilter && (
           <button onClick={() => setActiveFilter(null)} className="ml-2 text-zinc-500 hover:text-zinc-300 underline">
@@ -523,7 +523,7 @@ function AssetAudit({ siteId }: Props) {
                 {issue.url ? (
                   <img src={issue.url} alt="" className="w-full h-full object-cover" loading="lazy" />
                 ) : (
-                  <Image className="w-4 h-4 text-zinc-600" />
+                  <Image className="w-4 h-4 text-zinc-500" />
                 )}
               </button>
 
@@ -536,23 +536,23 @@ function AssetAudit({ siteId }: Props) {
                     if (!info) return null;
                     const Icon = info.icon;
                     return (
-                      <span key={issueType} className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border ${info.bg} ${info.color}`}>
+                      <span key={issueType} className={`inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded border ${info.bg} ${info.color}`}>
                         <Icon className="w-2.5 h-2.5" /> {info.label}
                       </span>
                     );
                   })}
                   {issue.fileSize && issue.fileSize > 0 && (
-                    <span className="text-[10px] text-zinc-600">{formatSize(issue.fileSize)}</span>
+                    <span className="text-[11px] text-zinc-500">{formatSize(issue.fileSize)}</span>
                   )}
                 </div>
               </div>
 
               {/* Usage */}
-              <div className="text-xs text-zinc-600 w-36 truncate text-right" title={issue.usedIn.join(', ')}>
+              <div className="text-xs text-zinc-500 w-36 truncate text-right" title={issue.usedIn.join(', ')}>
                 {issue.usedIn.length > 0 ? (
                   <span className="text-zinc-500">{issue.usedIn.length} page{issue.usedIn.length !== 1 ? 's' : ''}</span>
                 ) : (
-                  <span className="text-zinc-600 italic">Not used</span>
+                  <span className="text-zinc-500 italic">Not used</span>
                 )}
               </div>
 
@@ -636,7 +636,7 @@ function AssetAudit({ siteId }: Props) {
                     if (!info) return null;
                     const Icon = info.icon;
                     return (
-                      <span key={issueType} className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border ${info.bg} ${info.color}`}>
+                      <span key={issueType} className={`inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded border ${info.bg} ${info.color}`}>
                         <Icon className="w-2.5 h-2.5" /> {info.label}
                       </span>
                     );
@@ -644,7 +644,7 @@ function AssetAudit({ siteId }: Props) {
                 </div>
                 {lightboxIssue.usedIn.length > 0 && (
                   <div className="text-xs text-zinc-500">
-                    <span className="text-zinc-600">Used on:</span>{' '}
+                    <span className="text-zinc-500">Used on:</span>{' '}
                     {lightboxIssue.usedIn.join(', ')}
                   </div>
                 )}

@@ -401,12 +401,12 @@ export function SeoEditor({ siteId, workspaceId }: Props) {
                 {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500" />}
                 <div className="flex-1 min-w-0">
                   <div className="text-sm text-zinc-300 truncate">{page.title}</div>
-                  <div className="text-xs text-zinc-600 truncate">/{page.slug}</div>
+                  <div className="text-xs text-zinc-500 truncate">/{page.slug}</div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {!hasSeoTitle && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">No title</span>}
-                  {!hasSeoDesc && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400">No desc</span>}
-                  {edit?.dirty && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400">Unsaved</span>}
+                  {!hasSeoTitle && <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">No title</span>}
+                  {!hasSeoDesc && <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400">No desc</span>}
+                  {edit?.dirty && <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400">Unsaved</span>}
                 </div>
               </button>
               </div>
@@ -418,13 +418,13 @@ export function SeoEditor({ siteId, workspaceId }: Props) {
                     <div className="flex items-center justify-between mb-1">
                       <label className="text-xs font-medium text-zinc-400">SEO Title</label>
                       <div className="flex items-center gap-1">
-                        <span className={`text-[10px] ${(edit.seoTitle.length > 60 || edit.seoTitle.length === 0) ? 'text-red-400' : edit.seoTitle.length > 50 ? 'text-amber-400' : 'text-green-400'}`}>
+                        <span className={`text-[11px] ${(edit.seoTitle.length > 60 || edit.seoTitle.length === 0) ? 'text-red-400' : edit.seoTitle.length > 50 ? 'text-amber-400' : 'text-green-400'}`}>
                           {edit.seoTitle.length}/60
                         </span>
                         <button
                           onClick={() => aiRewrite(page.id, 'title')}
                           disabled={!!isAiLoading}
-                          className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-teal-600/50 hover:bg-teal-500/50 rounded transition-colors disabled:opacity-50"
+                          className="flex items-center gap-1 px-1.5 py-0.5 text-[11px] bg-teal-600/50 hover:bg-teal-500/50 rounded transition-colors disabled:opacity-50"
                           title="AI rewrite"
                         >
                           {isAiLoading === 'title' ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Sparkles className="w-2.5 h-2.5" />}
@@ -446,13 +446,13 @@ export function SeoEditor({ siteId, workspaceId }: Props) {
                     <div className="flex items-center justify-between mb-1">
                       <label className="text-xs font-medium text-zinc-400">Meta Description</label>
                       <div className="flex items-center gap-1">
-                        <span className={`text-[10px] ${(edit.seoDescription.length > 160 || edit.seoDescription.length === 0) ? 'text-red-400' : edit.seoDescription.length > 150 ? 'text-amber-400' : 'text-green-400'}`}>
+                        <span className={`text-[11px] ${(edit.seoDescription.length > 160 || edit.seoDescription.length === 0) ? 'text-red-400' : edit.seoDescription.length > 150 ? 'text-amber-400' : 'text-green-400'}`}>
                           {edit.seoDescription.length}/160
                         </span>
                         <button
                           onClick={() => aiRewrite(page.id, 'description')}
                           disabled={!!isAiLoading}
-                          className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-teal-600/50 hover:bg-teal-500/50 rounded transition-colors disabled:opacity-50"
+                          className="flex items-center gap-1 px-1.5 py-0.5 text-[11px] bg-teal-600/50 hover:bg-teal-500/50 rounded transition-colors disabled:opacity-50"
                           title="AI rewrite"
                         >
                           {isAiLoading === 'description' ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Sparkles className="w-2.5 h-2.5" />}

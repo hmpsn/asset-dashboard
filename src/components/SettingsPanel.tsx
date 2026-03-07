@@ -76,7 +76,7 @@ export function SettingsPanel() {
           </div>
           {googleStatus?.connected ? (
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full">Connected</span>
+              <span className="text-[11px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full">Connected</span>
               <button onClick={disconnectGoogle} className="p-1.5 rounded-lg hover:bg-white/5 transition-colors" title="Disconnect Google">
                 <LogOut className="w-4 h-4 text-zinc-500" />
               </button>
@@ -86,7 +86,7 @@ export function SettingsPanel() {
               <LogIn className="w-3.5 h-3.5" /> Connect Google
             </button>
           ) : (
-            <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-1 rounded-full">Not configured</span>
+            <span className="text-[11px] text-amber-400 bg-amber-500/10 px-2 py-1 rounded-full">Not configured</span>
           )}
         </div>
 
@@ -133,9 +133,9 @@ export function SettingsPanel() {
           ))}
           {unlinked.map(ws => (
             <div key={ws.id} className="px-5 py-3 flex items-center gap-3 opacity-60">
-              <Unplug className="w-4 h-4 text-zinc-600 shrink-0" />
+              <Unplug className="w-4 h-4 text-zinc-500 shrink-0" />
               <span className="text-sm text-zinc-500">{ws.name}</span>
-              <span className="text-xs text-zinc-600 ml-auto">Not linked</span>
+              <span className="text-xs text-zinc-500 ml-auto">Not linked</span>
             </div>
           ))}
           {workspaces.length === 0 && (

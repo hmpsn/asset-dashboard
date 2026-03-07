@@ -193,8 +193,8 @@ function DualTrendChart({ data, annotations: anns }: { data: PerformanceTrend[];
   return (
     <div className="relative">
       <div className="flex items-center gap-4 mb-2">
-        <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded bg-blue-400" /><span className="text-[10px] text-blue-400">Clicks</span></div>
-        <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded bg-teal-400" /><span className="text-[10px] text-teal-400">Impressions</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded bg-blue-400" /><span className="text-[11px] text-blue-400">Clicks</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded bg-teal-400" /><span className="text-[11px] text-teal-400">Impressions</span></div>
       </div>
       <svg viewBox={`0 0 ${w} 100`} className="w-full" style={{ height: 120 }} preserveAspectRatio="none">
         <defs>
@@ -291,7 +291,7 @@ function ScoreHistoryChart({ history }: { history: Array<{ id: string; createdAt
           ]}
         />
       )}
-      <div className="flex justify-between text-[9px] text-zinc-600 mt-1">
+      <div className="flex justify-between text-[11px] text-zinc-500 mt-1">
         {reversed.map((h, i) => (i === 0 || i === history.length - 1)
           ? <span key={h.id}>{new Date(h.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
           : <span key={h.id} />
@@ -304,7 +304,7 @@ function ScoreHistoryChart({ history }: { history: Array<{ id: string; createdAt
 function RenderMarkdown({ text }: { text: string }) {
   const inlineMd = (s: string) =>
     s.replace(/\*\*(.+?)\*\*/g, '<b class="text-zinc-200">$1</b>')
-     .replace(/`(.+?)`/g, '<code class="bg-zinc-800 px-1 rounded text-zinc-300 text-[10px]">$1</code>');
+     .replace(/`(.+?)`/g, '<code class="bg-zinc-800 px-1 rounded text-zinc-300 text-[11px]">$1</code>');
   const lines = text.split('\n');
   return (
     <div className="space-y-1.5">
@@ -1076,7 +1076,7 @@ export function ClientDashboard({ workspaceId }: Props) {
             <div className="w-px h-8 bg-zinc-800" />
             <div>
               <h1 className="text-lg font-semibold">{ws.name}</h1>
-              <p className="text-xs text-zinc-500 mt-0.5">Performance Dashboard{(overview || audit || ga4Overview) && <span className="ml-2 text-zinc-600">· Updated {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}</p>
+              <p className="text-xs text-zinc-500 mt-0.5">Performance Dashboard{(overview || audit || ga4Overview) && <span className="ml-2 text-zinc-500">· Updated {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -1110,15 +1110,15 @@ export function ClientDashboard({ workspaceId }: Props) {
               return (
                 <button key={t.id} onClick={() => t.locked ? setShowUpgradeModal(true) : setTab(t.id)}
                   className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium border-b-2 transition-colors ${
-                    t.locked ? 'border-transparent text-zinc-600 cursor-default' :
+                    t.locked ? 'border-transparent text-zinc-500 cursor-default' :
                     active ? 'border-teal-500 text-teal-300' :
                     'border-transparent text-zinc-500 hover:text-zinc-300 hover:border-zinc-700'
                   }`}>
                   <Icon className="w-3.5 h-3.5" /> {t.label}
-                  {t.locked && <Lock className="w-3 h-3 ml-0.5 text-zinc-600" />}
-                  {t.id === 'approvals' && pendingApprovals > 0 && <span className="ml-1 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-teal-500 text-white">{pendingApprovals}</span>}
-                  {t.id === 'requests' && unreadTeamNotes > 0 && <span className="ml-1 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-teal-500 text-white">{unreadTeamNotes}</span>}
-                  {t.id === 'content' && pendingReviews > 0 && <span className="ml-1 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-blue-500 text-white">{pendingReviews}</span>}
+                  {t.locked && <Lock className="w-3 h-3 ml-0.5 text-zinc-500" />}
+                  {t.id === 'approvals' && pendingApprovals > 0 && <span className="ml-1 px-1.5 py-0.5 text-[11px] font-bold rounded-full bg-teal-500 text-white">{pendingApprovals}</span>}
+                  {t.id === 'requests' && unreadTeamNotes > 0 && <span className="ml-1 px-1.5 py-0.5 text-[11px] font-bold rounded-full bg-teal-500 text-white">{unreadTeamNotes}</span>}
+                  {t.id === 'content' && pendingReviews > 0 && <span className="ml-1 px-1.5 py-0.5 text-[11px] font-bold rounded-full bg-blue-500 text-white">{pendingReviews}</span>}
                   {!t.locked && hasData && !active && t.id !== 'approvals' && t.id !== 'requests' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" />}
                 </button>
               );
@@ -1165,8 +1165,8 @@ export function ClientDashboard({ workspaceId }: Props) {
                       {card.td.length > 2 && <MiniSparkline data={card.td} color={card.color} />}
                     </div>
                     <div className="text-2xl font-bold text-zinc-100" style={{ color: card.label === 'Site Health' ? card.color : undefined }}>{card.value}</div>
-                    <div className="text-[10px] text-zinc-500 mt-0.5">{card.label}</div>
-                    {card.sub && <div className="text-[9px] text-zinc-600 mt-0.5">{card.sub}</div>}
+                    <div className="text-[11px] text-zinc-500 mt-0.5">{card.label}</div>
+                    {card.sub && <div className="text-[11px] text-zinc-500 mt-0.5">{card.sub}</div>}
                   </button>
                 ); })}
               </div>
@@ -1182,7 +1182,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                 <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-xs font-medium text-zinc-400">Traffic Trend</span>
-                    {ga4Overview && <span className="text-[10px] text-zinc-600">{ga4Overview.dateRange.start} — {ga4Overview.dateRange.end}</span>}
+                    {ga4Overview && <span className="text-[11px] text-zinc-500">{ga4Overview.dateRange.start} — {ga4Overview.dateRange.end}</span>}
                   </div>
                   <svg viewBox="0 0 400 100" className="w-full h-24" preserveAspectRatio="none">
                     {(() => {
@@ -1205,8 +1205,8 @@ export function ClientDashboard({ workspaceId }: Props) {
                     })()}
                   </svg>
                   <div className="flex items-center gap-4 mt-2">
-                    <span className="flex items-center gap-1.5 text-[10px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-teal-400 inline-block" /> Users</span>
-                    <span className="flex items-center gap-1.5 text-[10px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-blue-400/40 inline-block" /> Sessions</span>
+                    <span className="flex items-center gap-1.5 text-[11px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-teal-400 inline-block" /> Users</span>
+                    <span className="flex items-center gap-1.5 text-[11px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-blue-400/40 inline-block" /> Sessions</span>
                   </div>
                 </div>
               )}
@@ -1214,11 +1214,11 @@ export function ClientDashboard({ workspaceId }: Props) {
                 <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-xs font-medium text-zinc-400">Search Performance</span>
-                    {overview && <span className="text-[10px] text-zinc-600">{overview.dateRange.start} — {overview.dateRange.end}</span>}
+                    {overview && <span className="text-[11px] text-zinc-500">{overview.dateRange.start} — {overview.dateRange.end}</span>}
                   </div>
                   <div className="space-y-3">
-                    <div><div className="text-[10px] text-blue-400 mb-1">Clicks</div><TrendChart data={trend} metric="clicks" color="#60a5fa" /></div>
-                    <div><div className="text-[10px] text-teal-400 mb-1">Impressions</div><TrendChart data={trend} metric="impressions" color="#2dd4bf" /></div>
+                    <div><div className="text-[11px] text-blue-400 mb-1">Clicks</div><TrendChart data={trend} metric="clicks" color="#60a5fa" /></div>
+                    <div><div className="text-[11px] text-teal-400 mb-1">Impressions</div><TrendChart data={trend} metric="impressions" color="#2dd4bf" /></div>
                   </div>
                 </div>
               )}
@@ -1229,7 +1229,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                   <div className="flex items-center gap-2 mb-3">
                     <div className="w-5 h-5 rounded-md bg-emerald-500/15 flex items-center justify-center"><CheckCircle2 className="w-3 h-3 text-emerald-400" /></div>
                     <span className="text-xs font-medium text-zinc-300">Your Top Search Rankings</span>
-                    <button onClick={() => setTab('search')} className="text-[10px] text-teal-400 hover:text-teal-300 ml-auto">View all →</button>
+                    <button onClick={() => setTab('search')} className="text-[11px] text-teal-400 hover:text-teal-300 ml-auto">View all →</button>
                   </div>
                   <div className="space-y-1.5">
                     {insights.topPerformers.slice(0, 5).map((q, i) => (
@@ -1237,7 +1237,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                         <span className="text-zinc-300 truncate mr-3">{q.query}</span>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <span className={`font-mono font-medium ${q.position <= 3 ? 'text-emerald-400' : q.position <= 10 ? 'text-green-400' : 'text-amber-400'}`}>#{q.position}</span>
-                          <span className="text-[9px] text-zinc-600">{q.clicks} clicks</span>
+                          <span className="text-[11px] text-zinc-500">{q.clicks} clicks</span>
                         </div>
                       </div>
                     ))}
@@ -1250,14 +1250,14 @@ export function ClientDashboard({ workspaceId }: Props) {
                 <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2"><Zap className="w-4 h-4 text-teal-400" /><span className="text-xs font-medium text-zinc-300">Key Events</span></div>
-                    <button onClick={() => setTab('analytics')} className="text-[10px] text-teal-400 hover:text-teal-300">View all →</button>
+                    <button onClick={() => setTab('analytics')} className="text-[11px] text-teal-400 hover:text-teal-300">View all →</button>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {sortedConversions.filter(c => isEventPinned(c.eventName)).slice(0, 6).map((c, i) => (
                       <div key={i} className="bg-zinc-800/30 rounded-lg p-3">
-                        <div className="text-[10px] text-zinc-400 truncate mb-1">{eventDisplayName(c.eventName)}</div>
+                        <div className="text-[11px] text-zinc-400 truncate mb-1">{eventDisplayName(c.eventName)}</div>
                         <div className="text-lg font-bold text-zinc-200">{c.conversions.toLocaleString()}</div>
-                        {c.rate > 0 && <div className="text-[10px] text-emerald-400">{c.rate}% rate</div>}
+                        {c.rate > 0 && <div className="text-[11px] text-emerald-400">{c.rate}% rate</div>}
                       </div>
                     ))}
                   </div>
@@ -1289,9 +1289,9 @@ export function ClientDashboard({ workspaceId }: Props) {
                     </div>
                   </div>
                   {auditDetail && auditDetail.audit.errors > 0 && (
-                    <div className="mt-2 text-[10px] text-red-400">{auditDetail.audit.errors} issue{auditDetail.audit.errors !== 1 ? 's' : ''} to fix</div>
+                    <div className="mt-2 text-[11px] text-red-400">{auditDetail.audit.errors} issue{auditDetail.audit.errors !== 1 ? 's' : ''} to fix</div>
                   )}
-                  {audit.siteScore >= 80 && <div className="mt-2 text-[10px] text-emerald-400">Looking good — your site is healthy</div>}
+                  {audit.siteScore >= 80 && <div className="mt-2 text-[11px] text-emerald-400">Looking good — your site is healthy</div>}
                 </button>
               )}
 
@@ -1302,7 +1302,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                     <TrendingUp className="w-4 h-4 text-amber-400" />
                     <span className="text-xs font-medium text-zinc-300">Almost There</span>
                   </div>
-                  <p className="text-[10px] text-zinc-500 mb-2">Keywords close to page 1 — small improvements could mean big traffic gains.</p>
+                  <p className="text-[11px] text-zinc-500 mb-2">Keywords close to page 1 — small improvements could mean big traffic gains.</p>
                   <div className="space-y-1.5">
                     {insights.lowHanging.slice(0, 3).map((q, i) => (
                       <div key={i} className="flex items-center justify-between text-[11px] py-1.5 px-2.5 rounded-lg bg-zinc-800/30">
@@ -1311,7 +1311,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                       </div>
                     ))}
                   </div>
-                  {insights.lowHanging.length > 3 && <button onClick={() => setTab('search')} className="text-[10px] text-teal-400 hover:text-teal-300 mt-2">+{insights.lowHanging.length - 3} more →</button>}
+                  {insights.lowHanging.length > 3 && <button onClick={() => setTab('search')} className="text-[11px] text-teal-400 hover:text-teal-300 mt-2">+{insights.lowHanging.length - 3} more →</button>}
                 </div>
               )}
 
@@ -1348,7 +1348,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                       </button>
                     )}
                   </div>
-                  <div className="text-[10px] text-zinc-600 mt-2.5 pt-2 border-t border-zinc-800">View your full SEO strategy for details</div>
+                  <div className="text-[11px] text-zinc-500 mt-2.5 pt-2 border-t border-zinc-800">View your full SEO strategy for details</div>
                 </div>
               ) : null}
 
@@ -1379,10 +1379,10 @@ export function ClientDashboard({ workspaceId }: Props) {
                             <div className="w-[11px] h-[11px] rounded-full border-2 flex-shrink-0 mt-1 z-10" style={{ borderColor: cfg.color, backgroundColor: '#0f1219' }} />
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5">
-                                <span className="text-[9px] font-medium px-1 py-0.5 rounded" style={{ backgroundColor: `${cfg.color}15`, color: cfg.color }}>{cfg.label}</span>
-                                <span className="text-[9px] text-zinc-600">{new Date(entry.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                                <span className="text-[11px] font-medium px-1 py-0.5 rounded" style={{ backgroundColor: `${cfg.color}15`, color: cfg.color }}>{cfg.label}</span>
+                                <span className="text-[11px] text-zinc-500">{new Date(entry.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                               </div>
-                              <div className="text-[10px] text-zinc-400 mt-0.5 line-clamp-1">{entry.title}</div>
+                              <div className="text-[11px] text-zinc-400 mt-0.5 line-clamp-1">{entry.title}</div>
                             </div>
                           </div>
                         );
@@ -1407,7 +1407,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                 { label: 'Avg Position', value: String(overview.avgPosition), color: 'text-amber-400' },
               ].map(m => (
                 <div key={m.label} className="flex items-center gap-2">
-                  <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{m.label}</span>
+                  <span className="text-[11px] text-zinc-500 uppercase tracking-wider">{m.label}</span>
                   <span className={`text-sm font-bold ${m.color}`}>{m.value}</span>
                 </div>
               ))}
@@ -1417,7 +1417,7 @@ export function ClientDashboard({ workspaceId }: Props) {
               <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-medium text-zinc-400">Performance Trend</span>
-                  <span className="text-[10px] text-zinc-600">{overview.dateRange.start} — {overview.dateRange.end}</span>
+                  <span className="text-[11px] text-zinc-500">{overview.dateRange.start} — {overview.dateRange.end}</span>
                 </div>
                 <DualTrendChart data={trend} annotations={annotations} />
               </div>
@@ -1428,10 +1428,10 @@ export function ClientDashboard({ workspaceId }: Props) {
                 <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                   <div className="text-xs font-medium text-zinc-300 mb-3">Search Health Summary</div>
                   <div className="grid grid-cols-4 gap-3">
-                    <div className="text-center"><div className={`text-lg font-bold ${insights.page1 > 5 ? 'text-green-400' : 'text-amber-400'}`}>{insights.page1}</div><div className="text-[10px] text-zinc-500">Page 1 Rankings</div></div>
-                    <div className="text-center"><div className={`text-lg font-bold ${insights.top3 > 2 ? 'text-green-400' : 'text-amber-400'}`}>{insights.top3}</div><div className="text-[10px] text-zinc-500">Top 3 Rankings</div></div>
-                    <div className="text-center"><div className={`text-lg font-bold ${overview.avgCtr > 3 ? 'text-green-400' : overview.avgCtr > 1.5 ? 'text-amber-400' : 'text-red-400'}`}>{overview.avgCtr}%</div><div className="text-[10px] text-zinc-500">Avg CTR</div></div>
-                    <div className="text-center"><div className={`text-lg font-bold ${insights.lowHanging.length > 0 ? 'text-amber-400' : 'text-green-400'}`}>{insights.lowHanging.length}</div><div className="text-[10px] text-zinc-500">Opportunities</div></div>
+                    <div className="text-center"><div className={`text-lg font-bold ${insights.page1 > 5 ? 'text-green-400' : 'text-amber-400'}`}>{insights.page1}</div><div className="text-[11px] text-zinc-500">Page 1 Rankings</div></div>
+                    <div className="text-center"><div className={`text-lg font-bold ${insights.top3 > 2 ? 'text-green-400' : 'text-amber-400'}`}>{insights.top3}</div><div className="text-[11px] text-zinc-500">Top 3 Rankings</div></div>
+                    <div className="text-center"><div className={`text-lg font-bold ${overview.avgCtr > 3 ? 'text-green-400' : overview.avgCtr > 1.5 ? 'text-amber-400' : 'text-red-400'}`}>{overview.avgCtr}%</div><div className="text-[11px] text-zinc-500">Avg CTR</div></div>
+                    <div className="text-center"><div className={`text-lg font-bold ${insights.lowHanging.length > 0 ? 'text-amber-400' : 'text-green-400'}`}>{insights.lowHanging.length}</div><div className="text-[11px] text-zinc-500">Opportunities</div></div>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -1449,7 +1449,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                 <div className="flex items-center gap-2 mb-3">
                   <TrendingUp className="w-4 h-4 text-teal-400" />
                   <span className="text-xs font-semibold text-zinc-200">Keyword Rank Tracking</span>
-                  <span className="text-[10px] text-zinc-600 ml-auto">{rankHistory.length} snapshots</span>
+                  <span className="text-[11px] text-zinc-500 ml-auto">{rankHistory.length} snapshots</span>
                 </div>
                 {/* Rank history chart */}
                 {rankHistory.length > 1 && (() => {
@@ -1475,13 +1475,13 @@ export function ClientDashboard({ workspaceId }: Props) {
                       </svg>
                       <div className="flex flex-wrap gap-3 mt-1">
                         {allKws.map((kw, ki) => (
-                          <span key={kw} className="flex items-center gap-1.5 text-[10px] text-zinc-500">
+                          <span key={kw} className="flex items-center gap-1.5 text-[11px] text-zinc-500">
                             <span className="w-3 h-0.5 rounded inline-block" style={{ backgroundColor: colors[ki % colors.length] }} />
                             <span className="truncate max-w-[120px]">{kw}</span>
                           </span>
                         ))}
                       </div>
-                      <div className="flex items-center justify-between text-[9px] text-zinc-600 mt-1">
+                      <div className="flex items-center justify-between text-[11px] text-zinc-500 mt-1">
                         <span>Position 1 (top)</span>
                         <span>Position {maxPos} (bottom)</span>
                       </div>
@@ -1513,7 +1513,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                                   {r.change > 0 ? '↑' : '↓'}{Math.abs(r.change)}
                                 </span>
                               )}
-                              {r.change === 0 && <span className="text-zinc-600">—</span>}
+                              {r.change === 0 && <span className="text-zinc-500">—</span>}
                             </td>
                             <td className="py-1.5 px-3 text-right text-blue-400">{r.clicks}</td>
                           </tr>
@@ -1578,15 +1578,15 @@ export function ClientDashboard({ workspaceId }: Props) {
                 <div className="flex items-center gap-2 mb-3">
                   <Activity className="w-4 h-4 text-zinc-400" />
                   <span className="text-xs font-semibold text-zinc-200">Timeline Annotations</span>
-                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{annotations.length}</span>
+                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{annotations.length}</span>
                 </div>
                 <div className="space-y-1.5">
                   {annotations.map(ann => (
                     <div key={ann.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-zinc-950/50">
                       <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: ann.color || '#2dd4bf' }} />
-                      <span className="text-[10px] text-zinc-500 flex-shrink-0">{ann.date}</span>
+                      <span className="text-[11px] text-zinc-500 flex-shrink-0">{ann.date}</span>
                       <span className="text-xs text-zinc-300 flex-1 truncate">{ann.label}</span>
-                      {ann.description && <span className="text-[10px] text-zinc-600 truncate max-w-[120px]">{ann.description}</span>}
+                      {ann.description && <span className="text-[11px] text-zinc-500 truncate max-w-[120px]">{ann.description}</span>}
                     </div>
                   ))}
                 </div>
@@ -1594,9 +1594,9 @@ export function ClientDashboard({ workspaceId }: Props) {
             )}
           </>) : (
             <div className="text-center py-16">
-              <Search className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
+              <Search className="w-8 h-8 text-zinc-500 mx-auto mb-2" />
               <p className="text-sm text-zinc-500">Search data is not yet available</p>
-              <p className="text-xs text-zinc-600 mt-1">Search Console will be configured by your web team.</p>
+              <p className="text-xs text-zinc-500 mt-1">Search Console will be configured by your web team.</p>
             </div>
           )}
         </>)}
@@ -1610,7 +1610,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                 <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6 flex flex-col items-center justify-center">
                   <ScoreRing score={auditDetail.audit.siteScore} size={140} />
                   <div className="text-xs text-zinc-500 mt-3">{auditDetail.audit.totalPages} pages scanned</div>
-                  <div className="text-[10px] text-zinc-600">{new Date(auditDetail.createdAt).toLocaleDateString()}</div>
+                  <div className="text-[11px] text-zinc-500">{new Date(auditDetail.createdAt).toLocaleDateString()}</div>
                   {auditDetail.previousScore != null && (
                     <div className={`text-xs mt-1 ${auditDetail.audit.siteScore > auditDetail.previousScore ? 'text-green-400' : auditDetail.audit.siteScore < auditDetail.previousScore ? 'text-red-400' : 'text-zinc-500'}`}>
                       {auditDetail.audit.siteScore > auditDetail.previousScore ? '↑' : '↓'} {Math.abs(auditDetail.audit.siteScore - auditDetail.previousScore)} from previous
@@ -1652,7 +1652,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                           <div key={cat} className="flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: info.color }} />
                             <span className="text-[11px] text-zinc-400 flex-1">{info.label}</span>
-                            <div className="flex items-center gap-1.5 text-[10px]">
+                            <div className="flex items-center gap-1.5 text-[11px]">
                               {counts.errors > 0 && <span className="text-red-400">{counts.errors}E</span>}
                               {counts.warnings > 0 && <span className="text-amber-400">{counts.warnings}W</span>}
                               {counts.infos > 0 && <span className="text-blue-400">{counts.infos}I</span>}
@@ -1675,7 +1675,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                       return (
                         <div key={i} className={`px-3 py-2.5 rounded-lg ${sc.bg} border ${sc.border}`}>
                           <div className={`text-xs font-medium ${sc.text}`}>{issue.message}</div>
-                          <div className="text-[10px] text-zinc-500 mt-0.5">{issue.recommendation}</div>
+                          <div className="text-[11px] text-zinc-500 mt-0.5">{issue.recommendation}</div>
                         </div>
                       );
                     })}
@@ -1691,7 +1691,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                   <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-0.5">
                     {(['all', 'error', 'warning', 'info'] as const).map(s => (
                       <button key={s} onClick={() => setSeverityFilter(s)}
-                        className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-colors ${
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
                           severityFilter === s ? (s === 'all' ? 'bg-zinc-700 text-zinc-200' : `${SEV[s].bg} ${SEV[s].text}`) : 'text-zinc-500 hover:text-zinc-300'
                         }`}>{s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}</button>
                     ))}
@@ -1708,14 +1708,14 @@ export function ClientDashboard({ workspaceId }: Props) {
                     return (
                       <div key={page.pageId}>
                         <button onClick={() => togglePage(page.pageId)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/30 transition-colors text-left">
-                          <ChevronDown className={`w-3.5 h-3.5 text-zinc-600 transition-transform ${isExp ? '' : '-rotate-90'}`} />
+                          <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${isExp ? '' : '-rotate-90'}`} />
                           <div className="flex-1 min-w-0">
                             <div className="text-xs font-medium text-zinc-300 truncate">{page.page}</div>
-                            <div className="text-[10px] text-zinc-600 truncate">{toLiveUrl(page.url, ws.liveDomain)}</div>
+                            <div className="text-[11px] text-zinc-500 truncate">{toLiveUrl(page.url, ws.liveDomain)}</div>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            {errs > 0 && <span className="text-[10px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">{errs} err</span>}
-                            {warns > 0 && <span className="text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">{warns} warn</span>}
+                            {errs > 0 && <span className="text-[11px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">{errs} err</span>}
+                            {warns > 0 && <span className="text-[11px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">{warns} warn</span>}
                             <div className={`text-xs font-bold ${page.score >= 80 ? 'text-green-400' : page.score >= 60 ? 'text-amber-400' : 'text-red-400'}`}>{page.score}</div>
                           </div>
                         </button>
@@ -1726,11 +1726,11 @@ export function ClientDashboard({ workspaceId }: Props) {
                               return (
                                 <div key={i} className={`px-3 py-2 rounded-lg ${sc.bg} border ${sc.border}`}>
                                   <div className="flex items-start gap-2">
-                                    <span className={`text-[10px] font-medium uppercase ${sc.text} flex-shrink-0 mt-0.5`}>{issue.severity}</span>
+                                    <span className={`text-[11px] font-medium uppercase ${sc.text} flex-shrink-0 mt-0.5`}>{issue.severity}</span>
                                     <div>
                                       <div className="text-[11px] text-zinc-300">{issue.message}</div>
-                                      <div className="text-[10px] text-zinc-500 mt-0.5">{issue.recommendation}</div>
-                                      {issue.value && <div className="text-[10px] text-zinc-600 mt-0.5 font-mono">Current: {issue.value}</div>}
+                                      <div className="text-[11px] text-zinc-500 mt-0.5">{issue.recommendation}</div>
+                                      {issue.value && <div className="text-[11px] text-zinc-500 mt-0.5 font-mono">Current: {issue.value}</div>}
                                     </div>
                                   </div>
                                 </div>
@@ -1741,7 +1741,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                       </div>
                     );
                   })}
-                  {filteredPages.length === 0 && <div className="px-4 py-8 text-center text-xs text-zinc-600">No pages match your filters</div>}
+                  {filteredPages.length === 0 && <div className="px-4 py-8 text-center text-xs text-zinc-500">No pages match your filters</div>}
                 </div>
               </div>
             </div>
@@ -1758,9 +1758,9 @@ export function ClientDashboard({ workspaceId }: Props) {
             </div>
           ) : (
             <div className="text-center py-16">
-              <Shield className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
+              <Shield className="w-8 h-8 text-zinc-500 mx-auto mb-2" />
               <p className="text-sm text-zinc-500">No site audit available yet</p>
-              <p className="text-xs text-zinc-600 mt-1">Ask your team to run a site audit for detailed health metrics.</p>
+              <p className="text-xs text-zinc-500 mt-1">Ask your team to run a site audit for detailed health metrics.</p>
             </div>
           )}
         </>)}
@@ -1773,7 +1773,7 @@ export function ClientDashboard({ workspaceId }: Props) {
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-sm font-semibold text-zinc-200">SEO Keyword Strategy</h2>
-                  <p className="text-[10px] text-zinc-500 mt-0.5">Generated {new Date(strategyData.generatedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                  <p className="text-[11px] text-zinc-500 mt-0.5">Generated {new Date(strategyData.generatedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
                 </div>
               </div>
 
@@ -1786,24 +1786,24 @@ export function ClientDashboard({ workspaceId }: Props) {
                 return (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-                      <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Pages Mapped</div>
+                      <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Pages Mapped</div>
                       <div className="text-xl font-bold text-zinc-100">{strategyData.pageMap.length}</div>
-                      <div className="text-[10px] text-zinc-600">{strategyData.siteKeywords.length} target keywords</div>
+                      <div className="text-[11px] text-zinc-500">{strategyData.siteKeywords.length} target keywords</div>
                     </div>
                     <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-                      <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Eye className="w-3 h-3" /> Impressions</div>
+                      <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Eye className="w-3 h-3" /> Impressions</div>
                       <div className="text-xl font-bold text-zinc-100">{totalImp > 0 ? totalImp.toLocaleString() : '—'}</div>
-                      <div className="text-[10px] text-zinc-600">{totalImp > 0 ? 'last 90 days' : 'no search data yet'}</div>
+                      <div className="text-[11px] text-zinc-500">{totalImp > 0 ? 'last 90 days' : 'no search data yet'}</div>
                     </div>
                     <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-                      <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><MousePointerClick className="w-3 h-3" /> Clicks</div>
+                      <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><MousePointerClick className="w-3 h-3" /> Clicks</div>
                       <div className="text-xl font-bold text-zinc-100">{totalClk > 0 ? totalClk.toLocaleString() : '—'}</div>
-                      <div className="text-[10px] text-zinc-600">{totalImp > 0 ? `${((totalClk / totalImp) * 100).toFixed(1)}% CTR` : 'no search data yet'}</div>
+                      <div className="text-[11px] text-zinc-500">{totalImp > 0 ? `${((totalClk / totalImp) * 100).toFixed(1)}% CTR` : 'no search data yet'}</div>
                     </div>
                     <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-                      <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Trophy className="w-3 h-3" /> Avg Position</div>
+                      <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Trophy className="w-3 h-3" /> Avg Position</div>
                       <div className={`text-xl font-bold ${ranked.length > 0 ? (avgPos <= 3 ? 'text-emerald-400' : avgPos <= 10 ? 'text-green-400' : avgPos <= 20 ? 'text-amber-400' : 'text-red-400') : 'text-zinc-500'}`}>{ranked.length > 0 ? `#${avgPos.toFixed(1)}` : '—'}</div>
-                      <div className="text-[10px] text-zinc-600">{ranked.length} pages ranking</div>
+                      <div className="text-[11px] text-zinc-500">{ranked.length} pages ranking</div>
                     </div>
                   </div>
                 );
@@ -1820,7 +1820,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                       </div>
                       <div>
                         <div className="text-sm font-semibold text-amber-200">Quick Wins</div>
-                        <div className="text-[10px] text-amber-400/60">Low-effort changes that can improve rankings fast</div>
+                        <div className="text-[11px] text-amber-400/60">Low-effort changes that can improve rankings fast</div>
                       </div>
                     </div>
                     <div className="space-y-2 mt-3">
@@ -1830,10 +1830,10 @@ export function ClientDashboard({ workspaceId }: Props) {
                           <div key={i} className="px-3.5 py-3 rounded-lg bg-zinc-900/60 border border-zinc-800/80 hover:border-amber-500/20 transition-colors">
                             <div className="flex items-center justify-between">
                               <span className="text-[11px] font-mono text-zinc-500">{qw.pagePath}</span>
-                              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${impactColor}`}>{qw.estimatedImpact} impact</span>
+                              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${impactColor}`}>{qw.estimatedImpact} impact</span>
                             </div>
                             <div className="text-[11px] text-zinc-200 mt-1.5 font-medium">{qw.action}</div>
-                            <div className="text-[10px] text-zinc-500 mt-1">{qw.rationale}</div>
+                            <div className="text-[11px] text-zinc-500 mt-1">{qw.rationale}</div>
                           </div>
                         );
                       })}
@@ -1854,10 +1854,10 @@ export function ClientDashboard({ workspaceId }: Props) {
                         </div>
                         <div>
                           <div className="text-sm font-semibold text-teal-200">Content Opportunities</div>
-                          <div className="text-[10px] text-teal-400/60">New pages that could drive significant organic traffic</div>
+                          <div className="text-[11px] text-teal-400/60">New pages that could drive significant organic traffic</div>
                         </div>
                       </div>
-                      <span className="text-[10px] text-zinc-500">{strategyData.contentGaps.length} topics identified</span>
+                      <span className="text-[11px] text-zinc-500">{strategyData.contentGaps.length} topics identified</span>
                     </div>
                     <p className="text-[11px] text-zinc-400 mt-2 mb-4 leading-relaxed">
                       Based on your keyword strategy and competitor analysis, these topics represent untapped search traffic. Click <strong className="text-teal-300">Request This Topic</strong> to have our team create a full content brief.
@@ -1869,27 +1869,27 @@ export function ClientDashboard({ workspaceId }: Props) {
                         return (
                           <div key={i} className="px-4 py-3.5 rounded-lg bg-zinc-900/60 border border-zinc-800/80 hover:border-teal-500/30 transition-all group flex flex-col">
                             <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                              <span className="text-[9px] text-zinc-500 uppercase tracking-wider">{gap.intent}</span>
-                              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${prioColor}`}>{gap.priority}</span>
+                              <span className="text-[11px] text-zinc-500 uppercase tracking-wider">{gap.intent}</span>
+                              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${prioColor}`}>{gap.priority}</span>
                             </div>
                             <div className="text-xs font-semibold text-zinc-100 mb-1">{gap.topic}</div>
                             <div className="text-[11px] text-teal-400 font-medium mb-1">&ldquo;{gap.targetKeyword}&rdquo;</div>
-                            <div className="text-[10px] text-zinc-500 leading-relaxed flex-1 mb-3">{gap.rationale}</div>
+                            <div className="text-[11px] text-zinc-500 leading-relaxed flex-1 mb-3">{gap.rationale}</div>
                             <div className="mt-auto">
                               {alreadyRequested ? (
-                                <span className="flex items-center gap-1 text-[10px] text-teal-400 bg-teal-500/10 px-2.5 py-1.5 rounded-lg border border-teal-500/20 w-fit"><CheckCircle2 className="w-3.5 h-3.5" /> Requested</span>
+                                <span className="flex items-center gap-1 text-[11px] text-teal-400 bg-teal-500/10 px-2.5 py-1.5 rounded-lg border border-teal-500/20 w-fit"><CheckCircle2 className="w-3.5 h-3.5" /> Requested</span>
                               ) : (
                                 <div className="flex items-center gap-2">
                                   <button
                                     onClick={() => setPricingModal({ serviceType: 'brief_only', topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, source: 'strategy' })}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600/20 border border-teal-500/30 text-[10px] text-teal-300 font-medium hover:bg-teal-600/40 transition-all"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 font-medium hover:bg-teal-600/40 transition-all"
                                   >
                                     <FileText className="w-3 h-3" /> Get a Brief
                                     {ws?.contentPricing && <span className="text-[8px] opacity-70 ml-0.5">{new Intl.NumberFormat('en-US', { style: 'currency', currency: ws.contentPricing.currency || 'USD', minimumFractionDigits: 0 }).format(ws.contentPricing.briefPrice)}</span>}
                                   </button>
                                   <button
                                     onClick={() => setPricingModal({ serviceType: 'full_post', topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, source: 'strategy' })}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600/30 to-teal-600/30 border border-blue-500/30 text-[10px] text-blue-200 font-medium hover:from-blue-600/50 hover:to-teal-600/50 transition-all"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600/30 to-teal-600/30 border border-blue-500/30 text-[11px] text-blue-200 font-medium hover:from-blue-600/50 hover:to-teal-600/50 transition-all"
                                   >
                                     <Sparkles className="w-3 h-3" /> Get Full Post
                                     {ws?.contentPricing && <span className="text-[8px] opacity-70 ml-0.5">{new Intl.NumberFormat('en-US', { style: 'currency', currency: ws.contentPricing.currency || 'USD', minimumFractionDigits: 0 }).format(ws.contentPricing.fullPostPrice)}</span>}
@@ -1918,7 +1918,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                     <div className="space-y-2">
                       {strategyData.opportunities.map((opp, i) => (
                         <div key={i} className="flex items-start gap-2.5 text-[11px] text-zinc-300 px-3 py-2 rounded-lg bg-zinc-900/40 border border-zinc-800/50">
-                          <span className="w-5 h-5 rounded-full bg-teal-500/15 border border-teal-500/25 flex items-center justify-center flex-shrink-0 mt-0.5 text-[9px] text-teal-400 font-bold">{i + 1}</span>
+                          <span className="w-5 h-5 rounded-full bg-teal-500/15 border border-teal-500/25 flex items-center justify-center flex-shrink-0 mt-0.5 text-[11px] text-teal-400 font-bold">{i + 1}</span>
                           {opp}
                         </div>
                       ))}
@@ -1932,7 +1932,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                       <Target className="w-3.5 h-3.5 text-teal-400" />
                     </div>
                     <div className="text-xs font-semibold text-zinc-200">Target Keywords</div>
-                    <span className="text-[9px] text-zinc-600 ml-auto">{strategyData.siteKeywords.length} keywords</span>
+                    <span className="text-[11px] text-zinc-500 ml-auto">{strategyData.siteKeywords.length} keywords</span>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {strategyData.siteKeywords.map(kw => {
@@ -1941,10 +1941,10 @@ export function ClientDashboard({ workspaceId }: Props) {
                         <span key={kw} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-teal-500/10 border border-teal-500/20 text-[11px] text-teal-300">
                           {kw}
                           {metrics && metrics.volume > 0 && (
-                            <span className="text-[9px] text-zinc-500 font-mono">{metrics.volume.toLocaleString()}/mo</span>
+                            <span className="text-[11px] text-zinc-500 font-mono">{metrics.volume.toLocaleString()}/mo</span>
                           )}
                           {metrics && metrics.difficulty > 0 && (
-                            <span className={`text-[9px] font-mono ${metrics.difficulty <= 30 ? 'text-green-400' : metrics.difficulty <= 60 ? 'text-amber-400' : 'text-red-400'}`}>KD {metrics.difficulty}%</span>
+                            <span className={`text-[11px] font-mono ${metrics.difficulty <= 30 ? 'text-green-400' : metrics.difficulty <= 60 ? 'text-amber-400' : 'text-red-400'}`}>KD {metrics.difficulty}%</span>
                           )}
                         </span>
                       );
@@ -1952,7 +1952,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                   </div>
                   {strategyData.businessContext && (
                     <div className="mt-4 pt-3 border-t border-zinc-800">
-                      <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Business Context</div>
+                      <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Business Context</div>
                       <p className="text-xs text-zinc-400 leading-relaxed">{strategyData.businessContext}</p>
                     </div>
                   )}
@@ -1967,16 +1967,16 @@ export function ClientDashboard({ workspaceId }: Props) {
                       <Target className="w-3.5 h-3.5 text-orange-400" />
                     </div>
                     <div className="text-xs font-semibold text-orange-200">Competitor Keyword Gaps</div>
-                    <span className="text-[9px] text-zinc-600">Keywords your competitors rank for that you don't</span>
+                    <span className="text-[11px] text-zinc-500">Keywords your competitors rank for that you don't</span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                     {strategyData.keywordGaps.map((gap, i) => (
                       <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg bg-zinc-900/40 border border-zinc-800/50">
                         <span className="text-[11px] text-zinc-300 font-medium truncate mr-2">{gap.keyword}</span>
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          {gap.volume != null && gap.volume > 0 && <span className="text-[10px] text-zinc-500">{gap.volume.toLocaleString()}</span>}
+                          {gap.volume != null && gap.volume > 0 && <span className="text-[11px] text-zinc-500">{gap.volume.toLocaleString()}</span>}
                           {gap.difficulty != null && gap.difficulty > 0 && (
-                            <span className={`text-[10px] font-medium ${gap.difficulty <= 30 ? 'text-green-400' : gap.difficulty <= 60 ? 'text-amber-400' : 'text-red-400'}`}>
+                            <span className={`text-[11px] font-medium ${gap.difficulty <= 30 ? 'text-green-400' : gap.difficulty <= 60 ? 'text-amber-400' : 'text-red-400'}`}>
                               KD {gap.difficulty}
                             </span>
                           )}
@@ -2005,7 +2005,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                   <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
                     <div className="px-5 py-3 border-b border-zinc-800 flex items-center gap-3 flex-wrap">
                       <span className="text-xs font-medium text-zinc-300">Page Keyword Map</span>
-                      <span className="text-[10px] text-zinc-600">{filtered.length} of {strategyData.pageMap.length} pages</span>
+                      <span className="text-[11px] text-zinc-500">{filtered.length} of {strategyData.pageMap.length} pages</span>
                       <div className="flex items-center gap-2 ml-auto flex-wrap">
                         <div className="relative">
                           <Search className="w-3 h-3 text-zinc-500 absolute left-2 top-1/2 -translate-y-1/2" />
@@ -2037,11 +2037,11 @@ export function ClientDashboard({ workspaceId }: Props) {
                           <div className="flex items-center justify-between">
                             <div className="flex-1 min-w-0">
                               {page.pageTitle && <div className="text-xs text-zinc-300 truncate">{page.pageTitle}</div>}
-                              <div className="text-[10px] text-zinc-600 font-mono truncate">{page.pagePath}</div>
+                              <div className="text-[11px] text-zinc-500 font-mono truncate">{page.pagePath}</div>
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0 ml-3">
                               {page.searchIntent && (
-                                <span className={`text-[9px] px-1.5 py-0.5 rounded-full border font-medium ${
+                                <span className={`text-[11px] px-1.5 py-0.5 rounded-full border font-medium ${
                                   page.searchIntent === 'commercial' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' :
                                   page.searchIntent === 'transactional' ? 'text-green-400 bg-green-500/10 border-green-500/20' :
                                   page.searchIntent === 'informational' ? 'text-blue-400 bg-blue-500/10 border-blue-500/20' :
@@ -2049,23 +2049,23 @@ export function ClientDashboard({ workspaceId }: Props) {
                                 }`}>{page.searchIntent}</span>
                               )}
                               {page.currentPosition ? (
-                                <span className={`text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-zinc-800 ${page.currentPosition <= 3 ? 'text-emerald-400' : page.currentPosition <= 10 ? 'text-green-400' : page.currentPosition <= 20 ? 'text-amber-400' : 'text-red-400'}`}>#{page.currentPosition.toFixed(0)}</span>
+                                <span className={`text-[11px] font-mono font-medium px-1.5 py-0.5 rounded bg-zinc-800 ${page.currentPosition <= 3 ? 'text-emerald-400' : page.currentPosition <= 10 ? 'text-green-400' : page.currentPosition <= 20 ? 'text-amber-400' : 'text-red-400'}`}>#{page.currentPosition.toFixed(0)}</span>
                               ) : (
-                                <span className="text-[10px] text-zinc-600 bg-zinc-800 px-1.5 py-0.5 rounded font-mono">—</span>
+                                <span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded font-mono">—</span>
                               )}
                               {page.impressions != null && page.impressions > 0 && (
-                                <span className="text-[9px] text-zinc-500 font-mono">{page.impressions.toLocaleString()} imp</span>
+                                <span className="text-[11px] text-zinc-500 font-mono">{page.impressions.toLocaleString()} imp</span>
                               )}
                             </div>
                           </div>
                           <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[10px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded">{page.primaryKeyword}</span>
-                            {page.volume != null && page.volume > 0 && <span className="text-[9px] text-zinc-500 font-mono">{page.volume.toLocaleString()}/mo</span>}
+                            <span className="text-[11px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded">{page.primaryKeyword}</span>
+                            {page.volume != null && page.volume > 0 && <span className="text-[11px] text-zinc-500 font-mono">{page.volume.toLocaleString()}/mo</span>}
                             {page.difficulty != null && page.difficulty > 0 && (
-                              <span className={`text-[9px] font-mono ${page.difficulty <= 30 ? 'text-green-400' : page.difficulty <= 60 ? 'text-amber-400' : 'text-red-400'}`}>KD {page.difficulty}%</span>
+                              <span className={`text-[11px] font-mono ${page.difficulty <= 30 ? 'text-green-400' : page.difficulty <= 60 ? 'text-amber-400' : 'text-red-400'}`}>KD {page.difficulty}%</span>
                             )}
                             {page.secondaryKeywords && page.secondaryKeywords.length > 0 && (
-                              <span className="text-[9px] text-zinc-600">+{page.secondaryKeywords.length} secondary</span>
+                              <span className="text-[11px] text-zinc-500">+{page.secondaryKeywords.length} secondary</span>
                             )}
                           </div>
                         </div>
@@ -2080,9 +2080,9 @@ export function ClientDashboard({ workspaceId }: Props) {
             </div>
           ) : (
             <div className="text-center py-16">
-              <Target className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
+              <Target className="w-8 h-8 text-zinc-500 mx-auto mb-2" />
               <p className="text-sm text-zinc-500">SEO strategy is being prepared</p>
-              <p className="text-xs text-zinc-600 mt-1">Your web team is building a keyword strategy for your site. Check back soon!</p>
+              <p className="text-xs text-zinc-500 mt-1">Your web team is building a keyword strategy for your site. Check back soon!</p>
             </div>
           )}
         </>)}
@@ -2104,7 +2104,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                     {reviewCount > 0 && newComments > 0 && ' · '}
                     {newComments > 0 && <>{newComments} item{newComments > 1 ? 's' : ''} with new team responses</>}
                   </div>
-                  <div className="text-[10px] text-blue-400/60 mt-0.5">Your team has updates waiting for you below</div>
+                  <div className="text-[11px] text-blue-400/60 mt-0.5">Your team has updates waiting for you below</div>
                 </div>
               </div>
             );
@@ -2129,7 +2129,7 @@ export function ClientDashboard({ workspaceId }: Props) {
               <input type="text" value={newTopicKeyword} onChange={e => setNewTopicKeyword(e.target.value)} placeholder="Target keyword (e.g. 'sedation dentistry benefits')" className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600" />
               <textarea value={newTopicNotes} onChange={e => setNewTopicNotes(e.target.value)} placeholder="Any notes or context for this topic... (optional)" rows={2} className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 resize-none" />
               <div>
-                <div className="text-[10px] text-zinc-500 mb-1.5">What would you like?</div>
+                <div className="text-[11px] text-zinc-500 mb-1.5">What would you like?</div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => setNewTopicServiceType('brief_only')} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border text-xs font-medium transition-all ${newTopicServiceType === 'brief_only' ? 'bg-teal-600/20 border-teal-500/40 text-teal-300' : 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}>
                     <FileText className="w-3.5 h-3.5" /> Content Brief
@@ -2138,7 +2138,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                     <Sparkles className="w-3.5 h-3.5" /> Full Blog Post
                   </button>
                 </div>
-                <div className="text-[9px] text-zinc-600 mt-1">{newTopicServiceType === 'brief_only' ? 'A detailed content strategy document for this topic' : 'Brief + professionally written article delivered ready to publish'}</div>
+                <div className="text-[11px] text-zinc-500 mt-1">{newTopicServiceType === 'brief_only' ? 'A detailed content strategy document for this topic' : 'Brief + professionally written article delivered ready to publish'}</div>
               </div>
               <div className="flex items-center gap-2">
                 <button onClick={() => {
@@ -2157,7 +2157,7 @@ export function ClientDashboard({ workspaceId }: Props) {
             <div className="text-center py-16">
               <FileText className="w-10 h-10 text-zinc-700 mx-auto mb-3" />
               <p className="text-sm font-medium text-zinc-400">No content in the pipeline yet</p>
-              <p className="text-xs text-zinc-600 mt-1.5 max-w-sm mx-auto leading-relaxed">
+              <p className="text-xs text-zinc-500 mt-1.5 max-w-sm mx-auto leading-relaxed">
                 Request topics from the <button onClick={() => setTab('strategy')} className="text-teal-400 hover:text-teal-300 underline underline-offset-2 transition-colors">SEO Strategy</button> tab, or click <strong className="text-zinc-400">Suggest a Topic</strong> above to get started.
               </p>
             </div>
@@ -2203,9 +2203,9 @@ export function ClientDashboard({ workspaceId }: Props) {
                         <div className="text-xs text-teal-400 mt-0.5">&ldquo;{req.targetKeyword}&rdquo;</div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {req.source === 'client' && <span className="text-[9px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20">You submitted</span>}
-                        {req.status === 'changes_requested' && <span className="text-[9px] px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20">Changes Requested</span>}
-                        {req.status === 'client_review' && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 animate-pulse">Needs Your Review</span>}
+                        {req.source === 'client' && <span className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20">You submitted</span>}
+                        {req.status === 'changes_requested' && <span className="text-[11px] px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20">Changes Requested</span>}
+                        {req.status === 'client_review' && <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 animate-pulse">Needs Your Review</span>}
                         {isExpanded ? <ChevronUp className="w-4 h-4 text-zinc-500" /> : <ChevronDown className="w-4 h-4 text-zinc-500" />}
                       </div>
                     </div>
@@ -2235,7 +2235,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                           {/* — Strategic Overview — */}
                           {brief.executiveSummary && (
                             <div className="bg-teal-500/5 border border-teal-500/20 rounded-lg px-4 py-3">
-                              <div className="text-[10px] text-teal-400 font-medium uppercase tracking-wider mb-1.5">Strategic Overview</div>
+                              <div className="text-[11px] text-teal-400 font-medium uppercase tracking-wider mb-1.5">Strategic Overview</div>
                               <div className="text-xs text-zinc-300 leading-relaxed">{brief.executiveSummary}</div>
                             </div>
                           )}
@@ -2243,22 +2243,22 @@ export function ClientDashboard({ workspaceId }: Props) {
                           {/* Key Metrics */}
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                             <div className="bg-zinc-950 rounded-lg px-3 py-2.5 border border-zinc-800">
-                              <div className="text-[9px] text-zinc-600 mb-0.5">Word Count</div>
+                              <div className="text-[11px] text-zinc-500 mb-0.5">Word Count</div>
                               <div className="text-sm font-bold text-blue-400">{brief.wordCountTarget?.toLocaleString()}</div>
                             </div>
                             <div className="bg-zinc-950 rounded-lg px-3 py-2.5 border border-zinc-800">
-                              <div className="text-[9px] text-zinc-600 mb-0.5">Search Intent</div>
+                              <div className="text-[11px] text-zinc-500 mb-0.5">Search Intent</div>
                               <div className="text-xs text-zinc-300 capitalize font-medium">{brief.intent}</div>
                             </div>
                             {brief.contentFormat && (
                               <div className="bg-zinc-950 rounded-lg px-3 py-2.5 border border-zinc-800">
-                                <div className="text-[9px] text-zinc-600 mb-0.5">Format</div>
+                                <div className="text-[11px] text-zinc-500 mb-0.5">Format</div>
                                 <div className="text-xs text-amber-400 capitalize font-medium">{brief.contentFormat}</div>
                               </div>
                             )}
                             {brief.difficultyScore != null && (
                               <div className="bg-zinc-950 rounded-lg px-3 py-2.5 border border-zinc-800">
-                                <div className="text-[9px] text-zinc-600 mb-0.5">Difficulty</div>
+                                <div className="text-[11px] text-zinc-500 mb-0.5">Difficulty</div>
                                 <div className={`text-sm font-bold ${brief.difficultyScore <= 30 ? 'text-green-400' : brief.difficultyScore <= 60 ? 'text-amber-400' : 'text-red-400'}`}>{brief.difficultyScore}/100</div>
                               </div>
                             )}
@@ -2268,41 +2268,41 @@ export function ClientDashboard({ workspaceId }: Props) {
                           {brief.trafficPotential && (
                             <div className="bg-zinc-950 rounded-lg px-4 py-2.5 border border-zinc-800 flex items-start gap-2">
                               <TrendingUp className="w-3.5 h-3.5 text-green-400 mt-0.5 flex-shrink-0" />
-                              <div><div className="text-[9px] text-zinc-600 mb-0.5">Traffic Potential</div><div className="text-xs text-zinc-300">{brief.trafficPotential}</div></div>
+                              <div><div className="text-[11px] text-zinc-500 mb-0.5">Traffic Potential</div><div className="text-xs text-zinc-300">{brief.trafficPotential}</div></div>
                             </div>
                           )}
 
                           {/* — Content Direction — */}
                           <div className="space-y-3">
-                            <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">Content Direction</div>
+                            <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">Content Direction</div>
                             <div className="bg-zinc-950 rounded-lg px-4 py-3 border border-zinc-800">
-                              <div className="text-[9px] text-zinc-600 mb-1">Suggested Title</div>
+                              <div className="text-[11px] text-zinc-500 mb-1">Suggested Title</div>
                               <div className="text-sm text-teal-400 font-medium">{brief.suggestedTitle}</div>
                             </div>
                             <div className="bg-zinc-950 rounded-lg px-4 py-3 border border-zinc-800">
-                              <div className="text-[9px] text-zinc-600 mb-1">Meta Description</div>
+                              <div className="text-[11px] text-zinc-500 mb-1">Meta Description</div>
                               <div className="text-xs text-zinc-300">{brief.suggestedMetaDesc}</div>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               {brief.audience && (
                                 <div className="bg-zinc-950 rounded-lg px-4 py-3 border border-zinc-800">
-                                  <div className="text-[9px] text-zinc-600 mb-1">Target Audience</div>
+                                  <div className="text-[11px] text-zinc-500 mb-1">Target Audience</div>
                                   <div className="text-xs text-zinc-400 leading-relaxed">{brief.audience}</div>
                                 </div>
                               )}
                               {brief.toneAndStyle && (
                                 <div className="bg-zinc-950 rounded-lg px-4 py-3 border border-zinc-800">
-                                  <div className="text-[9px] text-zinc-600 mb-1">Tone & Style</div>
+                                  <div className="text-[11px] text-zinc-500 mb-1">Tone & Style</div>
                                   <div className="text-xs text-zinc-400 leading-relaxed">{brief.toneAndStyle}</div>
                                 </div>
                               )}
                             </div>
                             {brief.ctaRecommendations && brief.ctaRecommendations.length > 0 && (
                               <div>
-                                <div className="text-[9px] text-zinc-600 mb-1.5">Calls to Action</div>
+                                <div className="text-[11px] text-zinc-500 mb-1.5">Calls to Action</div>
                                 <div className="space-y-1">{brief.ctaRecommendations.map((cta: string, i: number) => (
                                   <div key={i} className="text-xs text-zinc-300 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800 flex items-start gap-2">
-                                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${i === 0 ? 'bg-teal-500/20 text-teal-400' : 'bg-zinc-800 text-zinc-500'}`}>{i === 0 ? 'Primary' : 'Secondary'}</span>{cta}
+                                    <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${i === 0 ? 'bg-teal-500/20 text-teal-400' : 'bg-zinc-800 text-zinc-500'}`}>{i === 0 ? 'Primary' : 'Secondary'}</span>{cta}
                                   </div>
                                 ))}</div>
                               </div>
@@ -2312,17 +2312,17 @@ export function ClientDashboard({ workspaceId }: Props) {
                           {/* — Detailed Outline — */}
                           {brief.outline?.length > 0 && (
                             <div className="space-y-3">
-                              <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">Content Outline</div>
+                              <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">Content Outline</div>
                               <div className="space-y-2">
                                 {brief.outline.map((s: { heading: string; notes: string; wordCount?: number; keywords?: string[] }, i: number) => (
                                   <div key={i} className="bg-zinc-950 rounded-lg px-4 py-3 border border-zinc-800">
                                     <div className="flex items-center justify-between">
                                       <div className="text-xs font-medium text-zinc-200">H2: {s.heading}</div>
-                                      {s.wordCount && <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{s.wordCount} words</span>}
+                                      {s.wordCount && <span className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{s.wordCount} words</span>}
                                     </div>
                                     <div className="text-[11px] text-zinc-500 mt-1.5 leading-relaxed">{s.notes}</div>
                                     {s.keywords && s.keywords.length > 0 && (
-                                      <div className="flex flex-wrap gap-1 mt-2">{s.keywords.map((kw: string, j: number) => <span key={j} className="text-[9px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400/80">{kw}</span>)}</div>
+                                      <div className="flex flex-wrap gap-1 mt-2">{s.keywords.map((kw: string, j: number) => <span key={j} className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400/80">{kw}</span>)}</div>
                                     )}
                                   </div>
                                 ))}
@@ -2332,30 +2332,30 @@ export function ClientDashboard({ workspaceId }: Props) {
 
                           {/* — SEO Intelligence — */}
                           <div className="space-y-3">
-                            <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">SEO Intelligence</div>
+                            <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">SEO Intelligence</div>
                             {brief.secondaryKeywords && brief.secondaryKeywords.length > 0 && (
                               <div>
-                                <div className="text-[9px] text-zinc-600 mb-1.5">Keywords to Include</div>
+                                <div className="text-[11px] text-zinc-500 mb-1.5">Keywords to Include</div>
                                 <div className="flex flex-wrap gap-1.5">
                                   {brief.secondaryKeywords.map((kw: string, i: number) => (
-                                    <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">{kw}</span>
+                                    <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">{kw}</span>
                                   ))}
                                 </div>
                               </div>
                             )}
                             {brief.topicalEntities && brief.topicalEntities.length > 0 && (
                               <div>
-                                <div className="text-[9px] text-zinc-600 mb-1.5">Topics to Reference</div>
+                                <div className="text-[11px] text-zinc-500 mb-1.5">Topics to Reference</div>
                                 <div className="flex flex-wrap gap-1.5">
                                   {brief.topicalEntities.map((entity: string, i: number) => (
-                                    <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-300">{entity}</span>
+                                    <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-300">{entity}</span>
                                   ))}
                                 </div>
                               </div>
                             )}
                             {brief.peopleAlsoAsk && brief.peopleAlsoAsk.length > 0 && (
                               <div>
-                                <div className="text-[9px] text-zinc-600 mb-1.5">Questions to Address</div>
+                                <div className="text-[11px] text-zinc-500 mb-1.5">Questions to Address</div>
                                 <div className="space-y-1">
                                   {brief.peopleAlsoAsk.map((q: string, i: number) => (
                                     <div key={i} className="flex items-start gap-2 text-xs text-zinc-300 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
@@ -2367,7 +2367,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                             )}
                             {brief.serpAnalysis?.gaps && brief.serpAnalysis.gaps.length > 0 && (
                               <div>
-                                <div className="text-[9px] text-zinc-600 mb-1.5">Your Competitive Edge</div>
+                                <div className="text-[11px] text-zinc-500 mb-1.5">Your Competitive Edge</div>
                                 <div className="space-y-1">
                                   {brief.serpAnalysis.gaps.map((g: string, i: number) => (
                                     <div key={i} className="text-[11px] text-green-300/80 flex items-start gap-1.5 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
@@ -2379,10 +2379,10 @@ export function ClientDashboard({ workspaceId }: Props) {
                             )}
                             {brief.internalLinkSuggestions && brief.internalLinkSuggestions.length > 0 && (
                               <div>
-                                <div className="text-[9px] text-zinc-600 mb-1.5">Internal Links to Include</div>
+                                <div className="text-[11px] text-zinc-500 mb-1.5">Internal Links to Include</div>
                                 <div className="flex flex-wrap gap-1.5">
                                   {brief.internalLinkSuggestions.map((link: string, i: number) => (
-                                    <span key={i} className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-blue-400">/{link}</span>
+                                    <span key={i} className="text-[11px] px-2 py-0.5 rounded bg-zinc-800 text-blue-400">/{link}</span>
                                   ))}
                                 </div>
                               </div>
@@ -2392,7 +2392,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                           {/* — E-E-A-T Guidance — */}
                           {brief.eeatGuidance && (
                             <div className="space-y-3">
-                              <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">E-E-A-T Signals</div>
+                              <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">E-E-A-T Signals</div>
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {[
                                   { label: 'Experience', value: brief.eeatGuidance.experience, color: 'text-blue-400' },
@@ -2401,7 +2401,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                                   { label: 'Trust', value: brief.eeatGuidance.trust, color: 'text-amber-400' },
                                 ].filter(e => e.value).map((e, i) => (
                                   <div key={i} className="bg-zinc-950 rounded-lg px-3 py-2.5 border border-zinc-800">
-                                    <div className={`text-[9px] ${e.color} font-medium uppercase tracking-wider mb-1`}>{e.label}</div>
+                                    <div className={`text-[11px] ${e.color} font-medium uppercase tracking-wider mb-1`}>{e.label}</div>
                                     <div className="text-[11px] text-zinc-400 leading-relaxed">{e.value}</div>
                                   </div>
                                 ))}
@@ -2412,7 +2412,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                           {/* — Content Checklist — */}
                           {brief.contentChecklist && brief.contentChecklist.length > 0 && (
                             <div className="space-y-3">
-                              <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">Content Checklist</div>
+                              <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">Content Checklist</div>
                               <div className="bg-zinc-950 rounded-lg border border-zinc-800 divide-y divide-zinc-800/50">
                                 {brief.contentChecklist.map((item: string, i: number) => (
                                   <div key={i} className="flex items-start gap-2.5 px-4 py-2.5">
@@ -2427,12 +2427,12 @@ export function ClientDashboard({ workspaceId }: Props) {
                           {/* — Schema Markup — */}
                           {brief.schemaRecommendations && brief.schemaRecommendations.length > 0 && (
                             <div className="space-y-3">
-                              <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">Schema Markup</div>
+                              <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">Schema Markup</div>
                               <div className="space-y-2">
                                 {brief.schemaRecommendations.map((schema: { type: string; notes: string }, i: number) => (
                                   <div key={i} className="bg-zinc-950 rounded-lg px-4 py-3 border border-zinc-800">
                                     <div className="flex items-center gap-2 mb-1">
-                                      <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-medium">{schema.type}</span>
+                                      <span className="text-[11px] px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-medium">{schema.type}</span>
                                     </div>
                                     <div className="text-[11px] text-zinc-400 leading-relaxed">{schema.notes}</div>
                                   </div>
@@ -2443,7 +2443,7 @@ export function ClientDashboard({ workspaceId }: Props) {
 
                           {/* Export */}
                           <div className="flex items-center gap-2 pt-1">
-                            <button onClick={() => window.open(`/api/content-briefs/${workspaceId}/${brief.id}/export`, '_blank')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors">
+                            <button onClick={() => window.open(`/api/content-briefs/${workspaceId}/${brief.id}/export`, '_blank')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors">
                               <Download className="w-3 h-3" /> Download PDF
                             </button>
                           </div>
@@ -2473,7 +2473,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                           </div>
                           <div className="flex-1">
                             <div className="text-xs font-semibold text-blue-200">Want the full article written?</div>
-                            <div className="text-[10px] text-zinc-400 mt-0.5 leading-relaxed">Love the brief? Upgrade to a professionally written blog post delivered ready to publish.</div>
+                            <div className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">Love the brief? Upgrade to a professionally written blog post delivered ready to publish.</div>
                           </div>
                           <button
                             onClick={(e) => { e.stopPropagation(); setPricingModal({ serviceType: 'full_post', topic: req.topic, targetKeyword: req.targetKeyword, source: 'upgrade', upgradeReqId: req.id }); }}
@@ -2481,7 +2481,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                           >
                             <Sparkles className="w-3.5 h-3.5" />
                             Upgrade to Full Post
-                            {ws?.contentPricing && <span className="text-[9px] opacity-70 ml-0.5">+{new Intl.NumberFormat('en-US', { style: 'currency', currency: ws.contentPricing.currency || 'USD', minimumFractionDigits: 0 }).format(Math.max(0, ws.contentPricing.fullPostPrice - ws.contentPricing.briefPrice))}</span>}
+                            {ws?.contentPricing && <span className="text-[11px] opacity-70 ml-0.5">+{new Intl.NumberFormat('en-US', { style: 'currency', currency: ws.contentPricing.currency || 'USD', minimumFractionDigits: 0 }).format(Math.max(0, ws.contentPricing.fullPostPrice - ws.contentPricing.briefPrice))}</span>}
                           </button>
                         </div>
                       )}
@@ -2512,19 +2512,19 @@ export function ClientDashboard({ workspaceId }: Props) {
 
                       {/* Decline option for requested topics (not in review) */}
                       {req.status === 'requested' && declineReqId !== req.id && (
-                        <button onClick={() => { setDeclineReqId(req.id); setDeclineReason(''); }} className="text-xs text-zinc-600 hover:text-red-400 transition-colors">Not interested in this topic</button>
+                        <button onClick={() => { setDeclineReqId(req.id); setDeclineReason(''); }} className="text-xs text-zinc-500 hover:text-red-400 transition-colors">Not interested in this topic</button>
                       )}
 
                       {/* Comments thread */}
                       {req.comments && req.comments.length > 0 && (
                         <div>
-                          <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-2">Comments</div>
+                          <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-2">Comments</div>
                           <div className="space-y-1.5">
                             {req.comments.map(c => (
                               <div key={c.id} className={`text-xs px-3 py-2 rounded-lg ${c.author === 'client' ? 'bg-blue-500/10 border border-blue-500/15 text-blue-300 ml-6' : 'bg-zinc-800/60 border border-zinc-800 text-zinc-400 mr-6'}`}>
                                 <div className="flex items-center justify-between mb-0.5">
-                                  <span className="font-medium text-[10px]">{c.author === 'client' ? 'You' : 'Team'}</span>
-                                  <span className="text-[9px] text-zinc-600">{new Date(c.createdAt).toLocaleDateString()}</span>
+                                  <span className="font-medium text-[11px]">{c.author === 'client' ? 'You' : 'Team'}</span>
+                                  <span className="text-[11px] text-zinc-500">{new Date(c.createdAt).toLocaleDateString()}</span>
                                 </div>
                                 {c.content}
                               </div>
@@ -2552,14 +2552,14 @@ export function ClientDashboard({ workspaceId }: Props) {
           {/* Declined items (collapsed) */}
           {contentRequests.filter(r => r.status === 'declined').length > 0 && (
             <details className="mt-4">
-              <summary className="text-xs text-zinc-600 cursor-pointer hover:text-zinc-400 transition-colors">
+              <summary className="text-xs text-zinc-500 cursor-pointer hover:text-zinc-400 transition-colors">
                 {contentRequests.filter(r => r.status === 'declined').length} declined topic{contentRequests.filter(r => r.status === 'declined').length > 1 ? 's' : ''}
               </summary>
               <div className="mt-2 space-y-2">
                 {contentRequests.filter(r => r.status === 'declined').map(req => (
                   <div key={req.id} className="bg-zinc-900/50 rounded-lg border border-zinc-800/50 px-4 py-3 opacity-60">
                     <div className="text-xs text-zinc-400">{req.topic}</div>
-                    <div className="text-[10px] text-zinc-600 mt-0.5">&ldquo;{req.targetKeyword}&rdquo;</div>
+                    <div className="text-[11px] text-zinc-500 mt-0.5">&ldquo;{req.targetKeyword}&rdquo;</div>
                   </div>
                 ))}
               </div>
@@ -2573,7 +2573,7 @@ export function ClientDashboard({ workspaceId }: Props) {
             <div className="text-center py-16">
               <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4"><LineChart className="w-8 h-8 text-zinc-700" /></div>
               <h3 className="text-sm font-medium text-zinc-400">Analytics Not Configured</h3>
-              <p className="text-xs text-zinc-600 mt-1 max-w-sm mx-auto">Google Analytics 4 has not been linked to this workspace yet. Contact your web team to enable it.</p>
+              <p className="text-xs text-zinc-500 mt-1 max-w-sm mx-auto">Google Analytics 4 has not been linked to this workspace yet. Contact your web team to enable it.</p>
             </div>
           ) : (<>
             {/* GA4 Overview Cards */}
@@ -2587,7 +2587,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                 { label: 'New Users', value: `${ga4Overview.newUserPercentage}%`, color: 'text-teal-400' },
               ].map(c => (
                 <div key={c.label} className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                  <div className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1">{c.label}</div>
+                  <div className="text-[11px] uppercase tracking-wider text-zinc-500 mb-1">{c.label}</div>
                   <div className={`text-xl font-bold ${c.color}`}>{c.value}</div>
                 </div>
               ))}
@@ -2616,9 +2616,9 @@ export function ClientDashboard({ workspaceId }: Props) {
                     })()}
                   </svg>
                   <div className="flex items-center justify-center gap-6 mt-2">
-                    <span className="flex items-center gap-1.5 text-[10px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-teal-400 inline-block" /> Users</span>
-                    <span className="flex items-center gap-1.5 text-[10px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-blue-400 inline-block" /> Sessions</span>
-                    <span className="flex items-center gap-1.5 text-[10px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-teal-400/40 inline-block" /> Pageviews</span>
+                    <span className="flex items-center gap-1.5 text-[11px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-teal-400 inline-block" /> Users</span>
+                    <span className="flex items-center gap-1.5 text-[11px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-blue-400 inline-block" /> Sessions</span>
+                    <span className="flex items-center gap-1.5 text-[11px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-teal-400/40 inline-block" /> Pageviews</span>
                   </div>
                 </div>
 
@@ -2650,10 +2650,10 @@ export function ClientDashboard({ workspaceId }: Props) {
                             <svg viewBox="0 0 140 140" className="w-32 h-32">{slices}</svg>
                             <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 mt-3">
                               {ga4Devices.map((d, i) => (
-                                <span key={i} className="flex items-center gap-1.5 text-[10px] text-zinc-400">
+                                <span key={i} className="flex items-center gap-1.5 text-[11px] text-zinc-400">
                                   <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
                                   <span className="capitalize">{d.device}</span>
-                                  <span className="text-zinc-600">{d.percentage}%</span>
+                                  <span className="text-zinc-500">{d.percentage}%</span>
                                 </span>
                               ))}
                             </div>
@@ -2673,10 +2673,10 @@ export function ClientDashboard({ workspaceId }: Props) {
                 <div className="space-y-1 max-h-[350px] overflow-y-auto">
                   {ga4Pages.slice(0, 15).map((p, i) => (
                     <div key={i} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-zinc-800/50">
-                      <span className="text-[10px] text-zinc-600 w-5 text-right">{i + 1}</span>
+                      <span className="text-[11px] text-zinc-500 w-5 text-right">{i + 1}</span>
                       <span className="text-xs text-zinc-300 flex-1 truncate font-mono">{p.path}</span>
                       <span className="text-xs text-teal-400 font-medium tabular-nums">{p.pageviews.toLocaleString()}</span>
-                      <span className="text-[10px] text-zinc-500 w-14 text-right">{p.users.toLocaleString()} u</span>
+                      <span className="text-[11px] text-zinc-500 w-14 text-right">{p.users.toLocaleString()} u</span>
                     </div>
                   ))}
                 </div>
@@ -2694,7 +2694,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                         <div className="flex items-center gap-2 py-1.5 px-2 rounded-lg relative z-10">
                           <span className="text-xs text-zinc-300 flex-1 truncate">{s.source}{s.medium !== '(none)' ? ` / ${s.medium}` : ''}</span>
                           <span className="text-xs text-blue-400 font-medium tabular-nums">{s.sessions.toLocaleString()}</span>
-                          <span className="text-[10px] text-zinc-500 w-12 text-right">{pct.toFixed(1)}%</span>
+                          <span className="text-[11px] text-zinc-500 w-12 text-right">{pct.toFixed(1)}%</span>
                         </div>
                         <div className="absolute inset-0 rounded-lg bg-blue-500/5" style={{ width: `${pct}%` }} />
                       </div>
@@ -2727,14 +2727,14 @@ export function ClientDashboard({ workspaceId }: Props) {
                   <button key={i} onClick={() => loadEventTrend(c.eventName)}
                     className={`text-left rounded-xl border p-4 transition-colors ${isSelected ? 'bg-teal-500/10 border-teal-500/30' : pinned ? 'bg-teal-500/5 border-teal-500/15 hover:border-teal-500/30' : 'bg-zinc-800/30 border-zinc-800 hover:border-zinc-700'}`}>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] text-zinc-400 truncate max-w-[140px]">{eventDisplayName(c.eventName)}</span>
+                      <span className="text-[11px] text-zinc-400 truncate max-w-[140px]">{eventDisplayName(c.eventName)}</span>
                       <div className="flex items-center gap-1.5">
                         {pinned && <span className="w-1.5 h-1.5 rounded-full bg-teal-400" title="Pinned" />}
-                        {c.rate > 0 && <span className="text-[10px] font-medium text-emerald-400">{c.rate}%</span>}
+                        {c.rate > 0 && <span className="text-[11px] font-medium text-emerald-400">{c.rate}%</span>}
                       </div>
                     </div>
                     <div className="text-xl font-bold text-zinc-200">{c.conversions.toLocaleString()}</div>
-                    <div className="text-[10px] text-zinc-600 mt-0.5">{c.users.toLocaleString()} users</div>
+                    <div className="text-[11px] text-zinc-500 mt-0.5">{c.users.toLocaleString()} users</div>
                   </button>
                 );
               };
@@ -2773,11 +2773,11 @@ export function ClientDashboard({ workspaceId }: Props) {
                         <div className="flex items-center gap-2 mb-2">
                           <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: group.color }} />
                           <h3 className="text-sm font-semibold text-zinc-300">{group.name}</h3>
-                          <span className="text-[10px] text-zinc-600 ml-auto">{groupEvents.length} events</span>
+                          <span className="text-[11px] text-zinc-500 ml-auto">{groupEvents.length} events</span>
                         </div>
                         {renderPageFilter(group.id, group.allowedPages)}
                         {noResults ? (
-                          <div className="text-center py-4 text-[11px] text-zinc-600">No events found for this page</div>
+                          <div className="text-center py-4 text-[11px] text-zinc-500">No events found for this page</div>
                         ) : (
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                             {groupEvents.map(renderEventCard)}
@@ -2790,10 +2790,10 @@ export function ClientDashboard({ workspaceId }: Props) {
                   {(ungroupedEvents.length > 0 || modulePageFilters['__ungrouped__']) && (
                     <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
                       <h3 className="text-sm font-semibold text-zinc-300 mb-1">{groups.length > 0 ? 'Other Events' : 'Key Events'}</h3>
-                      <p className="text-[10px] text-zinc-600 mb-2">{groups.length > 0 ? 'Events not assigned to a group' : 'Custom and conversion events tracked on your site'}</p>
+                      <p className="text-[11px] text-zinc-500 mb-2">{groups.length > 0 ? 'Events not assigned to a group' : 'Custom and conversion events tracked on your site'}</p>
                       {renderPageFilter('__ungrouped__')}
                       {modulePageFilters['__ungrouped__'] && ungroupedEvents.length === 0 && !modulePageLoading['__ungrouped__'] ? (
-                        <div className="text-center py-4 text-[11px] text-zinc-600">No events found for this page</div>
+                        <div className="text-center py-4 text-[11px] text-zinc-500">No events found for this page</div>
                       ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                           {ungroupedEvents.slice(0, 12).map(renderEventCard)}
@@ -2808,9 +2808,9 @@ export function ClientDashboard({ workspaceId }: Props) {
                       <div className="flex items-center justify-between mb-3">
                         <div>
                           <h3 className="text-sm font-semibold text-zinc-300">{eventDisplayName(ga4SelectedEvent)}</h3>
-                          <p className="text-[10px] text-zinc-600">Daily event count over the selected period</p>
+                          <p className="text-[11px] text-zinc-500">Daily event count over the selected period</p>
                         </div>
-                        <button onClick={() => { setGa4SelectedEvent(null); setGa4EventTrend([]); }} className="text-[10px] text-zinc-500 hover:text-zinc-300">Clear</button>
+                        <button onClick={() => { setGa4SelectedEvent(null); setGa4EventTrend([]); }} className="text-[11px] text-zinc-500 hover:text-zinc-300">Clear</button>
                       </div>
                       <svg viewBox="0 0 800 120" className="w-full h-28" preserveAspectRatio="none">
                         {(() => {
@@ -2828,7 +2828,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                           </>);
                         })()}
                       </svg>
-                      <div className="flex items-center justify-between mt-2 text-[10px] text-zinc-600">
+                      <div className="flex items-center justify-between mt-2 text-[11px] text-zinc-500">
                         <span>{ga4EventTrend[0]?.date}</span>
                         <span>Total: {ga4EventTrend.reduce((s, d) => s + d.eventCount, 0).toLocaleString()}</span>
                         <span>{ga4EventTrend[ga4EventTrend.length - 1]?.date}</span>
@@ -2850,10 +2850,10 @@ export function ClientDashboard({ workspaceId }: Props) {
               </button>
               {showExplorer && (
                 <div className="px-5 pb-5">
-                  <p className="text-[10px] text-zinc-600 mb-4">Break down events by page, or see which events fire on a specific page.</p>
+                  <p className="text-[11px] text-zinc-500 mb-4">Break down events by page, or see which events fire on a specific page.</p>
                   <div className="flex flex-wrap items-end gap-3 mb-4">
                     <div className="flex-1 min-w-[180px]">
-                      <label className="text-[10px] text-zinc-500 mb-1 block">Event Name</label>
+                      <label className="text-[11px] text-zinc-500 mb-1 block">Event Name</label>
                       <SearchableSelect
                         options={ga4Events.map(ev => ({ value: ev.eventName, label: eventDisplayName(ev.eventName) }))}
                         value={explorerEvent}
@@ -2864,11 +2864,11 @@ export function ClientDashboard({ workspaceId }: Props) {
                       />
                     </div>
                     <div className="flex-1 min-w-[180px]">
-                      <label className="text-[10px] text-zinc-500 mb-1 block">Page Path (contains)</label>
+                      <label className="text-[11px] text-zinc-500 mb-1 block">Page Path (contains)</label>
                       <input value={explorerPage} onChange={e => setExplorerPage(e.target.value)}
                         placeholder="/contact, /blog, etc."
                         onKeyDown={e => e.key === 'Enter' && runExplorer(explorerEvent || undefined, explorerPage || undefined)}
-                        className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500 placeholder:text-zinc-600" />
+                        className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500 placeholder:text-zinc-500" />
                     </div>
                     <button onClick={() => runExplorer(explorerEvent || undefined, explorerPage || undefined)}
                       className="px-4 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-medium transition-colors flex items-center gap-1.5">
@@ -2884,10 +2884,10 @@ export function ClientDashboard({ workspaceId }: Props) {
                       <table className="w-full text-left">
                         <thead>
                           <tr className="border-b border-zinc-800">
-                            <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 pr-3">Event</th>
-                            <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 pr-3">Page</th>
-                            <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 pr-3 text-right">Count</th>
-                            <th className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider py-2 text-right">Users</th>
+                            <th className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider py-2 pr-3">Event</th>
+                            <th className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider py-2 pr-3">Page</th>
+                            <th className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider py-2 pr-3 text-right">Count</th>
+                            <th className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider py-2 text-right">Users</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -2918,7 +2918,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                           })}
                         </tbody>
                       </table>
-                      <div className="text-[10px] text-zinc-600 mt-2 text-right">{explorerData.length} results</div>
+                      <div className="text-[11px] text-zinc-500 mt-2 text-right">{explorerData.length} results</div>
                     </div>
                   )}
                 </div>
@@ -2938,7 +2938,7 @@ export function ClientDashboard({ workspaceId }: Props) {
         {chatOpen && (
           <div className="fixed bottom-6 right-6 w-96 bg-zinc-900 rounded-2xl border border-zinc-800 shadow-2xl shadow-black/40 overflow-hidden z-50 flex flex-col max-h-[500px]">
             <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 flex-shrink-0">
-              <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-teal-400" /><span className="text-sm font-medium text-zinc-200">AI Assistant</span><span className="text-[10px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">GPT-4o</span></div>
+              <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-teal-400" /><span className="text-sm font-medium text-zinc-200">AI Assistant</span><span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">GPT-4o</span></div>
               <button onClick={() => setChatOpen(false)} className="text-zinc-500 hover:text-zinc-300"><X className="w-4 h-4" /></button>
             </div>
             <div className="flex-1 overflow-y-auto">
@@ -2989,10 +2989,10 @@ export function ClientDashboard({ workspaceId }: Props) {
               <ClipboardCheck className="w-5 h-5 text-teal-400" />
               <div>
                 <h2 className="text-sm font-semibold text-zinc-200">SEO Change Approvals</h2>
-                <p className="text-[10px] text-zinc-500 mt-0.5">Review proposed SEO changes, make edits if needed, then approve to push live.</p>
+                <p className="text-[11px] text-zinc-500 mt-0.5">Review proposed SEO changes, make edits if needed, then approve to push live.</p>
               </div>
               {pendingApprovals > 0 && (
-                <span className="ml-auto px-2 py-0.5 text-[10px] font-medium rounded-full bg-teal-500/20 border border-teal-500/30 text-teal-300">
+                <span className="ml-auto px-2 py-0.5 text-[11px] font-medium rounded-full bg-teal-500/20 border border-teal-500/30 text-teal-300">
                   {pendingApprovals} pending
                 </span>
               )}
@@ -3008,7 +3008,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                   <ClipboardCheck className="w-8 h-8 text-zinc-700" />
                 </div>
                 <h3 className="text-sm font-medium text-zinc-400 mb-1">No pending approvals</h3>
-                <p className="text-[10px] text-zinc-600">Your agency will send SEO changes here for your review.</p>
+                <p className="text-[11px] text-zinc-500">Your agency will send SEO changes here for your review.</p>
               </div>
             )}
 
@@ -3025,16 +3025,16 @@ export function ClientDashboard({ workspaceId }: Props) {
                   <div className="px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
                     <div>
                       <h3 className="text-sm font-medium text-zinc-200">{batch.name}</h3>
-                      <p className="text-[10px] text-zinc-500 mt-0.5">
+                      <p className="text-[11px] text-zinc-500 mt-0.5">
                         {new Date(batch.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                         {' · '}{batch.items.length} change{batch.items.length !== 1 ? 's' : ''}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      {batchPending > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400">{batchPending} pending</span>}
-                      {batchApproved > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/10 border border-green-500/30 text-green-400">{batchApproved} approved</span>}
-                      {batchApplied > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400">{batchApplied} applied</span>}
-                      {batchRejected > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/30 text-red-400">{batchRejected} rejected</span>}
+                      {batchPending > 0 && <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400">{batchPending} pending</span>}
+                      {batchApproved > 0 && <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-500/10 border border-green-500/30 text-green-400">{batchApproved} approved</span>}
+                      {batchApplied > 0 && <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400">{batchApplied} applied</span>}
+                      {batchRejected > 0 && <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/30 text-red-400">{batchRejected} rejected</span>}
                     </div>
                   </div>
 
@@ -3068,13 +3068,13 @@ export function ClientDashboard({ workspaceId }: Props) {
                             <div className="min-w-0">
                               <div className="flex items-center gap-2 mb-1">
                                 <span className="text-xs font-medium text-zinc-300 truncate">{item.pageTitle}</span>
-                                <span className={`text-[9px] px-1.5 py-0.5 rounded border ${statusColors[item.status]}`}>{item.status}</span>
+                                <span className={`text-[11px] px-1.5 py-0.5 rounded border ${statusColors[item.status]}`}>{item.status}</span>
                               </div>
-                              <span className="text-[10px] text-zinc-600">/{item.pageSlug} · {fieldLabel}</span>
+                              <span className="text-[11px] text-zinc-500">/{item.pageSlug} · {fieldLabel}</span>
                               {isSchema && schemaTypes.length > 0 && (
                                 <div className="flex items-center gap-1 mt-1">
                                   {schemaTypes.map(t => (
-                                    <span key={t} className="text-[9px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-300">{t}</span>
+                                    <span key={t} className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-300">{t}</span>
                                   ))}
                                 </div>
                               )}
@@ -3084,26 +3084,26 @@ export function ClientDashboard({ workspaceId }: Props) {
                           {/* Schema preview or Current vs proposed */}
                           {isSchema ? (
                             <div className="mt-3">
-                              <div className="text-[10px] text-zinc-500 mb-1">Proposed Schema</div>
-                              <pre className="text-[10px] text-zinc-300 bg-zinc-800/50 rounded-lg px-3 py-2 overflow-x-auto max-h-[200px] overflow-y-auto border border-zinc-800 font-mono leading-relaxed">
+                              <div className="text-[11px] text-zinc-500 mb-1">Proposed Schema</div>
+                              <pre className="text-[11px] text-zinc-300 bg-zinc-800/50 rounded-lg px-3 py-2 overflow-x-auto max-h-[200px] overflow-y-auto border border-zinc-800 font-mono leading-relaxed">
                                 {displayValue}
                               </pre>
                               {item.currentValue && (
                                 <div className="mt-2">
-                                  <div className="text-[10px] text-zinc-600 mb-1">Existing on page: {item.currentValue}</div>
+                                  <div className="text-[11px] text-zinc-500 mb-1">Existing on page: {item.currentValue}</div>
                                 </div>
                               )}
                             </div>
                           ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                               <div>
-                                <div className="text-[10px] text-zinc-500 mb-1">Current</div>
+                                <div className="text-[11px] text-zinc-500 mb-1">Current</div>
                                 <div className="text-[11px] text-zinc-400 bg-zinc-800/30 rounded-lg px-3 py-2 min-h-[2rem]">
-                                  {item.currentValue || <span className="italic text-zinc-600">Empty</span>}
+                                  {item.currentValue || <span className="italic text-zinc-500">Empty</span>}
                                 </div>
                               </div>
                               <div>
-                                <div className="text-[10px] text-zinc-500 mb-1 flex items-center gap-1">
+                                <div className="text-[11px] text-zinc-500 mb-1 flex items-center gap-1">
                                   Proposed
                                   {item.clientValue && <span className="text-teal-400">(edited by you)</span>}
                                 </div>
@@ -3127,11 +3127,11 @@ export function ClientDashboard({ workspaceId }: Props) {
                                     <div className="flex gap-1.5">
                                       <button
                                         onClick={() => updateApprovalItem(batch.id, item.id, { clientValue: editDraft })}
-                                        className="px-2.5 py-1 bg-teal-600 hover:bg-teal-500 rounded text-[10px] font-medium transition-colors"
+                                        className="px-2.5 py-1 bg-teal-600 hover:bg-teal-500 rounded text-[11px] font-medium transition-colors"
                                       >Save Edit</button>
                                       <button
                                         onClick={() => { setEditingApproval(null); setEditDraft(''); }}
-                                        className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 rounded text-[10px] text-zinc-400 transition-colors"
+                                        className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 rounded text-[11px] text-zinc-400 transition-colors"
                                       >Cancel</button>
                                     </div>
                                   </div>
@@ -3149,33 +3149,33 @@ export function ClientDashboard({ workspaceId }: Props) {
                             <div className="flex items-center gap-2 mt-3">
                               <button
                                 onClick={() => updateApprovalItem(batch.id, item.id, { status: 'approved' })}
-                                className="flex items-center gap-1 px-3 py-1.5 bg-green-600/80 hover:bg-green-500 rounded-lg text-[10px] font-medium transition-colors"
+                                className="flex items-center gap-1 px-3 py-1.5 bg-green-600/80 hover:bg-green-500 rounded-lg text-[11px] font-medium transition-colors"
                               >
                                 <Check className="w-3 h-3" /> Approve
                               </button>
                               {!isSchema && (
                                 <button
                                   onClick={() => { setEditingApproval(item.id); setEditDraft(displayValue); }}
-                                  className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-[10px] font-medium text-zinc-300 transition-colors"
+                                  className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-[11px] font-medium text-zinc-300 transition-colors"
                                 >
                                   <Edit3 className="w-3 h-3" /> Edit
                                 </button>
                               )}
                               <button
                                 onClick={() => updateApprovalItem(batch.id, item.id, { status: 'rejected' })}
-                                className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-[10px] font-medium text-red-400 transition-colors"
+                                className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-[11px] font-medium text-red-400 transition-colors"
                               >
                                 <X className="w-3 h-3" /> Reject
                               </button>
                             </div>
                           )}
                           {item.status === 'approved' && (
-                            <div className="flex items-center gap-2 mt-3 text-[10px] text-green-400">
+                            <div className="flex items-center gap-2 mt-3 text-[11px] text-green-400">
                               <Check className="w-3 h-3" /> Approved — will be applied when you push changes live
                             </div>
                           )}
                           {item.status === 'applied' && (
-                            <div className="flex items-center gap-2 mt-3 text-[10px] text-blue-400">
+                            <div className="flex items-center gap-2 mt-3 text-[11px] text-blue-400">
                               <CheckCircle2 className="w-3 h-3" /> Applied to live site
                             </div>
                           )}
@@ -3214,7 +3214,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                 <MessageSquare className="w-5 h-5 text-teal-400" />
                 <div>
                   <h2 className="text-sm font-semibold text-zinc-200">Requests</h2>
-                  <p className="text-[10px] text-zinc-500 mt-0.5">Submit requests for your web team to action on.</p>
+                  <p className="text-[11px] text-zinc-500 mt-0.5">Submit requests for your web team to action on.</p>
                 </div>
               </div>
               <button onClick={() => setShowNewRequest(!showNewRequest)}
@@ -3228,7 +3228,7 @@ export function ClientDashboard({ workspaceId }: Props) {
               <div className="bg-zinc-900 rounded-xl border border-teal-500/20 p-5 space-y-4">
                 <h3 className="text-xs font-semibold text-zinc-200">Submit a Request</h3>
                 <div>
-                  <label className="text-[10px] text-zinc-500 mb-1.5 block">Quick Templates</label>
+                  <label className="text-[11px] text-zinc-500 mb-1.5 block">Quick Templates</label>
                   <div className="flex flex-wrap gap-2">
                     {[
                       { label: 'Content Update', cat: 'content' as RequestCategory, title: 'Content update needed', desc: 'Page/section to update:\n\nCurrent text:\n\nNew text:' },
@@ -3238,33 +3238,33 @@ export function ClientDashboard({ workspaceId }: Props) {
                       { label: 'SEO Update', cat: 'seo' as RequestCategory, title: 'SEO update request', desc: 'Pages affected:\n\nKeywords to target:\n\nDetails:' },
                     ].map(t => (
                       <button key={t.label} onClick={() => { setNewReqCategory(t.cat); setNewReqTitle(t.title); setNewReqDesc(t.desc); }}
-                        className="px-2.5 py-1.5 rounded-lg text-[10px] font-medium border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-600 bg-zinc-800/50 transition-colors">
+                        className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-600 bg-zinc-800/50 transition-colors">
                         {t.label}
                       </button>
                     ))}
                   </div>
                 </div>
                 <div>
-                  <label className="text-[10px] text-zinc-500 mb-1 block">Your Name</label>
+                  <label className="text-[11px] text-zinc-500 mb-1 block">Your Name</label>
                   <input value={newReqName} onChange={e => setNewReqName(e.target.value)}
                     placeholder="So we know who to follow up with..."
                     className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500" />
                 </div>
                 <div>
-                  <label className="text-[10px] text-zinc-500 mb-1 block">Title</label>
+                  <label className="text-[11px] text-zinc-500 mb-1 block">Title</label>
                   <input value={newReqTitle} onChange={e => setNewReqTitle(e.target.value)}
                     placeholder="Brief summary of your request..."
                     className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500" />
                 </div>
                 <div>
-                  <label className="text-[10px] text-zinc-500 mb-1 block">Description</label>
+                  <label className="text-[11px] text-zinc-500 mb-1 block">Description</label>
                   <textarea value={newReqDesc} onChange={e => setNewReqDesc(e.target.value)} rows={3}
                     placeholder="Describe what you need in detail..."
                     className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 resize-none" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[10px] text-zinc-500 mb-1 block">Category</label>
+                    <label className="text-[11px] text-zinc-500 mb-1 block">Category</label>
                     <select value={newReqCategory} onChange={e => setNewReqCategory(e.target.value as RequestCategory)}
                       className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500">
                       <option value="content">Content Update</option>
@@ -3276,14 +3276,14 @@ export function ClientDashboard({ workspaceId }: Props) {
                     </select>
                   </div>
                   <div>
-                    <label className="text-[10px] text-zinc-500 mb-1 block">Related Page URL <span className="text-zinc-600">(optional)</span></label>
+                    <label className="text-[11px] text-zinc-500 mb-1 block">Related Page URL <span className="text-zinc-500">(optional)</span></label>
                     <input value={newReqPage} onChange={e => setNewReqPage(e.target.value)}
                       placeholder="/about or full URL..."
                       className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500" />
                   </div>
                 </div>
                 <div>
-                  <label className="text-[10px] text-zinc-500 mb-1 block">Attachments <span className="text-zinc-600">(optional — screenshots, docs)</span></label>
+                  <label className="text-[11px] text-zinc-500 mb-1 block">Attachments <span className="text-zinc-500">(optional — screenshots, docs)</span></label>
                   <input type="file" ref={newReqFileRef} className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.txt,.csv"
                     onChange={e => { if (e.target.files) setNewReqFiles(prev => [...prev, ...Array.from(e.target.files!)]); e.target.value = ''; }} />
                   <button onClick={() => newReqFileRef.current?.click()} type="button"
@@ -3293,7 +3293,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                   {newReqFiles.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       {newReqFiles.map((f, i) => (
-                        <span key={i} className="flex items-center gap-1 text-[10px] bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-zinc-300">
+                        <span key={i} className="flex items-center gap-1 text-[11px] bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-zinc-300">
                           <Paperclip className="w-2.5 h-2.5" />{f.name}
                           <button onClick={() => setNewReqFiles(prev => prev.filter((_, j) => j !== i))} className="text-zinc-500 hover:text-zinc-300"><X className="w-2.5 h-2.5" /></button>
                         </span>
@@ -3325,7 +3325,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                   <MessageSquare className="w-8 h-8 text-zinc-700" />
                 </div>
                 <h3 className="text-sm font-medium text-zinc-400 mb-1">No requests yet</h3>
-                <p className="text-[10px] text-zinc-600 mb-4">Submit a request and your web team will take care of it.</p>
+                <p className="text-[11px] text-zinc-500 mb-4">Submit a request and your web team will take care of it.</p>
                 <button onClick={() => setShowNewRequest(true)}
                   className="px-4 py-2 bg-teal-600 hover:bg-teal-500 rounded-lg text-xs font-medium transition-colors">
                   <Plus className="w-3.5 h-3.5 inline mr-1" /> Create Your First Request
@@ -3363,16 +3363,16 @@ export function ClientDashboard({ workspaceId }: Props) {
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="text-xs font-medium text-zinc-200 truncate">{req.title}</span>
-                              <span className={`text-[9px] px-1.5 py-0.5 rounded border shrink-0 ${statusColors[req.status] || statusColors.new}`}>
+                              <span className={`text-[11px] px-1.5 py-0.5 rounded border shrink-0 ${statusColors[req.status] || statusColors.new}`}>
                                 {statusLabels[req.status] || req.status}
                               </span>
                             </div>
-                            <div className="flex items-center gap-2 text-[10px] text-zinc-500">
+                            <div className="flex items-center gap-2 text-[11px] text-zinc-500">
                               <span className="px-1.5 py-0.5 bg-zinc-800 rounded text-zinc-400">{catLabels[req.category] || req.category}</span>
                               {req.submittedBy && <span className="text-zinc-400">by {req.submittedBy}</span>}
                               <span>{new Date(req.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                               {teamNotes > 0 && <span className="text-teal-400">{teamNotes} team note{teamNotes !== 1 ? 's' : ''}</span>}
-                              {req.pageUrl && <span className="text-zinc-600 truncate max-w-[150px]">{req.pageUrl}</span>}
+                              {req.pageUrl && <span className="text-zinc-500 truncate max-w-[150px]">{req.pageUrl}</span>}
                             </div>
                           </div>
                           {isExpanded ? <ChevronUp className="w-4 h-4 text-zinc-500 shrink-0" /> : <ChevronDown className="w-4 h-4 text-zinc-500 shrink-0" />}
@@ -3383,14 +3383,14 @@ export function ClientDashboard({ workspaceId }: Props) {
                         <div className="border-t border-zinc-800">
                           {/* Description */}
                           <div className="px-5 py-4">
-                            <div className="text-[10px] text-zinc-500 mb-1">Description</div>
+                            <div className="text-[11px] text-zinc-500 mb-1">Description</div>
                             <p className="text-[11px] text-zinc-300 leading-relaxed whitespace-pre-wrap">{req.description}</p>
                           </div>
 
                           {/* Notes / conversation */}
                           {req.notes.length > 0 && (
                             <div className="px-5 pb-3">
-                              <div className="text-[10px] text-zinc-500 mb-2">Conversation</div>
+                              <div className="text-[11px] text-zinc-500 mb-2">Conversation</div>
                               <div className="space-y-2">
                                 {req.notes.map(note => (
                                   <div key={note.id} className={`flex gap-2 ${note.author === 'client' ? 'justify-end' : ''}`}>
@@ -3400,10 +3400,10 @@ export function ClientDashboard({ workspaceId }: Props) {
                                         : 'bg-zinc-800/50 border border-zinc-700'
                                     }`}>
                                       <div className="flex items-center gap-1.5 mb-0.5">
-                                        <span className={`text-[9px] font-medium ${note.author === 'team' ? 'text-teal-400' : 'text-zinc-400'}`}>
+                                        <span className={`text-[11px] font-medium ${note.author === 'team' ? 'text-teal-400' : 'text-zinc-400'}`}>
                                           {note.author === 'team' ? 'Web Team' : 'You'}
                                         </span>
-                                        <span className="text-[9px] text-zinc-600">
+                                        <span className="text-[11px] text-zinc-500">
                                           {new Date(note.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                                         </span>
                                       </div>
@@ -3417,8 +3417,8 @@ export function ClientDashboard({ workspaceId }: Props) {
                                               </a>
                                             ) : (
                                               <a key={att.id} href={`/api/request-attachments/${att.filename}`} target="_blank" rel="noreferrer"
-                                                className="flex items-center gap-1.5 text-[10px] text-teal-400 hover:text-teal-300">
-                                                <FileText className="w-3 h-3" />{att.originalName} <span className="text-zinc-600">({(att.size / 1024).toFixed(0)}KB)</span>
+                                                className="flex items-center gap-1.5 text-[11px] text-teal-400 hover:text-teal-300">
+                                                <FileText className="w-3 h-3" />{att.originalName} <span className="text-zinc-500">({(att.size / 1024).toFixed(0)}KB)</span>
                                               </a>
                                             )
                                           ))}
@@ -3437,7 +3437,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                               {noteFiles.length > 0 && expandedRequest === req.id && (
                                 <div className="flex flex-wrap gap-1.5">
                                   {noteFiles.map((f, i) => (
-                                    <span key={i} className="flex items-center gap-1 text-[10px] bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-zinc-300">
+                                    <span key={i} className="flex items-center gap-1 text-[11px] bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-zinc-300">
                                       <Paperclip className="w-2.5 h-2.5" />{f.name}
                                       <button onClick={() => setNoteFiles(prev => prev.filter((_, j) => j !== i))} className="text-zinc-500 hover:text-zinc-300"><X className="w-2.5 h-2.5" /></button>
                                     </span>
@@ -3463,7 +3463,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                           )}
                           {(req.status === 'completed' || req.status === 'closed') && (
                             <div className="px-5 py-3 border-t border-zinc-800/50">
-                              <div className="flex items-center gap-1.5 text-[10px] text-green-400">
+                              <div className="flex items-center gap-1.5 text-[11px] text-green-400">
                                 <CheckCircle2 className="w-3 h-3" /> This request has been {req.status}
                               </div>
                             </div>
@@ -3549,7 +3549,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                     <div className="text-sm font-semibold text-zinc-100">
                       {isUpgrade ? 'Upgrade to Full Blog Post' : isFull ? (pricing?.fullPostLabel || 'Full Blog Post') : (pricing?.briefLabel || 'Content Brief')}
                     </div>
-                    <div className="text-[10px] text-zinc-500 mt-0.5">
+                    <div className="text-[11px] text-zinc-500 mt-0.5">
                       {isUpgrade ? 'Continue from your approved brief' : 'Confirm your content request'}
                     </div>
                   </div>
@@ -3558,13 +3558,13 @@ export function ClientDashboard({ workspaceId }: Props) {
                 {/* Topic info */}
                 <div className="bg-zinc-950/50 rounded-lg px-3 py-2.5 border border-zinc-800">
                   <div className="text-xs text-zinc-300 font-medium">{pricingModal.topic}</div>
-                  <div className="text-[10px] text-teal-400 mt-0.5">&ldquo;{pricingModal.targetKeyword}&rdquo;</div>
+                  <div className="text-[11px] text-teal-400 mt-0.5">&ldquo;{pricingModal.targetKeyword}&rdquo;</div>
                 </div>
               </div>
 
               {/* What's included */}
               <div className="px-6 py-4 border-t border-zinc-800/50">
-                <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-2.5">What&apos;s included</div>
+                <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-2.5">What&apos;s included</div>
                 <div className="space-y-1.5">
                   {(isFull ? fullPostIncludes : briefIncludes).map((item, i) => (
                     <div key={i} className="flex items-start gap-2">
@@ -3574,7 +3574,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                   ))}
                 </div>
                 {pricing && (isFull ? pricing.fullPostDescription : pricing.briefDescription) && (
-                  <div className="text-[10px] text-zinc-500 mt-3 leading-relaxed">{isFull ? pricing.fullPostDescription : pricing.briefDescription}</div>
+                  <div className="text-[11px] text-zinc-500 mt-3 leading-relaxed">{isFull ? pricing.fullPostDescription : pricing.briefDescription}</div>
                 )}
               </div>
 
@@ -3583,8 +3583,8 @@ export function ClientDashboard({ workspaceId }: Props) {
                 {displayPrice != null && (
                   <div className="flex items-baseline gap-2 mb-4">
                     <span className={`text-2xl font-bold ${isFull ? 'text-blue-300' : 'text-teal-300'}`}>{fmt(displayPrice)}</span>
-                    {isUpgrade && <span className="text-[10px] text-zinc-500">upgrade difference</span>}
-                    {!isUpgrade && <span className="text-[10px] text-zinc-500">one-time</span>}
+                    {isUpgrade && <span className="text-[11px] text-zinc-500">upgrade difference</span>}
+                    {!isUpgrade && <span className="text-[11px] text-zinc-500">one-time</span>}
                   </div>
                 )}
                 {displayPrice == null && (
@@ -3611,7 +3611,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                   </button>
                 </div>
                 <div className="text-center mt-3">
-                  <span className="text-[9px] text-zinc-600">
+                  <span className="text-[11px] text-zinc-500">
                     {displayPrice != null ? 'Payment will be processed securely. You can review your invoice anytime.' : 'No charge until pricing is confirmed by your team.'}
                   </span>
                 </div>
@@ -3633,8 +3633,8 @@ export function ClientDashboard({ workspaceId }: Props) {
       {/* Powered by footer */}
       <footer className="border-t border-zinc-800/50 mt-12">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <span className="text-[10px] text-zinc-700">Powered by hmpsn studio</span>
-          <a href="https://hmpsn.studio" target="_blank" rel="noopener noreferrer" className="text-[10px] text-zinc-700 hover:text-zinc-500 transition-colors">hmpsn.studio</a>
+          <span className="text-[11px] text-zinc-700">Powered by hmpsn studio</span>
+          <a href="https://hmpsn.studio" target="_blank" rel="noopener noreferrer" className="text-[11px] text-zinc-700 hover:text-zinc-500 transition-colors">hmpsn.studio</a>
         </div>
       </footer>
     </div>
@@ -3655,9 +3655,9 @@ function InsightCard({ icon: Icon, color, title, count, desc, items }: {
       <div className="flex items-center gap-1.5 mb-3">
         <Icon className={`w-4 h-4 ${c.text}`} />
         <span className={`text-xs font-medium ${c.text}`}>{title}</span>
-        <span className="text-[10px] text-zinc-600 ml-auto">{count} queries</span>
+        <span className="text-[11px] text-zinc-500 ml-auto">{count} queries</span>
       </div>
-      <p className="text-[10px] text-zinc-500 mb-2">{desc}</p>
+      <p className="text-[11px] text-zinc-500 mb-2">{desc}</p>
       <div className="space-y-1.5">
         {items.map((item, i) => (
           <div key={i} className="flex items-center justify-between text-[11px] py-1 px-2 rounded bg-zinc-800/30">

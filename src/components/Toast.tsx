@@ -71,7 +71,7 @@ function ToastMessage({ item, onDismiss }: { item: ToastItem; onDismiss: (id: st
     >
       {icons[item.type]}
       <span className="text-xs">{item.message}</span>
-      <button onClick={() => { setVisible(false); setTimeout(() => onDismiss(item.id), 200); }} className="ml-1 text-zinc-600 hover:text-zinc-400 transition-colors">
+      <button onClick={() => { setVisible(false); setTimeout(() => onDismiss(item.id), 200); }} className="ml-1 text-zinc-500 hover:text-zinc-400 transition-colors">
         <X className="w-3 h-3" />
       </button>
     </div>

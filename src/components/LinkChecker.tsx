@@ -71,10 +71,10 @@ export function LinkChecker({ siteId }: Props) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
         <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center">
-          <Link2Off className="w-8 h-8 text-zinc-600" />
+          <Link2Off className="w-8 h-8 text-zinc-500" />
         </div>
         <p className="text-zinc-400 text-sm">Find broken links and redirect chains across your site</p>
-        <p className="text-xs text-zinc-600 max-w-md text-center">
+        <p className="text-xs text-zinc-500 max-w-md text-center">
           Crawls every page, extracts all links, and checks each one for 404s, timeouts, and redirects
         </p>
         <button
@@ -92,7 +92,7 @@ export function LinkChecker({ siteId }: Props) {
       <div className="flex flex-col items-center justify-center py-16 gap-3 text-zinc-500">
         <Loader2 className="w-6 h-6 animate-spin text-teal-400" />
         <p className="text-sm">Checking all links across the site...</p>
-        <p className="text-xs text-zinc-600">This may take a few minutes for large sites</p>
+        <p className="text-xs text-zinc-500">This may take a few minutes for large sites</p>
       </div>
     );
   }
@@ -204,13 +204,13 @@ export function LinkChecker({ siteId }: Props) {
                 </div>
                 <div className="text-xs text-zinc-500 mt-0.5">
                   Found on <span className="text-zinc-400">{link.foundOn}</span>
-                  <span className="text-zinc-600"> (/{link.foundOnSlug})</span>
-                  {link.anchorText && <span className="text-zinc-600"> &middot; &ldquo;{link.anchorText.slice(0, 50)}&rdquo;</span>}
+                  <span className="text-zinc-500"> (/{link.foundOnSlug})</span>
+                  {link.anchorText && <span className="text-zinc-500"> &middot; &ldquo;{link.anchorText.slice(0, 50)}&rdquo;</span>}
                 </div>
-                <div className="text-[11px] text-zinc-600 mt-0.5">{link.statusText}</div>
+                <div className="text-[11px] text-zinc-500 mt-0.5">{link.statusText}</div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <span className={`text-[10px] px-1.5 py-0.5 rounded border ${link.type === 'internal' ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' : 'bg-zinc-800 border-zinc-700 text-zinc-400'}`}>
+                <span className={`text-[11px] px-1.5 py-0.5 rounded border ${link.type === 'internal' ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' : 'bg-zinc-800 border-zinc-700 text-zinc-400'}`}>
                   {link.type}
                 </span>
                 <span className={`text-xs font-mono font-bold ${tab === 'dead' ? 'text-red-400' : 'text-amber-400'}`}>
@@ -222,7 +222,7 @@ export function LinkChecker({ siteId }: Props) {
         )}
       </div>
 
-      <div className="text-[10px] text-zinc-600 text-center">
+      <div className="text-[11px] text-zinc-500 text-center">
         Last checked: {new Date(data.checkedAt).toLocaleString()}
       </div>
     </div>

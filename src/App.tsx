@@ -318,10 +318,10 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
           />
           {selected && (
             <div className="mt-1.5 flex items-center gap-1.5 px-1">
-              {selected.webflowSiteName && <div className="text-[10px] text-zinc-500 truncate flex-1">{selected.webflowSiteName}</div>}
+              {selected.webflowSiteName && <div className="text-[11px] text-zinc-500 truncate flex-1">{selected.webflowSiteName}</div>}
               <button
                 onClick={() => setTab('workspace-settings')}
-                className={`p-1 rounded transition-colors ${tab === 'workspace-settings' ? 'text-teal-400 bg-teal-500/10' : 'text-zinc-600 hover:text-zinc-400'}`}
+                className={`p-1 rounded transition-colors ${tab === 'workspace-settings' ? 'text-teal-400 bg-teal-500/10' : 'text-zinc-500 hover:text-zinc-400'}`}
                 title="Workspace settings"
               >
                 <Settings className="w-3 h-3" />
@@ -334,7 +334,7 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
         <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
           {navGroups.map((group, gi) => (
             <div key={group.label || `group-${gi}`}>
-              {group.label && <div className="text-[9px] text-zinc-600 font-semibold tracking-widest px-2.5 mb-1">{group.label}</div>}
+              {group.label && <div className="text-[11px] text-zinc-500 font-semibold tracking-widest px-2.5 mb-1">{group.label}</div>}
               {group.items.map(item => {
                 const Icon = item.icon;
                 const active = tab === item.id;
@@ -354,7 +354,7 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
                     <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${active ? 'text-teal-400' : ''}`} />
                     <span className="truncate">{item.label}</span>
                     {item.id === 'seo-briefs' && pendingContentRequests > 0 && (
-                      <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 tabular-nums">
+                      <span className="ml-auto text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 tabular-nums">
                         {pendingContentRequests}
                       </span>
                     )}
@@ -367,7 +367,7 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
 
         {/* Bottom: Tools */}
         <div className="px-2 py-2 space-y-0.5 border-t border-zinc-800">
-          <div className="text-[9px] text-zinc-600 font-semibold tracking-widest px-2.5 mb-1">TOOLS</div>
+          <div className="text-[11px] text-zinc-500 font-semibold tracking-widest px-2.5 mb-1">TOOLS</div>
           {([
             { id: 'prospect' as Page, label: 'Prospect', icon: FileSearch },
             { id: 'settings' as Page, label: 'Settings', icon: Settings },
@@ -392,7 +392,7 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
           {onLogout && (
             <button
               onClick={() => { fetch('/api/auth/logout', { method: 'POST' }); onLogout(); }}
-              className="w-full flex items-center gap-2.5 px-2.5 py-[5px] rounded-lg text-[12px] font-medium text-zinc-600 hover:text-red-400 hover:bg-red-500/5 transition-all mt-2"
+              className="w-full flex items-center gap-2.5 px-2.5 py-[5px] rounded-lg text-[12px] font-medium text-zinc-500 hover:text-red-400 hover:bg-red-500/5 transition-all mt-2"
             >
               <LogOut className="w-3.5 h-3.5 flex-shrink-0" />
               <span className="truncate">Log Out</span>
@@ -421,9 +421,9 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
                 </div>
                 <div className="text-left flex-1">
                   <span className="text-xs font-medium text-amber-300">{pendingContentRequests} new content {pendingContentRequests === 1 ? 'request' : 'requests'}</span>
-                  <span className="text-[10px] text-zinc-500 ml-2">from client portal</span>
+                  <span className="text-[11px] text-zinc-500 ml-2">from client portal</span>
                 </div>
-                <span className="text-[10px] text-zinc-500">View →</span>
+                <span className="text-[11px] text-zinc-500">View →</span>
               </button>
             )}
             {renderContent()}

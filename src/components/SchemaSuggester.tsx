@@ -438,15 +438,15 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
                     className="w-full text-left px-4 py-2 hover:bg-zinc-800/50 transition-colors border-b border-zinc-800/30 last:border-b-0 disabled:opacity-50"
                   >
                     <span className="text-xs text-zinc-300 block">{p.title}</span>
-                    <span className="text-[10px] text-zinc-600">/{p.slug}</span>
+                    <span className="text-[11px] text-zinc-500">/{p.slug}</span>
                   </button>
                 ))}
               {availablePages.length === 0 && (
-                <div className="px-4 py-3 text-xs text-zinc-600 text-center">No pages found</div>
+                <div className="px-4 py-3 text-xs text-zinc-500 text-center">No pages found</div>
               )}
             </div>
             <div className="px-3 py-2 border-t border-zinc-800">
-              <button onClick={() => setShowPagePicker(false)} className="text-[10px] text-zinc-500 hover:text-zinc-400 transition-colors">Cancel</button>
+              <button onClick={() => setShowPagePicker(false)} className="text-[11px] text-zinc-500 hover:text-zinc-400 transition-colors">Cancel</button>
             </div>
           </div>
         )}
@@ -455,10 +455,10 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
           <div className="w-full max-w-lg bg-zinc-900 border border-amber-500/20 rounded-xl overflow-hidden mt-2">
             <div className="px-4 py-2.5 border-b border-zinc-800 flex items-center justify-between">
               <span className="text-xs font-medium text-amber-300">CMS Collection Templates</span>
-              <button onClick={() => setShowCmsPanel(false)} className="text-[10px] text-zinc-500 hover:text-zinc-400">Close</button>
+              <button onClick={() => setShowCmsPanel(false)} className="text-[11px] text-zinc-500 hover:text-zinc-400">Close</button>
             </div>
             {cmsTemplatePages.length === 0 ? (
-              <div className="px-4 py-6 text-xs text-zinc-600 text-center">No CMS collections found</div>
+              <div className="px-4 py-6 text-xs text-zinc-500 text-center">No CMS collections found</div>
             ) : (
               <div className="max-h-[200px] overflow-y-auto">
                 {cmsTemplatePages.map(p => (
@@ -472,7 +472,7 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
                       <span className="text-xs text-zinc-300">{p.collectionName}</span>
                       {generatingCmsTemplate === p.collectionId && <Loader2 className="w-3 h-3 animate-spin text-amber-400" />}
                     </div>
-                    <span className="text-[10px] text-zinc-600">/{p.collectionSlug}/{'{'} slug {'}'} · Template: {p.pageTitle}</span>
+                    <span className="text-[11px] text-zinc-500">/{p.collectionSlug}/{'{'} slug {'}'} · Template: {p.pageTitle}</span>
                   </button>
                 ))}
               </div>
@@ -489,11 +489,11 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
                   <span className="text-xs font-medium text-amber-300">Template: {cmsTemplateResult.collectionName}</span>
                   <div className="flex gap-1.5 mt-1">
                     {cmsTemplateResult.schemaTypes.map((t, i) => (
-                      <span key={i} className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-amber-500/10 text-amber-300 border border-amber-500/20">{t}</span>
+                      <span key={i} className="px-1.5 py-0.5 rounded text-[11px] font-mono bg-amber-500/10 text-amber-300 border border-amber-500/20">{t}</span>
                     ))}
                   </div>
                 </div>
-                <span className="text-[10px] text-zinc-600">{cmsTemplateResult.fieldsUsed.length} CMS fields used</span>
+                <span className="text-[11px] text-zinc-500">{cmsTemplateResult.fieldsUsed.length} CMS fields used</span>
               </div>
             </div>
             <div className="px-4 py-3">
@@ -526,7 +526,7 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
                 )}
                 {cmsError && <span className="text-xs text-red-400">{cmsError}</span>}
               </div>
-              <p className="text-[10px] text-zinc-600 mt-2">This template uses {'{{wf}}'} tags — each CMS item page gets unique schema with its own field values.</p>
+              <p className="text-[11px] text-zinc-500 mt-2">This template uses {'{{wf}}'} tags — each CMS item page gets unique schema with its own field values.</p>
             </div>
           </div>
         )}
@@ -550,7 +550,7 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
       <div className="flex flex-col items-center justify-center py-16 gap-3 text-zinc-500">
         <Loader2 className="w-6 h-6 animate-spin" />
         <p className="text-sm">{progressMsg || 'Scanning pages for schema opportunities...'}</p>
-        <p className="text-xs text-zinc-600">Results will appear as each batch completes</p>
+        <p className="text-xs text-zinc-500">Results will appear as each batch completes</p>
         <button onClick={stopScan} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-red-400 bg-zinc-800 hover:bg-zinc-800/80 transition-colors mt-2">
           Stop
         </button>
@@ -609,7 +609,7 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
         <div className="flex items-center gap-2">
           <span className="text-xs text-zinc-500">
             {data.length} pages · {totalTypes} schema types generated{loading ? ' (so far)' : ''}
-            {snapshotDate && !loading && <span className="text-zinc-600"> · saved {new Date(snapshotDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
+            {snapshotDate && !loading && <span className="text-zinc-500"> · saved {new Date(snapshotDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -659,15 +659,15 @@ export function SchemaSuggester({ siteId, workspaceId }: Props) {
                         >
                           <div className="flex items-center justify-between">
                             <span className="text-xs text-zinc-300">{p.title}</span>
-                            {alreadyGenerated && <span className="text-[9px] text-zinc-600">exists</span>}
+                            {alreadyGenerated && <span className="text-[11px] text-zinc-500">exists</span>}
                           </div>
-                          <span className="text-[10px] text-zinc-600">/{p.slug}</span>
+                          <span className="text-[11px] text-zinc-500">/{p.slug}</span>
                         </button>
                       );
                     })}
                 </div>
                 <div className="px-3 py-2 border-t border-zinc-800">
-                  <button onClick={() => { setShowPagePicker(false); setPageSearch(''); }} className="text-[10px] text-zinc-500 hover:text-zinc-400 transition-colors">Close</button>
+                  <button onClick={() => { setShowPagePicker(false); setPageSearch(''); }} className="text-[11px] text-zinc-500 hover:text-zinc-400 transition-colors">Close</button>
                 </div>
               </div>
             )}

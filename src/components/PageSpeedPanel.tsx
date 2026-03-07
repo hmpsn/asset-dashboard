@@ -124,7 +124,7 @@ function VitalCard({ label, value, formatted, vitalKey }: { label: string; value
   const rating = vitalRating(vitalKey, value);
   return (
     <div className={`rounded-lg border p-3 ${ratingBg(rating)}`}>
-      <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">{label}</div>
+      <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">{label}</div>
       <div className={`text-lg font-bold tabular-nums ${ratingColor(rating)}`}>{formatted}</div>
     </div>
   );
@@ -269,7 +269,7 @@ export function PageSpeedPanel({ siteId }: Props) {
                   <div className="text-[11px] text-zinc-500 mt-0.5 line-clamp-2">{opp.description}</div>
                 </div>
                 {opp.savings && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 flex-shrink-0">
+                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 flex-shrink-0">
                     Save {opp.savings}
                   </span>
                 )}
@@ -293,7 +293,7 @@ export function PageSpeedPanel({ siteId }: Props) {
                   <div className="text-[11px] text-zinc-500 mt-0.5 line-clamp-2">{diag.description}</div>
                 </div>
                 {diag.displayValue && (
-                  <span className="text-[10px] text-zinc-500 flex-shrink-0">{diag.displayValue}</span>
+                  <span className="text-[11px] text-zinc-500 flex-shrink-0">{diag.displayValue}</span>
                 )}
               </div>
             ))}
@@ -307,7 +307,7 @@ export function PageSpeedPanel({ siteId }: Props) {
     return (
       <div className="flex flex-col items-center justify-center py-12 gap-5">
         <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center">
-          <Gauge className="w-8 h-8 text-zinc-600" />
+          <Gauge className="w-8 h-8 text-zinc-500" />
         </div>
         <p className="text-zinc-400 text-sm">Core Web Vitals & Performance</p>
 
@@ -357,7 +357,7 @@ export function PageSpeedPanel({ siteId }: Props) {
           </div>
         ) : (
           <div className="space-y-2 text-center">
-            <p className="text-xs text-zinc-600 max-w-md">
+            <p className="text-xs text-zinc-500 max-w-md">
               Tests the top 3 most important pages automatically (homepage + key pages).
             </p>
             <div className="flex gap-2 justify-center">
@@ -386,7 +386,7 @@ export function PageSpeedPanel({ siteId }: Props) {
       <div className="flex flex-col items-center justify-center py-20 gap-3">
         <Loader2 className="w-8 h-8 animate-spin text-teal-400" />
         <p className="text-sm text-zinc-400">Running PageSpeed analysis...</p>
-        <p className="text-xs text-zinc-600">{singleResult === null && !data ? 'Testing via Google PageSpeed Insights API' : ''}</p>
+        <p className="text-xs text-zinc-500">{singleResult === null && !data ? 'Testing via Google PageSpeed Insights API' : ''}</p>
         <p className="text-xs text-zinc-700">This may take 30-60 seconds</p>
       </div>
     );
@@ -443,7 +443,7 @@ export function PageSpeedPanel({ siteId }: Props) {
             <Monitor className="w-3 h-3" /> Desktop
           </button>
         </div>
-        <div className="text-xs text-zinc-600">
+        <div className="text-xs text-zinc-500">
           {data.pages.length} pages tested · {new Date(data.testedAt).toLocaleTimeString()}
         </div>
       </div>
@@ -478,7 +478,7 @@ export function PageSpeedPanel({ siteId }: Props) {
                 <div className={`text-lg font-bold tabular-nums w-10 ${scoreColor(page.score)}`}>{page.score}</div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm text-zinc-300 truncate">{page.page}</div>
-                  <div className="text-xs text-zinc-600 truncate">{page.url}</div>
+                  <div className="text-xs text-zinc-500 truncate">{page.url}</div>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-zinc-500">
                   <span>LCP {formatMs(page.vitals.LCP)}</span>
@@ -520,7 +520,7 @@ export function PageSpeedPanel({ siteId }: Props) {
                                 <div className="text-[11px] text-zinc-500 mt-0.5 line-clamp-2">{opp.description}</div>
                               </div>
                               {opp.savings && (
-                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 flex-shrink-0">
+                                <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 flex-shrink-0">
                                   Save {opp.savings}
                                 </span>
                               )}
@@ -552,7 +552,7 @@ export function PageSpeedPanel({ siteId }: Props) {
                                 <div className="text-[11px] text-zinc-500 mt-0.5 line-clamp-2">{diag.description}</div>
                               </div>
                               {diag.displayValue && (
-                                <span className="text-[10px] text-zinc-500 flex-shrink-0">{diag.displayValue}</span>
+                                <span className="text-[11px] text-zinc-500 flex-shrink-0">{diag.displayValue}</span>
                               )}
                             </div>
                           ))}

@@ -198,7 +198,7 @@ export function KeywordAnalysis({ siteId }: Props) {
           </span>
         )}
         <div className="flex-1" />
-        <div className="text-[10px] text-zinc-600 max-w-xs text-right">
+        <div className="text-[11px] text-zinc-500 max-w-xs text-right">
           Click a page to run AI keyword analysis. Each analysis uses GPT-4o-mini.
         </div>
       </div>
@@ -238,11 +238,11 @@ export function KeywordAnalysis({ siteId }: Props) {
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="text-sm text-zinc-300 truncate">{page.title}</div>
-                  <div className="text-xs text-zinc-600 truncate">/{page.slug}</div>
+                  <div className="text-xs text-zinc-500 truncate">/{page.slug}</div>
                 </div>
                 {kw && (
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-400">
+                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-400">
                       {kw.primaryKeyword}
                     </span>
                     <span className={`text-xs font-bold tabular-nums ${scoreColor(kw.optimizationScore)}`}>
@@ -266,7 +266,7 @@ export function KeywordAnalysis({ siteId }: Props) {
                       {/* Top row: Score + Intent + Difficulty */}
                       <div className="grid grid-cols-3 gap-3">
                         <div className="bg-zinc-900 rounded-lg p-3 border border-zinc-800">
-                          <div className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">Optimization</div>
+                          <div className="text-[11px] text-zinc-500 uppercase tracking-wide mb-1">Optimization</div>
                           <div className={`text-2xl font-bold ${scoreColor(kw.optimizationScore)}`}>
                             {kw.optimizationScore}
                             <span className="text-xs font-normal text-zinc-500">/100</span>
@@ -276,23 +276,23 @@ export function KeywordAnalysis({ siteId }: Props) {
                           </div>
                         </div>
                         <div className="bg-zinc-900 rounded-lg p-3 border border-zinc-800">
-                          <div className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">Search Intent</div>
+                          <div className="text-[11px] text-zinc-500 uppercase tracking-wide mb-1">Search Intent</div>
                           <div className="flex items-center gap-2">
                             <span className="w-6 h-6 rounded-full bg-teal-500/20 text-teal-400 flex items-center justify-center text-xs font-bold">
                               {intentIcon(kw.searchIntent)}
                             </span>
                             <div>
                               <div className="text-sm font-medium text-zinc-200 capitalize">{kw.searchIntent}</div>
-                              <div className="text-[10px] text-zinc-500">{Math.round(kw.searchIntentConfidence * 100)}% confidence</div>
+                              <div className="text-[11px] text-zinc-500">{Math.round(kw.searchIntentConfidence * 100)}% confidence</div>
                             </div>
                           </div>
                         </div>
                         <div className="bg-zinc-900 rounded-lg p-3 border border-zinc-800">
-                          <div className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">Difficulty</div>
+                          <div className="text-[11px] text-zinc-500 uppercase tracking-wide mb-1">Difficulty</div>
                           <div className={`text-lg font-bold capitalize ${difficultyColor(kw.estimatedDifficulty)}`}>
                             {kw.estimatedDifficulty}
                           </div>
-                          <div className="text-[10px] text-zinc-500 mt-0.5">Cluster: {kw.topicCluster}</div>
+                          <div className="text-[11px] text-zinc-500 mt-0.5">Cluster: {kw.topicCluster}</div>
                         </div>
                       </div>
 
@@ -314,7 +314,7 @@ export function KeywordAnalysis({ siteId }: Props) {
                                 ) : (
                                   <AlertCircle className="w-3 h-3 text-red-400" />
                                 )}
-                                <span className={`text-[10px] ${present ? 'text-green-400' : 'text-red-400'}`}>
+                                <span className={`text-[11px] ${present ? 'text-green-400' : 'text-red-400'}`}>
                                   {labels[key]}
                                 </span>
                               </div>
@@ -332,7 +332,7 @@ export function KeywordAnalysis({ siteId }: Props) {
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {kw.secondaryKeywords.map((k, i) => (
-                              <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400">
+                              <span key={i} className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400">
                                 {k}
                               </span>
                             ))}
@@ -345,7 +345,7 @@ export function KeywordAnalysis({ siteId }: Props) {
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {kw.longTailKeywords.map((k, i) => (
-                              <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-green-400">
+                              <span key={i} className="text-[11px] px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-green-400">
                                 {k}
                               </span>
                             ))}
@@ -362,7 +362,7 @@ export function KeywordAnalysis({ siteId }: Props) {
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {kw.competitorKeywords.map((k, i) => (
-                              <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                              <span key={i} className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400">
                                 {k}
                               </span>
                             ))}
@@ -427,31 +427,31 @@ export function KeywordAnalysis({ siteId }: Props) {
                           <div className="grid grid-cols-4 gap-3 mb-3">
                             <div>
                               <div className="text-lg font-bold text-zinc-200">{cs.wordCount}</div>
-                              <div className="text-[10px] text-zinc-500">Words</div>
+                              <div className="text-[11px] text-zinc-500">Words</div>
                             </div>
                             <div>
                               <div className={`text-lg font-bold ${cs.readabilityScore >= 60 ? 'text-green-400' : cs.readabilityScore >= 30 ? 'text-amber-400' : 'text-red-400'}`}>
                                 {cs.readabilityScore}
                               </div>
-                              <div className="text-[10px] text-zinc-500">Readability</div>
+                              <div className="text-[11px] text-zinc-500">Readability</div>
                             </div>
                             <div>
                               <div className="text-lg font-bold text-zinc-200">{cs.headings.total}</div>
-                              <div className="text-[10px] text-zinc-500">Headings</div>
+                              <div className="text-[11px] text-zinc-500">Headings</div>
                             </div>
                             <div>
                               <div className="text-lg font-bold text-zinc-200">{cs.avgWordsPerSentence}</div>
-                              <div className="text-[10px] text-zinc-500">Words/Sentence</div>
+                              <div className="text-[11px] text-zinc-500">Words/Sentence</div>
                             </div>
                           </div>
 
                           {/* Top keywords from content */}
                           {cs.topKeywords.length > 0 && (
                             <div>
-                              <div className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1.5">Top Words in Content</div>
+                              <div className="text-[11px] text-zinc-500 uppercase tracking-wide mb-1.5">Top Words in Content</div>
                               <div className="flex flex-wrap gap-1">
                                 {cs.topKeywords.slice(0, 10).map((kw, i) => (
-                                  <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
+                                  <span key={i} className="text-[11px] px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
                                     {kw.word} <span className="text-cyan-600">({kw.density}%)</span>
                                   </span>
                                 ))}
@@ -463,15 +463,15 @@ export function KeywordAnalysis({ siteId }: Props) {
                           <div className="flex items-center gap-4 mt-3">
                             <div className="flex items-center gap-1.5">
                               {cs.titleOk ? <CheckCircle className="w-3 h-3 text-green-400" /> : <AlertCircle className="w-3 h-3 text-amber-400" />}
-                              <span className="text-[10px] text-zinc-400">Title: {cs.titleLength} chars</span>
+                              <span className="text-[11px] text-zinc-400">Title: {cs.titleLength} chars</span>
                             </div>
                             <div className="flex items-center gap-1.5">
                               {cs.descOk ? <CheckCircle className="w-3 h-3 text-green-400" /> : <AlertCircle className="w-3 h-3 text-amber-400" />}
-                              <span className="text-[10px] text-zinc-400">Desc: {cs.descLength} chars</span>
+                              <span className="text-[11px] text-zinc-400">Desc: {cs.descLength} chars</span>
                             </div>
                             <div className="flex items-center gap-1.5">
                               <BookOpen className="w-3 h-3 text-zinc-500" />
-                              <span className="text-[10px] text-zinc-400">
+                              <span className="text-[11px] text-zinc-400">
                                 {cs.readabilityGrade} ({cs.readabilityScore})
                               </span>
                             </div>

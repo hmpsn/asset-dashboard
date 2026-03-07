@@ -27,15 +27,15 @@ function JobRow({ job, onDismiss, onCancel }: { job: BackgroundJob; onDismiss: (
         {job.status === 'cancelled' && <Ban className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />}
         <div className="flex-1 min-w-0">
           <div className="text-xs font-medium text-zinc-200 truncate">{label}</div>
-          <div className="text-[10px] text-zinc-500 truncate">{job.message}</div>
+          <div className="text-[11px] text-zinc-500 truncate">{job.message}</div>
         </div>
         {isActive && (
-          <button onClick={onCancel} className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-red-400 transition-all" title="Stop">
+          <button onClick={onCancel} className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 transition-all" title="Stop">
             <StopCircle className="w-3.5 h-3.5" />
           </button>
         )}
         {!isActive && (
-          <button onClick={onDismiss} className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-zinc-400 transition-all">
+          <button onClick={onDismiss} className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-zinc-400 transition-all">
             <X className="w-3 h-3" />
           </button>
         )}
@@ -83,7 +83,7 @@ export function TaskPanel() {
         {doneCount > 0 && !expanded && (
           <button
             onClick={(e) => { e.stopPropagation(); clearDone(); }}
-            className="text-[10px] text-zinc-600 hover:text-zinc-400 px-1"
+            className="text-[11px] text-zinc-500 hover:text-zinc-400 px-1"
           >
             Clear
           </button>
@@ -99,7 +99,7 @@ export function TaskPanel() {
           ))}
           {doneCount > 0 && (
             <div className="px-3 py-2 text-center">
-              <button onClick={clearDone} className="text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors">
+              <button onClick={clearDone} className="text-[11px] text-zinc-500 hover:text-zinc-400 transition-colors">
                 Clear completed
               </button>
             </div>

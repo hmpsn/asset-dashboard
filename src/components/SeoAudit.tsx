@@ -314,7 +314,7 @@ function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
               </div>
               <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                 <span className={`w-1.5 h-1.5 rounded-full ${PRIORITY_CONFIG[item.priority]?.dot || 'bg-zinc-500'}`} title={item.priority} />
-                <button onClick={() => deleteItem(item.id)} className="text-zinc-600 hover:text-red-400">
+                <button onClick={() => deleteItem(item.id)} className="text-zinc-500 hover:text-red-400">
                   <Trash2 className="w-3 h-3" />
                 </button>
               </div>
@@ -322,7 +322,7 @@ function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
           );
         })}
         {items.length === 0 && !adding && (
-          <div className="px-4 py-6 text-center text-xs text-zinc-600">
+          <div className="px-4 py-6 text-center text-xs text-zinc-500">
             No action items yet. Click "Add" to track work for this report.
           </div>
         )}
@@ -348,10 +348,10 @@ function AuditHistory({ siteId, history, onRefresh }: { siteId: string; history:
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
         <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center">
-          <Clock className="w-8 h-8 text-zinc-600" />
+          <Clock className="w-8 h-8 text-zinc-500" />
         </div>
         <p className="text-zinc-400 text-sm">No audit history yet</p>
-        <p className="text-xs text-zinc-600 max-w-md text-center">
+        <p className="text-xs text-zinc-500 max-w-md text-center">
           Run an SEO audit and click "Save & Share" to start tracking changes over time
         </p>
       </div>
@@ -450,7 +450,7 @@ function AuditHistory({ siteId, history, onRefresh }: { siteId: string; history:
                 <div className="flex-1 min-w-0">
                   <div className="text-sm text-zinc-300">
                     {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    <span className="text-zinc-600 ml-2">{date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                    <span className="text-zinc-500 ml-2">{date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
                   <div className="text-xs text-zinc-500">
                     {snap.totalPages} pages · {snap.errors} errors · {snap.warnings} warnings
@@ -966,10 +966,10 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
         {auditTabBar}
         <div className="flex flex-col items-center justify-center py-16 gap-4">
           <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center">
-            <Globe className="w-8 h-8 text-zinc-600" />
+            <Globe className="w-8 h-8 text-zinc-500" />
           </div>
           <p className="text-zinc-400 text-sm">Comprehensive SEO audit for your Webflow site</p>
-          <p className="text-xs text-zinc-600 max-w-md text-center">
+          <p className="text-xs text-zinc-500 max-w-md text-center">
             Checks titles, meta descriptions, headings, Open Graph, canonical tags, structured data, content length, and more
           </p>
           <button
@@ -990,7 +990,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
         <div className="flex flex-col items-center justify-center py-16 gap-3 text-zinc-500">
           <Loader2 className="w-6 h-6 animate-spin" />
           <p className="text-sm">Scanning pages for SEO issues...</p>
-          <p className="text-xs text-zinc-600">Fetching metadata and published HTML for each page</p>
+          <p className="text-xs text-zinc-500">Fetching metadata and published HTML for each page</p>
         </div>
       </div>
     );
@@ -1076,13 +1076,13 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
               <Clock className="w-4 h-4 text-zinc-400" />
               <span className="text-xs font-medium text-zinc-300">Scheduled Audits</span>
               {schedule?.enabled && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">Active</span>
+                <span className="text-[11px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">Active</span>
               )}
               {schedule?.lastRunAt && (
-                <span className="text-[10px] text-zinc-600">Last: {new Date(schedule.lastRunAt).toLocaleDateString()}</span>
+                <span className="text-[11px] text-zinc-500">Last: {new Date(schedule.lastRunAt).toLocaleDateString()}</span>
               )}
             </div>
-            <button onClick={() => setShowSchedule(!showSchedule)} className="text-[10px] text-teal-400 hover:text-teal-300">
+            <button onClick={() => setShowSchedule(!showSchedule)} className="text-[11px] text-teal-400 hover:text-teal-300">
               {showSchedule ? 'Hide' : 'Configure'}
             </button>
           </div>
@@ -1090,7 +1090,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
             <div className="mt-3 pt-3 border-t border-zinc-800 space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[10px] text-zinc-500 block mb-1">Run Every</label>
+                  <label className="text-[11px] text-zinc-500 block mb-1">Run Every</label>
                   <select value={scheduleInterval} onChange={e => setScheduleInterval(Number(e.target.value))}
                     className="w-full px-2 py-1.5 bg-zinc-950 border border-zinc-800 rounded text-xs text-zinc-300">
                     <option value={1}>Daily</option>
@@ -1100,7 +1100,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
                   </select>
                 </div>
                 <div>
-                  <label className="text-[10px] text-zinc-500 block mb-1">Alert on Score Drop &gt;</label>
+                  <label className="text-[11px] text-zinc-500 block mb-1">Alert on Score Drop &gt;</label>
                   <select value={scheduleThreshold} onChange={e => setScheduleThreshold(Number(e.target.value))}
                     className="w-full px-2 py-1.5 bg-zinc-950 border border-zinc-800 rounded text-xs text-zinc-300">
                     <option value={3}>3 points</option>
@@ -1147,15 +1147,15 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
                 <div className="flex-1 min-w-0">
                   <div className="text-sm text-zinc-300">{issue.message}</div>
                   <div className="text-xs text-zinc-500 mt-0.5">{issue.recommendation}</div>
-                  {issue.value && <div className="text-xs text-zinc-600 mt-0.5 italic truncate">{issue.value}</div>}
+                  {issue.value && <div className="text-xs text-zinc-500 mt-0.5 italic truncate">{issue.value}</div>}
                   {issue.suggestedFix && (
                     <div className="mt-1.5 px-2 py-1.5 rounded bg-emerald-950/40 border border-emerald-800/30">
-                      <div className="text-[9px] text-emerald-500 font-semibold uppercase tracking-wider mb-0.5">AI Suggestion</div>
+                      <div className="text-[11px] text-emerald-500 font-semibold uppercase tracking-wider mb-0.5">AI Suggestion</div>
                       <div className="text-xs text-emerald-300">{issue.suggestedFix}</div>
                     </div>
                   )}
                 </div>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded border flex-shrink-0 ${cfg.bg} ${cfg.color}`}>
+                <span className={`text-[11px] px-1.5 py-0.5 rounded border flex-shrink-0 ${cfg.bg} ${cfg.color}`}>
                   {cfg.label}
                 </span>
               </div>
@@ -1240,7 +1240,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
 
       {/* Category filter pills */}
       <div className="flex items-center gap-1.5 flex-wrap">
-        <span className="text-[10px] text-zinc-600 uppercase tracking-wider mr-1">Category:</span>
+        <span className="text-[11px] text-zinc-500 uppercase tracking-wider mr-1">Category:</span>
         {(['all', ...Object.keys(CATEGORY_CONFIG)] as (CheckCategory | 'all')[]).map(cat => {
           const active = categoryFilter === cat;
           const cfg = cat !== 'all' ? CATEGORY_CONFIG[cat] : null;
@@ -1248,7 +1248,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
             <button
               key={cat}
               onClick={() => setCategoryFilter(active ? 'all' : cat)}
-              className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors border ${
+              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors border ${
                 active
                   ? 'border-zinc-500 bg-zinc-800 text-zinc-200'
                   : 'border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-400'
@@ -1262,7 +1262,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
 
       {/* Showing count + batch actions */}
       <div className="flex items-center justify-between px-1">
-        <div className="text-xs text-zinc-600">
+        <div className="text-xs text-zinc-500">
           Showing {filteredPages.length} of {data.pages.length} pages
           {(severityFilter !== 'all' || categoryFilter !== 'all') && (
             <button onClick={() => { setSeverityFilter('all'); setCategoryFilter('all'); }} className="ml-2 text-zinc-500 hover:text-zinc-300 underline">
@@ -1273,19 +1273,19 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
         {workspaceId && (
           <div className="flex items-center gap-2">
             {batchResult && Date.now() - batchResult.timestamp < 8000 && (
-              <span className="text-[10px] text-emerald-400 flex items-center gap-1">
+              <span className="text-[11px] text-emerald-400 flex items-center gap-1">
                 <CheckCircle className="w-3 h-3" /> {batchResult.count} tasks created
               </span>
             )}
             {batchCreating ? (
-              <span className="flex items-center gap-1.5 text-[10px] text-zinc-400">
+              <span className="flex items-center gap-1.5 text-[11px] text-zinc-400">
                 <Loader2 className="w-3 h-3 animate-spin" /> Creating tasks...
               </span>
             ) : (
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => batchCreateTasks('errors')}
-                  className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors"
+                  className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors"
                   title="Create tasks for all errors"
                 >
                   <ClipboardList className="w-3 h-3" /> Add Errors ({data.errors})
@@ -1293,7 +1293,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
                 {(severityFilter !== 'all' || categoryFilter !== 'all') && (
                   <button
                     onClick={() => batchCreateTasks('filtered')}
-                    className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-teal-500/10 border border-teal-500/20 text-teal-400 hover:bg-teal-500/20 transition-colors"
+                    className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-teal-500/10 border border-teal-500/20 text-teal-400 hover:bg-teal-500/20 transition-colors"
                     title="Create tasks for currently filtered issues"
                   >
                     <ClipboardList className="w-3 h-3" /> Add Filtered
@@ -1301,7 +1301,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
                 )}
                 <button
                   onClick={() => batchCreateTasks('all')}
-                  className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-600 transition-colors"
+                  className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-600 transition-colors"
                   title="Create tasks for ALL findings"
                 >
                   <ClipboardList className="w-3 h-3" /> Add All ({data.errors + data.warnings + data.infos})
@@ -1332,11 +1332,11 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="text-sm text-zinc-300 truncate">{page.page}</div>
-                  <div className="text-xs text-zinc-600 truncate">/{page.slug}</div>
+                  <div className="text-xs text-zinc-500 truncate">/{page.slug}</div>
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
-                  {errorCount > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400">{errorCount} error{errorCount > 1 ? 's' : ''}</span>}
-                  {warningCount > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">{warningCount} warn</span>}
+                  {errorCount > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400">{errorCount} error{errorCount > 1 ? 's' : ''}</span>}
+                  {warningCount > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">{warningCount} warn</span>}
                   {page.issues.length === 0 && <CheckCircle className="w-4 h-4 text-green-500" />}
                   <span className={`text-sm font-bold tabular-nums ${scoreColor(page.score)}`}>{page.score}</span>
                 </div>
@@ -1360,7 +1360,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
                             <div className="flex-1 min-w-0">
                               <div className="text-xs text-zinc-300">{issue.message}</div>
                               <div className="text-[11px] text-zinc-500 mt-0.5">{issue.recommendation}</div>
-                              {issue.value && <div className="text-[10px] text-zinc-600 mt-0.5 italic truncate">{issue.value}</div>}
+                              {issue.value && <div className="text-[11px] text-zinc-500 mt-0.5 italic truncate">{issue.value}</div>}
                               {issue.suggestedFix && (() => {
                                 const fixKey = `${page.pageId}-${issue.check}`;
                                 const isApplying = applyingFix === fixKey;
@@ -1368,16 +1368,16 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
                                 return (
                                   <div className="mt-1.5 px-2 py-1.5 rounded bg-emerald-950/40 border border-emerald-800/30">
                                     <div className="flex items-center justify-between mb-0.5">
-                                      <div className="text-[9px] text-emerald-500 font-semibold uppercase tracking-wider">AI Suggestion</div>
+                                      <div className="text-[11px] text-emerald-500 font-semibold uppercase tracking-wider">AI Suggestion</div>
                                       {isApplied ? (
-                                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-medium flex items-center gap-1">
+                                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-medium flex items-center gap-1">
                                           <CheckCircle className="w-2.5 h-2.5" /> Applied
                                         </span>
                                       ) : (
                                         <button
                                           onClick={() => acceptSuggestion(page.pageId, issue)}
                                           disabled={isApplying}
-                                          className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
+                                          className="text-[11px] px-1.5 py-0.5 rounded bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
                                         >
                                           {isApplying ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <CheckCircle className="w-2.5 h-2.5" />}
                                           {isApplying ? 'Applying...' : 'Accept & Push to Webflow'}
@@ -1395,22 +1395,22 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
                                 const isCreated = createdTasks.has(taskKey);
                                 const isCreating = creatingTask === taskKey;
                                 return isCreated ? (
-                                  <span className="text-[9px] px-1 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 flex items-center gap-0.5">
+                                  <span className="text-[11px] px-1 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 flex items-center gap-0.5">
                                     <CheckCircle className="w-2.5 h-2.5" /> Task
                                   </span>
                                 ) : (
                                   <button onClick={() => createTaskFromIssue(page, issue)} disabled={isCreating}
-                                    className="text-[9px] px-1 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 border border-zinc-700 flex items-center gap-0.5 transition-colors disabled:opacity-50" title="Create request from this finding">
+                                    className="text-[11px] px-1 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 border border-zinc-700 flex items-center gap-0.5 transition-colors disabled:opacity-50" title="Create request from this finding">
                                     {isCreating ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <ClipboardList className="w-2.5 h-2.5" />} Task
                                   </button>
                                 );
                               })()}
                               {catCfg && (
-                                <span className={`text-[9px] px-1 py-0.5 rounded border border-zinc-800 ${catCfg.color}`}>
+                                <span className={`text-[11px] px-1 py-0.5 rounded border border-zinc-800 ${catCfg.color}`}>
                                   {catCfg.label}
                                 </span>
                               )}
-                              <span className={`text-[9px] px-1 py-0.5 rounded border ${cfg.bg} ${cfg.color}`}>
+                              <span className={`text-[11px] px-1 py-0.5 rounded border ${cfg.bg} ${cfg.color}`}>
                                 {issue.check}
                               </span>
                             </div>

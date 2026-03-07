@@ -269,12 +269,12 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
         </div>
         <div className="flex items-center gap-2">
           {dirtyCount > 0 && (
-            <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">
+            <span className="text-[11px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">
               {dirtyCount} unsaved
             </span>
           )}
           {savedCount > 0 && (
-            <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
+            <span className="text-[11px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
               {savedCount} saved (draft)
             </span>
           )}
@@ -329,10 +329,10 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
               <div className="flex items-center gap-2">
                 {isExpanded ? <ChevronDown className="w-4 h-4 text-zinc-500" /> : <ChevronRight className="w-4 h-4 text-zinc-500" />}
                 <span className="text-sm font-medium text-zinc-200">{coll.collectionName}</span>
-                <span className="text-[10px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">/{coll.collectionSlug}</span>
-                <span className="text-[10px] text-zinc-600">{coll.total} items</span>
+                <span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">/{coll.collectionSlug}</span>
+                <span className="text-[11px] text-zinc-500">{coll.total} items</span>
                 {extraSeoFields.length > 0 && (
-                  <span className="text-[10px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded">
+                  <span className="text-[11px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded">
                     {extraSeoFields.map(f => f.displayName).join(', ')}
                   </span>
                 )}
@@ -341,7 +341,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                 {collSavedIds.length > 0 && (
                   <span
                     onClick={e => { e.stopPropagation(); publishCollection(coll.collectionId); }}
-                    className="flex items-center gap-1 text-[10px] text-emerald-400 hover:text-emerald-300 cursor-pointer"
+                    className="flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 cursor-pointer"
                   >
                     {publishing.has(coll.collectionId) ? (
                       <Loader2 className="w-3 h-3 animate-spin" />
@@ -384,9 +384,9 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                               className="w-3.5 h-3.5 rounded border-zinc-600 text-teal-500 focus:ring-teal-500 bg-zinc-800 flex-shrink-0 cursor-pointer"
                             />
                           )}
-                          {isItemExpanded ? <ChevronDown className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" />}
+                          {isItemExpanded ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />}
                           <span className="text-xs text-zinc-300 truncate">{itemName || '(untitled)'}</span>
-                          <span className="text-[10px] text-zinc-600 font-mono flex-shrink-0">/{itemSlug}</span>
+                          <span className="text-[11px] text-zinc-500 font-mono flex-shrink-0">/{itemSlug}</span>
                         </div>
                         <div className="flex items-center gap-1.5 flex-shrink-0">
                           {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
@@ -400,9 +400,9 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                           {/* Name field */}
                           <div>
                             <div className="flex items-center justify-between mb-1">
-                              <label className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Name (Title)</label>
+                              <label className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Name (Title)</label>
                               <div className="flex items-center gap-1">
-                                <span className="text-[10px] text-zinc-600">{(edits[item.id]?.['name'] || '').length} chars</span>
+                                <span className="text-[11px] text-zinc-500">{(edits[item.id]?.['name'] || '').length} chars</span>
                                 <button
                                   onClick={() => aiRewrite(coll.collectionId, item.id, 'name')}
                                   disabled={!!aiLoading[`${item.id}-name`]}
@@ -423,7 +423,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
 
                           {/* Slug field */}
                           <div>
-                            <label className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-1 block">Slug</label>
+                            <label className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-1 block">Slug</label>
                             <input
                               type="text"
                               value={edits[item.id]?.['slug'] || ''}
@@ -444,9 +444,9 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                             return (
                               <div key={field.slug}>
                                 <div className="flex items-center justify-between mb-1">
-                                  <label className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">{field.displayName}</label>
+                                  <label className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">{field.displayName}</label>
                                   <div className="flex items-center gap-1">
-                                    <span className={`text-[10px] ${charColor}`}>{val.length} chars ({charTarget})</span>
+                                    <span className={`text-[11px] ${charColor}`}>{val.length} chars ({charTarget})</span>
                                     <button
                                       onClick={() => aiRewrite(coll.collectionId, item.id, field.slug)}
                                       disabled={!!aiLoading[`${item.id}-${field.slug}`]}
@@ -479,8 +479,8 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                           {/* Save button + error */}
                           <div className="flex items-center justify-between pt-1">
                             <div>
-                              {error && <span className="text-[10px] text-red-400">{error}</span>}
-                              {isSaved && !isDirty && <span className="text-[10px] text-emerald-400 flex items-center gap-1"><Check className="w-3 h-3" /> Saved as draft</span>}
+                              {error && <span className="text-[11px] text-red-400">{error}</span>}
+                              {isSaved && !isDirty && <span className="text-[11px] text-emerald-400 flex items-center gap-1"><Check className="w-3 h-3" /> Saved as draft</span>}
                             </div>
                             <button
                               onClick={() => saveItem(coll.collectionId, item.id)}

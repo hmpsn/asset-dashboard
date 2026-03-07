@@ -77,7 +77,7 @@ export default function SearchableSelect({
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder={placeholder}
-              className="flex-1 bg-transparent text-[11px] text-zinc-200 placeholder:text-zinc-600 focus:outline-none"
+              className="flex-1 bg-transparent text-[11px] text-zinc-200 placeholder:text-zinc-500 focus:outline-none"
             />
             {search && (
               <button onClick={() => setSearch('')} className="text-zinc-500 hover:text-zinc-300">
@@ -108,7 +108,7 @@ export default function SearchableSelect({
               </button>
             ))}
             {filtered.length === 0 && (
-              <div className="px-2.5 py-3 text-[10px] text-zinc-600 text-center">No matches</div>
+              <div className="px-2.5 py-3 text-[11px] text-zinc-500 text-center">No matches</div>
             )}
           </div>
         </div>

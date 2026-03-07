@@ -166,7 +166,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
                   {linkingId === ws.id && (
                     <div className="mx-2 mb-1 p-2 rounded-lg bg-zinc-900 border border-zinc-800">
                       <p className="text-xs text-zinc-500 mb-1">Paste a Webflow API token for this workspace:</p>
-                      <p className="text-[10px] text-zinc-600 mb-2">
+                      <p className="text-[11px] text-zinc-500 mb-2">
                         Get one at{' '}
                         <a href="https://webflow.com/dashboard/account/integrations" target="_blank" rel="noopener noreferrer" className="text-teal-400 hover:text-teal-300 inline-flex items-center gap-0.5">
                           webflow.com <ExternalLink className="w-2.5 h-2.5" />
@@ -208,7 +208,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
                       )}
                       {sites.length > 0 && (
                         <div className="space-y-0.5 max-h-32 overflow-auto">
-                          <p className="text-[10px] text-zinc-500 mb-1">Select a site:</p>
+                          <p className="text-[11px] text-zinc-500 mb-1">Select a site:</p>
                           {sites.map(site => (
                             <button
                               key={site.id}

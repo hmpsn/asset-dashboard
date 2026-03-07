@@ -35,7 +35,7 @@ export function ChartPointDetail({ date, metrics, onClose, xPct }: Props) {
             <div key={i} className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-1.5">
                 {m.color && <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: m.color }} />}
-                <span className="text-[10px] text-zinc-500">{m.label}</span>
+                <span className="text-[11px] text-zinc-500">{m.label}</span>
               </div>
               <span className="text-[11px] font-medium text-zinc-200">{typeof m.value === 'number' ? m.value.toLocaleString() : m.value}</span>
             </div>

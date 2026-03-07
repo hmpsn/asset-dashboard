@@ -128,7 +128,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
           <div key={stat.label} className="bg-zinc-900 rounded-xl px-4 py-3 border border-zinc-800">
             <div className="flex items-center gap-1.5 mb-1">
               <stat.icon className="w-3 h-3 text-zinc-500" />
-              <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-500">{stat.label}</span>
+              <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">{stat.label}</span>
             </div>
             <div className="text-xl font-bold" style={{ color: stat.color }}>{stat.value}</div>
           </div>
@@ -149,7 +149,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
             >
               {/* New request badge */}
               {ws.requests.new > 0 && (
-                <div className="absolute -top-2 -right-2 flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500 text-white shadow-lg">
+                <div className="absolute -top-2 -right-2 flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-500 text-white shadow-lg">
                   <Bell className="w-2.5 h-2.5" /> {ws.requests.new} new
                 </div>
               )}
@@ -158,7 +158,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
               <div className="flex items-start justify-between gap-3 mb-4">
                 <div className="min-w-0">
                   <h3 className="text-sm font-semibold truncate group-hover:text-teal-400 transition-colors text-zinc-200">{ws.name}</h3>
-                  <div className="flex items-center gap-2 mt-1 text-[10px] text-zinc-500">
+                  <div className="flex items-center gap-2 mt-1 text-[11px] text-zinc-500">
                     {ws.webflowSiteName && <span className="flex items-center gap-1"><Globe className="w-2.5 h-2.5" />{ws.webflowSiteName}</span>}
                     {!ws.webflowSiteId && <span className="flex items-center gap-1 text-amber-400"><AlertTriangle className="w-2.5 h-2.5" />No site linked</span>}
                     {ws.hasGsc && <span className="flex items-center gap-1"><Search className="w-2.5 h-2.5" />GSC</span>}
@@ -177,17 +177,17 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                     <>
                       <ScoreRing score={ws.audit.score} size={44} stroke={3.5} />
                       <div>
-                        <div className="text-[10px] font-medium text-zinc-500">Health</div>
+                        <div className="text-[11px] font-medium text-zinc-500">Health</div>
                         <div className="flex items-center gap-1 mt-0.5">
                           {scoreDelta !== null && scoreDelta !== 0 && (
-                            <span className={`flex items-center text-[10px] font-medium ${scoreDelta > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            <span className={`flex items-center text-[11px] font-medium ${scoreDelta > 0 ? 'text-green-400' : 'text-red-400'}`}>
                               {scoreDelta > 0 ? <ArrowUpRight className="w-2.5 h-2.5" /> : <ArrowDownRight className="w-2.5 h-2.5" />}
                               {Math.abs(scoreDelta)}
                             </span>
                           )}
-                          {scoreDelta === 0 && <span className="flex items-center text-[10px] text-zinc-500"><Minus className="w-2.5 h-2.5" /></span>}
+                          {scoreDelta === 0 && <span className="flex items-center text-[11px] text-zinc-500"><Minus className="w-2.5 h-2.5" /></span>}
                         </div>
-                        <div className="text-[9px] mt-0.5 text-zinc-600">
+                        <div className="text-[11px] mt-0.5 text-zinc-500">
                           {ws.audit.errors > 0 && <span className="text-red-400">{ws.audit.errors} err</span>}
                           {ws.audit.errors > 0 && ws.audit.warnings > 0 && ' · '}
                           {ws.audit.warnings > 0 && <span className="text-amber-400">{ws.audit.warnings} warn</span>}
@@ -195,45 +195,45 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                       </div>
                     </>
                   ) : (
-                    <div className="text-[10px] text-zinc-600">No audit yet</div>
+                    <div className="text-[11px] text-zinc-500">No audit yet</div>
                   )}
                 </div>
 
                 {/* Requests */}
                 <div>
-                  <div className="text-[10px] font-medium mb-1 text-zinc-500">Requests</div>
+                  <div className="text-[11px] font-medium mb-1 text-zinc-500">Requests</div>
                   {ws.requests.total > 0 ? (
                     <div className="space-y-0.5">
-                      {ws.requests.new > 0 && <div className="text-[10px] text-red-400 font-medium">{ws.requests.new} new</div>}
-                      {ws.requests.active > 0 && <div className="text-[10px] text-teal-400">{ws.requests.active} active</div>}
+                      {ws.requests.new > 0 && <div className="text-[11px] text-red-400 font-medium">{ws.requests.new} new</div>}
+                      {ws.requests.active > 0 && <div className="text-[11px] text-teal-400">{ws.requests.active} active</div>}
                       {ws.requests.total - ws.requests.new - ws.requests.active > 0 && (
-                        <div className="text-[10px] text-zinc-600">{ws.requests.total} total</div>
+                        <div className="text-[11px] text-zinc-500">{ws.requests.total} total</div>
                       )}
                       {ws.requests.latestDate && (
-                        <div className="text-[9px] text-zinc-600">{timeAgo(ws.requests.latestDate)}</div>
+                        <div className="text-[11px] text-zinc-500">{timeAgo(ws.requests.latestDate)}</div>
                       )}
                     </div>
                   ) : (
-                    <div className="text-[10px] text-zinc-600">None</div>
+                    <div className="text-[11px] text-zinc-500">None</div>
                   )}
                 </div>
 
                 {/* Approvals */}
                 <div>
-                  <div className="text-[10px] font-medium mb-1 text-zinc-500">Approvals</div>
+                  <div className="text-[11px] font-medium mb-1 text-zinc-500">Approvals</div>
                   {ws.approvals.total > 0 ? (
                     <div className="space-y-0.5">
                       {ws.approvals.pending > 0 && (
-                        <div className="text-[10px] text-teal-400 font-medium">{ws.approvals.pending} pending</div>
+                        <div className="text-[11px] text-teal-400 font-medium">{ws.approvals.pending} pending</div>
                       )}
                       {ws.approvals.pending === 0 && (
-                        <div className="flex items-center gap-1 text-[10px] text-green-400">
+                        <div className="flex items-center gap-1 text-[11px] text-green-400">
                           <CheckCircle2 className="w-2.5 h-2.5" /> All clear
                         </div>
                       )}
                     </div>
                   ) : (
-                    <div className="text-[10px] text-zinc-600">None</div>
+                    <div className="text-[11px] text-zinc-500">None</div>
                   )}
                 </div>
               </div>
@@ -274,11 +274,11 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                   <Icon className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-teal-400" />
                   <div className="flex-1 min-w-0">
                     <div className="text-xs text-zinc-200">{entry.title}</div>
-                    {entry.description && <div className="text-[10px] mt-0.5 text-zinc-500">{entry.description}</div>}
+                    {entry.description && <div className="text-[11px] mt-0.5 text-zinc-500">{entry.description}</div>}
                   </div>
                   <div className="flex-shrink-0 text-right">
-                    {wsName && <div className="text-[9px] text-zinc-600">{wsName}</div>}
-                    <div className="text-[9px] text-zinc-600">{timeAgo(entry.createdAt)}</div>
+                    {wsName && <div className="text-[11px] text-zinc-500">{wsName}</div>}
+                    <div className="text-[11px] text-zinc-500">{timeAgo(entry.createdAt)}</div>
                   </div>
                 </div>
               );

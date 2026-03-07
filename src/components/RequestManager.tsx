@@ -225,7 +225,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
           <MessageSquare className="w-5 h-5 text-teal-400" />
           <div>
             <h2 className="text-sm font-semibold text-zinc-200">Client Requests</h2>
-            <p className="text-[10px] mt-0.5 text-zinc-500">Review, respond to, and manage client requests across workspaces.</p>
+            <p className="text-[11px] mt-0.5 text-zinc-500">Review, respond to, and manage client requests across workspaces.</p>
           </div>
         </div>
       </div>
@@ -242,7 +242,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
             ].map(s => (
               <div key={s.label} className="text-center">
                 <div className="text-xl font-bold" style={{ color: s.color }}>{s.value}</div>
-                <div className="text-[9px] font-medium uppercase tracking-wider text-zinc-500">{s.label}</div>
+                <div className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">{s.label}</div>
               </div>
             ))}
           </div>
@@ -251,7 +251,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
               <div className="text-lg font-bold" style={{ color: '#4ade80' }}>
                 {Math.round((counts.completed / counts.total) * 100)}%
               </div>
-              <div className="text-[9px] uppercase tracking-wider text-zinc-500">Complete</div>
+              <div className="text-[11px] uppercase tracking-wider text-zinc-500">Complete</div>
             </div>
           )}
         </div>
@@ -301,7 +301,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
           <p className="text-sm text-zinc-500">
             {requests.length === 0 ? 'No client requests yet' : 'No requests match filters'}
           </p>
-          <p className="text-[10px] mt-1 text-zinc-600">Clients can submit requests from their dashboard.</p>
+          <p className="text-[11px] mt-1 text-zinc-500">Clients can submit requests from their dashboard.</p>
         </div>
       )}
 
@@ -314,20 +314,20 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
           </div>
           <div className="h-4 w-px bg-zinc-800" />
           <div className="flex items-center gap-1">
-            <span className="text-[10px] uppercase tracking-wider mr-1 text-zinc-500">Set status:</span>
+            <span className="text-[11px] uppercase tracking-wider mr-1 text-zinc-500">Set status:</span>
             {STATUS_OPTIONS.map(s => (
               <button key={s.value} onClick={() => bulkUpdateStatus(s.value)} disabled={bulkUpdating}
-                className={`px-2 py-1 rounded text-[10px] font-medium border transition-colors hover:opacity-90 disabled:opacity-50 ${s.color}`}>
+                className={`px-2 py-1 rounded text-[11px] font-medium border transition-colors hover:opacity-90 disabled:opacity-50 ${s.color}`}>
                 {s.label}
               </button>
             ))}
           </div>
           <div className="h-4 w-px bg-zinc-800" />
           <button onClick={bulkDelete} disabled={bulkUpdating}
-            className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50">
+            className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50">
             <Trash2 className="w-3 h-3" /> Delete
           </button>
-          <button onClick={() => setSelected(new Set())} className="ml-auto text-[10px] hover:underline text-zinc-500">
+          <button onClick={() => setSelected(new Set())} className="ml-auto text-[11px] hover:underline text-zinc-500">
             Clear selection
           </button>
         </div>
@@ -338,7 +338,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
         <div className="space-y-2">
           {/* Select all header */}
           <div className="flex items-center gap-2 px-2 py-1">
-            <button onClick={selectAll} className="flex items-center gap-1.5 text-[10px] font-medium transition-colors text-zinc-500">
+            <button onClick={selectAll} className="flex items-center gap-1.5 text-[11px] font-medium transition-colors text-zinc-500">
               <div className="w-4 h-4 rounded border flex items-center justify-center transition-colors"
                 style={selected.size === filtered.length && filtered.length > 0
                   ? { backgroundColor: '#2dd4bf', borderColor: '#2dd4bf' }
@@ -380,15 +380,15 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <span className={`text-xs font-medium truncate text-zinc-200 ${isDone ? 'line-through opacity-60' : ''}`}>{req.title}</span>
-                          <span className={`text-[9px] px-1.5 py-0.5 rounded border shrink-0 ${statusOpt.color}`}>
+                          <span className={`text-[11px] px-1.5 py-0.5 rounded border shrink-0 ${statusOpt.color}`}>
                             {statusOpt.label}
                           </span>
-                          <span className={`text-[9px] shrink-0 ${priorityOpt.color}`}>
+                          <span className={`text-[11px] shrink-0 ${priorityOpt.color}`}>
                             {priorityOpt.label}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 text-[10px] text-zinc-500">
-                          <span className="px-1.5 py-0.5 rounded bg-[#0f1219] text-zinc-600">
+                        <div className="flex items-center gap-2 text-[11px] text-zinc-500">
+                          <span className="px-1.5 py-0.5 rounded bg-[#0f1219] text-zinc-500">
                             {wsName(req.workspaceId)}
                           </span>
                           <span className="px-1.5 py-0.5 rounded bg-[#0f1219]">
@@ -411,7 +411,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                   <div className="flex items-center gap-1 px-3 flex-shrink-0">
                     {next && !isDone && (
                       <button onClick={() => quickStatus(req.id, next)}
-                        className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-colors"
+                        className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-colors"
                         style={{ backgroundColor: next === 'completed' ? 'rgba(74,222,128,0.1)' : 'rgba(45,212,191,0.1)', color: next === 'completed' ? '#4ade80' : '#2dd4bf' }}
                         title={next === 'in_progress' ? 'Start working' : next === 'completed' ? 'Mark complete' : next}>
                         {next === 'in_progress' ? <><Play className="w-3 h-3" /> Start</> : <><CheckCircle2 className="w-3 h-3" /> Done</>}
@@ -419,7 +419,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                     )}
                     {isDone && (
                       <button onClick={() => quickStatus(req.id, 'in_progress')}
-                        className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-colors"
+                        className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-colors"
                         style={{ backgroundColor: 'rgba(45,212,191,0.1)', color: '#2dd4bf' }}
                         title="Reopen task">
                         <ArrowRight className="w-3 h-3" /> Reopen
@@ -434,21 +434,21 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                     {/* Controls row */}
                     <div className="px-5 py-3 flex items-center gap-3 flex-wrap border-b border-zinc-800">
                       <div>
-                        <label className="text-[9px] uppercase tracking-wider block mb-1 text-zinc-500">Status</label>
+                        <label className="text-[11px] uppercase tracking-wider block mb-1 text-zinc-500">Status</label>
                         <select value={req.status} onChange={e => updateRequest(req.id, { status: e.target.value })}
                           className="px-2 py-1 rounded text-[11px] bg-[#0f1219] border border-zinc-800 text-zinc-200">
                           {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                         </select>
                       </div>
                       <div>
-                        <label className="text-[9px] uppercase tracking-wider block mb-1 text-zinc-500">Priority</label>
+                        <label className="text-[11px] uppercase tracking-wider block mb-1 text-zinc-500">Priority</label>
                         <select value={req.priority} onChange={e => updateRequest(req.id, { priority: e.target.value })}
                           className="px-2 py-1 rounded text-[11px] bg-[#0f1219] border border-zinc-800 text-zinc-200">
                           {PRIORITY_OPTIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                         </select>
                       </div>
                       <div>
-                        <label className="text-[9px] uppercase tracking-wider block mb-1 text-zinc-500">Category</label>
+                        <label className="text-[11px] uppercase tracking-wider block mb-1 text-zinc-500">Category</label>
                         <select value={req.category} onChange={e => updateRequest(req.id, { category: e.target.value })}
                           className="px-2 py-1 rounded text-[11px] bg-[#0f1219] border border-zinc-800 text-zinc-200">
                           {Object.entries(CAT_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -462,10 +462,10 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
 
                     {/* Description */}
                     <div className="px-5 py-4">
-                      <div className="text-[10px] mb-1 text-zinc-500">Description</div>
+                      <div className="text-[11px] mb-1 text-zinc-500">Description</div>
                       <p className="text-[11px] leading-relaxed whitespace-pre-wrap text-zinc-200">{req.description}</p>
                       {req.pageUrl && (
-                        <div className="mt-2 flex items-center gap-1 text-[10px] text-zinc-500">
+                        <div className="mt-2 flex items-center gap-1 text-[11px] text-zinc-500">
                           <ExternalLink className="w-3 h-3" />
                           <a href={req.pageUrl.startsWith('http') ? req.pageUrl : `https://${req.pageUrl}`} target="_blank" rel="noopener noreferrer"
                             className="hover:underline">{req.pageUrl}</a>
@@ -476,7 +476,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                     {/* Conversation */}
                     {req.notes.length > 0 && (
                       <div className="px-5 pb-3">
-                        <div className="text-[10px] mb-2 text-zinc-500">Conversation</div>
+                        <div className="text-[11px] mb-2 text-zinc-500">Conversation</div>
                         <div className="space-y-2 max-h-[300px] overflow-y-auto">
                           {req.notes.map(note => (
                             <div key={note.id} className={`flex gap-2 ${note.author === 'team' ? 'justify-end' : ''}`}>
@@ -490,10 +490,10 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                                   : { backgroundColor: '#0f1219', border: '1px solid #27272a' }
                               }>
                                 <div className="flex items-center gap-1.5 mb-0.5">
-                                  <span className={`text-[9px] font-medium ${note.author === 'team' ? 'text-teal-400' : 'text-zinc-500'}`}>
+                                  <span className={`text-[11px] font-medium ${note.author === 'team' ? 'text-teal-400' : 'text-zinc-500'}`}>
                                     {note.author === 'team' ? 'You (Team)' : 'Client'}
                                   </span>
-                                  <span className="text-[9px] text-zinc-600">
+                                  <span className="text-[11px] text-zinc-500">
                                     {new Date(note.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                                   </span>
                                 </div>
@@ -507,8 +507,8 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                                         </a>
                                       ) : (
                                         <a key={att.id} href={`/api/request-attachments/${att.filename}`} target="_blank" rel="noreferrer"
-                                          className="flex items-center gap-1.5 text-[10px] hover:underline text-teal-400">
-                                          <FileText className="w-3 h-3" />{att.originalName} <span className="text-zinc-600">({(att.size / 1024).toFixed(0)}KB)</span>
+                                          className="flex items-center gap-1.5 text-[11px] hover:underline text-teal-400">
+                                          <FileText className="w-3 h-3" />{att.originalName} <span className="text-zinc-500">({(att.size / 1024).toFixed(0)}KB)</span>
                                         </a>
                                       )
                                     ))}
@@ -526,7 +526,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                       {noteFiles.length > 0 && expandedId === req.id && (
                         <div className="flex flex-wrap gap-1.5">
                           {noteFiles.map((f, i) => (
-                            <span key={i} className="flex items-center gap-1 text-[10px] rounded px-2 py-1 bg-[#0f1219] border border-zinc-800 text-zinc-400">
+                            <span key={i} className="flex items-center gap-1 text-[11px] rounded px-2 py-1 bg-[#0f1219] border border-zinc-800 text-zinc-400">
                               <Paperclip className="w-2.5 h-2.5" />{f.name}
                               <button onClick={() => setNoteFiles(prev => prev.filter((_, j) => j !== i))} className="hover:opacity-70"><X className="w-2.5 h-2.5" /></button>
                             </span>
@@ -554,14 +554,14 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                     {/* Status hints */}
                     {req.status === 'completed' && (
                       <div className="px-5 py-2 border-t border-zinc-800">
-                        <div className="flex items-center gap-1.5 text-[10px]" style={{ color: '#4ade80' }}>
+                        <div className="flex items-center gap-1.5 text-[11px]" style={{ color: '#4ade80' }}>
                           <CheckCircle2 className="w-3 h-3" /> Marked as completed — visible to client
                         </div>
                       </div>
                     )}
                     {req.status === 'new' && (
                       <div className="px-5 py-2 border-t border-zinc-800">
-                        <div className="flex items-center gap-1.5 text-[10px]" style={{ color: '#60a5fa' }}>
+                        <div className="flex items-center gap-1.5 text-[11px]" style={{ color: '#60a5fa' }}>
                           <AlertTriangle className="w-3 h-3" /> New request — change status to let the client know you&apos;re on it
                         </div>
                       </div>

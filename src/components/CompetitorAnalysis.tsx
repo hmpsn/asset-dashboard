@@ -74,7 +74,7 @@ function MetricRow({ label, myVal, theirVal, suffix = '', higher = true }: {
       <div className="w-4 flex justify-center">
         {isBetter ? <TrendingUp className="w-3 h-3 text-green-500" /> :
          isWorse ? <TrendingDown className="w-3 h-3 text-red-500" /> :
-         <span className="text-zinc-600">—</span>}
+         <span className="text-zinc-500">—</span>}
       </div>
       <div className={`text-sm font-semibold w-20 text-left ${isWorse ? 'text-green-400' : isBetter ? 'text-red-400' : 'text-zinc-300'}`}>
         {theirVal}{suffix}
@@ -117,7 +117,7 @@ export function CompetitorAnalysis({ siteUrl }: Props) {
       <div className="flex flex-col items-center justify-center py-20 gap-3 text-zinc-500">
         <Loader2 className="w-6 h-6 animate-spin text-teal-400" />
         <p className="text-sm">Analyzing both sites...</p>
-        <p className="text-xs text-zinc-600">This may take 30-60 seconds depending on site size</p>
+        <p className="text-xs text-zinc-500">This may take 30-60 seconds depending on site size</p>
       </div>
     );
   }
@@ -135,7 +135,7 @@ export function CompetitorAnalysis({ siteUrl }: Props) {
           </div>
           <div className="w-full max-w-md space-y-3">
             <div>
-              <label className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1 block">Your Site URL</label>
+              <label className="text-[11px] uppercase tracking-wider text-zinc-500 mb-1 block">Your Site URL</label>
               <input
                 type="text"
                 value={myUrl}
@@ -150,7 +150,7 @@ export function CompetitorAnalysis({ siteUrl }: Props) {
               </div>
             </div>
             <div>
-              <label className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1 block">Competitor URL</label>
+              <label className="text-[11px] uppercase tracking-wider text-zinc-500 mb-1 block">Competitor URL</label>
               <input
                 type="text"
                 value={competitorUrl}
@@ -185,7 +185,7 @@ export function CompetitorAnalysis({ siteUrl }: Props) {
       <div className="grid grid-cols-3 gap-4">
         {/* My site score */}
         <div className="bg-zinc-900 rounded-xl p-5 border border-zinc-800 text-center">
-          <div className="text-[10px] uppercase tracking-wider text-zinc-500 mb-2">Your Site</div>
+          <div className="text-[11px] uppercase tracking-wider text-zinc-500 mb-2">Your Site</div>
           <div className={`text-4xl font-bold ${scoreColor(mySite.metrics.score)}`}>{mySite.metrics.score}</div>
           <div className="text-xs text-zinc-400 mt-1 truncate" title={mySite.url}>{mySite.name}</div>
           <div className="mt-2 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
@@ -199,7 +199,7 @@ export function CompetitorAnalysis({ siteUrl }: Props) {
           <div className={`text-2xl font-bold ${scoreDiff > 0 ? 'text-green-400' : scoreDiff < 0 ? 'text-red-400' : 'text-zinc-400'}`}>
             {scoreDiff > 0 ? '+' : ''}{scoreDiff}
           </div>
-          <div className="text-[10px] uppercase tracking-wider text-zinc-500 mt-1">Score Difference</div>
+          <div className="text-[11px] uppercase tracking-wider text-zinc-500 mt-1">Score Difference</div>
           <div className="flex items-center gap-2 mt-3">
             {scoreDiff > 0 ? (
               <span className="text-xs text-green-400 flex items-center gap-1"><TrendingUp className="w-3 h-3" /> You're ahead</span>
@@ -213,7 +213,7 @@ export function CompetitorAnalysis({ siteUrl }: Props) {
 
         {/* Competitor score */}
         <div className="bg-zinc-900 rounded-xl p-5 border border-zinc-800 text-center">
-          <div className="text-[10px] uppercase tracking-wider text-zinc-500 mb-2">Competitor</div>
+          <div className="text-[11px] uppercase tracking-wider text-zinc-500 mb-2">Competitor</div>
           <div className={`text-4xl font-bold ${scoreColor(competitor.metrics.score)}`}>{competitor.metrics.score}</div>
           <div className="text-xs text-zinc-400 mt-1 truncate" title={competitor.url}>{competitor.name}</div>
           <div className="mt-2 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
@@ -226,10 +226,10 @@ export function CompetitorAnalysis({ siteUrl }: Props) {
       {/* Metric comparison table */}
       <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 space-y-1">
         <div className="flex items-center gap-3 px-3 pb-2 border-b border-zinc-800 mb-2">
-          <div className="flex-1 text-[10px] uppercase tracking-wider text-zinc-500">Metric</div>
-          <div className="w-20 text-right text-[10px] uppercase tracking-wider text-zinc-500">You</div>
+          <div className="flex-1 text-[11px] uppercase tracking-wider text-zinc-500">Metric</div>
+          <div className="w-20 text-right text-[11px] uppercase tracking-wider text-zinc-500">You</div>
           <div className="w-4" />
-          <div className="w-20 text-left text-[10px] uppercase tracking-wider text-zinc-500">Them</div>
+          <div className="w-20 text-left text-[11px] uppercase tracking-wider text-zinc-500">Them</div>
         </div>
         <MetricRow label="Overall Score" myVal={mySite.metrics.score} theirVal={competitor.metrics.score} suffix="/100" />
         <MetricRow label="Pages Indexed" myVal={mySite.metrics.totalPages} theirVal={competitor.metrics.totalPages} />
