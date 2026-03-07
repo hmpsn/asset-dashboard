@@ -37,7 +37,8 @@
         { "id": 8, "title": "Admin Search Console: primitives audit", "source": "Memory/Roadmap", "est": "1-2h", "priority": "P1", "notes": "Shipped — new panels verified against shared UI primitives", "status": "done" },
         { "id": 9, "title": "Client dashboard: simplified search data", "source": "Memory/Roadmap", "est": "3-4h", "priority": "P1", "notes": "SearchSnapshot component: traffic trend, top pages, device split with comparison badges", "status": "done" },
         { "id": 10, "title": "Admin GA4 dashboard upgrade", "source": "Memory/Roadmap", "est": "3-4h", "priority": "P1", "notes": "Shipped in Sprint 1", "status": "done" },
-        { "id": 11, "title": "Client dashboard: simplified analytics data", "source": "Memory/Roadmap", "est": "2-3h", "priority": "P1", "notes": "AnalyticsSnapshot + OrganicInsight components: GA4 organic overview, landing pages, new vs returning", "status": "done" }
+        { "id": 11, "title": "Client dashboard: simplified analytics data", "source": "Memory/Roadmap", "est": "2-3h", "priority": "P1", "notes": "AnalyticsSnapshot + OrganicInsight components: GA4 organic overview, landing pages, new vs returning", "status": "done" },
+        { "id": 64, "title": "Insights Engine: overview redesign + branding", "source": "Sprint 3 addition", "est": "2-3h", "priority": "P0", "notes": "Insights-first overview: InsightsDigest auto-generates plain-English cards from all data sources, PerformancePulse compact metrics, chatbot promoted as Insights Engine in sidebar, OG/title branding, tab renamed Overview→Insights, removed SearchSnapshot+AnalyticsSnapshot from overview (data in dedicated tabs), design system alignment", "status": "done" }
       ]
     },
     {
@@ -63,7 +64,7 @@
         { "id": 60, "title": "Chat activity logging", "source": "Intelligence Wiring", "est": "30m", "priority": "P1", "notes": "First exchange of each session logged as chat_session activity type in both client + admin endpoints", "status": "done" },
         { "id": 61, "title": "Audit traffic data in chatbot context", "source": "Intelligence Wiring", "est": "45m", "priority": "P2", "notes": "getAuditTrafficForWorkspace cached helper + HIGH-TRAFFIC PAGES WITH SEO ISSUES injected into both admin + client chat prompts", "status": "done" },
         { "id": 62, "title": "Monthly reports: chat topic summaries", "source": "Intelligence Wiring", "est": "30m", "priority": "P2", "notes": "gatherMonthlyData fetches recent client chat summaries; email template renders 'Topics You Asked About' section", "status": "done" },
-        { "id": 63, "title": "Strategy: conversion + audit data", "source": "Intelligence Wiring", "est": "30m", "priority": "P1", "notes": "GA4 conversions + events by page + audit high-traffic error pages injected into strategy master prompt with rules for money-page protection and audit quickWins", "status": "done" }
+        { "id": 63, "title": "Strategy Flow Enrichment", "source": "Intelligence Wiring", "est": "30m", "priority": "P1", "notes": "GA4 conversions + events-by-page + audit high-traffic error pages injected into strategy master prompt. Money-page protection rules, conversion-aware rationales, audit quickWin candidates from traffic data", "status": "done" }
       ]
     },
     {
