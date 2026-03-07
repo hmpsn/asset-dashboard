@@ -25,14 +25,16 @@ Priority tiers:
 
 ## Execution Order
 
-### Sprint 1: AI Chatbot as Revenue Engine (10-13 hrs)
-*Rationale: Fastest path to visible client value and upsell potential. No dependencies. Can ship independently.*
+### ~~Sprint 1: AI Chatbot as Revenue Engine~~ ✅ SHIPPED
+*Shipped: March 7, 2026*
 
-| # | Item | Source | Est. | Priority | Notes |
+| # | Item | Source | Est. | Priority | Status |
 |---|------|--------|:----:|:--------:|-------|
-| 1 | **Client AI: Full dashboard context** — Feed audit, strategy, ranks, content pipeline, approvals, activity, annotations, GSC comparison, GA4 organic data into chatbot | AI_CHATBOT_ROADMAP Phase 1 | 3-4h | 🔴 P0 | All data already loaded in state — just needs to be passed |
-| 2 | **Client AI: Global knowledge base** — SEO fundamentals, industry benchmarks, common client questions, per-workspace business context | AI_CHATBOT_ROADMAP Phase 2 | 4-5h | 🔴 P0 | Transforms chatbot from data-reader to advisor |
-| 3 | **Client AI: Sales engine behavior** — Opportunity detection, soft upsell prompts, action deep-links, service-aware responses | AI_CHATBOT_ROADMAP Phase 3 | 3-4h | 🔴 P0 | This is where the chatbot pays for itself |
+| 1 | ~~**Client AI: Full dashboard context**~~ | AI_CHATBOT_ROADMAP Phase 1 | 3-4h | 🔴 P0 | ✅ Shipped — 10+ data sources wired into client askAi() |
+| 2 | ~~**Client AI: Global knowledge base**~~ | AI_CHATBOT_ROADMAP Phase 2 | 4-5h | 🔴 P0 | ✅ Shipped — knowledgeBase field + knowledge-docs/ folder, injected into both chatbots |
+| 3 | ~~**Client AI: Sales engine behavior**~~ | AI_CHATBOT_ROADMAP Phase 3 | 3-4h | 🔴 P0 | ✅ Shipped — 8 revenue hooks, Insights Engine branding, warm handoff pattern |
+| 3a | ~~**Admin AI chat panel**~~ | Sprint 1 addition | 2-3h | 🔴 P0 | ✅ Shipped — /api/admin-chat endpoint + AdminChat.tsx with internal analyst persona |
+| 3b | ~~**GA4 admin dashboard upgrade**~~ | Memory/Roadmap | 3-4h | � P1 | ✅ Shipped — sparklines, period comparison, organic, new vs returning, conversions |
 
 ### Sprint 2: Stripe Payments & Auth Foundation (20-28 hrs)
 *Rationale: Monetize content deliverables and establish user identity. Revenue + infrastructure.*
@@ -51,7 +53,7 @@ Priority tiers:
 |---|------|--------|:----:|:--------:|-------|
 | 8 | **Admin Search Console: primitives audit** — Verify new panels use shared UI primitives (SectionCard, DataList, etc.) per /use-primitives workflow | Memory/Roadmap | 1-2h | 🟠 P1 | Technical debt from rapid shipping |
 | 9 | **Client dashboard: simplified search data** — Add "dumbed down" GSC data to client portal: traffic growth direction, top pages (plain language), device split, period comparison as simple "up/down" indicators | Memory/Roadmap | 3-4h | 🟠 P1 | Client-facing value; no jargon |
-| 10 | **Admin GA4 dashboard upgrade** — Add landing pages, organic overview, period comparison, new vs returning users panels | Memory/Roadmap | 3-4h | 🟠 P1 | Mirror what we did for Search Console |
+| 10 | ~~**Admin GA4 dashboard upgrade**~~ | Memory/Roadmap | 3-4h | 🟠 P1 | ✅ Shipped in Sprint 1 |
 | 11 | **Client dashboard: simplified analytics data** — Simplified GA4 organic overview, new vs returning, landing pages for client portal | Memory/Roadmap | 2-3h | 🟠 P1 | Depends on #10 for admin-side data |
 
 ### Sprint 4: Intelligence Upgrades (6-9 hrs)
@@ -164,12 +166,13 @@ Track key decisions here as they're made:
 | 2026-03-07 | Stripe payments added as P0 in Sprint 2 | Accept payments for briefs, blog posts, keyword strategies — direct revenue from existing pipeline |
 | 2026-03-07 | Roadmap moved to server-side JSON | Items managed via API, no code changes needed to add/reorder/update items |
 | 2026-03-07 | 18 missing items added from FEATURE_AUDIT + ACTION_PLAN | 34 → 52 total items; comprehensive coverage of all planned features |
+| 2026-03-07 | Sprint 1 shipped: full chatbot revenue engine | All 5 items (context, knowledge base, sales engine, admin chat, GA4 upgrade) shipped same day |
 | | | |
 
 ---
 
 *Compiled: March 7, 2026*
-*Last updated: March 7, 2026*
-*Next review: After Sprint 1 completion*
+*Last updated: March 7, 2026 (Sprint 1 complete)*
+*Next review: Before Sprint 2 kickoff*
 *Total items tracked: 52*
 *Data source: Server-side roadmap.json (managed via /api/roadmap)*

@@ -4,129 +4,82 @@ Upgrade the client-facing AI assistant from a search-data-only Q&A tool into a f
 
 ---
 
-## Current State
+## Current State (Updated March 7, 2026)
 
-### What it sees today
+### What the client chatbot sees
 
 | Data Source | Passed to AI | Notes |
 |------------|:---:|---|
-| GSC overview (clicks, impressions, CTR, position) | Yes | Top 15 queries, top 10 pages |
-| GA4 overview (users, sessions, pageviews, bounce, duration) | Yes | |
-| GA4 top pages, sources, devices, countries | Yes | Sliced to top 8-15 |
-| GA4 events & conversions | Yes | Top 15 events, top 10 conversions |
-| **Site health audit** | **No** | Score, errors, warnings, page-level issues all available in state but not passed |
-| **SEO strategy / keyword map** | **No** | Page keywords, content gaps, quick wins all loaded but not passed |
-| **Rank tracking** | **No** | Historical positions, keyword changes available but not passed |
-| **Content requests / briefs** | **No** | Status of content pipeline invisible to AI |
-| **Approval batches** | **No** | Pending approvals not mentioned |
-| **Activity log** | **No** | Recent team actions invisible |
-| **Annotations** | **No** | Timeline events not correlated |
-| **Period comparison (GSC)** | **No** | New endpoint exists but client dashboard doesn't fetch it yet |
-| **Organic landing pages (GA4)** | **No** | New endpoint exists but not wired |
+| GSC overview (clicks, impressions, CTR, position) | ✅ Yes | Top 15 queries, top 10 pages |
+| GSC search trend (period comparison) | ✅ Yes | First/last day comparison |
+| GA4 overview (users, sessions, pageviews, bounce, duration) | ✅ Yes | |
+| GA4 top pages, sources, devices, countries | ✅ Yes | Sliced to top 8-15 |
+| GA4 events & conversions | ✅ Yes | Top 15 events, top 10 conversions |
+| Site health audit (score, errors, warnings) | ✅ Yes | Score, previousScore, totalPages |
+| Audit detail (site-wide issues, top problem pages) | ✅ Yes | Top 5 issue pages with specific issues |
+| SEO strategy / keyword map | ✅ Yes | Page map, opportunities, content gaps, quick wins |
+| Rank tracking | ✅ Yes | Latest positions with clicks, impressions, changes |
+| Activity log | ✅ Yes | Last 10 entries |
+| Annotations | ✅ Yes | Last 10 annotations |
+| Pending approvals | ✅ Yes | Count of pending batches |
+| Active requests | ✅ Yes | Top 5 open requests with title, category, status |
+| Global knowledge base | ✅ Yes | Per-workspace business context + knowledge-docs/ files |
+
+### What the admin chatbot sees
+
+| Data Source | Passed to AI | Notes |
+|------------|:---:|---|
+| All of the above | ✅ Yes | Fetched on-demand when chat opens |
+| GA4 period comparison | ✅ Yes | Current vs previous period deltas |
+| GA4 organic overview | ✅ Yes | Organic users, engagement, share |
+| GA4 new vs returning | ✅ Yes | Segment breakdown |
+| GA4 landing pages | ✅ Yes | Sessions, bounce by entry page |
+| GA4 conversions | ✅ Yes | Event counts, rates |
+| Keyword strategy context | ✅ Yes | Server-side injection via buildSeoContext() |
+| Keyword map context | ✅ Yes | Server-side injection via buildKeywordMapContext() |
 
 ### What it does well
-- Warm, data-driven tone (already tuned)
-- Natural "talk to your web team" soft-sell nudges
-- Quick question presets
-- GPT-4o model
-- Floating chat widget UX
+- ✅ Branded as "Insights Engine by hmpsn studio" (client) / "Admin Insights" (admin)
+- ✅ Revenue hooks: data signal → business impact → warm handoff
+- ✅ Full dashboard data awareness (10+ data sources)
+- ✅ Global knowledge base per workspace
+- ✅ Admin-specific internal analyst persona (direct, technical)
+- ✅ Quick question presets tailored to each persona
+- ✅ GPT-4o model
+- ✅ Floating chat widget UX (teal/emerald for client, indigo/violet for admin)
 
-### What it lacks
-1. **Blindness to 60% of the dashboard** — can't answer questions about site health, SEO strategy, content, or approvals
-2. **No memory** — every conversation starts from zero
-3. **No workspace/business context** — doesn't know the client's industry, goals, or brand
-4. **No proactive insights** — only answers questions, never surfaces opportunities
-5. **No action triggers** — can't link to specific dashboard sections or trigger actions
-6. **Single-turn context** — dumps raw JSON, no conversation history to the AI
+### What it still lacks
+1. **No memory** — every conversation starts from zero
+2. **No proactive insights** — only answers questions, never surfaces opportunities
+3. **No action triggers** — can't link to specific dashboard sections or trigger actions
+4. **Single-turn context** — no conversation history passed to the AI
 
 ---
 
 ## Implementation Phases
 
-### Phase 1: Full Dashboard Context (Priority: HIGH)
-**Estimated effort: 3-4 hours**
+### ~~Phase 1: Full Dashboard Context~~ ✅ SHIPPED
+**Shipped: March 7, 2026**
 
-Feed every available data source into the AI context so it can answer questions about anything on the dashboard.
-
-#### Frontend (ClientDashboard.tsx)
-- [ ] Pass audit summary to context: `{ siteScore, errors, warnings, previousScore, scoreHistory }`
-- [ ] Pass top audit issues (top 5 errors, top 3 warnings) as digestible summaries
-- [ ] Pass keyword strategy summary: `{ siteKeywords, pageCount, contentGaps count, quickWins count }`
-- [ ] Pass rank tracking: latest positions for tracked keywords with change deltas
-- [ ] Pass content pipeline status: `{ pending: N, in_review: N, approved: N, delivered: N }`
-- [ ] Pass approval status: `{ pendingBatches: N, totalItems: N }`
-- [ ] Pass recent activity log (last 5 entries)
-- [ ] Pass annotations (correlate with data)
-- [ ] Fetch and pass GSC period comparison (new endpoint)
-- [ ] Fetch and pass GA4 organic landing pages (new endpoint)
-
-#### Backend (server/index.ts — `/api/public/search-chat`)
-- [ ] Update system prompt to describe all new data sources
-- [ ] Add section-specific guidance: "If asked about site health, reference the audit score and top issues"
-- [ ] Increase maxTokens from 1500 → 2000 (more context = longer answers)
-
-#### Smart context compression
-- [ ] Don't dump full JSON — pre-summarize on the frontend:
-  - Audit: "Site health score: 78/100 (up from 72). 3 critical errors, 12 warnings. Top issues: missing meta descriptions (5 pages), thin content (3 pages)."
-  - Strategy: "28 pages mapped to keywords. 6 content gaps identified. 4 quick wins available."
-  - Ranks: "Top movers: 'web design dallas' +4 positions, 'seo services' -2 positions."
-
-**Why this is #1:** Dramatically increases the chatbot's usefulness with minimal backend work. All the data is already loaded in the client dashboard state — it just needs to be passed along.
+All available data sources now fed into both client and admin AI chatbot contexts. Client `askAi()` passes 10+ data sources including audit detail, SEO strategy, rank tracking, activity log, annotations, approvals, and requests. Admin chat auto-fetches GSC, GA4 (overview, comparison, organic, new-vs-returning, conversions, landing pages), and audit data on open.
 
 ---
 
-### Phase 2: Global Knowledge Base (Priority: HIGH)
-**Estimated effort: 4-5 hours**
+### ~~Phase 2: Global Knowledge Base~~ ✅ SHIPPED
+**Shipped: March 7, 2026**
 
-Give the AI a "brain" of SEO, web design, and digital marketing knowledge that's independent of any single client's data. This makes it genuinely helpful even when data is sparse.
-
-#### Knowledge base content
-- [ ] Create `server/ai-knowledge-base.ts` with structured knowledge:
-  - **SEO fundamentals**: What affects rankings, how Google works, E-E-A-T, Core Web Vitals thresholds
-  - **Common client questions**: "Why did my traffic drop?", "How long does SEO take?", "What's a good bounce rate?"
-  - **Industry benchmarks**: Average CTR by position, typical bounce rates by industry, conversion rate benchmarks
-  - **Service explanations**: What a content brief is, what schema markup does, why site speed matters
-  - **Objection handling**: "Is SEO worth it?", "Why can't I just do Google Ads?", "My competitor ranks higher"
-
-#### System prompt enrichment
-- [ ] Inject relevant knowledge base sections based on question classification
-- [ ] Simple keyword matching to select which knowledge modules to include (not full RAG — overkill for this size)
-- [ ] Keep knowledge base under 2000 tokens to avoid prompt bloat
-
-#### Per-workspace customization
-- [ ] Pull `brandVoice` from workspace settings into system prompt
-- [ ] Pull `businessContext` from keyword strategy into prompt ("This is a Dallas-based web design agency targeting SMBs")
-- [ ] Pull `competitorDomains` for competitive context
-
-**Why this is #2:** Transforms the chatbot from a "data reader" into a knowledgeable advisor. Clients ask "why did my traffic drop?" and get a real answer — not just "I don't have that data."
+Per-workspace `knowledgeBase` text field + `knowledge-docs/` folder for longer documents. `buildKnowledgeBase()` function in `seo-context.ts` reads both sources and injects into both chatbot system prompts. Editable from Workspace Settings → Features tab. Up to 6000 chars from knowledge-docs files.
 
 ---
 
-### Phase 3: Sales Engine Behavior (Priority: HIGH)
-**Estimated effort: 3-4 hours**
+### ~~Phase 3: Sales Engine Behavior~~ ✅ SHIPPED
+**Shipped: March 7, 2026**
 
-Make the chatbot a natural revenue driver without feeling pushy. It should identify opportunities and connect them to services the agency offers.
+Client chatbot rebranded as "Insights Engine by hmpsn studio". System prompt includes 8 revenue hook patterns (low organic → keyword strategy, high bounce → page optimization, content gaps → briefs, technical issues → cleanup sprint, no tracking → analytics setup, ranking drops → recovery plan, pending approvals → action nudge, schema gaps → implementation). Three-step pattern: surface insight with numbers → explain business impact → warm handoff. Admin chatbot uses separate internal analyst persona with direct technical tone.
 
-#### Opportunity detection rules
-- [ ] **Content gaps → content brief upsell**: "Your strategy shows 6 untapped content opportunities. Your team can generate detailed briefs for these — want me to explain what that looks like?"
-- [ ] **Low site score → audit-driven urgency**: "Your site health is at 64/100 — down from 71 last month. There are 3 critical issues your team should address soon."
-- [ ] **High-impression low-click queries → SEO service hook**: "You're showing up 800 times/month for 'dallas web design' but only getting 12 clicks. Title and meta optimization could 3-4x that traffic."
-- [ ] **Declining traffic → proactive alert**: "Your organic traffic dropped 18% vs last month. This could be seasonal, a competitor move, or a technical issue. Worth flagging with your team."
-- [ ] **No strategy generated → strategy upsell**: "I don't have keyword strategy data for your site yet. A full keyword mapping would help us identify your biggest growth opportunities."
-- [ ] **Pending approvals → action nudge**: "You have 8 SEO changes waiting for your review. Approving these could improve your search visibility."
-
-#### Soft-sell prompt engineering
-- [ ] Add `serviceOfferings` to system prompt based on what the agency actually provides
-- [ ] Train on conversion patterns: identify → educate → suggest action → defer to team
-- [ ] Never use words like "buy", "purchase", "upgrade" — use "explore", "discuss with your team", "great opportunity"
-- [ ] Track which upsell paths the AI suggests (log to activity)
-
-#### Action links
-- [ ] AI responses can include deep links: "Check your [Site Health tab](/client/ws_123?tab=health) to see the details"
-- [ ] "Request this topic" links embedded in content gap responses
-- [ ] "Review your approvals" links when pending items exist
-
-**Why this is #3:** This is where the chatbot pays for itself. Every conversation becomes a potential touchpoint for additional services.
+**Still TODO from Phase 3:**
+- [ ] Action deep-links in AI responses (link to specific dashboard tabs)
+- [ ] Track which revenue hooks the AI triggers (log to activity)
 
 ---
 
@@ -226,4 +179,5 @@ Critical path (Phases 1-3) = **10-13 hours**.
 ---
 
 *Created: March 7, 2026*
-*Status: Planning — not yet started*
+*Status: Phases 1-3 SHIPPED. Phases 4-6 pending.*
+*Last updated: March 7, 2026*

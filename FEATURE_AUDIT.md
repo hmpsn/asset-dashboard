@@ -139,9 +139,9 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 13. Google Analytics Integration
-**What it does:** Full GA4 integration — sessions, users, engagement, traffic sources, top pages, device breakdown, country data, event tracking, conversion summaries, and event explorer with page-level filtering. Click-to-inspect detail popovers on all charts showing date + key metrics per data point.
+**What it does:** Full GA4 integration — sessions, users, engagement, traffic sources, top pages, device breakdown, country data, event tracking, conversion summaries, and event explorer with page-level filtering. Click-to-inspect detail popovers on all charts showing date + key metrics per data point. **Admin GA4 dashboard** includes sparklines, period comparison (current vs previous with delta indicators), new vs returning user segments, organic overview (organic share of total traffic), organic landing pages, key events/conversions summary, richer sortable tables, and traffic health insights.
 
-**Agency value:** Deep analytics without GA4's clunky interface. Custom event grouping and module-level page filtering tailored per client. Interactive charts make data exploration effortless.
+**Agency value:** Deep analytics without GA4's clunky interface. Custom event grouping and module-level page filtering tailored per client. Interactive charts make data exploration effortless. Admin view surfaces period-over-period changes, organic performance, and conversion data at a glance.
 
 **Client value:** Clean, curated analytics view showing the metrics that matter to their business — not the overwhelming GA4 default.
 
@@ -261,14 +261,36 @@ A brief value assessment of every feature in the platform, covering what it does
 
 ---
 
-### 24. AI Search Chat
-**What it does:** In-dashboard chat assistant that answers questions about the client's search data, powered by their actual GSC metrics.
+### 24. AI Insights Engine (Client Chatbot)
+**What it does:** Branded "hmpsn studio Insights Engine" — in-dashboard AI advisor powered by GPT-4o that answers questions using the client's full dashboard data: Google Search Console, GA4 (overview, events, conversions, sources, devices, countries), site health audit + detail, SEO strategy (page map, opportunities, content gaps, quick wins), rank tracking, activity log, annotations, pending approvals, and active requests. Revenue hook system naturally connects data insights to team services using a 3-step pattern: surface insight with numbers → explain business impact → warm handoff. Per-workspace knowledge base provides business context. Updated quick questions reflect the full data breadth.
 
-**Agency value:** Reduces "what keyword am I ranking for?" support questions. The chat handles basic data queries.
+**Agency value:** Every conversation is a potential touchpoint for additional services. Revenue hooks surface upsell opportunities organically — data-backed, never pushy. Reduces support burden while positioning the agency as the solution.
 
-**Client value:** Instant answers about their search performance in plain English.
+**Client value:** A knowledgeable advisor that understands their entire site — not just search data. Answers questions about health, strategy, content, rankings, and approvals in plain English.
 
-**Mutual:** Empowers clients to self-serve basic questions while the agency focuses on strategic work.
+**Mutual:** The chatbot pays for itself. Clients get 24/7 data-driven advice; the agency gets natural lead-ins to propose services.
+
+---
+
+### 38. Admin AI Chat Panel
+**What it does:** Internal-only floating chat panel ("Admin Insights") with an expert analyst persona — direct, technical, no-fluff. Auto-fetches workspace data (GSC, GA4 overview/comparison/organic/new-vs-returning/conversions/landing pages, site audit) when opened. Server-side keyword strategy and keyword map context injected. Indigo/violet theme distinguishes it from client chatbot. 5 admin-specific quick questions (status report, ROI actions, page attention, period comparison, client communication). Only visible when a workspace is selected and OpenAI is configured.
+
+**Agency value:** Instant technical analysis without digging through dashboards. Cross-references data sources for non-obvious insights. Suggests how to frame findings for client communication.
+
+**Client value:** N/A — internal agency tool.
+
+**Mutual:** Faster, deeper analysis means better recommendations for clients and more efficient operations for the agency.
+
+---
+
+### 39. Global Knowledge Base
+**What it does:** Per-workspace knowledge base that feeds business context into both AI chatbots. Two input methods: inline `knowledgeBase` text field (editable in Workspace Settings → Features) and a `knowledge-docs/` folder for longer `.txt`/`.md` documents (up to 6000 chars). `buildKnowledgeBase()` in `seo-context.ts` reads both sources and injects into system prompts for client and admin chatbots.
+
+**Agency value:** One place to store everything the AI needs to know about a client — industry, services, differentiators, common questions, target audience. Shared across both chatbot personas.
+
+**Client value:** AI responses are tailored to their specific business instead of generic advice.
+
+**Mutual:** Knowledge base makes both chatbots dramatically more useful with minimal ongoing maintenance.
 
 ---
 
@@ -424,9 +446,10 @@ A brief value assessment of every feature in the platform, covering what it does
 | Content & Strategy | 3 | Strategy → brief → approval → production pipeline |
 | Client Communication | 5 | Structured workflows replace email chaos |
 | Client Self-Service | 6 | 24/7 data access reduces reporting overhead |
+| AI & Intelligence | 3 | Full-spectrum AI advisor + revenue engine + knowledge base |
 | Platform & UX | 6 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit |
 
-**37 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**40 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
 ---
 
@@ -527,4 +550,4 @@ When the user asks to update this document with recent features, follow this pro
 7. **Update Summary table**: Adjust category counts and total feature count.
 8. **Commit**: `git add FEATURE_AUDIT.md && git commit -m "docs: update FEATURE_AUDIT with recent features"`
 
-Current feature count: **37**. Last updated: March 2026.
+Current feature count: **40**. Last updated: March 7, 2026.
