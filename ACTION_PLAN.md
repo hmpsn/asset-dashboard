@@ -36,15 +36,30 @@ Priority tiers:
 | 3a | ~~**Admin AI chat panel**~~ | Sprint 1 addition | 2-3h | 🔴 P0 | ✅ Shipped — /api/admin-chat endpoint + AdminChat.tsx with internal analyst persona |
 | 3b | ~~**GA4 admin dashboard upgrade**~~ | Memory/Roadmap | 3-4h | � P1 | ✅ Shipped — sparklines, period comparison, organic, new vs returning, conversions |
 
-### Sprint 2: Stripe Payments & Auth Foundation (20-28 hrs)
-*Rationale: Monetize content deliverables and establish user identity. Revenue + infrastructure.*
+### Sprint 2: Stripe Payments & Auth Foundation (26-37 hrs)
+*Rationale: Monetize content deliverables, establish tier gating, and build user identity. Revenue + infrastructure.*
 
 | # | Item | Source | Est. | Priority | Notes |
 |---|------|--------|:----:|:--------:|-------|
-| 4 | **Stripe integration: content payments** — Accept payments for content briefs, full blog posts, and keyword strategies. Stripe Checkout or Payment Links, webhook for fulfillment status, payment tracking per workspace | User Priority | 5-7h | 🔴 P0 | Direct revenue from existing content pipeline |
+| 4 | **Stripe integration: content payments** — Stripe Checkout for briefs, posts, schemas, strategies. Webhook handler, payment tracking per workspace. `server/stripe.ts` + `server/payments.ts` | MONETIZATION.md Phase 1 | 5-7h | 🔴 P0 | Direct revenue from existing content pipeline |
+| 65 | **Workspace tier field + TierGate component** — Add `tier: free\|growth\|premium` to Workspace. Create `<TierGate>` with blur overlay + upgrade CTA. `GET /api/public/tier/:wsId` | MONETIZATION.md UX Spec | 1-2h | 🔴 P0 | Foundation for all tier gating |
+| 66 | **Soft-gate dashboard sections** — Wrap ~10-15 sections in TierGate: Strategy page map, content gaps, brief generation, approve/reject, custom date ranges, chat input after limit | MONETIZATION.md UX Spec | 1.5-2h | 🔴 P0 | Depends on #65 |
+| 67 | **AI chatbot rate limiting (free tier)** — Monthly conversation counter in `chat-memory.ts`. 3 convos/month free. Counter in chat header. Disable proactive insights on free tier | MONETIZATION.md UX Spec | 1h | 🔴 P0 | Depends on #65 |
 | 5 | **Internal user accounts** — User model, bcrypt, JWT/sessions, login by email, `req.user` on all routes | AUTH_ROADMAP Phase 1 | 6-8h | 🔴 P0 | Everything else in auth depends on this |
 | 6 | **Workspace access control** — Restrict workspaces by user, role-based middleware | AUTH_ROADMAP Phase 2 | 3-4h | 🔴 P0 | Required before any team onboarding |
 | 7 | **Client user accounts** — Individual client logins, client_admin/member roles, team management UI | AUTH_ROADMAP Phase 4 | 6-8h | 🔴 P0 | Replaces shared passwords, unlocks client team features |
+
+### Sprint 2b: Monetization UX (12-18 hrs)
+*Rationale: Maximize conversion from free → paid. Trial drives upgrades, page types expand product catalog, inline pricing reduces friction.*
+
+| # | Item | Source | Est. | Priority | Notes |
+|---|------|--------|:----:|:--------:|-------|
+| 68 | **14-day Growth trial for new workspaces** — `trialEndsAt` field on Workspace. Auto-resolve tier to growth during trial. Countdown banner at day 10+. Auto-downgrade to free | MONETIZATION.md Trial Strategy | 1-2h | 🔴 P0 | Loss aversion drives more upgrades than gain framing |
+| 69 | **Inline price visibility** — Show prices on all purchase buttons (brief $125, post $500, schema $35/pg). Bundle savings callouts. Prices from config, admin per-workspace overrides | MONETIZATION.md Pricing | 2-3h | 🔴 P0 | Reduces checkout friction |
+| 70 | **Page-type content briefs** — Expand brief generator: landing page, service page, location page, product page, pillar/hub page, resource/guide. Page-type-specific AI prompts and templates | MONETIZATION.md Products | 3-4h | 🔴 P0 | Expands product catalog from 2 to 8 brief types |
+| 71 | **Page type → content opportunity mapping** — Strategy engine recommends page types based on gap signals. Badge on content opportunity cards. Pre-selects type in "Request This Topic" flow | MONETIZATION.md Products | 2-3h | 🟠 P1 | Connects strategy intelligence to product catalog |
+| 72 | **Client onboarding welcome flow** — First-login experience explaining tier, features, and trial period. "What's included in your plan" section | ACTION_PLAN #25 | 2-3h | 🔴 P0 | Currently clients land cold on a password prompt |
+| 73 | **In-portal pricing/plans page** — Tier comparison in client portal. Bundle cards with feature lists. Stripe subscription checkout links. Upgrade/downgrade flow | MONETIZATION.md Phase 3 | 2-3h | 🟠 P1 | Where upgrade CTAs point to |
 
 ### Sprint 3: Data Quality & Dashboard Polish (8-12 hrs)
 *Rationale: Clean up recently shipped work, extend to client side, audit primitives.*
@@ -78,7 +93,17 @@ Priority tiers:
 | 62 | ~~**Monthly report: chat topics**~~ | Intelligence Wiring | 30m | � P1 | ✅ Shipped — "Topics You Asked About" section from session summaries |
 | 63 | ~~**Strategy: conversion data**~~ | Intelligence Wiring | 30m | 🟠 P1 | ✅ Shipped — GA4 conversions + events by page + audit errors in strategy prompt |
 
-### Sprint 5: Team & Permissions (7-9 hrs)
+### Sprint 5: Revenue Intelligence (10-14 hrs)
+*Rationale: Features that directly retain clients and increase lifetime value. ROI dashboard justifies retainer; churn signals prevent loss; credits increase prepaid revenue.*
+
+| # | Item | Source | Est. | Priority | Notes |
+|---|------|--------|:----:|:--------:|-------|
+| 74 | **ROI dashboard (Premium)** — Organic traffic value in dollars (GSC clicks × SEMRush CPC). Ad spend equivalent. Content ROI. Growth trend. Blurred soft-gate for free/growth | MONETIZATION.md ROI Spec | 3-4h | 🟠 P1 | Single most powerful retention tool |
+| 75 | **Churn prevention signals** — Daily background job: no-login 14d, chat drop-off, no requests 30d, health score drop, trial ending, payment failed. Positive signals: traffic up 20%+, high engagement | MONETIZATION.md Churn Spec | 2-3h | 🟠 P1 | Extends Command Center "Needs Attention" |
+| 76 | **Credits system** — Prepaid credit packs ($500/5cr, $900/10cr, $1600/20cr). Per-product credit costs. Purchase via Stripe. Admin can grant credits | MONETIZATION.md Credits Spec | 2-3h | 🟡 P2 | Cash flow positive, reduces checkout friction |
+| 77 | **Usage tracking + limits** — Track AI convos, briefs, strategies per workspace per month. Usage indicators ("3 of 4 briefs remaining"). Overage prompts. Admin usage dashboard | MONETIZATION.md Phase 4 | 2-3h | 🟡 P2 | Required for bundle enforcement |
+
+### Sprint 5b: Team & Permissions (7-9 hrs)
 *Rationale: Only needed when actually hiring/contracting. Do when the need arises.*
 
 | # | Item | Source | Est. | Priority | Notes |
@@ -141,28 +166,33 @@ Priority tiers:
 
 | Bucket | Items | Total Hours |
 |--------|:-----:|:-----------:|
-| 🔴 P0 — Do now | 9 items (#1-7, #25-26) | 38-51h |
-| 🟠 P1 — Do next | 8 items (#8-13, #27-30) | 20-30h |
-| 🟡 P2 — Do soon | 12 items (#14-15, #18-19, #31-37) | 28-40h |
+| 🔴 P0 — Do now | 15 items (#1-7, #25-26, #65-70, #72) | 54-75h |
+| 🟠 P1 — Do next | 12 items (#8-13, #27-30, #71, #73-75) | 30-44h |
+| 🟡 P2 — Do soon | 14 items (#14-17, #18-19, #31-37, #76-77) | 33-48h |
 | 🟢 P3 — Backlog | 13 items (#20-24, #38-44) | 32-46h |
 | ⚪ P4 — Someday | 8 items (#45-52) | 19-26h |
-| **Total** | **52 items** | **137-193h** |
+| **Total** | **65 items** | **168-239h** |
 
-### Critical path (first 3 sprints)
+### Critical path (first 4 sprints)
 
 ```
-Sprint 1: AI Chatbot Revenue Engine        →  10-13 hrs  →  Immediate client value
-Sprint 2: Stripe Payments + Auth Foundation →  20-28 hrs  →  Revenue + user identity
-Sprint 3: Data Quality + Dashboard          →   8-12 hrs  →  Polish + client-facing data
-                                               ─────────
-                                               38-53 hrs total for the critical path
+Sprint 1:  AI Chatbot Revenue Engine  ✅     →  10-13 hrs  →  Shipped
+Sprint 2:  Stripe + Tiers + Auth              →  26-37 hrs  →  Revenue + tier gating + identity
+Sprint 2b: Monetization UX                    →  12-18 hrs  →  Trial, pricing, page types, onboarding
+Sprint 3:  Data Quality + Dashboard  ✅       →   8-12 hrs  →  Shipped
+                                                 ─────────
+                                                 56-80 hrs total for the critical path
 ```
 
 ### Recommended execution cadence
 
-- **Sprints 1-2**: Back to back, full focus. Revenue engine + monetization + auth foundation.
-- **Sprint 3**: Interleave with client work. Items are independent and can be cherry-picked.
-- **Sprint 4+**: Pull from the backlog as needs arise. No fixed schedule.
+- **Sprint 1**: ✅ Shipped.
+- **Sprint 2**: Start tonight (Stripe). Tier gating + auth can interleave.
+- **Sprint 2b**: Immediately after Sprint 2. Trial + pricing + page types maximize conversion.
+- **Sprint 3**: ✅ Shipped.
+- **Sprint 4/4b**: ✅ Shipped.
+- **Sprint 5**: Revenue Intelligence — do after first paying clients are live.
+- **Sprint 5b+**: Pull from backlog as needs arise.
 
 ---
 
@@ -185,12 +215,17 @@ Track key decisions here as they're made:
 | 2026-03-07 | Sprint 6 items #18 + #19 shipped | Proactive insights (auto-greeting on chat open) + custom date range picker (calendar popover + full backend startDate/endDate support) |
 | 2026-03-07 | Typography hierarchy standardized | All 8 client dashboard tabs now use consistent page title (text-xl), subtitle (text-sm), section header (text-sm semibold) sizing. Added page titles to Search, Analytics, Site Health tabs. |
 | 2026-03-07 | Monetization strategy formalized | MONETIZATION.md: 3-tier model (Free/Growth/Premium), product pricing (briefs, posts, schemas, strategy), 3 bundles, Stripe integration spec. Phase 1: Stripe checkout for deliverables. |
+| 2026-03-07 | UX soft-gating approach chosen (Option A) | Blurred preview + upgrade CTA overlay. All tabs stay visible; gated content shown but not accessible. More effective than hiding features. |
+| 2026-03-07 | 14-day Growth trial strategy added | Loss aversion > gain framing. New workspaces get 14 days of Growth, then auto-downgrade. Countdown banner at day 10+. |
+| 2026-03-07 | Page-type content products expanded | 8 brief types + 8 full content types: blog, landing, service, location, product, pillar, resource/guide. Mapped to strategy engine content opportunities. |
+| 2026-03-07 | Revenue Intelligence sprint added | ROI dashboard (Premium), churn prevention signals, credits system, usage tracking. Sprint 5 in roadmap. |
+| 2026-03-07 | 13 new items added to roadmap | 52 → 65 total items. New sprints: 2b (Monetization UX), 5 (Revenue Intelligence). Items #65-77. |
 | | | |
 
 ---
 
 *Compiled: March 7, 2026*
-*Last updated: March 7, 2026 (Sprint 6: #18 proactive insights + #19 custom date range picker shipped)*
-*Next review: Before Sprint 2 kickoff*
-*Total items tracked: 52*
+*Last updated: March 7, 2026 (Monetization strategy: tiers, trial, page types, ROI, churn, credits wired into roadmap)*
+*Next review: During Sprint 2 (Stripe integration)*
+*Total items tracked: 65*
 *Data source: Server-side roadmap.json (managed via /api/roadmap)*

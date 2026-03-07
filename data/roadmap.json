@@ -19,13 +19,30 @@
     {
       "id": "sprint-2",
       "name": "Stripe Payments & Auth Foundation",
-      "hours": "20-28",
+      "hours": "26-37",
       "rationale": "Monetize content deliverables and establish user identity. Revenue + infrastructure.",
       "items": [
-        { "id": 4, "title": "Stripe integration: content payments", "source": "User Priority", "est": "5-7h", "priority": "P0", "notes": "Accept payments for content briefs, full blog posts, and keyword strategies. Stripe Checkout or Payment Links, webhook for fulfillment status, payment tracking per workspace", "status": "pending" },
+        { "id": 4, "title": "Stripe integration: content payments", "source": "MONETIZATION.md Phase 1", "est": "5-7h", "priority": "P0", "notes": "Stripe Checkout for briefs, posts, schemas, strategies. Webhook handler, payment tracking per workspace. server/stripe.ts + server/payments.ts", "status": "pending" },
+        { "id": 65, "title": "Workspace tier field + TierGate component", "source": "MONETIZATION.md UX Spec", "est": "1-2h", "priority": "P0", "notes": "Add tier: free|growth|premium to Workspace interface. Create <TierGate> component with blur overlay + upgrade CTA. GET /api/public/tier/:wsId endpoint", "status": "pending" },
+        { "id": 66, "title": "Soft-gate dashboard sections", "source": "MONETIZATION.md UX Spec", "est": "1.5-2h", "priority": "P0", "notes": "Wrap ~10-15 sections in TierGate: Strategy page map, content gaps, brief generation, approve/reject buttons, custom date ranges, chat input after limit", "status": "pending" },
+        { "id": 67, "title": "AI chatbot rate limiting (free tier)", "source": "MONETIZATION.md UX Spec", "est": "1h", "priority": "P0", "notes": "Monthly conversation counter in chat-memory.ts. 3 convos/month free. Counter in chat header. Disable proactive insights on free tier", "status": "pending" },
         { "id": 5, "title": "Internal user accounts", "source": "AUTH_ROADMAP Phase 1", "est": "6-8h", "priority": "P0", "notes": "User model, bcrypt, JWT/sessions, login by email, req.user on all routes", "status": "pending" },
         { "id": 6, "title": "Workspace access control", "source": "AUTH_ROADMAP Phase 2", "est": "3-4h", "priority": "P0", "notes": "Restrict workspaces by user, role-based middleware", "status": "pending" },
         { "id": 7, "title": "Client user accounts", "source": "AUTH_ROADMAP Phase 4", "est": "6-8h", "priority": "P0", "notes": "Individual client logins, client_admin/member roles, team management UI", "status": "pending" }
+      ]
+    },
+    {
+      "id": "sprint-2b",
+      "name": "Monetization UX",
+      "hours": "12-18",
+      "rationale": "Maximize conversion from free → paid. Trial drives upgrades, page types expand product catalog, inline pricing reduces friction.",
+      "items": [
+        { "id": 68, "title": "14-day Growth trial for new workspaces", "source": "MONETIZATION.md Trial Strategy", "est": "1-2h", "priority": "P0", "notes": "trialEndsAt field on Workspace. Auto-resolve tier to growth during trial. Countdown banner at day 10+. Post-trial auto-downgrade to free", "status": "pending" },
+        { "id": 69, "title": "Inline price visibility", "source": "MONETIZATION.md Pricing", "est": "2-3h", "priority": "P0", "notes": "Show prices on all purchase buttons (brief $125, post $500, schema $35/pg). Bundle savings callouts. Prices from config, not hardcoded. Admin per-workspace price overrides", "status": "pending" },
+        { "id": 70, "title": "Page-type content briefs", "source": "MONETIZATION.md Products", "est": "3-4h", "priority": "P0", "notes": "Expand brief generator: landing page, service page, location page, product page, pillar/hub page, resource/guide. Page-type-specific AI prompts and templates. Page type selector in request flow", "status": "pending" },
+        { "id": 71, "title": "Page type → content opportunity mapping", "source": "MONETIZATION.md Products", "est": "2-3h", "priority": "P1", "notes": "Strategy engine recommends page types based on gap signals. Badge on content opportunity cards. Pre-selects page type in Request This Topic flow. AI chatbot recommends page types", "status": "pending" },
+        { "id": 72, "title": "Client onboarding welcome flow", "source": "ACTION_PLAN #25", "est": "2-3h", "priority": "P0", "notes": "First-login experience explaining tier, features, and trial period. What's included in your plan section", "status": "pending" },
+        { "id": 73, "title": "In-portal pricing/plans page", "source": "MONETIZATION.md Phase 3", "est": "2-3h", "priority": "P1", "notes": "Tier comparison page in client portal. Bundle cards with feature lists. Links to Stripe subscription checkout. Upgrade/downgrade flow", "status": "pending" }
       ]
     },
     {
@@ -69,6 +86,18 @@
     },
     {
       "id": "sprint-5",
+      "name": "Revenue Intelligence",
+      "hours": "10-14",
+      "rationale": "Features that directly retain clients and increase lifetime value. ROI dashboard justifies retainer; churn signals prevent loss; credits increase prepaid revenue.",
+      "items": [
+        { "id": 74, "title": "ROI dashboard (Premium)", "source": "MONETIZATION.md ROI Spec", "est": "3-4h", "priority": "P1", "notes": "Organic traffic value in dollars (GSC clicks × SEMRush CPC). Ad spend equivalent. Content ROI. Growth trend. Blurred soft-gate for free/growth. GET /api/public/roi/:wsId", "status": "pending" },
+        { "id": 75, "title": "Churn prevention signals", "source": "MONETIZATION.md Churn Spec", "est": "2-3h", "priority": "P1", "notes": "Daily background job: no-login 14d, chat drop-off, no requests 30d, health score drop, trial ending, payment failed. Positive signals: traffic up 20%, high engagement. Alerts in Command Center", "status": "pending" },
+        { "id": 76, "title": "Credits system", "source": "MONETIZATION.md Credits Spec", "est": "2-3h", "priority": "P2", "notes": "Prepaid credit packs ($500/5cr, $900/10cr, $1600/20cr). Per-product credit costs. Purchase via Stripe. Admin can grant credits. Deduct on fulfillment", "status": "pending" },
+        { "id": 77, "title": "Usage tracking + limits", "source": "MONETIZATION.md Phase 4", "est": "2-3h", "priority": "P2", "notes": "Track AI conversations, briefs, strategies per workspace per month. Usage indicators (3 of 4 briefs remaining). Overage prompts. Admin usage dashboard", "status": "pending" }
+      ]
+    },
+    {
+      "id": "sprint-5b",
       "name": "Team & Permissions",
       "hours": "7-9",
       "rationale": "Only needed when actually hiring/contracting.",
@@ -100,8 +129,8 @@
         { "id": 24, "title": "Multi-competitor analysis", "source": "FEATURE_AUDIT", "est": "3-4h", "priority": "P3", "notes": "Compare against 2-3 competitors simultaneously", "status": "pending" },
         { "id": 25, "title": "Client onboarding wizard", "source": "ACTION_PLAN", "est": "2-3h", "priority": "P0", "notes": "Guided first-time experience for new clients", "status": "pending" },
         { "id": 26, "title": "Webhook / Zapier triggers", "source": "ACTION_PLAN", "est": "3-4h", "priority": "P0", "notes": "Fire webhooks on key events", "status": "pending" },
-        { "id": 27, "title": "White-label domain support", "source": "ACTION_PLAN", "est": "2-3h", "priority": "P1", "notes": "CNAME + reverse proxy for client portals", "status": "pending" },
-        { "id": 28, "title": "ROI calculator / value dashboard", "source": "ACTION_PLAN", "est": "3-4h", "priority": "P1", "notes": "Show dollar value of organic traffic", "status": "pending" },
+        { "id": 27, "title": "White-label domain support", "source": "MONETIZATION.md White-Label", "est": "4-6h", "priority": "P1", "notes": "CNAME + reverse proxy. Configurable branding (logo, colors, favicon, email sender, chatbot persona). Agency resale tiers ($299-999/mo)", "status": "pending" },
+        { "id": 28, "title": "ROI calculator / value dashboard", "source": "MONETIZATION.md", "est": "3-4h", "priority": "P1", "notes": "Moved to Sprint 5 (Revenue Intelligence) as item #74", "status": "pending" },
         { "id": 29, "title": "Automated competitive monitoring", "source": "ACTION_PLAN", "est": "3-4h", "priority": "P1", "notes": "Monthly competitor audit, alert on improvements", "status": "pending" },
         { "id": 30, "title": "\"What happened this month\" summary", "source": "ACTION_PLAN", "est": "2-3h", "priority": "P1", "notes": "Auto-generated plain-English monthly summary", "status": "pending" },
         { "id": 31, "title": "Content performance tracker", "source": "ACTION_PLAN", "est": "3-4h", "priority": "P2", "notes": "Track GSC/GA4 performance per published post", "status": "pending" },

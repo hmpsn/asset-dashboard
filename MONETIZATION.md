@@ -105,20 +105,31 @@ A comprehensive monetization plan for the asset dashboard platform, covering tie
 
 Transactional revenue items — purchased inside the platform, fulfilled through it.
 
-### Content Briefs
+### Content Briefs (By Page Type)
 
-| Product | Price | Agency Cost | Margin |
-|---------|:-----:|:-----------:|:------:|
-| AI Brief (keyword research, outline, meta, E-E-A-T) | $75–150 | ~$0.30 tokens + 15min review | ~95% |
-| Brief + SEMRush Enrichment (real volume, KD, CPC) | $125–200 | ~$0.50 tokens + SEMRush credits + 15min | ~90% |
+| Product | Price | Agency Cost | Margin | Notes |
+|---------|:-----:|:-----------:|:------:|-------|
+| **Blog Post Brief** | $75–150 | ~$0.30 tokens + 15min | ~95% | Keyword research, outline, meta, E-E-A-T |
+| Blog Post Brief + SEMRush | $125–200 | ~$0.50 + SEMRush credits + 15min | ~90% | Real volume, KD, CPC, related keywords |
+| **Landing Page Brief** | $150–250 | ~$0.40 tokens + 20min | ~90% | Conversion-focused: hero, benefits, social proof, CTA strategy |
+| **Service Page Brief** | $125–200 | ~$0.35 tokens + 20min | ~90% | Service description, differentiators, FAQ, schema recommendations |
+| **Location Page Brief** | $100–175 | ~$0.30 tokens + 15min | ~90% | Local SEO focus: NAP, service areas, local keywords, LocalBusiness schema |
+| **Product Page Brief** | $125–200 | ~$0.35 tokens + 15min | ~90% | Features, benefits, comparison, Product schema, buyer intent keywords |
+| **Pillar/Hub Page Brief** | $200–350 | ~$0.50 tokens + 30min | ~85% | Topic authority: comprehensive guide, internal linking map, cluster strategy |
+| **Resource/Guide Brief** | $150–250 | ~$0.40 tokens + 20min | ~90% | Long-form educational: downloadable checklist, lead gen integration |
 
-### Full Blog Posts
+### Full Content (By Page Type)
 
-| Product | Price | Agency Cost | Margin |
-|---------|:-----:|:-----------:|:------:|
-| AI Draft (1,500–2,000 words from brief) | $250–400 | ~$1.50 tokens + 30-45min editing | ~85% |
-| Polished Post (AI draft + human editing + images) | $500–800 | ~$2 tokens + 1.5-2hr editing | ~75% |
-| Premium Post (original research, custom graphics, expert quotes) | $1,000–1,500 | ~$2 tokens + 4-6hr work | ~60% |
+| Product | Price | Agency Cost | Margin | Notes |
+|---------|:-----:|:-----------:|:------:|-------|
+| **Blog Post — AI Draft** | $250–400 | ~$1.50 tokens + 30-45min | ~85% | 1,500–2,000 words from brief |
+| **Blog Post — Polished** | $500–800 | ~$2 tokens + 1.5-2hr editing | ~75% | AI draft + human editing + images |
+| **Blog Post — Premium** | $1,000–1,500 | ~$2 tokens + 4-6hr work | ~60% | Original research, custom graphics, expert quotes |
+| **Landing Page Copy** | $500–1,000 | ~$2 tokens + 2-3hr | ~70% | Full page copy: headline, subheads, benefits, proof, CTAs |
+| **Service Page Copy** | $400–750 | ~$1.50 tokens + 1.5-2hr | ~75% | Service description, process, FAQ, testimonial placement |
+| **Location Page Copy** | $300–500 | ~$1.50 tokens + 1-1.5hr | ~75% | Localized content, map embed, service area, reviews |
+| **Pillar Page** | $1,500–2,500 | ~$3 tokens + 6-8hr | ~55% | 3,000-5,000 word authority piece with cluster linking |
+| **Resource/Guide** | $800–1,500 | ~$2 tokens + 3-5hr | ~65% | Downloadable PDF + web version, lead gen form copy |
 
 ### Schema Generation
 
@@ -133,6 +144,27 @@ Transactional revenue items — purchased inside the platform, fulfilled through
 |---------|:-----:|:-----------:|:------:|
 | Full keyword strategy (page mapping, gaps, quick wins) | $300–500 | ~$1.50 tokens + SEMRush + 1hr review | ~80% |
 | Strategy refresh (re-run with new data) | $150–250 | ~$1.50 tokens + 30min | ~85% |
+
+### Page Type → Content Opportunity Mapping
+
+The strategy engine's "Content Opportunities" section should recommend **specific page types** based on the gap analysis:
+
+| Signal | Recommended Page Type | Why |
+|--------|----------------------|-----|
+| Informational keyword gap, no ranking content | **Blog Post** | Capture top-of-funnel search traffic |
+| High-volume service keyword, no dedicated page | **Service Page** | Direct conversion page for core offering |
+| "[service] near me" / "[service] in [city]" gaps | **Location Page** | Local SEO; one per service area |
+| Broad topic with 5+ related keyword clusters | **Pillar/Hub Page** | Topic authority; anchors internal link cluster |
+| Competitor has landing page for high-intent keyword | **Landing Page** | Conversion-focused response to competitor |
+| "How to" / "guide" / "checklist" queries | **Resource/Guide** | Lead gen opportunity; downloadable asset |
+| Product/feature comparison queries | **Product Page** | Bottom-of-funnel; buyer intent |
+| FAQ / "what is" queries with no content | **Blog Post** or **FAQ Section** | Quick wins; potential featured snippet |
+
+This mapping feeds into:
+1. **Strategy tab** — Content Opportunities cards show recommended page type badge
+2. **"Request This Topic" flow** — Pre-selects the page type, which determines brief template + pricing
+3. **AI chatbot** — When discussing content gaps, recommends specific page types with rationale
+4. **Content Pipeline** — Brief generation uses page-type-specific prompts and templates
 
 ---
 
@@ -272,6 +304,207 @@ The brief → post → publish pipeline is the most natural transaction point. C
 - **Free:** Low switching cost, but the data access creates habit
 - **Growth:** AI chatbot builds relationship, strategy shows roadmap
 - **Premium:** Knowledge base tuning + schema investment + conversation history = very high switching cost
+
+---
+
+## Trial Period Strategy
+
+### 14-Day Growth Trial for All New Clients
+
+Every new workspace starts with **14 days of Growth tier access** before dropping to Free.
+
+| Day | Experience |
+|-----|-----------|
+| Day 1 | Welcome flow explains Growth features; AI chatbot introduces itself with proactive insights |
+| Days 2–13 | Full Growth access: AI chat, strategy, content pipeline, custom date ranges, approvals |
+| Day 10 | In-dashboard banner: "Your Growth trial ends in 4 days — keep access to AI insights and content tools" |
+| Day 13 | Prominent upgrade prompt: "Trial ending tomorrow — upgrade now to keep your keyword strategy and AI advisor" |
+| Day 14 | Downgrade to Free; soft-gated sections show blurred teaser with "You had access to this — upgrade to get it back" |
+
+**Why this works:**
+- Loss aversion is more powerful than gain framing — taking features away drives more upgrades than offering them
+- 14 days is enough to experience 2-3 AI chatbot conversations, see strategy data, and request at least 1 brief
+- The downgrade experience is designed: clients see their data still exists behind the blur, creating urgency
+
+### Implementation
+- `trialEndsAt: Date` field on Workspace (set to now + 14 days on creation)
+- Tier resolution: `if (now < trialEndsAt) return 'growth'; else return ws.tier;`
+- Countdown banner component: shows at day 10+
+- Post-trial downgrade is automatic — no manual intervention needed
+
+---
+
+## Inline Price Visibility
+
+### Show Prices Before Checkout
+
+Clients should never be surprised by a price. Every purchasable action shows cost inline:
+
+| Location | What They See |
+|----------|--------------|
+| Content Pipeline → "Request Brief" button | "Generate Brief — $125" (varies by page type) |
+| Content Pipeline → "Upgrade to Full Post" | "Upgrade to Full Post — $500" with savings callout |
+| Strategy tab → content gap cards | Page type badge + "Request Brief — $150" |
+| AI chatbot → content recommendation | "I can generate a brief for this topic — $125" |
+| Schema tab → generate button | "Generate Schema — $35/page" or "Full Site — $350" |
+| Chat upgrade prompt | "Upgrade to Growth — $199/mo" |
+| Soft gate overlay | Tier price + "Starting at $149/mo" |
+
+### Bundle Savings Callouts
+When a client is on a bundle, show the savings:
+- "Generate Brief — ~~$125~~ **Included** (2 of 4 remaining this month)"
+- "Upgrade to Full Post — ~~$500~~ **$400** (Content Engine discount)"
+
+### Price Configuration
+- Prices stored in workspace settings or global config (not hardcoded)
+- Admin can override per-workspace for custom deals
+- Stripe Price IDs mapped to product types in `server/stripe.ts`
+
+---
+
+## ROI Dashboard (Premium Feature)
+
+### Show the Dollar Value of Organic Traffic
+
+A dedicated section (Overview tab or standalone) that translates SEO metrics into dollar terms:
+
+### Metrics
+
+| Metric | Formula | Data Source |
+|--------|---------|-------------|
+| **Organic Traffic Value** | `organic clicks × avg CPC for those keywords` | GSC clicks + SEMRush CPC data |
+| **Ad Spend Equivalent** | "You'd pay $X in Google Ads for this traffic" | SEMRush keyword CPCs |
+| **Content ROI** | `traffic value of pages with published content ÷ content spend` | GSC per-page + payment records |
+| **Estimated Lead Value** | `organic sessions × industry conversion rate × avg deal size` | GA4 conversions + knowledge base |
+| **Growth Trend** | Month-over-month organic traffic value change | GSC period comparison |
+
+### Display
+```
+┌─────────────────────────────────────────────────┐
+│  Your Organic Traffic Value                      │
+│                                                  │
+│  💰 $4,200/mo                                   │
+│  equivalent Google Ads spend                     │
+│                                                  │
+│  ↑ 18% vs last month                            │
+│                                                  │
+│  📈 Content ROI: 340%                           │
+│  $1,200 spent on content → $4,200/mo in value   │
+│                                                  │
+│  🎯 Top Value Keywords:                         │
+│  "emergency dentist" — $8.50/click × 340 clicks │
+│  "dental implants cost" — $12/click × 180 clicks│
+└─────────────────────────────────────────────────┘
+```
+
+**Why this is a Premium feature:** It's the single most powerful retention tool. A client who sees "your organic traffic is worth $4,200/mo and growing" never questions the retainer. It justifies the platform cost every single month.
+
+### Implementation
+- New endpoint: `GET /api/public/roi/:workspaceId`
+- Cross-reference GSC click data with SEMRush CPC per keyword
+- Cache aggressively (daily refresh is fine — SEMRush data doesn't change hourly)
+- ROI card on Overview tab for Premium; blurred soft-gate for Growth/Free
+- Est: 3-4 hours
+
+---
+
+## Churn Prevention Signals
+
+### Automated Admin Alerts
+
+The platform already has the data to predict disengagement. Surface these as admin-side alerts:
+
+| Signal | Threshold | Action |
+|--------|-----------|--------|
+| **No client login** | 14+ days since last dashboard visit | Email: "We noticed you haven't checked your dashboard — here's what's new" |
+| **Chat drop-off** | Conversations down 50%+ month-over-month | Admin flag: "Client X engagement declining" |
+| **No requests** | 30+ days without a request submission | Admin alert: "Consider proactive outreach" |
+| **Health score drop** | Score dropped 10+ points since last visit | Auto-email: "Your site health changed — log in to see details" |
+| **Trial ending** | 3 days before trial expiration | In-dashboard banner + email |
+| **Payment failed** | Stripe subscription payment fails | Admin alert + client email with retry link |
+
+### Positive Signals (Case Study Triggers)
+| Signal | Threshold | Action |
+|--------|-----------|--------|
+| Organic traffic up 20%+ | Quarter-over-quarter GSC comparison | Admin: "Client X is a strong case study candidate" |
+| Health score improved 15+ points | Compare current to 90-day-ago snapshot | Prompt client: "Your site health improved significantly!" |
+| AI chatbot high engagement | 10+ conversations in a month | Admin: "Client X is highly engaged — upsell opportunity" |
+
+### Implementation
+- Background job runs daily, checks all workspaces
+- Alerts stored in admin notification queue (not email-only)
+- Admin Command Center shows "Needs Attention" section (already exists — extend it)
+- Est: 2-3 hours
+
+---
+
+## Credits System (Phase 3)
+
+### Prepaid Credit Packs
+
+An alternative to per-item checkout for higher-volume clients:
+
+| Pack | Price | Credits | Savings | Per-Credit |
+|------|:-----:|:-------:|:-------:|:----------:|
+| Starter | $500 | 5 credits | — | $100 |
+| Growth | $900 | 10 credits | 10% off | $90 |
+| Pro | $1,600 | 20 credits | 20% off | $80 |
+
+### Credit Costs by Product
+
+| Product | Credits |
+|---------|:-------:|
+| Blog Post Brief | 1 |
+| Landing/Service/Product Page Brief | 1.5 |
+| Pillar/Hub Page Brief | 2 |
+| Blog Post — AI Draft | 3 |
+| Blog Post — Polished | 5 |
+| Landing Page Copy | 5 |
+| Service/Location Page Copy | 4 |
+| Pillar Page | 15 |
+| Schema (per page) | 0.5 |
+| Strategy Refresh | 2 |
+
+### Benefits
+- **Cash flow positive** — clients prepay, you deliver over time
+- **Increases lifetime value** — unused credits don't expire (or expire after 12 months)
+- **Reduces checkout friction** — one payment upfront, then "spend" credits without re-entering card
+- **Upsell path** — "You're running low on credits — upgrade to the next pack and save 10%"
+
+### Implementation
+- `credits: number` field on workspace
+- Deduct on fulfillment (brief generated, post delivered), not on request
+- Credit purchase via Stripe Checkout (one-time payment)
+- Admin can manually grant credits (comps, bonuses)
+- Est: 2-3 hours (after Stripe Phase 1 is built)
+
+---
+
+## White-Label Resale (Future)
+
+### Platform-as-a-Service for Other Agencies
+
+The long-term 10x revenue multiplier. Other web/SEO agencies license the platform under their own brand.
+
+| Tier | Price | Includes |
+|------|:-----:|---------|
+| Agency Starter | $299/mo | 5 client workspaces, their branding |
+| Agency Growth | $599/mo | 15 workspaces, custom domain, priority support |
+| Agency Enterprise | $999/mo | Unlimited workspaces, white-label everything, API access |
+
+### What Needs to Be Configurable
+- Logo, colors, favicon (already partially configurable per workspace)
+- Domain (CNAME + reverse proxy)
+- Email templates (sender name, branding)
+- AI chatbot persona name
+- "Powered by" footer (optional)
+
+### Design Decisions for Now
+Even before building white-label, make these choices to keep the door open:
+- Keep branding in config, not hardcoded
+- Keep the teal/zinc palette parameterizable (CSS variables)
+- Keep email templates reading from workspace config for sender details
+- API endpoints should work with any origin (CORS per-workspace)
 
 ---
 
