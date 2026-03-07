@@ -4,8 +4,7 @@ import { listWorkspaces, getTokenForSite } from './workspaces.js';
 import { runSeoAudit } from './seo-audit.js';
 import { saveSnapshot } from './reports.js';
 import { addActivity } from './activity-log.js';
-import { isEmailConfigured } from './email.js';
-import nodemailer from 'nodemailer';
+import { notifyAuditAlert } from './email.js';
 
 import { getUploadRoot } from './data-dir.js';
 
@@ -73,34 +72,13 @@ export function deleteSchedule(workspaceId: string): boolean {
   return true;
 }
 
-async function sendScoreDropAlert(workspaceName: string, oldScore: number, newScore: number, drop: number) {
-  if (!isEmailConfigured()) return;
-  const notifEmail = process.env.NOTIFICATION_EMAIL;
-  if (!notifEmail) return;
-
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_PORT === '465',
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-  });
-
-  await transporter.sendMail({
-    from: process.env.SMTP_FROM || process.env.SMTP_USER,
-    to: notifEmail,
-    subject: `⚠️ Score Drop Alert: ${workspaceName} (${oldScore} → ${newScore})`,
-    html: `
-      <div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:20px;">
-        <h2 style="color:#ef4444;">Site Health Score Drop</h2>
-        <p><strong>${workspaceName}</strong> score dropped by <strong>${drop} points</strong>.</p>
-        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
-          <tr><td style="padding:8px;border:1px solid #ddd;">Previous Score</td><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">${oldScore}</td></tr>
-          <tr><td style="padding:8px;border:1px solid #ddd;">Current Score</td><td style="padding:8px;border:1px solid #ddd;font-weight:bold;color:${newScore < 60 ? '#ef4444' : '#f59e0b'};">${newScore}</td></tr>
-          <tr><td style="padding:8px;border:1px solid #ddd;">Drop</td><td style="padding:8px;border:1px solid #ddd;color:#ef4444;">-${drop}</td></tr>
-        </table>
-        <p style="color:#666;font-size:12px;">Run a full audit to investigate.</p>
-      </div>
-    `,
+function sendScoreDropAlert(ws: { name: string; id: string }, oldScore: number, newScore: number) {
+  notifyAuditAlert({
+    workspaceName: ws.name,
+    workspaceId: ws.id,
+    siteName: ws.name,
+    score: newScore,
+    previousScore: oldScore,
   });
 }
 
@@ -133,9 +111,7 @@ async function runScheduledAudit(schedule: AuditSchedule) {
       const drop = oldScore - audit.siteScore;
       if (drop >= schedule.scoreDropThreshold) {
         console.log(`[Scheduled Audit] Score drop detected: ${oldScore} → ${audit.siteScore} (-${drop})`);
-        await sendScoreDropAlert(ws.name, oldScore, audit.siteScore, drop).catch(err => {
-          console.error('[Scheduled Audit] Failed to send alert:', err);
-        });
+        sendScoreDropAlert(ws, oldScore, audit.siteScore);
       }
     }
   } catch (err) {

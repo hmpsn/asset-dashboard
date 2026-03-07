@@ -1,4 +1,6 @@
 import nodemailer from 'nodemailer';
+import { queueEmail, registerSendFn, restoreQueue } from './email-queue.js';
+import type { EmailEvent } from './email-templates.js';
 
 // Configure via env vars:
 // SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
@@ -22,15 +24,21 @@ function getConfig(): EmailConfig | null {
   return { host, port, user, pass, from: from! };
 }
 
-function createTransport() {
+// ── Shared transport (singleton) ──
+
+let _transport: ReturnType<typeof nodemailer.createTransport> | null = null;
+
+function getTransport() {
+  if (_transport) return _transport;
   const cfg = getConfig();
   if (!cfg) return null;
-  return nodemailer.createTransport({
+  _transport = nodemailer.createTransport({
     host: cfg.host,
     port: cfg.port,
     secure: cfg.port === 465,
     auth: { user: cfg.user, pass: cfg.pass },
   });
+  return _transport;
 }
 
 export function isEmailConfigured(): boolean {
@@ -41,9 +49,13 @@ export function getNotificationEmail(): string | undefined {
   return process.env.NOTIFICATION_EMAIL;
 }
 
-async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
+/**
+ * Low-level send. Used by the queue flusher and for one-off emails
+ * (monthly reports, approval reminders) that bypass the queue.
+ */
+export async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
   const cfg = getConfig();
-  const transport = createTransport();
+  const transport = getTransport();
   if (!cfg || !transport) return false;
   try {
     await transport.sendMail({ from: cfg.from, to, subject, html });
@@ -54,131 +66,127 @@ async function sendEmail(to: string, subject: string, html: string): Promise<boo
   }
 }
 
-// ── Notification emails ──
+// ── Initialize queue ──
 
-export async function notifyTeamNewRequest(opts: {
+export function initEmailQueue() {
+  registerSendFn(sendEmail);
+  restoreQueue();
+  console.log('[email] Queue initialized');
+}
+
+// ── Queue-based notification helpers ──
+// These replace the old direct-send functions. Each pushes an event onto
+// the batching queue instead of sending immediately.
+
+function makeEvent(
+  type: EmailEvent['type'],
+  recipient: string,
+  workspaceId: string,
+  workspaceName: string,
+  dashboardUrl: string | undefined,
+  data: Record<string, unknown>,
+): EmailEvent {
+  return { type, recipient, workspaceId, workspaceName, dashboardUrl, data, createdAt: new Date().toISOString() };
+}
+
+export function notifyTeamNewRequest(opts: {
   workspaceName: string;
+  workspaceId?: string;
   title: string;
   description: string;
   category: string;
   submittedBy?: string;
   pageUrl?: string;
-}): Promise<boolean> {
+}): void {
   const to = getNotificationEmail();
-  if (!to) return false;
-  const subject = `New Request: ${opts.title} — ${opts.workspaceName}`;
-  const html = `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto;">
-      <div style="background: #0f1219; color: #e4e4e7; padding: 24px; border-radius: 12px;">
-        <div style="font-size: 11px; color: #71717a; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">New Client Request</div>
-        <h2 style="margin: 0 0 4px; font-size: 16px; color: #f4f4f5;">${escHtml(opts.title)}</h2>
-        <div style="font-size: 12px; color: #a1a1aa; margin-bottom: 16px;">
-          ${opts.submittedBy ? `<strong>${escHtml(opts.submittedBy)}</strong> · ` : ''}${escHtml(opts.workspaceName)} · ${escHtml(opts.category)}
-        </div>
-        <div style="background: #18181b; border: 1px solid #27272a; border-radius: 8px; padding: 16px; font-size: 13px; line-height: 1.5; color: #d4d4d8; white-space: pre-wrap;">${escHtml(opts.description)}</div>
-        ${opts.pageUrl ? `<div style="margin-top: 12px; font-size: 11px; color: #71717a;">Related page: <a href="${escHtml(opts.pageUrl.startsWith('http') ? opts.pageUrl : 'https://' + opts.pageUrl)}" style="color: #2dd4bf;">${escHtml(opts.pageUrl)}</a></div>` : ''}
-        <div style="margin-top: 20px; font-size: 11px; color: #52525b;">Log in to your dashboard to respond.</div>
-      </div>
-    </div>
-  `;
-  return sendEmail(to, subject, html);
+  if (!to || !isEmailConfigured()) return;
+  queueEmail(makeEvent('request_new', to, opts.workspaceId || '', opts.workspaceName, undefined, {
+    title: opts.title, description: opts.description, category: opts.category,
+    submittedBy: opts.submittedBy, pageUrl: opts.pageUrl,
+  }));
 }
 
-export async function notifyClientTeamResponse(opts: {
+export function notifyClientTeamResponse(opts: {
   clientEmail: string;
   workspaceName: string;
+  workspaceId?: string;
   requestTitle: string;
   noteContent: string;
   dashboardUrl?: string;
-}): Promise<boolean> {
-  const subject = `Update on your request: ${opts.requestTitle}`;
-  const html = `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto;">
-      <div style="background: #0f1219; color: #e4e4e7; padding: 24px; border-radius: 12px;">
-        <div style="font-size: 11px; color: #71717a; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Request Update — ${escHtml(opts.workspaceName)}</div>
-        <h2 style="margin: 0 0 16px; font-size: 16px; color: #f4f4f5;">${escHtml(opts.requestTitle)}</h2>
-        <div style="background: rgba(45,212,191,0.08); border: 1px solid rgba(45,212,191,0.15); border-radius: 8px; padding: 16px; font-size: 13px; line-height: 1.5; color: #d4d4d8; white-space: pre-wrap;">${escHtml(opts.noteContent)}</div>
-        ${opts.dashboardUrl ? `<div style="margin-top: 20px; text-align: center;"><a href="${escHtml(opts.dashboardUrl)}" style="display: inline-block; background: #0d9488; color: white; padding: 10px 24px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 500;">View in Dashboard</a></div>` : ''}
-        <div style="margin-top: 20px; font-size: 11px; color: #52525b;">You can reply directly from your dashboard.</div>
-      </div>
-    </div>
-  `;
-  return sendEmail(opts.clientEmail, subject, html);
+}): void {
+  if (!isEmailConfigured()) return;
+  queueEmail(makeEvent('request_response', opts.clientEmail, opts.workspaceId || '', opts.workspaceName, opts.dashboardUrl, {
+    requestTitle: opts.requestTitle, noteContent: opts.noteContent,
+  }));
 }
 
-export async function notifyClientStatusChange(opts: {
+export function notifyClientStatusChange(opts: {
   clientEmail: string;
   workspaceName: string;
+  workspaceId?: string;
   requestTitle: string;
   newStatus: string;
   dashboardUrl?: string;
-}): Promise<boolean> {
-  const statusLabels: Record<string, string> = {
-    new: 'New', in_review: 'In Review', in_progress: 'In Progress',
-    on_hold: 'On Hold', completed: 'Completed', closed: 'Closed',
-  };
-  const label = statusLabels[opts.newStatus] || opts.newStatus;
-  const subject = `Request "${opts.requestTitle}" is now ${label}`;
-  const html = `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto;">
-      <div style="background: #0f1219; color: #e4e4e7; padding: 24px; border-radius: 12px;">
-        <div style="font-size: 11px; color: #71717a; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Status Update — ${escHtml(opts.workspaceName)}</div>
-        <h2 style="margin: 0 0 8px; font-size: 16px; color: #f4f4f5;">${escHtml(opts.requestTitle)}</h2>
-        <div style="display: inline-block; background: ${opts.newStatus === 'completed' ? 'rgba(74,222,128,0.1)' : 'rgba(45,212,191,0.1)'}; border: 1px solid ${opts.newStatus === 'completed' ? 'rgba(74,222,128,0.3)' : 'rgba(45,212,191,0.2)'}; border-radius: 6px; padding: 4px 12px; font-size: 12px; color: ${opts.newStatus === 'completed' ? '#4ade80' : '#2dd4bf'}; font-weight: 500;">${escHtml(label)}</div>
-        ${opts.dashboardUrl ? `<div style="margin-top: 20px; text-align: center;"><a href="${escHtml(opts.dashboardUrl)}" style="display: inline-block; background: #0d9488; color: white; padding: 10px 24px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 500;">View in Dashboard</a></div>` : ''}
-      </div>
-    </div>
-  `;
-  return sendEmail(opts.clientEmail, subject, html);
+}): void {
+  if (!isEmailConfigured()) return;
+  queueEmail(makeEvent('request_status', opts.clientEmail, opts.workspaceId || '', opts.workspaceName, opts.dashboardUrl, {
+    requestTitle: opts.requestTitle, newStatus: opts.newStatus,
+  }));
 }
 
-export async function notifyTeamContentRequest(opts: {
+export function notifyTeamContentRequest(opts: {
   workspaceName: string;
+  workspaceId?: string;
   topic: string;
   targetKeyword: string;
   priority: string;
   rationale: string;
-}): Promise<boolean> {
+}): void {
   const to = getNotificationEmail();
-  if (!to) return false;
-  const subject = `Content Request: "${opts.topic}" — ${opts.workspaceName}`;
-  const html = `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto;">
-      <div style="background: #0f1219; color: #e4e4e7; padding: 24px; border-radius: 12px;">
-        <div style="font-size: 11px; color: #71717a; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Content Topic Request — ${escHtml(opts.workspaceName)}</div>
-        <h2 style="margin: 0 0 4px; font-size: 16px; color: #f4f4f5;">${escHtml(opts.topic)}</h2>
-        <div style="font-size: 12px; color: #2dd4bf; margin-bottom: 16px;">Keyword: "${escHtml(opts.targetKeyword)}" · Priority: ${escHtml(opts.priority)}</div>
-        <div style="background: #18181b; border: 1px solid #27272a; border-radius: 8px; padding: 16px; font-size: 13px; line-height: 1.5; color: #d4d4d8; white-space: pre-wrap;">${escHtml(opts.rationale)}</div>
-        <div style="margin-top: 20px; font-size: 11px; color: #52525b;">Log in to your dashboard → Content Briefs to generate a brief.</div>
-      </div>
-    </div>
-  `;
-  return sendEmail(to, subject, html);
+  if (!to || !isEmailConfigured()) return;
+  queueEmail(makeEvent('content_request', to, opts.workspaceId || '', opts.workspaceName, undefined, {
+    topic: opts.topic, targetKeyword: opts.targetKeyword, priority: opts.priority, rationale: opts.rationale,
+  }));
 }
 
-export async function notifyClientBriefReady(opts: {
+export function notifyClientBriefReady(opts: {
   clientEmail: string;
   workspaceName: string;
+  workspaceId?: string;
   topic: string;
   targetKeyword: string;
   dashboardUrl?: string;
-}): Promise<boolean> {
-  const subject = `Content Brief Ready for Review: "${opts.topic}"`;
-  const html = `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto;">
-      <div style="background: #0f1219; color: #e4e4e7; padding: 24px; border-radius: 12px;">
-        <div style="font-size: 11px; color: #71717a; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Content Brief Ready — ${escHtml(opts.workspaceName)}</div>
-        <h2 style="margin: 0 0 4px; font-size: 16px; color: #f4f4f5;">${escHtml(opts.topic)}</h2>
-        <div style="font-size: 12px; color: #2dd4bf; margin-bottom: 16px;">Keyword: &ldquo;${escHtml(opts.targetKeyword)}&rdquo;</div>
-        <p style="font-size: 13px; line-height: 1.6; color: #a1a1aa; margin: 0 0 16px;">A content brief has been prepared for your review. Please review the proposed title, outline, and key details, then approve or request changes.</p>
-        ${opts.dashboardUrl ? `<div style="text-align: center;"><a href="${escHtml(opts.dashboardUrl)}" style="display: inline-block; background: #0d9488; color: white; padding: 10px 24px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 500;">Review Brief in Dashboard</a></div>` : ''}
-        <div style="margin-top: 20px; font-size: 11px; color: #52525b;">You can approve, request changes, or leave comments directly from your dashboard.</div>
-      </div>
-    </div>
-  `;
-  return sendEmail(opts.clientEmail, subject, html);
+}): void {
+  if (!isEmailConfigured()) return;
+  queueEmail(makeEvent('content_brief_ready', opts.clientEmail, opts.workspaceId || '', opts.workspaceName, opts.dashboardUrl, {
+    topic: opts.topic, targetKeyword: opts.targetKeyword,
+  }));
 }
 
-function escHtml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+export function notifyApprovalReady(opts: {
+  clientEmail: string;
+  workspaceName: string;
+  workspaceId?: string;
+  batchName: string;
+  itemCount: number;
+  dashboardUrl?: string;
+}): void {
+  if (!isEmailConfigured()) return;
+  queueEmail(makeEvent('approval_ready', opts.clientEmail, opts.workspaceId || '', opts.workspaceName, opts.dashboardUrl, {
+    batchName: opts.batchName, itemCount: opts.itemCount,
+  }));
+}
+
+export function notifyAuditAlert(opts: {
+  workspaceName: string;
+  workspaceId?: string;
+  siteName?: string;
+  score: number;
+  previousScore?: number;
+}): void {
+  const to = getNotificationEmail();
+  if (!to || !isEmailConfigured()) return;
+  queueEmail(makeEvent('audit_alert', to, opts.workspaceId || '', opts.workspaceName, undefined, {
+    siteName: opts.siteName, score: opts.score, previousScore: opts.previousScore,
+  }));
 }

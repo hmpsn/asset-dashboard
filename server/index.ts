@@ -62,7 +62,8 @@ import { runSalesAudit } from './sales-audit.js';
 import { initJobs, createJob, updateJob, getJob, listJobs, cancelJob, registerAbort, isJobCancelled } from './jobs.js';
 import { createBatch, listBatches, getBatch, updateItem, markBatchApplied, deleteBatch } from './approvals.js';
 import { listRequests, createRequest, updateRequest, addNote, deleteRequest, getRequest, getAttachmentsDir, addAttachmentsToRequest, type RequestAttachment } from './requests.js';
-import { notifyTeamNewRequest, notifyClientTeamResponse, notifyClientStatusChange, notifyTeamContentRequest, notifyClientBriefReady, isEmailConfigured } from './email.js';
+import { notifyTeamNewRequest, notifyClientTeamResponse, notifyClientStatusChange, notifyTeamContentRequest, notifyClientBriefReady, notifyApprovalReady, isEmailConfigured, initEmailQueue } from './email.js';
+import { getQueueStats } from './email-queue.js';
 import { addActivity, listActivity } from './activity-log.js';
 import { getSchedule, listSchedules, upsertSchedule, deleteSchedule, startScheduler } from './scheduled-audits.js';
 import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword, togglePinKeyword, storeRankSnapshot, getRankHistory, getLatestRanks } from './rank-tracking.js';
@@ -3568,6 +3569,12 @@ app.post('/api/approvals/:workspaceId', (req, res) => {
   const { siteId, name, items } = req.body;
   if (!siteId || !items?.length) return res.status(400).json({ error: 'siteId and items required' });
   const batch = createBatch(req.params.workspaceId, siteId, name || 'SEO Changes', items);
+  // Notify client that items are ready for review
+  const ws = getWorkspace(req.params.workspaceId);
+  if (ws?.clientEmail) {
+    const dashUrl = ws.liveDomain ? `${ws.liveDomain.startsWith('http') ? '' : 'https://'}${ws.liveDomain}/client/${ws.id}` : undefined;
+    notifyApprovalReady({ clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: req.params.workspaceId, batchName: batch.name, itemCount: items.length, dashboardUrl: dashUrl });
+  }
   res.json(batch);
 });
 
@@ -3691,7 +3698,7 @@ app.post('/api/public/content-request/:workspaceId', (req, res) => {
   if (!topic || !targetKeyword) return res.status(400).json({ error: 'topic and targetKeyword are required' });
   const request = createContentRequest(req.params.workspaceId, { topic, targetKeyword, intent, priority, rationale, clientNote, serviceType });
   addActivity(req.params.workspaceId, 'content_requested', `Content topic requested: "${topic}"`, `Keyword: "${targetKeyword}" · Priority: ${priority}`, { requestId: request.id });
-  notifyTeamContentRequest({ workspaceName: ws.name, topic, targetKeyword, priority, rationale: rationale || '' }).catch(() => {});
+  notifyTeamContentRequest({ workspaceName: ws.name, workspaceId: req.params.workspaceId, topic, targetKeyword, priority, rationale: rationale || '' });
   res.json(request);
 });
 
@@ -3722,7 +3729,7 @@ app.post('/api/public/content-request/:workspaceId/submit', (req, res) => {
     clientNote: notes, source: 'client', serviceType: serviceType || 'brief_only',
   });
   addActivity(req.params.workspaceId, 'content_requested', `Client submitted topic: "${topic}"`, `Keyword: "${targetKeyword}"`, { requestId: request.id });
-  notifyTeamContentRequest({ workspaceName: ws.name, topic, targetKeyword, priority: 'medium', rationale: notes || '' }).catch(() => {});
+  notifyTeamContentRequest({ workspaceName: ws.name, workspaceId: req.params.workspaceId, topic, targetKeyword, priority: 'medium', rationale: notes || '' });
   res.json(request);
 });
 
@@ -3805,7 +3812,7 @@ app.patch('/api/content-requests/:workspaceId/:id', (req, res) => {
     if (wsInfo?.clientEmail) {
       const origin = req.get('origin') || req.get('referer')?.replace(/\/[^/]*$/, '') || '';
       const dashUrl = origin ? `${origin}/dashboard/${req.params.workspaceId}?tab=content` : undefined;
-      notifyClientBriefReady({ clientEmail: wsInfo.clientEmail, workspaceName: wsInfo.name, topic: updated.topic, targetKeyword: updated.targetKeyword, dashboardUrl: dashUrl }).catch(() => {});
+      notifyClientBriefReady({ clientEmail: wsInfo.clientEmail, workspaceName: wsInfo.name, workspaceId: req.params.workspaceId, topic: updated.topic, targetKeyword: updated.targetKeyword, dashboardUrl: dashUrl });
     }
   }
   res.json(updated);
@@ -3942,7 +3949,7 @@ app.post('/api/public/requests/:workspaceId', (req, res) => {
   // Email team
   const ws = getWorkspace(req.params.workspaceId);
   if (ws) {
-    notifyTeamNewRequest({ workspaceName: ws.name, title, description, category, submittedBy, pageUrl }).catch(() => {});
+    notifyTeamNewRequest({ workspaceName: ws.name, workspaceId: req.params.workspaceId, title, description, category, submittedBy, pageUrl });
   }
   res.json(request);
 });
@@ -4028,7 +4035,7 @@ app.patch('/api/requests/:id', (req, res) => {
     const ws = getWorkspace(updated.workspaceId);
     if (ws?.clientEmail) {
       const dashUrl = ws.liveDomain ? `${ws.liveDomain.startsWith('http') ? '' : 'https://'}${ws.liveDomain}/client/${ws.id}` : undefined;
-      notifyClientStatusChange({ clientEmail: ws.clientEmail, workspaceName: ws.name, requestTitle: updated.title, newStatus: status, dashboardUrl: dashUrl }).catch(() => {});
+      notifyClientStatusChange({ clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: updated.workspaceId, requestTitle: updated.title, newStatus: status, dashboardUrl: dashUrl });
     }
     // Log activity for completed/closed
     if (status === 'completed' || status === 'closed') {
@@ -4050,7 +4057,7 @@ app.post('/api/requests/:id/notes', (req, res) => {
   const ws = getWorkspace(updated.workspaceId);
   if (ws?.clientEmail) {
     const dashUrl = ws.liveDomain ? `${ws.liveDomain.startsWith('http') ? '' : 'https://'}${ws.liveDomain}/client/${ws.id}` : undefined;
-    notifyClientTeamResponse({ clientEmail: ws.clientEmail, workspaceName: ws.name, requestTitle: updated.title, noteContent: content, dashboardUrl: dashUrl }).catch(() => {});
+    notifyClientTeamResponse({ clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: updated.workspaceId, requestTitle: updated.title, noteContent: content, dashboardUrl: dashUrl });
   }
   res.json(updated);
 });
@@ -4142,7 +4149,7 @@ app.post('/api/requests/:id/notes-with-files', upload.array('files', 5), (req, r
   const ws = getWorkspace(updated.workspaceId);
   if (ws?.clientEmail && content) {
     const dashUrl = ws.liveDomain ? `${ws.liveDomain.startsWith('http') ? '' : 'https://'}${ws.liveDomain}/client/${ws.id}` : undefined;
-    notifyClientTeamResponse({ clientEmail: ws.clientEmail, workspaceName: ws.name, requestTitle: updated.title, noteContent: content, dashboardUrl: dashUrl }).catch(() => {});
+    notifyClientTeamResponse({ clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: updated.workspaceId, requestTitle: updated.title, noteContent: content, dashboardUrl: dashUrl });
   }
   res.json(updated);
 });
@@ -4796,6 +4803,7 @@ app.get('/api/health', (_req, res) => {
     hasGoogleAuth: !!getGoogleCredentials(),
     hasEmailConfig: isEmailConfigured(),
     notificationEmail: process.env.NOTIFICATION_EMAIL || null,
+    emailQueue: getQueueStats(),
   });
 });
 
@@ -4999,6 +5007,8 @@ if (IS_PROD) {
   });
 }
 
+// Initialize email batching queue
+initEmailQueue();
 // Start audit scheduler
 startScheduler();
 // Start approval reminders
