@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  Loader2, BarChart3, ChevronDown, ChevronRight, Search,
+  Loader2, BarChart3, ChevronDown, ChevronRight, Search, Images, ArrowRight,
 } from 'lucide-react';
 
 interface PageAsset {
@@ -59,20 +59,26 @@ function PageWeight({ siteId }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'page' | 'cms' | 'css'>('all');
+  const [error, setError] = useState<string | null>(null);
 
   const runAnalysis = () => {
     setLoading(true);
     setHasRun(true);
+    setError(null);
     fetch(`/api/webflow/page-weight/${siteId}`)
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`Server error: ${r.status}`);
+        return r.json();
+      })
       .then(d => setData(d))
-      .catch(() => {})
+      .catch(e => setError(e.message || 'Page weight analysis failed'))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
     setData(null);
     setHasRun(false);
+    setError(null);
   }, [siteId]);
 
   const toggleExpand = (page: string) => {
@@ -111,7 +117,26 @@ function PageWeight({ siteId }: Props) {
     );
   }
 
-  if (!data) return null;
+  if (error || !data) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 gap-4">
+        {error ? (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 max-w-md text-center">
+            <p className="text-red-400 text-sm font-medium mb-1">Page Weight Analysis Failed</p>
+            <p className="text-xs text-red-400/70">{error}</p>
+          </div>
+        ) : (
+          <p className="text-zinc-400 text-sm">No results available</p>
+        )}
+        <button
+          onClick={() => { setHasRun(false); setError(null); }}
+          className="px-4 py-2 rounded-lg text-sm font-medium bg-teal-400 text-[#0f1219] hover:bg-teal-300"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
 
   const maxSize = data.pages.length > 0 ? data.pages[0].totalSize : 0;
 
@@ -235,6 +260,14 @@ function PageWeight({ siteId }: Props) {
           </div>
         ))}
       </div>
+      {/* Cross-link tip: Asset Manager */}
+      {heavyPages > 0 && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-teal-500/5 border border-teal-500/20 text-xs text-teal-300">
+          <Images className="w-3.5 h-3.5 flex-shrink-0" />
+          <span className="flex-1"><strong>{heavyPages} heavy page{heavyPages !== 1 ? 's' : ''}</strong> found. Use the <strong>Asset Manager</strong> tab to compress images and reduce page weight.</span>
+          <ArrowRight className="w-3 h-3 flex-shrink-0 text-teal-400" />
+        </div>
+      )}
     </div>
   );
 }

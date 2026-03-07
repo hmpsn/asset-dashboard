@@ -319,8 +319,7 @@ export function PageSpeedPanel({ siteId }: Props) {
               <button
                 onClick={() => runSingleTest('mobile')}
                 disabled={!selectedPage}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors disabled:opacity-50"
-                className="bg-teal-400 text-[#0f1219]"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors disabled:opacity-50 bg-teal-400 text-[#0f1219] hover:bg-teal-300"
               >
                 <Smartphone className="w-4 h-4" /> Test Mobile
               </button>
@@ -341,8 +340,7 @@ export function PageSpeedPanel({ siteId }: Props) {
             <div className="flex gap-2 justify-center">
               <button
                 onClick={() => runBulkTest('mobile')}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors"
-                className="bg-teal-400 text-[#0f1219]"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors bg-teal-400 text-[#0f1219] hover:bg-teal-300"
               >
                 <Smartphone className="w-4 h-4" /> Test Mobile
               </button>
@@ -364,8 +362,8 @@ export function PageSpeedPanel({ siteId }: Props) {
       <div className="flex flex-col items-center justify-center py-20 gap-3">
         <Loader2 className="w-8 h-8 animate-spin text-teal-400" />
         <p className="text-sm text-zinc-400">Running PageSpeed analysis...</p>
-        <p className="text-xs text-zinc-500">{singleResult === null && !data ? 'Testing via Google PageSpeed Insights API' : ''}</p>
-        <p className="text-xs text-zinc-700">This may take 30-60 seconds</p>
+        <p className="text-xs text-zinc-500">Testing via Google PageSpeed Insights API</p>
+        <p className="text-xs text-zinc-500">This may take 30–60 seconds</p>
       </div>
     );
   }
@@ -388,8 +386,7 @@ export function PageSpeedPanel({ siteId }: Props) {
         )}
         <button
           onClick={() => { setHasRun(false); setError(null); }}
-          className="px-4 py-2 rounded-lg text-sm font-medium"
-          className="bg-teal-400 text-[#0f1219]"
+          className="px-4 py-2 rounded-lg text-sm font-medium bg-teal-400 text-[#0f1219] hover:bg-teal-300"
         >
           Try Again
         </button>
@@ -447,7 +444,7 @@ export function PageSpeedPanel({ siteId }: Props) {
         {data.pages.map(page => {
           const isOpen = expandedPage === page.url;
           return (
-            <div key={page.url} className="rounded-lg border border-zinc-800 overflow-hidden">
+            <div key={page.url} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
               <button
                 onClick={() => setExpandedPage(isOpen ? null : page.url)}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-900/50 transition-colors text-left"
