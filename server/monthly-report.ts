@@ -5,6 +5,8 @@ import { listRequests } from './requests.js';
 import { listBatches } from './approvals.js';
 import { isEmailConfigured, sendEmail } from './email.js';
 import { renderMonthlyReport } from './email-templates.js';
+import { getSearchPeriodComparison } from './search-console.js';
+import { getGA4PeriodComparison } from './google-analytics.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -43,6 +45,14 @@ function currentPeriod(frequency: 'weekly' | 'monthly'): string {
   return frequency === 'weekly' ? currentWeek() : currentMonth();
 }
 
+interface TrafficComparison {
+  clicks?: { current: number; previous: number; changePct: number };
+  impressions?: { current: number; previous: number; changePct: number };
+  users?: { current: number; previous: number; changePct: number };
+  sessions?: { current: number; previous: number; changePct: number };
+  pageviews?: { current: number; previous: number; changePct: number };
+}
+
 interface MonthlyData {
   workspace: Workspace;
   siteScore?: number;
@@ -56,9 +66,10 @@ interface MonthlyData {
   approvalsPending: number;
   activityCount: number;
   topActivities: { title: string; createdAt: string }[];
+  traffic?: TrafficComparison;
 }
 
-function gatherMonthlyData(ws: Workspace): MonthlyData {
+async function gatherMonthlyData(ws: Workspace): Promise<MonthlyData> {
   const snapshot = ws.webflowSiteId ? getLatestSnapshot(ws.webflowSiteId) : null;
   const requests = listRequests(ws.id);
   const batches = listBatches(ws.id);
@@ -74,6 +85,27 @@ function gatherMonthlyData(ws: Workspace): MonthlyData {
   const appliedBatches = batches.filter(b => b.status === 'applied').length;
   const pendingBatches = batches.filter(b => b.status === 'pending' || b.status === 'partial').length;
 
+  // Fetch period comparison data from GSC + GA4
+  const traffic: TrafficComparison = {};
+  const days = 28;
+
+  if (ws.gscPropertyUrl) {
+    try {
+      const cmp = await getSearchPeriodComparison(ws.id, ws.gscPropertyUrl, days);
+      traffic.clicks = { current: cmp.current.clicks, previous: cmp.previous.clicks, changePct: cmp.changePercent.clicks };
+      traffic.impressions = { current: cmp.current.impressions, previous: cmp.previous.impressions, changePct: cmp.changePercent.impressions };
+    } catch { /* GSC unavailable */ }
+  }
+
+  if (ws.ga4PropertyId) {
+    try {
+      const cmp = await getGA4PeriodComparison(ws.ga4PropertyId, days);
+      traffic.users = { current: cmp.current.totalUsers, previous: cmp.previous.totalUsers, changePct: cmp.changePercent.users };
+      traffic.sessions = { current: cmp.current.totalSessions, previous: cmp.previous.totalSessions, changePct: cmp.changePercent.sessions };
+      traffic.pageviews = { current: cmp.current.totalPageviews, previous: cmp.previous.totalPageviews, changePct: cmp.changePercent.pageviews };
+    } catch { /* GA4 unavailable */ }
+  }
+
   return {
     workspace: ws,
     siteScore: snapshot?.audit.siteScore,
@@ -87,6 +119,7 @@ function gatherMonthlyData(ws: Workspace): MonthlyData {
     approvalsPending: pendingBatches,
     activityCount: activities.length,
     topActivities: activities.slice(0, 5).map(a => ({ title: a.title, createdAt: a.createdAt })),
+    traffic: Object.keys(traffic).length > 0 ? traffic : undefined,
   };
 }
 
@@ -106,6 +139,7 @@ export function generateReportHTML(data: MonthlyData): string {
     approvalsPending: data.approvalsPending,
     activityCount: data.activityCount,
     topActivities: data.topActivities,
+    traffic: data.traffic,
   });
   return html;
 }
@@ -128,6 +162,7 @@ async function sendMonthlyReportEmail(ws: Workspace, data: MonthlyData) {
     approvalsPending: data.approvalsPending,
     activityCount: data.activityCount,
     topActivities: data.topActivities,
+    traffic: data.traffic,
   });
   await sendEmail(ws.clientEmail, subject, html);
 }
@@ -148,7 +183,7 @@ async function checkAndSendReports() {
     // Already sent for this period
     if (sent[ws.id] === period) continue;
 
-    const data = gatherMonthlyData(ws);
+    const data = await gatherMonthlyData(ws);
     console.log(`[Auto Report] Generating ${freq} report for ${ws.name} (${period})`);
 
     try {
@@ -190,7 +225,7 @@ export function stopMonthlyReports() {
 export async function triggerMonthlyReport(workspaceId: string): Promise<{ sent: boolean; html: string }> {
   const ws = listWorkspaces().find(w => w.id === workspaceId);
   if (!ws) throw new Error('Workspace not found');
-  const data = gatherMonthlyData(ws);
+  const data = await gatherMonthlyData(ws);
   const html = generateReportHTML(data);
   if (ws.clientEmail && isEmailConfigured()) {
     await sendMonthlyReportEmail(ws, data);

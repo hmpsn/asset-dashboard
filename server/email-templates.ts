@@ -364,6 +364,13 @@ export function renderMonthlyReport(data: {
   activityCount: number;
   topActivities: { title: string; createdAt: string }[];
   dashboardUrl?: string;
+  traffic?: {
+    clicks?: { current: number; previous: number; changePct: number };
+    impressions?: { current: number; previous: number; changePct: number };
+    users?: { current: number; previous: number; changePct: number };
+    sessions?: { current: number; previous: number; changePct: number };
+    pageviews?: { current: number; previous: number; changePct: number };
+  };
 }): { subject: string; html: string } {
   const d = data;
   const scoreColor = (d.siteScore ?? 0) >= 80 ? '#059669' : (d.siteScore ?? 0) >= 60 ? '#d97706' : '#dc2626';
@@ -378,6 +385,38 @@ export function renderMonthlyReport(data: {
       ${scoreDelta != null ? `<div style="font-size:12px;color:${scoreDelta >= 0 ? '#059669' : '#dc2626'};margin-top:2px;">${scoreDelta >= 0 ? '↑' : '↓'} ${Math.abs(scoreDelta)} from last audit</div>` : ''}
       ${d.totalPages ? `<div style="font-size:11px;color:#9ca3af;margin-top:2px;">${d.totalPages} pages · ${d.errors ?? 0} errors · ${d.warnings ?? 0} warnings</div>` : ''}
     </div>` : '';
+
+  // Traffic comparison section
+  const trafficCell = (label: string, m: { current: number; previous: number; changePct: number }) => {
+    const arrow = m.changePct >= 0 ? '↑' : '↓';
+    const color = m.changePct >= 0 ? '#059669' : '#dc2626';
+    return `<td style="padding:10px;background:#f8f9fa;border-radius:8px;text-align:center;width:50%;">
+      <div style="font-size:20px;font-weight:700;color:#111827;">${m.current.toLocaleString()}</div>
+      <div style="font-size:11px;color:#6b7280;margin-top:2px;">${label}</div>
+      <div style="font-size:11px;color:${color};margin-top:4px;">${arrow} ${Math.abs(m.changePct)}% vs prev period</div>
+    </td>`;
+  };
+
+  let trafficSection = '';
+  if (d.traffic) {
+    const rows: string[] = [];
+    if (d.traffic.clicks && d.traffic.impressions) {
+      rows.push(`<tr>${trafficCell('Search Clicks', d.traffic.clicks)}${trafficCell('Impressions', d.traffic.impressions)}</tr>`);
+    }
+    if (d.traffic.users && d.traffic.sessions) {
+      rows.push(`<tr>${trafficCell('Visitors', d.traffic.users)}${trafficCell('Sessions', d.traffic.sessions)}</tr>`);
+    }
+    if (d.traffic.pageviews) {
+      rows.push(`<tr>${trafficCell('Pageviews', d.traffic.pageviews)}<td></td></tr>`);
+    }
+    if (rows.length > 0) {
+      trafficSection = `
+        <div style="margin-top:20px;">
+          <div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Traffic Trends (28-day comparison)</div>
+          <table style="width:100%;border-collapse:separate;border-spacing:6px;">${rows.join('')}</table>
+        </div>`;
+    }
+  }
 
   const metricsGrid = `
     <table style="width:100%;border-collapse:separate;border-spacing:6px;">
@@ -412,7 +451,7 @@ export function renderMonthlyReport(data: {
       preheader: `Your ${d.monthName} summary for ${d.workspaceName}`,
       headline: 'Monthly Report',
       subtitle: `${d.workspaceName} · ${d.monthName}`,
-      body: scoreSection + metricsGrid + activitySection + pendingAlert,
+      body: scoreSection + trafficSection + metricsGrid + activitySection + pendingAlert,
       cta: d.dashboardUrl ? { label: 'Open Dashboard', url: d.dashboardUrl } : undefined,
       footer: 'Automated monthly summary from your web team',
     }),
