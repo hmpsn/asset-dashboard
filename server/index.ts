@@ -3493,19 +3493,25 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
       sendProgress('search_data', 'No GSC connected — skipping', 0.50);
     }
 
-    // 4b. Try to gather GA4 organic data if connected
+    // 4b. Try to gather GA4 organic data + conversions if connected
     let organicLandingPages: Awaited<ReturnType<typeof getGA4LandingPages>> = [];
     let organicOverview: Awaited<ReturnType<typeof getGA4OrganicOverview>> | null = null;
+    let ga4Conversions: Awaited<ReturnType<typeof getGA4Conversions>> = [];
+    let ga4EventsByPage: Awaited<ReturnType<typeof getGA4EventsByPage>> = [];
     if (ws.ga4PropertyId) {
       try {
-        sendProgress('search_data', 'Fetching GA4 organic search data...', 0.51);
-        const [landing, organic] = await Promise.all([
+        sendProgress('search_data', 'Fetching GA4 organic + conversion data...', 0.51);
+        const [landing, organic, conversions, eventPages] = await Promise.all([
           getGA4LandingPages(ws.ga4PropertyId, 28, 25, true).catch(() => []),
           getGA4OrganicOverview(ws.ga4PropertyId, 28).catch(() => null),
+          getGA4Conversions(ws.ga4PropertyId, 28).catch(() => []),
+          getGA4EventsByPage(ws.ga4PropertyId, 28, { limit: 50 }).catch(() => []),
         ]);
         organicLandingPages = landing;
         organicOverview = organic;
-        sendProgress('search_data', `Got ${landing.length} organic landing pages from GA4`, 0.52);
+        ga4Conversions = conversions;
+        ga4EventsByPage = eventPages;
+        sendProgress('search_data', `Got ${landing.length} organic landing pages, ${conversions.length} conversion events from GA4`, 0.52);
       } catch {
         sendProgress('search_data', 'GA4 organic data unavailable — continuing without it', 0.52);
       }
@@ -3780,6 +3786,57 @@ Rules:
         `- Avg engagement time: ${organicOverview.avgEngagementTime.toFixed(0)}s`;
     }
 
+    // GA4 conversions — which events fire and on which pages
+    if (ga4Conversions.length > 0) {
+      ga4Context += `\n\nCONVERSION EVENTS (GA4, last 28 days — these are the site's money actions):\n` +
+        ga4Conversions.slice(0, 10).map(c => `- "${c.eventName}": ${c.conversions} events, ${c.users} users (${c.rate}% conversion rate)`).join('\n');
+    }
+    if (ga4EventsByPage.length > 0) {
+      // Group events by page to find "money pages"
+      const pageEvents = new Map<string, { events: number; topEvent: string }>();
+      for (const ep of ga4EventsByPage) {
+        const existing = pageEvents.get(ep.pagePath);
+        if (!existing || ep.eventCount > existing.events) {
+          pageEvents.set(ep.pagePath, { events: ep.eventCount, topEvent: ep.eventName });
+        }
+      }
+      const topConvertingPages = [...pageEvents.entries()]
+        .sort((a, b) => b[1].events - a[1].events)
+        .slice(0, 8);
+      if (topConvertingPages.length > 0) {
+        ga4Context += `\n\nTOP CONVERTING PAGES (pages that drive the most events — protect these keywords):\n` +
+          topConvertingPages.map(([p, d]) => `- ${p}: ${d.events} events (top: "${d.topEvent}")`).join('\n');
+      }
+    }
+
+    // Audit data — pages with SEO errors + traffic = high-priority quick wins
+    let auditContext = '';
+    if (ws.webflowSiteId) {
+      try {
+        const trafficMap = await getAuditTrafficForWorkspace(ws);
+        const latestAudit = getLatestSnapshot(ws.webflowSiteId);
+        if (latestAudit && Object.keys(trafficMap).length > 0) {
+          const pagesWithIssues = latestAudit.audit.pages
+            .filter(p => p.issues.length > 0)
+            .map(p => {
+              const slug = p.slug.startsWith('/') ? p.slug : `/${p.slug}`;
+              const traffic = trafficMap[slug] || trafficMap[p.slug];
+              return { slug, issues: p.issues.length, score: p.score, traffic };
+            })
+            .filter(p => p.traffic && (p.traffic.clicks > 0 || p.traffic.pageviews > 0))
+            .sort((a, b) => ((b.traffic?.clicks || 0) + (b.traffic?.pageviews || 0)) - ((a.traffic?.clicks || 0) + (a.traffic?.pageviews || 0)))
+            .slice(0, 8);
+          if (pagesWithIssues.length > 0) {
+            auditContext = `\n\nSEO AUDIT: HIGH-TRAFFIC PAGES WITH ERRORS (fix these for immediate impact):\n` +
+              pagesWithIssues.map(p => `- ${p.slug}: ${p.issues} issues, score ${p.score}/100 | ${p.traffic!.clicks} clicks, ${p.traffic!.pageviews} pageviews`).join('\n');
+            if (latestAudit.audit.siteScore != null) {
+              auditContext += `\nOverall site health score: ${latestAudit.audit.siteScore}/100`;
+            }
+          }
+        }
+      } catch { /* non-critical */ }
+    }
+
     const hasSemrush = semrushContext.length > 0;
     const conflictNote = conflicts.length > 0
       ? `\n\nKEYWORD CONFLICTS to resolve (same keyword assigned to multiple pages):\n${conflicts.map(([kw, pages]) => `- "${kw}" → ${pages.join(', ')}`).join('\n')}\nFor each conflict, include a fix in "keywordFixes" — reassign one page to a different keyword.\n`
@@ -3789,7 +3846,7 @@ Rules:
 ${businessSection}
 Current keyword assignments (${allPageMappings.length} pages):
 ${kwSummary}
-${conflictNote}${gscSummary}${ga4Context}
+${conflictNote}${gscSummary}${ga4Context}${auditContext}
 ${semrushContext}
 
 Return JSON with this EXACT structure (do NOT include a pageMap — it's already done):
@@ -3826,6 +3883,9 @@ Rules:
 - If PERIOD COMPARISON shows declining metrics, flag defensive content gaps to recover traffic.
 - If GA4 shows high-bounce organic pages, include content-improvement quick wins for those pages.
 - If GA4 shows organic landing pages NOT in the keyword map, suggest adding them to the strategy.
+- If CONVERSION EVENTS data is available, prioritize keywords for pages that drive conversions. Protect "money pages" — never deprioritize their keywords.
+- If TOP CONVERTING PAGES data is available, mention specific conversion events in quickWin rationales (e.g., "this page drives 15 form_submissions — fixing its meta description could increase CTR").
+- If SEO AUDIT data shows high-traffic pages with errors, include them as quickWins with specific fix actions.
 - If COUNTRY data shows a dominant market, consider location-specific content gaps.
 ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.' : ''}
 - Return ONLY valid JSON, no markdown`;

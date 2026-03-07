@@ -73,11 +73,11 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 7. SEO Strategy (Keyword Mapping)
-**What it does:** Maps every page to primary/secondary keywords using GSC data, competitor analysis, SEMRush metrics (volume, KD%, intent), and AI. Batched parallel AI processing for large sites. Identifies content gaps, quick wins, low-hanging fruit, and keyword opportunities. Summary dashboard with performance tiers, search intent badges, and sortable/filterable page map. Runs as a background job with real-time progress. Smart page filtering excludes utility pages.
+**What it does:** Maps every page to primary/secondary keywords using GSC data, competitor analysis, SEMRush metrics (volume, KD%, intent), and AI. Batched parallel AI processing for large sites. Identifies content gaps, quick wins, low-hanging fruit, and keyword opportunities. Summary dashboard with performance tiers, search intent badges, and sortable/filterable page map. Runs as a background job with real-time progress. Smart page filtering excludes utility pages. **Conversion-aware**: GA4 conversion events and events-by-page data injected into the master synthesis prompt; AI protects "money pages" and references specific conversion events in quickWin rationales. **Audit-aware**: `getAuditTrafficForWorkspace` cross-references SEO audit errors with traffic data; high-traffic pages with issues surfaced as quickWins with specific fix actions.
 
-**Agency value:** Automates the most labor-intensive part of SEO — the keyword strategy document. Pulls real data from GSC + SEMRush instead of guesswork. Batched processing handles 100+ page sites efficiently.
+**Agency value:** Automates the most labor-intensive part of SEO — the keyword strategy document. Pulls real data from GSC + GA4 conversions + SEMRush + audit intelligence instead of guesswork. Batched processing handles 100+ page sites efficiently. Conversion data ensures the strategy never deprioritizes pages that drive revenue.
 
-**Client value:** A clear roadmap: which pages target which keywords, what content is missing, and where the quick wins are. Interactive strategy view with "Request This Topic" buttons.
+**Client value:** A clear roadmap: which pages target which keywords, what content is missing, and where the quick wins are. Interactive strategy view with "Request This Topic" buttons. Strategy now reflects which pages actually convert, not just which pages rank.
 
 **Mutual:** Replaces static PDF strategy decks with a living, data-driven plan both sides can reference and act on.
 
@@ -530,6 +530,8 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - ~~Admin chat conversation memory~~: ✅ Shipped — Full parity with client chat: sessionId, addMessage, buildConversationContext, history UI, auto-summarize.
 - ~~Chat activity logging~~: ✅ Shipped — First exchange of each new chat session logged to activity log (`chat_session` type) for both client and admin endpoints.
 - ~~Audit traffic in chatbot~~: ✅ Shipped — `getAuditTrafficForWorkspace` cached helper injects high-traffic pages with SEO errors into both chat system prompts.
+- ~~Strategy: conversion + audit data~~: ✅ Shipped — GA4 conversions + events by page + audit high-traffic error pages injected into strategy master prompt with money-page protection rules.
+- **Content brief: GA4 page performance** — Inject GA4 landing page performance (bounce rate, sessions, engagement) into brief generation for existing-page content refreshes.
 
 ### Content Pipeline
 - ~~Service tiers~~: ✅ Shipped — Brief vs. Full Post with configurable pricing.

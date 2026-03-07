@@ -56,15 +56,27 @@ Priority tiers:
 | 10 | ~~**Admin GA4 dashboard upgrade**~~ | Memory/Roadmap | 3-4h | 🟠 P1 | ✅ Shipped in Sprint 1 |
 | 11 | **Client dashboard: simplified analytics data** — Simplified GA4 organic overview, new vs returning, landing pages for client portal | Memory/Roadmap | 2-3h | 🟠 P1 | Depends on #10 for admin-side data |
 
-### Sprint 4: Intelligence Upgrades (6-9 hrs)
-*Rationale: Cross-pollinate data across tools for smarter recommendations.*
+### ~~Sprint 4: Intelligence Upgrades~~ ✅ SHIPPED
+*Shipped: March 7, 2026*
 
-| # | Item | Source | Est. | Priority | Notes |
+| # | Item | Source | Est. | Priority | Status |
 |---|------|--------|:----:|:--------:|-------|
-| 12 | **SEO Audit Intelligence** — Cross-reference audit findings with GSC/GA4 performance data. "This page has a missing meta description AND gets 500 impressions/month — fix this first" | Memory/Roadmap | 3-4h | 🟠 P1 | High impact: prioritizes audit fixes by actual traffic |
-| 13 | **Content brief enrichment** — Inject real GSC queries + GA4 landing page performance into AI brief generation | Memory/Roadmap | 1-2h | 🟠 P1 | Quick win: better briefs with data already available |
-| 14 | **Monthly report enrichment** — Period comparison data in auto-generated report narratives | Memory/Roadmap | 1h | 🟡 P2 | Small effort, nice polish |
-| 15 | **AI chatbot: conversation memory** — Session history, cross-session summaries, client preferences | AI_CHATBOT_ROADMAP Phase 4 | 3-4h | 🟡 P2 | Nice but not critical yet |
+| 12 | ~~**SEO Audit Intelligence**~~ | Memory/Roadmap | 3-4h | 🟠 P1 | ✅ Shipped — `/api/audit-traffic/:siteId` + traffic badges on audit page cards + sort by traffic toggle |
+| 13 | **Content brief enrichment** — Inject GA4 landing page performance into brief generation for existing-page refreshes | Memory/Roadmap | 1-2h | 🟠 P1 | Partially done — briefs use GSC queries + SEMRush; GA4 page performance not yet wired |
+| 14 | ~~**Monthly report enrichment**~~ | Memory/Roadmap | 1h | 🟡 P2 | ✅ Shipped — Traffic trends + chat topic summaries in email template |
+| 15 | ~~**AI chatbot: conversation memory**~~ | AI_CHATBOT_ROADMAP Phase 4 | 3-4h | 🟡 P2 | ✅ Shipped — Both client + admin chat: sessions, history UI, cross-session summaries, auto-summarize |
+
+### ~~Sprint 4b: Intelligence Wiring~~ ✅ SHIPPED
+*Shipped: March 7, 2026*
+
+| # | Item | Source | Est. | Priority | Status |
+|---|------|--------|:----:|:--------:|-------|
+| 58 | ~~**Admin chat: conversation memory**~~ | Intelligence Wiring | 30m | 🔴 P0 | ✅ Shipped — Full parity with client chat |
+| 59 | ~~**Client chat: comparison data**~~ | Intelligence Wiring | 15m | 🔴 P0 | ✅ Shipped — Period comparison + organic data in AI context |
+| 60 | ~~**Chat activity logging**~~ | Intelligence Wiring | 30m | 🔴 P0 | ✅ Shipped — `chat_session` activity type, first exchange logged |
+| 61 | ~~**Audit traffic in chatbot**~~ | Intelligence Wiring | 45m | 🟠 P1 | ✅ Shipped — Cached helper + high-traffic error pages in both chat prompts |
+| 62 | ~~**Monthly report: chat topics**~~ | Intelligence Wiring | 30m | � P1 | ✅ Shipped — "Topics You Asked About" section from session summaries |
+| 63 | ~~**Strategy: conversion data**~~ | Intelligence Wiring | 30m | 🟠 P1 | ✅ Shipped — GA4 conversions + events by page + audit errors in strategy prompt |
 
 ### Sprint 5: Team & Permissions (7-9 hrs)
 *Rationale: Only needed when actually hiring/contracting. Do when the need arises.*
