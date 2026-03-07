@@ -3853,8 +3853,8 @@ app.get('/api/content-requests/:workspaceId/:id', (req, res) => {
 });
 
 app.patch('/api/content-requests/:workspaceId/:id', (req, res) => {
-  const { status, internalNote } = req.body;
-  const updated = updateContentRequest(req.params.workspaceId, req.params.id, { status, internalNote });
+  const { status, internalNote, deliveryUrl, deliveryNotes } = req.body;
+  const updated = updateContentRequest(req.params.workspaceId, req.params.id, { status, internalNote, deliveryUrl, deliveryNotes });
   if (!updated) return res.status(404).json({ error: 'Request not found' });
   // Send email when brief is sent to client review
   if (status === 'client_review') {

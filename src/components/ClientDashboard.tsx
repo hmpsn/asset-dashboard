@@ -5,7 +5,7 @@ import {
   Target, Zap, Shield, MessageSquare, X, ChevronDown, ChevronUp,
   CheckCircle2, Info, LayoutDashboard, LineChart, Lock, Trophy,
   Users, Globe, Activity, Filter, ClipboardCheck, Check, Edit3,
-  Sun, Moon, Plus, Paperclip, FileText, Download,
+  Sun, Moon, Plus, Paperclip, FileText, Download, ExternalLink,
 } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 import { ChartPointDetail } from './ChartPointDetail';
@@ -53,6 +53,7 @@ interface ClientContentRequest {
   status: 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'delivered' | 'declined';
   source?: 'strategy' | 'client'; briefId?: string;
   serviceType?: 'brief_only' | 'full_post'; upgradedAt?: string;
+  deliveryUrl?: string; deliveryNotes?: string;
   comments?: { id: string; author: 'client' | 'team'; content: string; createdAt: string }[];
   requestedAt: string; updatedAt: string;
 }
@@ -2430,6 +2431,20 @@ export function ClientDashboard({ workspaceId }: Props) {
                           <button onClick={() => { setDeclineReqId(req.id); setDeclineReason(''); }} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-zinc-800 text-xs text-zinc-500 hover:text-red-400 transition-colors">
                             <X className="w-3.5 h-3.5" /> Decline
                           </button>
+                        </div>
+                      )}
+
+                      {/* Delivery link */}
+                      {req.status === 'delivered' && req.deliveryUrl && (
+                        <div className="bg-green-500/5 border border-green-500/20 rounded-xl p-4 flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                            <ExternalLink className="w-4 h-4 text-green-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-medium text-green-300 mb-0.5">Your content is ready</div>
+                            <a href={req.deliveryUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] text-green-400 hover:text-green-300 underline underline-offset-2 truncate block">{req.deliveryUrl}</a>
+                            {req.deliveryNotes && <div className="text-[11px] text-zinc-400 mt-1">{req.deliveryNotes}</div>}
+                          </div>
                         </div>
                       )}
 

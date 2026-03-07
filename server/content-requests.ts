@@ -36,6 +36,8 @@ export interface ContentTopicRequest {
   source?: 'strategy' | 'client';
   serviceType?: 'brief_only' | 'full_post';
   upgradedAt?: string;
+  deliveryUrl?: string;
+  deliveryNotes?: string;
   comments?: ContentRequestComment[];
   requestedAt: string;
   updatedAt: string;
@@ -114,7 +116,7 @@ export function createContentRequest(
 export function updateContentRequest(
   workspaceId: string,
   id: string,
-  updates: Partial<Pick<ContentTopicRequest, 'status' | 'briefId' | 'internalNote' | 'declineReason' | 'clientFeedback' | 'serviceType' | 'upgradedAt'>>
+  updates: Partial<Pick<ContentTopicRequest, 'status' | 'briefId' | 'internalNote' | 'declineReason' | 'clientFeedback' | 'serviceType' | 'upgradedAt' | 'deliveryUrl' | 'deliveryNotes'>>
 ): ContentTopicRequest | null {
   const items = read(workspaceId);
   const idx = items.findIndex(r => r.id === id);
