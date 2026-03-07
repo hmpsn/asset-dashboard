@@ -5283,133 +5283,49 @@ app.post('/api/jobs', async (req, res) => {
   }
 });
 
-// --- Roadmap Persistence (full items + statuses in one file) ---
-const ROADMAP_FILE = path.join(getDataDir('admin'), 'roadmap.json');
+// --- Roadmap Persistence ---
+// Canonical source: data/roadmap.json in the repo (tracked in git).
+// Runtime copy: written to the data dir for UI status updates via PATCH.
+// On load: runtime copy wins if it exists; otherwise seeds from the repo file.
+const ROADMAP_RUNTIME_FILE = path.join(getDataDir('admin'), 'roadmap.json');
+const ROADMAP_REPO_FILE = path.join(__dirname, '..', 'data', 'roadmap.json');
 const ROADMAP_STATUS_FILE = path.join(getDataDir('admin'), 'roadmap-status.json');
 
-function getDefaultRoadmap() {
-  return {
-    sprints: [
-      {
-        id: 'sprint-1', name: 'AI Chatbot Revenue Engine', hours: '10-13',
-        rationale: 'Fastest path to visible client value and upsell potential. No dependencies.',
-        items: [
-          { id: 1, title: 'Client AI: Full dashboard context', source: 'AI_CHATBOT_ROADMAP Phase 1', est: '3-4h', priority: 'P0', notes: 'Feed audit, strategy, ranks, content pipeline, approvals, activity, annotations into chatbot', status: 'done' },
-          { id: 2, title: 'Client AI: Global knowledge base', source: 'AI_CHATBOT_ROADMAP Phase 2', est: '4-5h', priority: 'P0', notes: 'Per-workspace knowledgeBase field + knowledge-docs/ folder, injected into both chatbots', status: 'done' },
-          { id: 3, title: 'Client AI: Sales engine behavior', source: 'AI_CHATBOT_ROADMAP Phase 3', est: '3-4h', priority: 'P0', notes: '8 revenue hooks, Insights Engine branding, warm handoff pattern', status: 'done' },
-          { id: 53, title: 'Admin AI chat panel', source: 'Sprint 1 addition', est: '2-3h', priority: 'P0', notes: '/api/admin-chat endpoint + AdminChat.tsx with internal analyst persona', status: 'done' },
-          { id: 54, title: 'Admin GA4 dashboard upgrade', source: 'Memory/Roadmap', est: '3-4h', priority: 'P1', notes: 'Sparklines, period comparison, organic, new vs returning, conversions', status: 'done' },
-        ],
-      },
-      {
-        id: 'sprint-2', name: 'Stripe Payments & Auth Foundation', hours: '20-28',
-        rationale: 'Monetize content deliverables and establish user identity. Revenue + infrastructure.',
-        items: [
-          { id: 4, title: 'Stripe integration: content payments', source: 'User Priority', est: '5-7h', priority: 'P0', notes: 'Accept payments for content briefs, full blog posts, and keyword strategies. Stripe Checkout or Payment Links, webhook for fulfillment status, payment tracking per workspace', status: 'pending' },
-          { id: 5, title: 'Internal user accounts', source: 'AUTH_ROADMAP Phase 1', est: '6-8h', priority: 'P0', notes: 'User model, bcrypt, JWT/sessions, login by email, req.user on all routes', status: 'pending' },
-          { id: 6, title: 'Workspace access control', source: 'AUTH_ROADMAP Phase 2', est: '3-4h', priority: 'P0', notes: 'Restrict workspaces by user, role-based middleware', status: 'pending' },
-          { id: 7, title: 'Client user accounts', source: 'AUTH_ROADMAP Phase 4', est: '6-8h', priority: 'P0', notes: 'Individual client logins, client_admin/member roles, team management UI', status: 'pending' },
-        ],
-      },
-      {
-        id: 'sprint-3', name: 'Data Quality & Dashboard Polish', hours: '8-12',
-        rationale: 'Clean up recently shipped work, extend to client side.',
-        items: [
-          { id: 8, title: 'Admin Search Console: primitives audit', source: 'Memory/Roadmap', est: '1-2h', priority: 'P1', notes: 'Verify new panels use shared UI primitives', status: 'pending' },
-          { id: 9, title: 'Client dashboard: simplified search data', source: 'Memory/Roadmap', est: '3-4h', priority: 'P1', notes: 'Traffic growth direction, top pages (plain language), device split', status: 'pending' },
-          { id: 10, title: 'Admin GA4 dashboard upgrade', source: 'Memory/Roadmap', est: '3-4h', priority: 'P1', notes: 'Shipped in Sprint 1', status: 'done' },
-          { id: 11, title: 'Client dashboard: simplified analytics data', source: 'Memory/Roadmap', est: '2-3h', priority: 'P1', notes: 'Simplified GA4 organic overview for client portal', status: 'pending' },
-        ],
-      },
-      {
-        id: 'sprint-4', name: 'Intelligence Upgrades', hours: '6-9',
-        rationale: 'Cross-pollinate data across tools for smarter recommendations.',
-        items: [
-          { id: 12, title: 'SEO Audit Intelligence', source: 'Memory/Roadmap', est: '3-4h', priority: 'P1', notes: 'Cross-reference audit findings with GSC/GA4 performance data', status: 'pending' },
-          { id: 13, title: 'Content brief enrichment', source: 'Memory/Roadmap', est: '1-2h', priority: 'P1', notes: 'Inject real GSC queries + GA4 landing page performance', status: 'pending' },
-          { id: 14, title: 'Monthly report enrichment', source: 'Memory/Roadmap', est: '1h', priority: 'P2', notes: 'Period comparison data in auto-generated report narratives', status: 'pending' },
-          { id: 15, title: 'AI chatbot: conversation memory', source: 'AI_CHATBOT_ROADMAP Phase 4', est: '3-4h', priority: 'P2', notes: 'Session history, cross-session summaries, client preferences', status: 'pending' },
-        ],
-      },
-      {
-        id: 'sprint-5', name: 'Team & Permissions', hours: '7-9',
-        rationale: 'Only needed when actually hiring/contracting.',
-        items: [
-          { id: 16, title: 'Internal team management', source: 'AUTH_ROADMAP Phase 3', est: '4-5h', priority: 'P2', notes: 'Invite, manage, assign workspaces, disable accounts', status: 'pending' },
-          { id: 17, title: 'Permission-based feature access', source: 'AUTH_ROADMAP Phase 5', est: '3-4h', priority: 'P2', notes: 'Fine-grained: client_member view-only on approvals', status: 'pending' },
-        ],
-      },
-      {
-        id: 'sprint-6', name: 'Platform Polish', hours: '10-15',
-        rationale: 'Quality-of-life improvements. Do in batches.',
-        items: [
-          { id: 18, title: 'AI chatbot: proactive insights', source: 'AI_CHATBOT_ROADMAP Phase 5', est: '4-5h', priority: 'P2', notes: 'Auto-surface 2-3 contextual insights on dashboard load', status: 'pending' },
-          { id: 19, title: 'Custom date range picker', source: 'FEATURE_AUDIT', est: '2-3h', priority: 'P2', notes: 'Replace preset buttons with full calendar selector', status: 'pending' },
-          { id: 20, title: 'Notification preferences', source: 'AUTH_ROADMAP Phase 6', est: '2-3h', priority: 'P3', notes: 'Per-user email settings, digest frequency, in-app bell', status: 'pending' },
-          { id: 21, title: 'Content calendar', source: 'FEATURE_AUDIT', est: '3-4h', priority: 'P3', notes: 'Visual calendar of content in production with due dates', status: 'pending' },
-        ],
-      },
-      {
-        id: 'backlog', name: 'Backlog', hours: '80+',
-        rationale: 'Revisit quarterly. Do when a specific need justifies it.',
-        items: [
-          { id: 22, title: 'AI chatbot: multi-modal responses', source: 'AI_CHATBOT_ROADMAP Phase 6', est: '3-4h', priority: 'P3', notes: 'Inline charts, data tables, export', status: 'pending' },
-          { id: 23, title: 'Writer assignment', source: 'FEATURE_AUDIT', est: '2-3h', priority: 'P3', notes: 'Assign content to specific writers', status: 'pending' },
-          { id: 24, title: 'Multi-competitor analysis', source: 'FEATURE_AUDIT', est: '3-4h', priority: 'P3', notes: 'Compare against 2-3 competitors simultaneously', status: 'pending' },
-          { id: 25, title: 'Client onboarding wizard', source: 'ACTION_PLAN', est: '2-3h', priority: 'P0', notes: 'Guided first-time experience for new clients', status: 'pending' },
-          { id: 26, title: 'Webhook / Zapier triggers', source: 'ACTION_PLAN', est: '3-4h', priority: 'P0', notes: 'Fire webhooks on key events', status: 'pending' },
-          { id: 27, title: 'White-label domain support', source: 'ACTION_PLAN', est: '2-3h', priority: 'P1', notes: 'CNAME + reverse proxy for client portals', status: 'pending' },
-          { id: 28, title: 'ROI calculator / value dashboard', source: 'ACTION_PLAN', est: '3-4h', priority: 'P1', notes: 'Show dollar value of organic traffic', status: 'pending' },
-          { id: 29, title: 'Automated competitive monitoring', source: 'ACTION_PLAN', est: '3-4h', priority: 'P1', notes: 'Monthly competitor audit, alert on improvements', status: 'pending' },
-          { id: 30, title: '"What happened this month" summary', source: 'ACTION_PLAN', est: '2-3h', priority: 'P1', notes: 'Auto-generated plain-English monthly summary', status: 'pending' },
-          { id: 31, title: 'Content performance tracker', source: 'ACTION_PLAN', est: '3-4h', priority: 'P2', notes: 'Track GSC/GA4 performance per published post', status: 'pending' },
-          { id: 32, title: 'Shared notes / wiki per workspace', source: 'ACTION_PLAN', est: '2-3h', priority: 'P2', notes: 'Team-internal notes about a client', status: 'pending' },
-          { id: 33, title: 'AI anomaly detection', source: 'ACTION_PLAN', est: '4-5h', priority: 'P2', notes: 'Background job to flag traffic/conversion anomalies', status: 'pending' },
-          { id: 34, title: 'Client NPS survey', source: 'ACTION_PLAN', est: '2h', priority: 'P2', notes: 'Periodic in-dashboard satisfaction survey', status: 'pending' },
-          { id: 35, title: 'Content delivery attachments', source: 'FEATURE_AUDIT', est: '2-3h', priority: 'P2', notes: 'Attach Google Docs or uploaded files to completed requests', status: 'pending' },
-          { id: 36, title: 'GSC 404 import for redirect scanner', source: 'FEATURE_AUDIT', est: '2-3h', priority: 'P2', notes: 'Pull crawl errors from GSC to seed redirect scanner', status: 'pending' },
-          { id: 37, title: 'Audit historical trend charts', source: 'FEATURE_AUDIT', est: '3-4h', priority: 'P2', notes: 'Track audit score over time per-page, not just site-wide', status: 'pending' },
-          { id: 38, title: 'Schema auto-schedule', source: 'FEATURE_AUDIT', est: '2-3h', priority: 'P3', notes: 'Re-generate schemas on cadence, flag stale pages', status: 'pending' },
-          { id: 39, title: 'Competitor historical comparisons', source: 'FEATURE_AUDIT', est: '3-4h', priority: 'P3', notes: 'Track competitor gap over time', status: 'pending' },
-          { id: 40, title: 'Competitor keyword overlap', source: 'FEATURE_AUDIT', est: '3-4h', priority: 'P3', notes: 'Show shared keywords and where you win/lose', status: 'pending' },
-          { id: 41, title: 'Historical redirect comparison', source: 'FEATURE_AUDIT', est: '2-3h', priority: 'P3', notes: 'Track redirect status over time, detect new 404s', status: 'pending' },
-          { id: 42, title: 'Full-site PageSpeed scan', source: 'FEATURE_AUDIT', est: '3-4h', priority: 'P3', notes: 'Multi-page PSI scan as background job', status: 'pending' },
-          { id: 43, title: 'Accessibility audit expansion', source: 'FEATURE_AUDIT', est: '3-4h', priority: 'P3', notes: 'WCAG contrast, ARIA, heading order, form labels', status: 'pending' },
-          { id: 44, title: 'WCAG AA full compliance', source: 'FEATURE_AUDIT', est: '3-4h', priority: 'P3', notes: 'Focus indicators, keyboard nav for all interactive elements', status: 'pending' },
-          { id: 45, title: 'GSC: URL Inspection API', source: 'Memory/Roadmap', est: '3-4h', priority: 'P4', notes: 'Per-URL indexing status, crawl info', status: 'pending' },
-          { id: 46, title: 'GA4: Exit pages + attribution', source: 'Memory/Roadmap', est: '3-4h', priority: 'P4', notes: 'Advanced analytics', status: 'pending' },
-          { id: 47, title: 'Webflow Enterprise API: 301 redirects', source: 'FEATURE_AUDIT', est: '1-2h', priority: 'P4', notes: 'Push rules via API (Enterprise-only)', status: 'pending' },
-          { id: 48, title: 'Sales report: branded PDF export', source: 'FEATURE_AUDIT', est: '3-4h', priority: 'P4', notes: 'Downloadable prospect reports with agency branding', status: 'pending' },
-          { id: 49, title: 'Sales report: email delivery', source: 'FEATURE_AUDIT', est: '2h', priority: 'P4', notes: 'Send reports directly to prospects', status: 'pending' },
-          { id: 50, title: 'Concurrent background job limits', source: 'FEATURE_AUDIT', est: '1-2h', priority: 'P4', notes: 'Prevent duplicate audits on same site', status: 'pending' },
-          { id: 51, title: 'Heavy dependency audit / tree-shaking', source: 'FEATURE_AUDIT', est: '2h', priority: 'P4', notes: 'Verify Lucide tree-shaking, audit chart libs', status: 'pending' },
-          { id: 52, title: 'Responsive mobile layout', source: 'FEATURE_AUDIT', est: '4-6h', priority: 'P4', notes: 'Sidebar → bottom nav, stacked cards on small screens', status: 'pending' },
-        ],
-      },
-    ],
-  };
-}
-
 function loadRoadmap() {
+  // 1. Runtime copy (has latest UI status updates)
   try {
-    if (fs.existsSync(ROADMAP_FILE)) {
-      return JSON.parse(fs.readFileSync(ROADMAP_FILE, 'utf-8'));
+    if (fs.existsSync(ROADMAP_RUNTIME_FILE)) {
+      return JSON.parse(fs.readFileSync(ROADMAP_RUNTIME_FILE, 'utf-8'));
     }
   } catch { /* fall through */ }
-  // Migrate from old status-only file if it exists
-  const defaultData = getDefaultRoadmap();
+
+  // 2. Tracked repo file (canonical structure + statuses)
+  let data: ReturnType<typeof JSON.parse> | null = null;
+  try {
+    if (fs.existsSync(ROADMAP_REPO_FILE)) {
+      data = JSON.parse(fs.readFileSync(ROADMAP_REPO_FILE, 'utf-8'));
+    }
+  } catch { /* fall through */ }
+
+  if (!data) {
+    data = { sprints: [] };
+  }
+
+  // Migrate from legacy status-only file if it exists
   if (fs.existsSync(ROADMAP_STATUS_FILE)) {
     try {
       const statuses = JSON.parse(fs.readFileSync(ROADMAP_STATUS_FILE, 'utf-8')) as Record<string, string>;
-      for (const sprint of defaultData.sprints) {
+      for (const sprint of data.sprints) {
         for (const item of sprint.items) {
           if (statuses[String(item.id)]) item.status = statuses[String(item.id)];
         }
       }
     } catch { /* ignore */ }
   }
-  fs.writeFileSync(ROADMAP_FILE, JSON.stringify(defaultData, null, 2));
-  return defaultData;
+
+  // Write runtime copy so future reads are fast
+  fs.writeFileSync(ROADMAP_RUNTIME_FILE, JSON.stringify(data, null, 2));
+  return data;
 }
 
 // GET full roadmap (sprints + items + statuses)
@@ -5420,7 +5336,7 @@ app.get('/api/roadmap', (_req, res) => {
 // PUT full roadmap (replace entire structure)
 app.put('/api/roadmap', (req, res) => {
   try {
-    fs.writeFileSync(ROADMAP_FILE, JSON.stringify(req.body, null, 2));
+    fs.writeFileSync(ROADMAP_RUNTIME_FILE, JSON.stringify(req.body, null, 2));
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
@@ -5436,7 +5352,7 @@ app.patch('/api/roadmap/item/:id', (req, res) => {
       const item = sprint.items.find((i: { id: number }) => i.id === itemId);
       if (item) {
         Object.assign(item, req.body);
-        fs.writeFileSync(ROADMAP_FILE, JSON.stringify(data, null, 2));
+        fs.writeFileSync(ROADMAP_RUNTIME_FILE, JSON.stringify(data, null, 2));
         return res.json({ ok: true, item });
       }
     }
