@@ -3,7 +3,7 @@ import {
   Loader2, Search, TrendingDown, TrendingUp, Eye, MousePointerClick,
   BarChart3, ArrowUpDown, Sparkles, Send, AlertTriangle,
   Target, Zap, Shield, MessageSquare, X, ChevronDown, ChevronUp,
-  CheckCircle2, LayoutDashboard, LineChart, Lock, Trophy,
+  CheckCircle2, LineChart, Lock, Trophy,
   Activity, Filter, ClipboardCheck, Check, Edit3,
   Sun, Moon, Plus, Paperclip, FileText, Download, ExternalLink,
 } from 'lucide-react';
@@ -173,7 +173,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
       .then((data: WorkspaceInfo) => {
         if (!data.id) { setError('Workspace not found'); setLoading(false); return; }
         setWs(data);
-        document.title = `${data.name} — Dashboard`;
+        document.title = `${data.name} — Insights Engine`;
         // Check if already authenticated via sessionStorage
         if (data.requiresPassword) {
           const stored = sessionStorage.getItem(`dash_auth_${workspaceId}`);
@@ -799,7 +799,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
 
   const strategyLocked = !ws?.seoClientView;
   const NAV = [
-    { id: 'overview' as ClientTab, label: 'Overview', icon: LayoutDashboard, locked: false },
+    { id: 'overview' as ClientTab, label: 'Insights', icon: Sparkles, locked: false },
     { id: 'strategy' as ClientTab, label: 'SEO Strategy', icon: Target, locked: strategyLocked },
     { id: 'health' as ClientTab, label: 'Site Health', icon: Shield, locked: false },
     ...(ws?.analyticsClientView !== false ? [
@@ -821,7 +821,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
             <div className="w-px h-8 bg-zinc-800" />
             <div>
               <h1 className="text-lg font-semibold">{ws.name}</h1>
-              <p className="text-xs text-zinc-500 mt-0.5">Performance Dashboard{(overview || audit || ga4Overview) && <span className="ml-2 text-zinc-500">· Updated {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}</p>
+              <p className="text-xs text-zinc-500 mt-0.5">Insights Engine{(overview || audit || ga4Overview) && <span className="ml-2 text-zinc-500">· Updated {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -879,7 +879,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
           {/* Welcome header */}
           <div className="mb-1">
             <h2 className="text-base font-semibold text-zinc-100">Welcome back</h2>
-            <p className="text-xs text-zinc-500 mt-0.5">Here's what's happening with your site</p>
+            <p className="text-xs text-zinc-500 mt-0.5">Here are your latest insights</p>
           </div>
 
           {/* Action-needed banner */}
