@@ -243,8 +243,7 @@ function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
         </div>
         <button
           onClick={() => setAdding(!adding)}
-          className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium hover:bg-zinc-800 transition-colors"
-          className="text-teal-400"
+          className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium hover:bg-zinc-800 transition-colors text-teal-400"
         >
           <Plus className="w-3 h-3" /> Add
         </button>
@@ -1068,6 +1067,31 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
         </button>
       </div>
 
+      {/* Contextual tool tips based on audit findings */}
+      {(() => {
+        const allIssues = data.pages.flatMap(p => p.issues);
+        const hasMetaIssues = allIssues.some(i => ['missing_title', 'title_length', 'missing_meta', 'meta_length', 'missing_h1', 'duplicate_h1'].includes(i.check));
+        const hasRedirectIssues = allIssues.some(i => ['redirect_chain', 'broken_link', 'missing_canonical'].includes(i.check));
+        const hasPerformanceIssues = allIssues.some(i => i.category === 'performance');
+        const hasSchemaIssues = allIssues.some(i => ['missing_schema', 'schema_errors'].includes(i.check));
+        const tips: { icon: typeof Globe; label: string; tool: string }[] = [];
+        if (hasMetaIssues) tips.push({ icon: FileText, label: 'Fix titles & meta descriptions in the SEO Editor', tool: 'SEO Editor' });
+        if (hasRedirectIssues) tips.push({ icon: AlertTriangle, label: 'Review redirect chains in the Redirects tool', tool: 'Redirects' });
+        if (hasSchemaIssues) tips.push({ icon: Globe, label: 'Generate structured data with the Schema tool', tool: 'Schema' });
+        if (hasPerformanceIssues) tips.push({ icon: TrendingDown, label: 'Check page weight & speed in the Performance tab', tool: 'Performance' });
+        if (tips.length === 0) return null;
+        return (
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-zinc-900/50 border border-zinc-800 flex-wrap">
+            <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mr-1">Quick fixes →</span>
+            {tips.map(tip => (
+              <span key={tip.tool} className="flex items-center gap-1 text-[11px] text-teal-400/80 bg-teal-500/5 px-2 py-1 rounded border border-teal-500/10">
+                <tip.icon className="w-3 h-3" /> {tip.label}
+              </span>
+            ))}
+          </div>
+        );
+      })()}
+
       {/* Scheduled Audit Settings */}
       {workspaceId && (
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
@@ -1180,7 +1204,6 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
           <button
             onClick={handleSaveAndShare}
             disabled={saving}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors"
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors bg-teal-400 text-[#0f1219]"
           >
             <Share2 className="w-3.5 h-3.5" /> {saving ? 'Saving...' : 'Save & Share'}
@@ -1226,13 +1249,13 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
             <div className="text-xs font-medium text-teal-400">Report saved! Share this link with clients:</div>
             <div className="text-xs text-zinc-300 truncate mt-0.5 font-mono">{shareUrl}</div>
           </div>
-          <button onClick={copyShareUrl} className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors bg-teal-400 text-[#0f1219]">
+          <button onClick={copyShareUrl} className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors bg-teal-400 text-[#0f1219]">
             <Copy className="w-3 h-3" /> {copied ? 'Copied!' : 'Copy'}
           </button>
           <a href={shareUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md hover:bg-white/10 text-teal-400">
             <ExternalLink className="w-3.5 h-3.5" />
           </a>
-          <button onClick={() => setShareUrl(null)} className="p-1 rounded hover:bg-white/10">
+          <button onClick={() => setShareUrl(null)} className="p-1 rounded hover:bg-white/10" aria-label="Dismiss share URL">
             <X className="w-3.5 h-3.5 text-zinc-400" />
           </button>
         </div>

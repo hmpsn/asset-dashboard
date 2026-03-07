@@ -526,6 +526,7 @@ export function RedirectManager({ siteId }: Props) {
               {acceptedRules.length > 0 && (
                 <p><strong className="text-zinc-400">Ready to apply:</strong> You have {acceptedRules.length} accepted redirect rule{acceptedRules.length !== 1 ? 's' : ''}. Export as CSV and import in Webflow Settings → Hosting → 301 Redirects.</p>
               )}
+              <p><strong className="text-teal-400">Tip:</strong> Run a <strong className="text-teal-400">Site Audit</strong> to find pages linking to these broken URLs, or check <strong className="text-teal-400">Dead Links</strong> for a comprehensive link scan.</p>
             </div>
           </div>
         </div>

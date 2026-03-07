@@ -358,7 +358,7 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
               <span className="text-sm font-medium text-zinc-200">SEO AI Assistant</span>
               <span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">GPT-4o</span>
             </div>
-            <button onClick={() => setChatOpen(false)} className="text-zinc-500 hover:text-zinc-300"><X className="w-4 h-4" /></button>
+            <button onClick={() => setChatOpen(false)} className="text-zinc-500 hover:text-zinc-300" aria-label="Close chat"><X className="w-4 h-4" /></button>
           </div>
 
           {/* Quick questions */}
@@ -672,6 +672,21 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
                     <div className="text-[11px] text-zinc-500">Opportunities</div>
                   </div>
                 </div>
+              </div>
+
+              {/* Cross-link tips */}
+              <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-zinc-900/50 border border-zinc-800 flex-wrap">
+                <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mr-1">Next steps →</span>
+                {insights.lowHanging.length > 0 && (
+                  <span className="flex items-center gap-1 text-[11px] text-teal-400/80 bg-teal-500/5 px-2 py-1 rounded border border-teal-500/10">
+                    <Target className="w-3 h-3" /> Build a <strong className="text-teal-400">Keyword Strategy</strong> to organize these opportunities
+                  </span>
+                )}
+                {insights.ctrOpps.length > 0 && (
+                  <span className="flex items-center gap-1 text-[11px] text-teal-400/80 bg-teal-500/5 px-2 py-1 rounded border border-teal-500/10">
+                    <Zap className="w-3 h-3" /> Improve CTR by rewriting titles in the <strong className="text-teal-400">SEO Editor</strong>
+                  </span>
+                )}
               </div>
             </div>
           )}

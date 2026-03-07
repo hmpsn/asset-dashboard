@@ -267,6 +267,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
             <div className="text-[11px] text-zinc-500 space-y-1">
               <p><strong className="text-zinc-400">How to implement:</strong> Open each page in the Webflow Designer and add links using the suggested anchor text. Place links naturally within the page's body content where they make contextual sense.</p>
               <p><strong className="text-zinc-400">SEO impact:</strong> Internal links help search engines discover and understand page relationships. They also distribute page authority (PageRank) across your site, which can improve rankings for linked pages.</p>
+              <p><strong className="text-teal-400">Tip:</strong> Use the <strong className="text-teal-400">SEO Editor</strong> from the sidebar to update page content directly, or run a <strong className="text-teal-400">Site Audit</strong> to validate the changes.</p>
             </div>
           </div>
         </div>

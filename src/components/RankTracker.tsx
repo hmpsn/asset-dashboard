@@ -171,7 +171,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
           {sorted.map(rank => (
             <div key={rank.query} className="grid grid-cols-[1fr,80px,80px,80px,80px,60px] gap-2 px-4 py-2.5 items-center border-b border-zinc-800/50 last:border-0 hover:bg-zinc-800/20">
               <div className="flex items-center gap-2 min-w-0">
-                <button onClick={() => togglePin(rank.query)} className={`flex-shrink-0 ${rank.pinned ? 'text-amber-400' : 'text-zinc-700 hover:text-zinc-400'}`}>
+                <button onClick={() => togglePin(rank.query)} className={`flex-shrink-0 ${rank.pinned ? 'text-amber-400' : 'text-zinc-700 hover:text-zinc-400'}`} aria-label={rank.pinned ? 'Unpin keyword' : 'Pin keyword'}>
                   <Pin className="w-3 h-3" />
                 </button>
                 <span className="text-xs text-zinc-200 truncate">{rank.query}</span>
@@ -194,7 +194,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
               <div className="text-right text-xs text-zinc-400">{rank.clicks}</div>
               <div className="text-right text-xs text-zinc-500">{rank.impressions.toLocaleString()}</div>
               <div className="text-right">
-                <button onClick={() => removeKeyword(rank.query)} className="text-zinc-700 hover:text-red-400 transition-colors">
+                <button onClick={() => removeKeyword(rank.query)} className="text-zinc-700 hover:text-red-400 transition-colors" aria-label="Remove keyword">
                   <Trash2 className="w-3 h-3" />
                 </button>
               </div>
@@ -211,7 +211,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
         <div className="text-center py-8">
           <Target className="w-7 h-7 text-zinc-700 mx-auto mb-2" />
           <p className="text-xs text-zinc-500">No keywords tracked yet</p>
-          <p className="text-[11px] text-zinc-500 mt-1">Add keywords above to start monitoring positions</p>
+          <p className="text-[11px] text-zinc-500 mt-1">Add keywords above, or generate a <strong className="text-teal-400">Keyword Strategy</strong> from the sidebar to discover target keywords</p>
         </div>
       )}
 

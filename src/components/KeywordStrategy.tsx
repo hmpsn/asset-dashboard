@@ -759,6 +759,10 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                   );
                 })}
               </div>
+              <div className="mt-3 flex items-center gap-1.5 text-[11px] text-teal-400/70 bg-teal-500/5 px-3 py-2 rounded-lg border border-teal-500/10">
+                <FileText className="w-3 h-3 flex-shrink-0" />
+                <span>Turn these into actionable content — create <strong className="text-teal-400">Content Briefs</strong> from the sidebar</span>
+              </div>
             </div>
           )}
 

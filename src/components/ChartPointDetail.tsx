@@ -26,7 +26,7 @@ export function ChartPointDetail({ date, metrics, onClose, xPct }: Props) {
       <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl shadow-black/40 min-w-[160px] overflow-hidden">
         <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800">
           <span className="text-[11px] font-semibold text-zinc-200">{date}</span>
-          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 -mr-1">
+          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 -mr-1" aria-label="Close">
             <X className="w-3 h-3" />
           </button>
         </div>

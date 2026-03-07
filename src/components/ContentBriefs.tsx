@@ -364,9 +364,9 @@ export function ContentBriefs({ workspaceId, onRequestCountChange }: { workspace
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-medium text-zinc-200">{req.topic}</span>
-                          {req.source === 'client' && <span className="text-[8px] px-1 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20">Client</span>}
-                          <span className={`text-[8px] px-1 py-0.5 rounded border ${(req.serviceType || 'brief_only') === 'full_post' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>{(req.serviceType || 'brief_only') === 'full_post' ? 'Full Post' : 'Brief Only'}</span>
-                          {req.upgradedAt && <span className="text-[8px] px-1 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">Upgraded</span>}
+                          {req.source === 'client' && <span className="text-[11px] px-1 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20">Client</span>}
+                          <span className={`text-[11px] px-1 py-0.5 rounded border ${(req.serviceType || 'brief_only') === 'full_post' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>{(req.serviceType || 'brief_only') === 'full_post' ? 'Full Post' : 'Brief Only'}</span>
+                          {req.upgradedAt && <span className="text-[11px] px-1 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">Upgraded</span>}
                         </div>
                         <div className="text-[11px] text-teal-400 mt-0.5">"{req.targetKeyword}"</div>
                         <div className="flex items-center gap-3 mt-1">

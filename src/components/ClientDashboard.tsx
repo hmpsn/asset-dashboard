@@ -1885,14 +1885,14 @@ export function ClientDashboard({ workspaceId }: Props) {
                                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 font-medium hover:bg-teal-600/40 transition-all"
                                   >
                                     <FileText className="w-3 h-3" /> Get a Brief
-                                    {ws?.contentPricing && <span className="text-[8px] opacity-70 ml-0.5">{new Intl.NumberFormat('en-US', { style: 'currency', currency: ws.contentPricing.currency || 'USD', minimumFractionDigits: 0 }).format(ws.contentPricing.briefPrice)}</span>}
+                                    {ws?.contentPricing && <span className="text-[11px] opacity-70 ml-0.5">{new Intl.NumberFormat('en-US', { style: 'currency', currency: ws.contentPricing.currency || 'USD', minimumFractionDigits: 0 }).format(ws.contentPricing.briefPrice)}</span>}
                                   </button>
                                   <button
                                     onClick={() => setPricingModal({ serviceType: 'full_post', topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, source: 'strategy' })}
                                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600/30 to-teal-600/30 border border-blue-500/30 text-[11px] text-blue-200 font-medium hover:from-blue-600/50 hover:to-teal-600/50 transition-all"
                                   >
                                     <Sparkles className="w-3 h-3" /> Get Full Post
-                                    {ws?.contentPricing && <span className="text-[8px] opacity-70 ml-0.5">{new Intl.NumberFormat('en-US', { style: 'currency', currency: ws.contentPricing.currency || 'USD', minimumFractionDigits: 0 }).format(ws.contentPricing.fullPostPrice)}</span>}
+                                    {ws?.contentPricing && <span className="text-[11px] opacity-70 ml-0.5">{new Intl.NumberFormat('en-US', { style: 'currency', currency: ws.contentPricing.currency || 'USD', minimumFractionDigits: 0 }).format(ws.contentPricing.fullPostPrice)}</span>}
                                   </button>
                                 </div>
                               )}
@@ -2195,10 +2195,10 @@ export function ClientDashboard({ workspaceId }: Props) {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-semibold text-zinc-200">{req.topic}</span>
-                          <span className={`text-[8px] px-1.5 py-0.5 rounded border font-medium ${(req.serviceType || 'brief_only') === 'full_post' ? 'bg-gradient-to-r from-blue-500/10 to-teal-500/10 text-blue-300 border-blue-500/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
+                          <span className={`text-[11px] px-1.5 py-0.5 rounded border font-medium ${(req.serviceType || 'brief_only') === 'full_post' ? 'bg-gradient-to-r from-blue-500/10 to-teal-500/10 text-blue-300 border-blue-500/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
                             {(req.serviceType || 'brief_only') === 'full_post' ? '✦ Full Post' : 'Brief'}
                           </span>
-                          {req.upgradedAt && <span className="text-[8px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 font-medium">Upgraded</span>}
+                          {req.upgradedAt && <span className="text-[11px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 font-medium">Upgraded</span>}
                         </div>
                         <div className="text-xs text-teal-400 mt-0.5">&ldquo;{req.targetKeyword}&rdquo;</div>
                       </div>
@@ -2218,7 +2218,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                           <div key={step} className="flex items-center flex-1">
                             <div className="flex flex-col items-center flex-1">
                               <div className={`w-full h-1.5 rounded-full ${isComplete ? (isCurrent ? (req.status === 'changes_requested' ? 'bg-orange-400' : 'bg-teal-400') : 'bg-teal-500/40') : 'bg-zinc-800'}`} />
-                              <span className={`text-[8px] mt-1 ${isCurrent ? (req.status === 'changes_requested' ? 'text-orange-400 font-medium' : 'text-teal-400 font-medium') : isComplete ? 'text-zinc-500' : 'text-zinc-700'}`}>{stepLabels[i]}</span>
+                              <span className={`text-[11px] mt-1 ${isCurrent ? (req.status === 'changes_requested' ? 'text-orange-400 font-medium' : 'text-teal-400 font-medium') : isComplete ? 'text-zinc-500' : 'text-zinc-700'}`}>{stepLabels[i]}</span>
                             </div>
                           </div>
                         );
