@@ -69,6 +69,9 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const [chatSessionId, setChatSessionId] = useState<string>(() => `cs-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  const [chatSessions, setChatSessions] = useState<Array<{ id: string; title: string; messageCount: number; updatedAt: string }>>([]);
+  const [showChatHistory, setShowChatHistory] = useState(false);
   const [ga4Overview, setGa4Overview] = useState<GA4Overview | null>(null);
   const [ga4Trend, setGa4Trend] = useState<GA4DailyTrend[]>([]);
   const [ga4Pages, setGa4Pages] = useState<GA4TopPage[]>([]);
@@ -650,7 +653,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
       }
       const res = await fetch(`/api/public/search-chat/${ws.id}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: question.trim(), context }),
+        body: JSON.stringify({ question: question.trim(), context, sessionId: chatSessionId }),
       });
       const data = await res.json();
       setChatMessages(prev => [...prev, { role: 'assistant', content: data.error ? `Error: ${data.error}` : data.answer }]);
@@ -2578,9 +2581,34 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
           <div className="fixed bottom-6 right-6 w-96 bg-zinc-900 rounded-2xl border border-zinc-800 shadow-2xl shadow-black/40 overflow-hidden z-50 flex flex-col max-h-[500px]">
             <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 flex-shrink-0">
               <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-teal-400" /><span className="text-sm font-medium text-zinc-200">Insights Engine</span><span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">by hmpsn studio</span></div>
-              <button onClick={() => setChatOpen(false)} className="text-zinc-500 hover:text-zinc-300"><X className="w-4 h-4" /></button>
+              <div className="flex items-center gap-1">
+                {chatMessages.length > 0 && (
+                  <button onClick={() => { setChatSessionId(`cs-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`); setChatMessages([]); setShowChatHistory(false); }}
+                    title="New conversation" className="text-zinc-500 hover:text-zinc-300 p-1"><Plus className="w-3.5 h-3.5" /></button>
+                )}
+                <button onClick={() => { setShowChatHistory(!showChatHistory); if (!showChatHistory && ws) { fetch(`/api/public/chat-sessions/${ws.id}?channel=client`).then(r => r.json()).then(d => { if (Array.isArray(d)) setChatSessions(d); }).catch(() => {}); } }}
+                  title="Chat history" className={`p-1 ${showChatHistory ? 'text-teal-400' : 'text-zinc-500 hover:text-zinc-300'}`}><MessageSquare className="w-3.5 h-3.5" /></button>
+                <button onClick={() => setChatOpen(false)} className="text-zinc-500 hover:text-zinc-300 p-1"><X className="w-4 h-4" /></button>
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto">
+              {showChatHistory ? (
+                <div className="p-3 space-y-1">
+                  <p className="text-[11px] text-zinc-500 mb-2">Previous conversations</p>
+                  {chatSessions.length === 0 && <p className="text-[11px] text-zinc-600 italic">No past conversations yet.</p>}
+                  {chatSessions.map(s => (
+                    <button key={s.id} onClick={() => {
+                      setChatSessionId(s.id); setShowChatHistory(false);
+                      if (ws) fetch(`/api/public/chat-sessions/${ws.id}/${s.id}`).then(r => r.json()).then(d => {
+                        if (d?.messages) setChatMessages(d.messages.map((m: { role: string; content: string }) => ({ role: m.role as 'user' | 'assistant', content: m.content })));
+                      }).catch(() => {});
+                    }} className={`w-full text-left px-3 py-2 rounded-lg border transition-colors ${s.id === chatSessionId ? 'bg-teal-500/10 border-teal-500/30 text-teal-300' : 'bg-zinc-800/50 border-zinc-800 text-zinc-300 hover:bg-zinc-800'}`}>
+                      <div className="text-[11px] font-medium truncate">{s.title}</div>
+                      <div className="text-[10px] text-zinc-500 mt-0.5">{s.messageCount} messages · {new Date(s.updatedAt).toLocaleDateString()}</div>
+                    </button>
+                  ))}
+                </div>
+              ) : (<>
               {chatMessages.length === 0 && (
                 <div className="p-4 space-y-3">
                   <p className="text-xs text-zinc-500">Ask anything about your site performance:</p>
@@ -2611,6 +2639,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                   <div ref={chatEndRef} />
                 </div>
               )}
+              </>)}
             </div>
             <div className="px-4 py-3 border-t border-zinc-800 flex gap-2 flex-shrink-0">
               <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && askAi(chatInput)}

@@ -76,6 +76,7 @@ import { renderBriefHTML } from './brief-export-html.js';
 import { listContentRequests, getContentRequest, createContentRequest, updateContentRequest, deleteContentRequest, addComment } from './content-requests.js';
 import { isSemrushConfigured, getKeywordOverview, getDomainOrganicKeywords, getKeywordGap, getRelatedKeywords, estimateCreditCost, clearSemrushCache } from './semrush.js';
 import { callOpenAI, getTokenUsage } from './openai-helpers.js';
+import { addMessage, buildConversationContext, listSessions, getSession as getChatSession, deleteSession as deleteChatSession, generateSessionSummary } from './chat-memory.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
 import { listGscSites, getSearchOverview, getPerformanceTrend, getQueryPageData, getAllGscPages, getSearchDeviceBreakdown, getSearchCountryBreakdown, getSearchTypeBreakdown, getSearchPeriodComparison } from './search-console.js';
@@ -4670,15 +4671,52 @@ app.get('/api/public/audit-detail/:workspaceId', (req, res) => {
   });
 });
 
+// --- Chat Session CRUD ---
+app.get('/api/public/chat-sessions/:workspaceId', (req, res) => {
+  const channel = req.query.channel as string | undefined;
+  res.json(listSessions(req.params.workspaceId, channel));
+});
+
+app.get('/api/public/chat-sessions/:workspaceId/:sessionId', (req, res) => {
+  const session = getChatSession(req.params.workspaceId, req.params.sessionId);
+  if (!session) return res.status(404).json({ error: 'Session not found' });
+  res.json(session);
+});
+
+app.delete('/api/public/chat-sessions/:workspaceId/:sessionId', (req, res) => {
+  deleteChatSession(req.params.workspaceId, req.params.sessionId);
+  res.json({ ok: true });
+});
+
+app.post('/api/public/chat-sessions/:workspaceId/:sessionId/summarize', async (req, res) => {
+  try {
+    const summary = await generateSessionSummary(req.params.workspaceId, req.params.sessionId);
+    res.json({ summary });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 app.post('/api/public/search-chat/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(400).json({ error: 'Workspace not configured' });
-  const { question, context } = req.body;
+  const { question, context, sessionId } = req.body;
   if (!question) return res.status(400).json({ error: 'question required' });
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) return res.status(400).json({ error: 'AI not configured' });
 
   try {
+    // Build conversation context from memory
+    let historyMessages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+    let priorContext = '';
+    if (sessionId) {
+      const ctx = buildConversationContext(ws.id, sessionId, 'client');
+      historyMessages = ctx.historyMessages;
+      priorContext = ctx.priorContext;
+      // Persist the user message
+      addMessage(ws.id, sessionId, 'client', 'user', question);
+    }
+
     const hasSearch = !!(context?.search);
     const hasGA4 = !!(context?.ga4);
     const hasHealth = !!(context?.siteHealth);
@@ -4701,12 +4739,14 @@ ${hasRankings ? '✅ **Rank Tracking** — tracked keyword positions, clicks, im
 ${hasActivity ? '✅ **Activity Log** — recent actions taken on the site' : ''}
 ${hasApprovals ? `✅ **Pending Approvals** — ${context.pendingApprovals} SEO changes awaiting client review` : ''}
 ${hasRequests ? '✅ **Active Requests** — open client requests with categories and statuses' : ''}
+${priorContext}
 
 YOUR APPROACH:
 1. **Be specific and data-driven** — Always reference actual numbers, queries, pages, and percentages. Vague answers are useless. Show you've actually analyzed their data.
 2. **Connect the dots across data sources** — The most powerful insights come from cross-referencing: a page with high impressions but low CTR AND a high bounce rate tells a very specific story. Use all available data together.
 3. **Prioritize impact** — Lead with the 2-3 things that would move the needle most. Don't overwhelm with everything at once.
 4. **Give quick wins they can do themselves** — Small, non-technical things like "update your Google Business Profile" or "add this topic to your blog calendar."
+5. **Remember context** — If the user references something from earlier in the conversation, use the conversation history to give a coherent, continuous response.
 
 REVENUE HOOKS — When data reveals an opportunity, naturally connect it to a service:
 - **Low organic traffic share** → "A keyword strategy could unlock the organic traffic you're missing — ${teamName} can build one targeted to your business."
@@ -4744,19 +4784,35 @@ ${buildKnowledgeBase(ws.id)}
 Current data context:
 ${JSON.stringify(context, null, 2)}`;
 
+    // Build messages array: system + conversation history + current question
+    const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+      { role: 'system', content: systemPrompt },
+      ...historyMessages.slice(-10), // last 10 messages for context window management
+      { role: 'user', content: question },
+    ];
+
     const aiResult = await callOpenAI({
       model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: question },
-      ],
+      messages,
       temperature: 0.7,
       maxTokens: 1500,
       feature: 'client-search-chat',
       workspaceId: ws.id,
     });
 
-    res.json({ answer: aiResult.text || 'No response generated.' });
+    const answer = aiResult.text || 'No response generated.';
+
+    // Persist assistant response
+    if (sessionId) {
+      addMessage(ws.id, sessionId, 'client', 'assistant', answer);
+      // Auto-summarize after 6+ messages
+      const session = getChatSession(ws.id, sessionId);
+      if (session && session.messages.length >= 6 && !session.summary) {
+        generateSessionSummary(ws.id, sessionId).catch(() => {});
+      }
+    }
+
+    res.json({ answer, sessionId: sessionId || undefined });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: msg });
