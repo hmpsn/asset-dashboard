@@ -50,7 +50,7 @@ function AdminApp() {
   const auth = useAuth();
 
   if (auth.checking) {
-    return <div className="flex items-center justify-center h-screen" style={{ backgroundColor: 'var(--brand-bg)' }}><div className="w-6 h-6 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--brand-border)', borderTopColor: 'var(--brand-mint)' }} /></div>;
+    return <div className="flex items-center justify-center h-screen bg-[#0f1219]"><div className="w-6 h-6 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>;
   }
   if (auth.required && !auth.authenticated) {
     return <LoginScreen onLogin={auth.login} />;
@@ -276,11 +276,11 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
     if (needsSite && !selected.webflowSiteId) {
       return (
         <div className="flex flex-col items-center justify-center py-24 gap-3">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'var(--brand-bg-elevated)' }}>
-            <Globe className="w-5 h-5" style={{ color: 'var(--brand-text-muted)' }} />
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-zinc-900">
+            <Globe className="w-5 h-5 text-zinc-500" />
           </div>
-          <p className="text-sm" style={{ color: 'var(--brand-text-muted)' }}>Link a Webflow site to use this tool</p>
-          <button onClick={() => setTab('settings')} className="mt-3 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors" style={{ backgroundColor: 'var(--brand-mint-dim)', color: 'var(--brand-mint)' }}>Go to Settings</button>
+          <p className="text-sm text-zinc-500">Link a Webflow site to use this tool</p>
+          <button onClick={() => setTab('settings')} className="mt-3 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors bg-teal-500/10 text-teal-400">Go to Settings</button>
         </div>
       );
     }
@@ -297,16 +297,16 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
   };
 
   return (
-    <div className="flex h-screen" style={{ backgroundColor: 'var(--brand-bg)', color: 'var(--brand-text-bright)' }}>
+    <div className="flex h-screen bg-[#0f1219] text-zinc-200">
       {/* ── Global sidebar ── */}
-      <aside className="w-[200px] flex-shrink-0 flex flex-col" style={{ borderRight: '1px solid var(--brand-border)' }}>
+      <aside className="w-[200px] flex-shrink-0 flex flex-col border-r border-zinc-800">
         {/* Logo */}
         <div className="px-4 pt-4 pb-3">
           <img src="/logo.svg" alt="hmpsn.studio" className="h-7" />
         </div>
 
         {/* Workspace selector */}
-        <div className="px-3 pb-2" style={{ borderBottom: '1px solid var(--brand-border)' }}>
+        <div className="px-3 pb-2 border-b border-zinc-800">
           <WorkspaceSelector
             workspaces={workspaces}
             selected={selected}
@@ -366,7 +366,7 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
         </nav>
 
         {/* Bottom: Tools */}
-        <div className="px-2 py-2 space-y-0.5" style={{ borderTop: '1px solid var(--brand-border)' }}>
+        <div className="px-2 py-2 space-y-0.5 border-t border-zinc-800">
           <div className="text-[9px] text-zinc-600 font-semibold tracking-widest px-2.5 mb-1">TOOLS</div>
           {([
             { id: 'prospect' as Page, label: 'Prospect', icon: FileSearch },
@@ -404,7 +404,7 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
       {/* ── Main content area ── */}
       <div className="flex-1 flex flex-col min-w-0">
         {clipboardStatus && (
-          <div className="flex items-center gap-1.5 px-5 py-1.5 text-[11px] font-medium" style={{ backgroundColor: 'var(--brand-mint-dim)', color: 'var(--brand-mint)', borderBottom: '1px solid var(--brand-border)' }}>
+          <div className="flex items-center gap-1.5 px-5 py-1.5 text-[11px] font-medium bg-teal-500/10 text-teal-400 border-b border-zinc-800">
             <Clipboard className="w-3 h-3" /> {clipboardStatus}
           </div>
         )}

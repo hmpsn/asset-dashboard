@@ -3,20 +3,20 @@
 
 :root {
   --brand-bg: #0f1219;
-  --brand-bg-surface: #161b26;
-  --brand-bg-elevated: #1c2333;
-  --brand-bg-card: #212a3a;
-  --brand-text: #b8c5d4;
-  --brand-text-bright: #f1f5f9;
-  --brand-text-muted: #8494a7;
-  --brand-mint: #2ed9c3;
-  --brand-mint-hover: #45f0d8;
-  --brand-mint-dim: rgba(46, 217, 195, 0.1);
-  --brand-mint-glow: rgba(46, 217, 195, 0.18);
+  --brand-bg-surface: #18181b;
+  --brand-bg-elevated: #18181b;
+  --brand-bg-card: #27272a;
+  --brand-text: #a1a1aa;
+  --brand-text-bright: #e4e4e7;
+  --brand-text-muted: #71717a;
+  --brand-mint: #2dd4bf;
+  --brand-mint-hover: #5eead4;
+  --brand-mint-dim: rgba(45, 212, 191, 0.1);
+  --brand-mint-glow: rgba(45, 212, 191, 0.18);
   --brand-yellow: #ffb600;
   --brand-yellow-dim: rgba(255, 182, 0, 0.1);
-  --brand-border: rgba(148, 163, 184, 0.1);
-  --brand-border-hover: rgba(148, 163, 184, 0.18);
+  --brand-border: #27272a;
+  --brand-border-hover: #3f3f46;
   --radius: 10px;
 }
 
@@ -70,16 +70,12 @@ input::placeholder, textarea::placeholder {
   color: var(--brand-text-bright);
 }
 
-/* ─── Brand surface utilities (maps to CSS variables) ─── */
-.bg-brand-surface { background-color: var(--brand-bg-surface); }
-.bg-brand-elevated { background-color: var(--brand-bg-elevated); }
-.bg-brand-card { background-color: var(--brand-bg-card); }
-.border-brand { border-color: var(--brand-border); }
-.border-brand-hover { border-color: var(--brand-border-hover); }
-
-/* ─── Global Legibility: bump mid-grey text contrast ─── */
-.text-zinc-600 { color: #78788a !important; }
-.text-zinc-500 { color: #9898a8 !important; }
+/* ─── Brand surface utilities (maps to zinc palette) ─── */
+.bg-brand-surface { background-color: #18181b; }
+.bg-brand-elevated { background-color: #18181b; }
+.bg-brand-card { background-color: #27272a; }
+.border-brand { border-color: #27272a; }
+.border-brand-hover { border-color: #3f3f46; }
 
 /* ─── Toast animation ─── */
 @keyframes slideUp {

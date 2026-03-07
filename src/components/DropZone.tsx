@@ -83,8 +83,8 @@ export function DropZone({ workspaceId, type, disabled }: Props) {
         uploading && 'border-emerald-500/50 bg-emerald-500/5'
       )}
       style={!uploading ? {
-        borderColor: dragging ? 'var(--brand-mint)' : 'var(--brand-border-hover)',
-        backgroundColor: dragging ? 'var(--brand-mint-dim)' : 'var(--brand-bg-surface)',
+        borderColor: dragging ? '#2dd4bf' : '#3f3f46',
+        backgroundColor: dragging ? 'rgba(45,212,191,0.1)' : '#18181b',
       } : undefined}
     >
       <input
@@ -98,8 +98,8 @@ export function DropZone({ workspaceId, type, disabled }: Props) {
 
       {uploading ? (
         <>
-          <div className="w-8 h-8 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--brand-border-hover)', borderTopColor: 'var(--brand-mint)' }} />
-          <p className="text-sm" style={{ color: 'var(--brand-text)' }}>Processing...</p>
+          <div className="w-8 h-8 border-2 rounded-full animate-spin border-zinc-700 border-t-teal-400" />
+          <p className="text-sm text-zinc-400">Processing...</p>
         </>
       ) : lastCount !== null ? (
         <>
@@ -112,20 +112,20 @@ export function DropZone({ workspaceId, type, disabled }: Props) {
         </>
       ) : (
         <>
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--brand-mint-dim)' }}>
-            <Icon className="w-5 h-5" style={{ color: 'var(--brand-mint)' }} />
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-teal-500/10">
+            <Icon className="w-5 h-5 text-teal-400" />
           </div>
           <div className="text-center">
-            <p className="text-sm font-medium" style={{ color: 'var(--brand-text-bright)' }}>
+            <p className="text-sm font-medium text-zinc-200">
               {type === 'meta' ? 'Meta / OG Images' : 'Assets'}
             </p>
-            <p className="text-xs mt-1" style={{ color: 'var(--brand-text-muted)' }}>
+            <p className="text-xs mt-1 text-zinc-500">
               {type === 'meta'
                 ? 'Optimized JPEG — keeps format for social sharing'
                 : 'Converts to AVIF, minifies SVGs'}
             </p>
           </div>
-          <p className="text-xs" style={{ color: 'var(--brand-text-muted)' }}>Drop files or click to browse</p>
+          <p className="text-xs text-zinc-500">Drop files or click to browse</p>
         </>
       )}
     </div>

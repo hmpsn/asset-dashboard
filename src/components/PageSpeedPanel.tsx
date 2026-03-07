@@ -342,7 +342,7 @@ export function PageSpeedPanel({ siteId }: Props) {
                 onClick={() => runSingleTest('mobile')}
                 disabled={!selectedPage}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors disabled:opacity-50"
-                style={{ background: 'var(--brand-mint)', color: '#0f1219' }}
+                className="bg-teal-400 text-[#0f1219]"
               >
                 <Smartphone className="w-4 h-4" /> Test Mobile
               </button>
@@ -364,7 +364,7 @@ export function PageSpeedPanel({ siteId }: Props) {
               <button
                 onClick={() => runBulkTest('mobile')}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors"
-                style={{ background: 'var(--brand-mint)', color: '#0f1219' }}
+                className="bg-teal-400 text-[#0f1219]"
               >
                 <Smartphone className="w-4 h-4" /> Test Mobile
               </button>
@@ -384,7 +384,7 @@ export function PageSpeedPanel({ siteId }: Props) {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
-        <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--brand-mint)' }} />
+        <Loader2 className="w-8 h-8 animate-spin text-teal-400" />
         <p className="text-sm text-zinc-400">Running PageSpeed analysis...</p>
         <p className="text-xs text-zinc-600">{singleResult === null && !data ? 'Testing via Google PageSpeed Insights API' : ''}</p>
         <p className="text-xs text-zinc-700">This may take 30-60 seconds</p>
@@ -411,7 +411,7 @@ export function PageSpeedPanel({ siteId }: Props) {
         <button
           onClick={() => { setHasRun(false); setError(null); }}
           className="px-4 py-2 rounded-lg text-sm font-medium"
-          style={{ background: 'var(--brand-mint)', color: '#0f1219' }}
+          className="bg-teal-400 text-[#0f1219]"
         >
           Try Again
         </button>

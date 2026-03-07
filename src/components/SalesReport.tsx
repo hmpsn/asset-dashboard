@@ -160,18 +160,18 @@ export function SalesReport() {
         {/* URL Input */}
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-8">
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: 'linear-gradient(135deg, var(--brand-mint), #14b8a6)' }}>
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: 'linear-gradient(135deg, #2dd4bf, #14b8a6)' }}>
               <Globe className="w-7 h-7 text-black" />
             </div>
-            <h2 className="text-xl font-bold" style={{ color: 'var(--brand-text-bright)' }}>Sales SEO Report</h2>
-            <p className="text-sm mt-1" style={{ color: 'var(--brand-text-muted)' }}>
+            <h2 className="text-xl font-bold text-zinc-200">Sales SEO Report</h2>
+            <p className="text-sm mt-1 text-zinc-500">
               Audit any website — no API key needed. Generate a client-ready SEO report.
             </p>
           </div>
 
           <div className="flex gap-2">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--brand-text-muted)' }} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
               <input
                 type="text"
                 value={url}
@@ -179,7 +179,7 @@ export function SalesReport() {
                 onKeyDown={(e) => e.key === 'Enter' && !loading && runReport()}
                 placeholder="Enter website URL (e.g. swishsmiles.com)"
                 className="w-full pl-10 pr-4 py-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)', color: 'var(--brand-text-bright)' }}
+                className="bg-zinc-900 border border-zinc-800 text-zinc-200"
                 disabled={loading}
               />
             </div>
@@ -187,7 +187,7 @@ export function SalesReport() {
               onClick={runReport}
               disabled={loading || !url.trim()}
               className="px-6 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
-              style={{ background: 'var(--brand-mint)', color: '#0f1219' }}
+              className="px-6 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 bg-teal-400 text-[#0f1219]"
             >
               {loading ? (
                 <div className="flex items-center gap-2">
@@ -199,7 +199,7 @@ export function SalesReport() {
           </div>
 
           {loading && progress && (
-            <div className="mt-3 flex items-center justify-center gap-2 text-sm" style={{ color: 'var(--brand-text-muted)' }}>
+            <div className="mt-3 flex items-center justify-center gap-2 text-sm text-zinc-500">
               <div className="w-3 h-3 border border-zinc-600 border-t-teal-400 rounded-full animate-spin" />
               {progress}
             </div>
@@ -215,24 +215,24 @@ export function SalesReport() {
         {/* Report History */}
         {history.length > 0 && (
           <div className="max-w-2xl mx-auto mt-8">
-            <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--brand-text-bright)' }}>Previous Reports</h3>
+            <h3 className="text-sm font-semibold mb-3 text-zinc-200">Previous Reports</h3>
             <div className="space-y-2">
               {history.map((h) => (
                 <div
                   key={h.id}
                   className="flex items-center justify-between px-4 py-3 rounded-xl cursor-pointer transition-colors hover:bg-white/5"
-                  style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}
+                  className="bg-zinc-900 border border-zinc-800"
                   onClick={() => loadReport(h.id)}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className={`text-lg font-bold ${scoreColor(h.siteScore)}`}>{h.siteScore}</div>
                     <div className="min-w-0">
-                      <div className="text-sm font-medium truncate" style={{ color: 'var(--brand-text-bright)' }}>{h.siteName}</div>
-                      <div className="text-xs truncate" style={{ color: 'var(--brand-text-muted)' }}>{h.url}</div>
+                      <div className="text-sm font-medium truncate text-zinc-200">{h.siteName}</div>
+                      <div className="text-xs truncate text-zinc-500">{h.url}</div>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
-                    <div className="text-xs" style={{ color: 'var(--brand-text-muted)' }}>
+                    <div className="text-xs text-zinc-500">
                       {new Date(h.generatedAt).toLocaleDateString()}
                     </div>
                     <button
@@ -240,7 +240,7 @@ export function SalesReport() {
                       className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
                       title="View printable report"
                     >
-                      <FileText className="w-4 h-4" style={{ color: 'var(--brand-text-muted)' }} />
+                      <FileText className="w-4 h-4 text-zinc-500" />
                     </button>
                   </div>
                 </div>
@@ -262,7 +262,7 @@ export function SalesReport() {
         <button
           onClick={() => { setView('input'); setReport(null); }}
           className="text-sm px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
-          style={{ color: 'var(--brand-text-muted)' }}
+          className="text-zinc-500"
         >
           ← Back
         </button>
@@ -271,7 +271,7 @@ export function SalesReport() {
             <button
               onClick={() => openHtmlReport(r.id!)}
               className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors"
-              style={{ background: 'var(--brand-mint)', color: '#0f1219' }}
+              className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors bg-teal-400 text-[#0f1219]"
             >
               <ExternalLink className="w-3.5 h-3.5" />
               Client Report
@@ -282,8 +282,8 @@ export function SalesReport() {
 
       {/* Score Header */}
       <div className="text-center">
-        <h2 className="text-lg font-bold" style={{ color: 'var(--brand-text-bright)' }}>{r.siteName}</h2>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--brand-text-muted)' }}>{r.url}</p>
+        <h2 className="text-lg font-bold text-zinc-200">{r.siteName}</h2>
+        <p className="text-xs mt-0.5 text-zinc-500">{r.url}</p>
 
         <div className="flex justify-center mt-4">
           <div className={`w-28 h-28 rounded-full border-4 flex flex-col items-center justify-center ${scoreBg(r.siteScore)}`}>
@@ -294,20 +294,20 @@ export function SalesReport() {
 
         <div className="flex justify-center gap-6 mt-4">
           <div className="text-center">
-            <div className="text-lg font-bold" style={{ color: 'var(--brand-text-bright)' }}>{r.totalPages}</div>
-            <div className="text-xs" style={{ color: 'var(--brand-text-muted)' }}>Pages</div>
+            <div className="text-lg font-bold text-zinc-200">{r.totalPages}</div>
+            <div className="text-xs text-zinc-500">Pages</div>
           </div>
           <div className="text-center">
             <div className="text-lg font-bold text-red-400">{r.errors}</div>
-            <div className="text-xs" style={{ color: 'var(--brand-text-muted)' }}>Errors</div>
+            <div className="text-xs text-zinc-500">Errors</div>
           </div>
           <div className="text-center">
             <div className="text-lg font-bold text-yellow-400">{r.warnings}</div>
-            <div className="text-xs" style={{ color: 'var(--brand-text-muted)' }}>Warnings</div>
+            <div className="text-xs text-zinc-500">Warnings</div>
           </div>
           <div className="text-center">
             <div className="text-lg font-bold text-blue-400">{r.infos}</div>
-            <div className="text-xs" style={{ color: 'var(--brand-text-muted)' }}>Info</div>
+            <div className="text-xs text-zinc-500">Info</div>
           </div>
         </div>
       </div>
@@ -315,7 +315,7 @@ export function SalesReport() {
       {/* Top Risks */}
       {r.topRisks.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold flex items-center gap-2 mb-3" style={{ color: 'var(--brand-text-bright)' }}>
+          <h3 className="text-sm font-semibold flex items-center gap-2 mb-3 text-zinc-200">
             <AlertTriangle className="w-4 h-4 text-red-400" />
             Top Risks
           </h3>
@@ -329,7 +329,7 @@ export function SalesReport() {
                     {risk.opportunityCost && (
                       <p className="text-xs text-red-400/70 mt-1 italic">{risk.opportunityCost}</p>
                     )}
-                    <p className="text-xs mt-1" style={{ color: 'var(--brand-text-muted)' }}>{risk.recommendation}</p>
+                    <p className="text-xs mt-1 text-zinc-500">{risk.recommendation}</p>
                   </div>
                 </div>
               </div>
@@ -341,7 +341,7 @@ export function SalesReport() {
       {/* Quick Wins */}
       {r.quickWins.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold flex items-center gap-2 mb-3" style={{ color: 'var(--brand-text-bright)' }}>
+          <h3 className="text-sm font-semibold flex items-center gap-2 mb-3 text-zinc-200">
             <Zap className="w-4 h-4 text-yellow-400" />
             Quick Wins
           </h3>
@@ -352,7 +352,7 @@ export function SalesReport() {
                   <Zap className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
                   <div>
                     <p className="text-sm font-medium text-emerald-300">{win.message}</p>
-                    <p className="text-xs mt-1" style={{ color: 'var(--brand-text-muted)' }}>{win.recommendation}</p>
+                    <p className="text-xs mt-1 text-zinc-500">{win.recommendation}</p>
                   </div>
                 </div>
               </div>
@@ -364,17 +364,17 @@ export function SalesReport() {
       {/* Site-Wide Issues */}
       {r.siteWideIssues.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold flex items-center gap-2 mb-3" style={{ color: 'var(--brand-text-bright)' }}>
-            <Globe className="w-4 h-4" style={{ color: 'var(--brand-text-muted)' }} />
+          <h3 className="text-sm font-semibold flex items-center gap-2 mb-3 text-zinc-200">
+            <Globe className="w-4 h-4 text-zinc-500" />
             Site-Wide Issues
           </h3>
           <div className="space-y-1">
             {r.siteWideIssues.map((issue, idx) => (
-              <div key={idx} className="flex items-start gap-2.5 px-3 py-2 rounded-lg" style={{ backgroundColor: 'var(--brand-bg-elevated)' }}>
+              <div key={idx} className="flex items-start gap-2.5 px-3 py-2 rounded-lg bg-zinc-900">
                 <SeverityBadge severity={issue.severity} />
                 <div className="min-w-0">
-                  <p className="text-sm" style={{ color: 'var(--brand-text-bright)' }}>{issue.message}</p>
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--brand-text-muted)' }}>{issue.recommendation}</p>
+                  <p className="text-sm text-zinc-200">{issue.message}</p>
+                  <p className="text-xs mt-0.5 text-zinc-500">{issue.recommendation}</p>
                 </div>
               </div>
             ))}
@@ -384,7 +384,7 @@ export function SalesReport() {
 
       {/* Page-by-Page */}
       <div>
-        <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--brand-text-bright)' }}>
+        <h3 className="text-sm font-semibold mb-3 text-zinc-200">
           Page-by-Page Breakdown
         </h3>
         <div className="space-y-1">
@@ -392,16 +392,16 @@ export function SalesReport() {
             <div key={page.url}>
               <div
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors hover:bg-white/5"
-                style={{ backgroundColor: 'var(--brand-bg-elevated)' }}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors hover:bg-white/5 bg-zinc-900"
                 onClick={() => setExpandedPage(expandedPage === page.url ? null : page.url)}
               >
                 {expandedPage === page.url
-                  ? <ChevronDown className="w-4 h-4 shrink-0" style={{ color: 'var(--brand-text-muted)' }} />
-                  : <ChevronRight className="w-4 h-4 shrink-0" style={{ color: 'var(--brand-text-muted)' }} />
+                  ? <ChevronDown className="w-4 h-4 shrink-0 text-zinc-500" />
+                  : <ChevronRight className="w-4 h-4 shrink-0 text-zinc-500" />
                 }
                 <div className={`text-sm font-bold w-8 text-center ${scoreColor(page.score)}`}>{page.score}</div>
                 <div className="min-w-0 flex-1">
-                  <span className="text-sm font-medium" style={{ color: 'var(--brand-text-bright)' }}>{page.page}</span>
+                  <span className="text-sm font-medium text-zinc-200">{page.page}</span>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   {page.issues.filter(i => i.severity === 'error').length > 0 && (
@@ -419,16 +419,16 @@ export function SalesReport() {
 
               {expandedPage === page.url && (
                 <div className="ml-7 mt-1 mb-2 space-y-1">
-                  <div className="text-xs truncate px-3 py-1" style={{ color: 'var(--brand-text-muted)' }}>{page.url}</div>
+                  <div className="text-xs truncate px-3 py-1 text-zinc-500">{page.url}</div>
                   {page.issues.length === 0 ? (
                     <div className="px-3 py-2 text-xs text-emerald-400">✓ No issues found</div>
                   ) : (
                     page.issues.map((issue, idx) => (
-                      <div key={idx} className="flex items-start gap-2.5 px-3 py-2 rounded-lg" style={{ backgroundColor: 'var(--brand-bg-surface)' }}>
+                      <div key={idx} className="flex items-start gap-2.5 px-3 py-2 rounded-lg bg-zinc-900">
                         <SeverityBadge severity={issue.severity} />
                         <div className="min-w-0">
-                          <p className="text-xs" style={{ color: 'var(--brand-text-bright)' }}>{issue.message}</p>
-                          <p className="text-xs mt-0.5" style={{ color: 'var(--brand-text-muted)' }}>{issue.recommendation}</p>
+                          <p className="text-xs text-zinc-200">{issue.message}</p>
+                          <p className="text-xs mt-0.5 text-zinc-500">{issue.recommendation}</p>
                         </div>
                       </div>
                     ))

@@ -87,21 +87,20 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
       <button
         onClick={() => setOpen(!open)}
         className={cn(
-          'flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm font-medium transition-all',
+          'flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm font-medium transition-all border border-zinc-800',
           open ? 'bg-teal-500/10 ring-1 ring-teal-500/20' : 'hover:bg-zinc-800/60'
         )}
-        style={{ border: '1px solid var(--brand-border)' }}
       >
         <div className={cn(
           'w-2 h-2 rounded-full shrink-0',
           selected ? 'bg-emerald-400' : 'bg-zinc-600'
         )} />
-        <span className="truncate flex-1 text-left" style={{ color: selected ? 'var(--brand-text-bright)' : 'var(--brand-text-muted)' }}>{selected?.name || 'Select workspace'}</span>
+        <span className={`truncate flex-1 text-left ${selected ? 'text-zinc-200' : 'text-zinc-500'}`}>{selected?.name || 'Select workspace'}</span>
         <ChevronDown className={cn('w-3.5 h-3.5 shrink-0 transition-transform', open ? 'rotate-180 text-teal-400' : 'text-zinc-500')} />
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-2 w-80 rounded-xl shadow-2xl z-50 overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border-hover)' }}>
+        <div className="absolute top-full left-0 mt-2 w-80 rounded-xl shadow-2xl z-50 overflow-hidden bg-zinc-900 border border-zinc-700">
           {workspaces.length > 0 && (
             <div className="p-1">
               {workspaces.map(ws => (
@@ -151,7 +150,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
                         <MoreHorizontal className="w-3 h-3 text-zinc-400" />
                       </button>
                       {menuOpen === ws.id && (
-                        <div className="absolute right-0 top-full mt-1 w-36 rounded-lg shadow-xl z-50 py-1" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border-hover)' }}>
+                        <div className="absolute right-0 top-full mt-1 w-36 rounded-lg shadow-xl z-50 py-1 bg-zinc-900 border border-zinc-700">
                           <button
                             onClick={(e) => { e.stopPropagation(); setConfirmDelete(ws.id); setMenuOpen(null); }}
                             className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 transition-colors"
@@ -165,7 +164,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
 
                   {/* Site linking dropdown */}
                   {linkingId === ws.id && (
-                    <div className="mx-2 mb-1 p-2 rounded-lg" style={{ backgroundColor: 'var(--brand-bg-surface)', border: '1px solid var(--brand-border)' }}>
+                    <div className="mx-2 mb-1 p-2 rounded-lg bg-zinc-900 border border-zinc-800">
                       <p className="text-xs text-zinc-500 mb-1">Paste a Webflow API token for this workspace:</p>
                       <p className="text-[10px] text-zinc-600 mb-2">
                         Get one at{' '}
@@ -233,7 +232,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
             </div>
           )}
 
-          <div className="p-2" style={{ borderTop: '1px solid var(--brand-border)' }}>
+          <div className="p-2 border-t border-zinc-800">
             {creating ? (
               <div className="flex gap-2">
                 <input
@@ -267,20 +266,20 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
       {/* Delete confirmation modal */}
       {confirmDelete && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100]" onClick={() => setConfirmDelete(null)}>
-          <div className="w-80 rounded-xl p-5 shadow-2xl" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border-hover)' }} onClick={e => e.stopPropagation()}>
+          <div className="w-80 rounded-xl p-5 shadow-2xl bg-zinc-900 border border-zinc-700" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-3 mb-3">
               <div className="w-9 h-9 rounded-lg bg-red-500/10 flex items-center justify-center shrink-0">
                 <AlertTriangle className="w-4 h-4 text-red-400" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Delete workspace?</h3>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--brand-text-muted)' }}>
+                <h3 className="text-sm font-semibold text-zinc-200">Delete workspace?</h3>
+                <p className="text-xs mt-0.5 text-zinc-500">
                   This will permanently remove <strong>{workspaces.find(w => w.id === confirmDelete)?.name}</strong> and all its data.
                 </p>
               </div>
             </div>
             <div className="flex gap-2 mt-4">
-              <button onClick={() => setConfirmDelete(null)} className="flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors" style={{ backgroundColor: 'var(--brand-bg-surface)', color: 'var(--brand-text-muted)', border: '1px solid var(--brand-border)' }}>
+              <button onClick={() => setConfirmDelete(null)} className="flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors bg-zinc-900 text-zinc-500 border border-zinc-800">
                 Cancel
               </button>
               <button onClick={() => { onDelete(confirmDelete); setConfirmDelete(null); setOpen(false); }} className="flex-1 px-3 py-2 rounded-lg text-xs font-medium bg-red-600 hover:bg-red-500 text-white transition-colors">

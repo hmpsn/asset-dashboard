@@ -278,8 +278,8 @@ function AssetAudit({ siteId }: Props) {
       <div className="grid grid-cols-4 gap-3">
         <button
           onClick={() => setActiveFilter(null)}
-          className={`bg-brand-elevated rounded-xl p-4 border text-left transition-colors ${
-            activeFilter === null ? 'border-zinc-600' : 'border-brand hover:border-zinc-700'
+          className={`bg-zinc-900 rounded-xl p-4 border text-left transition-colors ${
+            activeFilter === null ? 'border-zinc-600' : 'border-zinc-800 hover:border-zinc-700'
           }`}
         >
           <div className={`text-3xl font-bold ${scoreColor}`}>{score}</div>
@@ -289,8 +289,8 @@ function AssetAudit({ siteId }: Props) {
 
         <button
           onClick={() => setActiveFilter(activeFilter === 'missing-alt' ? null : 'missing-alt')}
-          className={`bg-brand-elevated rounded-xl p-4 border text-left transition-colors ${
-            activeFilter === 'missing-alt' ? 'border-amber-500/50' : 'border-brand hover:border-zinc-700'
+          className={`bg-zinc-900 rounded-xl p-4 border text-left transition-colors ${
+            activeFilter === 'missing-alt' ? 'border-amber-500/50' : 'border-zinc-800 hover:border-zinc-700'
           }`}
         >
           <div className="text-3xl font-bold text-amber-400">{audit.missingAlt}</div>
@@ -302,8 +302,8 @@ function AssetAudit({ siteId }: Props) {
 
         <button
           onClick={() => setActiveFilter(activeFilter === 'oversized' ? null : 'oversized')}
-          className={`bg-brand-elevated rounded-xl p-4 border text-left transition-colors ${
-            activeFilter === 'oversized' ? 'border-orange-500/50' : 'border-brand hover:border-zinc-700'
+          className={`bg-zinc-900 rounded-xl p-4 border text-left transition-colors ${
+            activeFilter === 'oversized' ? 'border-orange-500/50' : 'border-zinc-800 hover:border-zinc-700'
           }`}
         >
           <div className="text-3xl font-bold text-orange-400">{audit.oversized}</div>
@@ -315,8 +315,8 @@ function AssetAudit({ siteId }: Props) {
 
         <button
           onClick={() => setActiveFilter(activeFilter === 'unused' ? null : 'unused')}
-          className={`bg-brand-elevated rounded-xl p-4 border text-left transition-colors ${
-            activeFilter === 'unused' ? 'border-zinc-500/50' : 'border-brand hover:border-zinc-700'
+          className={`bg-zinc-900 rounded-xl p-4 border text-left transition-colors ${
+            activeFilter === 'unused' ? 'border-zinc-500/50' : 'border-zinc-800 hover:border-zinc-700'
           }`}
         >
           <div className="text-3xl font-bold text-zinc-400">{audit.unused}</div>
@@ -615,7 +615,7 @@ function AssetAudit({ siteId }: Props) {
             >
               <X className="w-5 h-5" />
             </button>
-            <div className="bg-brand-elevated rounded-xl border border-brand-hover overflow-hidden">
+            <div className="bg-zinc-900 rounded-xl border border-zinc-700 overflow-hidden">
               <div className="flex items-center justify-center bg-zinc-950 p-6 min-h-[300px] max-h-[60vh]">
                 <img
                   src={lightboxIssue.url}

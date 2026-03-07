@@ -166,8 +166,7 @@ export function CompetitorAnalysis({ siteUrl }: Props) {
             <button
               onClick={runComparison}
               disabled={!myUrl.trim() || !competitorUrl.trim()}
-              className="w-full px-4 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-              style={{ backgroundColor: 'var(--brand-mint)', color: '#0f1219' }}
+              className="w-full px-4 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 bg-teal-400 text-[#0f1219]"
             >
               Compare Sites
             </button>

@@ -950,7 +950,7 @@ export function ClientDashboard({ workspaceId }: Props) {
       </header>
       <main className="max-w-6xl mx-auto px-6 py-6">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {[1,2,3,4,5].map(i => <div key={i} className="bg-brand-elevated rounded-xl p-4 border border-brand"><div className="h-4 w-4 bg-zinc-800 rounded mb-2 animate-pulse" /><div className="h-7 w-16 bg-zinc-800 rounded animate-pulse" /><div className="h-3 w-20 bg-zinc-800/50 rounded animate-pulse mt-2" /></div>)}
+          {[1,2,3,4,5].map(i => <div key={i} className="bg-zinc-900 rounded-xl p-4 border border-zinc-800"><div className="h-4 w-4 bg-zinc-800 rounded mb-2 animate-pulse" /><div className="h-7 w-16 bg-zinc-800 rounded animate-pulse" /><div className="h-3 w-20 bg-zinc-800/50 rounded animate-pulse mt-2" /></div>)}
         </div>
       </main>
     </div>
@@ -968,7 +968,7 @@ export function ClientDashboard({ workspaceId }: Props) {
   if (ws.requiresPassword && !authenticated) return (
     <div className="min-h-screen bg-[#0f1219] flex items-center justify-center">
       <div className="w-full max-w-sm">
-        <div className="bg-brand-elevated rounded-2xl border border-brand p-8 shadow-2xl shadow-black/40">
+        <div className="bg-zinc-900 rounded-2xl border border-zinc-800 p-8 shadow-2xl shadow-black/40">
           <div className="flex flex-col items-center mb-6">
             <img src="/logo.svg" alt="hmpsn studio" className="h-7 opacity-60 mb-4" />
             <div className="w-12 h-12 rounded-2xl bg-teal-500/10 flex items-center justify-center mb-4">
@@ -1085,7 +1085,7 @@ export function ClientDashboard({ workspaceId }: Props) {
               {theme === 'dark' ? <Sun className="w-4 h-4 text-zinc-400" /> : <Moon className="w-4 h-4 text-zinc-400" />}
             </button>
             {(overview || ga4Overview) && (
-              <div className="flex items-center gap-1 bg-brand-elevated rounded-lg border border-brand p-0.5">
+              <div className="flex items-center gap-1 bg-zinc-900 rounded-lg border border-zinc-800 p-0.5">
                 {[7, 28, 90, 180, 365].map(d => (
                   <button key={d} onClick={() => changeDays(d)}
                     className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${days === d ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}
@@ -1159,7 +1159,7 @@ export function ClientDashboard({ workspaceId }: Props) {
             return (
               <div className={`grid gap-3 ${cards.length <= 3 ? 'grid-cols-' + cards.length : cards.length === 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'}`}>
                 {cards.map((card, i) => { const Icon = card.icon; return (
-                  <button key={i} onClick={card.onClick} className="bg-brand-elevated rounded-xl p-4 border border-brand hover:border-zinc-700 transition-colors text-left group">
+                  <button key={i} onClick={card.onClick} className="bg-zinc-900 rounded-xl p-4 border border-zinc-800 hover:border-zinc-700 transition-colors text-left group">
                     <div className="flex items-center justify-between mb-1.5">
                       <Icon className="w-4 h-4" style={{ color: card.color }} />
                       {card.td.length > 2 && <MiniSparkline data={card.td} color={card.color} />}
@@ -1179,7 +1179,7 @@ export function ClientDashboard({ workspaceId }: Props) {
             <div className="lg:col-span-3 space-y-5">
               {/* Traffic trend chart */}
               {ga4Trend.length > 2 && (
-                <div className="bg-brand-elevated rounded-xl border border-brand p-4">
+                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-xs font-medium text-zinc-400">Traffic Trend</span>
                     {ga4Overview && <span className="text-[10px] text-zinc-600">{ga4Overview.dateRange.start} — {ga4Overview.dateRange.end}</span>}
@@ -1211,7 +1211,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                 </div>
               )}
               {!ga4Trend.length && trend.length > 2 && (
-                <div className="bg-brand-elevated rounded-xl border border-brand p-4">
+                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-xs font-medium text-zinc-400">Search Performance</span>
                     {overview && <span className="text-[10px] text-zinc-600">{overview.dateRange.start} — {overview.dateRange.end}</span>}
@@ -1225,7 +1225,7 @@ export function ClientDashboard({ workspaceId }: Props) {
 
               {/* Top search wins — celebrate what's working */}
               {insights && insights.topPerformers.length > 0 && (
-                <div className="bg-brand-elevated rounded-xl border border-brand p-4">
+                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="w-5 h-5 rounded-md bg-emerald-500/15 flex items-center justify-center"><CheckCircle2 className="w-3 h-3 text-emerald-400" /></div>
                     <span className="text-xs font-medium text-zinc-300">Your Top Search Rankings</span>
@@ -1247,7 +1247,7 @@ export function ClientDashboard({ workspaceId }: Props) {
 
               {/* Pinned key events */}
               {sortedConversions.filter(c => isEventPinned(c.eventName)).length > 0 && (
-                <div className="bg-brand-elevated rounded-xl border border-brand p-4">
+                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2"><Zap className="w-4 h-4 text-teal-400" /><span className="text-xs font-medium text-zinc-300">Key Events</span></div>
                     <button onClick={() => setTab('analytics')} className="text-[10px] text-teal-400 hover:text-teal-300">View all →</button>
@@ -1278,7 +1278,7 @@ export function ClientDashboard({ workspaceId }: Props) {
             <div className="lg:col-span-2 space-y-4">
               {/* Site health snapshot */}
               {audit && (
-                <button onClick={() => setTab('health')} className="bg-brand-elevated rounded-xl border border-brand p-4 text-left hover:border-zinc-700 transition-colors w-full">
+                <button onClick={() => setTab('health')} className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 text-left hover:border-zinc-700 transition-colors w-full">
                   <div className="flex items-center gap-2 mb-2"><Shield className="w-4 h-4" style={{ color: audit.siteScore >= 80 ? '#34d399' : audit.siteScore >= 60 ? '#fbbf24' : '#f87171' }} /><span className="text-xs font-medium text-zinc-300">Site Health</span></div>
                   <div className="flex items-center gap-3">
                     <div className={`text-2xl font-bold ${audit.siteScore >= 80 ? 'text-green-400' : audit.siteScore >= 60 ? 'text-amber-400' : 'text-red-400'}`}>{audit.siteScore}/100</div>
@@ -1297,7 +1297,7 @@ export function ClientDashboard({ workspaceId }: Props) {
 
               {/* Search opportunities */}
               {insights && insights.lowHanging.length > 0 && (
-                <div className="bg-brand-elevated rounded-xl border border-brand p-4">
+                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <TrendingUp className="w-4 h-4 text-amber-400" />
                     <span className="text-xs font-medium text-zinc-300">Almost There</span>
@@ -1317,7 +1317,7 @@ export function ClientDashboard({ workspaceId }: Props) {
 
               {/* Growth insights — subtle strategy teaser, only if data exists */}
               {strategyData && (strategyData.quickWins?.length || strategyData.contentGaps?.length) ? (
-                <div className="bg-brand-elevated rounded-xl border border-brand p-4">
+                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                   <div className="flex items-center gap-2 mb-2.5">
                     <Sparkles className="w-4 h-4 text-teal-400" />
                     <span className="text-xs font-medium text-zinc-300">Growth Insights</span>
@@ -1354,7 +1354,7 @@ export function ClientDashboard({ workspaceId }: Props) {
 
               {/* Activity timeline (compact in sidebar) */}
               {activityLog.length > 0 && (
-                <div className="bg-brand-elevated rounded-xl border border-brand p-4">
+                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <Activity className="w-4 h-4 text-teal-400" />
                     <span className="text-xs font-medium text-zinc-300">Recent Work</span>
@@ -1376,7 +1376,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                         const cfg = icons[entry.type] || icons.note;
                         return (
                           <div key={entry.id} className="flex items-start gap-2.5 pl-0">
-                            <div className="w-[11px] h-[11px] rounded-full border-2 flex-shrink-0 mt-1 z-10" style={{ borderColor: cfg.color, backgroundColor: 'var(--brand-bg, #0f1219)' }} />
+                            <div className="w-[11px] h-[11px] rounded-full border-2 flex-shrink-0 mt-1 z-10" style={{ borderColor: cfg.color, backgroundColor: '#0f1219' }} />
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5">
                                 <span className="text-[9px] font-medium px-1 py-0.5 rounded" style={{ backgroundColor: `${cfg.color}15`, color: cfg.color }}>{cfg.label}</span>
@@ -1399,7 +1399,7 @@ export function ClientDashboard({ workspaceId }: Props) {
         {tab === 'search' && (<>
           {overview ? (<>
             {/* Compact metrics bar */}
-            <div className="bg-brand-elevated rounded-xl border border-brand px-5 py-3 flex items-center justify-between flex-wrap gap-3">
+            <div className="bg-zinc-900 rounded-xl border border-zinc-800 px-5 py-3 flex items-center justify-between flex-wrap gap-3">
               {[
                 { label: 'Clicks', value: overview.totalClicks.toLocaleString(), color: 'text-blue-400' },
                 { label: 'Impressions', value: overview.totalImpressions.toLocaleString(), color: 'text-teal-400' },
@@ -1414,7 +1414,7 @@ export function ClientDashboard({ workspaceId }: Props) {
             </div>
 
             {trend.length > 2 && (
-              <div className="bg-brand-elevated rounded-xl border border-brand p-4">
+              <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-medium text-zinc-400">Performance Trend</span>
                   <span className="text-[10px] text-zinc-600">{overview.dateRange.start} — {overview.dateRange.end}</span>
@@ -1425,7 +1425,7 @@ export function ClientDashboard({ workspaceId }: Props) {
 
             {insights && (
               <div className="space-y-3">
-                <div className="bg-brand-elevated rounded-xl border border-brand p-4">
+                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                   <div className="text-xs font-medium text-zinc-300 mb-3">Search Health Summary</div>
                   <div className="grid grid-cols-4 gap-3">
                     <div className="text-center"><div className={`text-lg font-bold ${insights.page1 > 5 ? 'text-green-400' : 'text-amber-400'}`}>{insights.page1}</div><div className="text-[10px] text-zinc-500">Page 1 Rankings</div></div>
@@ -1445,7 +1445,7 @@ export function ClientDashboard({ workspaceId }: Props) {
 
             {/* Rank Tracking */}
             {(rankHistory.length > 1 || latestRanks.length > 0) && (
-              <div className="bg-brand-elevated rounded-xl border border-brand p-4">
+              <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <TrendingUp className="w-4 h-4 text-teal-400" />
                   <span className="text-xs font-semibold text-zinc-200">Keyword Rank Tracking</span>
@@ -1525,7 +1525,7 @@ export function ClientDashboard({ workspaceId }: Props) {
               </div>
             )}
 
-            <div className="bg-brand-elevated rounded-xl border border-brand overflow-hidden">
+            <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
               <div className="flex items-center gap-1 px-4 pt-3 pb-1">
                 {(['queries', 'pages'] as const).map(st => (
                   <button key={st} onClick={() => setSearchSubTab(st)}
@@ -1574,7 +1574,7 @@ export function ClientDashboard({ workspaceId }: Props) {
 
             {/* Annotations (read-only, managed from admin) */}
             {annotations.length > 0 && (
-              <div className="bg-brand-elevated rounded-xl border border-brand p-4">
+              <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <Activity className="w-4 h-4 text-zinc-400" />
                   <span className="text-xs font-semibold text-zinc-200">Timeline Annotations</span>
@@ -1607,7 +1607,7 @@ export function ClientDashboard({ workspaceId }: Props) {
             <div className="space-y-5">
               <div className="grid grid-cols-3 gap-5">
                 {/* Score ring */}
-                <div className="bg-brand-elevated rounded-xl border border-brand p-6 flex flex-col items-center justify-center">
+                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6 flex flex-col items-center justify-center">
                   <ScoreRing score={auditDetail.audit.siteScore} size={140} />
                   <div className="text-xs text-zinc-500 mt-3">{auditDetail.audit.totalPages} pages scanned</div>
                   <div className="text-[10px] text-zinc-600">{new Date(auditDetail.createdAt).toLocaleDateString()}</div>
@@ -1627,7 +1627,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                     const sc = SEV[s.sev];
                     return (
                       <button key={s.sev} onClick={() => setSeverityFilter(severityFilter === s.sev ? 'all' : s.sev)}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors ${severityFilter === s.sev ? `${sc.bg} ${sc.border}` : 'bg-brand-elevated border-brand hover:border-zinc-700'}`}>
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors ${severityFilter === s.sev ? `${sc.bg} ${sc.border}` : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'}`}>
                         <s.Icon className={`w-4 h-4 ${sc.text}`} />
                         <span className="text-sm font-medium text-zinc-300">{s.label}</span>
                         <span className={`text-xl font-bold ml-auto ${sc.text}`}>{s.count}</span>
@@ -1638,12 +1638,12 @@ export function ClientDashboard({ workspaceId }: Props) {
                 {/* Score history + category breakdown */}
                 <div className="space-y-3">
                   {auditDetail.scoreHistory.length >= 2 && (
-                    <div className="bg-brand-elevated rounded-xl border border-brand p-4">
+                    <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                       <div className="text-xs font-medium text-zinc-400 mb-2">Score History</div>
                       <ScoreHistoryChart history={auditDetail.scoreHistory} />
                     </div>
                   )}
-                  <div className="bg-brand-elevated rounded-xl border border-brand p-4">
+                  <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                     <div className="text-xs font-medium text-zinc-400 mb-3">Issues by Category</div>
                     <div className="space-y-2">
                       {Object.entries(categoryStats).map(([cat, counts]) => {
@@ -1667,7 +1667,7 @@ export function ClientDashboard({ workspaceId }: Props) {
 
               {/* Site-wide issues */}
               {auditDetail.audit.siteWideIssues.length > 0 && (
-                <div className="bg-brand-elevated rounded-xl border border-brand p-4">
+                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                   <div className="text-xs font-medium text-zinc-400 mb-3">Site-Wide Issues</div>
                   <div className="space-y-2">
                     {auditDetail.audit.siteWideIssues.map((issue, i) => {
@@ -1684,7 +1684,7 @@ export function ClientDashboard({ workspaceId }: Props) {
               )}
 
               {/* Page-by-page breakdown */}
-              <div className="bg-brand-elevated rounded-xl border border-brand overflow-hidden">
+              <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
                 <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-3">
                   <span className="text-xs font-medium text-zinc-300">Page Breakdown</span>
                   <div className="flex-1" />
@@ -1746,7 +1746,7 @@ export function ClientDashboard({ workspaceId }: Props) {
               </div>
             </div>
           ) : audit ? (
-            <div className="bg-brand-elevated rounded-xl border border-brand p-6">
+            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
               <div className="flex items-center gap-4">
                 <ScoreRing score={audit.siteScore} size={100} />
                 <div>
@@ -1785,22 +1785,22 @@ export function ClientDashboard({ workspaceId }: Props) {
                 const totalClk = strategyData.pageMap.reduce((s, p) => s + (p.clicks || 0), 0);
                 return (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div className="bg-brand-elevated rounded-xl border border-brand p-3">
+                    <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
                       <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Pages Mapped</div>
                       <div className="text-xl font-bold text-zinc-100">{strategyData.pageMap.length}</div>
                       <div className="text-[10px] text-zinc-600">{strategyData.siteKeywords.length} target keywords</div>
                     </div>
-                    <div className="bg-brand-elevated rounded-xl border border-brand p-3">
+                    <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
                       <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Eye className="w-3 h-3" /> Impressions</div>
                       <div className="text-xl font-bold text-zinc-100">{totalImp > 0 ? totalImp.toLocaleString() : '—'}</div>
                       <div className="text-[10px] text-zinc-600">{totalImp > 0 ? 'last 90 days' : 'no search data yet'}</div>
                     </div>
-                    <div className="bg-brand-elevated rounded-xl border border-brand p-3">
+                    <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
                       <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><MousePointerClick className="w-3 h-3" /> Clicks</div>
                       <div className="text-xl font-bold text-zinc-100">{totalClk > 0 ? totalClk.toLocaleString() : '—'}</div>
                       <div className="text-[10px] text-zinc-600">{totalImp > 0 ? `${((totalClk / totalImp) * 100).toFixed(1)}% CTR` : 'no search data yet'}</div>
                     </div>
-                    <div className="bg-brand-elevated rounded-xl border border-brand p-3">
+                    <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
                       <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Trophy className="w-3 h-3" /> Avg Position</div>
                       <div className={`text-xl font-bold ${ranked.length > 0 ? (avgPos <= 3 ? 'text-emerald-400' : avgPos <= 10 ? 'text-green-400' : avgPos <= 20 ? 'text-amber-400' : 'text-red-400') : 'text-zinc-500'}`}>{ranked.length > 0 ? `#${avgPos.toFixed(1)}` : '—'}</div>
                       <div className="text-[10px] text-zinc-600">{ranked.length} pages ranking</div>
@@ -1926,7 +1926,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                   </div>
                 )}
 
-                <div className="bg-brand-elevated rounded-xl border border-brand p-5">
+                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="w-6 h-6 rounded-lg bg-teal-500/20 flex items-center justify-center">
                       <Target className="w-3.5 h-3.5 text-teal-400" />
@@ -2002,7 +2002,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                 else if (mapSort === 'impressions') filtered = [...filtered].sort((a, b) => (b.impressions || 0) - (a.impressions || 0));
                 else if (mapSort === 'clicks') filtered = [...filtered].sort((a, b) => (b.clicks || 0) - (a.clicks || 0));
                 return (
-                  <div className="bg-brand-elevated rounded-xl border border-brand overflow-hidden">
+                  <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
                     <div className="px-5 py-3 border-b border-zinc-800 flex items-center gap-3 flex-wrap">
                       <span className="text-xs font-medium text-zinc-300">Page Keyword Map</span>
                       <span className="text-[10px] text-zinc-600">{filtered.length} of {strategyData.pageMap.length} pages</span>
@@ -2123,7 +2123,7 @@ export function ClientDashboard({ workspaceId }: Props) {
 
           {/* Topic submission form */}
           {showTopicForm && (
-            <div className="bg-brand-elevated rounded-xl border border-blue-500/20 p-5 space-y-3">
+            <div className="bg-zinc-900 rounded-xl border border-blue-500/20 p-5 space-y-3">
               <div className="text-xs font-medium text-zinc-300">Suggest a Content Topic</div>
               <input type="text" value={newTopicName} onChange={e => setNewTopicName(e.target.value)} placeholder="Topic name (e.g. 'Benefits of sedation dentistry')" className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600" />
               <input type="text" value={newTopicKeyword} onChange={e => setNewTopicKeyword(e.target.value)} placeholder="Target keyword (e.g. 'sedation dentistry benefits')" className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600" />
@@ -2185,7 +2185,7 @@ export function ClientDashboard({ workspaceId }: Props) {
               const canUpgrade = isBriefOnly && ['approved', 'delivered'].includes(req.status);
 
               return (
-                <div key={req.id} className="bg-brand-elevated rounded-xl border border-brand overflow-hidden">
+                <div key={req.id} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
                   <button onClick={() => {
                     const next = isExpanded ? null : req.id;
                     setExpandedContentReq(next);
@@ -2571,7 +2571,7 @@ export function ClientDashboard({ workspaceId }: Props) {
         {tab === 'analytics' && (<>
           {!ga4Overview ? (
             <div className="text-center py-16">
-              <div className="w-16 h-16 rounded-2xl bg-brand-elevated border border-brand flex items-center justify-center mx-auto mb-4"><LineChart className="w-8 h-8 text-zinc-700" /></div>
+              <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4"><LineChart className="w-8 h-8 text-zinc-700" /></div>
               <h3 className="text-sm font-medium text-zinc-400">Analytics Not Configured</h3>
               <p className="text-xs text-zinc-600 mt-1 max-w-sm mx-auto">Google Analytics 4 has not been linked to this workspace yet. Contact your web team to enable it.</p>
             </div>
@@ -2586,7 +2586,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                 { label: 'Bounce Rate', value: `${ga4Overview.bounceRate}%`, color: ga4Overview.bounceRate > 60 ? 'text-red-400' : 'text-emerald-400' },
                 { label: 'New Users', value: `${ga4Overview.newUserPercentage}%`, color: 'text-teal-400' },
               ].map(c => (
-                <div key={c.label} className="bg-brand-elevated rounded-xl border border-brand p-4">
+                <div key={c.label} className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                   <div className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1">{c.label}</div>
                   <div className={`text-xl font-bold ${c.color}`}>{c.value}</div>
                 </div>
@@ -2597,7 +2597,7 @@ export function ClientDashboard({ workspaceId }: Props) {
             {ga4Trend.length > 0 && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
                 {/* Traffic Trend (2/3) */}
-                <div className="lg:col-span-2 bg-brand-elevated rounded-xl border border-brand p-5">
+                <div className="lg:col-span-2 bg-zinc-900 rounded-xl border border-zinc-800 p-5">
                   <h3 className="text-sm font-semibold text-zinc-300 mb-4">Traffic Trend</h3>
                   <svg viewBox={`0 0 800 200`} className="w-full h-48">
                     {(() => {
@@ -2624,7 +2624,7 @@ export function ClientDashboard({ workspaceId }: Props) {
 
                 {/* Devices Pie Chart (1/3) */}
                 {ga4Devices.length > 0 && (
-                  <div className="bg-brand-elevated rounded-xl border border-brand p-5 flex flex-col">
+                  <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5 flex flex-col">
                     <h3 className="text-sm font-semibold text-zinc-300 mb-4">Devices</h3>
                     <div className="flex-1 flex flex-col items-center justify-center">
                       {(() => {
@@ -2668,7 +2668,7 @@ export function ClientDashboard({ workspaceId }: Props) {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
               {/* Top Pages */}
-              <div className="bg-brand-elevated rounded-xl border border-brand p-5">
+              <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
                 <h3 className="text-sm font-semibold text-zinc-300 mb-3">Top Pages</h3>
                 <div className="space-y-1 max-h-[350px] overflow-y-auto">
                   {ga4Pages.slice(0, 15).map((p, i) => (
@@ -2683,7 +2683,7 @@ export function ClientDashboard({ workspaceId }: Props) {
               </div>
 
               {/* Traffic Sources */}
-              <div className="bg-brand-elevated rounded-xl border border-brand p-5">
+              <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
                 <h3 className="text-sm font-semibold text-zinc-300 mb-3">Traffic Sources</h3>
                 <div className="space-y-2">
                   {ga4Sources.slice(0, 10).map((s, i) => {
@@ -2769,7 +2769,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                     const groupEvents = getEventsForModule(group.id);
                     const noResults = modulePageFilters[group.id] && groupEvents.length === 0 && !modulePageLoading[group.id];
                     return (
-                      <div key={group.id} className="bg-brand-elevated rounded-xl border border-brand p-5">
+                      <div key={group.id} className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
                         <div className="flex items-center gap-2 mb-2">
                           <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: group.color }} />
                           <h3 className="text-sm font-semibold text-zinc-300">{group.name}</h3>
@@ -2788,7 +2788,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                   })}
                   {/* Ungrouped events */}
                   {(ungroupedEvents.length > 0 || modulePageFilters['__ungrouped__']) && (
-                    <div className="bg-brand-elevated rounded-xl border border-brand p-5">
+                    <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
                       <h3 className="text-sm font-semibold text-zinc-300 mb-1">{groups.length > 0 ? 'Other Events' : 'Key Events'}</h3>
                       <p className="text-[10px] text-zinc-600 mb-2">{groups.length > 0 ? 'Events not assigned to a group' : 'Custom and conversion events tracked on your site'}</p>
                       {renderPageFilter('__ungrouped__')}
@@ -2804,7 +2804,7 @@ export function ClientDashboard({ workspaceId }: Props) {
 
                   {/* Event Trend (shown when an event is selected) */}
                   {ga4SelectedEvent && ga4EventTrend.length > 2 && (
-                    <div className="bg-brand-elevated rounded-xl border border-brand p-5">
+                    <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
                       <div className="flex items-center justify-between mb-3">
                         <div>
                           <h3 className="text-sm font-semibold text-zinc-300">{eventDisplayName(ga4SelectedEvent)}</h3>
@@ -2840,7 +2840,7 @@ export function ClientDashboard({ workspaceId }: Props) {
             })()}
 
             {/* ── Collapsible Event Explorer ── */}
-            <div className="bg-brand-elevated rounded-xl border border-brand overflow-hidden mt-6">
+            <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden mt-6">
               <button onClick={() => setShowExplorer(!showExplorer)} className="w-full flex items-center justify-between px-5 py-3 hover:bg-zinc-800/30 transition-colors">
                 <div className="flex items-center gap-2">
                   <Filter className="w-4 h-4 text-teal-400" />
@@ -2936,7 +2936,7 @@ export function ClientDashboard({ workspaceId }: Props) {
           </button>
         )}
         {chatOpen && (
-          <div className="fixed bottom-6 right-6 w-96 bg-brand-elevated rounded-2xl border border-brand shadow-2xl shadow-black/40 overflow-hidden z-50 flex flex-col max-h-[500px]">
+          <div className="fixed bottom-6 right-6 w-96 bg-zinc-900 rounded-2xl border border-zinc-800 shadow-2xl shadow-black/40 overflow-hidden z-50 flex flex-col max-h-[500px]">
             <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 flex-shrink-0">
               <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-teal-400" /><span className="text-sm font-medium text-zinc-200">AI Assistant</span><span className="text-[10px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">GPT-4o</span></div>
               <button onClick={() => setChatOpen(false)} className="text-zinc-500 hover:text-zinc-300"><X className="w-4 h-4" /></button>
@@ -3004,7 +3004,7 @@ export function ClientDashboard({ workspaceId }: Props) {
 
             {!approvalsLoading && approvalBatches.length === 0 && (
               <div className="text-center py-16">
-                <div className="w-16 h-16 rounded-2xl bg-brand-elevated border border-brand flex items-center justify-center mx-auto mb-4">
+                <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4">
                   <ClipboardCheck className="w-8 h-8 text-zinc-700" />
                 </div>
                 <h3 className="text-sm font-medium text-zinc-400 mb-1">No pending approvals</h3>
@@ -3020,7 +3020,7 @@ export function ClientDashboard({ workspaceId }: Props) {
               const isApplying = applyingBatch === batch.id;
 
               return (
-                <div key={batch.id} className="bg-brand-elevated rounded-xl border border-brand overflow-hidden">
+                <div key={batch.id} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
                   {/* Batch header */}
                   <div className="px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
                     <div>
@@ -3225,7 +3225,7 @@ export function ClientDashboard({ workspaceId }: Props) {
 
             {/* New request form */}
             {showNewRequest && (
-              <div className="bg-brand-elevated rounded-xl border border-teal-500/20 p-5 space-y-4">
+              <div className="bg-zinc-900 rounded-xl border border-teal-500/20 p-5 space-y-4">
                 <h3 className="text-xs font-semibold text-zinc-200">Submit a Request</h3>
                 <div>
                   <label className="text-[10px] text-zinc-500 mb-1.5 block">Quick Templates</label>
@@ -3321,7 +3321,7 @@ export function ClientDashboard({ workspaceId }: Props) {
             {/* Empty state */}
             {!requestsLoading && requests.length === 0 && !showNewRequest && (
               <div className="text-center py-16">
-                <div className="w-16 h-16 rounded-2xl bg-brand-elevated border border-brand flex items-center justify-center mx-auto mb-4">
+                <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4">
                   <MessageSquare className="w-8 h-8 text-zinc-700" />
                 </div>
                 <h3 className="text-sm font-medium text-zinc-400 mb-1">No requests yet</h3>
@@ -3356,7 +3356,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                   };
                   const teamNotes = req.notes.filter(n => n.author === 'team').length;
                   return (
-                    <div key={req.id} className="bg-brand-elevated rounded-xl border border-brand overflow-hidden">
+                    <div key={req.id} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
                       <button onClick={() => { setExpandedRequest(isExpanded ? null : req.id); setReqNoteInput(''); }}
                         className="w-full px-5 py-4 text-left hover:bg-zinc-800/30 transition-colors">
                         <div className="flex items-start justify-between gap-3">
@@ -3483,7 +3483,7 @@ export function ClientDashboard({ workspaceId }: Props) {
       {/* ── SEO Upgrade Modal ── */}
       {showUpgradeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowUpgradeModal(false)}>
-          <div className="bg-brand-elevated border border-brand-hover rounded-2xl p-8 max-w-md w-full mx-4 text-center shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-8 max-w-md w-full mx-4 text-center shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="w-14 h-14 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center mx-auto mb-4">
               <Sparkles className="w-7 h-7 text-teal-400" />
             </div>
@@ -3538,7 +3538,7 @@ export function ClientDashboard({ workspaceId }: Props) {
 
         return (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => !pricingConfirming && setPricingModal(null)}>
-            <div className="bg-brand-elevated border border-brand-hover rounded-2xl shadow-2xl shadow-black/40 w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-zinc-900 border border-zinc-700/50 rounded-2xl shadow-2xl shadow-black/40 w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
               {/* Header */}
               <div className={`px-6 pt-6 pb-4 ${isFull ? 'bg-gradient-to-br from-blue-600/10 via-teal-600/10 to-transparent' : 'bg-gradient-to-br from-teal-600/10 to-transparent'}`}>
                 <div className="flex items-center gap-3 mb-3">
@@ -3651,7 +3651,7 @@ function InsightCard({ icon: Icon, color, title, count, desc, items }: {
   };
   const c = colorMap[color] || colorMap.amber;
   return (
-    <div className="bg-brand-elevated rounded-xl border border-brand p-4">
+    <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
       <div className="flex items-center gap-1.5 mb-3">
         <Icon className={`w-4 h-4 ${c.text}`} />
         <span className={`text-xs font-medium ${c.text}`}>{title}</span>

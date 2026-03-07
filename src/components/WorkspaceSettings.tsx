@@ -235,11 +235,11 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
       </div>
 
       {/* Tab nav */}
-      <nav className="flex items-center gap-1 border-b" style={{ borderColor: 'var(--brand-border)' }}>
+      <nav className="flex items-center gap-1 border-b border-zinc-800">
         {([['connections', 'Connections'], ['features', 'Features'], ['dashboard', 'Client Dashboard']] as [SectionTab, string][]).map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
             className="px-4 py-2.5 text-xs font-medium border-b-2 transition-colors -mb-px"
-            style={tab === id ? { borderColor: 'var(--brand-mint)', color: 'var(--brand-mint)' } : { borderColor: 'transparent', color: 'var(--brand-text-muted)' }}>
+            style={tab === id ? { borderColor: '#2dd4bf', color: '#2dd4bf' } : { borderColor: 'transparent', color: '#71717a' }}>
             {label}
           </button>
         ))}
@@ -249,14 +249,14 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
       {tab === 'connections' && (
         <div className="space-y-5">
           {/* Webflow */}
-          <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
-            <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid var(--brand-border)' }}>
+          <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+            <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
               <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
                 <Globe className="w-4 h-4 text-teal-400" />
               </div>
               <div className="flex-1">
-                <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Webflow Site</h3>
-                <p className="text-xs" style={{ color: 'var(--brand-text-muted)' }}>Linked via workspace dropdown</p>
+                <h3 className="text-sm font-semibold text-zinc-200">Webflow Site</h3>
+                <p className="text-xs text-zinc-500">Linked via workspace dropdown</p>
               </div>
               {webflowSiteId ? (
                 <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full flex items-center gap-1">
@@ -271,14 +271,14 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
           </section>
 
           {/* Google Auth */}
-          <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
-            <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid var(--brand-border)' }}>
+          <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+            <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
               <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
                 <Search className="w-4 h-4 text-blue-400" />
               </div>
               <div className="flex-1">
-                <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Google Account</h3>
-                <p className="text-xs" style={{ color: 'var(--brand-text-muted)' }}>Search Console & Analytics access</p>
+                <h3 className="text-sm font-semibold text-zinc-200">Google Account</h3>
+                <p className="text-xs text-zinc-500">Search Console & Analytics access</p>
               </div>
               {googleStatus?.connected ? (
                 <div className="flex items-center gap-2">
@@ -299,10 +299,10 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
 
           {/* GSC Property */}
           {googleStatus?.connected && gscSites.length > 0 && (
-            <section className="rounded-xl" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
+            <section className="rounded-xl bg-zinc-900 border border-zinc-800">
               <div className="px-5 py-4 flex items-center gap-3">
                 <Search className="w-4 h-4 text-blue-400" />
-                <span className="text-sm font-medium flex-1" style={{ color: 'var(--brand-text-bright)' }}>Search Console Property</span>
+                <span className="text-sm font-medium flex-1 text-zinc-200">Search Console Property</span>
                 {loadingGoogle ? <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-500" /> : (
                   <SearchableSelect
                     options={gscSites.map(s => ({ value: s.siteUrl, label: s.siteUrl }))}
@@ -320,10 +320,10 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
 
           {/* GA4 Property */}
           {googleStatus?.connected && ga4Properties.length > 0 && (
-            <section className="rounded-xl" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
+            <section className="rounded-xl bg-zinc-900 border border-zinc-800">
               <div className="px-5 py-4 flex items-center gap-3">
                 <BarChart3 className="w-4 h-4 text-teal-400" />
-                <span className="text-sm font-medium flex-1" style={{ color: 'var(--brand-text-bright)' }}>GA4 Property</span>
+                <span className="text-sm font-medium flex-1 text-zinc-200">GA4 Property</span>
                 {loadingGoogle ? <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-500" /> : (
                   <SearchableSelect
                     options={ga4Properties.map(p => ({ value: p.propertyId, label: p.displayName }))}
@@ -345,14 +345,14 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
       {tab === 'features' && (
         <div className="space-y-5">
           {/* Client Portal Toggles */}
-          <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
-            <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid var(--brand-border)' }}>
+          <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+            <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
               <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
                 <SlidersHorizontal className="w-4 h-4 text-teal-400" />
               </div>
               <div className="flex-1">
-                <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Client Portal Features</h3>
-                <p className="text-xs" style={{ color: 'var(--brand-text-muted)' }}>Control what the client can see and access in their dashboard</p>
+                <h3 className="text-sm font-semibold text-zinc-200">Client Portal Features</h3>
+                <p className="text-xs text-zinc-500">Control what the client can see and access in their dashboard</p>
               </div>
             </div>
             <div className="px-5 py-4 space-y-4">
@@ -361,8 +361,8 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                 <div className="flex items-center gap-3">
                   <Users className="w-4 h-4 text-zinc-500" />
                   <div>
-                    <div className="text-xs font-medium" style={{ color: 'var(--brand-text-bright)' }}>Client Portal</div>
-                    <div className="text-[10px]" style={{ color: 'var(--brand-text-muted)' }}>Master toggle — enable or disable the client dashboard entirely</div>
+                    <div className="text-xs font-medium text-zinc-200">Client Portal</div>
+                    <div className="text-[10px] text-zinc-500">Master toggle — enable or disable the client dashboard entirely</div>
                   </div>
                 </div>
                 <button onClick={async () => {
@@ -383,8 +383,8 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                 <div className="flex items-center gap-3">
                   <Shield className="w-4 h-4 text-zinc-500" />
                   <div>
-                    <div className="text-xs font-medium" style={{ color: 'var(--brand-text-bright)' }}>SEO Health View</div>
-                    <div className="text-[10px]" style={{ color: 'var(--brand-text-muted)' }}>Show SEO audit scores and detailed findings to the client (paid upgrade)</div>
+                    <div className="text-xs font-medium text-zinc-200">SEO Health View</div>
+                    <div className="text-[10px] text-zinc-500">Show SEO audit scores and detailed findings to the client (paid upgrade)</div>
                   </div>
                 </div>
                 <button onClick={async () => {
@@ -405,8 +405,8 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                 <div className="flex items-center gap-3">
                   <BarChart3 className="w-4 h-4 text-zinc-500" />
                   <div>
-                    <div className="text-xs font-medium" style={{ color: 'var(--brand-text-bright)' }}>Analytics View</div>
-                    <div className="text-[10px]" style={{ color: 'var(--brand-text-muted)' }}>Show Google Analytics and Search Console data to the client</div>
+                    <div className="text-xs font-medium text-zinc-200">Analytics View</div>
+                    <div className="text-[10px] text-zinc-500">Show Google Analytics and Search Console data to the client</div>
                   </div>
                 </div>
                 <button onClick={async () => {
@@ -426,14 +426,14 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
           </section>
 
           {/* Automated Reports */}
-          <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
-            <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid var(--brand-border)' }}>
+          <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+            <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
               <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
                 <Mail className="w-4 h-4 text-blue-400" />
               </div>
               <div className="flex-1">
-                <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Automated Reports</h3>
-                <p className="text-xs" style={{ color: 'var(--brand-text-muted)' }}>Automatically send SEO and performance reports to the client</p>
+                <h3 className="text-sm font-semibold text-zinc-200">Automated Reports</h3>
+                <p className="text-xs text-zinc-500">Automatically send SEO and performance reports to the client</p>
               </div>
             </div>
             <div className="px-5 py-4 space-y-4">
@@ -441,8 +441,8 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                 <div className="flex items-center gap-3">
                   <Mail className="w-4 h-4 text-zinc-500" />
                   <div>
-                    <div className="text-xs font-medium" style={{ color: 'var(--brand-text-bright)' }}>Enable Auto-Reports</div>
-                    <div className="text-[10px]" style={{ color: 'var(--brand-text-muted)' }}>Send scheduled SEO audit reports to the client email{ws?.clientEmail ? ` (${ws.clientEmail})` : ' — set email in Client Dashboard tab'}</div>
+                    <div className="text-xs font-medium text-zinc-200">Enable Auto-Reports</div>
+                    <div className="text-[10px] text-zinc-500">Send scheduled SEO audit reports to the client email{ws?.clientEmail ? ` (${ws.clientEmail})` : ' — set email in Client Dashboard tab'}</div>
                   </div>
                 </div>
                 <button onClick={async () => {
@@ -461,7 +461,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
               {ws?.autoReports && (
                 <div className="space-y-3 pl-7">
                   <div className="flex items-center gap-3">
-                    <span className="text-xs" style={{ color: 'var(--brand-text-muted)' }}>Frequency:</span>
+                    <span className="text-xs text-zinc-500">Frequency:</span>
                     {(['monthly', 'weekly'] as const).map(freq => (
                       <button key={freq} onClick={async () => {
                         await patchWorkspace({ autoReportFrequency: freq });
@@ -498,19 +498,19 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
           </section>
 
           {/* Branding */}
-          <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
-            <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid var(--brand-border)' }}>
+          <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+            <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
               <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
                 <ImageIcon className="w-4 h-4 text-teal-400" />
               </div>
               <div className="flex-1">
-                <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>White-Label Branding</h3>
-                <p className="text-xs" style={{ color: 'var(--brand-text-muted)' }}>Customize the client dashboard and reports appearance</p>
+                <h3 className="text-sm font-semibold text-zinc-200">White-Label Branding</h3>
+                <p className="text-xs text-zinc-500">Customize the client dashboard and reports appearance</p>
               </div>
             </div>
             <div className="px-5 py-4 space-y-4">
               <div>
-                <div className="text-[10px] font-medium mb-1.5" style={{ color: 'var(--brand-text-muted)' }}>Logo URL</div>
+                <div className="text-[10px] font-medium mb-1.5 text-zinc-500">Logo URL</div>
                 <div className="flex items-center gap-2">
                   <input type="url" defaultValue={ws?.brandLogoUrl || ''}
                     placeholder="https://example.com/logo.svg"
@@ -526,7 +526,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                 </div>
               </div>
               <div>
-                <div className="text-[10px] font-medium mb-1.5" style={{ color: 'var(--brand-text-muted)' }}>Accent Color</div>
+                <div className="text-[10px] font-medium mb-1.5 text-zinc-500">Accent Color</div>
                 <div className="flex items-center gap-2">
                   <input type="color" defaultValue={ws?.brandAccentColor || '#2dd4bf'}
                     onChange={async (e) => {
@@ -535,7 +535,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                     }}
                     className="w-8 h-8 rounded-lg border border-zinc-700 cursor-pointer bg-transparent" />
                   <code className="text-xs text-zinc-400">{ws?.brandAccentColor || '#2dd4bf'}</code>
-                  <span className="text-[10px]" style={{ color: 'var(--brand-text-muted)' }}>Used in reports and the client portal header</span>
+                  <span className="text-[10px] text-zinc-500">Used in reports and the client portal header</span>
                 </div>
               </div>
             </div>
@@ -553,13 +553,13 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
             </div>
           ) : (<>
             {/* Dashboard link + password */}
-            <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
-              <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--brand-border)' }}>
+            <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+              <div className="px-5 py-4 border-b border-zinc-800">
                 <div className="flex items-center gap-2">
                   <Users className="w-4 h-4 text-teal-400" />
-                  <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Client Access</h3>
+                  <h3 className="text-sm font-semibold text-zinc-200">Client Access</h3>
                 </div>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--brand-text-muted)' }}>Share the dashboard link with your client. Optionally protect it with a password.</p>
+                <p className="text-xs mt-0.5 text-zinc-500">Share the dashboard link with your client. Optionally protect it with a password.</p>
               </div>
               <div className="px-5 py-4 space-y-3">
                 {/* Link row */}
@@ -570,12 +570,11 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                   <button onClick={copyClientLink}
                     className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all"
                     style={copiedLink ? { backgroundColor: 'rgba(52,211,153,0.1)', color: '#34d399', border: '1px solid rgba(52,211,153,0.2)' }
-                      : { backgroundColor: 'var(--brand-bg-surface)', color: 'var(--brand-text)', border: '1px solid var(--brand-border)' }}>
+                      : { backgroundColor: '#18181b', color: '#a1a1aa', border: '1px solid #27272a' }}>
                     {copiedLink ? <><CheckCircle className="w-3.5 h-3.5" /> Copied!</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
                   </button>
                   <a href={`/client/${workspaceId}`} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors"
-                    style={{ backgroundColor: 'var(--brand-mint-dim)', color: 'var(--brand-mint)', border: '1px solid rgba(45,212,191,0.2)' }}>
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors bg-teal-500/10 text-teal-400 border border-teal-500/20">
                     <ExternalLink className="w-3.5 h-3.5" /> Open <ChevronRight className="w-3 h-3" />
                   </a>
                 </div>
@@ -615,9 +614,9 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                   </div>
                 )}
                 {/* Client notification email */}
-                <div className="pt-2" style={{ borderTop: '1px solid var(--brand-border)' }}>
-                  <div className="text-[10px] font-medium mb-1.5" style={{ color: 'var(--brand-text-muted)' }}>Client Notification Email</div>
-                  <p className="text-[10px] mb-2" style={{ color: 'var(--brand-text-dim)' }}>We'll email this address when your team responds to requests or changes status.</p>
+                <div className="pt-2 border-t border-zinc-800">
+                  <div className="text-[10px] font-medium mb-1.5 text-zinc-500">Client Notification Email</div>
+                  <p className="text-[10px] mb-2 text-zinc-600">We'll email this address when your team responds to requests or changes status.</p>
                   <div className="flex items-center gap-2">
                     <input type="email" value={clientEmail} onChange={e => setClientEmail(e.target.value)}
                       placeholder="client@company.com"
@@ -637,14 +636,14 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
             </section>
 
             {/* Content Pricing */}
-            <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
-              <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid var(--brand-border)' }}>
+            <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+              <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
                 <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
                   <DollarSign className="w-4 h-4 text-green-400" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Content Pricing</h3>
-                  <p className="text-xs" style={{ color: 'var(--brand-text-muted)' }}>Set pricing for content briefs and full blog posts. Clients see these before confirming.</p>
+                  <h3 className="text-sm font-semibold text-zinc-200">Content Pricing</h3>
+                  <p className="text-xs text-zinc-500">Set pricing for content briefs and full blog posts. Clients see these before confirming.</p>
                 </div>
                 <button
                   onClick={() => {
@@ -656,7 +655,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                     setShowPricingConfig(!showPricingConfig);
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-                  style={{ backgroundColor: 'var(--brand-bg-card)', color: 'var(--brand-text)' }}>
+                  style={{ backgroundColor: '#27272a', color: '#a1a1aa' }}>
                   {showPricingConfig ? 'Close' : <><Pencil className="w-3 h-3" /> Configure</>}
                 </button>
               </div>
@@ -667,17 +666,17 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                   {ws?.contentPricing ? (
                     <>
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-medium" style={{ color: 'var(--brand-text-muted)' }}>Brief:</span>
+                        <span className="text-[10px] font-medium text-zinc-500">Brief:</span>
                         <span className="text-xs font-semibold text-teal-400">${ws.contentPricing.briefPrice}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-medium" style={{ color: 'var(--brand-text-muted)' }}>Full Post:</span>
+                        <span className="text-[10px] font-medium text-zinc-500">Full Post:</span>
                         <span className="text-xs font-semibold text-blue-400">${ws.contentPricing.fullPostPrice}</span>
                       </div>
                       <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Active</span>
                     </>
                   ) : (
-                    <span className="text-[10px]" style={{ color: 'var(--brand-text-dim)' }}>No pricing set — clients will see "Pricing confirmed after submission"</span>
+                    <span className="text-[10px] text-zinc-600">No pricing set — clients will see "Pricing confirmed after submission"</span>
                   )}
                 </div>
               )}
@@ -687,7 +686,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                 <div className="px-5 py-4 space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <div className="text-[10px] font-medium mb-1.5" style={{ color: 'var(--brand-text-muted)' }}>Content Brief Price</div>
+                      <div className="text-[10px] font-medium mb-1.5 text-zinc-500">Content Brief Price</div>
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500">$</span>
                         <input type="number" min={0} value={pricingBrief || ''} onChange={e => setPricingBrief(Number(e.target.value))}
@@ -696,7 +695,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                       </div>
                     </div>
                     <div>
-                      <div className="text-[10px] font-medium mb-1.5" style={{ color: 'var(--brand-text-muted)' }}>Full Blog Post Price</div>
+                      <div className="text-[10px] font-medium mb-1.5 text-zinc-500">Full Blog Post Price</div>
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500">$</span>
                         <input type="number" min={0} value={pricingFull || ''} onChange={e => setPricingFull(Number(e.target.value))}
@@ -706,7 +705,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                     </div>
                   </div>
                   <div>
-                    <div className="text-[10px] font-medium mb-1.5" style={{ color: 'var(--brand-text-muted)' }}>Currency</div>
+                    <div className="text-[10px] font-medium mb-1.5 text-zinc-500">Currency</div>
                     <select value={pricingCurrency} onChange={e => setPricingCurrency(e.target.value)}
                       className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-teal-500">
                       <option value="USD">USD ($)</option>
@@ -716,7 +715,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                       <option value="AUD">AUD (A$)</option>
                     </select>
                   </div>
-                  <div className="pt-2 flex items-center gap-3" style={{ borderTop: '1px solid var(--brand-border)' }}>
+                  <div className="pt-2 flex items-center gap-3 border-t border-zinc-800">
                     <button
                       disabled={savingPricing}
                       onClick={async () => {
@@ -752,7 +751,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                       </button>
                     )}
                   </div>
-                  <div className="text-[9px] leading-relaxed" style={{ color: 'var(--brand-text-dim)' }}>
+                  <div className="text-[9px] leading-relaxed text-zinc-600">
                     Clients will see these prices in a confirmation dialog before submitting content requests. Stripe integration for direct payments is coming soon.
                   </div>
                 </div>
@@ -761,12 +760,12 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
 
             {/* Event Configuration */}
             {ws?.ga4PropertyId && (
-              <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
-                <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid var(--brand-border)' }}>
+              <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+                <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
                   <Pin className="w-4 h-4 text-teal-400" />
                   <div className="flex-1">
-                    <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Event Display & Pinning</h3>
-                    <p className="text-xs" style={{ color: 'var(--brand-text-muted)' }}>Rename events, pin key metrics, and group them for the client dashboard.</p>
+                    <h3 className="text-sm font-semibold text-zinc-200">Event Display & Pinning</h3>
+                    <p className="text-xs text-zinc-500">Rename events, pin key metrics, and group them for the client dashboard.</p>
                   </div>
                   <div className="flex items-center gap-2">
                     {showEventConfig && (
@@ -777,7 +776,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                     )}
                     <button onClick={() => showEventConfig ? setShowEventConfig(false) : loadEvents()}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-                      style={{ backgroundColor: 'var(--brand-bg-card)', color: 'var(--brand-text)' }}>
+                      style={{ backgroundColor: '#27272a', color: '#a1a1aa' }}>
                       {showEventConfig ? 'Close' : <><RefreshCw className="w-3 h-3" /> Configure</>}
                     </button>
                   </div>
@@ -786,24 +785,24 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                 {showEventConfig && (
                   <div className="px-5 py-4 space-y-4">
                     {loadingEvents ? (
-                      <div className="flex items-center gap-2 text-xs py-4 justify-center" style={{ color: 'var(--brand-text-muted)' }}>
+                      <div className="flex items-center gap-2 text-xs py-4 justify-center text-zinc-500">
                         <Loader2 className="w-3 h-3 animate-spin" /> Loading events from GA4...
                       </div>
                     ) : availableEvents.length === 0 ? (
-                      <p className="text-xs py-4 text-center" style={{ color: 'var(--brand-text-muted)' }}>No events found.</p>
+                      <p className="text-xs py-4 text-center text-zinc-500">No events found.</p>
                     ) : (<>
                       {/* Groups */}
                       <div className="rounded-lg border border-zinc-700/50 p-3">
                         <div className="flex items-center gap-2 mb-2">
                           <Palette className="w-3.5 h-3.5 text-teal-400" />
-                          <span className="text-xs font-medium" style={{ color: 'var(--brand-text-bright)' }}>Event Groups</span>
+                          <span className="text-xs font-medium text-zinc-200">Event Groups</span>
                           <span className="text-[10px] text-zinc-600 ml-auto">{localGroups.length} groups</span>
                         </div>
                         {localGroups.sort((a, b) => a.order - b.order).map((g, idx) => (
                           <div key={g.id} className="rounded-lg hover:bg-white/5 mb-1">
                             <div className="flex items-center gap-2 px-2 py-1.5">
                               <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: g.color }} />
-                              <span className="text-xs flex-1" style={{ color: 'var(--brand-text)' }}>{g.name}</span>
+                              <span className="text-xs flex-1 text-zinc-400">{g.name}</span>
                               <span className="text-[10px] text-zinc-600">{localEventConfig.filter(c => c.group === g.id).length} events</span>
                               <button onClick={() => moveGroup(g.id, -1)} disabled={idx === 0} className="p-0.5 text-zinc-600 hover:text-zinc-400 disabled:opacity-30"><ArrowUp className="w-3 h-3" /></button>
                               <button onClick={() => moveGroup(g.id, 1)} disabled={idx === localGroups.length - 1} className="p-0.5 text-zinc-600 hover:text-zinc-400 disabled:opacity-30"><ArrowDown className="w-3 h-3" /></button>
@@ -914,7 +913,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                                   </div>
                                 ) : (
                                   <div className="flex items-center gap-1.5">
-                                    <span className="text-xs font-medium truncate" style={{ color: displayName !== ev.eventName ? 'var(--brand-text-bright)' : 'var(--brand-text)' }}>
+                                    <span className={`text-xs font-medium truncate ${displayName !== ev.eventName ? 'text-zinc-200' : 'text-zinc-400'}`}>
                                       {displayName !== ev.eventName ? displayName : ev.eventName.replace(/_/g, ' ')}
                                     </span>
                                     {displayName !== ev.eventName && <span className="text-[10px] text-zinc-600 font-mono">{ev.eventName}</span>}

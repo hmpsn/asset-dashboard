@@ -60,19 +60,19 @@ export function SettingsPanel() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
-        <h2 className="text-lg font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Settings</h2>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--brand-text-muted)' }}>Account-level connections and configuration</p>
+        <h2 className="text-lg font-semibold text-zinc-200">Settings</h2>
+        <p className="text-xs mt-0.5 text-zinc-500">Account-level connections and configuration</p>
       </div>
 
       {/* Google Account Connection */}
-      <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
-        <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid var(--brand-border)' }}>
+      <section className="bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800">
+        <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
           <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
             <Search className="w-4 h-4 text-blue-400" />
           </div>
           <div className="flex-1">
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Google Account</h3>
-            <p className="text-xs" style={{ color: 'var(--brand-text-muted)' }}>Connect once to access Search Console &amp; GA4 across all workspaces</p>
+            <h3 className="text-sm font-semibold text-zinc-200">Google Account</h3>
+            <p className="text-xs text-zinc-500">Connect once to access Search Console &amp; GA4 across all workspaces</p>
           </div>
           {googleStatus?.connected ? (
             <div className="flex items-center gap-2">
@@ -93,7 +93,7 @@ export function SettingsPanel() {
         {googleStatus?.connected && (
           <div className="px-5 py-3">
             {loadingGsc ? (
-              <div className="flex items-center gap-2 text-xs py-2" style={{ color: 'var(--brand-text-muted)' }}>
+              <div className="flex items-center gap-2 text-xs py-2 text-zinc-500">
                 <Loader2 className="w-3 h-3 animate-spin" /> Loading properties...
               </div>
             ) : gscSites.length > 0 ? (
@@ -103,31 +103,31 @@ export function SettingsPanel() {
                 ))}
               </div>
             ) : (
-              <p className="text-xs py-2" style={{ color: 'var(--brand-text-muted)' }}>No properties found. Make sure your Google account has Search Console access.</p>
+              <p className="text-xs py-2 text-zinc-500">No properties found. Make sure your Google account has Search Console access.</p>
             )}
           </div>
         )}
       </section>
 
       {/* Webflow Connections Overview */}
-      <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
-        <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--brand-border)' }}>
+      <section className="bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800">
+        <div className="px-5 py-4 border-b border-zinc-800">
           <div className="flex items-center gap-2">
             <Globe className="w-4 h-4 text-teal-400" />
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Webflow Connections</h3>
+            <h3 className="text-sm font-semibold text-zinc-200">Webflow Connections</h3>
           </div>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--brand-text-muted)' }}>
+          <p className="text-xs mt-0.5 text-zinc-500">
             Link sites from the workspace dropdown. Generate tokens at{' '}
             <a href="https://webflow.com/dashboard/account/integrations" target="_blank" rel="noopener noreferrer" className="text-teal-400 hover:text-teal-300 inline-flex items-center gap-0.5">
               webflow.com <ExternalLink className="w-3 h-3" />
             </a>
           </p>
         </div>
-        <div className="divide-y" style={{ borderColor: 'var(--brand-border)' }}>
+        <div className="divide-y divide-zinc-800">
           {linked.map(ws => (
             <div key={ws.id} className="px-5 py-3 flex items-center gap-3">
               <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span className="text-sm font-medium" style={{ color: 'var(--brand-text-bright)' }}>{ws.name}</span>
+              <span className="text-sm font-medium text-zinc-200">{ws.name}</span>
               <span className="text-xs text-zinc-500">{ws.webflowSiteName}</span>
             </div>
           ))}
@@ -147,21 +147,21 @@ export function SettingsPanel() {
       </section>
 
       {/* API Keys */}
-      <section className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
-        <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--brand-border)' }}>
-          <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>API Keys</h3>
+      <section className="bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800">
+        <div className="px-5 py-4 border-b border-zinc-800">
+          <h3 className="text-sm font-semibold text-zinc-200">API Keys</h3>
         </div>
         <div className="px-5 py-3 flex items-center gap-3">
           <Check className="w-4 h-4 text-emerald-400" />
           <div>
-            <span className="text-sm" style={{ color: 'var(--brand-text)' }}>OpenAI API Key</span>
+            <span className="text-sm text-zinc-400">OpenAI API Key</span>
             <span className="text-xs text-zinc-500 ml-2">Configured via .env</span>
           </div>
         </div>
       </section>
 
       {/* Hint */}
-      <p className="text-xs text-center py-4" style={{ color: 'var(--brand-text-muted)' }}>
+      <p className="text-xs text-center py-4 text-zinc-500">
         Workspace-specific settings (GSC, GA4, client dashboards) are now in the gear icon next to each workspace.
       </p>
     </div>

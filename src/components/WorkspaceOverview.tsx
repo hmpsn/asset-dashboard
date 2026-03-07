@@ -42,7 +42,7 @@ function ScoreRing({ score, size = 48, stroke = 4 }: { score: number; size?: num
   const color = score >= 80 ? '#4ade80' : score >= 60 ? '#fbbf24' : '#f87171';
   return (
     <svg width={size} height={size} className="shrink-0">
-      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="var(--brand-border)" strokeWidth={stroke} />
+      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#27272a" strokeWidth={stroke} />
       <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={color} strokeWidth={stroke}
         strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round"
         transform={`rotate(-90 ${size / 2} ${size / 2})`} className="transition-all duration-700" />
@@ -90,8 +90,8 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
       <div className="flex flex-col items-center justify-center h-full gap-6">
         <img src="/logo.svg" alt="hmpsn.studio" className="h-10 opacity-40" />
         <div className="text-center max-w-sm">
-          <p className="text-base font-semibold mb-1" style={{ color: 'var(--brand-text-bright)' }}>Welcome to hmpsn studio</p>
-          <p className="text-xs leading-relaxed" style={{ color: 'var(--brand-text-muted)' }}>Create a workspace to get started.</p>
+          <p className="text-base font-semibold mb-1 text-zinc-200">Welcome to hmpsn studio</p>
+          <p className="text-xs leading-relaxed text-zinc-500">Create a workspace to get started.</p>
         </div>
       </div>
     );
@@ -110,8 +110,8 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-lg font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Workspace Overview</h1>
-        <p className="text-xs mt-1" style={{ color: 'var(--brand-text-muted)' }}>
+        <h1 className="text-lg font-semibold text-zinc-200">Workspace Overview</h1>
+        <p className="text-xs mt-1 text-zinc-500">
           {data.length} workspace{data.length !== 1 ? 's' : ''} — select one to dive deeper
         </p>
       </div>
@@ -119,16 +119,16 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
       {/* Global stats bar */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {[
-          { label: 'New Requests', value: totalNewRequests, color: totalNewRequests > 0 ? '#f87171' : 'var(--brand-text-muted)', icon: Bell },
-          { label: 'Active Requests', value: totalActiveRequests, color: totalActiveRequests > 0 ? '#fbbf24' : 'var(--brand-text-muted)', icon: MessageSquare },
-          { label: 'Content Briefs', value: totalPendingContent, color: totalPendingContent > 0 ? '#f59e0b' : 'var(--brand-text-muted)', icon: ClipboardCheck },
-          { label: 'Pending Approvals', value: totalPendingApprovals, color: totalPendingApprovals > 0 ? '#2dd4bf' : 'var(--brand-text-muted)', icon: ClipboardCheck },
-          { label: 'Avg Health Score', value: avgScore !== null ? avgScore : '—', color: avgScore !== null ? (avgScore >= 80 ? '#4ade80' : avgScore >= 60 ? '#fbbf24' : '#f87171') : 'var(--brand-text-muted)', icon: Shield },
+          { label: 'New Requests', value: totalNewRequests, color: totalNewRequests > 0 ? '#f87171' : '#71717a', icon: Bell },
+          { label: 'Active Requests', value: totalActiveRequests, color: totalActiveRequests > 0 ? '#fbbf24' : '#71717a', icon: MessageSquare },
+          { label: 'Content Briefs', value: totalPendingContent, color: totalPendingContent > 0 ? '#f59e0b' : '#71717a', icon: ClipboardCheck },
+          { label: 'Pending Approvals', value: totalPendingApprovals, color: totalPendingApprovals > 0 ? '#2dd4bf' : '#71717a', icon: ClipboardCheck },
+          { label: 'Avg Health Score', value: avgScore !== null ? avgScore : '—', color: avgScore !== null ? (avgScore >= 80 ? '#4ade80' : avgScore >= 60 ? '#fbbf24' : '#f87171') : '#71717a', icon: Shield },
         ].map(stat => (
-          <div key={stat.label} className="rounded-xl px-4 py-3" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
+          <div key={stat.label} className="bg-zinc-900 rounded-xl px-4 py-3 border border-zinc-800">
             <div className="flex items-center gap-1.5 mb-1">
-              <stat.icon className="w-3 h-3" style={{ color: 'var(--brand-text-muted)' }} />
-              <span className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--brand-text-muted)' }}>{stat.label}</span>
+              <stat.icon className="w-3 h-3 text-zinc-500" />
+              <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-500">{stat.label}</span>
             </div>
             <div className="text-xl font-bold" style={{ color: stat.color }}>{stat.value}</div>
           </div>
@@ -145,8 +145,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
             <button
               key={ws.id}
               onClick={() => onSelectWorkspace(ws.id)}
-              className="text-left rounded-xl p-5 transition-all hover:scale-[1.01] hover:shadow-lg group relative"
-              style={{ backgroundColor: 'var(--brand-bg-elevated)', border: `1px solid ${hasAlerts ? 'rgba(251, 191, 36, 0.3)' : 'var(--brand-border)'}` }}
+              className={`text-left rounded-xl p-5 transition-all hover:scale-[1.01] hover:shadow-lg group relative bg-zinc-900 border ${hasAlerts ? 'border-amber-500/30' : 'border-zinc-800'}`}
             >
               {/* New request badge */}
               {ws.requests.new > 0 && (
@@ -158,8 +157,8 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
               {/* Top row: name + site */}
               <div className="flex items-start justify-between gap-3 mb-4">
                 <div className="min-w-0">
-                  <h3 className="text-sm font-semibold truncate group-hover:text-teal-400 transition-colors" style={{ color: 'var(--brand-text-bright)' }}>{ws.name}</h3>
-                  <div className="flex items-center gap-2 mt-1 text-[10px]" style={{ color: 'var(--brand-text-muted)' }}>
+                  <h3 className="text-sm font-semibold truncate group-hover:text-teal-400 transition-colors text-zinc-200">{ws.name}</h3>
+                  <div className="flex items-center gap-2 mt-1 text-[10px] text-zinc-500">
                     {ws.webflowSiteName && <span className="flex items-center gap-1"><Globe className="w-2.5 h-2.5" />{ws.webflowSiteName}</span>}
                     {!ws.webflowSiteId && <span className="flex items-center gap-1 text-amber-400"><AlertTriangle className="w-2.5 h-2.5" />No site linked</span>}
                     {ws.hasGsc && <span className="flex items-center gap-1"><Search className="w-2.5 h-2.5" />GSC</span>}
@@ -167,7 +166,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                     {ws.hasPassword && <span className="flex items-center gap-1"><Lock className="w-2.5 h-2.5" />Client</span>}
                   </div>
                 </div>
-                <ExternalLink className="w-4 h-4 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" style={{ color: 'var(--brand-text-muted)' }} />
+                <ExternalLink className="w-4 h-4 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity text-zinc-500" />
               </div>
 
               {/* Metrics row */}
@@ -178,7 +177,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                     <>
                       <ScoreRing score={ws.audit.score} size={44} stroke={3.5} />
                       <div>
-                        <div className="text-[10px] font-medium" style={{ color: 'var(--brand-text-muted)' }}>Health</div>
+                        <div className="text-[10px] font-medium text-zinc-500">Health</div>
                         <div className="flex items-center gap-1 mt-0.5">
                           {scoreDelta !== null && scoreDelta !== 0 && (
                             <span className={`flex items-center text-[10px] font-medium ${scoreDelta > 0 ? 'text-green-400' : 'text-red-400'}`}>
@@ -188,7 +187,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                           )}
                           {scoreDelta === 0 && <span className="flex items-center text-[10px] text-zinc-500"><Minus className="w-2.5 h-2.5" /></span>}
                         </div>
-                        <div className="text-[9px] mt-0.5" style={{ color: 'var(--brand-text-dim)' }}>
+                        <div className="text-[9px] mt-0.5 text-zinc-600">
                           {ws.audit.errors > 0 && <span className="text-red-400">{ws.audit.errors} err</span>}
                           {ws.audit.errors > 0 && ws.audit.warnings > 0 && ' · '}
                           {ws.audit.warnings > 0 && <span className="text-amber-400">{ws.audit.warnings} warn</span>}
@@ -196,32 +195,32 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                       </div>
                     </>
                   ) : (
-                    <div className="text-[10px]" style={{ color: 'var(--brand-text-dim)' }}>No audit yet</div>
+                    <div className="text-[10px] text-zinc-600">No audit yet</div>
                   )}
                 </div>
 
                 {/* Requests */}
                 <div>
-                  <div className="text-[10px] font-medium mb-1" style={{ color: 'var(--brand-text-muted)' }}>Requests</div>
+                  <div className="text-[10px] font-medium mb-1 text-zinc-500">Requests</div>
                   {ws.requests.total > 0 ? (
                     <div className="space-y-0.5">
                       {ws.requests.new > 0 && <div className="text-[10px] text-red-400 font-medium">{ws.requests.new} new</div>}
                       {ws.requests.active > 0 && <div className="text-[10px] text-teal-400">{ws.requests.active} active</div>}
                       {ws.requests.total - ws.requests.new - ws.requests.active > 0 && (
-                        <div className="text-[10px]" style={{ color: 'var(--brand-text-dim)' }}>{ws.requests.total} total</div>
+                        <div className="text-[10px] text-zinc-600">{ws.requests.total} total</div>
                       )}
                       {ws.requests.latestDate && (
-                        <div className="text-[9px]" style={{ color: 'var(--brand-text-dim)' }}>{timeAgo(ws.requests.latestDate)}</div>
+                        <div className="text-[9px] text-zinc-600">{timeAgo(ws.requests.latestDate)}</div>
                       )}
                     </div>
                   ) : (
-                    <div className="text-[10px]" style={{ color: 'var(--brand-text-dim)' }}>None</div>
+                    <div className="text-[10px] text-zinc-600">None</div>
                   )}
                 </div>
 
                 {/* Approvals */}
                 <div>
-                  <div className="text-[10px] font-medium mb-1" style={{ color: 'var(--brand-text-muted)' }}>Approvals</div>
+                  <div className="text-[10px] font-medium mb-1 text-zinc-500">Approvals</div>
                   {ws.approvals.total > 0 ? (
                     <div className="space-y-0.5">
                       {ws.approvals.pending > 0 && (
@@ -234,7 +233,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                       )}
                     </div>
                   ) : (
-                    <div className="text-[10px]" style={{ color: 'var(--brand-text-dim)' }}>None</div>
+                    <div className="text-[10px] text-zinc-600">None</div>
                   )}
                 </div>
               </div>
@@ -247,10 +246,10 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
       {recentActivity.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <Activity className="w-4 h-4" style={{ color: 'var(--brand-text-muted)' }} />
-            <h2 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Recent Activity</h2>
+            <Activity className="w-4 h-4 text-zinc-500" />
+            <h2 className="text-sm font-semibold text-zinc-200">Recent Activity</h2>
           </div>
-          <div className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
+          <div className="bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800">
             {recentActivity.map((entry, i) => {
               const wsName = data.find(w => w.id === entry.workspaceId)?.name || '';
               const iconMap: Record<string, typeof Zap> = {
@@ -270,17 +269,16 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
               return (
                 <div
                   key={entry.id}
-                  className={`flex items-start gap-3 px-4 py-2.5 ${i < recentActivity.length - 1 ? 'border-b' : ''}`}
-                  style={{ borderColor: 'var(--brand-border)' }}
+                  className={`flex items-start gap-3 px-4 py-2.5 ${i < recentActivity.length - 1 ? 'border-b border-zinc-800' : ''}`}
                 >
-                  <Icon className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" style={{ color: 'var(--brand-mint)' }} />
+                  <Icon className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-teal-400" />
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs" style={{ color: 'var(--brand-text-bright)' }}>{entry.title}</div>
-                    {entry.description && <div className="text-[10px] mt-0.5" style={{ color: 'var(--brand-text-muted)' }}>{entry.description}</div>}
+                    <div className="text-xs text-zinc-200">{entry.title}</div>
+                    {entry.description && <div className="text-[10px] mt-0.5 text-zinc-500">{entry.description}</div>}
                   </div>
                   <div className="flex-shrink-0 text-right">
-                    {wsName && <div className="text-[9px]" style={{ color: 'var(--brand-text-dim)' }}>{wsName}</div>}
-                    <div className="text-[9px]" style={{ color: 'var(--brand-text-dim)' }}>{timeAgo(entry.createdAt)}</div>
+                    {wsName && <div className="text-[9px] text-zinc-600">{wsName}</div>}
+                    <div className="text-[9px] text-zinc-600">{timeAgo(entry.createdAt)}</div>
                   </div>
                 </div>
               );

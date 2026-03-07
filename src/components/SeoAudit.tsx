@@ -233,7 +233,7 @@ function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
     <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
         <div className="flex items-center gap-2">
-          <ListChecks className="w-4 h-4" style={{ color: 'var(--brand-mint)' }} />
+          <ListChecks className="w-4 h-4 text-teal-400" />
           <span className="text-sm font-medium text-zinc-300">Action Items</span>
           {items.length > 0 && (
             <span className="text-xs text-zinc-500">
@@ -244,7 +244,7 @@ function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
         <button
           onClick={() => setAdding(!adding)}
           className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium hover:bg-zinc-800 transition-colors"
-          style={{ color: 'var(--brand-mint)' }}
+          className="text-teal-400"
         >
           <Plus className="w-3 h-3" /> Add
         </button>
@@ -292,7 +292,7 @@ function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
             </div>
             <div className="flex gap-2">
               <button onClick={() => setAdding(false)} className="px-3 py-1.5 rounded-md text-xs text-zinc-400 hover:text-zinc-200">Cancel</button>
-              <button onClick={addItem} className="px-3 py-1.5 rounded-md text-xs font-medium" style={{ background: 'var(--brand-mint)', color: '#0f1219' }}>Add</button>
+              <button onClick={addItem} className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-400 text-[#0f1219]">Add</button>
             </div>
           </div>
         </div>
@@ -413,7 +413,7 @@ function AuditHistory({ siteId, history, onRefresh }: { siteId: string; history:
 
       {/* Audit report link */}
       <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-zinc-900 border border-zinc-800">
-        <Globe className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--brand-mint)' }} />
+        <Globe className="w-4 h-4 flex-shrink-0 text-teal-400" />
         <div className="flex-1 min-w-0">
           <div className="text-xs font-medium text-zinc-300">Audit Report</div>
           <div className="text-xs text-zinc-500 truncate font-mono">{window.location.origin}/report/audit/{siteId}</div>
@@ -426,7 +426,7 @@ function AuditHistory({ siteId, history, onRefresh }: { siteId: string; history:
         >
           <Copy className="w-3 h-3" /> Copy
         </button>
-        <a href={`/report/audit/${siteId}`} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md hover:bg-zinc-800" style={{ color: 'var(--brand-mint)' }}>
+        <a href={`/report/audit/${siteId}`} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md hover:bg-zinc-800 text-teal-400">
           <ExternalLink className="w-3.5 h-3.5" />
         </a>
       </div>
@@ -1005,7 +1005,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
             <p className="text-red-400 text-sm font-medium mb-1">SEO Audit Failed</p>
             <p className="text-xs text-red-400/70">{auditError}</p>
           </div>
-          <button onClick={runAudit} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--brand-mint)', color: '#0f1219' }}>
+          <button onClick={runAudit} className="px-4 py-2 rounded-lg text-sm font-medium bg-teal-400 text-[#0f1219]">
             Try Again
           </button>
         </div>
@@ -1181,7 +1181,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
             onClick={handleSaveAndShare}
             disabled={saving}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors"
-            style={{ backgroundColor: 'var(--brand-mint)', color: '#0f1219' }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors bg-teal-400 text-[#0f1219]"
           >
             <Share2 className="w-3.5 h-3.5" /> {saving ? 'Saving...' : 'Save & Share'}
           </button>
@@ -1220,16 +1220,16 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
 
       {/* Share URL banner */}
       {shareUrl && (
-        <div className="flex items-center gap-3 px-4 py-3 rounded-lg" style={{ backgroundColor: 'var(--brand-mint-dim)', border: '1px solid rgba(46,217,195,0.2)' }}>
-          <Share2 className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--brand-mint)' }} />
+        <div className="flex items-center gap-3 px-4 py-3 rounded-lg" style={{ backgroundColor: 'rgba(45,212,191,0.1)', border: '1px solid rgba(46,217,195,0.2)' }}>
+          <Share2 className="w-4 h-4 flex-shrink-0 text-teal-400" />
           <div className="flex-1 min-w-0">
-            <div className="text-xs font-medium" style={{ color: 'var(--brand-mint)' }}>Report saved! Share this link with clients:</div>
+            <div className="text-xs font-medium text-teal-400">Report saved! Share this link with clients:</div>
             <div className="text-xs text-zinc-300 truncate mt-0.5 font-mono">{shareUrl}</div>
           </div>
-          <button onClick={copyShareUrl} className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors" style={{ backgroundColor: 'var(--brand-mint)', color: '#0f1219' }}>
+          <button onClick={copyShareUrl} className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors bg-teal-400 text-[#0f1219]">
             <Copy className="w-3 h-3" /> {copied ? 'Copied!' : 'Copy'}
           </button>
-          <a href={shareUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md hover:bg-white/10" style={{ color: 'var(--brand-mint)' }}>
+          <a href={shareUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md hover:bg-white/10 text-teal-400">
             <ExternalLink className="w-3.5 h-3.5" />
           </a>
           <button onClick={() => setShareUrl(null)} className="p-1 rounded hover:bg-white/10">

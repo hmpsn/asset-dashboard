@@ -434,10 +434,10 @@ export function RedirectManager({ siteId }: Props) {
               onClick={() => setFilter(f.id)}
               className="px-2.5 py-1 rounded text-[11px] font-medium transition-colors"
               style={filter === f.id ? {
-                backgroundColor: 'var(--brand-mint-dim)',
-                color: 'var(--brand-mint)',
+                backgroundColor: 'rgba(45,212,191,0.1)',
+                color: '#2dd4bf',
               } : {
-                color: 'var(--brand-text-muted)',
+                color: '#71717a',
               }}
             >
               {f.label}

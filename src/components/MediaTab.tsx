@@ -33,13 +33,7 @@ export function MediaTab({ siteId, workspaceFolder, queue }: Props) {
             <button
               key={t.id}
               onClick={() => setSub(t.id)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium"
-              style={active ? {
-                backgroundColor: 'var(--brand-mint-dim)',
-                color: 'var(--brand-mint)',
-              } : {
-                color: 'var(--brand-text-muted)',
-              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium ${active ? 'bg-teal-500/10 text-teal-400' : 'text-zinc-500'}`}
             >
               <Icon className="w-3 h-3" /> {t.label}
             </button>
@@ -54,12 +48,12 @@ export function MediaTab({ siteId, workspaceFolder, queue }: Props) {
             <DropZone workspaceId={workspaceFolder} type="asset" />
             <DropZone workspaceId={workspaceFolder} type="meta" />
           </div>
-          <div className="flex items-center justify-center gap-2 text-[11px]" style={{ color: 'var(--brand-text-muted)' }}>
+          <div className="flex items-center justify-center gap-2 text-[11px] text-zinc-500">
             <Clipboard className="w-3 h-3" />
-            <span>Press <kbd className="px-1.5 py-0.5 rounded font-mono text-[10px]" style={{ backgroundColor: 'var(--brand-bg-elevated)', color: 'var(--brand-text)' }}>⌘V</kbd> to paste images from clipboard</span>
+            <span>Press <kbd className="px-1.5 py-0.5 rounded font-mono text-[10px] bg-zinc-900 text-zinc-400">⌘V</kbd> to paste images from clipboard</span>
           </div>
           <div>
-            <h2 className="text-xs font-medium mb-2.5 px-0.5" style={{ color: 'var(--brand-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Processing Queue</h2>
+            <h2 className="text-xs font-medium mb-2.5 px-0.5 text-zinc-500 uppercase tracking-wider">Processing Queue</h2>
             <ProcessingQueue items={queue} />
           </div>
         </div>
@@ -71,10 +65,10 @@ export function MediaTab({ siteId, workspaceFolder, queue }: Props) {
       )}
       {sub === 'browse' && !siteId && (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'var(--brand-bg-elevated)' }}>
-            <FolderSearch className="w-5 h-5" style={{ color: 'var(--brand-text-muted)' }} />
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-zinc-900">
+            <FolderSearch className="w-5 h-5 text-zinc-500" />
           </div>
-          <p className="text-sm" style={{ color: 'var(--brand-text-muted)' }}>Link a Webflow site to browse assets</p>
+          <p className="text-sm text-zinc-500">Link a Webflow site to browse assets</p>
         </div>
       )}
 
@@ -84,10 +78,10 @@ export function MediaTab({ siteId, workspaceFolder, queue }: Props) {
       )}
       {sub === 'audit' && !siteId && (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'var(--brand-bg-elevated)' }}>
-            <ShieldCheck className="w-5 h-5" style={{ color: 'var(--brand-text-muted)' }} />
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-zinc-900">
+            <ShieldCheck className="w-5 h-5 text-zinc-500" />
           </div>
-          <p className="text-sm" style={{ color: 'var(--brand-text-muted)' }}>Link a Webflow site to run an audit</p>
+          <p className="text-sm text-zinc-500">Link a Webflow site to run an audit</p>
         </div>
       )}
     </div>

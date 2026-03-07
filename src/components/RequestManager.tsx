@@ -222,27 +222,27 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <MessageSquare className="w-5 h-5" style={{ color: 'var(--brand-mint)' }} />
+          <MessageSquare className="w-5 h-5 text-teal-400" />
           <div>
-            <h2 className="text-sm font-semibold" style={{ color: 'var(--brand-text-bright)' }}>Client Requests</h2>
-            <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-text-muted)' }}>Review, respond to, and manage client requests across workspaces.</p>
+            <h2 className="text-sm font-semibold text-zinc-200">Client Requests</h2>
+            <p className="text-[10px] mt-0.5 text-zinc-500">Review, respond to, and manage client requests across workspaces.</p>
           </div>
         </div>
       </div>
 
       {/* Stats + Progress */}
-      <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)' }}>
+      <div className="rounded-xl p-4 bg-zinc-900 border border-zinc-800">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-6">
             {[
-              { label: 'Total', value: counts.total, color: 'var(--brand-text-bright)' },
+              { label: 'Total', value: counts.total, color: '#e4e4e7' },
               { label: 'New', value: counts.new, color: '#60a5fa' },
               { label: 'Active', value: counts.in_progress, color: '#2dd4bf' },
               { label: 'Resolved', value: counts.completed, color: '#4ade80' },
             ].map(s => (
               <div key={s.label} className="text-center">
                 <div className="text-xl font-bold" style={{ color: s.color }}>{s.value}</div>
-                <div className="text-[9px] font-medium uppercase tracking-wider" style={{ color: 'var(--brand-text-muted)' }}>{s.label}</div>
+                <div className="text-[9px] font-medium uppercase tracking-wider text-zinc-500">{s.label}</div>
               </div>
             ))}
           </div>
@@ -251,12 +251,12 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
               <div className="text-lg font-bold" style={{ color: '#4ade80' }}>
                 {Math.round((counts.completed / counts.total) * 100)}%
               </div>
-              <div className="text-[9px] uppercase tracking-wider" style={{ color: 'var(--brand-text-muted)' }}>Complete</div>
+              <div className="text-[9px] uppercase tracking-wider text-zinc-500">Complete</div>
             </div>
           )}
         </div>
         {counts.total > 0 && (
-          <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--brand-bg)' }}>
+          <div className="h-2 rounded-full overflow-hidden bg-[#0f1219]">
             <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(counts.completed / counts.total) * 100}%`, backgroundColor: '#4ade80' }} />
           </div>
         )}
@@ -265,56 +265,56 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
       {/* Filters */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-1.5">
-          <Filter className="w-3 h-3" style={{ color: 'var(--brand-text-muted)' }} />
+          <Filter className="w-3 h-3 text-zinc-500" />
         </div>
         <select value={wsFilter} onChange={e => setWsFilter(e.target.value)}
-          className="px-2.5 py-1.5 rounded-lg text-[11px]" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)', color: 'var(--brand-text-bright)' }}>
+          className="px-2.5 py-1.5 rounded-lg text-[11px] bg-zinc-900 border border-zinc-800 text-zinc-200">
           <option value="all">All Workspaces</option>
           {workspaces.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
         </select>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as RequestStatus | 'all')}
-          className="px-2.5 py-1.5 rounded-lg text-[11px]" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)', color: 'var(--brand-text-bright)' }}>
+          className="px-2.5 py-1.5 rounded-lg text-[11px] bg-zinc-900 border border-zinc-800 text-zinc-200">
           <option value="all">All Statuses</option>
           {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
         <select value={catFilter} onChange={e => setCatFilter(e.target.value as RequestCategory | 'all')}
-          className="px-2.5 py-1.5 rounded-lg text-[11px]" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)', color: 'var(--brand-text-bright)' }}>
+          className="px-2.5 py-1.5 rounded-lg text-[11px] bg-zinc-900 border border-zinc-800 text-zinc-200">
           <option value="all">All Categories</option>
           {Object.entries(CAT_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
         <div className="flex-1 min-w-[140px] max-w-[240px] relative ml-auto">
-          <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--brand-text-muted)' }} />
+          <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
           <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search requests..."
-            className="w-full pl-7 pr-3 py-1.5 rounded-lg text-[11px]" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)', color: 'var(--brand-text-bright)' }} />
+            className="w-full pl-7 pr-3 py-1.5 rounded-lg text-[11px] bg-zinc-900 border border-zinc-800 text-zinc-200" />
         </div>
       </div>
 
       {/* Loading */}
       {loading && (
-        <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--brand-text-muted)' }} /></div>
+        <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-zinc-500" /></div>
       )}
 
       {/* Empty */}
       {!loading && filtered.length === 0 && (
         <div className="text-center py-16">
-          <MessageSquare className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--brand-text-muted)' }} />
-          <p className="text-sm" style={{ color: 'var(--brand-text-muted)' }}>
+          <MessageSquare className="w-8 h-8 mx-auto mb-2 text-zinc-500" />
+          <p className="text-sm text-zinc-500">
             {requests.length === 0 ? 'No client requests yet' : 'No requests match filters'}
           </p>
-          <p className="text-[10px] mt-1" style={{ color: 'var(--brand-text-dim)' }}>Clients can submit requests from their dashboard.</p>
+          <p className="text-[10px] mt-1 text-zinc-600">Clients can submit requests from their dashboard.</p>
         </div>
       )}
 
       {/* Bulk action bar */}
       {selected.size > 0 && (
-        <div className="rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap" style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '2px solid var(--brand-mint)', boxShadow: '0 0 12px rgba(45,212,191,0.1)' }}>
+        <div className="rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap bg-zinc-900 border-2 border-teal-400" style={{ boxShadow: '0 0 12px rgba(45,212,191,0.1)' }}>
           <div className="flex items-center gap-2">
-            <CheckCheck className="w-4 h-4" style={{ color: 'var(--brand-mint)' }} />
-            <span className="text-xs font-semibold" style={{ color: 'var(--brand-text-bright)' }}>{selected.size} selected</span>
+            <CheckCheck className="w-4 h-4 text-teal-400" />
+            <span className="text-xs font-semibold text-zinc-200">{selected.size} selected</span>
           </div>
-          <div className="h-4 w-px" style={{ backgroundColor: 'var(--brand-border)' }} />
+          <div className="h-4 w-px bg-zinc-800" />
           <div className="flex items-center gap-1">
-            <span className="text-[10px] uppercase tracking-wider mr-1" style={{ color: 'var(--brand-text-muted)' }}>Set status:</span>
+            <span className="text-[10px] uppercase tracking-wider mr-1 text-zinc-500">Set status:</span>
             {STATUS_OPTIONS.map(s => (
               <button key={s.value} onClick={() => bulkUpdateStatus(s.value)} disabled={bulkUpdating}
                 className={`px-2 py-1 rounded text-[10px] font-medium border transition-colors hover:opacity-90 disabled:opacity-50 ${s.color}`}>
@@ -322,12 +322,12 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
               </button>
             ))}
           </div>
-          <div className="h-4 w-px" style={{ backgroundColor: 'var(--brand-border)' }} />
+          <div className="h-4 w-px bg-zinc-800" />
           <button onClick={bulkDelete} disabled={bulkUpdating}
             className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50">
             <Trash2 className="w-3 h-3" /> Delete
           </button>
-          <button onClick={() => setSelected(new Set())} className="ml-auto text-[10px] hover:underline" style={{ color: 'var(--brand-text-muted)' }}>
+          <button onClick={() => setSelected(new Set())} className="ml-auto text-[10px] hover:underline text-zinc-500">
             Clear selection
           </button>
         </div>
@@ -338,11 +338,11 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
         <div className="space-y-2">
           {/* Select all header */}
           <div className="flex items-center gap-2 px-2 py-1">
-            <button onClick={selectAll} className="flex items-center gap-1.5 text-[10px] font-medium transition-colors" style={{ color: 'var(--brand-text-muted)' }}>
+            <button onClick={selectAll} className="flex items-center gap-1.5 text-[10px] font-medium transition-colors text-zinc-500">
               <div className="w-4 h-4 rounded border flex items-center justify-center transition-colors"
                 style={selected.size === filtered.length && filtered.length > 0
-                  ? { backgroundColor: 'var(--brand-mint)', borderColor: 'var(--brand-mint)' }
-                  : { borderColor: 'var(--brand-border)' }}>
+                  ? { backgroundColor: '#2dd4bf', borderColor: '#2dd4bf' }
+                  : { borderColor: '#27272a' }}>
                 {selected.size === filtered.length && filtered.length > 0 && <CheckCheck className="w-3 h-3 text-black" />}
               </div>
               {selected.size === filtered.length && filtered.length > 0 ? 'Deselect all' : 'Select all'}
@@ -360,16 +360,16 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
 
             return (
               <div key={req.id} className={`rounded-xl overflow-hidden transition-all ${isSelected ? 'ring-1' : ''}`}
-                style={{ backgroundColor: 'var(--brand-bg-elevated)', border: '1px solid var(--brand-border)', ...(isSelected ? { ringColor: 'var(--brand-mint)' } : {}) }}>
+                style={{ backgroundColor: '#18181b', border: '1px solid #27272a', ...(isSelected ? { ringColor: '#2dd4bf' } : {}) }}>
                 {/* Row header */}
                 <div className="flex items-center">
                   {/* Checkbox */}
-                  <button onClick={() => toggleSelect(req.id)} className="px-3 py-3.5 flex-shrink-0 self-stretch flex items-center"
-                    style={{ borderRight: '1px solid var(--brand-border)' }}>
+                  <button onClick={() => toggleSelect(req.id)}
+                    className="px-3 py-3.5 flex-shrink-0 self-stretch flex items-center border-r border-zinc-800">
                     <div className="w-4 h-4 rounded border flex items-center justify-center transition-colors"
                       style={isSelected
-                        ? { backgroundColor: 'var(--brand-mint)', borderColor: 'var(--brand-mint)' }
-                        : { borderColor: 'var(--brand-border)' }}>
+                        ? { backgroundColor: '#2dd4bf', borderColor: '#2dd4bf' }
+                        : { borderColor: '#27272a' }}>
                       {isSelected && <CheckCheck className="w-3 h-3 text-black" />}
                     </div>
                   </button>
@@ -379,7 +379,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                     <div className="flex items-center gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className={`text-xs font-medium truncate ${isDone ? 'line-through opacity-60' : ''}`} style={{ color: 'var(--brand-text-bright)' }}>{req.title}</span>
+                          <span className={`text-xs font-medium truncate text-zinc-200 ${isDone ? 'line-through opacity-60' : ''}`}>{req.title}</span>
                           <span className={`text-[9px] px-1.5 py-0.5 rounded border shrink-0 ${statusOpt.color}`}>
                             {statusOpt.label}
                           </span>
@@ -387,16 +387,16 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                             {priorityOpt.label}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--brand-text-muted)' }}>
-                          <span className="px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--brand-bg)', color: 'var(--brand-text-dim)' }}>
+                        <div className="flex items-center gap-2 text-[10px] text-zinc-500">
+                          <span className="px-1.5 py-0.5 rounded bg-[#0f1219] text-zinc-600">
                             {wsName(req.workspaceId)}
                           </span>
-                          <span className="px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--brand-bg)' }}>
+                          <span className="px-1.5 py-0.5 rounded bg-[#0f1219]">
                             {CAT_LABELS[req.category] || req.category}
                           </span>
-                          {req.submittedBy && <span style={{ color: 'var(--brand-text-bright)' }}>by {req.submittedBy}</span>}
+                          {req.submittedBy && <span className="text-zinc-200">by {req.submittedBy}</span>}
                           <span><Clock className="w-2.5 h-2.5 inline mr-0.5" />{new Date(req.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                          {unreadTeam > 0 && <span style={{ color: 'var(--brand-mint)' }}>{unreadTeam} client note{unreadTeam !== 1 ? 's' : ''}</span>}
+                          {unreadTeam > 0 && <span className="text-teal-400">{unreadTeam} client note{unreadTeam !== 1 ? 's' : ''}</span>}
                           {req.pageUrl && (
                             <span className="flex items-center gap-0.5 truncate max-w-[140px]">
                               <ExternalLink className="w-2.5 h-2.5" />{req.pageUrl}
@@ -404,7 +404,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                           )}
                         </div>
                       </div>
-                      {isExpanded ? <ChevronUp className="w-4 h-4 shrink-0" style={{ color: 'var(--brand-text-muted)' }} /> : <ChevronDown className="w-4 h-4 shrink-0" style={{ color: 'var(--brand-text-muted)' }} />}
+                      {isExpanded ? <ChevronUp className="w-4 h-4 shrink-0 text-zinc-500" /> : <ChevronDown className="w-4 h-4 shrink-0 text-zinc-500" />}
                     </div>
                   </button>
                   {/* Quick action buttons */}
@@ -412,7 +412,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                     {next && !isDone && (
                       <button onClick={() => quickStatus(req.id, next)}
                         className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-colors"
-                        style={{ backgroundColor: next === 'completed' ? 'rgba(74,222,128,0.1)' : 'rgba(45,212,191,0.1)', color: next === 'completed' ? '#4ade80' : 'var(--brand-mint)' }}
+                        style={{ backgroundColor: next === 'completed' ? 'rgba(74,222,128,0.1)' : 'rgba(45,212,191,0.1)', color: next === 'completed' ? '#4ade80' : '#2dd4bf' }}
                         title={next === 'in_progress' ? 'Start working' : next === 'completed' ? 'Mark complete' : next}>
                         {next === 'in_progress' ? <><Play className="w-3 h-3" /> Start</> : <><CheckCircle2 className="w-3 h-3" /> Done</>}
                       </button>
@@ -420,7 +420,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                     {isDone && (
                       <button onClick={() => quickStatus(req.id, 'in_progress')}
                         className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-colors"
-                        style={{ backgroundColor: 'rgba(45,212,191,0.1)', color: 'var(--brand-mint)' }}
+                        style={{ backgroundColor: 'rgba(45,212,191,0.1)', color: '#2dd4bf' }}
                         title="Reopen task">
                         <ArrowRight className="w-3 h-3" /> Reopen
                       </button>
@@ -430,27 +430,27 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
 
                 {/* Expanded detail */}
                 {isExpanded && (
-                  <div style={{ borderTop: '1px solid var(--brand-border)' }}>
+                  <div className="border-t border-zinc-800">
                     {/* Controls row */}
-                    <div className="px-5 py-3 flex items-center gap-3 flex-wrap" style={{ borderBottom: '1px solid var(--brand-border)' }}>
+                    <div className="px-5 py-3 flex items-center gap-3 flex-wrap border-b border-zinc-800">
                       <div>
-                        <label className="text-[9px] uppercase tracking-wider block mb-1" style={{ color: 'var(--brand-text-muted)' }}>Status</label>
+                        <label className="text-[9px] uppercase tracking-wider block mb-1 text-zinc-500">Status</label>
                         <select value={req.status} onChange={e => updateRequest(req.id, { status: e.target.value })}
-                          className="px-2 py-1 rounded text-[11px]" style={{ backgroundColor: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text-bright)' }}>
+                          className="px-2 py-1 rounded text-[11px] bg-[#0f1219] border border-zinc-800 text-zinc-200">
                           {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                         </select>
                       </div>
                       <div>
-                        <label className="text-[9px] uppercase tracking-wider block mb-1" style={{ color: 'var(--brand-text-muted)' }}>Priority</label>
+                        <label className="text-[9px] uppercase tracking-wider block mb-1 text-zinc-500">Priority</label>
                         <select value={req.priority} onChange={e => updateRequest(req.id, { priority: e.target.value })}
-                          className="px-2 py-1 rounded text-[11px]" style={{ backgroundColor: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text-bright)' }}>
+                          className="px-2 py-1 rounded text-[11px] bg-[#0f1219] border border-zinc-800 text-zinc-200">
                           {PRIORITY_OPTIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                         </select>
                       </div>
                       <div>
-                        <label className="text-[9px] uppercase tracking-wider block mb-1" style={{ color: 'var(--brand-text-muted)' }}>Category</label>
+                        <label className="text-[9px] uppercase tracking-wider block mb-1 text-zinc-500">Category</label>
                         <select value={req.category} onChange={e => updateRequest(req.id, { category: e.target.value })}
-                          className="px-2 py-1 rounded text-[11px]" style={{ backgroundColor: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text-bright)' }}>
+                          className="px-2 py-1 rounded text-[11px] bg-[#0f1219] border border-zinc-800 text-zinc-200">
                           {Object.entries(CAT_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                         </select>
                       </div>
@@ -462,10 +462,10 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
 
                     {/* Description */}
                     <div className="px-5 py-4">
-                      <div className="text-[10px] mb-1" style={{ color: 'var(--brand-text-muted)' }}>Description</div>
-                      <p className="text-[11px] leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--brand-text-bright)' }}>{req.description}</p>
+                      <div className="text-[10px] mb-1 text-zinc-500">Description</div>
+                      <p className="text-[11px] leading-relaxed whitespace-pre-wrap text-zinc-200">{req.description}</p>
                       {req.pageUrl && (
-                        <div className="mt-2 flex items-center gap-1 text-[10px]" style={{ color: 'var(--brand-text-muted)' }}>
+                        <div className="mt-2 flex items-center gap-1 text-[10px] text-zinc-500">
                           <ExternalLink className="w-3 h-3" />
                           <a href={req.pageUrl.startsWith('http') ? req.pageUrl : `https://${req.pageUrl}`} target="_blank" rel="noopener noreferrer"
                             className="hover:underline">{req.pageUrl}</a>
@@ -476,7 +476,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                     {/* Conversation */}
                     {req.notes.length > 0 && (
                       <div className="px-5 pb-3">
-                        <div className="text-[10px] mb-2" style={{ color: 'var(--brand-text-muted)' }}>Conversation</div>
+                        <div className="text-[10px] mb-2 text-zinc-500">Conversation</div>
                         <div className="space-y-2 max-h-[300px] overflow-y-auto">
                           {req.notes.map(note => (
                             <div key={note.id} className={`flex gap-2 ${note.author === 'team' ? 'justify-end' : ''}`}>
@@ -487,28 +487,28 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                               }`} style={
                                 note.author === 'team'
                                   ? { backgroundColor: 'rgba(45, 212, 191, 0.08)', borderColor: 'rgba(45, 212, 191, 0.15)' }
-                                  : { backgroundColor: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }
+                                  : { backgroundColor: '#0f1219', border: '1px solid #27272a' }
                               }>
                                 <div className="flex items-center gap-1.5 mb-0.5">
-                                  <span className="text-[9px] font-medium" style={{ color: note.author === 'team' ? 'var(--brand-mint)' : 'var(--brand-text-muted)' }}>
+                                  <span className={`text-[9px] font-medium ${note.author === 'team' ? 'text-teal-400' : 'text-zinc-500'}`}>
                                     {note.author === 'team' ? 'You (Team)' : 'Client'}
                                   </span>
-                                  <span className="text-[9px]" style={{ color: 'var(--brand-text-dim)' }}>
+                                  <span className="text-[9px] text-zinc-600">
                                     {new Date(note.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                                   </span>
                                 </div>
-                                {note.content && <p className="text-[11px] whitespace-pre-wrap" style={{ color: 'var(--brand-text-bright)' }}>{note.content}</p>}
+                                {note.content && <p className="text-[11px] whitespace-pre-wrap text-zinc-200">{note.content}</p>}
                                 {note.attachments && note.attachments.length > 0 && (
                                   <div className="mt-1.5 space-y-1">
                                     {note.attachments.map(att => (
                                       att.mimeType.startsWith('image/') ? (
                                         <a key={att.id} href={`/api/request-attachments/${att.filename}`} target="_blank" rel="noreferrer" className="block">
-                                          <img src={`/api/request-attachments/${att.filename}`} alt={att.originalName} className="max-w-[240px] max-h-[180px] rounded-md" style={{ border: '1px solid var(--brand-border)' }} />
+                                          <img src={`/api/request-attachments/${att.filename}`} alt={att.originalName} className="max-w-[240px] max-h-[180px] rounded-md border border-zinc-800" />
                                         </a>
                                       ) : (
                                         <a key={att.id} href={`/api/request-attachments/${att.filename}`} target="_blank" rel="noreferrer"
-                                          className="flex items-center gap-1.5 text-[10px] hover:underline" style={{ color: 'var(--brand-mint)' }}>
-                                          <FileText className="w-3 h-3" />{att.originalName} <span style={{ color: 'var(--brand-text-dim)' }}>({(att.size / 1024).toFixed(0)}KB)</span>
+                                          className="flex items-center gap-1.5 text-[10px] hover:underline text-teal-400">
+                                          <FileText className="w-3 h-3" />{att.originalName} <span className="text-zinc-600">({(att.size / 1024).toFixed(0)}KB)</span>
                                         </a>
                                       )
                                     ))}
@@ -522,11 +522,11 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                     )}
 
                     {/* Team reply */}
-                    <div className="px-5 py-3 space-y-2" style={{ borderTop: '1px solid var(--brand-border)' }}>
+                    <div className="px-5 py-3 space-y-2 border-t border-zinc-800">
                       {noteFiles.length > 0 && expandedId === req.id && (
                         <div className="flex flex-wrap gap-1.5">
                           {noteFiles.map((f, i) => (
-                            <span key={i} className="flex items-center gap-1 text-[10px] rounded px-2 py-1" style={{ backgroundColor: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}>
+                            <span key={i} className="flex items-center gap-1 text-[10px] rounded px-2 py-1 bg-[#0f1219] border border-zinc-800 text-zinc-400">
                               <Paperclip className="w-2.5 h-2.5" />{f.name}
                               <button onClick={() => setNoteFiles(prev => prev.filter((_, j) => j !== i))} className="hover:opacity-70"><X className="w-2.5 h-2.5" /></button>
                             </span>
@@ -537,15 +537,15 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                         <input value={expandedId === req.id ? noteInput : ''} onChange={e => setNoteInput(e.target.value)}
                           onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendNote(req.id)}
                           placeholder="Send a note to the client..."
-                          className="flex-1 px-3 py-2 rounded-lg text-[11px]" style={{ backgroundColor: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text-bright)' }}
+                          className="flex-1 px-3 py-2 rounded-lg text-[11px] bg-[#0f1219] border border-zinc-800 text-zinc-200"
                           disabled={sendingNote} />
                         <input type="file" ref={noteFileRef} className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.txt,.csv"
                           onChange={e => { if (e.target.files) setNoteFiles(prev => [...prev, ...Array.from(e.target.files!)]); e.target.value = ''; }} />
-                        <button onClick={() => noteFileRef.current?.click()} className="px-2 py-2 rounded-lg transition-colors" style={{ backgroundColor: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }} title="Attach file">
-                          <Paperclip className="w-3.5 h-3.5" style={{ color: 'var(--brand-text-muted)' }} />
+                        <button onClick={() => noteFileRef.current?.click()} className="px-2 py-2 rounded-lg transition-colors bg-[#0f1219] border border-zinc-800" title="Attach file">
+                          <Paperclip className="w-3.5 h-3.5 text-zinc-500" />
                         </button>
                         <button onClick={() => sendNote(req.id)} disabled={sendingNote || (!noteInput.trim() && noteFiles.length === 0)}
-                          className="px-3 py-2 rounded-lg transition-colors disabled:opacity-50" style={{ backgroundColor: 'var(--brand-mint)', color: '#000' }}>
+                          className="px-3 py-2 rounded-lg transition-colors disabled:opacity-50 bg-teal-400 text-black">
                           <Send className="w-3.5 h-3.5" />
                         </button>
                       </div>
@@ -553,14 +553,14 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
 
                     {/* Status hints */}
                     {req.status === 'completed' && (
-                      <div className="px-5 py-2" style={{ borderTop: '1px solid var(--brand-border)' }}>
+                      <div className="px-5 py-2 border-t border-zinc-800">
                         <div className="flex items-center gap-1.5 text-[10px]" style={{ color: '#4ade80' }}>
                           <CheckCircle2 className="w-3 h-3" /> Marked as completed — visible to client
                         </div>
                       </div>
                     )}
                     {req.status === 'new' && (
-                      <div className="px-5 py-2" style={{ borderTop: '1px solid var(--brand-border)' }}>
+                      <div className="px-5 py-2 border-t border-zinc-800">
                         <div className="flex items-center gap-1.5 text-[10px]" style={{ color: '#60a5fa' }}>
                           <AlertTriangle className="w-3 h-3" /> New request — change status to let the client know you&apos;re on it
                         </div>

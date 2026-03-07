@@ -9,7 +9,7 @@ interface Props {
 
 export function StatusBar({ hasOpenAIKey, hasWebflowToken, connected, workspaceCount }: Props) {
   return (
-    <div className="flex items-center gap-4 px-4 py-2 text-xs" style={{ borderTop: '1px solid var(--brand-border)', backgroundColor: 'var(--brand-bg-surface)', color: 'var(--brand-text)' }}>
+    <div className="flex items-center gap-4 px-4 py-2 text-xs border-t border-zinc-800 bg-zinc-900 text-zinc-400">
       <div className="flex items-center gap-1.5">
         {connected
           ? <Wifi className="w-3 h-3 text-emerald-400" />
