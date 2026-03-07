@@ -11,7 +11,7 @@ import { TaskPanel } from './components/TaskPanel';
 import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, FileSearch, Search,
   Pencil, CornerDownRight, Share2, Target, Code2, LogOut, Swords, TrendingUp, Flag,
-  Sun, Moon,
+  Sun, Moon, Map,
 } from 'lucide-react';
 
 // ── Lazy-loaded route-level chunks ──
@@ -30,6 +30,7 @@ const GoogleAnalytics = lazy(() => import('./components/GoogleAnalytics').then(m
 const Annotations = lazy(() => import('./components/Annotations').then(m => ({ default: m.Annotations })));
 const RequestManager = lazy(() => import('./components/RequestManager').then(m => ({ default: m.RequestManager })));
 const SalesReport = lazy(() => import('./components/SalesReport').then(m => ({ default: m.SalesReport })));
+const Roadmap = lazy(() => import('./components/Roadmap').then(m => ({ default: m.Roadmap })));
 
 function ChunkFallback() {
   return <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>;
@@ -44,6 +45,7 @@ type Page =
   | 'performance'
   | 'workspace-settings'
   | 'prospect'
+  | 'roadmap'
   | 'requests'
   | 'settings';
 
@@ -281,6 +283,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
 
   const renderContent = () => {
     if (tab === 'settings') return <SettingsPanel />;
+    if (tab === 'roadmap') return <Roadmap />;
     if (tab === 'workspace-settings' && selected) return <WorkspaceSettings key={`ws-settings-${selected.id}`} workspaceId={selected.id} workspaceName={selected.name} webflowSiteId={selected.webflowSiteId} webflowSiteName={selected.webflowSiteName} onUpdate={(patch) => {
       const updated = { ...selected, ...patch } as typeof selected;
       setSelected(updated);
@@ -292,7 +295,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
       return <WorkspaceOverview onSelectWorkspace={(id) => {
         const ws = workspaces.find(w => w.id === id);
         if (ws) { setSelected(ws); setTab('media'); }
-      }} />;
+      }} onNavigate={(t) => setTab(t as Page)} />;
     }
 
     if (needsSite && !selected.webflowSiteId) {
@@ -392,6 +395,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
           <div className="text-[11px] text-zinc-500 font-semibold tracking-widest px-2.5 mb-1">TOOLS</div>
           {([
             { id: 'prospect' as Page, label: 'Prospect', icon: FileSearch },
+            { id: 'roadmap' as Page, label: 'Roadmap', icon: Map },
             { id: 'settings' as Page, label: 'Settings', icon: Settings },
           ]).map(item => {
             const Icon = item.icon;

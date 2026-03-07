@@ -5187,6 +5187,28 @@ app.post('/api/jobs', async (req, res) => {
   }
 });
 
+// --- Roadmap Status Persistence ---
+const ROADMAP_FILE = path.join(getDataDir('admin'), 'roadmap-status.json');
+
+app.get('/api/roadmap-status', (_req, res) => {
+  try {
+    if (fs.existsSync(ROADMAP_FILE)) {
+      res.json(JSON.parse(fs.readFileSync(ROADMAP_FILE, 'utf-8')));
+    } else {
+      res.json({});
+    }
+  } catch { res.json({}); }
+});
+
+app.put('/api/roadmap-status', (req, res) => {
+  try {
+    fs.writeFileSync(ROADMAP_FILE, JSON.stringify(req.body, null, 2));
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
