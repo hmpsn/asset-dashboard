@@ -350,7 +350,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 32. Unified Design System
-**What it does:** Consistent teal/zinc color palette across all admin and client dashboard components. All inline CSS variable references replaced with Tailwind utility classes. Unified card backgrounds, sidebar styling, workspace selector, and button treatments. **Accessibility pass**: minimum `text-[11px]` font size enforced (was `text-[8px]` in some places), improved contrast ratios, `aria-label` attributes on all icon-only buttons.
+**What it does:** Consistent teal/zinc color palette across all admin and client dashboard components. All inline CSS variable references replaced with Tailwind utility classes. Unified card backgrounds, sidebar styling, workspace selector, and button treatments. **Accessibility pass**: minimum `text-[11px]` font size enforced (was `text-[8px]` in some places), improved contrast ratios, `aria-label` attributes on all icon-only buttons. **Selective type size bump**: `text-[11px]`/`text-xs` → 13.5px, `text-sm` → 15.5px for improved readability. **MetricRing** background tracks use muted score-colored fills (15% opacity) instead of flat gray. **Global cursor-pointer** rule ensures all interactive elements show pointer cursor. **SectionCard** headings bumped to `font-semibold text-zinc-200`, **PageHeader** titles to `text-zinc-100`. Theme-aware `scoreColor()` returns WCAG-compliant colors in light mode.
 
 **Agency value:** Professional, cohesive appearance across every screen. No visual inconsistencies that undermine credibility.
 
@@ -360,7 +360,18 @@ A brief value assessment of every feature in the platform, covering what it does
 
 ---
 
-### 33. Contextual Cross-Linking (UX)
+### 33. Component Styleguide
+**What it does:** Dedicated `/styleguide` route showcasing every UI primitive and pattern in one place — color palette, typography scale, MetricRings, StatCards, CompactStatBar, Badges, EmptyState, TabBar, DateRangeSelector, DataList, PageHeader, SectionCard, Line/Area Charts (single + dual trend), ChartPointDetail popovers, data tables, modals/dialogs, toast notifications (global + inline), form inputs (text, search, textarea, select, segmented toggle), loading states (page/inline/button/typing), progress bars (segmented, severity, bulk), and sidebar navigation. Includes a dark/light theme toggle for visual verification.
+
+**Agency value:** Single reference page for all UI patterns — accelerates development, catches inconsistencies, and onboards new team members instantly.
+
+**Client value:** Indirectly benefits clients through more consistent, polished UI delivery.
+
+**Mutual:** Prevents UI drift as the platform grows. Every component is visible, testable, and auditable in one place.
+
+---
+
+### 34. Contextual Cross-Linking (UX)
 **What it does:** Contextual "next step" tips embedded throughout the platform that guide users from one tool to another based on their current data. Site Audit results suggest → SEO Editor (for meta fixes), → Redirects (for chain issues), → Schema (for structured data gaps), → Performance (for speed issues). Search Console insights suggest → Strategy (for keyword opportunities), → SEO Editor (for CTR improvements). Keyword Strategy content gaps suggest → Content Briefs. Rank Tracker empty state suggests → Strategy. Internal Links tips point to → SEO Editor and → Site Audit. Redirect Manager tips point to → Site Audit and → Dead Links.
 
 **Agency value:** Reduces training time for team members. The tools teach you the workflow as you use them.
@@ -380,9 +391,9 @@ A brief value assessment of every feature in the platform, covering what it does
 | Content & Strategy | 3 | Strategy → brief → approval → production pipeline |
 | Client Communication | 4 | Structured workflows replace email chaos |
 | Client Self-Service | 6 | 24/7 data access reduces reporting overhead |
-| Platform & UX | 3 | Design system, cross-linking, sales tooling |
+| Platform & UX | 4 | Design system, styleguide, cross-linking, sales tooling |
 
-**33 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**34 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
 ---
 
@@ -425,7 +436,7 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - **Concurrent job limits**: Prevent multiple audits from running simultaneously on the same site.
 
 ### Client Dashboard
-- ~~Interactive inline charts~~: ✅ Shipped — Click-to-inspect detail popovers on all charts.
+- ~~Interactive inline charts~~: ✅ Shipped — Hover-to-inspect detail popovers on all charts (upgraded from click to hover).
 - ~~PDF export~~: ✅ Shipped — Professional PDF with TOC, page breaks, section numbers.
 - **Custom date range picker**: Replace preset buttons (7d/28d/90d) with a full calendar date range selector.
 - **White-label email templates**: Branded email notifications matching the client portal theme.
@@ -440,8 +451,19 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - ~~Unified zinc/teal palette~~: ✅ Shipped — All CSS variables replaced with Tailwind utility classes.
 - ~~Accessibility pass~~: ✅ Shipped — Minimum 11px font sizes, improved contrast, aria-labels on icon-only buttons.
 - ~~Activity log wiring~~: ✅ Shipped — All major operations now logged automatically.
+- ~~Light mode WCAG overrides~~: ✅ Shipped — Full accent color, gradient, border, and text overrides for WCAG AA compliance in light mode across all tabs including SEO Strategy.
+- ~~Component Styleguide~~: ✅ Shipped — `/styleguide` route with all UI primitives, charts, tables, modals, toasts, forms, loading states, progress bars, and sidebar nav.
+- ~~Selective type size bump~~: ✅ Shipped — `text-[11px]`/`text-xs` → 13.5px, `text-sm` → 15.5px.
+- ~~Heading contrast~~: ✅ Shipped — SectionCard and PageHeader titles punched up.
 - **WCAG AA compliance**: Full contrast ratio audit, focus indicators, keyboard navigation for all interactive elements.
 - **Responsive mobile layout**: Sidebar collapses to bottom nav, cards stack vertically on small screens.
+
+### Performance & Bundle Size
+- **Current bundle**: 929KB minified (206KB gzip). Approaching the recommended 500KB threshold for initial load.
+- **Code-splitting**: Use dynamic `import()` for tab-level components (Search Console, Analytics, SEO Audit, etc.) so only the active tab's code is loaded.
+- **Route-based splitting**: Lazy-load `/styleguide`, `/client/:id`, and admin routes as separate chunks.
+- **Heavy dependency audit**: Identify if any large libraries (chart libs, PDF generators) can be loaded on-demand.
+- **Tree-shaking**: Verify Lucide icons are tree-shaken (only used icons in bundle, not the full set).
 
 ### Competitor Analysis Enhancements
 - **Historical comparisons**: Track how you vs. competitor gap changes over time.
@@ -468,4 +490,4 @@ When the user asks to update this document with recent features, follow this pro
 7. **Update Summary table**: Adjust category counts and total feature count.
 8. **Commit**: `git add FEATURE_AUDIT.md && git commit -m "docs: update FEATURE_AUDIT with recent features"`
 
-Current feature count: **33**. Last updated: March 2026.
+Current feature count: **34**. Last updated: March 2026.

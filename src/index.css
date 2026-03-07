@@ -424,9 +424,15 @@ nav button[class*="bg-teal-500"] {
 /* ── Strategy Card Gradients → light subtle tints ── */
 .dashboard-light .from-amber-950\/30 { --tw-gradient-from: rgba(180,83,9,0.06) !important; }
 .dashboard-light .from-teal-950\/40 { --tw-gradient-from: rgba(13,148,136,0.06) !important; }
+.dashboard-light .from-teal-950\/30 { --tw-gradient-from: rgba(13,148,136,0.05) !important; }
 .dashboard-light .from-orange-950\/20 { --tw-gradient-from: rgba(194,65,12,0.05) !important; }
 .dashboard-light .to-zinc-900 { --tw-gradient-to: #ffffff !important; }
 .dashboard-light .via-zinc-900 { --tw-gradient-via: #ffffff !important; }
+/* ── Get Full Post button gradient ── */
+.dashboard-light .from-blue-600\/30 { --tw-gradient-from: rgba(37,99,235,0.1) !important; }
+.dashboard-light .to-teal-600\/30 { --tw-gradient-to: rgba(13,148,136,0.1) !important; }
+.dashboard-light .hover\:from-blue-600\/50:hover { --tw-gradient-from: rgba(37,99,235,0.18) !important; }
+.dashboard-light .hover\:to-teal-600\/50:hover { --tw-gradient-to: rgba(13,148,136,0.18) !important; }
 
 /* ── Semi-transparent zinc backgrounds ── */
 .dashboard-light .bg-zinc-900\/60 { background-color: rgba(255,255,255,0.9) !important; }
@@ -441,6 +447,8 @@ nav button[class*="bg-teal-500"] {
 .dashboard-light .text-amber-300 { color: #b45309 !important; }
 .dashboard-light .text-teal-200 { color: #0f766e !important; }
 .dashboard-light .text-orange-200 { color: #9a3412 !important; }
+.dashboard-light .text-blue-200 { color: #1d4ed8 !important; }        /* blue-700 · 5.2:1 */
+.dashboard-light .text-blue-300 { color: #2563eb !important; }        /* blue-600 · 4.6:1 */
 
 /* ── Accent subtitle/muted text ── */
 .dashboard-light .text-amber-400\/60 { color: rgba(180,83,9,0.7) !important; }
@@ -450,9 +458,11 @@ nav button[class*="bg-teal-500"] {
 .dashboard-light .bg-amber-500\/20 { background-color: rgba(180,83,9,0.1) !important; }
 .dashboard-light .bg-amber-500\/5 { background-color: rgba(180,83,9,0.03) !important; }
 .dashboard-light .bg-teal-500\/20 { background-color: rgba(13,148,136,0.1) !important; }
+.dashboard-light .bg-teal-500\/15 { background-color: rgba(13,148,136,0.08) !important; }
 .dashboard-light .bg-teal-500\/5 { background-color: rgba(13,148,136,0.03) !important; }
 .dashboard-light .bg-orange-500\/20 { background-color: rgba(194,65,12,0.1) !important; }
 .dashboard-light .bg-emerald-500\/15 { background-color: rgba(4,120,87,0.08) !important; }
+.dashboard-light .border-teal-500\/25 { border-color: rgba(13,148,136,0.2) !important; }
 
 /* ── Impact/priority pill backgrounds ── */
 .dashboard-light .bg-green-500\/15 { background-color: rgba(21,128,61,0.1) !important; }
@@ -470,7 +480,12 @@ nav button[class*="bg-teal-500"] {
 /* ── Button backgrounds (Request Topic, etc.) ── */
 .dashboard-light .bg-teal-600\/30 { background-color: rgba(13,148,136,0.12) !important; }
 .dashboard-light .bg-teal-600 { background-color: #0d9488 !important; }
+.dashboard-light .hover\:bg-teal-600\/40:hover { background-color: rgba(13,148,136,0.15) !important; }
 .dashboard-light .hover\:bg-teal-600\/50:hover { background-color: rgba(13,148,136,0.2) !important; }
+.dashboard-light .bg-blue-600\/20 { background-color: rgba(37,99,235,0.1) !important; }
+.dashboard-light .bg-blue-600 { background-color: #2563eb !important; }
+.dashboard-light .hover\:bg-blue-600\/30:hover { background-color: rgba(37,99,235,0.15) !important; }
+.dashboard-light .hover\:bg-blue-500:hover { background-color: #3b82f6 !important; }
 .dashboard-light .hover\:border-teal-400\/60:hover { border-color: rgba(13,148,136,0.4) !important; }
 .dashboard-light .hover\:border-amber-500\/20:hover { border-color: rgba(180,83,9,0.22) !important; }
 .dashboard-light .hover\:border-teal-500\/30:hover { border-color: rgba(13,148,136,0.28) !important; }
