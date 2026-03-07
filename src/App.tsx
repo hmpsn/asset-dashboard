@@ -12,7 +12,7 @@ import { AdminChat } from './components/AdminChat';
 import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, FileSearch, Search,
   Pencil, CornerDownRight, Share2, Target, Code2, LogOut, Swords, TrendingUp, Flag,
-  Sun, Moon, Map,
+  Sun, Moon, Map, LayoutDashboard,
 } from 'lucide-react';
 
 // ── Lazy-loaded route-level chunks ──
@@ -32,12 +32,14 @@ const Annotations = lazy(() => import('./components/Annotations').then(m => ({ d
 const RequestManager = lazy(() => import('./components/RequestManager').then(m => ({ default: m.RequestManager })));
 const SalesReport = lazy(() => import('./components/SalesReport').then(m => ({ default: m.SalesReport })));
 const Roadmap = lazy(() => import('./components/Roadmap').then(m => ({ default: m.Roadmap })));
+const WorkspaceHome = lazy(() => import('./components/WorkspaceHome').then(m => ({ default: m.WorkspaceHome })));
 
 function ChunkFallback() {
   return <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>;
 }
 
 type Page =
+  | 'home'
   | 'media'
   | 'seo-audit' | 'seo-editor'
   | 'seo-redirects' | 'seo-internal'
@@ -90,7 +92,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [health, setHealth] = useState({ hasOpenAIKey: false, hasWebflowToken: false });
   const [connected, setConnected] = useState(false);
-  const [tab, setTab] = useState<Page>('media');
+  const [tab, setTab] = useState<Page>('home');
   const [clipboardStatus, setClipboardStatus] = useState<string | null>(null);
   const [pendingContentRequests, setPendingContentRequests] = useState(0);
 
@@ -126,7 +128,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!e.metaKey && !e.ctrlKey) return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
-      const tabMap: Record<string, Page> = { '1': 'media', '2': 'seo-audit', '3': 'search', '4': 'performance' };
+      const tabMap: Record<string, Page> = { '1': 'home', '2': 'seo-audit', '3': 'search', '4': 'analytics' };
       if (tabMap[e.key] && selected) { e.preventDefault(); setTab(tabMap[e.key]); }
       if (e.key === ',') { e.preventDefault(); setTab('settings'); }
     };
@@ -254,26 +256,29 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   // ── Sidebar navigation groups ──
   const navGroups: Array<{ label: string; items: Array<{ id: Page; label: string; icon: typeof Globe; needsSite?: boolean }> }> = [
     { label: '', items: [
-      { id: 'media', label: 'Assets', icon: Image },
-      { id: 'requests', label: 'Requests', icon: Clipboard },
-    ]},
-    { label: 'SITE HEALTH', items: [
-      { id: 'seo-audit', label: 'Site Audit', icon: Globe, needsSite: true },
-      { id: 'seo-redirects', label: 'Redirects', icon: CornerDownRight, needsSite: true },
-      { id: 'performance', label: 'Performance', icon: Gauge, needsSite: true },
-    ]},
-    { label: 'SEO', items: [
-      { id: 'seo-strategy', label: 'Strategy', icon: Target, needsSite: true },
-      { id: 'seo-editor', label: 'SEO Editor', icon: Pencil, needsSite: true },
-      { id: 'seo-internal', label: 'Internal Links', icon: Share2, needsSite: true },
-      { id: 'seo-schema', label: 'Schema', icon: Code2, needsSite: true },
-      { id: 'seo-briefs', label: 'Content Briefs', icon: Clipboard, needsSite: true },
-      { id: 'seo-competitors', label: 'Competitors', icon: Swords, needsSite: true },
-      { id: 'seo-ranks', label: 'Rank Tracker', icon: TrendingUp, needsSite: true },
+      { id: 'home', label: 'Home', icon: LayoutDashboard },
     ]},
     { label: 'ANALYTICS', items: [
       { id: 'search', label: 'Search Console', icon: Search, needsSite: true },
       { id: 'analytics', label: 'Google Analytics', icon: BarChart3, needsSite: true },
+      { id: 'seo-ranks', label: 'Rank Tracker', icon: TrendingUp, needsSite: true },
+    ]},
+    { label: 'SITE HEALTH', items: [
+      { id: 'seo-audit', label: 'Site Audit', icon: Globe, needsSite: true },
+      { id: 'performance', label: 'Performance', icon: Gauge, needsSite: true },
+      { id: 'seo-redirects', label: 'Redirects', icon: CornerDownRight, needsSite: true },
+      { id: 'seo-internal', label: 'Internal Links', icon: Share2, needsSite: true },
+    ]},
+    { label: 'SEO', items: [
+      { id: 'seo-strategy', label: 'Strategy', icon: Target, needsSite: true },
+      { id: 'seo-editor', label: 'SEO Editor', icon: Pencil, needsSite: true },
+      { id: 'seo-schema', label: 'Schema', icon: Code2, needsSite: true },
+      { id: 'seo-briefs', label: 'Content Briefs', icon: Clipboard, needsSite: true },
+      { id: 'seo-competitors', label: 'Competitors', icon: Swords, needsSite: true },
+    ]},
+    { label: 'MANAGE', items: [
+      { id: 'requests', label: 'Requests', icon: Clipboard },
+      { id: 'media', label: 'Assets', icon: Image },
       { id: 'annotations', label: 'Annotations', icon: Flag, needsSite: true },
     ]},
   ];
@@ -295,7 +300,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (!selected) {
       return <WorkspaceOverview onSelectWorkspace={(id) => {
         const ws = workspaces.find(w => w.id === id);
-        if (ws) { setSelected(ws); setTab('media'); }
+        if (ws) { setSelected(ws); setTab('home'); }
       }} onNavigate={(t) => setTab(t as Page)} />;
     }
 
@@ -311,6 +316,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
       );
     }
 
+    if (tab === 'home') return <WorkspaceHome key={`home-${selected.id}`} workspaceId={selected.id} workspaceName={selected.webflowSiteName || selected.name} webflowSiteId={selected.webflowSiteId} webflowSiteName={selected.webflowSiteName} gscPropertyUrl={selected.gscPropertyUrl} ga4PropertyId={selected.ga4PropertyId} onNavigate={(t) => setTab(t as Page)} />;
     if (tab === 'media') return <MediaTab key={selected.folder} siteId={selected.webflowSiteId} workspaceFolder={selected.folder} queue={workspaceQueue} />;
     if (seoView) return <SeoAudit key={`seo-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} siteName={selected.webflowSiteName || selected.name} view={seoView} onRequestCountChange={setPendingContentRequests} />;
     if (tab === 'search') return <SearchConsole key={`search-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} gscPropertyUrl={selected.gscPropertyUrl} />;
@@ -336,7 +342,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
           <WorkspaceSelector
             workspaces={workspaces}
             selected={selected}
-            onSelect={(ws) => { setSelected(ws); if (tab === 'prospect' || tab === 'settings') setTab('media'); }}
+            onSelect={(ws) => { setSelected(ws); if (tab === 'prospect' || tab === 'settings') setTab('home'); }}
             onCreate={handleCreate}
             onDelete={handleDelete}
             onLinkSite={handleLinkSite}
