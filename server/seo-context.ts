@@ -109,6 +109,55 @@ function readBrandDocs(workspaceFolder: string): string {
 }
 
 /**
+ * Build a global knowledge base block for AI chatbot prompts.
+ * Combines the workspace's knowledgeBase field + any .txt/.md files in knowledge-docs/.
+ */
+export function buildKnowledgeBase(workspaceId?: string): string {
+  if (!workspaceId) return '';
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return '';
+
+  const parts: string[] = [];
+
+  // Inline knowledge base field
+  if (ws.knowledgeBase?.trim()) {
+    parts.push(ws.knowledgeBase.trim());
+  }
+
+  // Read knowledge-docs/ folder
+  const docsContent = readKnowledgeDocs(ws.folder);
+  if (docsContent) parts.push(docsContent);
+
+  if (parts.length === 0) return '';
+  return `\n\nBUSINESS KNOWLEDGE BASE (use this to give informed, business-aware answers):\n${parts.join('\n\n')}`;
+}
+
+/**
+ * Read .txt and .md files from a workspace's knowledge-docs/ folder.
+ */
+function readKnowledgeDocs(workspaceFolder: string): string {
+  const docsDir = path.join(getUploadRoot(), workspaceFolder, 'knowledge-docs');
+  if (!fs.existsSync(docsDir)) return '';
+
+  try {
+    const files = fs.readdirSync(docsDir).filter(f => /\.(txt|md)$/i.test(f)).sort();
+    if (files.length === 0) return '';
+
+    let content = '';
+    for (const file of files) {
+      const text = fs.readFileSync(path.join(docsDir, file), 'utf-8').trim();
+      if (text) {
+        content += `--- ${file} ---\n${text}\n\n`;
+      }
+      if (content.length > 6000) break;
+    }
+    return content.slice(0, 6000);
+  } catch {
+    return '';
+  }
+}
+
+/**
  * Build a full keyword map string for prompts that need cross-page awareness
  * (e.g., internal links, content briefs to avoid cannibalization).
  */

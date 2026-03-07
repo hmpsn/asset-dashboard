@@ -4,7 +4,7 @@ import {
   Globe, Search, BarChart3, Loader2, Check, Unplug, ExternalLink, LogIn, LogOut,
   Copy, CheckCircle, Lock, KeyRound, X, Users, ChevronRight,
   Pin, PinOff, Pencil, Save, RefreshCw, Plus, Trash2, ArrowUp, ArrowDown, Palette,
-  Shield, SlidersHorizontal, Mail, Image as ImageIcon, DollarSign,
+  Shield, SlidersHorizontal, Mail, Image as ImageIcon, DollarSign, BookOpen,
 } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 
@@ -27,6 +27,7 @@ interface WorkspaceData {
   autoReportFrequency?: 'weekly' | 'monthly';
   brandLogoUrl?: string;
   brandAccentColor?: string;
+  knowledgeBase?: string;
   contentPricing?: { briefPrice: number; fullPostPrice: number; currency: string; briefLabel?: string; fullPostLabel?: string; briefDescription?: string; fullPostDescription?: string } | null;
 }
 
@@ -538,6 +539,38 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                   <span className="text-[11px] text-zinc-500">Used in reports and the client portal header</span>
                 </div>
               </div>
+            </div>
+          </section>
+
+          {/* Knowledge Base */}
+          <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+            <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
+              <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                <BookOpen className="w-4 h-4 text-indigo-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-zinc-200">Knowledge Base</h3>
+                <p className="text-xs text-zinc-500">Business context for the AI chatbot — services, capabilities, FAQs, industry info</p>
+              </div>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <textarea
+                defaultValue={ws?.knowledgeBase || ''}
+                rows={8}
+                placeholder={"Example:\n- Industry: Home services (plumbing, HVAC)\n- Location: Denver metro area\n- Key services: Emergency repair, new installations, maintenance plans\n- Differentiators: 24/7 availability, licensed & insured, 15+ years\n- Target audience: Homeowners, property managers\n- Common client questions: pricing, response time, service areas"}
+                onBlur={async (e) => {
+                  const val = e.target.value.trim();
+                  if (val !== (ws?.knowledgeBase || '')) {
+                    await patchWorkspace({ knowledgeBase: val });
+                    toast('Knowledge base saved');
+                  }
+                }}
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-indigo-500 resize-y font-mono leading-relaxed"
+              />
+              <p className="text-[11px] text-zinc-500">
+                This context is shared with both the client Insights Engine and Admin Insights chatbots.
+                You can also place <code className="text-zinc-400">.txt</code> or <code className="text-zinc-400">.md</code> files in the <code className="text-zinc-400">knowledge-docs/</code> folder for longer documents.
+              </p>
             </div>
           </section>
         </div>

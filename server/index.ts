@@ -18,7 +18,7 @@ import {
   getTokenForSite,
 } from './workspaces.js';
 import { getUploadRoot, getOptRoot, getDataDir, DATA_BASE } from './data-dir.js';
-import { buildSeoContext, buildKeywordMapContext } from './seo-context.js';
+import { buildSeoContext, buildKeywordMapContext, buildKnowledgeBase } from './seo-context.js';
 import { startWatcher, getQueue, triggerOptimize, getMetadata } from './processor.js';
 import {
   listSites,
@@ -3030,7 +3030,7 @@ TONE:
 
 Site: ${ws.webflowSiteName || ws.name}
 Date range: last ${context?.days || 28} days
-
+${buildKnowledgeBase(workspaceId)}
 Full data context:
 ${JSON.stringify(context, null, 2)}`;
 
@@ -4697,6 +4697,7 @@ CRITICAL RULES:
 
 Site: ${ws.webflowSiteName || ws.name}
 Date range: last ${context?.days || 28} days
+${buildKnowledgeBase(ws.id)}
 Current data context:
 ${JSON.stringify(context, null, 2)}`;
 
