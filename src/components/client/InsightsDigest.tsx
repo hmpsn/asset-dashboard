@@ -299,12 +299,12 @@ function generateInsights(props: InsightsDigestProps): DigestInsight[] {
 
 // ─── Color Maps ───
 
-const COLORS: Record<string, { bg: string; border: string; text: string; iconBg: string; badge: string }> = {
-  teal:  { bg: 'bg-teal-500/5',  border: 'border-teal-500/15',  text: 'text-teal-400',  iconBg: 'bg-teal-500/15',  badge: 'bg-teal-500/10 text-teal-400' },
-  blue:  { bg: 'bg-blue-500/5',  border: 'border-blue-500/15',  text: 'text-blue-400',  iconBg: 'bg-blue-500/15',  badge: 'bg-blue-500/10 text-blue-400' },
-  green: { bg: 'bg-emerald-500/5', border: 'border-emerald-500/15', text: 'text-emerald-400', iconBg: 'bg-emerald-500/15', badge: 'bg-emerald-500/10 text-emerald-400' },
-  amber: { bg: 'bg-amber-500/5', border: 'border-amber-500/15', text: 'text-amber-400', iconBg: 'bg-amber-500/15', badge: 'bg-amber-500/10 text-amber-400' },
-  red:   { bg: 'bg-red-500/5',   border: 'border-red-500/15',   text: 'text-red-400',   iconBg: 'bg-red-500/15',   badge: 'bg-red-500/10 text-red-400' },
+const COLORS: Record<string, { text: string; badge: string }> = {
+  teal:  { text: 'text-teal-400',    badge: 'bg-teal-500/10 text-teal-400' },
+  blue:  { text: 'text-blue-400',    badge: 'bg-blue-500/10 text-blue-400' },
+  green: { text: 'text-emerald-400', badge: 'bg-emerald-500/10 text-emerald-400' },
+  amber: { text: 'text-amber-400',   badge: 'bg-amber-500/10 text-amber-400' },
+  red:   { text: 'text-red-400',     badge: 'bg-red-500/10 text-red-400' },
 };
 
 const SENTIMENT_LABELS: Record<string, string> = {
@@ -327,8 +327,8 @@ export function InsightsDigest(props: InsightsDigestProps) {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <div className="w-6 h-6 rounded-lg bg-teal-500/15 flex items-center justify-center">
-          <Sparkles className="w-3.5 h-3.5 text-teal-400" />
+        <div className="w-5 h-5 rounded-md bg-teal-500/15 flex items-center justify-center">
+          <Sparkles className="w-3 h-3 text-teal-400" />
         </div>
         <span className="text-xs font-medium text-zinc-300">Insights</span>
         <span className="text-[11px] text-zinc-500">{visible.length} things to know</span>
@@ -341,35 +341,28 @@ export function InsightsDigest(props: InsightsDigestProps) {
           return (
             <div
               key={insight.id}
-              className={`${c.bg} rounded-xl border ${c.border} p-4 transition-colors hover:border-zinc-600/40`}
+              className="bg-zinc-900 rounded-xl border border-zinc-800 p-4"
             >
               {/* Header */}
-              <div className="flex items-start gap-2.5 mb-2">
-                <div className={`w-7 h-7 rounded-lg ${c.iconBg} flex items-center justify-center flex-shrink-0 mt-0.5`}>
-                  <Icon className={`w-3.5 h-3.5 ${c.text}`} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${c.badge}`}>
-                      {SENTIMENT_LABELS[insight.sentiment]}
-                    </span>
-                  </div>
-                  <h3 className="text-[13px] font-medium text-zinc-200 leading-snug">{insight.headline}</h3>
-                </div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <Icon className={`w-4 h-4 ${c.text}`} />
+                <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded ${c.badge}`}>
+                  {SENTIMENT_LABELS[insight.sentiment]}
+                </span>
               </div>
+              <h3 className="text-[13px] font-medium text-zinc-200 leading-snug mb-1.5">{insight.headline}</h3>
 
               {/* Body */}
-              <p className="text-[11px] text-zinc-400 leading-relaxed mb-2 pl-[38px]">
+              <p className="text-[11px] text-zinc-500 leading-relaxed mb-2">
                 {insight.body}
               </p>
 
               {/* Detail items */}
               {insight.detail && insight.detail.length > 0 && (
-                <div className="pl-[38px] space-y-1 mb-2">
+                <div className="space-y-1 mb-2">
                   {insight.detail.map((item, i) => (
-                    <div key={i} className="text-[11px] text-zinc-500 flex items-center gap-1.5">
-                      <span className={`w-1 h-1 rounded-full ${c.text} opacity-60 flex-shrink-0`} />
-                      <span className="truncate">{item}</span>
+                    <div key={i} className="text-[11px] py-1 px-2 rounded bg-zinc-800/30 text-zinc-400 truncate">
+                      {item}
                     </div>
                   ))}
                 </div>
@@ -379,7 +372,7 @@ export function InsightsDigest(props: InsightsDigestProps) {
               {insight.action && (
                 <button
                   onClick={() => props.onNavigate(insight.action!.tab)}
-                  className={`pl-[38px] text-[11px] ${c.text} hover:opacity-80 flex items-center gap-1 transition-opacity`}
+                  className="text-[11px] text-teal-400 hover:text-teal-300 flex items-center gap-1 transition-colors"
                 >
                   {insight.action.label} <ArrowRight className="w-3 h-3" />
                 </button>
