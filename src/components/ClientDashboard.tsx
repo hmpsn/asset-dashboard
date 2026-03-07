@@ -1,17 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  Loader2, Search, TrendingDown, TrendingUp, Eye, MousePointer, MousePointerClick,
+  Loader2, Search, TrendingDown, TrendingUp, Eye, MousePointerClick,
   BarChart3, ArrowUpDown, Sparkles, Send, AlertTriangle,
   Target, Zap, Shield, MessageSquare, X, ChevronDown, ChevronUp,
   CheckCircle2, LayoutDashboard, LineChart, Lock, Trophy,
-  Users, Globe, Activity, Filter, ClipboardCheck, Check, Edit3,
+  Activity, Filter, ClipboardCheck, Check, Edit3,
   Sun, Moon, Plus, Paperclip, FileText, Download, ExternalLink,
 } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
-import { StatCard, CompactStatBar, EmptyState } from './ui';
-import { TrendChart, DualTrendChart, RenderMarkdown, InsightCard } from './client/helpers';
+import { CompactStatBar, EmptyState } from './ui';
+import { DualTrendChart, RenderMarkdown, InsightCard } from './client/helpers';
 import { HealthTab } from './client/HealthTab';
-import { SearchSnapshot, AnalyticsSnapshot, OrganicInsight } from './client/DataSnapshots';
+import { OrganicInsight } from './client/DataSnapshots';
+import { InsightsDigest, PerformancePulse } from './client/InsightsDigest';
 import {
   QUICK_QUESTIONS,
   type SearchOverview, type PerformanceTrend, type WorkspaceInfo, type AuditSummary,
@@ -878,7 +879,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
           {/* Welcome header */}
           <div className="mb-1">
             <h2 className="text-base font-semibold text-zinc-100">Welcome back</h2>
-            <p className="text-xs text-zinc-500 mt-0.5">Here's how your site is performing</p>
+            <p className="text-xs text-zinc-500 mt-0.5">Here's what's happening with your site</p>
           </div>
 
           {/* Action-needed banner */}
@@ -888,8 +889,6 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
             const contentReviews = contentRequests.filter(r => r.status === 'client_review').length;
             if (contentReviews > 0) actions.push({ label: `${contentReviews} content brief${contentReviews > 1 ? 's' : ''} ready for review`, count: contentReviews, tab: 'content', color: 'text-blue-400' });
             if (unreadTeamNotes > 0) actions.push({ label: `${unreadTeamNotes} request${unreadTeamNotes > 1 ? 's' : ''} with new team replies`, count: unreadTeamNotes, tab: 'requests', color: 'text-teal-400' });
-            const healthErrors = auditDetail?.audit.errors || 0;
-            if (healthErrors > 0) actions.push({ label: `${healthErrors} site health issue${healthErrors > 1 ? 's' : ''} found`, count: healthErrors, tab: 'health', color: 'text-red-400' });
             if (actions.length === 0) return null;
             const total = actions.reduce((s, a) => s + a.count, 0);
             return (
@@ -910,172 +909,73 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
             );
           })()}
 
-          {/* Key metrics row */}
-          {(() => {
-            const cards: { icon: typeof Users; label: string; value: string; sub?: string; color: string; td: number[]; onClick: () => void }[] = [];
-            if (audit) cards.push({ icon: Shield, label: 'Site Health', value: String(audit.siteScore), sub: `${audit.totalPages} pages`, color: audit.siteScore >= 80 ? '#34d399' : audit.siteScore >= 60 ? '#fbbf24' : '#f87171', td: [], onClick: () => setTab('health') });
-            if (ga4Overview) {
-              cards.push({ icon: Users, label: 'Visitors', value: ga4Overview.totalUsers.toLocaleString(), sub: 'last 30 days', color: '#2dd4bf', td: ga4Trend.map(d => d.users), onClick: () => setTab('analytics') });
-            }
-            if (overview) {
-              cards.push({ icon: MousePointer, label: 'Search Clicks', value: overview.totalClicks.toLocaleString(), sub: overview.totalImpressions > 0 ? `${((overview.totalClicks / overview.totalImpressions) * 100).toFixed(1)}% CTR` : '', color: '#60a5fa', td: trend.map(t => t.clicks), onClick: () => setTab('search') });
-              cards.push({ icon: Eye, label: 'Impressions', value: overview.totalImpressions.toLocaleString(), sub: 'Google searches', color: '#a78bfa', td: trend.map(t => t.impressions), onClick: () => setTab('search') });
-            } else if (ga4Overview) {
-              cards.push({ icon: Globe, label: 'Sessions', value: ga4Overview.totalSessions.toLocaleString(), sub: 'last 30 days', color: '#60a5fa', td: ga4Trend.map(d => d.sessions), onClick: () => setTab('analytics') });
-            }
-            if (strategyData) {
-              const rankedPages = strategyData.pageMap.filter(p => p.currentPosition);
-              const avgP = rankedPages.length > 0 ? rankedPages.reduce((s, p) => s + (p.currentPosition || 0), 0) / rankedPages.length : 0;
-              cards.push({ icon: Target, label: 'Avg SEO Position', value: rankedPages.length > 0 ? `#${avgP.toFixed(1)}` : '—', sub: rankedPages.length > 0 ? `${rankedPages.length} pages ranking` : `${strategyData.pageMap.length} pages mapped`, color: avgP && avgP <= 10 ? '#34d399' : avgP && avgP <= 20 ? '#fbbf24' : '#60a5fa', td: [], onClick: () => setTab('strategy') });
-            }
-            if (cards.length === 0) return null;
-            return (
-              <div className={`grid gap-3 ${cards.length <= 3 ? 'grid-cols-' + cards.length : cards.length === 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'}`}>
-                {cards.map((card, i) => (
-                  <StatCard
-                    key={i}
-                    label={card.label}
-                    value={card.value}
-                    icon={card.icon}
-                    iconColor={card.color}
-                    valueColor={card.label === 'Site Health' ? card.color : undefined}
-                    sub={card.sub}
-                    sparklineData={card.td.length > 2 ? card.td : undefined}
-                    sparklineColor={card.color}
-                    onClick={card.onClick}
-                  />
-                ))}
-              </div>
-            );
-          })()}
+          {/* Compact performance pulse */}
+          <PerformancePulse
+            overview={overview}
+            searchComparison={searchComparison}
+            ga4Overview={ga4Overview}
+            ga4Comparison={ga4Comparison}
+            audit={audit}
+            strategyData={strategyData}
+          />
 
-          {/* Main content: trend + sidebar */}
+          {/* Main content: insights + sidebar */}
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
-            {/* Left column (3/5) */}
+            {/* Left column (3/5) — Insights feed */}
             <div className="lg:col-span-3 space-y-5">
-              {/* Traffic trend chart */}
-              {ga4Trend.length > 2 && (
-                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-medium text-zinc-400">Traffic Trend</span>
-                    {ga4Overview && <span className="text-[11px] text-zinc-500">{ga4Overview.dateRange.start} — {ga4Overview.dateRange.end}</span>}
-                  </div>
-                  <svg viewBox="0 0 400 100" className="w-full h-24" preserveAspectRatio="none">
-                    {(() => {
-                      const maxU = Math.max(...ga4Trend.map(d => d.users), 1);
-                      const maxS = Math.max(...ga4Trend.map(d => d.sessions), 1);
-                      const xStep = 400 / Math.max(ga4Trend.length - 1, 1);
-                      const mkPath = (vals: number[], max: number) => vals.map((v, i) => `${i === 0 ? 'M' : 'L'}${i * xStep},${95 - (v / max) * 85}`).join(' ');
-                      return (<>
-                        <path d={mkPath(ga4Trend.map(d => d.sessions), maxS)} fill="none" stroke="rgba(96,165,250,0.4)" strokeWidth="1.5" />
-                        <path d={mkPath(ga4Trend.map(d => d.users), maxU)} fill="none" stroke="#2dd4bf" strokeWidth="2" />
-                        <path d={`${mkPath(ga4Trend.map(d => d.users), maxU)} L${(ga4Trend.length - 1) * xStep},95 L0,95 Z`} fill="url(#overviewGa4)" opacity="0.12" />
-                        <defs><linearGradient id="overviewGa4" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2dd4bf" /><stop offset="100%" stopColor="transparent" /></linearGradient></defs>
-                        {annotations.map(ann => {
-                          const idx = ga4Trend.findIndex(d => d.date === ann.date);
-                          if (idx < 0) return null;
-                          const x = idx * xStep;
-                          return <g key={ann.id}><line x1={x} y1={2} x2={x} y2={95} stroke={ann.color || '#2dd4bf'} strokeWidth="1" strokeDasharray="3,2" opacity="0.6" /><circle cx={x} cy={4} r="3" fill={ann.color || '#2dd4bf'} /><title>{ann.label}</title></g>;
-                        })}
-                      </>);
-                    })()}
-                  </svg>
-                  <div className="flex items-center gap-4 mt-2">
-                    <span className="flex items-center gap-1.5 text-[11px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-teal-400 inline-block" /> Users</span>
-                    <span className="flex items-center gap-1.5 text-[11px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-blue-400/40 inline-block" /> Sessions</span>
-                  </div>
-                </div>
-              )}
-              {!ga4Trend.length && trend.length > 2 && (
-                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-medium text-zinc-400">Search Performance</span>
-                    {overview && <span className="text-[11px] text-zinc-500">{overview.dateRange.start} — {overview.dateRange.end}</span>}
-                  </div>
-                  <div className="space-y-3">
-                    <div><div className="text-[11px] text-blue-400 mb-1">Clicks</div><TrendChart data={trend} metric="clicks" color="#60a5fa" /></div>
-                    <div><div className="text-[11px] text-teal-400 mb-1">Impressions</div><TrendChart data={trend} metric="impressions" color="#2dd4bf" /></div>
-                  </div>
-                </div>
-              )}
-
-              {/* Simplified search snapshot */}
-              {overview && (
-                <SearchSnapshot
-                  overview={overview}
-                  trend={trend}
-                  comparison={searchComparison}
-                  devices={searchDevices}
-                  onViewMore={() => setTab('search')}
-                />
-              )}
-
-              {/* Simplified analytics snapshot */}
-              {ga4Overview && (
-                <AnalyticsSnapshot
-                  overview={ga4Overview}
-                  trend={ga4Trend}
-                  topPages={ga4Pages}
-                  comparison={ga4Comparison}
-                  newVsReturning={ga4NewVsReturning}
-                  onViewMore={() => setTab('analytics')}
-                />
-              )}
-
-              {/* Top search wins — celebrate what's working */}
-              {insights && insights.topPerformers.length > 0 && (
-                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-5 h-5 rounded-md bg-emerald-500/15 flex items-center justify-center"><CheckCircle2 className="w-3 h-3 text-emerald-400" /></div>
-                    <span className="text-xs font-medium text-zinc-300">Your Top Search Rankings</span>
-                    <button onClick={() => setTab('search')} className="text-[11px] text-teal-400 hover:text-teal-300 ml-auto">View all →</button>
-                  </div>
-                  <div className="space-y-1.5">
-                    {insights.topPerformers.slice(0, 5).map((q, i) => (
-                      <div key={i} className="flex items-center justify-between text-[11px] py-2 px-3 rounded-lg bg-zinc-800/30">
-                        <span className="text-zinc-300 truncate mr-3">{q.query}</span>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className={`font-mono font-medium ${q.position <= 3 ? 'text-emerald-400' : q.position <= 10 ? 'text-green-400' : 'text-amber-400'}`}>#{q.position}</span>
-                          <span className="text-[11px] text-zinc-500">{q.clicks} clicks</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Pinned key events */}
-              {sortedConversions.filter(c => isEventPinned(c.eventName)).length > 0 && (
-                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2"><Zap className="w-4 h-4 text-teal-400" /><span className="text-xs font-medium text-zinc-300">Key Events</span></div>
-                    <button onClick={() => setTab('analytics')} className="text-[11px] text-teal-400 hover:text-teal-300">View all →</button>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {sortedConversions.filter(c => isEventPinned(c.eventName)).slice(0, 6).map((c, i) => (
-                      <div key={i} className="bg-zinc-800/30 rounded-lg p-3">
-                        <div className="text-[11px] text-zinc-400 truncate mb-1">{eventDisplayName(c.eventName)}</div>
-                        <div className="text-lg font-bold text-zinc-200">{c.conversions.toLocaleString()}</div>
-                        {c.rate > 0 && <div className="text-[11px] text-emerald-400">{c.rate}% rate</div>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* AI-generated insights digest */}
+              <InsightsDigest
+                overview={overview}
+                searchComparison={searchComparison}
+                ga4Overview={ga4Overview}
+                ga4Comparison={ga4Comparison}
+                ga4Organic={ga4Organic}
+                ga4Conversions={ga4Conversions}
+                ga4NewVsReturning={ga4NewVsReturning}
+                audit={audit}
+                auditDetail={auditDetail}
+                strategyData={strategyData}
+                searchInsights={insights ? { lowHanging: insights.lowHanging, topPerformers: insights.topPerformers } : null}
+                eventDisplayName={eventDisplayName}
+                isEventPinned={isEventPinned}
+                onNavigate={setTab}
+              />
 
               {/* Empty state */}
               {!overview && !audit && !ga4Overview && (
                 <div className="bg-gradient-to-br from-teal-500/10 via-zinc-900 to-emerald-500/10 rounded-xl border border-zinc-800 p-8 text-center">
                   <div className="w-12 h-12 rounded-2xl bg-teal-500/10 flex items-center justify-center mx-auto mb-4"><BarChart3 className="w-6 h-6 text-teal-400" /></div>
                   <h2 className="text-lg font-semibold text-zinc-200 mb-2">{ws.name}</h2>
-                  <p className="text-sm text-zinc-400">We're getting everything set up for you. Your performance data will start appearing here shortly.</p>
+                  <p className="text-sm text-zinc-400">We're getting everything set up for you. Your performance data and insights will start appearing here shortly.</p>
                 </div>
               )}
             </div>
 
-            {/* Right sidebar (2/5) — insights & status */}
+            {/* Right sidebar (2/5) */}
             <div className="lg:col-span-2 space-y-4">
-              {/* Site health snapshot */}
+              {/* Ask the Insights Engine */}
+              <div className="bg-gradient-to-br from-teal-500/5 via-zinc-900 to-zinc-900 rounded-xl border border-teal-500/15 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-6 h-6 rounded-lg bg-teal-500/15 flex items-center justify-center">
+                    <Sparkles className="w-3.5 h-3.5 text-teal-400" />
+                  </div>
+                  <span className="text-xs font-medium text-zinc-300">Ask the Insights Engine</span>
+                </div>
+                <p className="text-[11px] text-zinc-500 mb-3">Get instant answers about your site's performance, SEO opportunities, and next steps.</p>
+                <div className="space-y-1.5">
+                  {QUICK_QUESTIONS.slice(0, 4).map((q, i) => (
+                    <button
+                      key={i}
+                      onClick={() => { setChatOpen(true); setTimeout(() => askAi(q), 100); }}
+                      className="w-full text-left px-3 py-2 rounded-lg bg-zinc-800/40 hover:bg-zinc-800/70 border border-zinc-700/30 hover:border-teal-500/20 transition-colors text-[11px] text-zinc-400 hover:text-zinc-300"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Site health compact */}
               {audit && (
                 <button onClick={() => setTab('health')} className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 text-left hover:border-zinc-700 transition-colors w-full">
                   <div className="flex items-center gap-2 mb-2"><Shield className="w-4 h-4" style={{ color: audit.siteScore >= 80 ? '#34d399' : audit.siteScore >= 60 ? '#fbbf24' : '#f87171' }} /><span className="text-xs font-medium text-zinc-300">Site Health</span></div>
@@ -1094,64 +994,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                 </button>
               )}
 
-              {/* Search opportunities */}
-              {insights && insights.lowHanging.length > 0 && (
-                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <TrendingUp className="w-4 h-4 text-amber-400" />
-                    <span className="text-xs font-medium text-zinc-300">Almost There</span>
-                  </div>
-                  <p className="text-[11px] text-zinc-500 mb-2">Keywords close to page 1 — small improvements could mean big traffic gains.</p>
-                  <div className="space-y-1.5">
-                    {insights.lowHanging.slice(0, 3).map((q, i) => (
-                      <div key={i} className="flex items-center justify-between text-[11px] py-1.5 px-2.5 rounded-lg bg-zinc-800/30">
-                        <span className="text-zinc-300 truncate mr-2">{q.query}</span>
-                        <span className="text-amber-400 font-mono font-medium flex-shrink-0">#{q.position}</span>
-                      </div>
-                    ))}
-                  </div>
-                  {insights.lowHanging.length > 3 && <button onClick={() => setTab('search')} className="text-[11px] text-teal-400 hover:text-teal-300 mt-2">+{insights.lowHanging.length - 3} more →</button>}
-                </div>
-              )}
-
-              {/* Growth insights — subtle strategy teaser, only if data exists */}
-              {strategyData && (strategyData.quickWins?.length || strategyData.contentGaps?.length) ? (
-                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                  <div className="flex items-center gap-2 mb-2.5">
-                    <Sparkles className="w-4 h-4 text-teal-400" />
-                    <span className="text-xs font-medium text-zinc-300">Growth Insights</span>
-                  </div>
-                  <div className="space-y-2">
-                    {strategyData.quickWins && strategyData.quickWins.length > 0 && (
-                      <button onClick={() => setTab('strategy')} className="w-full text-left px-3 py-2.5 rounded-lg bg-zinc-800/30 hover:bg-zinc-800/50 transition-colors">
-                        <div className="flex items-center gap-2">
-                          <Zap className="w-3 h-3 text-amber-400 flex-shrink-0" />
-                          <span className="text-[11px] text-zinc-300">We identified <strong className="text-amber-300">{strategyData.quickWins.length} quick wins</strong> that could improve your rankings</span>
-                        </div>
-                      </button>
-                    )}
-                    {strategyData.contentGaps && strategyData.contentGaps.length > 0 && (
-                      <button onClick={() => setTab('strategy')} className="w-full text-left px-3 py-2.5 rounded-lg bg-zinc-800/30 hover:bg-zinc-800/50 transition-colors">
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-3 h-3 text-teal-400 flex-shrink-0" />
-                          <span className="text-[11px] text-zinc-300">Found <strong className="text-teal-300">{strategyData.contentGaps.length} content {strategyData.contentGaps.length === 1 ? 'opportunity' : 'opportunities'}</strong> for new traffic</span>
-                        </div>
-                      </button>
-                    )}
-                    {strategyData.opportunities && strategyData.opportunities.length > 0 && (
-                      <button onClick={() => setTab('strategy')} className="w-full text-left px-3 py-2.5 rounded-lg bg-zinc-800/30 hover:bg-zinc-800/50 transition-colors">
-                        <div className="flex items-center gap-2">
-                          <Target className="w-3 h-3 text-teal-400 flex-shrink-0" />
-                          <span className="text-[11px] text-zinc-300"><strong className="text-teal-300">{strategyData.opportunities.length} keyword {strategyData.opportunities.length === 1 ? 'opportunity' : 'opportunities'}</strong> identified</span>
-                        </div>
-                      </button>
-                    )}
-                  </div>
-                  <div className="text-[11px] text-zinc-500 mt-2.5 pt-2 border-t border-zinc-800">View your full SEO strategy for details</div>
-                </div>
-              ) : null}
-
-              {/* Activity timeline (compact in sidebar) */}
+              {/* Activity timeline */}
               {activityLog.length > 0 && (
                 <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
                   <div className="flex items-center gap-2 mb-3">
