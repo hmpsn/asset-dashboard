@@ -43,9 +43,15 @@ export function LinkChecker({ siteId }: Props) {
       .finally(() => setLoading(false));
   };
 
+  // Load last saved snapshot on site change
   useEffect(() => {
-    setData(null);
-    setHasRun(false);
+    let cancelled = false;
+    setData(null); setHasRun(false);
+    fetch(`/api/webflow/link-check-snapshot/${siteId}`)
+      .then(r => r.json())
+      .then(snap => { if (!cancelled && snap?.result) { setData(snap.result); setHasRun(true); } })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, [siteId]);
 
   const exportCsv = () => {

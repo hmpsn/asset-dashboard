@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Loader2, TrendingUp, TrendingDown, Target, Zap, AlertTriangle,
   CheckCircle, ArrowRight, Globe, BarChart3, Shield,
@@ -77,6 +77,21 @@ export function CompetitorAnalysis({ siteUrl }: Props) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ComparisonResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Load last saved comparison for this site on mount
+  useEffect(() => {
+    if (!siteUrl) return;
+    let cancelled = false;
+    fetch(`/api/competitor-compare-latest?myUrl=${encodeURIComponent(siteUrl)}`)
+      .then(r => r.json())
+      .then(snap => {
+        if (cancelled || !snap?.result) return;
+        setResult(snap.result);
+        if (snap.result.competitor?.url) setCompetitorUrl(snap.result.competitor.url);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [siteUrl]);
 
   const runComparison = async () => {
     if (!myUrl.trim() || !competitorUrl.trim()) return;

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Loader2, ArrowRight, RefreshCw, ExternalLink, Search as SearchIcon,
   Link, AlertCircle, ChevronDown, ChevronRight, ArrowUpRight,
@@ -61,6 +61,16 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
       setLoading(false);
     }
   };
+
+  // Load last saved snapshot on mount
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/webflow/internal-links-snapshot/${siteId}`)
+      .then(r => r.json())
+      .then(snap => { if (!cancelled && snap?.result) setData(snap.result); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [siteId]);
 
   const toggleExpanded = (idx: number) => {
     setExpanded(prev => {

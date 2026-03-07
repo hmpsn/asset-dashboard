@@ -75,10 +75,15 @@ function PageWeight({ siteId }: Props) {
       .finally(() => setLoading(false));
   };
 
+  // Load last saved snapshot on site change
   useEffect(() => {
-    setData(null);
-    setHasRun(false);
-    setError(null);
+    let cancelled = false;
+    setData(null); setHasRun(false); setError(null);
+    fetch(`/api/webflow/page-weight-snapshot/${siteId}`)
+      .then(r => r.json())
+      .then(snap => { if (!cancelled && snap?.result) { setData(snap.result); setHasRun(true); } })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, [siteId]);
 
   const toggleExpand = (page: string) => {

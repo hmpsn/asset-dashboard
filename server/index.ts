@@ -50,6 +50,7 @@ import { runSeoAudit } from './seo-audit.js';
 import { checkSiteLinks } from './link-checker.js';
 import { scanRedirects } from './redirect-scanner.js';
 import { saveRedirectSnapshot, getRedirectSnapshot } from './redirect-store.js';
+import { savePageWeight, getPageWeight, savePageSpeed, getPageSpeed, saveSinglePageSpeed, saveLinkCheck, getLinkCheck, saveInternalLinks, getInternalLinks, saveCompetitorCompare, getCompetitorCompare, getLatestCompetitorCompareForSite } from './performance-store.js';
 import { analyzeInternalLinks } from './internal-links.js';
 import {
   saveSnapshot, getSnapshot, listSnapshots, getLatestSnapshot, renderReportHTML,
@@ -798,14 +799,22 @@ app.get('/api/webflow/page-weight/:siteId', async (req, res) => {
 
     pages.sort((a, b) => b.totalSize - a.totalSize);
 
-    res.json({
+    const result = {
       totalPages: pages.length,
       totalAssetSize: assets.reduce((sum, a) => sum + (a.size || 0), 0),
       pages,
-    });
+    };
+    savePageWeight(req.params.siteId, result);
+    res.json(result);
   } catch {
     res.status(500).json({ error: 'Page weight analysis failed' });
   }
+});
+
+// Load last saved page weight snapshot
+app.get('/api/webflow/page-weight-snapshot/:siteId', (req, res) => {
+  const snapshot = getPageWeight(req.params.siteId);
+  res.json(snapshot);
 });
 
 // --- SEO Audit ---
@@ -976,18 +985,37 @@ app.post('/api/competitor-compare', async (req, res) => {
       }
     }
 
-    res.json({
+    const compareResult = {
       mySite: { url: myAudit.url, name: myAudit.siteName, metrics: myMetrics, quickWins: myAudit.quickWins },
       competitor: { url: theirAudit.url, name: theirAudit.siteName, metrics: theirMetrics, quickWins: theirAudit.quickWins },
       advantages: advantages.slice(0, 8),
       disadvantages: disadvantages.slice(0, 8),
       opportunities: opportunities.slice(0, 8),
       comparedAt: new Date().toISOString(),
-    });
+    };
+    saveCompetitorCompare(myUrl, competitorUrl, compareResult);
+    res.json(compareResult);
   } catch (err) {
     console.error('Competitor compare error:', err);
     res.status(500).json({ error: 'Comparison failed' });
   }
+});
+
+// Load last saved competitor comparison (exact match)
+app.get('/api/competitor-compare-snapshot', (req, res) => {
+  const myUrl = req.query.myUrl as string;
+  const competitorUrl = req.query.competitorUrl as string;
+  if (!myUrl || !competitorUrl) return res.json(null);
+  const snapshot = getCompetitorCompare(myUrl, competitorUrl);
+  res.json(snapshot);
+});
+
+// Load most recent competitor comparison for a given site URL (any competitor)
+app.get('/api/competitor-compare-latest', (req, res) => {
+  const myUrl = req.query.myUrl as string;
+  if (!myUrl) return res.json(null);
+  const snapshot = getLatestCompetitorCompareForSite(myUrl);
+  res.json(snapshot);
 });
 
 // --- JSON-LD Schema Suggester (internal tool, not client-visible) ---
@@ -1154,11 +1182,18 @@ app.get('/api/webflow/pagespeed/:siteId', async (req, res) => {
     const strategy = (req.query.strategy as 'mobile' | 'desktop') || 'mobile';
     const maxPages = parseInt(req.query.maxPages as string) || 5;
     const result = await runSiteSpeed(req.params.siteId, strategy, maxPages, token);
+    savePageSpeed(req.params.siteId, result);
     res.json(result);
   } catch (err) {
     console.error('PageSpeed error:', err);
     res.status(500).json({ error: 'PageSpeed analysis failed' });
   }
+});
+
+// Load last saved PageSpeed snapshot
+app.get('/api/webflow/pagespeed-snapshot/:siteId', (req, res) => {
+  const snapshot = getPageSpeed(req.params.siteId);
+  res.json(snapshot);
 });
 
 // Single-page PageSpeed test (resolves URL from siteId + slug)
@@ -1180,6 +1215,7 @@ app.post('/api/webflow/pagespeed-single/:siteId', async (req, res) => {
     const url = pageSlug ? `https://${subdomain}.webflow.io/${pageSlug}` : `https://${subdomain}.webflow.io`;
     const result = await runSinglePageSpeed(url, strategy || 'mobile', pageTitle || '');
     if (!result) return res.status(502).json({ error: 'PageSpeed API returned no data. It may be rate-limited.' });
+    saveSinglePageSpeed(siteId, `${pageSlug || 'home'}_${strategy || 'mobile'}`, result);
     res.json(result);
   } catch (err) {
     console.error('Single PageSpeed error:', err);
@@ -1370,11 +1406,18 @@ app.get('/api/webflow/link-check/:siteId', async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
     const result = await checkSiteLinks(req.params.siteId, token);
+    saveLinkCheck(req.params.siteId, result);
     res.json(result);
   } catch (err) {
     console.error('Link check error:', err);
     res.status(500).json({ error: 'Link check failed' });
   }
+});
+
+// Load last saved link check snapshot
+app.get('/api/webflow/link-check-snapshot/:siteId', (req, res) => {
+  const snapshot = getLinkCheck(req.params.siteId);
+  res.json(snapshot);
 });
 
 // --- Redirect Scanner ---
@@ -1433,11 +1476,18 @@ app.get('/api/webflow/internal-links/:siteId', async (req, res) => {
     const token = getTokenForSite(req.params.siteId) || undefined;
     const workspaceId = req.query.workspaceId as string | undefined;
     const result = await analyzeInternalLinks(req.params.siteId, workspaceId, token);
+    saveInternalLinks(req.params.siteId, result);
     res.json(result);
   } catch (err) {
     console.error('Internal links error:', err);
     res.status(500).json({ error: 'Internal link analysis failed' });
   }
+});
+
+// Load last saved internal links snapshot
+app.get('/api/webflow/internal-links-snapshot/:siteId', (req, res) => {
+  const snapshot = getInternalLinks(req.params.siteId);
+  res.json(snapshot);
 });
 
 // --- AI SEO Rewrite ---

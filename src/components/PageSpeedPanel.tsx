@@ -128,14 +128,25 @@ export function PageSpeedPanel({ siteId }: Props) {
   const [mode, setMode] = useState<'single' | 'bulk'>('single');
 
   useEffect(() => {
+    let cancelled = false;
     fetch(`/api/webflow/pages/${siteId}`)
       .then(r => r.json())
       .then(d => {
+        if (cancelled) return;
         const list = (Array.isArray(d) ? d : []).filter((p: WebflowPage) => !p.title.toLowerCase().includes('password'));
         setPages(list);
         if (list.length > 0) setSelectedPage(list[0].id);
       })
       .catch(() => {});
+    // Load last saved bulk PageSpeed snapshot
+    fetch(`/api/webflow/pagespeed-snapshot/${siteId}`)
+      .then(r => r.json())
+      .then(snap => {
+        if (cancelled) return;
+        if (snap?.result) { setData(snap.result); setHasRun(true); }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, [siteId]);
 
   const runBulkTest = (strat: 'mobile' | 'desktop') => {
