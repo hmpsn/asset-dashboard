@@ -12,7 +12,7 @@ import { AdminChat } from './components/AdminChat';
 import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, Search,
   Pencil, CornerDownRight, Share2, Target, Code2, LogOut, Swords, TrendingUp, Flag,
-  Sun, Moon, LayoutDashboard, Rocket,
+  Sun, Moon, LayoutDashboard,
 } from 'lucide-react';
 
 // ── Lazy-loaded route-level chunks ──
@@ -341,25 +341,14 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     <div className="flex h-screen bg-[#0f1219] text-zinc-200">
       {/* ── Global sidebar ── */}
       <aside className="w-[200px] flex-shrink-0 flex flex-col border-r border-zinc-800">
-        {/* Logo */}
-        <div className="px-4 pt-4 pb-2">
+        {/* Logo → Command Center */}
+        <button
+          onClick={() => { setSelected(null); setTab('home'); }}
+          className="px-4 pt-4 pb-3 block hover:opacity-80 transition-opacity"
+          title="Command Center"
+        >
           <img src="/logo.svg" alt="hmpsn.studio" className="h-7" style={theme === 'light' ? { filter: 'invert(1) brightness(0.3)' } : undefined} />
-        </div>
-
-        {/* Command Center */}
-        <div className="px-2 pb-2">
-          <button
-            onClick={() => { setSelected(null); setTab('home'); }}
-            className={`w-full flex items-center gap-2.5 px-2.5 py-[6px] rounded-lg text-[12px] font-medium transition-all ${
-              !selected
-                ? 'bg-teal-500/10 text-teal-300'
-                : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
-            }`}
-          >
-            <Rocket className={`w-3.5 h-3.5 flex-shrink-0 ${!selected ? 'text-teal-400' : ''}`} />
-            <span className="truncate">Command Center</span>
-          </button>
-        </div>
+        </button>
 
         {/* Workspace selector */}
         <div className="px-3 pb-2 border-b border-zinc-800">
@@ -372,18 +361,6 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
             onLinkSite={handleLinkSite}
             onUnlinkSite={handleUnlinkSite}
           />
-          {selected && (
-            <div className="mt-1.5 flex items-center gap-1.5 px-1">
-              {selected.webflowSiteName && <div className="text-[11px] text-zinc-500 truncate flex-1">{selected.webflowSiteName}</div>}
-              <button
-                onClick={() => setTab('workspace-settings')}
-                className={`p-1 rounded transition-colors ${tab === 'workspace-settings' ? 'text-teal-400 bg-teal-500/10' : 'text-zinc-500 hover:text-zinc-400'}`}
-                title="Workspace settings"
-              >
-                <Settings className="w-3 h-3" />
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Navigation */}

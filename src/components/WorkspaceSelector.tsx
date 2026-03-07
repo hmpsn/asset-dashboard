@@ -95,7 +95,12 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
           'w-2 h-2 rounded-full shrink-0',
           selected ? 'bg-emerald-400' : 'bg-zinc-600'
         )} />
-        <span className={`truncate flex-1 text-left ${selected ? 'text-zinc-200' : 'text-zinc-500'}`}>{selected?.name || 'Select workspace'}</span>
+        <div className="truncate flex-1 text-left">
+          <span className={selected ? 'text-zinc-200' : 'text-zinc-500'}>{selected?.name || 'Select workspace'}</span>
+          {selected?.webflowSiteName && (
+            <div className="text-[10px] text-zinc-500 truncate leading-tight">{selected.webflowSiteName}</div>
+          )}
+        </div>
         <ChevronDown className={cn('w-3.5 h-3.5 shrink-0 transition-transform', open ? 'rotate-180 text-teal-400' : 'text-zinc-500')} />
       </button>
 
