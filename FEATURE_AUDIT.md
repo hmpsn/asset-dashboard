@@ -128,13 +128,13 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 12. Search Console Integration
-**What it does:** Pulls Google Search Console data — clicks, impressions, CTR, average position — with query-level and page-level breakdowns. Supports 7/28/90/180/365-day ranges.
+**What it does:** Pulls Google Search Console data — clicks, impressions, CTR, average position — with query-level and page-level breakdowns. Supports 7d/28d/90d/6mo/16mo date ranges with sparkline mini-charts and full performance trend charts. **Insights tab** automatically identifies low-hanging fruit (positions 5-20 with impressions), top performers, CTR opportunities (page 1 but <3% CTR), high-impression/low-click queries, and branded vs. non-branded query breakdown. **AI Search Chat** (GPT-4o) answers natural language questions about the client's actual search data with quick-question presets. Contextual cross-link tips guide users to Strategy and SEO Editor based on findings.
 
-**Agency value:** GSC data in context alongside all other tools. No more switching between platforms to correlate data.
+**Agency value:** GSC data in context alongside all other tools. The insights tab surfaces the exact queries worth optimizing — no manual spreadsheet analysis. AI chat handles "which keywords am I ranking for?" questions.
 
-**Client value:** Understands how their site performs in Google search without needing their own GSC access.
+**Client value:** Understands how their site performs in Google search without needing their own GSC access. AI chat answers questions in plain English.
 
-**Mutual:** Single source of truth for organic search performance that both sides reference.
+**Mutual:** Single source of truth for organic search performance. Insights → Strategy → Editor workflow keeps both sides aligned on priorities.
 
 ---
 
@@ -161,9 +161,9 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 15. Activity Log
-**What it does:** Chronological feed of all platform actions — audits run, changes applied, content requested, briefs generated, approvals completed.
+**What it does:** Chronological feed of all platform actions — audits run, changes applied, content requested, briefs generated, approvals completed, schemas published, redirects scanned, strategies generated, and more. Now wired to **all major operations** across the platform with consolidated data paths for reliable persistence.
 
-**Agency value:** Full audit trail. Know exactly what was done, when, and for which client.
+**Agency value:** Full audit trail. Know exactly what was done, when, and for which client. Every tool action is automatically logged.
 
 **Client value:** Transparency into what the agency is actively doing. "Last activity: 2 hours ago" beats silence.
 
@@ -273,7 +273,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 25. Redirect Manager
-**What it does:** Scans all published pages (static + CMS via sitemap) for redirect chains, 404s, loops, and routing issues. Traces multi-hop redirects and detects broken destinations. AI-powered **redirect target recommendations** match broken/404 slugs against healthy pages using keyword overlap and path similarity. Review panel with accept/edit target/dismiss workflow. **Export CSV** generates Webflow-compatible redirect rules for import in Settings → Hosting → 301 Redirects. Results persist to disk between deploys.
+**What it does:** Scans all published pages (static + CMS via sitemap) for redirect chains, 404s, loops, and routing issues. Traces multi-hop redirects and detects broken destinations. **GSC ghost URL detection** identifies old/renamed pages that Google still indexes but no longer exist on the site — catches redirect gaps invisible to a simple crawl. AI-powered **redirect target recommendations** match broken/404 slugs against healthy pages using keyword overlap and path similarity. Review panel with accept/edit target/dismiss workflow. **Export CSV** generates Webflow-compatible redirect rules for import in Settings → Hosting → 301 Redirects. Results persist to disk between deploys.
 
 **Agency value:** Finds redirect problems across the entire site in one scan — including CMS pages. Recommendations eliminate the guesswork of "where should this redirect to?"
 
@@ -316,17 +316,73 @@ A brief value assessment of every feature in the platform, covering what it does
 
 ---
 
+### 29. Competitor SEO Analysis
+**What it does:** Side-by-side SEO comparison between your site and any competitor URL. Runs a full audit on both sites simultaneously, then compares scores, page counts, error/warning ratios, title/description lengths, OG coverage, schema coverage, H1 coverage, and issue distribution. Surfaces **quick wins** — issues the competitor handles well that your site doesn't. Color-coded metric comparisons (green = winning, red = losing) with per-category breakdowns.
+
+**Agency value:** Answers the #1 client question — "how do we compare to [competitor]?" — with data instead of guesswork. Identifies specific areas where the competitor is ahead.
+
+**Client value:** Concrete evidence of where they stand vs. competitors. Motivates action on recommendations when they can see the gap.
+
+**Mutual:** Turns competitive analysis from a subjective opinion into an objective, repeatable benchmark. Re-run after improvements to show progress.
+
+---
+
+### 30. Sales Report (Prospect Audit)
+**What it does:** URL-based SEO audit for **any website** — no Webflow API key or workspace needed. Enter a URL, and the system crawls and audits up to 50 pages, producing a branded prospect report with site score, page-by-page issues, **quick wins** (highest-impact fixes), **top risks** (most damaging problems), and site-wide issues. Reports persist and are browsable from a history list. Runs as a background job with real-time progress.
+
+**Agency value:** A sales tool disguised as an audit. Run a report on a prospect's site during a sales call and show them exactly what needs fixing. Saved reports build a pipeline of prospects.
+
+**Client value:** N/A — this is an internal agency tool for pre-sale conversations.
+
+**Mutual:** Converts prospects into clients by demonstrating expertise with their own data. "Here are 12 errors on your site — want us to fix them?"
+
+---
+
+### 31. Page Weight Analyzer
+**What it does:** Analyzes total image weight per page across the entire site. Identifies pages loading the most image data, flags heavy pages (>2MB), and provides per-page breakdowns of image count and total size. Runs as part of the Performance tab alongside PageSpeed Insights.
+
+**Agency value:** Pinpoints which pages need image optimization first. Pairs with the Asset Manager's compression tool for a complete workflow.
+
+**Client value:** Faster pages for visitors. Heavy pages are identified and fixed before they hurt bounce rates.
+
+**Mutual:** Data-driven prioritization — optimize the heaviest pages first for maximum performance impact.
+
+---
+
+### 32. Unified Design System
+**What it does:** Consistent teal/zinc color palette across all admin and client dashboard components. All inline CSS variable references replaced with Tailwind utility classes. Unified card backgrounds, sidebar styling, workspace selector, and button treatments. **Accessibility pass**: minimum `text-[11px]` font size enforced (was `text-[8px]` in some places), improved contrast ratios, `aria-label` attributes on all icon-only buttons.
+
+**Agency value:** Professional, cohesive appearance across every screen. No visual inconsistencies that undermine credibility.
+
+**Client value:** A polished, accessible interface that works well on all devices and for users with visual impairments.
+
+**Mutual:** A design system that scales — new features automatically inherit consistent styling without manual polish.
+
+---
+
+### 33. Contextual Cross-Linking (UX)
+**What it does:** Contextual "next step" tips embedded throughout the platform that guide users from one tool to another based on their current data. Site Audit results suggest → SEO Editor (for meta fixes), → Redirects (for chain issues), → Schema (for structured data gaps), → Performance (for speed issues). Search Console insights suggest → Strategy (for keyword opportunities), → SEO Editor (for CTR improvements). Keyword Strategy content gaps suggest → Content Briefs. Rank Tracker empty state suggests → Strategy. Internal Links tips point to → SEO Editor and → Site Audit. Redirect Manager tips point to → Site Audit and → Dead Links.
+
+**Agency value:** Reduces training time for team members. The tools teach you the workflow as you use them.
+
+**Client value:** N/A — admin-side feature, though the client dashboard already has cross-linked overview cards.
+
+**Mutual:** Increases tool adoption and ensures the full platform is used, not just 2-3 features.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
 |----------|:---:|---|
-| SEO & Technical | 10 | Audit, fix, and optimize faster than manual tools |
+| SEO & Technical | 12 | Audit, fix, and optimize faster than manual tools |
 | Analytics & Tracking | 5 | Unified data view replaces platform-hopping |
 | Content & Strategy | 3 | Strategy → brief → approval → production pipeline |
 | Client Communication | 4 | Structured workflows replace email chaos |
 | Client Self-Service | 6 | 24/7 data access reduces reporting overhead |
+| Platform & UX | 3 | Design system, cross-linking, sales tooling |
 
-**28 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**33 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
 ---
 
@@ -350,12 +406,14 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - **Bulk publish all**: One-click to publish all generated schemas at once (currently per-page).
 
 ### Redirect Manager Enhancements
+- ~~GSC ghost URL detection~~: ✅ Shipped — Identifies old/renamed pages Google still indexes but no longer exist on site.
 - **Webflow Enterprise API**: The 301 Redirects API is Enterprise-only. If/when Enterprise access is available, push accepted rules directly via API instead of CSV export.
 - **Historical comparison**: Track redirect status over time — detect new 404s since last scan.
 - **Google Search Console 404 import**: Pull crawl errors from GSC to seed the redirect scanner with known broken URLs.
 
 ### Site Audit Enhancements
 - ~~Redirect + CWV integration~~: ✅ Shipped — Redirect chains and homepage Core Web Vitals wired into audit.
+- ~~Contextual cross-link tips~~: ✅ Shipped — Audit results suggest SEO Editor, Redirects, Schema, Performance based on findings.
 - **Full-site PageSpeed**: Offer a deeper multi-page PSI scan as a separate background job.
 - **Accessibility audit expansion**: Currently only checks img alt text. Could add WCAG contrast, ARIA, heading order, form label checks.
 - **Historical trend charts**: Track audit score over time per-page, not just site-wide.
@@ -377,3 +435,37 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - ~~E-E-A-T guidelines~~: ✅ Shipped — Content briefs include E-E-A-T, content checklists, schema recs.
 - **Content calendar**: Visual calendar view of content in production with due dates.
 - **Writer assignment**: Assign content pieces to specific writers with notifications.
+
+### Design & Accessibility
+- ~~Unified zinc/teal palette~~: ✅ Shipped — All CSS variables replaced with Tailwind utility classes.
+- ~~Accessibility pass~~: ✅ Shipped — Minimum 11px font sizes, improved contrast, aria-labels on icon-only buttons.
+- ~~Activity log wiring~~: ✅ Shipped — All major operations now logged automatically.
+- **WCAG AA compliance**: Full contrast ratio audit, focus indicators, keyboard navigation for all interactive elements.
+- **Responsive mobile layout**: Sidebar collapses to bottom nav, cards stack vertically on small screens.
+
+### Competitor Analysis Enhancements
+- **Historical comparisons**: Track how you vs. competitor gap changes over time.
+- **Multi-competitor**: Compare against 2-3 competitors simultaneously.
+- **Keyword overlap**: Show which keywords both sites rank for and where you're winning/losing.
+
+### Sales Report Enhancements
+- **Branded PDF export**: Generate prospect reports as downloadable PDFs with agency branding.
+- **Email delivery**: Send prospect reports directly to leads from the platform.
+- **CRM integration**: Push prospect data to HubSpot/Pipedrive when a report is generated.
+
+---
+
+## Cascade Update Prompt
+
+When the user asks to update this document with recent features, follow this process:
+
+1. **Check git log**: `git log --oneline -30` to see recent commits since the last FEATURE_AUDIT update.
+2. **Identify new features**: Look for `feat:` commits that introduce entirely new tools or capabilities not yet documented above.
+3. **Identify enhancements**: Look for commits that significantly expand existing features (new modes, integrations, UI overhauls).
+4. **For each new feature**: Add a numbered entry (continuing from the current last number) with the standard format: What it does / Agency value / Client value / Mutual.
+5. **For each enhancement**: Update the existing feature's "What it does" paragraph to reflect the new capability.
+6. **Update Future Additions**: Mark any shipped items with ~~strikethrough~~: ✅ Shipped — [description]. Add new future items if the work suggests obvious next steps.
+7. **Update Summary table**: Adjust category counts and total feature count.
+8. **Commit**: `git add FEATURE_AUDIT.md && git commit -m "docs: update FEATURE_AUDIT with recent features"`
+
+Current feature count: **33**. Last updated: March 2026.
