@@ -10,9 +10,9 @@ import { BackgroundTaskProvider } from './hooks/useBackgroundTasks';
 import { TaskPanel } from './components/TaskPanel';
 import { AdminChat } from './components/AdminChat';
 import {
-  Settings, Clipboard, BarChart3, Globe, Image, Gauge, FileSearch, Search,
+  Settings, Clipboard, BarChart3, Globe, Image, Gauge, Search,
   Pencil, CornerDownRight, Share2, Target, Code2, LogOut, Swords, TrendingUp, Flag,
-  Sun, Moon, Map, LayoutDashboard,
+  Sun, Moon, LayoutDashboard, Rocket,
 } from 'lucide-react';
 
 // ── Lazy-loaded route-level chunks ──
@@ -333,8 +333,23 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
       {/* ── Global sidebar ── */}
       <aside className="w-[200px] flex-shrink-0 flex flex-col border-r border-zinc-800">
         {/* Logo */}
-        <div className="px-4 pt-4 pb-3">
+        <div className="px-4 pt-4 pb-2">
           <img src="/logo.svg" alt="hmpsn.studio" className="h-7" style={theme === 'light' ? { filter: 'invert(1) brightness(0.3)' } : undefined} />
+        </div>
+
+        {/* Command Center */}
+        <div className="px-2 pb-2">
+          <button
+            onClick={() => { setSelected(null); setTab('home'); }}
+            className={`w-full flex items-center gap-2.5 px-2.5 py-[6px] rounded-lg text-[12px] font-medium transition-all ${
+              !selected
+                ? 'bg-teal-500/10 text-teal-300'
+                : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
+            }`}
+          >
+            <Rocket className={`w-3.5 h-3.5 flex-shrink-0 ${!selected ? 'text-teal-400' : ''}`} />
+            <span className="truncate">Command Center</span>
+          </button>
         </div>
 
         {/* Workspace selector */}
@@ -342,7 +357,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
           <WorkspaceSelector
             workspaces={workspaces}
             selected={selected}
-            onSelect={(ws) => { setSelected(ws); if (tab === 'prospect' || tab === 'settings') setTab('home'); }}
+            onSelect={(ws) => { setSelected(ws); if (tab === 'prospect' || tab === 'settings' || tab === 'roadmap') setTab('home'); }}
             onCreate={handleCreate}
             onDelete={handleDelete}
             onLinkSite={handleLinkSite}
@@ -397,47 +412,29 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
           ))}
         </nav>
 
-        {/* Bottom: Tools */}
-        <div className="px-2 py-2 space-y-0.5 border-t border-zinc-800">
-          <div className="text-[11px] text-zinc-500 font-semibold tracking-widest px-2.5 mb-1">TOOLS</div>
-          {([
-            { id: 'prospect' as Page, label: 'Prospect', icon: FileSearch },
-            { id: 'roadmap' as Page, label: 'Roadmap', icon: Map },
-            { id: 'settings' as Page, label: 'Settings', icon: Settings },
-          ]).map(item => {
-            const Icon = item.icon;
-            const active = tab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setTab(item.id)}
-                className={`w-full flex items-center gap-2.5 px-2.5 py-[5px] rounded-lg text-[12px] font-medium transition-all ${
-                  active
-                    ? 'bg-teal-500/10 text-teal-300'
-                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
-                }`}
-              >
-                <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${active ? 'text-teal-400' : ''}`} />
-                <span className="truncate">{item.label}</span>
-              </button>
-            );
-          })}
+        {/* Bottom: icon-only utility bar */}
+        <div className="px-3 py-2.5 border-t border-zinc-800 flex items-center justify-center gap-1">
+          <button
+            onClick={() => setTab('settings')}
+            title="Settings"
+            className={`p-2 rounded-lg transition-all ${tab === 'settings' ? 'text-teal-400 bg-teal-500/10' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'}`}
+          >
+            <Settings className="w-4 h-4" />
+          </button>
           <button
             onClick={toggleTheme}
             title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            className="w-full flex items-center gap-2.5 px-2.5 py-[5px] rounded-lg text-[12px] font-medium text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-all"
-            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            className="p-2 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-all"
           >
-            {theme === 'dark' ? <Sun className="w-3.5 h-3.5 flex-shrink-0" /> : <Moon className="w-3.5 h-3.5 flex-shrink-0" />}
-            <span className="truncate">{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
           {onLogout && (
             <button
               onClick={() => { fetch('/api/auth/logout', { method: 'POST' }); onLogout(); }}
-              className="w-full flex items-center gap-2.5 px-2.5 py-[5px] rounded-lg text-[12px] font-medium text-zinc-500 hover:text-red-400 hover:bg-red-500/5 transition-all mt-2"
+              title="Log out"
+              className="p-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/5 transition-all"
             >
-              <LogOut className="w-3.5 h-3.5 flex-shrink-0" />
-              <span className="truncate">Log Out</span>
+              <LogOut className="w-4 h-4" />
             </button>
           )}
         </div>

@@ -3,7 +3,7 @@ import {
   Globe, Shield, MessageSquare, ClipboardCheck, AlertTriangle,
   CheckCircle2, ArrowUpRight, ArrowDownRight, Minus, Loader2,
   Search, BarChart3, Lock, ExternalLink, Bell, Activity, FileText, Zap,
-  Map, Clock, Circle, Rocket, Wifi, WifiOff, Key, Mail,
+  Map, Clock, Circle, Rocket, Wifi, WifiOff, Key, Mail, FileSearch,
 } from 'lucide-react';
 import { MetricRingSvg, PageHeader, SectionCard, Badge, StatCard } from './ui';
 
@@ -152,6 +152,16 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
         title="Command Center"
         subtitle={`${data.length} workspace${data.length !== 1 ? 's' : ''} · ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`}
         icon={<Rocket className="w-5 h-5 text-teal-400" />}
+        actions={onNavigate && (
+          <div className="flex items-center gap-2">
+            <button onClick={() => onNavigate('prospect')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-800 transition-all">
+              <FileSearch className="w-3.5 h-3.5" /> Prospect
+            </button>
+            <button onClick={() => onNavigate('roadmap')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-800 transition-all">
+              <Map className="w-3.5 h-3.5" /> Roadmap
+            </button>
+          </div>
+        )}
       />
 
       {/* ── Needs Attention ── */}
