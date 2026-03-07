@@ -70,6 +70,13 @@ input::placeholder, textarea::placeholder {
   color: var(--brand-text-bright);
 }
 
+/* ─── Brand surface utilities (maps to CSS variables) ─── */
+.bg-brand-surface { background-color: var(--brand-bg-surface); }
+.bg-brand-elevated { background-color: var(--brand-bg-elevated); }
+.bg-brand-card { background-color: var(--brand-bg-card); }
+.border-brand { border-color: var(--brand-border); }
+.border-brand-hover { border-color: var(--brand-border-hover); }
+
 /* ─── Global Legibility: bump mid-grey text contrast ─── */
 .text-zinc-600 { color: #78788a !important; }
 .text-zinc-500 { color: #9898a8 !important; }
