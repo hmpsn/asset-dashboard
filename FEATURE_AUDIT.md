@@ -40,7 +40,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 4. Dead Link Checker
-**What it does:** Crawls every page (including CMS via sitemap), extracts all links, and checks for 404s, timeouts, and redirect chains.
+**What it does:** Crawls every page (including CMS via sitemap), extracts all links, and checks for 404s, timeouts, and redirect chains. **Auto-restore**: last scan results persist to disk and load on mount — no data loss between navigation, deploys, or restarts.
 
 **Agency value:** Catches broken links before Google does, including ones buried in CMS collection pages.
 
@@ -51,7 +51,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 5. PageSpeed / Performance
-**What it does:** Runs Google PageSpeed Insights on key pages. Reports Core Web Vitals (LCP, FID, CLS) with per-page breakdowns and optimization opportunities. Single-page on-demand testing by slug. Homepage CWV wired into the site audit for a unified health picture.
+**What it does:** Runs Google PageSpeed Insights on key pages. Reports Core Web Vitals (LCP, FID, CLS) with per-page breakdowns and optimization opportunities. Single-page on-demand testing by slug. Homepage CWV wired into the site audit for a unified health picture. **Auto-restore**: bulk and single-page test results persist to disk and load on mount — expensive 30-60s tests survive navigation and deploys.
 
 **Agency value:** Performance data directly from Google's own tool. No "but my site feels fast" debates — the numbers are objective.
 
@@ -284,7 +284,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 26. Internal Linking Analyzer
-**What it does:** Analyzes internal link structure across the site, identifying orphan pages, under-linked content, and opportunities to strengthen topic clusters through better internal linking.
+**What it does:** Analyzes internal link structure across the site, identifying orphan pages, under-linked content, and opportunities to strengthen topic clusters through better internal linking. **Auto-restore**: analysis results persist to disk and load on mount.
 
 **Agency value:** Internal linking is one of the highest-leverage SEO tactics and one of the most tedious to audit manually. This automates the discovery.
 
@@ -317,7 +317,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 29. Competitor SEO Analysis
-**What it does:** Side-by-side SEO comparison between your site and any competitor URL. Runs a full audit on both sites simultaneously, then compares scores, page counts, error/warning ratios, title/description lengths, OG coverage, schema coverage, H1 coverage, and issue distribution. Surfaces **quick wins** — issues the competitor handles well that your site doesn't. Color-coded metric comparisons (green = winning, red = losing) with per-category breakdowns.
+**What it does:** Side-by-side SEO comparison between your site and any competitor URL. Runs a full audit on both sites simultaneously, then compares scores, page counts, error/warning ratios, title/description lengths, OG coverage, schema coverage, H1 coverage, and issue distribution. Surfaces **quick wins** — issues the competitor handles well that your site doesn't. Color-coded metric comparisons (green = winning, red = losing) with per-category breakdowns. **Auto-restore**: comparison results persist to disk — the most recent comparison for your site loads on mount, pre-filling the competitor URL.
 
 **Agency value:** Answers the #1 client question — "how do we compare to [competitor]?" — with data instead of guesswork. Identifies specific areas where the competitor is ahead.
 
@@ -339,7 +339,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 31. Page Weight Analyzer
-**What it does:** Analyzes total image weight per page across the entire site. Identifies pages loading the most image data, flags heavy pages (>2MB), and provides per-page breakdowns of image count and total size. Runs as part of the Performance tab alongside PageSpeed Insights.
+**What it does:** Analyzes total image weight per page across the entire site. Identifies pages loading the most image data, flags heavy pages (>2MB), and provides per-page breakdowns of image count and total size. Runs as part of the Performance tab alongside PageSpeed Insights. **Auto-restore**: results persist to disk and load on mount — no need to re-run the analysis after navigating away.
 
 **Agency value:** Pinpoints which pages need image optimization first. Pairs with the Asset Manager's compression tool for a complete workflow.
 
@@ -382,6 +382,17 @@ A brief value assessment of every feature in the platform, covering what it does
 
 ---
 
+### 35. Batched Email Notification Queue
+**What it does:** Intelligent email batching system that groups notifications of the same type per recipient over a 5-minute sliding window, then sends a single digest email instead of spamming individual messages. Covers 7 event types: approval ready, new request, status change, team response, content request, brief ready, and audit score drop alerts. Light-mode branded HTML templates with hmpsn studio logo (#202945 on white). Queue persists to disk so events survive restarts. Queue stats visible in `/api/health` diagnostics.
+
+**Agency value:** No more inbox flooding when bulk operations trigger dozens of notifications. One clean digest per batch instead of 15 individual emails.
+
+**Client value:** Professional, readable email notifications with clear CTAs and dashboard links. No notification fatigue.
+
+**Mutual:** Emails become a useful signal instead of noise. Branded templates reinforce professionalism.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
@@ -389,11 +400,11 @@ A brief value assessment of every feature in the platform, covering what it does
 | SEO & Technical | 12 | Audit, fix, and optimize faster than manual tools |
 | Analytics & Tracking | 5 | Unified data view replaces platform-hopping |
 | Content & Strategy | 3 | Strategy → brief → approval → production pipeline |
-| Client Communication | 4 | Structured workflows replace email chaos |
+| Client Communication | 5 | Structured workflows replace email chaos |
 | Client Self-Service | 6 | 24/7 data access reduces reporting overhead |
 | Platform & UX | 4 | Design system, styleguide, cross-linking, sales tooling |
 
-**34 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**35 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
 ---
 
@@ -440,7 +451,7 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - ~~Interactive inline charts~~: ✅ Shipped — Hover-to-inspect detail popovers on all charts (upgraded from click to hover).
 - ~~PDF export~~: ✅ Shipped — Professional PDF with TOC, page breaks, section numbers.
 - **Custom date range picker**: Replace preset buttons (7d/28d/90d) with a full calendar date range selector.
-- **White-label email templates**: Branded email notifications matching the client portal theme.
+- ~~White-label email templates~~: ✅ Shipped — Light-mode branded HTML email templates with batched digest system. 7 event types, 5-min sliding window, disk-persisted queue.
 
 ### Content Pipeline
 - ~~Service tiers~~: ✅ Shipped — Brief vs. Full Post with configurable pricing.
@@ -490,4 +501,4 @@ When the user asks to update this document with recent features, follow this pro
 7. **Update Summary table**: Adjust category counts and total feature count.
 8. **Commit**: `git add FEATURE_AUDIT.md && git commit -m "docs: update FEATURE_AUDIT with recent features"`
 
-Current feature count: **34**. Last updated: March 2026.
+Current feature count: **35**. Last updated: March 2026.
