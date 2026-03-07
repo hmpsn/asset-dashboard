@@ -23,6 +23,7 @@ import { TaskPanel } from './components/TaskPanel';
 import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, FileSearch, Search,
   Pencil, CornerDownRight, Share2, Target, Code2, LogOut, Swords, TrendingUp, Flag,
+  Sun, Moon,
 } from 'lucide-react';
 
 type Page =
@@ -48,18 +49,26 @@ function App() {
 
 function AdminApp() {
   const auth = useAuth();
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    try { return (localStorage.getItem('admin-theme') as 'dark' | 'light') || 'dark'; } catch { return 'dark'; }
+  });
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    try { localStorage.setItem('admin-theme', next); } catch { /* skip */ }
+  };
 
   if (auth.checking) {
-    return <div className="flex items-center justify-center h-screen bg-[#0f1219]"><div className="w-6 h-6 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>;
+    return <div className={`flex items-center justify-center h-screen bg-[#0f1219] ${theme === 'light' ? 'dashboard-light' : ''}`}><div className="w-6 h-6 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>;
   }
   if (auth.required && !auth.authenticated) {
-    return <LoginScreen onLogin={auth.login} />;
+    return <div className={theme === 'light' ? 'dashboard-light' : ''}><LoginScreen onLogin={auth.login} /></div>;
   }
 
-  return <><Dashboard onLogout={auth.logout} /><TaskPanel /></>;
+  return <div className={theme === 'light' ? 'dashboard-light' : ''}><Dashboard onLogout={auth.logout} theme={theme} toggleTheme={toggleTheme} /><TaskPanel /></div>;
 }
 
-function Dashboard({ onLogout }: { onLogout?: () => void }) {
+function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; theme: 'dark' | 'light'; toggleTheme: () => void }) {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [selected, setSelected] = useState<Workspace | null>(null);
   const [queue, setQueue] = useState<QueueItem[]>([]);
@@ -302,7 +311,7 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
       <aside className="w-[200px] flex-shrink-0 flex flex-col border-r border-zinc-800">
         {/* Logo */}
         <div className="px-4 pt-4 pb-3">
-          <img src="/logo.svg" alt="hmpsn.studio" className="h-7" />
+          <img src="/logo.svg" alt="hmpsn.studio" className="h-7" style={theme === 'light' ? { filter: 'invert(1) brightness(0.3)' } : undefined} />
         </div>
 
         {/* Workspace selector */}
@@ -389,6 +398,15 @@ function Dashboard({ onLogout }: { onLogout?: () => void }) {
               </button>
             );
           })}
+          <button
+            onClick={toggleTheme}
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            className="w-full flex items-center gap-2.5 px-2.5 py-[5px] rounded-lg text-[12px] font-medium text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-all"
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {theme === 'dark' ? <Sun className="w-3.5 h-3.5 flex-shrink-0" /> : <Moon className="w-3.5 h-3.5 flex-shrink-0" />}
+            <span className="truncate">{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+          </button>
           {onLogout && (
             <button
               onClick={() => { fetch('/api/auth/logout', { method: 'POST' }); onLogout(); }}

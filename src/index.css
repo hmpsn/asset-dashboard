@@ -1,5 +1,13 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* ─── D-DIN PRO (self-hosted) ─── */
+@font-face { font-family: 'DIN Pro'; src: url('/fonts/D-DIN-PRO-400-Regular.otf') format('opentype'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'DIN Pro'; src: url('/fonts/D-DIN-PRO-500-Medium.otf') format('opentype'); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: 'DIN Pro'; src: url('/fonts/D-DIN-PRO-600-SemiBold.otf') format('opentype'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: 'DIN Pro'; src: url('/fonts/D-DIN-PRO-700-Bold.otf') format('opentype'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'DIN Pro'; src: url('/fonts/D-DIN-PRO-800-ExtraBold.otf') format('opentype'); font-weight: 800; font-style: normal; font-display: swap; }
+@font-face { font-family: 'DIN Pro'; src: url('/fonts/D-DIN-PRO-900-Heavy.otf') format('opentype'); font-weight: 900; font-style: normal; font-display: swap; }
 
 :root {
   --brand-bg: #0f1219;
@@ -25,13 +33,20 @@ body {
   background-color: var(--brand-bg);
   color: var(--brand-text-bright);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-weight: 420;
   -webkit-font-smoothing: antialiased;
   letter-spacing: -0.01em;
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'DM Sans', 'Inter', sans-serif;
+  font-family: 'DIN Pro', 'Inter', sans-serif;
+  font-weight: 600;
   letter-spacing: -0.02em;
+}
+
+/* DIN Pro for UI elements: nav labels, buttons, badges, uppercase labels */
+button, [class*="uppercase"], [class*="tracking-wider"], nav {
+  font-family: 'DIN Pro', 'Inter', sans-serif;
 }
 
 /* Hide scrollbar utility */
@@ -69,6 +84,25 @@ input::placeholder, textarea::placeholder {
   background: rgba(46, 217, 195, 0.25);
   color: var(--brand-text-bright);
 }
+
+/* ─── Dark mode readability boost ───
+   Remap low-contrast zinc greys to brighter values.
+   .dashboard-light rules (higher specificity + !important) override these in light mode. */
+.text-zinc-500 { color: #d4d4d8 !important; }   /* was #71717a → zinc-300 */
+.text-zinc-600 { color: #a1a1aa !important; }   /* was #52525b → zinc-400 */
+.text-zinc-700 { color: #a1a1aa !important; }   /* was #3f3f46 → zinc-400 */
+.text-zinc-400 { color: #d4d4d8 !important; }   /* was #a1a1aa → zinc-300 */
+.placeholder-zinc-600::placeholder { color: #a1a1aa !important; }
+.placeholder-zinc-500::placeholder { color: #a1a1aa !important; }
+.hover\:text-zinc-400:hover { color: #e4e4e7 !important; }  /* zinc-200 */
+.hover\:text-zinc-300:hover { color: #f4f4f5 !important; }  /* zinc-100 */
+.hover\:text-zinc-500:hover { color: #d4d4d8 !important; }
+
+/* ─── Minimum font size: 11px → 12px ─── */
+.text-\[11px\] { font-size: 12px !important; line-height: 1.5 !important; }
+
+/* ─── Font weight boost on small text without explicit weight ─── */
+.text-xs:not(.font-medium):not(.font-semibold):not(.font-bold):not(.font-black) { font-weight: 450; }
 
 /* ─── Brand surface utilities (maps to zinc palette) ─── */
 .bg-brand-surface { background-color: #18181b; }
@@ -194,6 +228,7 @@ input::placeholder, textarea::placeholder {
 .dashboard-light .hover\:text-zinc-100:hover { color: #0f172a !important; }
 .dashboard-light .hover\:text-zinc-200:hover { color: #0f172a !important; }
 .dashboard-light .hover\:text-zinc-300:hover { color: #1e293b !important; }
+.dashboard-light .hover\:text-zinc-400:hover { color: #334155 !important; }
 .dashboard-light .hover\:text-zinc-500:hover { color: #475569 !important; }
 .dashboard-light .hover\:text-teal-300:hover { color: #0d9488 !important; }
 
