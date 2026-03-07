@@ -5,7 +5,7 @@ import {
   Sparkles, Send, AlertTriangle, Target, Zap, Shield, MessageSquare, X,
 } from 'lucide-react';
 import { ChartPointDetail } from './ChartPointDetail';
-import { PageHeader, StatCard, DateRangeSelector, EmptyState } from './ui';
+import { PageHeader, StatCard, SectionCard, TabBar, DateRangeSelector, EmptyState } from './ui';
 import { DATE_PRESETS_SEARCH } from './ui/constants';
 
 interface SearchQuery {
@@ -472,11 +472,7 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
 
           {/* Period comparison banner */}
           {comparison && (
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <TrendingUp className="w-4 h-4 text-zinc-500" />
-                <span className="text-xs font-medium text-zinc-400">vs Previous {days} Days</span>
-              </div>
+            <SectionCard title={`vs Previous ${days} Days`} titleIcon={<TrendingUp className="w-4 h-4 text-zinc-500" />}>
               <div className="grid grid-cols-4 gap-4">
                 {([
                   { label: 'Clicks', key: 'clicks' as const, color: 'blue' },
@@ -502,16 +498,15 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
                   );
                 })}
               </div>
-            </div>
+            </SectionCard>
           )}
 
           {/* Trend chart */}
           {trend.length > 2 && (
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-medium text-zinc-400">Performance Trend</span>
-                <span className="text-[11px] text-zinc-500">{overview.dateRange.start} — {overview.dateRange.end}</span>
-              </div>
+            <SectionCard
+              title="Performance Trend"
+              action={<span className="text-[11px] text-zinc-500">{overview.dateRange.start} — {overview.dateRange.end}</span>}
+            >
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <div className="text-[11px] text-blue-400 mb-1">Clicks</div>
@@ -522,7 +517,7 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
                   <TrendChart data={trend} metric="impressions" color="#22d3ee" />
                 </div>
               </div>
-            </div>
+            </SectionCard>
           )}
 
           {/* Device + Country + Search Type breakdowns */}
@@ -530,8 +525,7 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
             <div className="grid grid-cols-3 gap-3">
               {/* Device breakdown */}
               {devices.length > 0 && (
-                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                  <div className="text-xs font-medium text-zinc-400 mb-3">Devices</div>
+                <SectionCard title="Devices">
                   <div className="space-y-2.5">
                     {devices.map(d => {
                       const totalClicks = devices.reduce((s, x) => s + x.clicks, 0);
@@ -553,13 +547,12 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
                       );
                     })}
                   </div>
-                </div>
+                </SectionCard>
               )}
 
               {/* Country breakdown */}
               {countries.length > 0 && (
-                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                  <div className="text-xs font-medium text-zinc-400 mb-3">Top Countries</div>
+                <SectionCard title="Top Countries">
                   <div className="space-y-1.5">
                     {countries.slice(0, 8).map((c, i) => (
                       <div key={c.country} className="flex items-center justify-between text-[11px] py-1 px-2 rounded bg-zinc-800/30">
@@ -574,13 +567,12 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
                       </div>
                     ))}
                   </div>
-                </div>
+                </SectionCard>
               )}
 
               {/* Search type breakdown */}
               {searchTypes.length > 0 && (
-                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                  <div className="text-xs font-medium text-zinc-400 mb-3">Search Types</div>
+                <SectionCard title="Search Types">
                   <div className="space-y-2.5">
                     {searchTypes.map(st => {
                       const totalClicks = searchTypes.reduce((s, x) => s + x.clicks, 0);
@@ -602,39 +594,27 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
                       );
                     })}
                   </div>
-                </div>
+                </SectionCard>
               )}
             </div>
           )}
 
           {/* Tab navigation */}
-          <div className="flex items-center gap-0.5">
-            {([
-              { id: 'queries' as DataTab, label: 'Top Queries', icon: Search },
-              { id: 'pages' as DataTab, label: 'Top Pages', icon: ExternalLink },
-              { id: 'insights' as DataTab, label: 'Insights', icon: Zap },
-            ]).map(t => {
-              const Icon = t.icon;
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => setTab(t.id)}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-colors ${
-                    tab === t.id ? 'bg-zinc-800 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5" /> {t.label}
-                </button>
-              );
-            })}
-          </div>
+          <TabBar
+            tabs={[
+              { id: 'queries', label: 'Top Queries', icon: Search },
+              { id: 'pages', label: 'Top Pages', icon: ExternalLink },
+              { id: 'insights', label: 'Insights', icon: Zap },
+            ]}
+            active={tab}
+            onChange={id => setTab(id as DataTab)}
+          />
 
           {/* Insights tab */}
           {tab === 'insights' && insights && (
             <div className="space-y-3">
               {/* Branded vs Non-branded */}
-              <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                <div className="text-xs font-medium text-zinc-300 mb-3">Query Breakdown</div>
+              <SectionCard title="Query Breakdown">
                 <div className="flex items-center gap-4">
                   <div className="flex-1">
                     <div className="flex items-center justify-between text-[11px] mb-1.5">
@@ -655,17 +635,12 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
                     </div>
                   </div>
                 </div>
-              </div>
+              </SectionCard>
 
               <div className="grid grid-cols-2 gap-3">
                 {/* Low-hanging fruit */}
                 {insights.lowHanging.length > 0 && (
-                  <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                    <div className="flex items-center gap-1.5 mb-3">
-                      <Target className="w-4 h-4 text-amber-400" />
-                      <span className="text-xs font-medium text-amber-400">Low-Hanging Fruit</span>
-                      <span className="text-[11px] text-zinc-500 ml-auto">{insights.lowHanging.length} queries</span>
-                    </div>
+                  <SectionCard title="Low-Hanging Fruit" titleIcon={<Target className="w-4 h-4 text-amber-400" />} titleExtra={<span className="text-[11px] text-zinc-500">{insights.lowHanging.length} queries</span>}>
                     <p className="text-[11px] text-zinc-500 mb-2">Ranking 5-20 with impressions — small optimizations could push these to page 1</p>
                     <div className="space-y-1.5">
                       {insights.lowHanging.slice(0, 8).map((q, i) => (
@@ -678,17 +653,12 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </SectionCard>
                 )}
 
                 {/* Top performers */}
                 {insights.topPerformers.length > 0 && (
-                  <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                    <div className="flex items-center gap-1.5 mb-3">
-                      <Shield className="w-4 h-4 text-green-400" />
-                      <span className="text-xs font-medium text-green-400">Top Performers</span>
-                      <span className="text-[11px] text-zinc-500 ml-auto">{insights.topPerformers.length} queries</span>
-                    </div>
+                  <SectionCard title="Top Performers" titleIcon={<Shield className="w-4 h-4 text-green-400" />} titleExtra={<span className="text-[11px] text-zinc-500">{insights.topPerformers.length} queries</span>}>
                     <p className="text-[11px] text-zinc-500 mb-2">Top 3 positions with real clicks — protect these rankings</p>
                     <div className="space-y-1.5">
                       {insights.topPerformers.slice(0, 8).map((q, i) => (
@@ -701,17 +671,12 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </SectionCard>
                 )}
 
                 {/* CTR opportunities */}
                 {insights.ctrOpps.length > 0 && (
-                  <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                    <div className="flex items-center gap-1.5 mb-3">
-                      <TrendingDown className="w-4 h-4 text-red-400" />
-                      <span className="text-xs font-medium text-red-400">CTR Opportunities</span>
-                      <span className="text-[11px] text-zinc-500 ml-auto">{insights.ctrOpps.length} queries</span>
-                    </div>
+                  <SectionCard title="CTR Opportunities" titleIcon={<TrendingDown className="w-4 h-4 text-red-400" />} titleExtra={<span className="text-[11px] text-zinc-500">{insights.ctrOpps.length} queries</span>}>
                     <p className="text-[11px] text-zinc-500 mb-2">Ranking on page 1 but CTR under 3% — improve titles & meta descriptions</p>
                     <div className="space-y-1.5">
                       {insights.ctrOpps.slice(0, 8).map((q, i) => (
@@ -724,17 +689,12 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </SectionCard>
                 )}
 
                 {/* High impressions, low clicks */}
                 {insights.highImpLowClick.length > 0 && (
-                  <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                    <div className="flex items-center gap-1.5 mb-3">
-                      <AlertTriangle className="w-4 h-4 text-orange-400" />
-                      <span className="text-xs font-medium text-orange-400">Visibility Without Clicks</span>
-                      <span className="text-[11px] text-zinc-500 ml-auto">{insights.highImpLowClick.length} queries</span>
-                    </div>
+                  <SectionCard title="Visibility Without Clicks" titleIcon={<AlertTriangle className="w-4 h-4 text-orange-400" />} titleExtra={<span className="text-[11px] text-zinc-500">{insights.highImpLowClick.length} queries</span>}>
                     <p className="text-[11px] text-zinc-500 mb-2">100+ impressions but under 5 clicks — being seen but not clicked</p>
                     <div className="space-y-1.5">
                       {insights.highImpLowClick.slice(0, 8).map((q, i) => (
@@ -747,13 +707,12 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </SectionCard>
                 )}
               </div>
 
               {/* Score-style summary */}
-              <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                <div className="text-xs font-medium text-zinc-300 mb-3">Search Health Summary</div>
+              <SectionCard title="Search Health Summary">
                 <div className="grid grid-cols-4 gap-3">
                   <div className="text-center">
                     <div className={`text-lg font-bold ${overview.topQueries.filter(q => q.position <= 10).length > 5 ? 'text-green-400' : 'text-amber-400'}`}>
@@ -780,7 +739,7 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
                     <div className="text-[11px] text-zinc-500">Opportunities</div>
                   </div>
                 </div>
-              </div>
+              </SectionCard>
 
               {/* Cross-link tips */}
               <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-zinc-900/50 border border-zinc-800 flex-wrap">
@@ -801,7 +760,7 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
 
           {/* Data tables */}
           {(tab === 'queries' || tab === 'pages') && (
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+            <SectionCard noPadding>
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-zinc-800">
@@ -859,7 +818,7 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
                   })}
                 </tbody>
               </table>
-            </div>
+            </SectionCard>
           )}
         </>
       )}

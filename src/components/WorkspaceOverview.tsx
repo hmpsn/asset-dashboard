@@ -181,6 +181,119 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
         <StatCard label="Avg Health" value={avgScore !== null ? avgScore : '—'} icon={Shield} iconColor={avgScore !== null ? (avgScore >= 80 ? '#4ade80' : avgScore >= 60 ? '#fbbf24' : '#f87171') : '#71717a'} />
       </div>
 
+      {/* ── Workspace Cards ── */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <Globe className="w-4 h-4 text-zinc-500" />
+          <h2 className="text-sm font-semibold text-zinc-200">Workspaces</h2>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {data.map(ws => {
+            const hasAlerts = ws.requests.new > 0 || ws.approvals.pending > 0 || (ws.contentRequests?.pending || 0) > 0;
+            const scoreDelta = ws.audit && ws.audit.previousScore != null ? ws.audit.score - ws.audit.previousScore : null;
+
+            return (
+              <button
+                key={ws.id}
+                onClick={() => onSelectWorkspace(ws.id)}
+                className={`text-left rounded-xl p-5 transition-all hover:scale-[1.01] hover:shadow-lg group relative bg-zinc-900 border ${hasAlerts ? 'border-amber-500/30' : 'border-zinc-800'}`}
+              >
+                {/* New request badge */}
+                {ws.requests.new > 0 && (
+                  <div className="absolute -top-2 -right-2 flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-500 text-white shadow-lg">
+                    <Bell className="w-2.5 h-2.5" /> {ws.requests.new} new
+                  </div>
+                )}
+
+                {/* Top row: name + site */}
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-semibold truncate group-hover:text-teal-400 transition-colors text-zinc-200">{ws.name}</h3>
+                    <div className="flex items-center gap-2 mt-1 text-[11px] text-zinc-500">
+                      {ws.webflowSiteName && <span className="flex items-center gap-1"><Globe className="w-2.5 h-2.5" />{ws.webflowSiteName}</span>}
+                      {!ws.webflowSiteId && <span className="flex items-center gap-1 text-amber-400"><AlertTriangle className="w-2.5 h-2.5" />No site linked</span>}
+                      {ws.hasGsc && <span className="flex items-center gap-1"><Search className="w-2.5 h-2.5" />GSC</span>}
+                      {ws.hasGa4 && <span className="flex items-center gap-1"><BarChart3 className="w-2.5 h-2.5" />GA4</span>}
+                      {ws.hasPassword && <span className="flex items-center gap-1"><Lock className="w-2.5 h-2.5" />Client</span>}
+                    </div>
+                  </div>
+                  <ExternalLink className="w-4 h-4 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity text-zinc-500" />
+                </div>
+
+                {/* Metrics row */}
+                <div className="grid grid-cols-3 gap-3">
+                  {/* Audit score */}
+                  <div className="flex items-center gap-3">
+                    {ws.audit ? (
+                      <>
+                        <ScoreRing score={ws.audit.score} size={44} strokeWidth={3.5} />
+                        <div>
+                          <div className="text-[11px] font-medium text-zinc-500">Health</div>
+                          <div className="flex items-center gap-1 mt-0.5">
+                            {scoreDelta !== null && scoreDelta !== 0 && (
+                              <span className={`flex items-center text-[11px] font-medium ${scoreDelta > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                {scoreDelta > 0 ? <ArrowUpRight className="w-2.5 h-2.5" /> : <ArrowDownRight className="w-2.5 h-2.5" />}
+                                {Math.abs(scoreDelta)}
+                              </span>
+                            )}
+                            {scoreDelta === 0 && <span className="flex items-center text-[11px] text-zinc-500"><Minus className="w-2.5 h-2.5" /></span>}
+                          </div>
+                          <div className="text-[11px] mt-0.5 text-zinc-500">
+                            {ws.audit.errors > 0 && <span className="text-red-400">{ws.audit.errors} err</span>}
+                            {ws.audit.errors > 0 && ws.audit.warnings > 0 && ' · '}
+                            {ws.audit.warnings > 0 && <span className="text-amber-400">{ws.audit.warnings} warn</span>}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-[11px] text-zinc-500">No audit yet</div>
+                    )}
+                  </div>
+
+                  {/* Requests */}
+                  <div>
+                    <div className="text-[11px] font-medium mb-1 text-zinc-500">Requests</div>
+                    {ws.requests.total > 0 ? (
+                      <div className="space-y-0.5">
+                        {ws.requests.new > 0 && <div className="text-[11px] text-red-400 font-medium">{ws.requests.new} new</div>}
+                        {ws.requests.active > 0 && <div className="text-[11px] text-teal-400">{ws.requests.active} active</div>}
+                        {ws.requests.total - ws.requests.new - ws.requests.active > 0 && (
+                          <div className="text-[11px] text-zinc-500">{ws.requests.total} total</div>
+                        )}
+                        {ws.requests.latestDate && (
+                          <div className="text-[11px] text-zinc-500">{timeAgo(ws.requests.latestDate)}</div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-zinc-500">None</div>
+                    )}
+                  </div>
+
+                  {/* Approvals */}
+                  <div>
+                    <div className="text-[11px] font-medium mb-1 text-zinc-500">Approvals</div>
+                    {ws.approvals.total > 0 ? (
+                      <div className="space-y-0.5">
+                        {ws.approvals.pending > 0 && (
+                          <div className="text-[11px] text-teal-400 font-medium">{ws.approvals.pending} pending</div>
+                        )}
+                        {ws.approvals.pending === 0 && (
+                          <div className="flex items-center gap-1 text-[11px] text-green-400">
+                            <CheckCircle2 className="w-2.5 h-2.5" /> All clear
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-zinc-500">None</div>
+                    )}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* ── Two-column: Roadmap + Platform Health ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Roadmap Progress */}
@@ -299,119 +412,6 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
             </div>
           </div>
         </SectionCard>
-      </div>
-
-      {/* ── Workspace Cards ── */}
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <Globe className="w-4 h-4 text-zinc-500" />
-          <h2 className="text-sm font-semibold text-zinc-200">Workspaces</h2>
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {data.map(ws => {
-            const hasAlerts = ws.requests.new > 0 || ws.approvals.pending > 0 || (ws.contentRequests?.pending || 0) > 0;
-            const scoreDelta = ws.audit && ws.audit.previousScore != null ? ws.audit.score - ws.audit.previousScore : null;
-
-            return (
-              <button
-                key={ws.id}
-                onClick={() => onSelectWorkspace(ws.id)}
-                className={`text-left rounded-xl p-5 transition-all hover:scale-[1.01] hover:shadow-lg group relative bg-zinc-900 border ${hasAlerts ? 'border-amber-500/30' : 'border-zinc-800'}`}
-              >
-                {/* New request badge */}
-                {ws.requests.new > 0 && (
-                  <div className="absolute -top-2 -right-2 flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-500 text-white shadow-lg">
-                    <Bell className="w-2.5 h-2.5" /> {ws.requests.new} new
-                  </div>
-                )}
-
-                {/* Top row: name + site */}
-                <div className="flex items-start justify-between gap-3 mb-4">
-                  <div className="min-w-0">
-                    <h3 className="text-sm font-semibold truncate group-hover:text-teal-400 transition-colors text-zinc-200">{ws.name}</h3>
-                    <div className="flex items-center gap-2 mt-1 text-[11px] text-zinc-500">
-                      {ws.webflowSiteName && <span className="flex items-center gap-1"><Globe className="w-2.5 h-2.5" />{ws.webflowSiteName}</span>}
-                      {!ws.webflowSiteId && <span className="flex items-center gap-1 text-amber-400"><AlertTriangle className="w-2.5 h-2.5" />No site linked</span>}
-                      {ws.hasGsc && <span className="flex items-center gap-1"><Search className="w-2.5 h-2.5" />GSC</span>}
-                      {ws.hasGa4 && <span className="flex items-center gap-1"><BarChart3 className="w-2.5 h-2.5" />GA4</span>}
-                      {ws.hasPassword && <span className="flex items-center gap-1"><Lock className="w-2.5 h-2.5" />Client</span>}
-                    </div>
-                  </div>
-                  <ExternalLink className="w-4 h-4 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity text-zinc-500" />
-                </div>
-
-                {/* Metrics row */}
-                <div className="grid grid-cols-3 gap-3">
-                  {/* Audit score */}
-                  <div className="flex items-center gap-3">
-                    {ws.audit ? (
-                      <>
-                        <ScoreRing score={ws.audit.score} size={44} strokeWidth={3.5} />
-                        <div>
-                          <div className="text-[11px] font-medium text-zinc-500">Health</div>
-                          <div className="flex items-center gap-1 mt-0.5">
-                            {scoreDelta !== null && scoreDelta !== 0 && (
-                              <span className={`flex items-center text-[11px] font-medium ${scoreDelta > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                {scoreDelta > 0 ? <ArrowUpRight className="w-2.5 h-2.5" /> : <ArrowDownRight className="w-2.5 h-2.5" />}
-                                {Math.abs(scoreDelta)}
-                              </span>
-                            )}
-                            {scoreDelta === 0 && <span className="flex items-center text-[11px] text-zinc-500"><Minus className="w-2.5 h-2.5" /></span>}
-                          </div>
-                          <div className="text-[11px] mt-0.5 text-zinc-500">
-                            {ws.audit.errors > 0 && <span className="text-red-400">{ws.audit.errors} err</span>}
-                            {ws.audit.errors > 0 && ws.audit.warnings > 0 && ' · '}
-                            {ws.audit.warnings > 0 && <span className="text-amber-400">{ws.audit.warnings} warn</span>}
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="text-[11px] text-zinc-500">No audit yet</div>
-                    )}
-                  </div>
-
-                  {/* Requests */}
-                  <div>
-                    <div className="text-[11px] font-medium mb-1 text-zinc-500">Requests</div>
-                    {ws.requests.total > 0 ? (
-                      <div className="space-y-0.5">
-                        {ws.requests.new > 0 && <div className="text-[11px] text-red-400 font-medium">{ws.requests.new} new</div>}
-                        {ws.requests.active > 0 && <div className="text-[11px] text-teal-400">{ws.requests.active} active</div>}
-                        {ws.requests.total - ws.requests.new - ws.requests.active > 0 && (
-                          <div className="text-[11px] text-zinc-500">{ws.requests.total} total</div>
-                        )}
-                        {ws.requests.latestDate && (
-                          <div className="text-[11px] text-zinc-500">{timeAgo(ws.requests.latestDate)}</div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-[11px] text-zinc-500">None</div>
-                    )}
-                  </div>
-
-                  {/* Approvals */}
-                  <div>
-                    <div className="text-[11px] font-medium mb-1 text-zinc-500">Approvals</div>
-                    {ws.approvals.total > 0 ? (
-                      <div className="space-y-0.5">
-                        {ws.approvals.pending > 0 && (
-                          <div className="text-[11px] text-teal-400 font-medium">{ws.approvals.pending} pending</div>
-                        )}
-                        {ws.approvals.pending === 0 && (
-                          <div className="flex items-center gap-1 text-[11px] text-green-400">
-                            <CheckCircle2 className="w-2.5 h-2.5" /> All clear
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-[11px] text-zinc-500">None</div>
-                    )}
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
       </div>
 
       {/* ── Recent Activity ── */}
