@@ -113,7 +113,7 @@ function ScoreRing({ score, size = 80 }: { score: number; size?: number }) {
           strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
           style={{ transition: 'stroke-dashoffset 0.8s ease' }} />
       </svg>
-      <div className={`absolute inset-0 flex items-center justify-center text-xl font-bold ${scoreColor(score)}`}>
+      <div className={`absolute inset-0 flex items-center justify-center text-2xl font-bold ${scoreColor(score)}`} style={{ fontFamily: "'DIN Pro', 'Inter', sans-serif", letterSpacing: '-0.03em' }}>
         {score}
       </div>
     </div>

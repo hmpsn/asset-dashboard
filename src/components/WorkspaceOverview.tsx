@@ -46,7 +46,7 @@ function ScoreRing({ score, size = 48, stroke = 4 }: { score: number; size?: num
       <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={color} strokeWidth={stroke}
         strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round"
         transform={`rotate(-90 ${size / 2} ${size / 2})`} className="transition-all duration-700" />
-      <text x="50%" y="50%" dominantBaseline="central" textAnchor="middle" fontSize={size * 0.28} fontWeight="700" fill={color}>{score}</text>
+      <text x="50%" y="50%" dominantBaseline="central" textAnchor="middle" fontSize={size * 0.38} fontWeight="700" fill={color} fontFamily="'DIN Pro', 'Inter', sans-serif" letterSpacing="-0.03em">{score}</text>
     </svg>
   );
 }

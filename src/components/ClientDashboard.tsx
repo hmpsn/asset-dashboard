@@ -251,7 +251,7 @@ function ScoreRing({ score, size = 120 }: { score: number; size?: number }) {
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={sw}
           strokeDasharray={c} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-1000" />
       </svg>
-      <div className="absolute inset-0 flex items-center justify-center"><span className="font-bold" style={{ color, fontSize: size * 0.28 }}>{score}</span></div>
+      <div className="absolute inset-0 flex items-center justify-center"><span className="font-bold" style={{ color, fontSize: size * 0.38, fontFamily: "'DIN Pro', 'Inter', sans-serif", fontWeight: 700, letterSpacing: '-0.03em' }}>{score}</span></div>
     </div>
   );
 }

@@ -51,6 +51,11 @@ h1, h2, h3, h4, h5, h6 {
   font-family: 'DIN Pro', 'Inter', sans-serif;
 }
 
+/* Bold text is almost always a stat number or heading in this app */
+.font-bold, .font-black {
+  font-family: 'DIN Pro', 'Inter', sans-serif;
+}
+
 /* UI chrome: nav labels, section dividers, uppercase badges */
 nav, [class*="tracking-wider"], [class*="tracking-widest"] {
   font-family: 'DIN Pro', 'Inter', sans-serif;
@@ -137,22 +142,23 @@ input::placeholder, textarea::placeholder {
   box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.08);
 }
 
-/* Stat/metric numbers: the hero of every dashboard screen */
+/* Stat/metric numbers: the hero of every dashboard screen.
+   Bump sizes so numbers dominate their cards. */
+.text-xl.font-bold, .text-xl.font-black {
+  font-size: 24px !important;
+  letter-spacing: -0.025em;
+}
 .text-2xl {
-  font-weight: 700;
+  font-size: 28px !important;
   letter-spacing: -0.025em;
 }
 .text-3xl {
-  font-weight: 700;
+  font-size: 34px !important;
   letter-spacing: -0.03em;
 }
 .text-4xl {
-  font-weight: 700;
+  font-size: 42px !important;
   letter-spacing: -0.03em;
-}
-/* Bold numbers get a subtle text-shadow for depth */
-.text-2xl.font-bold, .text-3xl.font-bold, .text-xl.font-bold {
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 /* Gradient shimmer on teal buttons */
