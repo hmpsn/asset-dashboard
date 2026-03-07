@@ -371,6 +371,7 @@ export function renderMonthlyReport(data: {
     sessions?: { current: number; previous: number; changePct: number };
     pageviews?: { current: number; previous: number; changePct: number };
   };
+  chatTopics?: { title: string; summary: string }[];
 }): { subject: string; html: string } {
   const d = data;
   const scoreColor = (d.siteScore ?? 0) >= 80 ? '#059669' : (d.siteScore ?? 0) >= 60 ? '#d97706' : '#dc2626';
@@ -445,13 +446,23 @@ export function renderMonthlyReport(data: {
       <span style="font-size:12px;color:#92400e;">${d.approvalsPending} approval batch${d.approvalsPending > 1 ? 'es' : ''} awaiting your review</span>
     </div>` : '';
 
+  const chatSection = d.chatTopics && d.chatTopics.length > 0 ? `
+    <div style="margin-top:20px;">
+      <div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Topics You Asked About</div>
+      ${d.chatTopics.map(t => `
+      <div style="padding:8px 12px;margin-bottom:4px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;">
+        <div style="font-size:12px;font-weight:600;color:#374151;">${esc(t.title)}</div>
+        <div style="font-size:11px;color:#6b7280;margin-top:2px;">${esc(t.summary)}</div>
+      </div>`).join('')}
+    </div>` : '';
+
   return {
     subject: `Monthly Report — ${d.workspaceName} (${d.monthName})`,
     html: layout({
       preheader: `Your ${d.monthName} summary for ${d.workspaceName}`,
       headline: 'Monthly Report',
       subtitle: `${d.workspaceName} · ${d.monthName}`,
-      body: scoreSection + trafficSection + metricsGrid + activitySection + pendingAlert,
+      body: scoreSection + trafficSection + metricsGrid + activitySection + chatSection + pendingAlert,
       cta: d.dashboardUrl ? { label: 'Open Dashboard', url: d.dashboardUrl } : undefined,
       footer: 'Automated monthly summary from your web team',
     }),

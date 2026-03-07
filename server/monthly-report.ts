@@ -7,6 +7,7 @@ import { isEmailConfigured, sendEmail } from './email.js';
 import { renderMonthlyReport } from './email-templates.js';
 import { getSearchPeriodComparison } from './search-console.js';
 import { getGA4PeriodComparison } from './google-analytics.js';
+import { listSessions } from './chat-memory.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -67,6 +68,7 @@ interface MonthlyData {
   activityCount: number;
   topActivities: { title: string; createdAt: string }[];
   traffic?: TrafficComparison;
+  chatTopics?: { title: string; summary: string }[];
 }
 
 async function gatherMonthlyData(ws: Workspace): Promise<MonthlyData> {
@@ -120,6 +122,16 @@ async function gatherMonthlyData(ws: Workspace): Promise<MonthlyData> {
     activityCount: activities.length,
     topActivities: activities.slice(0, 5).map(a => ({ title: a.title, createdAt: a.createdAt })),
     traffic: Object.keys(traffic).length > 0 ? traffic : undefined,
+    chatTopics: (() => {
+      try {
+        const sessions = listSessions(ws.id, 'client');
+        const recent = sessions
+          .filter(s => s.summary && new Date(s.updatedAt) >= monthStart)
+          .slice(0, 5)
+          .map(s => ({ title: s.title, summary: s.summary! }));
+        return recent.length > 0 ? recent : undefined;
+      } catch { return undefined; }
+    })(),
   };
 }
 
@@ -140,6 +152,7 @@ export function generateReportHTML(data: MonthlyData): string {
     activityCount: data.activityCount,
     topActivities: data.topActivities,
     traffic: data.traffic,
+    chatTopics: data.chatTopics,
   });
   return html;
 }
@@ -163,6 +176,7 @@ async function sendMonthlyReportEmail(ws: Workspace, data: MonthlyData) {
     activityCount: data.activityCount,
     topActivities: data.topActivities,
     traffic: data.traffic,
+    chatTopics: data.chatTopics,
   });
   await sendEmail(ws.clientEmail, subject, html);
 }

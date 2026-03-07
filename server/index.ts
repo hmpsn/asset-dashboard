@@ -836,6 +836,42 @@ app.get('/api/webflow/seo-audit/:siteId', async (req, res) => {
   }
 });
 
+// --- Audit Traffic Context: cached helper for chat injection ---
+const auditTrafficCache: Record<string, { data: Record<string, { clicks: number; impressions: number; sessions: number; pageviews: number }>; ts: number }> = {};
+async function getAuditTrafficForWorkspace(ws: { id: string; webflowSiteId?: string; gscPropertyUrl?: string; ga4PropertyId?: string }): Promise<Record<string, { clicks: number; impressions: number; sessions: number; pageviews: number }>> {
+  if (!ws.webflowSiteId) return {};
+  const cacheKey = ws.id;
+  const cached = auditTrafficCache[cacheKey];
+  if (cached && Date.now() - cached.ts < 5 * 60 * 1000) return cached.data;
+  const trafficMap: Record<string, { clicks: number; impressions: number; sessions: number; pageviews: number }> = {};
+  if (ws.gscPropertyUrl) {
+    try {
+      const gscPages = await getAllGscPages(ws.id, ws.gscPropertyUrl, 28);
+      for (const p of gscPages) {
+        try {
+          const urlPath = new URL(p.page).pathname;
+          if (!trafficMap[urlPath]) trafficMap[urlPath] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
+          trafficMap[urlPath].clicks += p.clicks;
+          trafficMap[urlPath].impressions += p.impressions;
+        } catch { /* skip */ }
+      }
+    } catch { /* GSC unavailable */ }
+  }
+  if (ws.ga4PropertyId) {
+    try {
+      const ga4Pages = await getGA4TopPages(ws.ga4PropertyId, 28, 500);
+      for (const p of ga4Pages) {
+        const urlPath = p.path.startsWith('/') ? p.path : `/${p.path}`;
+        if (!trafficMap[urlPath]) trafficMap[urlPath] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
+        trafficMap[urlPath].pageviews += p.pageviews;
+        trafficMap[urlPath].sessions += p.users;
+      }
+    } catch { /* GA4 unavailable */ }
+  }
+  auditTrafficCache[cacheKey] = { data: trafficMap, ts: Date.now() };
+  return trafficMap;
+}
+
 // --- Audit Traffic Context (cross-reference audit pages with GSC/GA4 traffic) ---
 app.get('/api/audit-traffic/:siteId', async (req, res) => {
   try {
@@ -3026,7 +3062,7 @@ ${JSON.stringify(context, null, 2)}`;
 
 // ── Admin AI Chat (auth-gated, internal analyst persona) ──
 app.post('/api/admin-chat', async (req, res) => {
-  const { workspaceId, question, context } = req.body;
+  const { workspaceId, question, context, sessionId } = req.body;
   if (!question) return res.status(400).json({ error: 'question required' });
   if (!workspaceId) return res.status(400).json({ error: 'workspaceId required' });
   const ws = getWorkspace(workspaceId);
@@ -3038,6 +3074,16 @@ app.post('/api/admin-chat', async (req, res) => {
   const kwMapContext = buildKeywordMapContext(workspaceId);
 
   try {
+    // Build conversation context from memory
+    let historyMessages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+    let priorContext = '';
+    if (sessionId) {
+      const ctx = buildConversationContext(ws.id, sessionId, 'admin');
+      historyMessages = ctx.historyMessages;
+      priorContext = ctx.priorContext;
+      addMessage(ws.id, sessionId, 'admin', 'user', question);
+    }
+
     const strategySection = (keywordBlock || kwMapContext || bizCtx)
       ? `\n\nKEYWORD STRATEGY CONTEXT:\n${keywordBlock}${kwMapContext}${bizCtx ? `\nBusiness: ${bizCtx}` : ''}${brandVoiceBlock}`
       : '';
@@ -3053,11 +3099,39 @@ app.post('/api/admin-chat', async (req, res) => {
     if (context?.siteHealth) dataSources.push('Site Health Audit (score, errors, warnings, page issues)');
     if (context?.rankings) dataSources.push('Rank Tracking (keyword positions, changes over time)');
 
+    // Audit traffic intelligence: cross-reference audit errors with real traffic
+    let auditTrafficSection = '';
+    if (context?.siteHealth && ws.webflowSiteId) {
+      try {
+        const trafficMap = await getAuditTrafficForWorkspace(ws);
+        const latestAudit = getLatestSnapshot(ws.webflowSiteId);
+        if (latestAudit && Object.keys(trafficMap).length > 0) {
+          const pagesWithTraffic = latestAudit.audit.pages
+            .filter(p => p.issues.length > 0)
+            .map(p => {
+              const slug = p.slug.startsWith('/') ? p.slug : `/${p.slug}`;
+              const traffic = trafficMap[slug] || trafficMap[p.slug];
+              return { page: p.page, slug, issues: p.issues.length, score: p.score, traffic };
+            })
+            .filter(p => p.traffic && (p.traffic.clicks > 0 || p.traffic.pageviews > 0))
+            .sort((a, b) => ((b.traffic?.clicks || 0) + (b.traffic?.pageviews || 0)) - ((a.traffic?.clicks || 0) + (a.traffic?.pageviews || 0)))
+            .slice(0, 8);
+          if (pagesWithTraffic.length > 0) {
+            dataSources.push('Audit Traffic Intelligence (high-traffic pages with SEO errors)');
+            auditTrafficSection = '\n\nHIGH-TRAFFIC PAGES WITH SEO ISSUES (prioritize these — they get real visitors):\n' +
+              pagesWithTraffic.map(p => `• ${p.slug} — ${p.issues} issues, score ${p.score} | ${p.traffic!.clicks} clicks, ${p.traffic!.pageviews} pageviews`).join('\n');
+          }
+        }
+      } catch { /* non-critical, skip */ }
+    }
+
     const systemPrompt = `You are an expert internal analytics analyst for **${ws.webflowSiteName || ws.name}**. You're embedded in the admin dashboard of hmpsn studio's platform. The user is a team member managing this client's website — give them unfiltered, technical, data-driven analysis.
 
 AVAILABLE DATA:
 ${dataSources.map(d => `• ${d}`).join('\n')}
 ${strategySection}
+${auditTrafficSection}
+${priorContext}
 
 YOUR ROLE:
 1. **Deep technical analysis** — Cross-reference data sources to surface non-obvious insights. A page ranking #8 with high impressions + high bounce + no conversion tracking tells a multi-layered story.
@@ -3065,6 +3139,7 @@ YOUR ROLE:
 3. **Prioritize by ROI** — Time is limited. Lead with changes that have the biggest impact relative to effort.
 4. **Flag risks** — Dropping rankings, rising bounce rates, audit score declining, stale content — surface these proactively.
 5. **Client communication suggestions** — When you spot something the client should know about, suggest how to frame it: "You could tell the client: 'Your contact form submissions are up 40% — the landing page updates are paying off.'"
+6. **Remember context** — Use conversation history for coherent multi-turn analysis. Build on prior discussion points.
 
 TONE:
 - Direct, technical, no fluff — you're talking to a peer, not a client
@@ -3078,19 +3153,37 @@ ${buildKnowledgeBase(workspaceId)}
 Full data context:
 ${JSON.stringify(context, null, 2)}`;
 
+    const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+      { role: 'system', content: systemPrompt },
+      ...historyMessages.slice(-10),
+      { role: 'user', content: question },
+    ];
+
     const aiResult = await callOpenAI({
       model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: question },
-      ],
+      messages,
       temperature: 0.6,
       maxTokens: 2000,
       feature: 'admin-chat',
       workspaceId: ws.id,
     });
 
-    res.json({ answer: aiResult.text || 'No response generated.' });
+    const answer = aiResult.text || 'No response generated.';
+
+    // Persist assistant response + auto-summarize
+    if (sessionId) {
+      addMessage(ws.id, sessionId, 'admin', 'assistant', answer);
+      const session = getChatSession(ws.id, sessionId);
+      // Log first admin chat exchange to activity
+      if (session && session.messages.length === 2) {
+        addActivity(ws.id, 'chat_session', 'Admin chat: ' + question.trim().slice(0, 80), `Admin started a new Insights conversation`);
+      }
+      if (session && session.messages.length >= 6 && !session.summary) {
+        generateSessionSummary(ws.id, sessionId).catch(() => {});
+      }
+    }
+
+    res.json({ answer, sessionId: sessionId || undefined });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: msg });
@@ -4726,19 +4819,50 @@ app.post('/api/public/search-chat/:workspaceId', async (req, res) => {
     const hasApprovals = !!(context?.pendingApprovals);
     const hasRequests = !!(context?.activeRequests);
 
+    // Audit traffic intelligence for client chat
+    let clientAuditTrafficSection = '';
+    if (hasHealth && ws.webflowSiteId) {
+      try {
+        const trafficMap = await getAuditTrafficForWorkspace(ws);
+        const latestAudit = getLatestSnapshot(ws.webflowSiteId);
+        if (latestAudit && Object.keys(trafficMap).length > 0) {
+          const pagesWithTraffic = latestAudit.audit.pages
+            .filter(p => p.issues.length > 0)
+            .map(p => {
+              const slug = p.slug.startsWith('/') ? p.slug : `/${p.slug}`;
+              const traffic = trafficMap[slug] || trafficMap[p.slug];
+              return { page: p.page, slug, issues: p.issues.length, score: p.score, traffic };
+            })
+            .filter(p => p.traffic && (p.traffic.clicks > 0 || p.traffic.pageviews > 0))
+            .sort((a, b) => ((b.traffic?.clicks || 0) + (b.traffic?.pageviews || 0)) - ((a.traffic?.clicks || 0) + (a.traffic?.pageviews || 0)))
+            .slice(0, 5);
+          if (pagesWithTraffic.length > 0) {
+            clientAuditTrafficSection = '\n\nHIGH-TRAFFIC PAGES WITH SEO ISSUES (mention these when discussing site health — they impact real visitors):\n' +
+              pagesWithTraffic.map(p => `• ${p.slug} — ${p.issues} issues | ${p.traffic!.clicks} clicks, ${p.traffic!.pageviews} pageviews`).join('\n');
+          }
+        }
+      } catch { /* non-critical */ }
+    }
+
     const teamName = 'your web team';
     const systemPrompt = `You are the **hmpsn studio Insights Engine** — a smart, data-driven analytics advisor embedded in a client's website performance dashboard. You work alongside ${teamName} who manages this client's website. Your job is to help the client understand their data, spot opportunities, and feel confident about their website's direction.
 
 DATA YOU HAVE ACCESS TO:
 ${hasSearch ? '✅ **Google Search Console** — search queries, clicks, impressions, CTR, positions, top pages, search trend over time' : ''}
+${context?.searchComparison ? '✅ **Search Period Comparison** — clicks, impressions, CTR, position changes vs previous period with % deltas' : ''}
 ${hasGA4 ? '✅ **Google Analytics 4** — users, sessions, pageviews, bounce rate, session duration, top pages, traffic sources, devices, events/conversions, countries' : ''}
+${context?.ga4Comparison ? '✅ **GA4 Period Comparison** — current vs previous period deltas for users, sessions, pageviews, bounce rate' : ''}
+${context?.ga4Organic ? '✅ **Organic Overview** — organic users, sessions, engagement rate, bounce rate, organic share of total traffic' : ''}
+${context?.ga4NewVsReturning ? '✅ **New vs Returning Users** — segment breakdown with engagement rates' : ''}
 ${hasHealth ? '✅ **Site Health Audit** — site score, errors, warnings, page-level issues, score history' : ''}
 ${context?.siteHealthDetail ? '✅ **Audit Detail** — site-wide issues, top problem pages with specific issue descriptions' : ''}
+${clientAuditTrafficSection ? '✅ **Audit Traffic Intelligence** — high-traffic pages that have SEO issues' : ''}
 ${hasStrategy ? '✅ **SEO Strategy** — keyword-to-page mapping, content gaps, quick wins, opportunities' : ''}
 ${hasRankings ? '✅ **Rank Tracking** — tracked keyword positions, clicks, impressions, position changes' : ''}
 ${hasActivity ? '✅ **Activity Log** — recent actions taken on the site' : ''}
 ${hasApprovals ? `✅ **Pending Approvals** — ${context.pendingApprovals} SEO changes awaiting client review` : ''}
 ${hasRequests ? '✅ **Active Requests** — open client requests with categories and statuses' : ''}
+${clientAuditTrafficSection}
 ${priorContext}
 
 YOUR APPROACH:
@@ -4805,8 +4929,12 @@ ${JSON.stringify(context, null, 2)}`;
     // Persist assistant response
     if (sessionId) {
       addMessage(ws.id, sessionId, 'client', 'assistant', answer);
-      // Auto-summarize after 6+ messages
       const session = getChatSession(ws.id, sessionId);
+      // Log first exchange to activity log so agency sees what clients ask
+      if (session && session.messages.length === 2) {
+        addActivity(ws.id, 'chat_session', 'Client chat: ' + question.trim().slice(0, 80), `Client started a new Insights Engine conversation`);
+      }
+      // Auto-summarize after 6+ messages
       if (session && session.messages.length >= 6 && !session.summary) {
         generateSessionSummary(ws.id, sessionId).catch(() => {});
       }

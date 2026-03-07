@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Sparkles, X, Send, Loader2, MessageSquare, Bot } from 'lucide-react';
+import { Sparkles, X, Send, Loader2, MessageSquare, Bot, Plus } from 'lucide-react';
 import { RenderMarkdown } from './client/helpers';
 
 interface ChatMessage { role: 'user' | 'assistant'; content: string; }
@@ -27,6 +27,9 @@ export function AdminChat({ workspaceId, workspaceName, ga4PropertyId, gscProper
   const [context, setContext] = useState<Record<string, unknown> | null>(null);
   const [contextLoading, setContextLoading] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const [sessionId, setSessionId] = useState<string>(() => `as-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  const [sessions, setSessions] = useState<Array<{ id: string; title: string; messageCount: number; updatedAt: string }>>([]);
+  const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
     if (endRef.current) endRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -37,6 +40,8 @@ export function AdminChat({ workspaceId, workspaceName, ga4PropertyId, gscProper
     setMessages([]);
     setContext(null);
     setInput('');
+    setSessionId(`as-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+    setShowHistory(false);
   }, [workspaceId]);
 
   // Fetch context when chat opens
@@ -125,7 +130,7 @@ export function AdminChat({ workspaceId, workspaceName, ga4PropertyId, gscProper
       const res = await fetch('/api/admin-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workspaceId, question: question.trim(), context: context || { days: 28 } }),
+        body: JSON.stringify({ workspaceId, question: question.trim(), context: context || { days: 28 }, sessionId }),
       });
       const data = await res.json();
       setMessages(prev => [...prev, { role: 'assistant', content: data.error ? `Error: ${data.error}` : data.answer }]);
@@ -152,10 +157,35 @@ export function AdminChat({ workspaceId, workspaceName, ga4PropertyId, gscProper
               <span className="text-sm font-medium text-zinc-200">Admin Insights</span>
               <span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">{workspaceName}</span>
             </div>
-            <button onClick={() => setOpen(false)} className="text-zinc-500 hover:text-zinc-300"><X className="w-4 h-4" /></button>
+            <div className="flex items-center gap-1">
+              {messages.length > 0 && (
+                <button onClick={() => { setSessionId(`as-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`); setMessages([]); setShowHistory(false); }}
+                  title="New conversation" className="text-zinc-500 hover:text-zinc-300 p-1"><Plus className="w-3.5 h-3.5" /></button>
+              )}
+              <button onClick={() => { setShowHistory(!showHistory); if (!showHistory) { fetch(`/api/public/chat-sessions/${workspaceId}?channel=admin`).then(r => r.json()).then(d => { if (Array.isArray(d)) setSessions(d); }).catch(() => {}); } }}
+                title="Chat history" className={`p-1 ${showHistory ? 'text-purple-400' : 'text-zinc-500 hover:text-zinc-300'}`}><MessageSquare className="w-3.5 h-3.5" /></button>
+              <button onClick={() => setOpen(false)} className="text-zinc-500 hover:text-zinc-300 p-1"><X className="w-4 h-4" /></button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto">
+            {showHistory ? (
+              <div className="p-3 space-y-1">
+                <p className="text-[11px] text-zinc-500 mb-2">Previous conversations</p>
+                {sessions.length === 0 && <p className="text-[11px] text-zinc-600 italic">No past conversations yet.</p>}
+                {sessions.map(s => (
+                  <button key={s.id} onClick={() => {
+                    setSessionId(s.id); setShowHistory(false);
+                    fetch(`/api/public/chat-sessions/${workspaceId}/${s.id}`).then(r => r.json()).then(d => {
+                      if (d?.messages) setMessages(d.messages.map((m: { role: string; content: string }) => ({ role: m.role as 'user' | 'assistant', content: m.content })));
+                    }).catch(() => {});
+                  }} className={`w-full text-left px-3 py-2 rounded-lg border transition-colors ${s.id === sessionId ? 'bg-purple-500/10 border-purple-500/30 text-purple-300' : 'bg-zinc-800/50 border-zinc-800 text-zinc-300 hover:bg-zinc-800'}`}>
+                    <div className="text-[11px] font-medium truncate">{s.title}</div>
+                    <div className="text-[10px] text-zinc-500 mt-0.5">{s.messageCount} messages · {new Date(s.updatedAt).toLocaleDateString()}</div>
+                  </button>
+                ))}
+              </div>
+            ) : (<>
             {contextLoading && (
               <div className="flex items-center justify-center py-8 gap-2 text-xs text-zinc-500">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading workspace data...
@@ -191,6 +221,7 @@ export function AdminChat({ workspaceId, workspaceName, ga4PropertyId, gscProper
                 <div ref={endRef} />
               </div>
             )}
+            </>)}
           </div>
 
           <div className="px-4 py-3 border-t border-zinc-800 flex gap-2 flex-shrink-0">

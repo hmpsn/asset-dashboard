@@ -608,6 +608,18 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
           countries: ga4Countries.slice(0, 8),
         };
       }
+      if (searchComparison) {
+        context.searchComparison = searchComparison;
+      }
+      if (ga4Comparison) {
+        context.ga4Comparison = ga4Comparison;
+      }
+      if (ga4Organic) {
+        context.ga4Organic = ga4Organic;
+      }
+      if (ga4NewVsReturning && ga4NewVsReturning.length > 0) {
+        context.ga4NewVsReturning = ga4NewVsReturning;
+      }
       if (audit) {
         context.siteHealth = {
           score: audit.siteScore, totalPages: audit.totalPages,

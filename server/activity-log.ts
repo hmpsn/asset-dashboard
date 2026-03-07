@@ -24,6 +24,7 @@ export type ActivityType =
   | 'redirects_scanned'
   | 'strategy_generated'
   | 'rank_snapshot'
+  | 'chat_session'
   | 'note';
 
 export interface ActivityEntry {
