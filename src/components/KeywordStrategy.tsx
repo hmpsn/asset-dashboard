@@ -7,6 +7,7 @@ import {
   Copy, Link, MessageSquare, Save,
 } from 'lucide-react';
 import { KeywordAnalysis } from './KeywordAnalysis';
+import { StatCard } from './ui';
 
 interface PageKeywordMap {
   pagePath: string;
@@ -618,27 +619,12 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
         <>
           {/* ── Summary Dashboard ── */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-              <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Pages Mapped</div>
-              <div className="text-xl font-bold text-zinc-100">{strategy.pageMap.length}</div>
-            </div>
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-              <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Eye className="w-3 h-3" /> Impressions</div>
-              <div className="text-xl font-bold text-zinc-100">{totalImpressions.toLocaleString()}</div>
-              <div className="text-[11px] text-zinc-500">last 90 days</div>
-            </div>
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-              <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><MousePointerClick className="w-3 h-3" /> Clicks</div>
-              <div className="text-xl font-bold text-zinc-100">{totalClicks.toLocaleString()}</div>
-              <div className="text-[11px] text-zinc-500">{totalImpressions > 0 ? `${((totalClicks / totalImpressions) * 100).toFixed(1)}% CTR` : ''}</div>
-            </div>
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-              <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Trophy className="w-3 h-3" /> Avg Position</div>
-              <div className={`text-xl font-bold ${positionColor(avgPos)}`}>{ranked.length > 0 ? `#${avgPos.toFixed(1)}` : '—'}</div>
-              <div className="text-[11px] text-zinc-500">{ranked.length} pages ranking</div>
-            </div>
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-              <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Ranking Tiers</div>
+            <StatCard label="Pages Mapped" value={strategy.pageMap.length} />
+            <StatCard label="Impressions" value={totalImpressions.toLocaleString()} icon={Eye} sub="last 90 days" />
+            <StatCard label="Clicks" value={totalClicks.toLocaleString()} icon={MousePointerClick} sub={totalImpressions > 0 ? `${((totalClicks / totalImpressions) * 100).toFixed(1)}% CTR` : undefined} />
+            <StatCard label="Avg Position" value={ranked.length > 0 ? `#${avgPos.toFixed(1)}` : '—'} icon={Trophy} valueColor={positionColor(avgPos)} sub={`${ranked.length} pages ranking`} />
+            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+              <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-1.5">Ranking Tiers</div>
               <div className="flex items-center gap-1 mt-1 flex-wrap">
                 {top3.length > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium">{top3.length} top 3</span>}
                 {top10.length > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 font-medium">{top10.length} top 10</span>}

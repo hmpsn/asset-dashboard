@@ -4,6 +4,7 @@ import {
   CheckCircle2, ArrowUpRight, ArrowDownRight, Minus, Loader2,
   Search, BarChart3, Lock, ExternalLink, Bell, Activity, FileText, Zap,
 } from 'lucide-react';
+import { MetricRingSvg } from './ui';
 
 interface ActivityEntry {
   id: string;
@@ -35,21 +36,8 @@ interface WorkspaceSummary {
   contentRequests?: { pending: number; total: number };
 }
 
-function ScoreRing({ score, size = 48, stroke = 4 }: { score: number; size?: number; stroke?: number }) {
-  const radius = (size - stroke) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (score / 100) * circumference;
-  const color = score >= 80 ? '#4ade80' : score >= 60 ? '#fbbf24' : '#f87171';
-  return (
-    <svg width={size} height={size} className="shrink-0">
-      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#27272a" strokeWidth={stroke} />
-      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={color} strokeWidth={stroke}
-        strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round"
-        transform={`rotate(-90 ${size / 2} ${size / 2})`} className="transition-all duration-700" />
-      <text x="50%" y="50%" dominantBaseline="central" textAnchor="middle" fontSize={size * 0.38} fontWeight="700" fill={color} fontFamily="'DIN Pro', 'Inter', sans-serif" letterSpacing="-0.03em">{score}</text>
-    </svg>
-  );
-}
+// ScoreRing replaced by unified <MetricRingSvg /> from ./ui
+const ScoreRing = MetricRingSvg;
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -175,7 +163,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                 <div className="flex items-center gap-3">
                   {ws.audit ? (
                     <>
-                      <ScoreRing score={ws.audit.score} size={44} stroke={3.5} />
+                      <ScoreRing score={ws.audit.score} size={44} strokeWidth={3.5} />
                       <div>
                         <div className="text-[11px] font-medium text-zinc-500">Health</div>
                         <div className="flex items-center gap-1 mt-0.5">

@@ -4,6 +4,8 @@ import {
   TrendingUp, TrendingDown, BarChart3,
 } from 'lucide-react';
 import { ChartPointDetail } from './ChartPointDetail';
+import { PageHeader, StatCard, SectionCard, DateRangeSelector, DataList, EmptyState } from './ui';
+import { DATE_PRESETS_FULL } from './ui/constants';
 
 interface GA4Overview {
   totalUsers: number;
@@ -185,15 +187,11 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
   // ── Not configured state ──
   if (!ga4PropertyId) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 gap-3">
-        <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center">
-          <BarChart3 className="w-8 h-8 text-zinc-500" />
-        </div>
-        <p className="text-sm text-zinc-400">Google Analytics not configured</p>
-        <p className="text-xs text-zinc-500 max-w-md text-center">
-          Connect Google in Settings and select a GA4 property for this workspace to view analytics data.
-        </p>
-      </div>
+      <EmptyState
+        icon={BarChart3}
+        title="Google Analytics not configured"
+        description="Connect Google in Settings and select a GA4 property for this workspace to view analytics data."
+      />
     );
   }
 
@@ -236,123 +234,52 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-zinc-200">Google Analytics</h2>
-          <p className="text-xs text-zinc-500 mt-0.5">
-            {overview.dateRange.start} — {overview.dateRange.end}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      <PageHeader
+        title="Google Analytics"
+        subtitle={`${overview.dateRange.start} — ${overview.dateRange.end}`}
+        actions={<>
           {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-500" />}
-          <div className="flex rounded-lg overflow-hidden border border-zinc-700">
-            {[7, 14, 28, 90, 180, 365].map(d => (
-              <button
-                key={d}
-                onClick={() => setDays(d)}
-                className={`px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                  days === d ? 'bg-teal-600 text-white' : 'bg-zinc-800 text-zinc-500 hover:text-zinc-300'
-                }`}
-              >
-                {d >= 365 ? '1y' : d >= 180 ? '6mo' : `${d}d`}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+          <DateRangeSelector options={DATE_PRESETS_FULL} selected={days} onChange={setDays} />
+        </>}
+      />
 
       {/* Overview metrics */}
       <div className="grid grid-cols-6 gap-3">
-        {metrics.map(m => {
-          const Icon = m.icon;
-          return (
-            <div key={m.label} className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <Icon className={`w-3.5 h-3.5 ${m.color}`} />
-                <span className="text-[11px] text-zinc-500 font-medium">{m.label}</span>
-              </div>
-              <div className="text-xl font-bold text-zinc-200">{m.value}</div>
-            </div>
-          );
-        })}
+        {metrics.map(m => (
+          <StatCard key={m.label} label={m.label} value={m.value} icon={m.icon} iconColor={m.color.replace('text-', '')} />
+        ))}
       </div>
 
       {/* Trend chart */}
       {trend.length > 1 && (
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-medium text-zinc-300">Daily Trend</span>
-            <div className="flex rounded-lg overflow-hidden border border-zinc-700">
-              {(['users', 'sessions', 'pageviews'] as const).map(k => (
-                <button
-                  key={k}
-                  onClick={() => setTrendMetric(k)}
-                  className={`px-2 py-0.5 text-[11px] font-medium capitalize transition-colors ${
-                    trendMetric === k ? 'bg-zinc-700 text-zinc-200' : 'bg-zinc-800 text-zinc-500 hover:text-zinc-300'
-                  }`}
-                >
-                  {k}
-                </button>
-              ))}
-            </div>
-          </div>
+        <SectionCard
+          title="Daily Trend"
+          action={
+            <DateRangeSelector
+              options={[{ label: 'Users', value: 0 }, { label: 'Sessions', value: 1 }, { label: 'Pageviews', value: 2 }]}
+              selected={['users', 'sessions', 'pageviews'].indexOf(trendMetric)}
+              onChange={i => setTrendMetric((['users', 'sessions', 'pageviews'] as const)[i])}
+            />
+          }
+        >
           <TrendChart data={trend} dataKey={trendMetric} color={trendColors[trendMetric]} />
-        </div>
+        </SectionCard>
       )}
 
       {/* Two-column: Top Pages + Sources */}
       <div className="grid grid-cols-2 gap-4">
-        {/* Top Pages */}
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-          <h3 className="text-sm font-medium text-zinc-300 mb-3">Top Pages</h3>
-          <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
-            {topPages.slice(0, 15).map((page, i) => (
-              <div key={page.path} className="flex items-center gap-2 text-xs py-1">
-                <span className="text-zinc-500 w-4 text-right flex-shrink-0">{i + 1}</span>
-                <span className="text-zinc-300 truncate flex-1 min-w-0" title={page.path}>{page.path}</span>
-                <span className="text-zinc-500 flex-shrink-0 tabular-nums">{formatNumber(page.pageviews)}</span>
-              </div>
-            ))}
-            {topPages.length === 0 && <p className="text-xs text-zinc-500">No data</p>}
-          </div>
-        </div>
+        <SectionCard title="Top Pages">
+          <DataList items={topPages.slice(0, 15).map(p => ({ label: p.path, value: formatNumber(p.pageviews) }))} />
+        </SectionCard>
 
-        {/* Traffic Sources */}
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-          <h3 className="text-sm font-medium text-zinc-300 mb-3">Traffic Sources</h3>
-          <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
-            {sources.map((src, i) => {
-              const maxSessions = sources[0]?.sessions || 1;
-              return (
-                <div key={`${src.source}-${src.medium}`} className="flex items-center gap-2 text-xs py-1">
-                  <span className="text-zinc-500 w-4 text-right flex-shrink-0">{i + 1}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-zinc-300 truncate">{src.source || '(direct)'}</span>
-                      <span className="text-zinc-500">/</span>
-                      <span className="text-zinc-500 truncate">{src.medium || '(none)'}</span>
-                    </div>
-                    <div className="mt-0.5 h-1 bg-zinc-800 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-teal-500/40 rounded-full"
-                        style={{ width: `${(src.sessions / maxSessions) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                  <span className="text-zinc-500 flex-shrink-0 tabular-nums">{formatNumber(src.sessions)}</span>
-                </div>
-              );
-            })}
-            {sources.length === 0 && <p className="text-xs text-zinc-500">No data</p>}
-          </div>
-        </div>
+        <SectionCard title="Traffic Sources">
+          <DataList items={sources.map(s => ({ label: `${s.source || '(direct)'} / ${s.medium || '(none)'}`, value: formatNumber(s.sessions) }))} />
+        </SectionCard>
       </div>
 
       {/* Two-column: Devices + Countries */}
       <div className="grid grid-cols-2 gap-4">
-        {/* Devices */}
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-          <h3 className="text-sm font-medium text-zinc-300 mb-3">Devices</h3>
+        <SectionCard title="Devices">
           <div className="space-y-2">
             {devices.map(d => (
               <div key={d.device} className="flex items-center gap-3">
@@ -363,10 +290,7 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
                     <span className="text-zinc-500">{d.percentage}%</span>
                   </div>
                   <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-teal-500 rounded-full transition-all"
-                      style={{ width: `${d.percentage}%` }}
-                    />
+                    <div className="h-full bg-teal-500 rounded-full transition-all" style={{ width: `${d.percentage}%` }} />
                   </div>
                 </div>
                 <span className="text-xs text-zinc-500 tabular-nums w-10 text-right">{formatNumber(d.users)}</span>
@@ -374,35 +298,14 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
             ))}
             {devices.length === 0 && <p className="text-xs text-zinc-500">No data</p>}
           </div>
-        </div>
+        </SectionCard>
 
-        {/* Countries */}
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-          <h3 className="text-sm font-medium text-zinc-300 mb-3">Top Countries</h3>
-          <div className="space-y-1.5 max-h-[200px] overflow-y-auto">
-            {countries.map((c, i) => {
-              const maxUsers = countries[0]?.users || 1;
-              return (
-                <div key={c.country} className="flex items-center gap-2 text-xs py-0.5">
-                  <span className="text-zinc-500 w-4 text-right flex-shrink-0">{i + 1}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-zinc-300 truncate">{c.country}</span>
-                      <span className="text-zinc-500 tabular-nums">{formatNumber(c.users)}</span>
-                    </div>
-                    <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-emerald-500/40 rounded-full"
-                        style={{ width: `${(c.users / maxUsers) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-            {countries.length === 0 && <p className="text-xs text-zinc-500">No data</p>}
-          </div>
-        </div>
+        <SectionCard title="Top Countries">
+          <DataList
+            items={countries.map(c => ({ label: c.country, value: formatNumber(c.users) }))}
+            maxHeight="200px"
+          />
+        </SectionCard>
       </div>
 
     </div>

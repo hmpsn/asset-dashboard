@@ -4,6 +4,7 @@ import {
   RefreshCw, ChevronDown, ChevronRight, ExternalLink, Search as SearchIcon,
   CornerDownRight, Ban, Link2, Download, Copy, Check, Sparkles, Edit3, X,
 } from 'lucide-react';
+import { PageHeader, StatCard } from './ui';
 
 interface RedirectHop {
   url: string;
@@ -230,55 +231,22 @@ export function RedirectManager({ siteId }: Props) {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-semibold text-zinc-200">Redirect Manager</h3>
-          <p className="text-[11px] text-zinc-500 mt-0.5">
-            Scanned {new Date(snapshotDate || data.scannedAt).toLocaleString()} · {summary.totalPages} pages checked
-          </p>
-        </div>
-        <button
-          onClick={runScan}
-          disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium transition-colors"
-        >
-          <RefreshCw className="w-3 h-3" /> Rescan
-        </button>
-      </div>
+      <PageHeader
+        title="Redirect Manager"
+        subtitle={`Scanned ${new Date(snapshotDate || data.scannedAt).toLocaleString()} · ${summary.totalPages} pages checked`}
+        actions={
+          <button onClick={runScan} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium transition-colors">
+            <RefreshCw className="w-3 h-3" /> Rescan
+          </button>
+        }
+      />
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-          <div className="flex items-center gap-1.5 mb-1">
-            <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Healthy</span>
-          </div>
-          <p className="text-xl font-bold text-emerald-400">{summary.healthy}</p>
-        </div>
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-          <div className="flex items-center gap-1.5 mb-1">
-            <ArrowRight className="w-3.5 h-3.5 text-amber-400" />
-            <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Redirecting</span>
-          </div>
-          <p className="text-xl font-bold text-amber-400">{summary.redirecting}</p>
-        </div>
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-          <div className="flex items-center gap-1.5 mb-1">
-            <Ban className="w-3.5 h-3.5 text-red-400" />
-            <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">404s</span>
-          </div>
-          <p className="text-xl font-bold text-red-400">{summary.notFound}</p>
-        </div>
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-          <div className="flex items-center gap-1.5 mb-1">
-            <Link2 className="w-3.5 h-3.5 text-teal-400" />
-            <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Chains</span>
-          </div>
-          <p className="text-xl font-bold text-teal-400">{summary.chainsDetected}</p>
-          {summary.longestChain > 1 && (
-            <p className="text-[11px] text-zinc-500">longest: {summary.longestChain} hops</p>
-          )}
-        </div>
+        <StatCard label="Healthy" value={summary.healthy} icon={CheckCircle} iconColor="#34d399" valueColor="text-emerald-400" />
+        <StatCard label="Redirecting" value={summary.redirecting} icon={ArrowRight} iconColor="#fbbf24" valueColor="text-amber-400" />
+        <StatCard label="404s" value={summary.notFound} icon={Ban} iconColor="#f87171" valueColor="text-red-400" />
+        <StatCard label="Chains" value={summary.chainsDetected} icon={Link2} iconColor="#2dd4bf" valueColor="text-teal-400" sub={summary.longestChain > 1 ? `longest: ${summary.longestChain} hops` : undefined} />
       </div>
 
       {/* Redirect Chains */}

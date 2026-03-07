@@ -3,6 +3,7 @@ import {
   Loader2, ArrowRight, RefreshCw, ExternalLink, Search as SearchIcon,
   Link, AlertCircle, ChevronDown, ChevronRight, ArrowUpRight,
 } from 'lucide-react';
+import { PageHeader, StatCard } from './ui';
 
 interface LinkSuggestion {
   fromPage: string;
@@ -127,36 +128,21 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-semibold text-zinc-200">Internal Linking Suggestions</h3>
-          <p className="text-[11px] text-zinc-500 mt-0.5">
-            Analyzed {data.pageCount} pages · {data.existingLinkCount} existing internal links · {data.suggestions.length} suggestions
-          </p>
-        </div>
-        <button
-          onClick={runAnalysis}
-          disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium transition-colors"
-        >
-          <RefreshCw className="w-3 h-3" /> Reanalyze
-        </button>
-      </div>
+      <PageHeader
+        title="Internal Linking Suggestions"
+        subtitle={`Analyzed ${data.pageCount} pages · ${data.existingLinkCount} existing internal links · ${data.suggestions.length} suggestions`}
+        actions={
+          <button onClick={runAnalysis} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium transition-colors">
+            <RefreshCw className="w-3 h-3" /> Reanalyze
+          </button>
+        }
+      />
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-          <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">High Priority</span>
-          <p className="text-xl font-bold text-red-400">{counts.high}</p>
-        </div>
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-          <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Medium Priority</span>
-          <p className="text-xl font-bold text-amber-400">{counts.medium}</p>
-        </div>
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-          <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Low Priority</span>
-          <p className="text-xl font-bold text-blue-400">{counts.low}</p>
-        </div>
+        <StatCard label="High Priority" value={counts.high} valueColor="text-red-400" />
+        <StatCard label="Medium Priority" value={counts.medium} valueColor="text-amber-400" />
+        <StatCard label="Low Priority" value={counts.low} valueColor="text-blue-400" />
       </div>
 
       {/* Filter + search */}

@@ -15,6 +15,7 @@ import { InternalLinks } from './InternalLinks';
 import { ContentBriefs } from './ContentBriefs';
 import { CompetitorAnalysis } from './CompetitorAnalysis';
 import { RankTracker } from './RankTracker';
+import { StatCard } from './ui';
 
 type Severity = 'error' | 'warning' | 'info';
 
@@ -1034,37 +1035,18 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
       {/* Summary cards */}
       <div className="grid grid-cols-5 gap-3">
         <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800 col-span-1">
-          <div className={`text-4xl font-bold ${scoreColor(data.siteScore)}`}>{data.siteScore}</div>
-          <div className="text-xs text-zinc-500 mt-1">Site Score</div>
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Site Score</span>
+          </div>
+          <div className={`text-3xl font-bold ${scoreColor(data.siteScore)}`}>{data.siteScore}</div>
           <div className="mt-2 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
             <div className={`h-full rounded-full ${scoreBg(data.siteScore)}`} style={{ width: `${data.siteScore}%` }} />
           </div>
         </div>
-        <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
-          <div className="text-3xl font-bold text-zinc-200">{data.totalPages}</div>
-          <div className="text-xs text-zinc-500 mt-1">Pages Scanned</div>
-        </div>
-        <button
-          onClick={() => setSeverityFilter(severityFilter === 'error' ? 'all' : 'error')}
-          className={`bg-zinc-900 rounded-xl p-4 border text-left transition-colors ${severityFilter === 'error' ? 'border-red-500/50' : 'border-zinc-800 hover:border-zinc-700'}`}
-        >
-          <div className="text-3xl font-bold text-red-400">{data.errors}</div>
-          <div className="text-xs text-zinc-500 mt-1">Errors</div>
-        </button>
-        <button
-          onClick={() => setSeverityFilter(severityFilter === 'warning' ? 'all' : 'warning')}
-          className={`bg-zinc-900 rounded-xl p-4 border text-left transition-colors ${severityFilter === 'warning' ? 'border-amber-500/50' : 'border-zinc-800 hover:border-zinc-700'}`}
-        >
-          <div className="text-3xl font-bold text-amber-400">{data.warnings}</div>
-          <div className="text-xs text-zinc-500 mt-1">Warnings</div>
-        </button>
-        <button
-          onClick={() => setSeverityFilter(severityFilter === 'info' ? 'all' : 'info')}
-          className={`bg-zinc-900 rounded-xl p-4 border text-left transition-colors ${severityFilter === 'info' ? 'border-blue-500/50' : 'border-zinc-800 hover:border-zinc-700'}`}
-        >
-          <div className="text-3xl font-bold text-blue-400">{data.infos}</div>
-          <div className="text-xs text-zinc-500 mt-1">Info</div>
-        </button>
+        <StatCard label="Pages Scanned" value={data.totalPages} />
+        <StatCard label="Errors" value={data.errors} valueColor="text-red-400" onClick={() => setSeverityFilter(severityFilter === 'error' ? 'all' : 'error')} className={severityFilter === 'error' ? 'border-red-500/50' : ''} />
+        <StatCard label="Warnings" value={data.warnings} valueColor="text-amber-400" onClick={() => setSeverityFilter(severityFilter === 'warning' ? 'all' : 'warning')} className={severityFilter === 'warning' ? 'border-amber-500/50' : ''} />
+        <StatCard label="Info" value={data.infos} valueColor="text-blue-400" onClick={() => setSeverityFilter(severityFilter === 'info' ? 'all' : 'info')} className={severityFilter === 'info' ? 'border-blue-500/50' : ''} />
       </div>
 
       {/* Contextual tool tips based on audit findings */}

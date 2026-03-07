@@ -4,6 +4,7 @@ import {
   Zap, AlertTriangle, Info,
 } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
+import { MetricRing } from './ui';
 
 interface CoreWebVitals {
   LCP: number | null;
@@ -60,11 +61,7 @@ function scoreColor(score: number): string {
   return 'text-red-400';
 }
 
-function scoreRing(score: number): string {
-  if (score >= 90) return '#22c55e';
-  if (score >= 50) return '#eab308';
-  return '#ef4444';
-}
+// scoreRing replaced by MetricRing from ./ui
 
 function formatMs(ms: number | null): string {
   if (ms === null) return '—';
@@ -99,26 +96,7 @@ function ratingBg(r: 'good' | 'needs-improvement' | 'poor'): string {
   return r === 'good' ? 'bg-green-500/10 border-green-500/30' : r === 'needs-improvement' ? 'bg-amber-500/10 border-amber-500/30' : 'bg-red-500/10 border-red-500/30';
 }
 
-function ScoreRing({ score, size = 80 }: { score: number; size?: number }) {
-  const r = (size - 8) / 2;
-  const circ = 2 * Math.PI * r;
-  const offset = circ * (1 - score / 100);
-  const color = scoreRing(score);
-
-  return (
-    <div className="relative" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6" />
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="6"
-          strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
-          style={{ transition: 'stroke-dashoffset 0.8s ease' }} />
-      </svg>
-      <div className={`absolute inset-0 flex items-center justify-center text-2xl font-bold ${scoreColor(score)}`} style={{ fontFamily: "'DIN Pro', 'Inter', sans-serif", letterSpacing: '-0.03em' }}>
-        {score}
-      </div>
-    </div>
-  );
-}
+// ScoreRing replaced by unified <MetricRing /> from ./ui
 
 function VitalCard({ label, value, formatted, vitalKey }: { label: string; value: number | null; formatted: string; vitalKey: string }) {
   const rating = vitalRating(vitalKey, value);
@@ -242,7 +220,7 @@ export function PageSpeedPanel({ siteId }: Props) {
 
       <div className="grid grid-cols-[auto_1fr] gap-6 bg-zinc-900 rounded-xl p-6 border border-zinc-800">
         <div className="flex flex-col items-center gap-2">
-          <ScoreRing score={result.score} size={100} />
+          <MetricRing score={result.score} size={100} />
           <div className="text-xs text-zinc-500">{strategy === 'mobile' ? 'Mobile' : 'Desktop'}</div>
         </div>
         <div className="grid grid-cols-3 gap-2">
@@ -451,7 +429,7 @@ export function PageSpeedPanel({ siteId }: Props) {
       {/* Average score + vitals */}
       <div className="grid grid-cols-[auto_1fr] gap-6 bg-zinc-900 rounded-xl p-6 border border-zinc-800">
         <div className="flex flex-col items-center gap-2">
-          <ScoreRing score={data.averageScore} size={100} />
+          <MetricRing score={data.averageScore} size={100} />
           <div className="text-xs text-zinc-500">Avg Score</div>
         </div>
         <div className="grid grid-cols-3 gap-2">

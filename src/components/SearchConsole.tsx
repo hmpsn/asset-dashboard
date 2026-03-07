@@ -5,6 +5,8 @@ import {
   Sparkles, Send, AlertTriangle, Target, Zap, Shield, MessageSquare, X,
 } from 'lucide-react';
 import { ChartPointDetail } from './ChartPointDetail';
+import { PageHeader, StatCard, DateRangeSelector, EmptyState } from './ui';
+import { DATE_PRESETS_SEARCH } from './ui/constants';
 
 interface SearchQuery {
   query: string;
@@ -48,26 +50,6 @@ interface ChatMessage {
 interface Props {
   siteId: string;
   gscPropertyUrl?: string;
-}
-
-function MiniSparkline({ data, color }: { data: number[]; color: string }) {
-  if (data.length < 2) return null;
-  const max = Math.max(...data);
-  const min = Math.min(...data);
-  const range = max - min || 1;
-  const w = 120;
-  const h = 32;
-  const points = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * w;
-    const y = h - ((v - min) / range) * (h - 4) - 2;
-    return `${x},${y}`;
-  }).join(' ');
-
-  return (
-    <svg width={w} height={h} className="flex-shrink-0">
-      <polyline fill="none" stroke={color} strokeWidth="1.5" points={points} strokeLinejoin="round" />
-    </svg>
-  );
 }
 
 function TrendChart({ data, metric, color, height = 80 }: { data: PerformanceTrend[]; metric: keyof PerformanceTrend; color: string; height?: number }) {
@@ -292,15 +274,11 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
   // Not configured state
   if (!gscPropertyUrl) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 gap-3">
-        <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center">
-          <Search className="w-8 h-8 text-zinc-500" />
-        </div>
-        <p className="text-sm text-zinc-400">Search Console not configured</p>
-        <p className="text-xs text-zinc-500 max-w-md text-center">
-          Select a Search Console property in the workspace settings (gear icon) to view search data.
-        </p>
-      </div>
+      <EmptyState
+        icon={Search}
+        title="Search Console not configured"
+        description="Select a Search Console property in the workspace settings (gear icon) to view search data."
+      />
     );
   }
 
@@ -309,34 +287,26 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
   return (
     <div className="space-y-5">
       {/* Top bar */}
-      <div className="flex items-center gap-3">
-        <div className="text-sm text-zinc-300 flex items-center gap-2">
-          <Search className="w-4 h-4 text-zinc-500" />
-          <span className="truncate">{gscPropertyUrl}</span>
-        </div>
-        <div className="flex-1" />
-        <button
-          onClick={() => setChatOpen(!chatOpen)}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-            chatOpen ? 'bg-teal-600 text-white' : 'bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white'
-          }`}
-        >
-          <Sparkles className="w-3.5 h-3.5" /> Ask AI
-        </button>
-        <div className="flex items-center gap-1 bg-zinc-900 rounded-lg border border-zinc-800 p-0.5">
-          {[7, 28, 90, 180, 480].map(d => (
-            <button
-              key={d}
-              onClick={() => { setDays(d); loadData(undefined, d); }}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                days === d ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              {d >= 480 ? '16mo' : d >= 180 ? '6mo' : `${d}d`}
-            </button>
-          ))}
-        </div>
-      </div>
+      <PageHeader
+        title="Search Console"
+        subtitle={gscPropertyUrl}
+        icon={<Search className="w-4 h-4 text-zinc-500" />}
+        actions={<>
+          <button
+            onClick={() => setChatOpen(!chatOpen)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+              chatOpen ? 'bg-teal-600 text-white' : 'bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" /> Ask AI
+          </button>
+          <DateRangeSelector
+            options={DATE_PRESETS_SEARCH}
+            selected={days}
+            onChange={d => { setDays(d); loadData(undefined, d); }}
+          />
+        </>}
+      />
 
       {error && (
         <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-lg">{error}</div>
@@ -445,38 +415,10 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
         <>
           {/* Summary cards */}
           <div className="grid grid-cols-4 gap-3">
-            <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
-              <div className="flex items-center justify-between mb-1">
-                <MousePointer className="w-4 h-4 text-blue-400" />
-                <MiniSparkline data={trend.map(t => t.clicks)} color="#60a5fa" />
-              </div>
-              <div className="text-2xl font-bold text-zinc-200">{overview.totalClicks.toLocaleString()}</div>
-              <div className="text-[11px] text-zinc-500 mt-0.5">Total Clicks</div>
-            </div>
-            <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
-              <div className="flex items-center justify-between mb-1">
-                <Eye className="w-4 h-4 text-cyan-400" />
-                <MiniSparkline data={trend.map(t => t.impressions)} color="#22d3ee" />
-              </div>
-              <div className="text-2xl font-bold text-zinc-200">{overview.totalImpressions.toLocaleString()}</div>
-              <div className="text-[11px] text-zinc-500 mt-0.5">Total Impressions</div>
-            </div>
-            <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
-              <div className="flex items-center justify-between mb-1">
-                <TrendingUp className="w-4 h-4 text-emerald-400" />
-                <MiniSparkline data={trend.map(t => t.ctr)} color="#34d399" />
-              </div>
-              <div className="text-2xl font-bold text-zinc-200">{overview.avgCtr}%</div>
-              <div className="text-[11px] text-zinc-500 mt-0.5">Avg CTR</div>
-            </div>
-            <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
-              <div className="flex items-center justify-between mb-1">
-                <BarChart3 className="w-4 h-4 text-amber-400" />
-                <MiniSparkline data={trend.map(t => t.position)} color="#fbbf24" />
-              </div>
-              <div className="text-2xl font-bold text-zinc-200">{overview.avgPosition}</div>
-              <div className="text-[11px] text-zinc-500 mt-0.5">Avg Position</div>
-            </div>
+            <StatCard label="Total Clicks" value={overview.totalClicks.toLocaleString()} icon={MousePointer} iconColor="#60a5fa" sparklineData={trend.map(t => t.clicks)} sparklineColor="#60a5fa" />
+            <StatCard label="Total Impressions" value={overview.totalImpressions.toLocaleString()} icon={Eye} iconColor="#22d3ee" sparklineData={trend.map(t => t.impressions)} sparklineColor="#22d3ee" />
+            <StatCard label="Avg CTR" value={`${overview.avgCtr}%`} icon={TrendingUp} iconColor="#34d399" sparklineData={trend.map(t => t.ctr)} sparklineColor="#34d399" />
+            <StatCard label="Avg Position" value={overview.avgPosition} icon={BarChart3} iconColor="#fbbf24" sparklineData={trend.map(t => t.position)} sparklineColor="#fbbf24" />
           </div>
 
           {/* Trend chart */}

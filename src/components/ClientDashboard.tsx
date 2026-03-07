@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 import { ChartPointDetail } from './ChartPointDetail';
+import { MetricRing, StatCard, CompactStatBar, EmptyState } from './ui';
 
 interface SearchQuery { query: string; clicks: number; impressions: number; ctr: number; position: number; }
 interface SearchPage { page: string; clicks: number; impressions: number; ctr: number; position: number; }
@@ -129,13 +130,6 @@ const QUICK_QUESTIONS = [
   'What content should I create next based on search data?',
 ];
 
-function MiniSparkline({ data, color }: { data: number[]; color: string }) {
-  if (data.length < 2) return null;
-  const max = Math.max(...data), min = Math.min(...data), range = max - min || 1, w = 120, h = 32;
-  const points = data.map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - min) / range) * (h - 4) - 2}`).join(' ');
-  return <svg width={w} height={h} className="flex-shrink-0"><polyline fill="none" stroke={color} strokeWidth="1.5" points={points} strokeLinejoin="round" /></svg>;
-}
-
 function TrendChart({ data, metric, color }: { data: PerformanceTrend[]; metric: keyof PerformanceTrend; color: string }) {
   const [selected, setSelected] = useState<number | null>(null);
   if (data.length < 2) return null;
@@ -241,20 +235,8 @@ function DualTrendChart({ data, annotations: anns }: { data: PerformanceTrend[];
   );
 }
 
-function ScoreRing({ score, size = 120 }: { score: number; size?: number }) {
-  const sw = 8, r = (size - sw) / 2, c = 2 * Math.PI * r, offset = c - (score / 100) * c;
-  const color = score >= 80 ? '#34d399' : score >= 60 ? '#fbbf24' : '#f87171';
-  return (
-    <div className="relative" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="transform -rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#27272a" strokeWidth={sw} />
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={sw}
-          strokeDasharray={c} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-1000" />
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center"><span className="font-bold" style={{ color, fontSize: size * 0.38, fontFamily: "'DIN Pro', 'Inter', sans-serif", fontWeight: 700, letterSpacing: '-0.03em' }}>{score}</span></div>
-    </div>
-  );
-}
+// ScoreRing replaced by unified <MetricRing /> from ./ui
+const ScoreRing = MetricRing;
 
 function ScoreHistoryChart({ history }: { history: Array<{ id: string; createdAt: string; siteScore: number }> }) {
   const [selected, setSelected] = useState<number | null>(null);
@@ -1158,17 +1140,20 @@ export function ClientDashboard({ workspaceId }: Props) {
             if (cards.length === 0) return null;
             return (
               <div className={`grid gap-3 ${cards.length <= 3 ? 'grid-cols-' + cards.length : cards.length === 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'}`}>
-                {cards.map((card, i) => { const Icon = card.icon; return (
-                  <button key={i} onClick={card.onClick} className="bg-zinc-900 rounded-xl p-4 border border-zinc-800 hover:border-zinc-700 transition-colors text-left group">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <Icon className="w-4 h-4" style={{ color: card.color }} />
-                      {card.td.length > 2 && <MiniSparkline data={card.td} color={card.color} />}
-                    </div>
-                    <div className="text-2xl font-bold text-zinc-100" style={{ color: card.label === 'Site Health' ? card.color : undefined }}>{card.value}</div>
-                    <div className="text-[11px] text-zinc-500 mt-0.5">{card.label}</div>
-                    {card.sub && <div className="text-[11px] text-zinc-500 mt-0.5">{card.sub}</div>}
-                  </button>
-                ); })}
+                {cards.map((card, i) => (
+                  <StatCard
+                    key={i}
+                    label={card.label}
+                    value={card.value}
+                    icon={card.icon}
+                    iconColor={card.color}
+                    valueColor={card.label === 'Site Health' ? card.color : undefined}
+                    sub={card.sub}
+                    sparklineData={card.td.length > 2 ? card.td : undefined}
+                    sparklineColor={card.color}
+                    onClick={card.onClick}
+                  />
+                ))}
               </div>
             );
           })()}
@@ -1399,19 +1384,12 @@ export function ClientDashboard({ workspaceId }: Props) {
         {tab === 'search' && (<>
           {overview ? (<>
             {/* Compact metrics bar */}
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 px-5 py-3 flex items-center justify-between flex-wrap gap-3">
-              {[
-                { label: 'Clicks', value: overview.totalClicks.toLocaleString(), color: 'text-blue-400' },
-                { label: 'Impressions', value: overview.totalImpressions.toLocaleString(), color: 'text-teal-400' },
-                { label: 'CTR', value: `${overview.avgCtr}%`, color: 'text-emerald-400' },
-                { label: 'Avg Position', value: String(overview.avgPosition), color: 'text-amber-400' },
-              ].map(m => (
-                <div key={m.label} className="flex items-center gap-2">
-                  <span className="text-[11px] text-zinc-500 uppercase tracking-wider">{m.label}</span>
-                  <span className={`text-sm font-bold ${m.color}`}>{m.value}</span>
-                </div>
-              ))}
-            </div>
+            <CompactStatBar items={[
+              { label: 'Clicks', value: overview.totalClicks.toLocaleString(), valueColor: 'text-blue-400' },
+              { label: 'Impressions', value: overview.totalImpressions.toLocaleString(), valueColor: 'text-teal-400' },
+              { label: 'CTR', value: `${overview.avgCtr}%`, valueColor: 'text-emerald-400' },
+              { label: 'Avg Position', value: String(overview.avgPosition), valueColor: 'text-amber-400' },
+            ]} />
 
             {trend.length > 2 && (
               <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
@@ -1593,11 +1571,7 @@ export function ClientDashboard({ workspaceId }: Props) {
               </div>
             )}
           </>) : (
-            <div className="text-center py-16">
-              <Search className="w-8 h-8 text-zinc-500 mx-auto mb-2" />
-              <p className="text-sm text-zinc-500">Search data is not yet available</p>
-              <p className="text-xs text-zinc-500 mt-1">Search Console will be configured by your web team.</p>
-            </div>
+            <EmptyState icon={Search} title="Search data is not yet available" description="Search Console will be configured by your web team." />
           )}
         </>)}
 
