@@ -3258,16 +3258,47 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     // 4. Try to gather GSC data if connected
     sendProgress('search_data', 'Fetching Google Search Console data...', 0.48);
     let gscData: Array<{ query: string; page: string; clicks: number; impressions: number; position: number }> = [];
+    let deviceBreakdown: Awaited<ReturnType<typeof getSearchDeviceBreakdown>> = [];
+    let countryBreakdown: Awaited<ReturnType<typeof getSearchCountryBreakdown>> = [];
+    let periodComparison: Awaited<ReturnType<typeof getSearchPeriodComparison>> | null = null;
     if (ws.gscPropertyUrl) {
       try {
-        gscData = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90);
-        sendProgress('search_data', `Got ${gscData.length} search query rows from GSC`, 0.52);
+        // Parallel: query+page data, device, country, and period comparison
+        const [qpData, devices, countries, comparison] = await Promise.all([
+          getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90),
+          getSearchDeviceBreakdown(ws.webflowSiteId, ws.gscPropertyUrl, 28).catch(() => []),
+          getSearchCountryBreakdown(ws.webflowSiteId, ws.gscPropertyUrl, 28, 10).catch(() => []),
+          getSearchPeriodComparison(ws.webflowSiteId, ws.gscPropertyUrl, 28).catch(() => null),
+        ]);
+        gscData = qpData;
+        deviceBreakdown = devices;
+        countryBreakdown = countries;
+        periodComparison = comparison;
+        sendProgress('search_data', `Got ${gscData.length} query rows, ${devices.length} devices, ${countries.length} countries from GSC`, 0.50);
       } catch {
-        sendProgress('search_data', 'GSC unavailable — continuing without it', 0.52);
+        sendProgress('search_data', 'GSC unavailable — continuing without it', 0.50);
         console.log('Keyword strategy: GSC data unavailable, proceeding without it');
       }
     } else {
-      sendProgress('search_data', 'No GSC connected — skipping', 0.52);
+      sendProgress('search_data', 'No GSC connected — skipping', 0.50);
+    }
+
+    // 4b. Try to gather GA4 organic data if connected
+    let organicLandingPages: Awaited<ReturnType<typeof getGA4LandingPages>> = [];
+    let organicOverview: Awaited<ReturnType<typeof getGA4OrganicOverview>> | null = null;
+    if (ws.ga4PropertyId) {
+      try {
+        sendProgress('search_data', 'Fetching GA4 organic search data...', 0.51);
+        const [landing, organic] = await Promise.all([
+          getGA4LandingPages(ws.ga4PropertyId, 28, 25, true).catch(() => []),
+          getGA4OrganicOverview(ws.ga4PropertyId, 28).catch(() => null),
+        ]);
+        organicLandingPages = landing;
+        organicOverview = organic;
+        sendProgress('search_data', `Got ${landing.length} organic landing pages from GA4`, 0.52);
+      } catch {
+        sendProgress('search_data', 'GA4 organic data unavailable — continuing without it', 0.52);
+      }
     }
 
     // 5. SEMRush data gathering (based on mode)
@@ -3481,12 +3512,62 @@ Rules:
     // Compact summary: just keywords per page (no secondary details — keep prompt small)
     const kwSummary = allPageMappings.map(pm => `${pm.pagePath}: "${pm.primaryKeyword}"`).join('\n');
 
-    // GSC: top queries only
+    // GSC: top queries + enriched signals
     let gscSummary = '';
     if (gscData.length > 0) {
       const topGsc = [...gscData].sort((a, b) => b.impressions - a.impressions).slice(0, 30);
       gscSummary = `\n\nTop GSC queries (last 90 days):\n` +
         topGsc.map(r => `- "${r.query}" → ${new URL(r.page).pathname} (pos: ${r.position.toFixed(1)}, clicks: ${r.clicks}, imp: ${r.impressions})`).join('\n');
+    }
+
+    // Device breakdown context
+    if (deviceBreakdown.length > 0) {
+      gscSummary += `\n\nDEVICE BREAKDOWN (last 28 days):\n` +
+        deviceBreakdown.map(d => `- ${d.device}: ${d.clicks} clicks, ${d.impressions} imp, CTR ${d.ctr}%, avg pos ${d.position}`).join('\n');
+      // Flag if mobile dominates but has worse position
+      const mobile = deviceBreakdown.find(d => d.device === 'MOBILE');
+      const desktop = deviceBreakdown.find(d => d.device === 'DESKTOP');
+      if (mobile && desktop && mobile.impressions > desktop.impressions && mobile.position > desktop.position + 2) {
+        gscSummary += `\n⚠️ MOBILE GAP: Mobile has ${mobile.impressions} imp vs desktop ${desktop.impressions} but avg position is ${mobile.position.toFixed(1)} vs ${desktop.position.toFixed(1)} — mobile optimization is critical.`;
+      }
+    }
+
+    // Period comparison context
+    if (periodComparison) {
+      const { change, changePercent } = periodComparison;
+      gscSummary += `\n\nPERIOD COMPARISON (last 28 days vs previous 28 days):\n` +
+        `- Clicks: ${change.clicks >= 0 ? '+' : ''}${change.clicks} (${changePercent.clicks >= 0 ? '+' : ''}${changePercent.clicks}%)\n` +
+        `- Impressions: ${change.impressions >= 0 ? '+' : ''}${change.impressions} (${changePercent.impressions >= 0 ? '+' : ''}${changePercent.impressions}%)\n` +
+        `- Avg Position: ${change.position >= 0 ? '+' : ''}${change.position} (${change.position > 0 ? 'declining ⚠️' : change.position < 0 ? 'improving ✓' : 'stable'})`;
+    }
+
+    // Country breakdown
+    if (countryBreakdown.length > 0) {
+      gscSummary += `\n\nTOP COUNTRIES by clicks:\n` +
+        countryBreakdown.slice(0, 5).map(c => `- ${c.country}: ${c.clicks} clicks, ${c.impressions} imp, pos ${c.position}`).join('\n');
+    }
+
+    // GA4 organic landing pages — find pages getting traffic that aren't in the keyword map
+    let ga4Context = '';
+    if (organicLandingPages.length > 0) {
+      const mappedPaths = new Set(allPageMappings.map(pm => pm.pagePath));
+      const unmappedLanding = organicLandingPages.filter(lp => !mappedPaths.has(lp.landingPage));
+      if (unmappedLanding.length > 0) {
+        ga4Context += `\n\nGA4 ORGANIC LANDING PAGES not in keyword map (getting traffic but no keyword strategy):\n` +
+          unmappedLanding.slice(0, 10).map(lp => `- ${lp.landingPage}: ${lp.sessions} organic sessions, ${lp.users} users, bounce ${lp.bounceRate}%`).join('\n');
+      }
+      // High-bounce organic landing pages = content quality signal
+      const highBounce = organicLandingPages.filter(lp => lp.bounceRate > 70 && lp.sessions > 5);
+      if (highBounce.length > 0) {
+        ga4Context += `\n\nHIGH-BOUNCE ORGANIC PAGES (>70% bounce, may need content improvement):\n` +
+          highBounce.slice(0, 5).map(lp => `- ${lp.landingPage}: bounce ${lp.bounceRate}%, ${lp.sessions} sessions`).join('\n');
+      }
+    }
+    if (organicOverview) {
+      ga4Context += `\n\nORGANIC SEARCH OVERVIEW (GA4, last 28 days):\n` +
+        `- ${organicOverview.organicUsers} organic users (${organicOverview.shareOfTotalUsers}% of all traffic)\n` +
+        `- Engagement rate: ${organicOverview.engagementRate}%\n` +
+        `- Avg engagement time: ${organicOverview.avgEngagementTime.toFixed(0)}s`;
     }
 
     const hasSemrush = semrushContext.length > 0;
@@ -3498,7 +3579,7 @@ Rules:
 ${businessSection}
 Current keyword assignments (${allPageMappings.length} pages):
 ${kwSummary}
-${conflictNote}${gscSummary}
+${conflictNote}${gscSummary}${ga4Context}
 ${semrushContext}
 
 Return JSON with this EXACT structure (do NOT include a pageMap — it's already done):
@@ -3531,6 +3612,11 @@ Rules:
 - siteKeywords: 8-15 broad themes covering the full site
 - contentGaps: 6-10 NEW pages/posts to create. Vary intent (informational, commercial, transactional). Mix high and medium priority${hasSemrush ? '. Prioritize competitor gap keywords.' : ''}
 - quickWins: 3-5 existing pages where small changes boost rankings. Use GSC data if available (high impressions + poor position = opportunity).
+- If DEVICE BREAKDOWN shows mobile ranking gaps, include a mobile-optimization quick win.
+- If PERIOD COMPARISON shows declining metrics, flag defensive content gaps to recover traffic.
+- If GA4 shows high-bounce organic pages, include content-improvement quick wins for those pages.
+- If GA4 shows organic landing pages NOT in the keyword map, suggest adding them to the strategy.
+- If COUNTRY data shows a dominant market, consider location-specific content gaps.
 ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.' : ''}
 - Return ONLY valid JSON, no markdown`;
 
@@ -3690,6 +3776,14 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
       keywordGaps: keywordGaps.length > 0 ? keywordGaps.slice(0, 30) : undefined,
       businessContext: businessContext || undefined,
       semrushMode: semrushMode as 'quick' | 'full' | 'none',
+      // Enriched search signals
+      searchSignals: {
+        deviceBreakdown: deviceBreakdown.length > 0 ? deviceBreakdown : undefined,
+        periodComparison: periodComparison || undefined,
+        topCountries: countryBreakdown.length > 0 ? countryBreakdown.slice(0, 5) : undefined,
+        organicOverview: organicOverview || undefined,
+        organicLandingPages: organicLandingPages.length > 0 ? organicLandingPages.slice(0, 15) : undefined,
+      },
       generatedAt: new Date().toISOString(),
     };
     updateWorkspace(ws.id, { keywordStrategy });
