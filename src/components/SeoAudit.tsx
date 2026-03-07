@@ -530,6 +530,18 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [actionMenuKey, setActionMenuKey] = useState<string | null>(null);
 
+  // Traffic intelligence (#12)
+  const [trafficMap, setTrafficMap] = useState<Record<string, { clicks: number; impressions: number; sessions: number; pageviews: number }>>({});
+  const [sortMode, setSortMode] = useState<'issues' | 'traffic'>('issues');
+
+  useEffect(() => {
+    if (siteId) {
+      fetch(`/api/audit-traffic/${siteId}`).then(r => r.ok ? r.json() : {}).then((m: Record<string, { clicks: number; impressions: number; sessions: number; pageviews: number }>) => {
+        if (m && typeof m === 'object') setTrafficMap(m);
+      }).catch(() => {});
+    }
+  }, [siteId]);
+
   const acceptSuggestion = async (pageId: string, issue: SeoIssue) => {
     if (!issue.suggestedFix) return;
     const fixKey = `${pageId}-${issue.check}`;
@@ -1097,6 +1109,15 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
         p.issues.some(i => i.message.toLowerCase().includes(q) || i.check.toLowerCase().includes(q));
     })
     .sort((a, b) => {
+      if (sortMode === 'traffic') {
+        const aSlug = `/${a.slug}`;
+        const bSlug = `/${b.slug}`;
+        const aT = trafficMap[aSlug];
+        const bT = trafficMap[bSlug];
+        const aScore = (aT?.clicks || 0) + (aT?.pageviews || 0);
+        const bScore = (bT?.clicks || 0) + (bT?.pageviews || 0);
+        if (bScore !== aScore) return bScore - aScore;
+      }
       const aErrors = a.issues.filter(i => i.severity === 'error').length;
       const bErrors = b.issues.filter(i => i.severity === 'error').length;
       if (bErrors !== aErrors) return bErrors - aErrors;
@@ -1344,12 +1365,29 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
 
       {/* Showing count + batch actions */}
       <div className="flex items-center justify-between px-1">
-        <div className="text-xs text-zinc-500">
-          Showing {filteredPages.length} of {data.pages.length} pages
+        <div className="flex items-center gap-3 text-xs text-zinc-500">
+          <span>Showing {filteredPages.length} of {data.pages.length} pages</span>
           {(severityFilter !== 'all' || categoryFilter !== 'all') && (
-            <button onClick={() => { setSeverityFilter('all'); setCategoryFilter('all'); }} className="ml-2 text-zinc-500 hover:text-zinc-300 underline">
+            <button onClick={() => { setSeverityFilter('all'); setCategoryFilter('all'); }} className="text-zinc-500 hover:text-zinc-300 underline">
               Clear filters
             </button>
+          )}
+          {Object.keys(trafficMap).length > 0 && (
+            <div className="flex items-center gap-1 ml-2">
+              <span className="text-[11px] text-zinc-600">Sort:</span>
+              <button
+                onClick={() => setSortMode('issues')}
+                className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors border ${sortMode === 'issues' ? 'border-zinc-500 bg-zinc-800 text-zinc-200' : 'border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}
+              >
+                Issues
+              </button>
+              <button
+                onClick={() => setSortMode('traffic')}
+                className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors border ${sortMode === 'traffic' ? 'border-teal-500/50 bg-teal-500/10 text-teal-400' : 'border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}
+              >
+                Traffic Impact
+              </button>
+            </div>
           )}
         </div>
         {workspaceId && (
@@ -1400,6 +1438,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
           const isExpanded = expanded.has(page.page);
           const errorCount = page.issues.filter(i => i.severity === 'error').length;
           const warningCount = page.issues.filter(i => i.severity === 'warning').length;
+          const pageTraffic = trafficMap[`/${page.slug}`];
 
           return (
             <div key={page.slug || page.page} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
@@ -1417,6 +1456,11 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
                   <div className="text-xs text-zinc-500 truncate">/{page.slug}</div>
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
+                  {pageTraffic && (pageTraffic.clicks > 0 || pageTraffic.pageviews > 0) && (
+                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400 tabular-nums" title={`${pageTraffic.clicks} clicks, ${pageTraffic.impressions} impressions, ${pageTraffic.pageviews} pageviews (28d)`}>
+                      {pageTraffic.clicks > 0 ? `${pageTraffic.clicks.toLocaleString()} clicks` : ''}{pageTraffic.clicks > 0 && pageTraffic.pageviews > 0 ? ' · ' : ''}{pageTraffic.pageviews > 0 ? `${pageTraffic.pageviews.toLocaleString()} views` : ''}
+                    </span>
+                  )}
                   {errorCount > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400">{errorCount} error{errorCount > 1 ? 's' : ''}</span>}
                   {warningCount > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">{warningCount} warn</span>}
                   {page.issues.length === 0 && <CheckCircle className="w-4 h-4 text-green-500" />}

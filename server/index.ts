@@ -835,6 +835,49 @@ app.get('/api/webflow/seo-audit/:siteId', async (req, res) => {
   }
 });
 
+// --- Audit Traffic Context (cross-reference audit pages with GSC/GA4 traffic) ---
+app.get('/api/audit-traffic/:siteId', async (req, res) => {
+  try {
+    const allWs = listWorkspaces();
+    const ws = allWs.find(w => w.webflowSiteId === req.params.siteId);
+    if (!ws) return res.json({});
+
+    const trafficMap: Record<string, { clicks: number; impressions: number; sessions: number; pageviews: number }> = {};
+
+    // Fetch GSC page-level data
+    if (ws.gscPropertyUrl) {
+      try {
+        const gscPages = await getAllGscPages(ws.id, ws.gscPropertyUrl, 28);
+        for (const p of gscPages) {
+          try {
+            const path = new URL(p.page).pathname;
+            if (!trafficMap[path]) trafficMap[path] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
+            trafficMap[path].clicks += p.clicks;
+            trafficMap[path].impressions += p.impressions;
+          } catch { /* skip malformed URLs */ }
+        }
+      } catch { /* GSC unavailable */ }
+    }
+
+    // Fetch GA4 top pages
+    if (ws.ga4PropertyId) {
+      try {
+        const ga4Pages = await getGA4TopPages(ws.ga4PropertyId, 28, 500);
+        for (const p of ga4Pages) {
+          const path = p.path.startsWith('/') ? p.path : `/${p.path}`;
+          if (!trafficMap[path]) trafficMap[path] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
+          trafficMap[path].pageviews += p.pageviews;
+          trafficMap[path].sessions += p.users; // users as proxy for sessions at page level
+        }
+      } catch { /* GA4 unavailable */ }
+    }
+
+    res.json(trafficMap);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 // --- Sales Report (URL-based, no Webflow API needed) ---
 app.post('/api/sales-report', async (req, res) => {
   try {
