@@ -1,4 +1,5 @@
 import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet, getCollectionSchema, listCollections } from './webflow.js';
+import { callOpenAI } from './openai-helpers.js';
 
 const WEBFLOW_API = 'https://api.webflow.com/v2';
 
@@ -299,59 +300,45 @@ QUALITY RULES — strict:
 
 Return ONLY the JSON-LD object. No markdown, no explanation, no wrapping.`;
 
-  const MAX_RETRIES = 4;
-  const OpenAI = (await import('openai')).default;
-  const client = new OpenAI({ apiKey });
+  try {
+    const aiResult = await callOpenAI({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      maxTokens: 3000,
+      temperature: 0.2,
+      feature: 'schema-generation',
+      workspaceId: undefined,
+      maxRetries: 4,
+    });
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const response = await client.chat.completions.create({
-        model: 'gpt-4o-mini',
-        max_tokens: 3000,
-        temperature: 0.2,
-        messages: [{ role: 'user', content: prompt }],
-      });
+    const content = aiResult.text;
+    if (!content) return null;
 
-      const content = response.choices[0]?.message?.content?.trim();
-      if (!content) return null;
+    let jsonStr = content;
+    const mdMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (mdMatch) jsonStr = mdMatch[1].trim();
 
-      let jsonStr = content;
-      const mdMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-      if (mdMatch) jsonStr = mdMatch[1].trim();
+    const rawSchema = JSON.parse(jsonStr) as Record<string, unknown>;
+    const schema = cleanSchema(rawSchema);
 
-      const rawSchema = JSON.parse(jsonStr) as Record<string, unknown>;
-      const schema = cleanSchema(rawSchema);
-
-      // Ensure it has @graph structure
-      if (!schema['@graph'] && schema['@type']) {
-        // AI returned a single type instead of @graph — wrap it
-        const wrapped = { '@context': 'https://schema.org', '@graph': [schema] };
-        delete (wrapped['@graph'][0] as Record<string, unknown>)['@context'];
-        const errors = validateUnifiedSchema(wrapped);
-        const types = (wrapped['@graph'] as Record<string, unknown>[]).map(n => n['@type']).filter(Boolean);
-        return { schema: wrapped, reason: `Unified schema with ${types.join(', ')}`, errors };
-      }
-
-      const errors = validateUnifiedSchema(schema);
-      const graph = schema['@graph'] as Record<string, unknown>[];
-      const types = graph?.map(n => n['@type']).filter(Boolean) || [];
-      return { schema, reason: `Unified @graph schema with ${types.join(', ')}`, errors };
-    } catch (err: unknown) {
-      const isRateLimit = err instanceof Error && 'status' in err && (err as { status: number }).status === 429;
-      if (isRateLimit && attempt < MAX_RETRIES) {
-        // Parse retry-after from headers if available, otherwise exponential backoff
-        let waitMs = Math.min(2000 * Math.pow(2, attempt), 30000);
-        const retryAfterMs = (err as { headers?: { get?: (k: string) => string | null } }).headers?.get?.('retry-after-ms');
-        if (retryAfterMs) waitMs = Math.max(parseInt(retryAfterMs, 10) + 500, waitMs);
-        console.log(`[schema] Rate limited, retrying in ${(waitMs / 1000).toFixed(1)}s (attempt ${attempt + 1}/${MAX_RETRIES})`);
-        await new Promise(r => setTimeout(r, waitMs));
-        continue;
-      }
-      console.error('[schema] AI unified generation error:', err);
-      return null;
+    // Ensure it has @graph structure
+    if (!schema['@graph'] && schema['@type']) {
+      // AI returned a single type instead of @graph — wrap it
+      const wrapped = { '@context': 'https://schema.org', '@graph': [schema] };
+      delete (wrapped['@graph'][0] as Record<string, unknown>)['@context'];
+      const errors = validateUnifiedSchema(wrapped);
+      const types = (wrapped['@graph'] as Record<string, unknown>[]).map(n => n['@type']).filter(Boolean);
+      return { schema: wrapped, reason: `Unified schema with ${types.join(', ')}`, errors };
     }
+
+    const errors = validateUnifiedSchema(schema);
+    const graph = schema['@graph'] as Record<string, unknown>[];
+    const types = graph?.map(n => n['@type']).filter(Boolean) || [];
+    return { schema, reason: `Unified @graph schema with ${types.join(', ')}`, errors };
+  } catch (err: unknown) {
+    console.error('[schema] AI unified generation error:', err);
+    return null;
   }
-  return null;
 }
 
 // Fallback: build a basic @graph schema without AI
@@ -802,18 +789,17 @@ REQUIREMENTS:
 
 Return ONLY the raw JSON-LD. No markdown, no explanation.`;
 
-  const OpenAI = (await import('openai')).default;
-  const client = new OpenAI({ apiKey });
-
   try {
-    const response = await client.chat.completions.create({
+    const aiResult = await callOpenAI({
       model: 'gpt-4o-mini',
-      max_tokens: 3000,
-      temperature: 0.2,
       messages: [{ role: 'user', content: prompt }],
+      maxTokens: 3000,
+      temperature: 0.2,
+      feature: 'cms-schema-template',
+      maxRetries: 3,
     });
 
-    const content = response.choices[0]?.message?.content?.trim();
+    const content = aiResult.text;
     if (!content) return null;
 
     let jsonStr = content;

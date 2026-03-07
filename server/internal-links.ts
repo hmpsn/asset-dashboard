@@ -8,6 +8,8 @@ import {
   getSiteSubdomain,
 } from './webflow.js';
 import { getWorkspace } from './workspaces.js';
+import { callOpenAI } from './openai-helpers.js';
+import { buildSeoContext } from './seo-context.js';
 
 export interface PageContent {
   path: string;
@@ -142,6 +144,11 @@ export async function analyzeInternalLinks(
     return { suggestions: [], pageCount: pages.length, existingLinkCount, analyzedAt: new Date().toISOString() };
   }
 
+  // Enrich with brand voice for better anchor text quality
+  const wsObj = workspaceId ? getWorkspace(workspaceId) : null;
+  const { brandVoiceBlock } = buildSeoContext(workspaceId);
+  const brandCtx = brandVoiceBlock || (wsObj?.brandVoice ? `\nBrand voice: ${wsObj.brandVoice}` : '');
+
   // Build the page summary for AI analysis
   const pageSummaries = pages.map(p => {
     const links = p.existingInternalLinks.length > 0
@@ -181,6 +188,7 @@ Rules:
 - Include bidirectional suggestions where appropriate (if A should link to B, B might also link to A)
 - Aim for 10-20 high-quality suggestions, not exhaustive lists
 - Every page should ideally have at least 2-3 internal links
+- Anchor text should sound natural and match the site's tone${brandCtx ? ` (${brandCtx.replace(/\n/g, ' ').trim()})` : ''}
 
 Return ONLY a JSON array:
 [
@@ -198,30 +206,19 @@ Return ONLY a JSON array:
 Return ONLY valid JSON array, no markdown fences, no explanation.`;
 
   try {
-    const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${openaiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          { role: 'system', content: 'You are an SEO expert. Return only valid JSON arrays, no markdown, no explanation.' },
-          { role: 'user', content: prompt },
-        ],
-        max_tokens: 4000,
-        temperature: 0.3,
-      }),
+    const aiResult = await callOpenAI({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: 'You are an SEO expert. Return only valid JSON arrays, no markdown, no explanation.' },
+        { role: 'user', content: prompt },
+      ],
+      maxTokens: 4000,
+      temperature: 0.3,
+      feature: 'internal-links',
+      workspaceId: workspaceId || undefined,
     });
 
-    if (!aiRes.ok) {
-      console.error('Internal links AI error:', await aiRes.text());
-      return { suggestions: [], pageCount: pages.length, existingLinkCount, analyzedAt: new Date().toISOString() };
-    }
-
-    const aiData = await aiRes.json() as { choices?: Array<{ message?: { content?: string } }> };
-    let raw = aiData.choices?.[0]?.message?.content?.trim() || '[]';
+    let raw = aiResult.text || '[]';
     raw = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
 
     let suggestions: LinkSuggestion[];

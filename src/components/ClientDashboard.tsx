@@ -3,332 +3,26 @@ import {
   Loader2, Search, TrendingDown, TrendingUp, Eye, MousePointer, MousePointerClick,
   BarChart3, ArrowUpDown, Sparkles, Send, AlertTriangle,
   Target, Zap, Shield, MessageSquare, X, ChevronDown, ChevronUp,
-  CheckCircle2, Info, LayoutDashboard, LineChart, Lock, Trophy,
+  CheckCircle2, LayoutDashboard, LineChart, Lock, Trophy,
   Users, Globe, Activity, Filter, ClipboardCheck, Check, Edit3,
   Sun, Moon, Plus, Paperclip, FileText, Download, ExternalLink,
 } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
-import { ChartPointDetail } from './ChartPointDetail';
-import { MetricRing, StatCard, CompactStatBar, EmptyState } from './ui';
+import { StatCard, CompactStatBar, EmptyState } from './ui';
+import { TrendChart, DualTrendChart, RenderMarkdown, InsightCard } from './client/helpers';
+import { HealthTab } from './client/HealthTab';
+import {
+  QUICK_QUESTIONS,
+  type SearchOverview, type PerformanceTrend, type WorkspaceInfo, type AuditSummary,
+  type AuditDetail, type ChatMessage, type GA4Overview, type GA4DailyTrend, type GA4TopPage,
+  type GA4TopSource, type GA4DeviceBreakdown, type GA4CountryBreakdown, type GA4Event,
+  type GA4EventTrend, type GA4ConversionSummary, type GA4EventPageBreakdown,
+  type ClientContentRequest, type ClientBriefPreview, type ClientKeywordStrategy,
+  type ClientRequest, type ApprovalBatch,
+  type SortKey, type ClientTab, type RequestCategory,
+} from './client/types';
 
-interface SearchQuery { query: string; clicks: number; impressions: number; ctr: number; position: number; }
-interface SearchPage { page: string; clicks: number; impressions: number; ctr: number; position: number; }
-interface SearchOverview {
-  totalClicks: number; totalImpressions: number; avgCtr: number; avgPosition: number;
-  topQueries: SearchQuery[]; topPages: SearchPage[];
-  dateRange: { start: string; end: string };
-}
-interface PerformanceTrend { date: string; clicks: number; impressions: number; ctr: number; position: number; }
-interface EventGroup { id: string; name: string; order: number; color: string; defaultPageFilter?: string; allowedPages?: string[]; }
-interface EventDisplayConfig { eventName: string; displayName: string; pinned: boolean; group?: string; }
-interface ContentPricing { briefPrice: number; fullPostPrice: number; currency: string; briefLabel?: string; fullPostLabel?: string; briefDescription?: string; fullPostDescription?: string; }
-interface WorkspaceInfo { id: string; name: string; webflowSiteId?: string; webflowSiteName?: string; gscPropertyUrl?: string; ga4PropertyId?: string; liveDomain?: string; eventConfig?: EventDisplayConfig[]; eventGroups?: EventGroup[]; requiresPassword?: boolean; clientPortalEnabled?: boolean; seoClientView?: boolean; analyticsClientView?: boolean; contentPricing?: ContentPricing | null; }
-interface AuditSummary { id: string; createdAt: string; siteScore: number; totalPages: number; errors: number; warnings: number; previousScore?: number; }
-interface SeoIssue { check: string; severity: 'error' | 'warning' | 'info'; category?: string; message: string; recommendation: string; value?: string; }
-interface PageAuditResult { pageId: string; page: string; slug: string; url: string; score: number; issues: SeoIssue[]; }
-interface AuditDetail {
-  id: string; createdAt: string; siteName: string; logoUrl?: string; previousScore?: number;
-  audit: { siteScore: number; totalPages: number; errors: number; warnings: number; infos: number; pages: PageAuditResult[]; siteWideIssues: SeoIssue[]; };
-  scoreHistory: Array<{ id: string; createdAt: string; siteScore: number }>;
-}
-interface ChatMessage { role: 'user' | 'assistant'; content: string; }
-interface GA4Overview {
-  totalUsers: number; totalSessions: number; totalPageviews: number;
-  avgSessionDuration: number; bounceRate: number; newUserPercentage: number;
-  dateRange: { start: string; end: string };
-}
-interface GA4DailyTrend { date: string; users: number; sessions: number; pageviews: number; }
-interface GA4TopPage { path: string; pageviews: number; users: number; avgEngagementTime: number; }
-interface GA4TopSource { source: string; medium: string; users: number; sessions: number; }
-interface GA4DeviceBreakdown { device: string; users: number; sessions: number; percentage: number; }
-interface GA4CountryBreakdown { country: string; users: number; sessions: number; }
-interface GA4Event { eventName: string; eventCount: number; users: number; }
-interface GA4EventTrend { date: string; eventCount: number; }
-interface GA4ConversionSummary { eventName: string; conversions: number; users: number; rate: number; }
-interface GA4EventPageBreakdown { eventName: string; pagePath: string; eventCount: number; users: number; }
-interface Props { workspaceId: string; }
-
-interface ClientContentRequest {
-  id: string; topic: string; targetKeyword: string; intent: string; priority: string;
-  status: 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'delivered' | 'declined';
-  source?: 'strategy' | 'client'; briefId?: string;
-  serviceType?: 'brief_only' | 'full_post'; upgradedAt?: string;
-  deliveryUrl?: string; deliveryNotes?: string;
-  comments?: { id: string; author: 'client' | 'team'; content: string; createdAt: string }[];
-  requestedAt: string; updatedAt: string;
-}
-
-interface ClientBriefPreview {
-  id: string; targetKeyword: string; suggestedTitle: string; suggestedMetaDesc: string;
-  wordCountTarget: number; intent: string; audience: string; contentFormat?: string;
-  executiveSummary?: string; outline: { heading: string; notes: string; wordCount?: number; keywords?: string[] }[];
-  difficultyScore?: number; trafficPotential?: string;
-  toneAndStyle?: string;
-  ctaRecommendations?: string[];
-  secondaryKeywords?: string[];
-  topicalEntities?: string[];
-  peopleAlsoAsk?: string[];
-  serpAnalysis?: { contentType: string; avgWordCount: number; commonElements: string[]; gaps: string[] };
-  internalLinkSuggestions?: string[];
-  competitorInsights?: string;
-  eeatGuidance?: { experience: string; expertise: string; authority: string; trust: string };
-  contentChecklist?: string[];
-  schemaRecommendations?: { type: string; notes: string }[];
-}
-
-type SortKey = 'clicks' | 'impressions' | 'ctr' | 'position';
-type ClientTab = 'overview' | 'search' | 'health' | 'strategy' | 'analytics' | 'approvals' | 'requests' | 'content';
-
-interface ClientKeywordStrategy {
-  siteKeywords: string[];
-  siteKeywordMetrics?: { keyword: string; volume: number; difficulty: number }[];
-  pageMap: { pagePath: string; pageTitle?: string; primaryKeyword: string; secondaryKeywords?: string[]; searchIntent?: string; currentPosition?: number; impressions?: number; clicks?: number; volume?: number; difficulty?: number }[];
-  opportunities: string[];
-  contentGaps?: { topic: string; targetKeyword: string; intent: string; priority: string; rationale: string }[];
-  quickWins?: { pagePath: string; action: string; estimatedImpact: string; rationale: string }[];
-  keywordGaps?: { keyword: string; volume?: number; difficulty?: number }[];
-  businessContext?: string;
-  generatedAt: string;
-}
-
-type RequestCategory = 'bug' | 'content' | 'design' | 'seo' | 'feature' | 'other';
-type RequestStatus = 'new' | 'in_review' | 'in_progress' | 'on_hold' | 'completed' | 'closed';
-interface RequestAttachment { id: string; filename: string; originalName: string; mimeType: string; size: number; }
-interface RequestNote { id: string; author: 'client' | 'team'; content: string; attachments?: RequestAttachment[]; createdAt: string; }
-interface ClientRequest {
-  id: string; workspaceId: string; title: string; description: string;
-  category: RequestCategory; priority: string; status: RequestStatus;
-  submittedBy?: string; pageUrl?: string; attachments?: RequestAttachment[]; notes: RequestNote[]; createdAt: string; updatedAt: string;
-}
-
-interface ApprovalItem {
-  id: string; pageId: string; pageTitle: string; pageSlug: string;
-  field: 'seoTitle' | 'seoDescription' | 'schema'; currentValue: string; proposedValue: string;
-  clientValue?: string; status: 'pending' | 'approved' | 'rejected' | 'applied'; clientNote?: string;
-}
-interface ApprovalBatch {
-  id: string; workspaceId: string; siteId: string; name: string;
-  items: ApprovalItem[]; status: string; createdAt: string;
-}
-
-const SEV = {
-  error: { bg: 'bg-red-500/10', border: 'border-red-500/20', text: 'text-red-400' },
-  warning: { bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-amber-400' },
-  info: { bg: 'bg-blue-500/10', border: 'border-blue-500/20', text: 'text-blue-400' },
-} as const;
-
-const CAT_LABELS: Record<string, { label: string; color: string }> = {
-  content: { label: 'Content', color: '#60a5fa' }, technical: { label: 'Technical', color: '#2dd4bf' },
-  social: { label: 'Social', color: '#f472b6' }, performance: { label: 'Performance', color: '#fbbf24' },
-  accessibility: { label: 'Accessibility', color: '#34d399' },
-};
-
-const QUICK_QUESTIONS = [
-  'What are my biggest opportunities right now?',
-  'Which pages drive the most conversions?',
-  'Summarize my traffic and event trends this month',
-  'What should I focus on to improve performance?',
-  'What content should I create next based on search data?',
-];
-
-function TrendChart({ data, metric, color }: { data: PerformanceTrend[]; metric: keyof PerformanceTrend; color: string }) {
-  const [selected, setSelected] = useState<number | null>(null);
-  if (data.length < 2) return null;
-  const values = data.map(d => d[metric] as number);
-  const max = Math.max(...values), min = Math.min(...values), range = max - min || 1, w = 100;
-  const pointCoords = values.map((v, i) => ({ x: (i / (values.length - 1)) * w, y: 100 - ((v - min) / range) * 90 - 5 }));
-  const points = pointCoords.map(p => `${p.x},${p.y}`).join(' ');
-  const bandW = w / data.length;
-  return (
-    <div className="relative" onMouseLeave={() => setSelected(null)}>
-      <svg viewBox={`0 0 ${w} 100`} className="w-full" style={{ height: 80 }} preserveAspectRatio="none">
-        <defs><linearGradient id={`cg-${metric}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={color} stopOpacity="0.2" /><stop offset="100%" stopColor={color} stopOpacity="0" /></linearGradient></defs>
-        <polygon fill={`url(#cg-${metric})`} points={`0,100 ${points} ${w},100`} />
-        <polyline fill="none" stroke={color} strokeWidth="1.5" points={points} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
-        {pointCoords.map((p, i) => (
-          <rect key={i} x={p.x - bandW / 2} y={0} width={bandW} height={100} fill="transparent" className="cursor-pointer" onMouseEnter={() => setSelected(i)} />
-        ))}
-        {selected !== null && pointCoords[selected] && (
-          <>
-            <line x1={pointCoords[selected].x} y1={0} x2={pointCoords[selected].x} y2={100} stroke={color} strokeWidth="0.5" strokeDasharray="2,1.5" opacity="0.6" vectorEffect="non-scaling-stroke" />
-            <circle cx={pointCoords[selected].x} cy={pointCoords[selected].y} r="3" fill={color} stroke="#18181b" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-          </>
-        )}
-      </svg>
-      {selected !== null && data[selected] && (
-        <ChartPointDetail
-          date={data[selected].date}
-          xPct={(selected / (data.length - 1)) * 100}
-          onClose={() => setSelected(null)}
-          metrics={[
-            { label: 'Clicks', value: data[selected].clicks, color: '#60a5fa' },
-            { label: 'Impressions', value: data[selected].impressions, color: '#a78bfa' },
-            { label: 'CTR', value: `${data[selected].ctr}%`, color: '#34d399' },
-            { label: 'Position', value: data[selected].position, color: '#fbbf24' },
-          ]}
-        />
-      )}
-    </div>
-  );
-}
-
-function DualTrendChart({ data, annotations: anns }: { data: PerformanceTrend[]; annotations?: { id: string; date: string; label: string; color?: string }[] }) {
-  const [selected, setSelected] = useState<number | null>(null);
-  if (data.length < 2) return null;
-  const clicks = data.map(d => d.clicks);
-  const imps = data.map(d => d.impressions);
-  const cMax = Math.max(...clicks), cMin = Math.min(...clicks), cRange = cMax - cMin || 1;
-  const iMax = Math.max(...imps), iMin = Math.min(...imps), iRange = iMax - iMin || 1;
-  const w = 100;
-  const cCoords = clicks.map((v, i) => ({ x: (i / (clicks.length - 1)) * w, y: 100 - ((v - cMin) / cRange) * 85 - 7 }));
-  const iCoords = imps.map((v, i) => ({ x: (i / (imps.length - 1)) * w, y: 100 - ((v - iMin) / iRange) * 85 - 7 }));
-  const cPoints = cCoords.map(p => `${p.x},${p.y}`).join(' ');
-  const iPoints = iCoords.map(p => `${p.x},${p.y}`).join(' ');
-  const bandW = w / data.length;
-  return (
-    <div className="relative" onMouseLeave={() => setSelected(null)}>
-      <div className="flex items-center gap-4 mb-2">
-        <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded bg-blue-400" /><span className="text-[11px] text-blue-400">Clicks</span></div>
-        <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded bg-teal-400" /><span className="text-[11px] text-teal-400">Impressions</span></div>
-      </div>
-      <svg viewBox={`0 0 ${w} 100`} className="w-full" style={{ height: 120 }} preserveAspectRatio="none">
-        <defs>
-          <linearGradient id="cg-clicks-dual" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#60a5fa" stopOpacity="0.15" /><stop offset="100%" stopColor="#60a5fa" stopOpacity="0" /></linearGradient>
-          <linearGradient id="cg-imps-dual" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2dd4bf" stopOpacity="0.1" /><stop offset="100%" stopColor="#2dd4bf" stopOpacity="0" /></linearGradient>
-        </defs>
-        <polygon fill="url(#cg-imps-dual)" points={`0,100 ${iPoints} ${w},100`} />
-        <polyline fill="none" stroke="#2dd4bf" strokeWidth="1.2" points={iPoints} vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeOpacity="0.6" />
-        <polygon fill="url(#cg-clicks-dual)" points={`0,100 ${cPoints} ${w},100`} />
-        <polyline fill="none" stroke="#60a5fa" strokeWidth="1.5" points={cPoints} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
-        {anns?.map(ann => {
-          const idx = data.findIndex(d => d.date === ann.date);
-          if (idx < 0) return null;
-          const x = (idx / (data.length - 1)) * w;
-          return <g key={ann.id}><line x1={x} y1={2} x2={x} y2={98} stroke={ann.color || '#2dd4bf'} strokeWidth="0.8" strokeDasharray="2,1.5" opacity="0.7" vectorEffect="non-scaling-stroke" /><circle cx={x} cy={3} r="1.5" fill={ann.color || '#2dd4bf'} vectorEffect="non-scaling-stroke" /><title>{ann.label}</title></g>;
-        })}
-        {/* Hover hit areas */}
-        {cCoords.map((p, i) => (
-          <rect key={i} x={p.x - bandW / 2} y={0} width={bandW} height={100} fill="transparent" className="cursor-pointer" onMouseEnter={() => setSelected(i)} />
-        ))}
-        {/* Selected point indicators */}
-        {selected !== null && cCoords[selected] && (
-          <>
-            <line x1={cCoords[selected].x} y1={2} x2={cCoords[selected].x} y2={98} stroke="#a1a1aa" strokeWidth="0.5" strokeDasharray="2,1.5" opacity="0.5" vectorEffect="non-scaling-stroke" />
-            <circle cx={cCoords[selected].x} cy={cCoords[selected].y} r="3" fill="#60a5fa" stroke="#18181b" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-            <circle cx={iCoords[selected].x} cy={iCoords[selected].y} r="3" fill="#2dd4bf" stroke="#18181b" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-          </>
-        )}
-      </svg>
-      {selected !== null && data[selected] && (
-        <ChartPointDetail
-          date={data[selected].date}
-          xPct={(selected / (data.length - 1)) * 100}
-          onClose={() => setSelected(null)}
-          metrics={[
-            { label: 'Clicks', value: data[selected].clicks, color: '#60a5fa' },
-            { label: 'Impressions', value: data[selected].impressions, color: '#2dd4bf' },
-            { label: 'CTR', value: `${data[selected].ctr}%`, color: '#34d399' },
-            { label: 'Position', value: data[selected].position, color: '#fbbf24' },
-          ]}
-        />
-      )}
-    </div>
-  );
-}
-
-// ScoreRing replaced by unified <MetricRing /> from ./ui
-const ScoreRing = MetricRing;
-
-function ScoreHistoryChart({ history }: { history: Array<{ id: string; createdAt: string; siteScore: number }> }) {
-  const [selected, setSelected] = useState<number | null>(null);
-  if (history.length < 2) return null;
-  const reversed = history.slice().reverse();
-  const scores = reversed.map(h => h.siteScore);
-  const max = Math.max(...scores, 100), min = Math.min(...scores, 0), range = max - min || 1, w = 100;
-  const pointCoords = scores.map((v, i) => ({ x: (i / (scores.length - 1)) * w, y: 100 - ((v - min) / range) * 85 - 5 }));
-  const points = pointCoords.map(p => `${p.x},${p.y}`).join(' ');
-  const bandW = w / scores.length;
-  return (
-    <div className="relative" onMouseLeave={() => setSelected(null)}>
-      <svg viewBox={`0 0 ${w} 100`} className="w-full" style={{ height: 60 }} preserveAspectRatio="none">
-        <defs><linearGradient id="sh-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#34d399" stopOpacity="0.15" /><stop offset="100%" stopColor="#34d399" stopOpacity="0" /></linearGradient></defs>
-        <polygon fill="url(#sh-g)" points={`0,100 ${points} ${w},100`} />
-        <polyline fill="none" stroke="#34d399" strokeWidth="2" points={points} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
-        {pointCoords.map((p, i) => (
-          <rect key={i} x={p.x - bandW / 2} y={0} width={bandW} height={100} fill="transparent" className="cursor-pointer" onMouseEnter={() => setSelected(i)} />
-        ))}
-        {selected !== null && pointCoords[selected] && (
-          <>
-            <line x1={pointCoords[selected].x} y1={0} x2={pointCoords[selected].x} y2={100} stroke="#34d399" strokeWidth="0.5" strokeDasharray="2,1.5" opacity="0.6" vectorEffect="non-scaling-stroke" />
-            <circle cx={pointCoords[selected].x} cy={pointCoords[selected].y} r="3" fill="#34d399" stroke="#18181b" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-          </>
-        )}
-      </svg>
-      {selected !== null && reversed[selected] && (
-        <ChartPointDetail
-          date={new Date(reversed[selected].createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-          xPct={(selected / (scores.length - 1)) * 100}
-          onClose={() => setSelected(null)}
-          metrics={[
-            { label: 'Audit Score', value: `${reversed[selected].siteScore}/100`, color: reversed[selected].siteScore >= 80 ? '#34d399' : reversed[selected].siteScore >= 60 ? '#fbbf24' : '#f87171' },
-          ]}
-        />
-      )}
-      <div className="flex justify-between text-[11px] text-zinc-500 mt-1">
-        {reversed.map((h, i) => (i === 0 || i === history.length - 1)
-          ? <span key={h.id}>{new Date(h.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
-          : <span key={h.id} />
-        )}
-      </div>
-    </div>
-  );
-}
-
-function RenderMarkdown({ text }: { text: string }) {
-  const inlineMd = (s: string) =>
-    s.replace(/\*\*(.+?)\*\*/g, '<b class="text-zinc-200">$1</b>')
-     .replace(/`(.+?)`/g, '<code class="bg-zinc-800 px-1 rounded text-zinc-300 text-[11px]">$1</code>');
-  const lines = text.split('\n');
-  return (
-    <div className="space-y-1.5">
-      {lines.map((line, i) => {
-        const trimmed = line.trimStart();
-        const indent = line.length - trimmed.length;
-        if (trimmed.startsWith('### ')) return <h4 key={i} className="text-xs font-semibold text-zinc-200 mt-2">{trimmed.slice(4)}</h4>;
-        if (trimmed.startsWith('## ')) return <h3 key={i} className="text-sm font-semibold text-zinc-200 mt-2">{trimmed.slice(3)}</h3>;
-        if (trimmed.startsWith('# ')) return <h3 key={i} className="text-sm font-bold text-zinc-200 mt-3">{trimmed.slice(2)}</h3>;
-        if (trimmed.match(/^\d+\.\s/)) {
-          const content = trimmed.replace(/^\d+\.\s/, '');
-          const num = trimmed.match(/^(\d+)\./)?.[1];
-          return <div key={i} className="flex gap-1.5 text-[11px] text-zinc-400 mt-1" style={{ marginLeft: indent > 0 ? 12 : 0 }}><span className="text-zinc-500 shrink-0 w-4 text-right">{num}.</span><span dangerouslySetInnerHTML={{ __html: inlineMd(content) }} /></div>;
-        }
-        if (trimmed.startsWith('- ')) {
-          const content = trimmed.slice(2);
-          return <div key={i} className="flex gap-1.5 text-[11px] text-zinc-400" style={{ marginLeft: indent > 0 ? 12 : 0 }}><span className="text-zinc-500 shrink-0">•</span><span dangerouslySetInnerHTML={{ __html: inlineMd(content) }} /></div>;
-        }
-        if (trimmed === '') return <div key={i} className="h-1" />;
-        return <p key={i} className="text-[11px] text-zinc-400 leading-relaxed" dangerouslySetInnerHTML={{ __html: inlineMd(trimmed) }} />;
-      })}
-    </div>
-  );
-}
-
-/** Rewrite webflow.io URLs to live domain, or show just the path */
-function toLiveUrl(url: string, liveDomain?: string): string {
-  if (!url) return url;
-  if (liveDomain) {
-    return url.replace(/https?:\/\/[^/]+\.webflow\.io/, liveDomain.replace(/\/$/, ''));
-  }
-  // No live domain — strip the staging domain and show just the path
-  try {
-    const path = new URL(url).pathname;
-    return path || '/';
-  } catch {
-    return url.replace(/https?:\/\/[^/]+/, '') || '/';
-  }
-}
-
-export function ClientDashboard({ workspaceId }: Props) {
+export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     try { return (localStorage.getItem('dashboard-theme') as 'dark' | 'light') || 'dark'; } catch { return 'dark'; }
   });
@@ -344,12 +38,18 @@ export function ClientDashboard({ workspaceId }: Props) {
   const [auditDetail, setAuditDetail] = useState<AuditDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<ClientTab>(() => {
+  const [tab, setTabRaw] = useState<ClientTab>(() => {
     const params = new URLSearchParams(window.location.search);
     const t = params.get('tab');
     if (t && ['overview','search','health','strategy','analytics','approvals','requests','content'].includes(t)) return t as ClientTab;
     return 'overview';
   });
+  const setTab = (t: ClientTab) => {
+    setTabRaw(t);
+    const url = new URL(window.location.href);
+    if (t === 'overview') url.searchParams.delete('tab'); else url.searchParams.set('tab', t);
+    window.history.replaceState({}, '', url.toString());
+  };
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [strategyData, setStrategyData] = useState<ClientKeywordStrategy | null>(null);
   const [requestedTopics, setRequestedTopics] = useState<Set<string>>(new Set());
@@ -367,9 +67,6 @@ export function ClientDashboard({ workspaceId }: Props) {
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const [severityFilter, setSeverityFilter] = useState<'all' | 'error' | 'warning' | 'info'>('all');
-  const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
-  const [auditSearch, setAuditSearch] = useState('');
   const [ga4Overview, setGa4Overview] = useState<GA4Overview | null>(null);
   const [ga4Trend, setGa4Trend] = useState<GA4DailyTrend[]>([]);
   const [ga4Pages, setGa4Pages] = useState<GA4TopPage[]>([]);
@@ -986,23 +683,6 @@ export function ClientDashboard({ workspaceId }: Props) {
   );
 
   const insights = getInsights();
-  const togglePage = (id: string) => setExpandedPages(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-
-  const filteredPages = auditDetail?.audit.pages.filter(p => {
-    if (auditSearch && !p.page.toLowerCase().includes(auditSearch.toLowerCase()) && !toLiveUrl(p.url, ws?.liveDomain).toLowerCase().includes(auditSearch.toLowerCase())) return false;
-    if (severityFilter === 'all') return true;
-    return p.issues.some(i => i.severity === severityFilter);
-  }) || [];
-
-  const categoryStats = auditDetail ? (() => {
-    const cats: Record<string, { errors: number; warnings: number; infos: number }> = {};
-    auditDetail.audit.pages.forEach(p => p.issues.forEach(i => {
-      const cat = i.category || 'other';
-      if (!cats[cat]) cats[cat] = { errors: 0, warnings: 0, infos: 0 };
-      if (i.severity === 'error') cats[cat].errors++; else if (i.severity === 'warning') cats[cat].warnings++; else cats[cat].infos++;
-    }));
-    return cats;
-  })() : {};
 
   const updateApprovalItem = async (batchId: string, itemId: string, update: { status?: string; clientValue?: string; clientNote?: string }) => {
     try {
@@ -1119,6 +799,35 @@ export function ClientDashboard({ workspaceId }: Props) {
             <h2 className="text-base font-semibold text-zinc-100">Welcome back</h2>
             <p className="text-xs text-zinc-500 mt-0.5">Here's how your site is performing</p>
           </div>
+
+          {/* Action-needed banner */}
+          {(() => {
+            const actions: { label: string; count: number; tab: ClientTab; color: string }[] = [];
+            if (pendingApprovals > 0) actions.push({ label: `${pendingApprovals} SEO change${pendingApprovals > 1 ? 's' : ''} to review`, count: pendingApprovals, tab: 'approvals', color: 'text-amber-400' });
+            const contentReviews = contentRequests.filter(r => r.status === 'client_review').length;
+            if (contentReviews > 0) actions.push({ label: `${contentReviews} content brief${contentReviews > 1 ? 's' : ''} ready for review`, count: contentReviews, tab: 'content', color: 'text-blue-400' });
+            if (unreadTeamNotes > 0) actions.push({ label: `${unreadTeamNotes} request${unreadTeamNotes > 1 ? 's' : ''} with new team replies`, count: unreadTeamNotes, tab: 'requests', color: 'text-teal-400' });
+            const healthErrors = auditDetail?.audit.errors || 0;
+            if (healthErrors > 0) actions.push({ label: `${healthErrors} site health issue${healthErrors > 1 ? 's' : ''} found`, count: healthErrors, tab: 'health', color: 'text-red-400' });
+            if (actions.length === 0) return null;
+            const total = actions.reduce((s, a) => s + a.count, 0);
+            return (
+              <div className="bg-gradient-to-r from-amber-600/10 via-zinc-900 to-teal-600/10 border border-amber-500/20 rounded-xl px-5 py-3.5">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-5 h-5 rounded-md bg-amber-500/15 flex items-center justify-center"><AlertTriangle className="w-3 h-3 text-amber-400" /></div>
+                  <span className="text-xs font-medium text-zinc-200">{total} item{total > 1 ? 's' : ''} need{total === 1 ? 's' : ''} your attention</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {actions.map((a, i) => (
+                    <button key={i} onClick={() => setTab(a.tab)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/50 transition-colors text-left">
+                      <span className={`text-[11px] font-semibold ${a.color}`}>{a.count}</span>
+                      <span className="text-[11px] text-zinc-400">{a.label.replace(/^\d+\s*/, '')}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Key metrics row */}
           {(() => {
@@ -1255,7 +964,7 @@ export function ClientDashboard({ workspaceId }: Props) {
                 <div className="bg-gradient-to-br from-teal-500/10 via-zinc-900 to-emerald-500/10 rounded-xl border border-zinc-800 p-8 text-center">
                   <div className="w-12 h-12 rounded-2xl bg-teal-500/10 flex items-center justify-center mx-auto mb-4"><BarChart3 className="w-6 h-6 text-teal-400" /></div>
                   <h2 className="text-lg font-semibold text-zinc-200 mb-2">{ws.name}</h2>
-                  <p className="text-sm text-zinc-400">Your dashboard is being configured. Data will appear here once set up by your web team.</p>
+                  <p className="text-sm text-zinc-400">We're getting everything set up for you. Your performance data will start appearing here shortly.</p>
                 </div>
               )}
             </div>
@@ -1572,173 +1281,12 @@ export function ClientDashboard({ workspaceId }: Props) {
               </div>
             )}
           </>) : (
-            <EmptyState icon={Search} title="Search data is not yet available" description="Search Console will be configured by your web team." />
+            <EmptyState icon={Search} title="Search data coming soon" description="Once Google Search Console is connected, you'll see how people find your site through Google — keywords, clicks, and ranking positions." />
           )}
         </>)}
 
         {/* ════════════ SITE HEALTH TAB ════════════ */}
-        {tab === 'health' && (<>
-          {auditDetail ? (
-            <div className="space-y-5">
-              <div className="grid grid-cols-3 gap-5">
-                {/* Score ring */}
-                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6 flex flex-col items-center justify-center">
-                  <ScoreRing score={auditDetail.audit.siteScore} size={140} />
-                  <div className="text-xs text-zinc-500 mt-3">{auditDetail.audit.totalPages} pages scanned</div>
-                  <div className="text-[11px] text-zinc-500">{new Date(auditDetail.createdAt).toLocaleDateString()}</div>
-                  {auditDetail.previousScore != null && (
-                    <div className={`text-xs mt-1 ${auditDetail.audit.siteScore > auditDetail.previousScore ? 'text-green-400' : auditDetail.audit.siteScore < auditDetail.previousScore ? 'text-red-400' : 'text-zinc-500'}`}>
-                      {auditDetail.audit.siteScore > auditDetail.previousScore ? '↑' : '↓'} {Math.abs(auditDetail.audit.siteScore - auditDetail.previousScore)} from previous
-                    </div>
-                  )}
-                </div>
-                {/* Severity buttons */}
-                <div className="space-y-3">
-                  {([
-                    { sev: 'error' as const, count: auditDetail.audit.errors, label: 'Errors', Icon: AlertTriangle },
-                    { sev: 'warning' as const, count: auditDetail.audit.warnings, label: 'Warnings', Icon: Info },
-                    { sev: 'info' as const, count: auditDetail.audit.infos, label: 'Info', Icon: CheckCircle2 },
-                  ]).map(s => {
-                    const sc = SEV[s.sev];
-                    return (
-                      <button key={s.sev} onClick={() => setSeverityFilter(severityFilter === s.sev ? 'all' : s.sev)}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors ${severityFilter === s.sev ? `${sc.bg} ${sc.border}` : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'}`}>
-                        <s.Icon className={`w-4 h-4 ${sc.text}`} />
-                        <span className="text-sm font-medium text-zinc-300">{s.label}</span>
-                        <span className={`text-xl font-bold ml-auto ${sc.text}`}>{s.count}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                {/* Score history + category breakdown */}
-                <div className="space-y-3">
-                  {auditDetail.scoreHistory.length >= 2 && (
-                    <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                      <div className="text-xs font-medium text-zinc-400 mb-2">Score History</div>
-                      <ScoreHistoryChart history={auditDetail.scoreHistory} />
-                    </div>
-                  )}
-                  <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                    <div className="text-xs font-medium text-zinc-400 mb-3">Issues by Category</div>
-                    <div className="space-y-2">
-                      {Object.entries(categoryStats).map(([cat, counts]) => {
-                        const info = CAT_LABELS[cat] || { label: cat, color: '#71717a' };
-                        return (
-                          <div key={cat} className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: info.color }} />
-                            <span className="text-[11px] text-zinc-400 flex-1">{info.label}</span>
-                            <div className="flex items-center gap-1.5 text-[11px]">
-                              {counts.errors > 0 && <span className="text-red-400">{counts.errors}E</span>}
-                              {counts.warnings > 0 && <span className="text-amber-400">{counts.warnings}W</span>}
-                              {counts.infos > 0 && <span className="text-blue-400">{counts.infos}I</span>}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Site-wide issues */}
-              {auditDetail.audit.siteWideIssues.length > 0 && (
-                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-                  <div className="text-xs font-medium text-zinc-400 mb-3">Site-Wide Issues</div>
-                  <div className="space-y-2">
-                    {auditDetail.audit.siteWideIssues.map((issue, i) => {
-                      const sc = SEV[issue.severity] || SEV.info;
-                      return (
-                        <div key={i} className={`px-3 py-2.5 rounded-lg ${sc.bg} border ${sc.border}`}>
-                          <div className={`text-xs font-medium ${sc.text}`}>{issue.message}</div>
-                          <div className="text-[11px] text-zinc-500 mt-0.5">{issue.recommendation}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Page-by-page breakdown */}
-              <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-                <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-3">
-                  <span className="text-xs font-medium text-zinc-300">Page Breakdown</span>
-                  <div className="flex-1" />
-                  <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-0.5">
-                    {(['all', 'error', 'warning', 'info'] as const).map(s => (
-                      <button key={s} onClick={() => setSeverityFilter(s)}
-                        className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
-                          severityFilter === s ? (s === 'all' ? 'bg-zinc-700 text-zinc-200' : `${SEV[s].bg} ${SEV[s].text}`) : 'text-zinc-500 hover:text-zinc-300'
-                        }`}>{s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}</button>
-                    ))}
-                  </div>
-                  <input type="text" value={auditSearch} onChange={e => setAuditSearch(e.target.value)} placeholder="Search pages..."
-                    className="bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-[11px] text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-600 w-40" />
-                </div>
-                <div className="divide-y divide-zinc-800/50 max-h-[600px] overflow-y-auto">
-                  {filteredPages.map(page => {
-                    const isExp = expandedPages.has(page.pageId);
-                    const pageIssues = severityFilter === 'all' ? page.issues : page.issues.filter(i => i.severity === severityFilter);
-                    const errs = page.issues.filter(i => i.severity === 'error').length;
-                    const warns = page.issues.filter(i => i.severity === 'warning').length;
-                    return (
-                      <div key={page.pageId}>
-                        <button onClick={() => togglePage(page.pageId)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/30 transition-colors text-left">
-                          <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${isExp ? '' : '-rotate-90'}`} />
-                          <div className="flex-1 min-w-0">
-                            <div className="text-xs font-medium text-zinc-300 truncate">{page.page}</div>
-                            <div className="text-[11px] text-zinc-500 truncate">{toLiveUrl(page.url, ws.liveDomain)}</div>
-                          </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            {errs > 0 && <span className="text-[11px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">{errs} err</span>}
-                            {warns > 0 && <span className="text-[11px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">{warns} warn</span>}
-                            <div className={`text-xs font-bold ${page.score >= 80 ? 'text-green-400' : page.score >= 60 ? 'text-amber-400' : 'text-red-400'}`}>{page.score}</div>
-                          </div>
-                        </button>
-                        {isExp && pageIssues.length > 0 && (
-                          <div className="px-4 pb-3 pl-11 space-y-1.5">
-                            {pageIssues.map((issue, i) => {
-                              const sc = SEV[issue.severity] || SEV.info;
-                              return (
-                                <div key={i} className={`px-3 py-2 rounded-lg ${sc.bg} border ${sc.border}`}>
-                                  <div className="flex items-start gap-2">
-                                    <span className={`text-[11px] font-medium uppercase ${sc.text} flex-shrink-0 mt-0.5`}>{issue.severity}</span>
-                                    <div>
-                                      <div className="text-[11px] text-zinc-300">{issue.message}</div>
-                                      <div className="text-[11px] text-zinc-500 mt-0.5">{issue.recommendation}</div>
-                                      {issue.value && <div className="text-[11px] text-zinc-500 mt-0.5 font-mono">Current: {issue.value}</div>}
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                  {filteredPages.length === 0 && <div className="px-4 py-8 text-center text-xs text-zinc-500">No pages match your filters</div>}
-                </div>
-              </div>
-            </div>
-          ) : audit ? (
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
-              <div className="flex items-center gap-4">
-                <ScoreRing score={audit.siteScore} size={100} />
-                <div>
-                  <div className="text-sm font-medium text-zinc-200">Site Health Score</div>
-                  <div className="text-xs text-zinc-500">{audit.totalPages} pages • {new Date(audit.createdAt).toLocaleDateString()}</div>
-                  <div className="flex gap-3 mt-2"><span className="text-xs text-red-400">{audit.errors} errors</span><span className="text-xs text-amber-400">{audit.warnings} warnings</span></div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-16">
-              <Shield className="w-8 h-8 text-zinc-500 mx-auto mb-2" />
-              <p className="text-sm text-zinc-500">No site audit available yet</p>
-              <p className="text-xs text-zinc-500 mt-1">Ask your team to run a site audit for detailed health metrics.</p>
-            </div>
-          )}
-        </>)}
+        {tab === 'health' && <HealthTab audit={audit} auditDetail={auditDetail} liveDomain={ws.liveDomain} initialSeverity={(() => { const s = new URLSearchParams(window.location.search).get('severity'); return s && ['error','warning','info'].includes(s) ? s as 'error' | 'warning' | 'info' : 'all'; })()} />}
 
         {/* ════════════ SEO STRATEGY TAB ════════════ */}
         {tab === 'strategy' && (<>
@@ -2125,9 +1673,9 @@ export function ClientDashboard({ workspaceId }: Props) {
           {contentRequests.length === 0 && (
             <div className="text-center py-16">
               <FileText className="w-10 h-10 text-zinc-700 mx-auto mb-3" />
-              <p className="text-sm font-medium text-zinc-400">No content in the pipeline yet</p>
+              <p className="text-sm font-medium text-zinc-400">Your content pipeline is empty</p>
               <p className="text-xs text-zinc-500 mt-1.5 max-w-sm mx-auto leading-relaxed">
-                Request topics from the <button onClick={() => setTab('strategy')} className="text-teal-400 hover:text-teal-300 underline underline-offset-2 transition-colors">SEO Strategy</button> tab, or click <strong className="text-zinc-400">Suggest a Topic</strong> above to get started.
+                Ready to grow your traffic? Browse content ideas on the <button onClick={() => setTab('strategy')} className="text-teal-400 hover:text-teal-300 underline underline-offset-2 transition-colors">SEO Strategy</button> tab, or click <strong className="text-zinc-400">Suggest a Topic</strong> above to kick things off.
               </p>
             </div>
           )}
@@ -2555,8 +2103,8 @@ export function ClientDashboard({ workspaceId }: Props) {
           {!ga4Overview ? (
             <div className="text-center py-16">
               <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4"><LineChart className="w-8 h-8 text-zinc-700" /></div>
-              <h3 className="text-sm font-medium text-zinc-400">Analytics Not Configured</h3>
-              <p className="text-xs text-zinc-500 mt-1 max-w-sm mx-auto">Google Analytics 4 has not been linked to this workspace yet. Contact your web team to enable it.</p>
+              <h3 className="text-sm font-medium text-zinc-400">Analytics Coming Soon</h3>
+              <p className="text-xs text-zinc-500 mt-1 max-w-sm mx-auto">Once Google Analytics is connected, you'll see visitor trends, traffic sources, top pages, and conversion events — all in one place.</p>
             </div>
           ) : (<>
             {/* GA4 Overview Cards */}
@@ -3307,8 +2855,8 @@ export function ClientDashboard({ workspaceId }: Props) {
                 <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4">
                   <MessageSquare className="w-8 h-8 text-zinc-700" />
                 </div>
-                <h3 className="text-sm font-medium text-zinc-400 mb-1">No requests yet</h3>
-                <p className="text-[11px] text-zinc-500 mb-4">Submit a request and your web team will take care of it.</p>
+                <h3 className="text-sm font-medium text-zinc-400 mb-1">Need something? We're here to help</h3>
+                <p className="text-[11px] text-zinc-500 mb-4">Report a bug, request a design change, or suggest an improvement — your team will get right on it.</p>
                 <button onClick={() => setShowNewRequest(true)}
                   className="px-4 py-2 bg-teal-600 hover:bg-teal-500 rounded-lg text-xs font-medium transition-colors">
                   <Plus className="w-3.5 h-3.5 inline mr-1" /> Create Your First Request
@@ -3620,38 +3168,6 @@ export function ClientDashboard({ workspaceId }: Props) {
           <a href="https://hmpsn.studio" target="_blank" rel="noopener noreferrer" className="text-[11px] text-zinc-700 hover:text-zinc-500 transition-colors">hmpsn.studio</a>
         </div>
       </footer>
-    </div>
-  );
-}
-
-function InsightCard({ icon: Icon, color, title, count, desc, items }: {
-  icon: typeof Target; color: string; title: string; count: number; desc: string;
-  items: Array<{ label: string; value: string; sub: string }>;
-}) {
-  const colorMap: Record<string, { text: string }> = {
-    amber: { text: 'text-amber-400' }, green: { text: 'text-green-400' },
-    red: { text: 'text-red-400' }, orange: { text: 'text-orange-400' },
-  };
-  const c = colorMap[color] || colorMap.amber;
-  return (
-    <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-      <div className="flex items-center gap-1.5 mb-3">
-        <Icon className={`w-4 h-4 ${c.text}`} />
-        <span className={`text-xs font-medium ${c.text}`}>{title}</span>
-        <span className="text-[11px] text-zinc-500 ml-auto">{count} queries</span>
-      </div>
-      <p className="text-[11px] text-zinc-500 mb-2">{desc}</p>
-      <div className="space-y-1.5">
-        {items.map((item, i) => (
-          <div key={i} className="flex items-center justify-between text-[11px] py-1 px-2 rounded bg-zinc-800/30">
-            <span className="text-zinc-300 truncate mr-2">{item.label}</span>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <span className="text-zinc-500">{item.sub}</span>
-              <span className={`${c.text} font-medium`}>{item.value}</span>
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

@@ -1,6 +1,9 @@
 import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from './webflow.js';
 import { scanRedirects } from './redirect-scanner.js';
 import { runSinglePageSpeed } from './pagespeed.js';
+import { buildSeoContext } from './seo-context.js';
+import { listWorkspaces } from './workspaces.js';
+import { callOpenAI } from './openai-helpers.js';
 
 const WEBFLOW_API = 'https://api.webflow.com/v2';
 
@@ -526,7 +529,7 @@ function isExcludedPage(slug: string, title?: string): boolean {
   return false;
 }
 
-export async function runSeoAudit(siteId: string, tokenOverride?: string): Promise<SeoAuditResult> {
+export async function runSeoAudit(siteId: string, tokenOverride?: string, workspaceId?: string): Promise<SeoAuditResult> {
   const siteInfo = await getSiteInfo(siteId, tokenOverride);
   const baseUrl = siteInfo.subdomain ? `https://${siteInfo.subdomain}.webflow.io` : '';
   // Use custom domain for site-wide checks (robots.txt, sitemap) since webflow.io blocks crawlers by design
@@ -878,10 +881,12 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string): Promi
   // Generate keyword-optimized title/meta description suggestions using actual page content
   const apiKey = process.env.OPENAI_API_KEY;
   if (apiKey) {
+    // Resolve workspaceId from siteId if not provided
+    const wsId = workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
     const pagesNeedingFixes = results.filter(r =>
       r.issues.some(i => ['title', 'meta-description', 'og-tags'].includes(i.check))
     );
-    console.log(`[seo-audit] Generating AI recommendations for ${pagesNeedingFixes.length} pages...`);
+    console.log(`[seo-audit] Generating AI recommendations for ${pagesNeedingFixes.length} pages (workspace: ${wsId || 'unknown'})...`);
 
     // Helper: extract readable body text from HTML for context
     const extractBodyText = (html: string): string => {
@@ -925,22 +930,27 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string): Promi
           const cachedHtml = htmlCache.get(pageResult.pageId);
           const pageContent = cachedHtml ? extractBodyText(cachedHtml) : '';
 
-          const prompt = `You are an expert SEO copywriter. Generate optimized meta tags for this webpage that match the brand voice and existing content.
+          // Build keyword strategy + brand voice context for this page
+          const pagePath = pageResult.url ? (() => { try { return new URL(pageResult.url).pathname; } catch { return undefined; } })() : undefined;
+          const { keywordBlock, brandVoiceBlock } = buildSeoContext(wsId, pagePath);
+
+          const prompt = `You are an expert SEO copywriter. Generate optimized meta tags for this webpage that match the brand voice and target the right keywords.
 
 PAGE: ${pageResult.page}
 URL: ${pageResult.url}
 CURRENT TITLE: ${currentTitle || '(missing)'}
 CURRENT META DESCRIPTION: ${currentDesc || '(missing)'}
 
-${pageContent ? `PAGE CONTENT:\n${pageContent}\n` : ''}
+${pageContent ? `PAGE CONTENT:\n${pageContent}\n` : ''}${keywordBlock}${brandVoiceBlock}
 ISSUES TO FIX:
 ${titleIssue ? `- Title: ${titleIssue.message}` : ''}
 ${descIssue ? `- Meta Description: ${descIssue.message}` : ''}
 ${ogTitleIssue ? `- OG Title: ${ogTitleIssue.message}` : ''}
 
 RULES:
-- Match the brand's existing tone and voice as shown in the page content above
-- Title: 30-60 chars, include primary keyword near the start, compelling for clicks
+- If keyword strategy is provided above, the title MUST include the primary keyword near the start
+- If brand voice is provided above, match that exact tone and style
+- Title: 30-60 chars, front-load the primary keyword, compelling for clicks
 - Meta Description: 120-155 chars, include primary + secondary keywords naturally, include a call-to-action
 - OG Title: Can match the SEO title or be slightly more conversational for social sharing
 - Use natural language that sounds like it belongs on this specific website
@@ -949,20 +959,16 @@ RULES:
 Respond in this exact JSON format (only include fields that need fixing):
 {"title":"...","metaDescription":"...","ogTitle":"..."}`;
 
-          const res = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              model: 'gpt-4o',
-              messages: [{ role: 'user', content: prompt }],
-              temperature: 0.6,
-              max_tokens: 400,
-            }),
+          const aiResult = await callOpenAI({
+            model: 'gpt-4o',
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.6,
+            maxTokens: 400,
+            feature: 'seo-audit-recs',
+            workspaceId: wsId,
           });
 
-          if (!res.ok) return;
-          const data = await res.json() as { choices: Array<{ message: { content: string } }> };
-          const content = data.choices?.[0]?.message?.content || '';
+          const content = aiResult.text;
           const jsonMatch = content.match(/\{[\s\S]*\}/);
           if (!jsonMatch) return;
 

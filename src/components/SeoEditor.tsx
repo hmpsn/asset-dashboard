@@ -40,6 +40,7 @@ export function SeoEditor({ siteId, workspaceId }: Props) {
   const [approvalSelected, setApprovalSelected] = useState<Set<string>>(new Set());
   const [sendingApproval, setSendingApproval] = useState(false);
   const [approvalSent, setApprovalSent] = useState(false);
+  const [variations, setVariations] = useState<Record<string, { field: string; options: string[] }>>({});
 
   const fetchPages = async () => {
     setLoading(true);
@@ -126,7 +127,12 @@ export function SeoEditor({ siteId, workspaceId }: Props) {
         }),
       });
       const data = await res.json();
-      if (data.text) {
+      if (data.variations?.length > 1) {
+        // Show variation picker — auto-select the first one
+        const key = field === 'title' ? 'seoTitle' : 'seoDescription';
+        updateField(pageId, key, data.variations[0]);
+        setVariations(prev => ({ ...prev, [pageId]: { field, options: data.variations } }));
+      } else if (data.text) {
         const key = field === 'title' ? 'seoTitle' : 'seoDescription';
         updateField(pageId, key, data.text);
       }
@@ -439,6 +445,25 @@ export function SeoEditor({ siteId, workspaceId }: Props) {
                       placeholder="Enter SEO title..."
                       className="w-full px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-sm focus:outline-none focus:border-zinc-500"
                     />
+                    {variations[page.id]?.field === 'title' && variations[page.id].options.length > 1 && (
+                      <div className="mt-1.5 space-y-1">
+                        <div className="text-[11px] text-zinc-500 font-medium">Pick a variation:</div>
+                        {variations[page.id].options.map((v, i) => (
+                          <button
+                            key={i}
+                            onClick={() => { updateField(page.id, 'seoTitle', v); setVariations(prev => { const n = { ...prev }; delete n[page.id]; return n; }); }}
+                            className={`w-full text-left px-3 py-1.5 rounded text-xs border transition-colors ${
+                              edit.seoTitle === v
+                                ? 'bg-teal-600/20 border-teal-500/40 text-teal-300'
+                                : 'bg-zinc-800/60 border-zinc-700/50 text-zinc-300 hover:border-teal-500/30 hover:bg-teal-600/10'
+                            }`}
+                          >
+                            <span className="text-zinc-500 mr-1.5">{i + 1}.</span>{v}
+                            <span className={`ml-2 text-[10px] ${v.length > 60 ? 'text-red-400' : v.length > 50 ? 'text-amber-400' : 'text-green-400'}`}>{v.length}/60</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Meta Description */}
@@ -467,6 +492,25 @@ export function SeoEditor({ siteId, workspaceId }: Props) {
                       rows={2}
                       className="w-full px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-sm focus:outline-none focus:border-zinc-500 resize-none"
                     />
+                    {variations[page.id]?.field === 'description' && variations[page.id].options.length > 1 && (
+                      <div className="mt-1.5 space-y-1">
+                        <div className="text-[11px] text-zinc-500 font-medium">Pick a variation:</div>
+                        {variations[page.id].options.map((v, i) => (
+                          <button
+                            key={i}
+                            onClick={() => { updateField(page.id, 'seoDescription', v); setVariations(prev => { const n = { ...prev }; delete n[page.id]; return n; }); }}
+                            className={`w-full text-left px-3 py-1.5 rounded text-xs border transition-colors ${
+                              edit.seoDescription === v
+                                ? 'bg-teal-600/20 border-teal-500/40 text-teal-300'
+                                : 'bg-zinc-800/60 border-zinc-700/50 text-zinc-300 hover:border-teal-500/30 hover:bg-teal-600/10'
+                            }`}
+                          >
+                            <span className="text-zinc-500 mr-1.5">{i + 1}.</span>{v}
+                            <span className={`ml-2 text-[10px] ${v.length > 160 ? 'text-red-400' : v.length > 150 ? 'text-amber-400' : 'text-green-400'}`}>{v.length}/160</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Save button */}

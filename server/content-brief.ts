@@ -3,6 +3,7 @@ import path from 'path';
 import { buildSeoContext, buildKeywordMapContext } from './seo-context.js';
 import { getUploadRoot, getDataDir } from './data-dir.js';
 import type { KeywordMetrics, RelatedKeyword } from './semrush.js';
+import { callOpenAI } from './openai-helpers.js';
 
 const UPLOAD_ROOT = getUploadRoot();
 const BRIEFS_DIR = getDataDir('content-briefs');
@@ -216,27 +217,16 @@ Requirements:
 
 Return ONLY valid JSON, no markdown fences, no explanation.`;
 
-  const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${openaiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 5000,
-      temperature: 0.7,
-    }),
+  const aiResult = await callOpenAI({
+    model: 'gpt-4o-mini',
+    messages: [{ role: 'user', content: prompt }],
+    maxTokens: 5000,
+    temperature: 0.7,
+    feature: 'content-brief',
+    workspaceId,
   });
 
-  if (!aiRes.ok) {
-    const err = await aiRes.text();
-    throw new Error(`OpenAI API error: ${err}`);
-  }
-
-  const aiData = await aiRes.json() as { choices: { message: { content: string } }[] };
-  const raw = aiData.choices[0]?.message?.content?.trim() || '{}';
+  const raw = aiResult.text || '{}';
 
   let parsed: Record<string, unknown>;
   try {

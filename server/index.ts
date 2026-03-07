@@ -75,6 +75,7 @@ import { listBriefs, getBrief, updateBrief, deleteBrief, generateBrief } from '.
 import { renderBriefHTML } from './brief-export-html.js';
 import { listContentRequests, getContentRequest, createContentRequest, updateContentRequest, deleteContentRequest, addComment } from './content-requests.js';
 import { isSemrushConfigured, getKeywordOverview, getDomainOrganicKeywords, getKeywordGap, getRelatedKeywords, estimateCreditCost, clearSemrushCache } from './semrush.js';
+import { callOpenAI, getTokenUsage } from './openai-helpers.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
 import { listGscSites, getSearchOverview, getPerformanceTrend, getQueryPageData, getAllGscPages } from './search-console.js';
@@ -825,7 +826,7 @@ app.get('/api/webflow/seo-audit/:siteId', async (req, res) => {
       console.error('SEO audit: No token available for site', req.params.siteId);
       return res.status(500).json({ error: 'No Webflow API token configured. Please link a workspace to this site in Settings, or set WEBFLOW_API_TOKEN environment variable.' });
     }
-    const result = await runSeoAudit(req.params.siteId, token);
+    const result = await runSeoAudit(req.params.siteId, token, req.query.workspaceId as string | undefined);
     res.json(result);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -1490,7 +1491,7 @@ app.get('/api/webflow/internal-links-snapshot/:siteId', (req, res) => {
   res.json(snapshot);
 });
 
-// --- AI SEO Rewrite ---
+// --- AI SEO Rewrite (returns 3 variations) ---
 app.post('/api/webflow/seo-rewrite', async (req, res) => {
   const { pageTitle, currentSeoTitle, currentDescription, pageContent, siteContext, field, workspaceId, pagePath } = req.body;
   if (!pageTitle) return res.status(400).json({ error: 'pageTitle required' });
@@ -1501,26 +1502,43 @@ app.post('/api/webflow/seo-rewrite', async (req, res) => {
   // Build shared keyword strategy + brand voice context
   const { keywordBlock: keywordContext, brandVoiceBlock } = buildSeoContext(workspaceId, pagePath);
 
+  // Enforce character limits helper
+  const enforceLimit = (text: string, maxLen: number): string => {
+    let t = text.replace(/^["']|["']$/g, '').trim();
+    if (t.length > maxLen) {
+      const truncated = t.slice(0, maxLen);
+      const lastSpace = truncated.lastIndexOf(' ');
+      t = lastSpace > maxLen * 0.6 ? truncated.slice(0, lastSpace) : truncated;
+    }
+    return t;
+  };
+
   try {
+    const maxLen = field === 'description' ? 160 : 60;
     let prompt: string;
     if (field === 'description') {
-      prompt = `You are an expert SEO copywriter. Write a compelling meta description for this web page.
+      prompt = `You are an expert SEO copywriter. Write 3 different compelling meta descriptions for this web page. Each should take a different angle.
 
 Page title: ${pageTitle}
 Current meta description: ${currentDescription || '(none)'}
 Site context: ${siteContext || 'N/A'}
 Page content excerpt: ${pageContent ? pageContent.slice(0, 1500) : 'N/A'}${keywordContext}${brandVoiceBlock}
 
-Requirements:
+Requirements for EACH variation:
 - Between 150-160 characters (hard limit: 160)
 - Include a clear call to action or value proposition
 - Natural, not keyword-stuffed
 - Compelling enough to increase click-through rate from search results
 - If keyword strategy is provided, naturally incorporate the primary keyword
 
-Return ONLY the meta description text, nothing else.`;
+Variation approaches:
+1. Benefit-focused: Lead with the key value proposition
+2. Action-focused: Lead with a strong call-to-action
+3. Question/curiosity: Lead with a question or curiosity hook
+
+Return ONLY a JSON array of 3 strings, e.g. ["desc1","desc2","desc3"]. No explanation.`;
     } else {
-      prompt = `You are an expert SEO copywriter. Write an optimized SEO title tag for this web page.
+      prompt = `You are an expert SEO copywriter. Write 3 different optimized SEO title tags for this web page. Each should take a different angle.
 
 Page title: ${pageTitle}
 Current SEO title: ${currentSeoTitle || '(none)'}
@@ -1528,48 +1546,42 @@ Current meta description: ${currentDescription || '(none)'}
 Site context: ${siteContext || 'N/A'}
 Page content excerpt: ${pageContent ? pageContent.slice(0, 1500) : 'N/A'}${keywordContext}${brandVoiceBlock}
 
-Requirements:
+Requirements for EACH variation:
 - Between 50-60 characters (hard limit: 60)
 - Front-load the most important keywords
 - Include brand name at end if appropriate (use pipe separator: |)
 - Compelling and descriptive
 - If keyword strategy is provided, front-load the primary keyword
 
-Return ONLY the title tag text, nothing else.`;
+Variation approaches:
+1. Keyword-forward: Primary keyword first, then context
+2. Benefit-forward: Lead with the value/benefit, keyword second
+3. Specific/numeric: Include a number, year, or specific detail
+
+Return ONLY a JSON array of 3 strings, e.g. ["title1","title2","title3"]. No explanation.`;
     }
 
-    const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${openaiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 200,
-        temperature: 0.7,
-      }),
+    const aiResult = await callOpenAI({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      maxTokens: 500,
+      temperature: 0.8,
+      feature: 'seo-rewrite',
+      workspaceId,
     });
 
-    if (!aiRes.ok) {
-      const errText = await aiRes.text();
-      return res.status(500).json({ error: `OpenAI error: ${errText.slice(0, 200)}` });
+    // Parse the 3 variations
+    let variations: string[];
+    try {
+      const parsed = JSON.parse(aiResult.text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
+      variations = Array.isArray(parsed) ? parsed.map((v: string) => enforceLimit(String(v), maxLen)) : [enforceLimit(String(parsed), maxLen)];
+    } catch {
+      // Fallback: single variation from raw text
+      variations = [enforceLimit(aiResult.text, maxLen)];
     }
 
-    const aiData = await aiRes.json() as { choices?: Array<{ message?: { content?: string } }> };
-    let text = aiData.choices?.[0]?.message?.content?.trim() || '';
-    // Strip surrounding quotes if the model wrapped its output
-    text = text.replace(/^["']|["']$/g, '');
-    // Enforce hard character limits
-    const maxLen = field === 'description' ? 160 : 60;
-    if (text.length > maxLen) {
-      // Truncate at last word boundary before the limit
-      const truncated = text.slice(0, maxLen);
-      const lastSpace = truncated.lastIndexOf(' ');
-      text = lastSpace > maxLen * 0.6 ? truncated.slice(0, lastSpace) : truncated;
-    }
-    res.json({ text, field });
+    // Always return at least the first as `text` for backward compatibility + all as `variations`
+    res.json({ text: variations[0] || '', field, variations: variations.filter(Boolean) });
   } catch (err) {
     console.error('SEO rewrite error:', err);
     res.status(500).json({ error: 'AI rewrite failed' });
@@ -1578,7 +1590,7 @@ Return ONLY the title tag text, nothing else.`;
 
 // --- Bulk AI SEO Fix ---
 app.post('/api/webflow/seo-bulk-fix/:siteId', async (req, res) => {
-  const { pages, field, workspaceId } = req.body as { pages: Array<{ pageId: string; title: string; slug?: string; currentSeoTitle?: string; currentDescription?: string }>; field: 'title' | 'description'; workspaceId?: string };
+  const { pages, field, workspaceId } = req.body as { pages: Array<{ pageId: string; title: string; slug?: string; currentSeoTitle?: string; currentDescription?: string; pageContent?: string }>; field: 'title' | 'description'; workspaceId?: string };
   if (!pages?.length) return res.status(400).json({ error: 'pages required' });
 
   const openaiKey = process.env.OPENAI_API_KEY;
@@ -1587,28 +1599,60 @@ app.post('/api/webflow/seo-bulk-fix/:siteId', async (req, res) => {
 
   if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
+  // Try to fetch page content for pages that don't have it (best-effort)
+  const ws = workspaceId ? getWorkspace(workspaceId) : listWorkspaces().find(w => w.webflowSiteId === siteId);
+  let baseUrl = '';
+  if (ws?.liveDomain) {
+    baseUrl = ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;
+  } else {
+    try {
+      const sub = await getSiteSubdomain(siteId, token);
+      if (sub) baseUrl = `https://${sub}.webflow.io`;
+    } catch { /* best-effort */ }
+  }
+
   const results = [];
   for (const page of pages) {
     try {
-      const { keywordBlock, brandVoiceBlock: bvBlock } = buildSeoContext(workspaceId, page.slug ? `/${page.slug}` : undefined);
-      const prompt = field === 'description'
-        ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}".${keywordBlock}${bvBlock}\nReturn ONLY the text.`
-        : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}".${keywordBlock}${bvBlock}\nReturn ONLY the text.`;
+      const { keywordBlock, brandVoiceBlock: bvBlock } = buildSeoContext(workspaceId || ws?.id, page.slug ? `/${page.slug}` : undefined);
 
-      const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [{ role: 'user', content: prompt }],
-          max_tokens: 200,
-          temperature: 0.7,
-        }),
+      // Fetch page content if not provided and we have a base URL
+      let contentExcerpt = page.pageContent || '';
+      if (!contentExcerpt && baseUrl && page.slug) {
+        try {
+          const htmlRes = await fetch(`${baseUrl}/${page.slug}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
+          if (htmlRes.ok) {
+            const html = await htmlRes.text();
+            const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+            const body = bodyMatch ? bodyMatch[1] : html;
+            contentExcerpt = body
+              .replace(/<script[\s\S]*?<\/script>/gi, '')
+              .replace(/<style[\s\S]*?<\/style>/gi, '')
+              .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+              .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+              .replace(/<[^>]+>/g, ' ')
+              .replace(/\s+/g, ' ')
+              .trim()
+              .slice(0, 800);
+          }
+        } catch { /* best-effort */ }
+      }
+
+      const contentSection = contentExcerpt ? `\nPage content excerpt: ${contentExcerpt}` : '';
+      const prompt = field === 'description'
+        ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}".${contentSection}${keywordBlock}${bvBlock}\n\nRules:\n- 150-160 characters, hard limit 160\n- Include primary keyword naturally\n- Include a call-to-action or value proposition\n- Match the brand voice if provided\nReturn ONLY the text.`
+        : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}".${contentSection}${keywordBlock}${bvBlock}\n\nRules:\n- 50-60 characters, hard limit 60\n- Front-load the primary keyword\n- Match the brand voice if provided\nReturn ONLY the text.`;
+
+      const aiResult = await callOpenAI({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: prompt }],
+        maxTokens: 200,
+        temperature: 0.7,
+        feature: 'seo-bulk-fix',
+        workspaceId: workspaceId || ws?.id,
       });
-      const aiData = await aiRes.json() as { choices?: Array<{ message?: { content?: string } }> };
-      let text = aiData.choices?.[0]?.message?.content?.trim() || '';
-      // Strip surrounding quotes and enforce character limits
-      text = text.replace(/^["']|["']$/g, '');
+
+      let text = aiResult.text.replace(/^["']|["']$/g, '');
       const maxLen = field === 'description' ? 160 : 60;
       if (text.length > maxLen) {
         const truncated = text.slice(0, maxLen);
@@ -1749,27 +1793,19 @@ CRITICAL RULES:
 Return ONLY valid JSON, no markdown fences.`;
 
   try {
-    const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: 'You are an expert SEO copywriter who preserves brand voice while optimizing for search. Return valid JSON only.' },
-          { role: 'user', content: prompt },
-        ],
-        max_tokens: 1500,
-        temperature: 0.6,
-      }),
+    const aiResult = await callOpenAI({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: 'You are an expert SEO copywriter who preserves brand voice while optimizing for search. Return valid JSON only.' },
+        { role: 'user', content: prompt },
+      ],
+      maxTokens: 1500,
+      temperature: 0.6,
+      feature: 'content-score',
+      workspaceId,
     });
 
-    if (!aiRes.ok) {
-      const errText = await aiRes.text();
-      return res.status(500).json({ error: `OpenAI error: ${errText.slice(0, 200)}` });
-    }
-
-    const aiData = await aiRes.json() as { choices?: Array<{ message?: { content?: string } }> };
-    const raw = aiData.choices?.[0]?.message?.content?.trim() || '{}';
+    const raw = aiResult.text || '{}';
     const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '');
 
     let parsed;
@@ -1809,6 +1845,34 @@ app.post('/api/webflow/keyword-analysis', async (req, res) => {
   const { keywordBlock, brandVoiceBlock: bvBlock2 } = buildSeoContext(workspaceId, slug ? `/${slug}` : undefined);
   const kwMapContext = buildKeywordMapContext(workspaceId);
 
+  // Fetch real SEMRush data for accuracy
+  let semrushBlock = '';
+  if (isSemrushConfigured() && workspaceId) {
+    try {
+      // Try to get metrics for the page's likely primary keyword from title
+      const seedKeyword = seoTitle || pageTitle;
+      const words = seedKeyword.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter((w: string) => w.length > 2);
+      if (words.length > 0) {
+        const phrase = words.slice(0, 5).join(' ');
+        const [metrics, related] = await Promise.all([
+          getKeywordOverview([phrase], workspaceId).catch(() => []),
+          getRelatedKeywords(phrase, workspaceId, 10).catch(() => []),
+        ]);
+        if (metrics.length > 0) {
+          const m = metrics[0];
+          semrushBlock += `\n\nREAL KEYWORD DATA (from SEMRush — use these exact values for difficulty and volume, do NOT estimate):\n`;
+          semrushBlock += `- "${m.keyword}": vol ${m.volume.toLocaleString()}/mo, KD ${m.difficulty}/100, CPC $${m.cpc.toFixed(2)}, competition ${m.competition.toFixed(2)}`;
+        }
+        if (related.length > 0) {
+          semrushBlock += `\n\nRELATED KEYWORDS WITH REAL METRICS:\n`;
+          semrushBlock += related.slice(0, 10).map(r =>
+            `- "${r.keyword}" (vol: ${r.volume.toLocaleString()}/mo, KD: ${r.difficulty}/100, CPC: $${r.cpc.toFixed(2)})`
+          ).join('\n');
+        }
+      }
+    } catch (e) { console.error('[keyword-analysis] SEMRush enrichment error:', e); }
+  }
+
   try {
     const prompt = `You are an expert SEO strategist and keyword researcher. Analyze this web page and provide a comprehensive keyword analysis.
 
@@ -1817,7 +1881,7 @@ SEO title: ${seoTitle || '(same as page title)'}
 Meta description: ${metaDescription || '(none)'}
 URL slug: /${slug || ''}
 Site context: ${siteContext || 'N/A'}
-Page content excerpt: ${pageContent ? pageContent.slice(0, 3000) : 'N/A'}${keywordBlock}${bvBlock2}${kwMapContext}
+Page content excerpt: ${pageContent ? pageContent.slice(0, 3000) : 'N/A'}${keywordBlock}${bvBlock2}${kwMapContext}${semrushBlock}
 
 Provide your analysis as a JSON object with exactly these fields:
 {
@@ -1833,34 +1897,32 @@ Provide your analysis as a JSON object with exactly these fields:
   "optimizationIssues": ["specific actionable issues with keyword optimization"],
   "recommendations": ["specific actionable recommendation 1", "recommendation 2", "recommendation 3"],
   "estimatedDifficulty": "low | medium | high",
+  "keywordDifficulty": 0-100,
+  "monthlyVolume": 0,
   "topicCluster": "the broader topic cluster this page belongs to"
 }
 
+IMPORTANT:
+- If real keyword data from SEMRush is provided above, use those EXACT numbers for keywordDifficulty and monthlyVolume. Do NOT make up different values.
+- estimatedDifficulty should be derived from keywordDifficulty: 0-30 = low, 31-60 = medium, 61-100 = high
+- If no real data is available, set keywordDifficulty and monthlyVolume to 0 and estimate based on content analysis
+
 Return ONLY valid JSON, no markdown, no explanation.`;
 
-    const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 1000,
-        temperature: 0.4,
-      }),
+    const aiResult = await callOpenAI({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      maxTokens: 1000,
+      temperature: 0.4,
+      feature: 'keyword-analysis',
+      workspaceId,
     });
 
-    if (!aiRes.ok) {
-      const errText = await aiRes.text();
-      return res.status(500).json({ error: `OpenAI error: ${errText.slice(0, 200)}` });
-    }
-
-    const aiData = await aiRes.json() as { choices?: Array<{ message?: { content?: string } }> };
-    const raw = aiData.choices?.[0]?.message?.content?.trim() || '';
     try {
-      const analysis = JSON.parse(raw);
+      const analysis = JSON.parse(aiResult.text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
       res.json(analysis);
     } catch {
-      res.json({ error: 'Failed to parse AI response', raw: raw.slice(0, 500) });
+      res.json({ error: 'Failed to parse AI response', raw: aiResult.text.slice(0, 500) });
     }
   } catch (err) {
     console.error('Keyword analysis error:', err);
@@ -1935,7 +1997,7 @@ app.post('/api/webflow/content-score', async (req, res) => {
 
 // --- AI Alt Text Generation for existing assets ---
 app.post('/api/webflow/generate-alt/:assetId', async (req, res) => {
-  const { imageUrl, siteId } = req.body;
+  const { imageUrl, siteId, workspaceId: altWsId } = req.body;
   if (!imageUrl) return res.status(400).json({ error: 'imageUrl required' });
 
   try {
@@ -1985,6 +2047,23 @@ app.post('/api/webflow/generate-alt/:assetId', async (req, res) => {
     const tmpPath = `/tmp/alt_gen_${Date.now()}${ext}`;
     fs.writeFileSync(tmpPath, buffer);
 
+    // Enrich context with keyword strategy from workspace
+    const resolvedWsId = altWsId || (siteId ? listWorkspaces().find(w => w.webflowSiteId === siteId)?.id : undefined);
+    if (resolvedWsId) {
+      const { businessContext: altBizCtx } = buildSeoContext(resolvedWsId);
+      const ws = getWorkspace(resolvedWsId);
+      const brandVoice = ws?.brandVoice;
+      const kwParts: string[] = [];
+      if (altBizCtx) kwParts.push(`Business: ${altBizCtx}`);
+      if (brandVoice) kwParts.push(`Brand voice: ${brandVoice}`);
+      if (ws?.keywordStrategy?.siteKeywords?.length) {
+        kwParts.push(`Site keywords: ${ws.keywordStrategy.siteKeywords.slice(0, 5).join(', ')}`);
+      }
+      if (kwParts.length > 0) {
+        context = context ? `${context}\n${kwParts.join('. ')}` : kwParts.join('. ');
+      }
+    }
+
     const altText = await generateAltText(tmpPath, context || undefined);
     fs.unlinkSync(tmpPath);
 
@@ -2011,9 +2090,10 @@ app.post('/api/webflow/generate-alt/:assetId', async (req, res) => {
 
 // --- Bulk AI Alt Text Generation (fetches context once) ---
 app.post('/api/webflow/bulk-generate-alt', async (req, res) => {
-  const { assets, siteId } = req.body as {
+  const { assets, siteId, workspaceId: bulkAltWsId } = req.body as {
     assets: Array<{ assetId: string; imageUrl: string }>;
     siteId?: string;
+    workspaceId?: string;
   };
   if (!assets?.length) return res.status(400).json({ error: 'assets required' });
 
@@ -2027,6 +2107,22 @@ app.post('/api/webflow/bulk-generate-alt', async (req, res) => {
       const site = sites.find(s => s.id === siteId);
       if (site) siteContext = `Website: ${site.displayName}`;
     } catch { /* proceed without context */ }
+  }
+
+  // Enrich with keyword strategy context
+  const bulkWsId = bulkAltWsId || (siteId ? listWorkspaces().find(w => w.webflowSiteId === siteId)?.id : undefined);
+  if (bulkWsId) {
+    const { businessContext: bulkBizCtx } = buildSeoContext(bulkWsId);
+    const bulkWs = getWorkspace(bulkWsId);
+    const kwParts: string[] = [];
+    if (bulkBizCtx) kwParts.push(`Business: ${bulkBizCtx}`);
+    if (bulkWs?.brandVoice) kwParts.push(`Brand voice: ${bulkWs.brandVoice}`);
+    if (bulkWs?.keywordStrategy?.siteKeywords?.length) {
+      kwParts.push(`Site keywords: ${bulkWs.keywordStrategy.siteKeywords.slice(0, 5).join(', ')}`);
+    }
+    if (kwParts.length > 0) {
+      siteContext = siteContext ? `${siteContext}. ${kwParts.join('. ')}` : kwParts.join('. ');
+    }
   }
 
   // Build a mapping of assetId → page context by scanning pages once
@@ -2834,12 +2930,21 @@ app.get('/api/google/gsc-sites/:siteId', async (req, res) => {
 });
 
 app.post('/api/google/search-chat/:siteId', async (req, res) => {
-  const { question, context } = req.body;
+  const { question, context, workspaceId } = req.body;
   if (!question) return res.status(400).json({ error: 'question required' });
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) return res.status(400).json({ error: 'OPENAI_API_KEY not configured' });
 
+  // Look up workspace for keyword strategy context
+  const wsId = workspaceId || listWorkspaces().find(w => w.webflowSiteId === req.params.siteId)?.id;
+  const { keywordBlock, brandVoiceBlock, businessContext: bizCtx } = buildSeoContext(wsId);
+  const kwMapContext = buildKeywordMapContext(wsId);
+
   try {
+    const strategySection = (keywordBlock || kwMapContext || bizCtx)
+      ? `\n\nKEYWORD STRATEGY CONTEXT (use this to give strategic, keyword-aware answers):${keywordBlock}${kwMapContext}${bizCtx ? `\nBusiness: ${bizCtx}` : ''}${brandVoiceBlock}`
+      : '';
+
     const systemPrompt = `You are an expert SEO analyst embedded in a search analytics dashboard. The user is a website owner or client asking about their Google Search Console data.
 
 You have access to their real search data which is provided as context. Give specific, actionable, data-driven answers. Reference actual queries, pages, and numbers from their data. Be concise but thorough. Use markdown formatting.
@@ -2849,37 +2954,26 @@ When giving recommendations:
 - Explain the "why" behind recommendations
 - Prioritize by potential impact
 - Suggest concrete next steps
+- If keyword strategy data is available, reference their target keywords and suggest alignment improvements
+- Identify gaps between what they're ranking for and what they should be targeting
+${strategySection}
 
 Current search data context:
 ${JSON.stringify(context, null, 2)}`;
 
-    const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${openaiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: question },
-        ],
-        temperature: 0.7,
-        max_tokens: 1500,
-      }),
+    const aiResult = await callOpenAI({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: question },
+      ],
+      temperature: 0.7,
+      maxTokens: 1500,
+      feature: 'search-chat',
+      workspaceId: wsId,
     });
 
-    if (!aiRes.ok) {
-      const err = await aiRes.text();
-      throw new Error(`OpenAI error: ${err}`);
-    }
-
-    const aiData = await aiRes.json() as {
-      choices: Array<{ message: { content: string } }>;
-    };
-    const answer = aiData.choices?.[0]?.message?.content || 'No response generated.';
-    res.json({ answer });
+    res.json({ answer: aiResult.text || 'No response generated.' });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: msg });
@@ -3203,31 +3297,20 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     //    Step 1: Split pages into batches, analyze each batch in parallel (per-page keyword mapping)
     //    Step 2: Master synthesis call merges all mappings + GSC + SEMRush into final strategy
 
-    // Helper: call OpenAI with retry + timeout
-    const callOpenAI = async (messages: Array<{ role: string; content: string }>, maxTokens: number, label: string): Promise<string> => {
-      const body = JSON.stringify({ model: 'gpt-4o-mini', messages, max_tokens: maxTokens, temperature: 0.3 });
-      for (let attempt = 1; attempt <= 2; attempt++) {
-        try {
-          const r = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
-            body,
-            signal: AbortSignal.timeout(90_000),
-          });
-          if (!r.ok) {
-            const errText = await r.text();
-            throw new Error(`OpenAI ${r.status}: ${errText.slice(0, 200)}`);
-          }
-          const data = await r.json() as { choices?: Array<{ message?: { content?: string } }> };
-          const raw = data.choices?.[0]?.message?.content?.trim() || '';
-          return raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
-        } catch (err) {
-          console.error(`[Strategy][${label}] Attempt ${attempt} failed:`, err instanceof Error ? err.message : err);
-          if (attempt === 2) throw err;
-          await new Promise(r => setTimeout(r, 2000));
-        }
-      }
-      throw new Error('Unreachable');
+    // Helper: call OpenAI for strategy using shared utility
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const callStrategyAI = async (messages: Array<{ role: string; content: string }>, maxTokens: number, _label?: string): Promise<string> => {
+      const result = await callOpenAI({
+        model: 'gpt-4o-mini',
+        messages: messages as Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+        maxTokens,
+        temperature: 0.3,
+        feature: 'keyword-strategy',
+        workspaceId: ws.id,
+        maxRetries: 3,
+        timeoutMs: 90_000,
+      });
+      return result.text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
     };
 
     // Keepalive pings to prevent Render proxy from killing idle SSE connection
@@ -3301,7 +3384,7 @@ Rules:
 - Return ONLY valid JSON array, no markdown, no explanation`;
 
       console.log(`[Strategy] Batch ${batchIdx + 1}/${batches.length}: ${batch.length} pages, ${batchPrompt.length} chars`);
-      const raw = await callOpenAI([
+      const raw = await callStrategyAI([
         { role: 'system', content: 'You are an expert SEO strategist. Return valid JSON only.' },
         { role: 'user', content: batchPrompt },
       ], 3000, `batch-${batchIdx + 1}`);
@@ -3408,7 +3491,7 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
 
     console.log(`[Strategy] Master prompt: ${masterPrompt.length} chars (~${Math.ceil(masterPrompt.length / 4)} tokens)`);
 
-    const masterRaw = await callOpenAI([
+    const masterRaw = await callStrategyAI([
       { role: 'system', content: 'You are an expert SEO strategist. Return valid JSON only.' },
       { role: 'user', content: masterPrompt },
     ], 3000, 'master');
@@ -3581,6 +3664,13 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
     }
     res.status(500).json({ error: msg });
   }
+});
+
+// --- AI Token Usage Tracking ---
+app.get('/api/ai/usage', (req, res) => {
+  const workspaceId = req.query.workspaceId as string | undefined;
+  const since = req.query.since as string | undefined;
+  res.json(getTokenUsage(workspaceId, since));
 });
 
 // --- SEMRush Utilities ---
@@ -4331,26 +4421,19 @@ Date range: last ${context?.days || 28} days
 Current data context:
 ${JSON.stringify(context, null, 2)}`;
 
-    const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${openaiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: question },
-        ],
-        temperature: 0.7,
-        max_tokens: 1500,
-      }),
+    const aiResult = await callOpenAI({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: question },
+      ],
+      temperature: 0.7,
+      maxTokens: 1500,
+      feature: 'client-search-chat',
+      workspaceId: ws.id,
     });
 
-    if (!aiRes.ok) throw new Error('AI request failed');
-    const aiData = await aiRes.json() as { choices: Array<{ message: { content: string } }> };
-    res.json({ answer: aiData.choices?.[0]?.message?.content || 'No response generated.' });
+    res.json({ answer: aiResult.text || 'No response generated.' });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: msg });
@@ -4530,7 +4613,7 @@ app.post('/api/jobs', async (req, res) => {
         (async () => {
           try {
             updateJob(job.id, { status: 'running', message: 'Scanning pages...' });
-            const result = await runSeoAudit(siteId, token);
+            const result = await runSeoAudit(siteId, token, params.workspaceId as string);
             // Auto-save snapshot so overview + client dashboard stay in sync
             const ws = getWorkspace(params.workspaceId as string);
             const siteName = ws?.webflowSiteName || ws?.name || siteId;
@@ -4669,7 +4752,17 @@ app.post('/api/jobs', async (req, res) => {
                 const imgExt = path.extname(asset.imageUrl).split('?')[0] || '.jpg';
                 const tmpPath = `/tmp/bulk_alt_${Date.now()}${imgExt}`;
                 fs.writeFileSync(tmpPath, buffer);
-                const altTextResult = await generateAltText(tmpPath);
+                // Build context from workspace keyword strategy
+                const jobWsId = params.workspaceId as string | undefined;
+                const jobWs = jobWsId ? getWorkspace(jobWsId) : (altSiteId ? listWorkspaces().find(w => w.webflowSiteId === altSiteId) : undefined);
+                let jobAltContext = '';
+                if (jobWs) {
+                  const parts: string[] = [];
+                  if (jobWs.brandVoice) parts.push(`Brand voice: ${jobWs.brandVoice}`);
+                  if (jobWs.keywordStrategy?.siteKeywords?.length) parts.push(`Site keywords: ${jobWs.keywordStrategy.siteKeywords.slice(0, 5).join(', ')}`);
+                  if (parts.length > 0) jobAltContext = parts.join('. ');
+                }
+                const altTextResult = await generateAltText(tmpPath, jobAltContext || undefined);
                 try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
                 if (altTextResult) {
                   await updateAsset(asset.assetId, { altText: altTextResult }, token);
@@ -4709,13 +4802,15 @@ app.post('/api/jobs', async (req, res) => {
                 const prompt = field === 'description'
                   ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}".${kwb}${bvb}\nReturn ONLY the text.`
                   : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}".${kwb}${bvb}\nReturn ONLY the text.`;
-                const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-                  method: 'POST',
-                  headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }], max_tokens: 200, temperature: 0.7 }),
+                const aiResult = await callOpenAI({
+                  model: 'gpt-4o-mini',
+                  messages: [{ role: 'user', content: prompt }],
+                  maxTokens: 200,
+                  temperature: 0.7,
+                  feature: 'job-bulk-seo-fix',
+                  workspaceId: bwsId,
                 });
-                const aiData = await aiRes.json() as { choices?: Array<{ message?: { content?: string } }> };
-                let text = aiData.choices?.[0]?.message?.content?.trim() || '';
+                let text = aiResult.text;
                 text = text.replace(/^["']|["']$/g, '');
                 const maxLen = field === 'description' ? 160 : 60;
                 if (text.length > maxLen) { const t = text.slice(0, maxLen); const ls = t.lastIndexOf(' '); text = ls > maxLen * 0.6 ? t.slice(0, ls) : t; }

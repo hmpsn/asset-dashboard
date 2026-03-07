@@ -80,10 +80,17 @@ For long-running operations (audits, crawls, reports):
 3. Store results server-side so they persist across refreshes
 4. Add to history list if the tool supports re-running
 
-## 6. Feature Documentation
+## 6. Feature Documentation & Memory Updates
 
 When adding or significantly modifying a feature:
 
 1. Add/update entry in `FEATURE_AUDIT.md` with: what it does, agency value, client value, mutual value
 2. Update `DESIGN_SYSTEM.md` if new UI patterns are introduced
 3. Note any new cross-links in this workflow file
+4. **Update global knowledge memories** — check the File → Memory Update Map (in memory rules) and update any affected memories. Key ones:
+   - New/moved endpoints in `server/index.ts` → update **Server index.ts Section Map**
+   - New server files → update **Server File Map**
+   - New frontend components/tabs → update **Frontend Component Map**
+   - New AI features or model changes → update **AI Feature Inventory**
+   - New env vars → update **Environment Variables**
+   - Changed data models → update **Workspace Interface**

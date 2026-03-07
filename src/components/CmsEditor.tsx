@@ -47,6 +47,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
   const [approvalSelected, setApprovalSelected] = useState<Set<string>>(new Set());
   const [sendingApproval, setSendingApproval] = useState(false);
   const [approvalSent, setApprovalSent] = useState(false);
+  const [variations, setVariations] = useState<Record<string, { fieldSlug: string; options: string[] }>>({});
 
   const fetchData = async () => {
     setLoading(true);
@@ -152,7 +153,10 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
         }),
       });
       const data = await res.json();
-      if (data.text) {
+      if (data.variations?.length > 1) {
+        updateField(itemId, fieldSlug, data.variations[0]);
+        setVariations(prev => ({ ...prev, [itemId]: { fieldSlug, options: data.variations } }));
+      } else if (data.text) {
         updateField(itemId, fieldSlug, data.text);
       }
     } catch { /* ignore */ } finally {
@@ -419,6 +423,25 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                               onChange={e => updateField(item.id, 'name', e.target.value)}
                               className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
                             />
+                            {variations[item.id]?.fieldSlug === 'name' && variations[item.id].options.length > 1 && (
+                              <div className="mt-1.5 space-y-1">
+                                <div className="text-[10px] text-zinc-500 font-medium">Pick a variation:</div>
+                                {variations[item.id].options.map((v, vi) => (
+                                  <button
+                                    key={vi}
+                                    onClick={() => { updateField(item.id, 'name', v); setVariations(prev => { const n = { ...prev }; delete n[item.id]; return n; }); }}
+                                    className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs border transition-colors ${
+                                      (edits[item.id]?.['name'] || '') === v
+                                        ? 'bg-teal-600/20 border-teal-500/40 text-teal-300'
+                                        : 'bg-zinc-800/60 border-zinc-700/50 text-zinc-300 hover:border-teal-500/30 hover:bg-teal-600/10'
+                                    }`}
+                                  >
+                                    <span className="text-zinc-500 mr-1">{vi + 1}.</span>{v}
+                                    <span className={`ml-2 text-[10px] ${v.length > 60 ? 'text-red-400' : 'text-emerald-400'}`}>{v.length}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
 
                           {/* Slug field */}
@@ -471,6 +494,28 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                                     rows={3}
                                     className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500 resize-none"
                                   />
+                                )}
+                                {variations[item.id]?.fieldSlug === field.slug && variations[item.id].options.length > 1 && (
+                                  <div className="mt-1.5 space-y-1">
+                                    <div className="text-[10px] text-zinc-500 font-medium">Pick a variation:</div>
+                                    {variations[item.id].options.map((v, vi) => {
+                                      const maxLen = isTitle ? 60 : 160;
+                                      return (
+                                        <button
+                                          key={vi}
+                                          onClick={() => { updateField(item.id, field.slug, v); setVariations(prev => { const n = { ...prev }; delete n[item.id]; return n; }); }}
+                                          className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs border transition-colors ${
+                                            val === v
+                                              ? 'bg-teal-600/20 border-teal-500/40 text-teal-300'
+                                              : 'bg-zinc-800/60 border-zinc-700/50 text-zinc-300 hover:border-teal-500/30 hover:bg-teal-600/10'
+                                          }`}
+                                        >
+                                          <span className="text-zinc-500 mr-1">{vi + 1}.</span>{v}
+                                          <span className={`ml-2 text-[10px] ${v.length > maxLen ? 'text-red-400' : 'text-emerald-400'}`}>{v.length}/{maxLen}</span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
                                 )}
                               </div>
                             );
