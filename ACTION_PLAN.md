@@ -91,8 +91,8 @@ Priority tiers:
 
 | # | Item | Source | Est. | Priority | Notes |
 |---|------|--------|:----:|:--------:|-------|
-| 18 | **AI chatbot: proactive insights** — Auto-surface 2-3 contextual insights on dashboard load, trigger-based suggestions | AI_CHATBOT_ROADMAP Phase 5 | 4-5h | 🟡 P2 | Makes chatbot feel alive |
-| 19 | **Custom date range picker** — Replace preset buttons (7d/28d/90d) with full calendar selector | FEATURE_AUDIT | 2-3h | 🟡 P2 | Long-requested UX improvement |
+| 18 | ~~**AI chatbot: proactive insights**~~ | AI_CHATBOT_ROADMAP Phase 5 | 4-5h | 🟡 P2 | ✅ Shipped — Auto-greeting with 2-3 data-driven insights on chat open, quick question follow-ups |
+| 19 | ~~**Custom date range picker**~~ | FEATURE_AUDIT | 2-3h | 🟡 P2 | ✅ Shipped — Preset buttons + Custom calendar popover; backend: all GSC + GA4 routes accept startDate/endDate |
 | 20 | **Notification preferences** — Per-user email settings, digest frequency, in-app notification bell | AUTH_ROADMAP Phase 6 | 2-3h | 🟢 P3 | After user accounts exist |
 | 21 | **Content calendar** — Visual calendar view of content in production with due dates | FEATURE_AUDIT | 3-4h | 🟢 P3 | Nice visualization, not blocking |
 
@@ -182,12 +182,13 @@ Track key decisions here as they're made:
 | 2026-03-07 | Audit pipeline: error sort + flag + Fix→ + auto-fix | Pages sorted by errors, Flag for Client workflow, Fix→ routes to tools with auto-generation context |
 | 2026-03-07 | Workspace Home Dashboard added | Per-workspace landing page with parallel-fetched audit/search/GA4/ranks/requests/activity data |
 | 2026-03-07 | Sidebar restructured | Icon-only bottom bar, Command Center button, grouped nav (Analytics, Site Health, SEO, Manage) |
+| 2026-03-07 | Sprint 6 items #18 + #19 shipped | Proactive insights (auto-greeting on chat open) + custom date range picker (calendar popover + full backend startDate/endDate support) |
 | | | |
 
 ---
 
 *Compiled: March 7, 2026*
-*Last updated: March 7, 2026 (Sprint 1 complete + audit pipeline + workspace home)*
+*Last updated: March 7, 2026 (Sprint 6: #18 proactive insights + #19 custom date range picker shipped)*
 *Next review: Before Sprint 2 kickoff*
 *Total items tracked: 52*
 *Data source: Server-side roadmap.json (managed via /api/roadmap)*

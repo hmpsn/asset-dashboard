@@ -50,7 +50,7 @@ Upgrade the client-facing AI assistant from a search-data-only Q&A tool into a f
 
 ### What it still lacks
 1. ~~**No memory** — every conversation starts from zero~~ ✅ Shipped — persistent sessions, cross-session summaries, chat history UI
-2. **No proactive insights** — only answers questions, never surfaces opportunities
+2. ~~**No proactive insights** — only answers questions, never surfaces opportunities~~ ✅ Shipped — auto-greeting with 2-3 data-driven insights on chat open
 3. **No action triggers** — can't link to specific dashboard sections or trigger actions
 4. ~~**Single-turn context** — no conversation history passed to the AI~~ ✅ Shipped — last 10 messages passed as conversation context
 
@@ -125,18 +125,17 @@ Client chatbot rebranded as "Insights Engine by hmpsn studio". System prompt inc
 
 ---
 
-### Phase 5: Proactive Insights (Priority: MEDIUM)
-**Estimated effort: 4-5 hours**
+### ~~Phase 5: Proactive Insights~~ ✅ SHIPPED
+**Shipped: March 7, 2026**
 
-Instead of waiting for questions, the chatbot surfaces insights automatically.
+The chatbot now surfaces insights automatically when the chat opens.
 
 #### Insight engine
-- [ ] On dashboard load, generate 2-3 contextual insights based on current data:
-  - "Your traffic is up 23% this month — great momentum!"
-  - "3 pages have bounce rates over 80% — worth investigating"
-  - "You have 2 content briefs ready for review"
-- [ ] Display as cards above the chat or as the chat's "greeting"
-- [ ] Each insight links to the relevant dashboard section
+- [x] On chat open, generate 2-3 contextual insights based on current data via `fetchProactiveInsight()`
+- [x] Display as the chat's opening "greeting" — no user message needed, just an assistant message
+- [x] `proactiveInsightSent` ref prevents duplicate greetings
+- [x] `buildChatContext()` helper extracted for shared context building between `askAi()` and proactive insight
+- [x] Quick question follow-ups shown after proactive greeting (QUICK_QUESTIONS displayed when exactly 1 assistant message exists)
 
 #### Trigger-based suggestions
 - [ ] When client views Health tab with score < 70: chat bubble pulses with "I noticed some issues — want to talk about them?"
@@ -147,7 +146,9 @@ Instead of waiting for questions, the chatbot surfaces insights automatically.
 - [ ] Auto-generate a weekly summary insight for each workspace
 - [ ] Could be pushed via email notification system
 
-**Why this is medium:** Proactive feels premium but requires careful UX to not be annoying. Best implemented after the foundation is solid.
+**Still TODO from Phase 5:**
+- [ ] Trigger-based suggestions (tab-aware chat prompts)
+- [ ] Weekly digest generation
 
 ---
 
@@ -190,7 +191,7 @@ Instead of waiting for questions, the chatbot surfaces insights automatically.
 | Phase 2: Global knowledge base | 4-5 | HIGH |
 | Phase 3: Sales engine behavior | 3-4 | HIGH |
 | Phase 4: Conversation memory | 3-4 | MEDIUM |
-| Phase 5: Proactive insights | 4-5 | MEDIUM |
+| Phase 5: Proactive insights | 4-5 | ~~MEDIUM~~ ✅ SHIPPED |
 | Phase 6: Multi-modal responses | 3-4 | LOW |
 | **Total** | **20-26** | |
 
@@ -199,5 +200,5 @@ Critical path (Phases 1-3) = **10-13 hours**.
 ---
 
 *Created: March 7, 2026*
-*Status: Phases 1-4 SHIPPED. Phases 5-6 pending.*
+*Status: Phases 1-5 SHIPPED. Phase 6 pending.*
 *Last updated: March 7, 2026*

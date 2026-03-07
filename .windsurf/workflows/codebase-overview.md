@@ -26,8 +26,8 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 | `server/content-brief.ts` | AI content brief generation with SEMRush/GSC enrichment |
 | `server/seo-audit.ts` | Site health audit engine |
 | `server/reports.ts` | Audit snapshot persistence, `getLatestSnapshot` |
-| `server/google-analytics.ts` | GA4 API: overview, landing pages, organic, conversions, events, period comparison, new vs returning |
-| `server/search-console.ts` | GSC API: queries, pages, devices, countries, period comparison |
+| `server/google-analytics.ts` | GA4 API: overview, landing pages, organic, conversions, events, period comparison, new vs returning. Exports `CustomDateRange` type; all functions accept optional `dateRange` param |
+| `server/search-console.ts` | GSC API: queries, pages, devices, countries, period comparison. All functions accept optional `dateRange?: CustomDateRange` param |
 | `server/semrush.ts` | SEMRush API: keyword overview, domain organic, keyword gaps, related keywords |
 | `server/openai-helpers.ts` | `callOpenAI` with retry/backoff/timeout, `parseAIJson`, token usage tracking |
 | `server/schema-suggester.ts` | JSON-LD schema generation per page |
@@ -38,7 +38,7 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 | Component | Purpose |
 |-----------|---------|
 | `src/App.tsx` | Router, workspace selector, admin tabs (lazy-loaded) |
-| `src/components/ClientDashboard.tsx` | Full client portal with chat, analytics snapshots, approvals, requests |
+| `src/components/ClientDashboard.tsx` | Full client portal with chat (proactive insights greeting), custom date range picker, analytics snapshots, approvals, requests |
 | `src/components/AdminChat.tsx` | Floating admin chat panel with conversation memory + history UI |
 | `src/components/SeoStrategy.tsx` | Keyword strategy viewer/generator |
 | `src/components/SeoAudit.tsx` | Site health audit viewer |
@@ -50,6 +50,7 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 - Period comparison data (search + GA4), organic overview, new vs returning
 - Audit traffic intelligence (high-traffic pages with SEO errors)
 - Conversation memory via `chat-memory.ts`
+- Proactive insights: `fetchProactiveInsight()` auto-sends 2-3 data-driven greeting bullets on chat open via `buildChatContext()` helper
 
 ### Admin Chat (`/api/admin-chat`)
 - Same data as client chat + keyword strategy context + keyword map
