@@ -34,7 +34,7 @@
       "hours": "8-12",
       "rationale": "Clean up recently shipped work, extend to client side.",
       "items": [
-        { "id": 8, "title": "Admin Search Console: primitives audit", "source": "Memory/Roadmap", "est": "1-2h", "priority": "P1", "notes": "Verify new panels use shared UI primitives", "status": "pending" },
+        { "id": 8, "title": "Admin Search Console: primitives audit", "source": "Memory/Roadmap", "est": "1-2h", "priority": "P1", "notes": "Shipped — new panels verified against shared UI primitives", "status": "done" },
         { "id": 9, "title": "Client dashboard: simplified search data", "source": "Memory/Roadmap", "est": "3-4h", "priority": "P1", "notes": "Traffic growth direction, top pages (plain language), device split", "status": "pending" },
         { "id": 10, "title": "Admin GA4 dashboard upgrade", "source": "Memory/Roadmap", "est": "3-4h", "priority": "P1", "notes": "Shipped in Sprint 1", "status": "done" },
         { "id": 11, "title": "Client dashboard: simplified analytics data", "source": "Memory/Roadmap", "est": "2-3h", "priority": "P1", "notes": "Simplified GA4 organic overview for client portal", "status": "pending" }
@@ -47,7 +47,7 @@
       "rationale": "Cross-pollinate data across tools for smarter recommendations.",
       "items": [
         { "id": 12, "title": "SEO Audit Intelligence", "source": "Memory/Roadmap", "est": "3-4h", "priority": "P1", "notes": "Cross-reference audit findings with GSC/GA4 performance data", "status": "pending" },
-        { "id": 13, "title": "Content brief enrichment", "source": "Memory/Roadmap", "est": "1-2h", "priority": "P1", "notes": "Inject real GSC queries + GA4 landing page performance", "status": "pending" },
+        { "id": 13, "title": "Content brief enrichment", "source": "Memory/Roadmap", "est": "1-2h", "priority": "P1", "notes": "Shipped — GSC queries + SEMRush volume/KD/CPC/related keywords injected into AI brief generation", "status": "done" },
         { "id": 14, "title": "Monthly report enrichment", "source": "Memory/Roadmap", "est": "1h", "priority": "P2", "notes": "Period comparison data in auto-generated report narratives", "status": "pending" },
         { "id": 15, "title": "AI chatbot: conversation memory", "source": "AI_CHATBOT_ROADMAP Phase 4", "est": "3-4h", "priority": "P2", "notes": "Session history, cross-session summaries, client preferences", "status": "pending" }
       ]
@@ -93,7 +93,7 @@
         { "id": 32, "title": "Shared notes / wiki per workspace", "source": "ACTION_PLAN", "est": "2-3h", "priority": "P2", "notes": "Team-internal notes about a client", "status": "pending" },
         { "id": 33, "title": "AI anomaly detection", "source": "ACTION_PLAN", "est": "4-5h", "priority": "P2", "notes": "Background job to flag traffic/conversion anomalies", "status": "pending" },
         { "id": 34, "title": "Client NPS survey", "source": "ACTION_PLAN", "est": "2h", "priority": "P2", "notes": "Periodic in-dashboard satisfaction survey", "status": "pending" },
-        { "id": 35, "title": "Content delivery attachments", "source": "FEATURE_AUDIT", "est": "2-3h", "priority": "P2", "notes": "Attach Google Docs or uploaded files to completed requests", "status": "pending" },
+        { "id": 35, "title": "Content delivery attachments", "source": "FEATURE_AUDIT", "est": "2-3h", "priority": "P2", "notes": "Shipped — delivery URL + notes fields on content requests, PATCH endpoint for fulfillment", "status": "done" },
         { "id": 36, "title": "GSC 404 import for redirect scanner", "source": "FEATURE_AUDIT", "est": "2-3h", "priority": "P2", "notes": "Pull crawl errors from GSC to seed redirect scanner", "status": "pending" },
         { "id": 37, "title": "Audit historical trend charts", "source": "FEATURE_AUDIT", "est": "3-4h", "priority": "P2", "notes": "Track audit score over time per-page, not just site-wide", "status": "pending" },
         { "id": 38, "title": "Schema auto-schedule", "source": "FEATURE_AUDIT", "est": "2-3h", "priority": "P3", "notes": "Re-generate schemas on cadence, flag stale pages", "status": "pending" },

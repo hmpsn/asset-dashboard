@@ -5292,12 +5292,54 @@ const ROADMAP_REPO_FILE = path.join(__dirname, '..', 'data', 'roadmap.json');
 const ROADMAP_STATUS_FILE = path.join(getDataDir('admin'), 'roadmap-status.json');
 
 function loadRoadmap() {
-  // 1. Runtime copy (has latest UI status updates)
+  // If the repo file is newer than the runtime copy, re-seed from repo.
+  // This ensures git updates to data/roadmap.json propagate automatically.
+  let repoNewer = false;
   try {
-    if (fs.existsSync(ROADMAP_RUNTIME_FILE)) {
-      return JSON.parse(fs.readFileSync(ROADMAP_RUNTIME_FILE, 'utf-8'));
+    if (fs.existsSync(ROADMAP_REPO_FILE) && fs.existsSync(ROADMAP_RUNTIME_FILE)) {
+      const repoMtime = fs.statSync(ROADMAP_REPO_FILE).mtimeMs;
+      const runtimeMtime = fs.statSync(ROADMAP_RUNTIME_FILE).mtimeMs;
+      if (repoMtime > runtimeMtime) {
+        repoNewer = true;
+        // Merge: repo file has new structure/items, runtime has UI status updates.
+        // Strategy: load repo as base, overlay any runtime status changes for items
+        // that exist in both, then write merged result as the new runtime copy.
+        const repoData = JSON.parse(fs.readFileSync(ROADMAP_REPO_FILE, 'utf-8'));
+        const runtimeData = JSON.parse(fs.readFileSync(ROADMAP_RUNTIME_FILE, 'utf-8'));
+        // Build a status map from runtime (preserves UI toggling)
+        const runtimeStatuses: Record<string, string> = {};
+        for (const sprint of runtimeData.sprints || []) {
+          for (const item of sprint.items || []) {
+            runtimeStatuses[String(item.id)] = item.status;
+          }
+        }
+        // Use repo structure as base, overlay runtime statuses only where
+        // the runtime had a more-advanced status (e.g. user toggled to done)
+        for (const sprint of repoData.sprints || []) {
+          for (const item of sprint.items || []) {
+            const rtStatus = runtimeStatuses[String(item.id)];
+            if (rtStatus && rtStatus !== item.status) {
+              // If runtime says done but repo says pending, keep done (user toggled it)
+              // If repo says done but runtime says pending, keep done (git updated it)
+              const priority: Record<string, number> = { pending: 0, in_progress: 1, done: 2 };
+              item.status = (priority[rtStatus] ?? 0) >= (priority[item.status] ?? 0) ? rtStatus : item.status;
+            }
+          }
+        }
+        fs.writeFileSync(ROADMAP_RUNTIME_FILE, JSON.stringify(repoData, null, 2));
+        return repoData;
+      }
     }
-  } catch { /* fall through */ }
+  } catch { /* fall through to normal load */ }
+
+  // 1. Runtime copy (has latest UI status updates)
+  if (!repoNewer) {
+    try {
+      if (fs.existsSync(ROADMAP_RUNTIME_FILE)) {
+        return JSON.parse(fs.readFileSync(ROADMAP_RUNTIME_FILE, 'utf-8'));
+      }
+    } catch { /* fall through */ }
+  }
 
   // 2. Tracked repo file (canonical structure + statuses)
   let data: ReturnType<typeof JSON.parse> | null = null;

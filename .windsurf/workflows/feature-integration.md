@@ -26,18 +26,24 @@ Every tool should include "Next steps" or "Tip" hints that guide users to relate
 
 ### Existing cross-links (keep these updated)
 
-| From | To | Condition |
-|------|----|-----------|
-| Site Audit errors | → SEO Editor | Meta title/desc issues found |
-| Site Audit errors | → Redirects | Redirect chain issues found |
-| Site Audit errors | → Schema | Structured data gaps found |
-| Site Audit errors | → Performance | Speed issues found |
-| Search Console | → Keyword Strategy | Low-hanging fruit queries exist |
-| Search Console | → SEO Editor | CTR improvement opportunities |
-| Keyword Strategy gaps | → Content Briefs | Content gaps identified |
-| Rank Tracker empty | → Strategy | No keywords tracked yet |
-| Internal Links | → SEO Editor, Site Audit | After analysis |
-| Redirect Manager | → Site Audit, Dead Links | After adding redirects |
+| From | To | Condition | Action |
+|------|----|-----------|--------|
+| Site Audit Fix→ | → SEO Editor | Meta title/desc/H1/OG issues | Auto-expands + scrolls to target page |
+| Site Audit Fix→ | → Schema Generator | Missing/invalid JSON-LD | Auto-generates schema for target page |
+| Site Audit Fix→ | → Content Briefs | Thin content / low word count | Pre-fills keyword from page name |
+| Site Audit Fix→ | → Redirects | Redirect chain issues | Navigates to tool |
+| Site Audit Fix→ | → Performance | Speed / CWV issues | Navigates to tool |
+| Site Audit Flag | → Client Requests | Any issue needing client sign-off | Creates request with issue context |
+| Site Audit tips | → SEO Editor | Meta title/desc issues found | Static cross-link hint |
+| Site Audit tips | → Redirects | Redirect chain issues found | Static cross-link hint |
+| Site Audit tips | → Schema | Structured data gaps found | Static cross-link hint |
+| Site Audit tips | → Performance | Speed issues found | Static cross-link hint |
+| Search Console | → Keyword Strategy | Low-hanging fruit queries exist | Static cross-link hint |
+| Search Console | → SEO Editor | CTR improvement opportunities | Static cross-link hint |
+| Keyword Strategy gaps | → Content Briefs | Content gaps identified | Static cross-link hint |
+| Rank Tracker empty | → Strategy | No keywords tracked yet | Static cross-link hint |
+| Internal Links | → SEO Editor, Site Audit | After analysis | Static cross-link hint |
+| Redirect Manager | → Site Audit, Dead Links | After adding redirects | Static cross-link hint |
 
 ### When to add a cross-link
 
