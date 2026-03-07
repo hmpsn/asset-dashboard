@@ -1,5 +1,10 @@
-/** Score color helper — used by MetricRing and any component showing health scores */
+/** Score color helper — used by MetricRing and any component showing health scores.
+ *  Returns WCAG-compliant darker shades when .dashboard-light is active. */
 export function scoreColor(score: number): string {
+  const light = typeof document !== 'undefined' && !!document.querySelector('.dashboard-light');
+  if (light) {
+    return score >= 80 ? '#047857' : score >= 60 ? '#b45309' : '#dc2626';
+  }
   return score >= 80 ? '#34d399' : score >= 60 ? '#fbbf24' : '#f87171';
 }
 

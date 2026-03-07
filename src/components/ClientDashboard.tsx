@@ -139,13 +139,13 @@ function TrendChart({ data, metric, color }: { data: PerformanceTrend[]; metric:
   const points = pointCoords.map(p => `${p.x},${p.y}`).join(' ');
   const bandW = w / data.length;
   return (
-    <div className="relative">
+    <div className="relative" onMouseLeave={() => setSelected(null)}>
       <svg viewBox={`0 0 ${w} 100`} className="w-full" style={{ height: 80 }} preserveAspectRatio="none">
         <defs><linearGradient id={`cg-${metric}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={color} stopOpacity="0.2" /><stop offset="100%" stopColor={color} stopOpacity="0" /></linearGradient></defs>
         <polygon fill={`url(#cg-${metric})`} points={`0,100 ${points} ${w},100`} />
         <polyline fill="none" stroke={color} strokeWidth="1.5" points={points} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
         {pointCoords.map((p, i) => (
-          <rect key={i} x={p.x - bandW / 2} y={0} width={bandW} height={100} fill="transparent" className="cursor-pointer" onClick={() => setSelected(selected === i ? null : i)} />
+          <rect key={i} x={p.x - bandW / 2} y={0} width={bandW} height={100} fill="transparent" className="cursor-pointer" onMouseEnter={() => setSelected(i)} />
         ))}
         {selected !== null && pointCoords[selected] && (
           <>
@@ -185,7 +185,7 @@ function DualTrendChart({ data, annotations: anns }: { data: PerformanceTrend[];
   const iPoints = iCoords.map(p => `${p.x},${p.y}`).join(' ');
   const bandW = w / data.length;
   return (
-    <div className="relative">
+    <div className="relative" onMouseLeave={() => setSelected(null)}>
       <div className="flex items-center gap-4 mb-2">
         <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded bg-blue-400" /><span className="text-[11px] text-blue-400">Clicks</span></div>
         <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded bg-teal-400" /><span className="text-[11px] text-teal-400">Impressions</span></div>
@@ -205,9 +205,9 @@ function DualTrendChart({ data, annotations: anns }: { data: PerformanceTrend[];
           const x = (idx / (data.length - 1)) * w;
           return <g key={ann.id}><line x1={x} y1={2} x2={x} y2={98} stroke={ann.color || '#2dd4bf'} strokeWidth="0.8" strokeDasharray="2,1.5" opacity="0.7" vectorEffect="non-scaling-stroke" /><circle cx={x} cy={3} r="1.5" fill={ann.color || '#2dd4bf'} vectorEffect="non-scaling-stroke" /><title>{ann.label}</title></g>;
         })}
-        {/* Clickable hit areas */}
+        {/* Hover hit areas */}
         {cCoords.map((p, i) => (
-          <rect key={i} x={p.x - bandW / 2} y={0} width={bandW} height={100} fill="transparent" className="cursor-pointer" onClick={() => setSelected(selected === i ? null : i)} />
+          <rect key={i} x={p.x - bandW / 2} y={0} width={bandW} height={100} fill="transparent" className="cursor-pointer" onMouseEnter={() => setSelected(i)} />
         ))}
         {/* Selected point indicators */}
         {selected !== null && cCoords[selected] && (
@@ -248,13 +248,13 @@ function ScoreHistoryChart({ history }: { history: Array<{ id: string; createdAt
   const points = pointCoords.map(p => `${p.x},${p.y}`).join(' ');
   const bandW = w / scores.length;
   return (
-    <div className="relative">
+    <div className="relative" onMouseLeave={() => setSelected(null)}>
       <svg viewBox={`0 0 ${w} 100`} className="w-full" style={{ height: 60 }} preserveAspectRatio="none">
         <defs><linearGradient id="sh-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#34d399" stopOpacity="0.15" /><stop offset="100%" stopColor="#34d399" stopOpacity="0" /></linearGradient></defs>
         <polygon fill="url(#sh-g)" points={`0,100 ${points} ${w},100`} />
         <polyline fill="none" stroke="#34d399" strokeWidth="2" points={points} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
         {pointCoords.map((p, i) => (
-          <rect key={i} x={p.x - bandW / 2} y={0} width={bandW} height={100} fill="transparent" className="cursor-pointer" onClick={() => setSelected(selected === i ? null : i)} />
+          <rect key={i} x={p.x - bandW / 2} y={0} width={bandW} height={100} fill="transparent" className="cursor-pointer" onMouseEnter={() => setSelected(i)} />
         ))}
         {selected !== null && pointCoords[selected] && (
           <>

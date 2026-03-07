@@ -86,6 +86,11 @@ button, a, input, textarea, select {
   transition: all 0.15s ease;
 }
 
+/* Pointer cursor on all interactive elements */
+button, a, [role="button"], summary, select, label[for] {
+  cursor: pointer;
+}
+
 /* Input styling */
 input, textarea, select {
   font-family: inherit;
@@ -109,12 +114,12 @@ input::placeholder, textarea::placeholder {
 .text-zinc-200 { color: #f4f4f5 !important; }   /* was #e4e4e7 → zinc-100 level */
 .text-zinc-300 { color: #e4e4e7 !important; }   /* was #d4d4d8 → one notch brighter */
 /* Secondary text: readable but clearly subordinate */
-.text-zinc-400 { color: #b4b4bc !important; }   /* was #a1a1aa → halfway to zinc-300 */
-.text-zinc-500 { color: #a1a1aa !important; }   /* was #71717a → zinc-400 */
+.text-zinc-400 { color: #c4c4cc !important; }   /* was #b4b4bc → brighter for contrast */
+.text-zinc-500 { color: #adadb6 !important; }   /* was #a1a1aa → one notch brighter */
 
 /* Muted text: still visible on dark bg */
-.text-zinc-600 { color: #71717a !important; }   /* was #52525b → zinc-500 */
-.text-zinc-700 { color: #71717a !important; }   /* was #3f3f46 → zinc-500 */
+.text-zinc-600 { color: #82828a !important; }   /* was #71717a → one notch brighter */
+.text-zinc-700 { color: #82828a !important; }   /* was #71717a → one notch brighter */
 
 .placeholder-zinc-600::placeholder { color: #71717a !important; }
 .placeholder-zinc-500::placeholder { color: #a1a1aa !important; }
@@ -123,8 +128,10 @@ input::placeholder, textarea::placeholder {
 .hover\:text-zinc-300:hover { color: #f4f4f5 !important; }
 .hover\:text-zinc-200:hover { color: #ffffff !important; }
 
-/* ─── Type scale: only fix the inaccessible sizes ─── */
-.text-\[11px\] { font-size: 12px !important; line-height: 1.5 !important; }
+/* ─── Type scale: bump small sizes for readability ─── */
+.text-\[11px\] { font-size: 13.5px !important; line-height: 1.5 !important; }
+.text-xs { font-size: 13.5px !important; line-height: 1.5 !important; }
+.text-sm { font-size: 15.5px !important; line-height: 1.5 !important; }
 
 /* ─── Visual depth & premium interactions ─── */
 
@@ -260,15 +267,16 @@ nav button[class*="bg-teal-500"] {
 .dashboard-light .text-zinc-100 { color: #0f172a !important; }  /* near-black navy */
 .dashboard-light .text-zinc-200 { color: #0f172a !important; }  /* primary → dark navy */
 .dashboard-light .text-zinc-300 { color: #1e293b !important; }  /* strong secondary */
-.dashboard-light .text-zinc-400 { color: #334155 !important; }  /* secondary */
-.dashboard-light .text-zinc-500 { color: #475569 !important; }  /* muted */
-.dashboard-light .text-zinc-600 { color: #64748b !important; }  /* subtle */
+.dashboard-light .text-zinc-400 { color: #1e293b !important; }  /* secondary — darker for contrast */
+.dashboard-light .text-zinc-500 { color: #334155 !important; }  /* muted — darker for contrast */
+.dashboard-light .text-zinc-600 { color: #475569 !important; }  /* subtle — one notch darker */
 .dashboard-light .text-zinc-700 { color: #334155 !important; }
 /* .text-white stays white — used on teal/green button backgrounds in both modes */
 
 /* === Accent Text — accessible on white (≥4.5:1 WCAG AA) === */
 .dashboard-light .text-teal-400 { color: #0d9488 !important; }       /* teal-600  · 4.5:1 */
 .dashboard-light .text-teal-300 { color: #0d9488 !important; }       /* map up   · 4.5:1 */
+.dashboard-light .text-teal-200 { color: #0d9488 !important; }       /* map up   · 4.5:1 */
 .dashboard-light .text-emerald-400 { color: #047857 !important; }    /* emrld-700 · 5.5:1 */
 .dashboard-light .text-green-400 { color: #15803d !important; }      /* green-700 · 5.2:1 */
 .dashboard-light .text-green-300 { color: #15803d !important; }      /* map up   · 5.2:1 */

@@ -80,8 +80,8 @@ export function CompactStatBar({ items, className }: { items: CompactStatProps[]
     <div className={`bg-zinc-900 rounded-xl border border-zinc-800 px-5 py-3 flex items-center justify-between flex-wrap gap-3 ${className ?? ''}`}>
       {items.map(m => (
         <div key={m.label} className="flex items-center gap-2">
-          <span className="text-[11px] text-zinc-500 uppercase tracking-wider">{m.label}</span>
-          <span className={`text-sm font-bold ${m.valueColor ?? 'text-zinc-200'}`}>{m.value}</span>
+          <span className="text-xs text-zinc-500 uppercase tracking-wider">{m.label}</span>
+          <span className={`text-base font-bold ${m.valueColor ?? 'text-zinc-200'}`}>{m.value}</span>
         </div>
       ))}
     </div>

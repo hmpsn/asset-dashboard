@@ -14,6 +14,7 @@ import { SearchConsole } from './components/SearchConsole';
 import { RequestManager } from './components/RequestManager';
 import { WorkspaceOverview } from './components/WorkspaceOverview';
 import { ClientDashboard } from './components/ClientDashboard';
+import { Styleguide } from './components/Styleguide';
 import { LoginScreen } from './components/LoginScreen';
 import { useAuth } from './hooks/useAuth';
 import { useWebSocket } from './hooks/useWebSocket';
@@ -39,6 +40,10 @@ type Page =
   | 'settings';
 
 function App() {
+  // Styleguide route: /styleguide (no auth)
+  if (window.location.pathname === '/styleguide') {
+    return <Styleguide />;
+  }
   // Client dashboard route: /client/:workspaceId (public, no auth)
   const clientMatch = window.location.pathname.match(/^\/client\/([\w_]+)/);
   if (clientMatch) {

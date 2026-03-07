@@ -13,12 +13,12 @@ interface SectionCardProps {
 export function SectionCard({ title, titleIcon, titleExtra, action, children, className, noPadding }: SectionCardProps) {
   const hasHeader = title || action;
   return (
-    <div className={`bg-zinc-900 rounded-xl border border-zinc-800 ${hasHeader ? 'overflow-hidden' : ''} ${className ?? ''}`}>
+    <div className={`bg-zinc-900 rounded-xl border border-zinc-800 ${className ?? ''}`}>
       {hasHeader && (
-        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 rounded-t-xl">
           <div className="flex items-center gap-2 min-w-0">
             {titleIcon}
-            <span className="text-sm font-medium text-zinc-300">{title}</span>
+            <span className="text-sm font-semibold text-zinc-200">{title}</span>
             {titleExtra}
           </div>
           {action}
