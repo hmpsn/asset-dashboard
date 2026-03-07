@@ -49,10 +49,10 @@ Upgrade the client-facing AI assistant from a search-data-only Q&A tool into a f
 - ✅ Floating chat widget UX (teal/emerald for client, indigo/violet for admin)
 
 ### What it still lacks
-1. **No memory** — every conversation starts from zero
+1. ~~**No memory** — every conversation starts from zero~~ ✅ Shipped — persistent sessions, cross-session summaries, chat history UI
 2. **No proactive insights** — only answers questions, never surfaces opportunities
 3. **No action triggers** — can't link to specific dashboard sections or trigger actions
-4. **Single-turn context** — no conversation history passed to the AI
+4. ~~**Single-turn context** — no conversation history passed to the AI~~ ✅ Shipped — last 10 messages passed as conversation context
 
 ---
 
@@ -83,25 +83,33 @@ Client chatbot rebranded as "Insights Engine by hmpsn studio". System prompt inc
 
 ---
 
-### Phase 4: Conversation Memory (Priority: MEDIUM)
-**Estimated effort: 3-4 hours**
+### ~~Phase 4: Conversation Memory~~ ✅ SHIPPED
+**Shipped: March 7, 2026**
 
 #### Short-term memory (within session)
-- [ ] Pass full conversation history to AI (not just latest question)
-- [ ] Sliding window: last 10 messages to avoid token overflow
-- [ ] AI can reference earlier questions: "As we discussed, your mobile traffic is growing..."
+- [x] Pass full conversation history to AI (not just latest question)
+- [x] Sliding window: last 10 messages to avoid token overflow
+- [x] AI can reference earlier questions: "As we discussed, your mobile traffic is growing..."
 
 #### Long-term memory (across sessions)
-- [ ] Store conversation summaries per workspace: `{ lastTopics, keyInsights, openQuestions }`
-- [ ] On chat open, inject: "Last time we talked about mobile traffic growth and your content strategy."
+- [x] Store conversation summaries per workspace via `server/chat-memory.ts`
+- [x] On chat open, inject prior session summaries into system prompt for continuity
 - [ ] Store client preferences: "This client always asks about rankings" → prioritize rank data in context
 
 #### Backend
-- [ ] `/api/public/chat-history/:workspaceId` — store/retrieve conversation summaries
-- [ ] Summarize conversations on close (quick AI call to extract key points)
+- [x] `/api/public/chat-sessions/:workspaceId` — list, get, delete sessions; summarize endpoint
+- [x] Auto-summarize conversations after 6+ messages (gpt-4o-mini)
 - [ ] Prune history older than 90 days
 
-**Why this is medium:** Valuable but not critical. The chatbot is useful without memory; memory makes it feel *personal*.
+#### Client UI
+- [x] Session ID tracking per conversation
+- [x] New Chat button (+ icon) to start fresh session
+- [x] Chat History panel listing past conversations with message counts and dates
+- [x] Click to resume any previous session
+
+**Still TODO from Phase 4:**
+- [ ] Client preference tracking (auto-detect frequent topics)
+- [ ] History pruning (90-day cleanup cron)
 
 ---
 
@@ -179,5 +187,5 @@ Critical path (Phases 1-3) = **10-13 hours**.
 ---
 
 *Created: March 7, 2026*
-*Status: Phases 1-3 SHIPPED. Phases 4-6 pending.*
+*Status: Phases 1-4 SHIPPED. Phases 5-6 pending.*
 *Last updated: March 7, 2026*

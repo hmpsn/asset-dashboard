@@ -29,9 +29,9 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 3. Site Health Audit
-**What it does:** Per-page SEO audit with 20+ checks: titles, meta descriptions, canonicals, H1s, heading hierarchy, content length, alt text, Open Graph, structured data, HTML size, orphan pages, indexability, and more. Weighted scoring prioritizes high-impact ranking factors. Integrates redirect chain detection and homepage Core Web Vitals inline. Auto-saves snapshots for historical comparison. Scheduled recurring audits with email alerts on score drops. **Auto-restore**: latest audit results load from disk on mount — no data loss between deploys or server restarts. **Error-sorted page list**: pages with the most errors display first so critical issues surface immediately. **Flag for Client**: send specific audit issues to the client request queue with an inline note for review/discussion — for issues that need client approval before the agency can act. **Fix→ routing**: each issue has a Fix button that routes to the appropriate tool (Schema Generator for structured data, SEO Editor for metadata, Content Briefs for thin content, Redirects for chain issues, Performance for speed). **Auto-fix context**: when Fix→ is clicked, the target tool receives the page context — Schema auto-generates for that specific page, SEO Editor auto-expands and scrolls to the page, Content Briefs pre-fills the keyword from the page name.
+**What it does:** Per-page SEO audit with 20+ checks: titles, meta descriptions, canonicals, H1s, heading hierarchy, content length, alt text, Open Graph, structured data, HTML size, orphan pages, indexability, and more. Weighted scoring prioritizes high-impact ranking factors. Integrates redirect chain detection and homepage Core Web Vitals inline. Auto-saves snapshots for historical comparison. Scheduled recurring audits with email alerts on score drops. **Auto-restore**: latest audit results load from disk on mount — no data loss between deploys or server restarts. **Error-sorted page list**: pages with the most errors display first so critical issues surface immediately. **Flag for Client**: send specific audit issues to the client request queue with an inline note for review/discussion — for issues that need client approval before the agency can act. **Fix→ routing**: each issue has a Fix button that routes to the appropriate tool (Schema Generator for structured data, SEO Editor for metadata, Content Briefs for thin content, Redirects for chain issues, Performance for speed). **Auto-fix context**: when Fix→ is clicked, the target tool receives the page context — Schema auto-generates for that specific page, SEO Editor auto-expands and scrolls to the page, Content Briefs pre-fills the keyword from the page name. **Traffic Intelligence**: cross-references audit results with GSC clicks/impressions and GA4 pageviews/sessions via `/api/audit-traffic/:siteId`. Each page card displays traffic badges (clicks + views). Toggle between sorting by issues or traffic impact — so high-traffic pages with SEO problems surface first.
 
-**Agency value:** Replaces paid tools for Webflow-specific checks. Catches issues Screaming Frog misses (Webflow API vs. published HTML discrepancies). Historical snapshots track progress over time. Fix→ routing eliminates manual navigation — go from issue to solution in one click. Flag for Client handles issues that need sign-off without disrupting the workflow.
+**Agency value:** Replaces paid tools for Webflow-specific checks. Catches issues Screaming Frog misses (Webflow API vs. published HTML discrepancies). Historical snapshots track progress over time. Fix→ routing eliminates manual navigation — go from issue to solution in one click. Flag for Client handles issues that need sign-off without disrupting the workflow. Traffic intelligence means you fix the pages that actually get visitors first — not just the ones with the most errors.
 
 **Client value:** A clear health score with specific, actionable recommendations — not a wall of jargon. Flagged issues arrive as structured requests with context and recommendations.
 
@@ -207,13 +207,13 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 19. Client Search & Analytics View
-**What it does:** Client-facing views of GSC and GA4 data with the same time range controls, charts, and breakdowns as the admin side.
+**What it does:** Client-facing views of GSC and GA4 data with the same time range controls, charts, and breakdowns as the admin side. **SearchSnapshot** component on the Overview tab presents traffic trends, top pages (plain language), and device split with period comparison badges and sparklines — no jargon. **AnalyticsSnapshot** shows visitor counts, new vs returning breakdown, top pages by engagement, and period-over-period comparison. **OrganicInsight** displays organic traffic share, organic users, bounce rate, and top organic landing pages — helping clients understand how much of their traffic comes from search.
 
-**Agency value:** Clients stop asking "how's traffic?" — they can check themselves. Frees up time for actual optimization work.
+**Agency value:** Clients stop asking "how's traffic?" — they can check themselves. Snapshot components translate raw data into client-friendly language. Frees up time for actual optimization work.
 
-**Client value:** Ownership of their data in a clean interface. No GA4 login required.
+**Client value:** Ownership of their data in a clean, jargon-free interface. Organic insights show the real impact of SEO work. No GA4 login required.
 
-**Mutual:** Self-service data access reduces back-and-forth while keeping the agency positioned as the expert who acts on the data.
+**Mutual:** Self-service data access reduces back-and-forth while keeping the agency positioned as the expert who acts on the data. Comparison badges make trends obvious — clients see progress without needing to interpret charts.
 
 ---
 
@@ -262,13 +262,13 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 24. AI Insights Engine (Client Chatbot)
-**What it does:** Branded "hmpsn studio Insights Engine" — in-dashboard AI advisor powered by GPT-4o that answers questions using the client's full dashboard data: Google Search Console, GA4 (overview, events, conversions, sources, devices, countries), site health audit + detail, SEO strategy (page map, opportunities, content gaps, quick wins), rank tracking, activity log, annotations, pending approvals, and active requests. Revenue hook system naturally connects data insights to team services using a 3-step pattern: surface insight with numbers → explain business impact → warm handoff. Per-workspace knowledge base provides business context. Updated quick questions reflect the full data breadth.
+**What it does:** Branded "hmpsn studio Insights Engine" — in-dashboard AI advisor powered by GPT-4o that answers questions using the client's full dashboard data: Google Search Console, GA4 (overview, events, conversions, sources, devices, countries), site health audit + detail, SEO strategy (page map, opportunities, content gaps, quick wins), rank tracking, activity log, annotations, pending approvals, and active requests. Revenue hook system naturally connects data insights to team services using a 3-step pattern: surface insight with numbers → explain business impact → warm handoff. Per-workspace knowledge base provides business context. Updated quick questions reflect the full data breadth. **Conversation memory**: persistent session history stored to disk (`server/chat-memory.ts`). Last 10 messages sent as conversation context to OpenAI for coherent multi-turn dialogue. **Cross-session summaries**: AI-generated session summaries (gpt-4o-mini) injected into system prompts so the chatbot recalls topics from previous conversations. Auto-summarizes after 6+ messages. **Chat history UI**: New Chat button, session history panel listing past conversations with message counts and dates, click to resume any previous session.
 
-**Agency value:** Every conversation is a potential touchpoint for additional services. Revenue hooks surface upsell opportunities organically — data-backed, never pushy. Reduces support burden while positioning the agency as the solution.
+**Agency value:** Every conversation is a potential touchpoint for additional services. Revenue hooks surface upsell opportunities organically — data-backed, never pushy. Reduces support burden while positioning the agency as the solution. Conversation memory means the chatbot builds rapport over time — clients don't repeat themselves.
 
-**Client value:** A knowledgeable advisor that understands their entire site — not just search data. Answers questions about health, strategy, content, rankings, and approvals in plain English.
+**Client value:** A knowledgeable advisor that understands their entire site — not just search data. Answers questions about health, strategy, content, rankings, and approvals in plain English. Remembers previous conversations and preferences across sessions.
 
-**Mutual:** The chatbot pays for itself. Clients get 24/7 data-driven advice; the agency gets natural lead-ins to propose services.
+**Mutual:** The chatbot pays for itself. Clients get 24/7 data-driven advice; the agency gets natural lead-ins to propose services. Memory turns one-off Q&A into an ongoing relationship.
 
 ---
 
@@ -446,6 +446,15 @@ A brief value assessment of every feature in the platform, covering what it does
 
 **Mutual:** Eliminates the "let me pull up the data" delay. Every workspace conversation starts from a position of full awareness.
 
+### 41. Automated Monthly Reports
+**What it does:** Auto-generated monthly report emails sent to clients on a configurable schedule. `gatherMonthlyData` aggregates site health audit (score, delta, errors, warnings), requests completed/open, approvals applied/pending, activity log, and now **traffic trends**: GSC period comparison (clicks, impressions with % change vs previous 28 days) and GA4 period comparison (users, sessions, pageviews with % change). `renderMonthlyReport` in `email-templates.ts` generates a branded HTML email with a health score ring, traffic trends grid (each metric shows current value + arrow + % change vs previous period), metrics grid (requests, approvals, activities), recent activity feed, and pending approval alerts. Manual trigger via `triggerMonthlyReport()` or automatic via `startMonthlyReports()` scheduler.
+
+**Agency value:** Monthly reporting that writes itself. Traffic trends show clients their site is growing (or flag problems) without manual data pulls. Positions the agency as proactive — clients get a polished report without anyone remembering to send it.
+
+**Client value:** Regular, data-rich updates on their site's performance without scheduling a meeting. Traffic trends contextualize the numbers — "your clicks are up 23% vs last month" is immediately meaningful.
+
+**Mutual:** Eliminates the most common source of client "radio silence" complaints. The agency delivers consistent communication; the client stays informed and engaged.
+
 ---
 
 ## Summary
@@ -455,12 +464,12 @@ A brief value assessment of every feature in the platform, covering what it does
 | SEO & Technical | 12 | Audit, fix, and optimize faster than manual tools |
 | Analytics & Tracking | 5 | Unified data view replaces platform-hopping |
 | Content & Strategy | 3 | Strategy → brief → approval → production pipeline |
-| Client Communication | 5 | Structured workflows replace email chaos |
+| Client Communication | 6 | Structured workflows + automated reports replace email chaos |
 | Client Self-Service | 6 | 24/7 data access reduces reporting overhead |
-| AI & Intelligence | 3 | Full-spectrum AI advisor + revenue engine + knowledge base |
+| AI & Intelligence | 3 | Full-spectrum AI advisor + revenue engine + knowledge base + memory |
 | Platform & UX | 7 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home |
 
-**41 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**42 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
 ---
 
@@ -497,6 +506,7 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - ~~Flag for Client~~: ✅ Shipped — Send specific audit issues to client request queue with inline note for review/discussion.
 - ~~Fix→ routing~~: ✅ Shipped — Each issue maps to the appropriate tool (Schema, SEO Editor, Briefs, Redirects, Performance) with a one-click Fix button.
 - ~~Auto-fix context~~: ✅ Shipped — Fix→ passes page context to target tools: Schema auto-generates, SEO Editor auto-expands, Briefs pre-fill keyword.
+- ~~Traffic intelligence~~: ✅ Shipped — `/api/audit-traffic/:siteId` cross-references GSC clicks/impressions and GA4 pageviews/sessions per page. Traffic badges on page cards. Sort by traffic impact toggle.
 - **Full-site PageSpeed**: Offer a deeper multi-page PSI scan as a separate background job.
 - **Accessibility audit expansion**: Currently only checks img alt text. Could add WCAG contrast, ARIA, heading order, form label checks.
 - **Historical trend charts**: Track audit score over time per-page, not just site-wide.
@@ -512,6 +522,9 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - ~~PDF export~~: ✅ Shipped — Professional PDF with TOC, page breaks, section numbers.
 - **Custom date range picker**: Replace preset buttons (7d/28d/90d) with a full calendar date range selector.
 - ~~White-label email templates~~: ✅ Shipped — Light-mode branded HTML email templates with batched digest system. 7 event types, 5-min sliding window, disk-persisted queue.
+- ~~Simplified search snapshot~~: ✅ Shipped — SearchSnapshot component on Overview tab: traffic trend, top pages (plain language), device split with comparison badges and sparklines.
+- ~~Simplified analytics snapshot~~: ✅ Shipped — AnalyticsSnapshot + OrganicInsight components: GA4 organic overview, landing pages, new vs returning, period comparison.
+- ~~Monthly report traffic trends~~: ✅ Shipped — `gatherMonthlyData` fetches GSC/GA4 period comparison; `renderMonthlyReport` renders traffic trends grid with arrows + % change in email template.
 
 ### Content Pipeline
 - ~~Service tiers~~: ✅ Shipped — Brief vs. Full Post with configurable pricing.
@@ -565,4 +578,4 @@ When the user asks to update this document with recent features, follow this pro
 7. **Update Summary table**: Adjust category counts and total feature count.
 8. **Commit**: `git add FEATURE_AUDIT.md && git commit -m "docs: update FEATURE_AUDIT with recent features"`
 
-Current feature count: **41**. Last updated: March 7, 2026.
+Current feature count: **42**. Last updated: March 7, 2026.
