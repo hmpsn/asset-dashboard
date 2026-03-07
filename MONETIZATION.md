@@ -275,6 +275,100 @@ The brief → post → publish pipeline is the most natural transaction point. C
 
 ---
 
+## UX Soft-Gating Spec (Option A)
+
+The dashboard shell, tabs, layout, and navigation stay **identical across all tiers**. What changes is depth of access within certain features. Gated content is shown as a **blurred teaser with an upgrade CTA overlay** — clients always see what they're missing.
+
+### Unchanged Across All Tiers
+
+| Tab / Feature | Experience |
+|---------------|-----------|
+| Overview (Welcome back, metric cards, InsightsDigest) | Identical |
+| Search (full GSC data, charts, queries, pages) | Identical |
+| Analytics (full GA4 data, charts, sources, devices) | Identical |
+| Site Health (score ring, severity, page list) | Identical |
+| Requests (submit, track, comment) | Identical |
+| Activity Log | Identical |
+| Monthly Report Emails | Identical |
+
+### Gated Feature Matrix
+
+| Feature | Free | Growth | Premium |
+|---------|------|--------|---------|
+| AI Chatbot | 3 convos/month → soft upgrade prompt | Unlimited | Unlimited |
+| Proactive Insights greeting | Disabled (no greeting on chat open) | Full greeting + follow-ups | Full |
+| Strategy tab | Teaser: summary cards visible, page map + content gaps blurred with "Upgrade to see your full keyword strategy" overlay | Full view + "Request This Topic" | Full + multi-competitor |
+| Content Pipeline | Can request topics; brief generation requires per-brief Stripe payment | Brief requests → Stripe checkout | Included in bundle allowance |
+| Approvals | View proposed changes (read-only) | Full approve / reject / edit | Full + priority queue |
+| Schema generation | Tab not visible | Not visible | Full generation + publishing |
+| Custom date ranges | Locked to 28d default | Full presets + custom calendar | Full |
+| Competitor comparison | Not available | 1 competitor | Multiple competitors |
+| Knowledge base tuning | Default only | Default only | Dedicated per-client tuning |
+
+### Soft Gate UX Pattern
+
+Each gated section uses the same visual treatment:
+
+```
+┌──────────────────────────────────────┐
+│  [Blurred/frosted content preview]   │
+│                                      │
+│  ┌────────────────────────────────┐  │
+│  │  🔒 Upgrade to Growth          │  │
+│  │                                │  │
+│  │  12 content opportunities      │  │
+│  │  identified for your site.     │  │
+│  │                                │  │
+│  │  [ See Plans → ]               │  │
+│  └────────────────────────────────┘  │
+│                                      │
+│  [Blurred/frosted content preview]   │
+└──────────────────────────────────────┘
+```
+
+- Background: actual data rendered but with `blur-md` + `pointer-events-none`
+- Overlay: centered card with lock icon, tier name, value proposition, and CTA button
+- CTA links to in-portal pricing page or Stripe subscription checkout
+
+### AI Chatbot Rate Limiting (Free Tier)
+
+- Track conversations per workspace per calendar month in `chat-memory.ts`
+- A "conversation" = a chat session with at least 1 user message
+- After 3 conversations: chat input disabled, replaced with upgrade prompt
+- Counter shown in chat header: "2 of 3 free conversations remaining"
+- Proactive insights greeting disabled on free tier (saves tokens + creates upgrade incentive)
+
+### Implementation Checklist
+
+1. **Add `tier` to Workspace interface** — `tier: 'free' | 'growth' | 'premium'` in `server/workspaces.ts`
+2. **Create `<TierGate>` component** — accepts `requiredTier`, renders children or upgrade overlay
+   ```tsx
+   <TierGate tier={ws.tier} required="growth" feature="Full Keyword Strategy" teaser="12 content opportunities identified">
+     {/* Strategy page map, content gaps, etc. */}
+   </TierGate>
+   ```
+3. **Wrap gated sections** (~10-15 spots across ClientDashboard.tsx):
+   - Strategy tab: page map + content gaps + quick wins
+   - Content Pipeline: brief generation button
+   - Approvals: approve/reject buttons
+   - Chat: input field after limit reached
+   - Date range: custom calendar popover
+4. **Chat rate limiting** — monthly counter in `chat-memory.ts`, checked at `/api/public/search-chat/`
+5. **Tier endpoint** — `GET /api/public/tier/:workspaceId` returns current tier for frontend
+6. **Stripe subscription sync** — webhook updates `ws.tier` on subscription create/cancel/change
+7. **Admin tier management** — Workspace Settings dropdown to manually set tier (override)
+
+### Estimated Effort: 3-4 hours
+
+- `<TierGate>` component: 30min
+- Workspace `tier` field + endpoint: 30min
+- Wrap 10-15 gated sections: 1-1.5h
+- Chat rate limiting: 30min
+- Admin tier management UI: 30min
+- Testing across tiers: 30min
+
+---
+
 ## Stripe Integration Spec (Phase 1)
 
 ### Required Environment Variables
