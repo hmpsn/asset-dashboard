@@ -184,6 +184,7 @@ Track key decisions here as they're made:
 | 2026-03-07 | Sidebar restructured | Icon-only bottom bar, Command Center button, grouped nav (Analytics, Site Health, SEO, Manage) |
 | 2026-03-07 | Sprint 6 items #18 + #19 shipped | Proactive insights (auto-greeting on chat open) + custom date range picker (calendar popover + full backend startDate/endDate support) |
 | 2026-03-07 | Typography hierarchy standardized | All 8 client dashboard tabs now use consistent page title (text-xl), subtitle (text-sm), section header (text-sm semibold) sizing. Added page titles to Search, Analytics, Site Health tabs. |
+| 2026-03-07 | Monetization strategy formalized | MONETIZATION.md: 3-tier model (Free/Growth/Premium), product pricing (briefs, posts, schemas, strategy), 3 bundles, Stripe integration spec. Phase 1: Stripe checkout for deliverables. |
 | | | |
 
 ---
