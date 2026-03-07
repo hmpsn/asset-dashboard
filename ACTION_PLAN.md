@@ -42,7 +42,7 @@ Priority tiers:
 | # | Item | Source | Est. | Priority | Notes |
 |---|------|--------|:----:|:--------:|-------|
 | 78 | ~~**Pre-Stripe security hardening**~~ — Helmet security headers (CSP whitelists Stripe), HTTPS enforcement, rate limiting (60/min read, 10/min write, 5/min checkout), input sanitization on content endpoints | Security Audit | 1h | 🔴 P0 | ✅ Shipped — foundation for payment routes |
-| 4 | **Stripe integration: content payments** — Stripe Checkout for briefs, posts, schemas, strategies. Webhook handler, payment tracking per workspace. `server/stripe.ts` + `server/payments.ts` | MONETIZATION.md Phase 1 | 5-7h | 🔴 P0 | Direct revenue from existing content pipeline |
+| 4 | ~~**Stripe integration: content payments**~~ — Stripe Checkout for briefs, posts, schemas, strategies. Webhook handler, payment tracking per workspace. `server/stripe.ts` + `server/payments.ts` | MONETIZATION.md Phase 1 | 5-7h | 🔴 P0 | ✅ Shipped — 14 products, checkout redirect, webhook, payment records, success/cancel toast |
 | 65 | **Workspace tier field + TierGate component** — Add `tier: free\|growth\|premium` to Workspace. Create `<TierGate>` with blur overlay + upgrade CTA. `GET /api/public/tier/:wsId` | MONETIZATION.md UX Spec | 1-2h | 🔴 P0 | Foundation for all tier gating |
 | 66 | **Soft-gate dashboard sections** — Wrap ~10-15 sections in TierGate: Strategy page map, content gaps, brief generation, approve/reject, custom date ranges, chat input after limit | MONETIZATION.md UX Spec | 1.5-2h | 🔴 P0 | Depends on #65 |
 | 67 | **AI chatbot rate limiting (free tier)** — Monthly conversation counter in `chat-memory.ts`. 3 convos/month free. Counter in chat header. Disable proactive insights on free tier | MONETIZATION.md UX Spec | 1h | 🔴 P0 | Depends on #65 |
@@ -222,6 +222,7 @@ Track key decisions here as they're made:
 | 2026-03-07 | Revenue Intelligence sprint added | ROI dashboard (Premium), churn prevention signals, credits system, usage tracking. Sprint 5 in roadmap. |
 | 2026-03-07 | 13 new items added to roadmap | 52 → 65 total items. New sprints: 2b (Monetization UX), 5 (Revenue Intelligence). Items #65-77. |
 | 2026-03-07 | Pre-Stripe security hardening shipped | Helmet (CSP for Stripe domains), HTTPS enforcement, 3-tier rate limiting on public routes, input sanitization on all content endpoints. Item #78. |
+| 2026-03-07 | Stripe integration shipped | server/stripe.ts + server/payments.ts. 14 product types, Stripe Checkout redirect, webhook handler (checkout.session.completed + payment_intent.payment_failed), payment record persistence, frontend success/cancel detection. Item #4. |
 | | | |
 
 ---

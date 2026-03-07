@@ -42,8 +42,8 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 | `server/openai-helpers.ts` | `callOpenAI` with retry/backoff/timeout, `parseAIJson`, token usage tracking |
 | `server/schema-suggester.ts` | JSON-LD schema generation per page |
 | `server/rank-tracking.ts` | Keyword position tracking over time |
-| `server/stripe.ts` | *(Planned)* Stripe SDK setup, checkout session creation, webhook handler |
-| `server/payments.ts` | *(Planned)* Payment record persistence (JSON on disk), per-workspace payment history |
+| `server/stripe.ts` | Stripe SDK setup, product config (14 types), checkout session creation, webhook handler (checkout.session.completed, payment_intent.payment_failed) |
+| `server/payments.ts` | Payment record CRUD (JSON on disk), per-workspace payment history, lookup by session ID |
 
 ## Key Frontend Components
 
