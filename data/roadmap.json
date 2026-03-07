@@ -35,9 +35,9 @@
       "rationale": "Clean up recently shipped work, extend to client side.",
       "items": [
         { "id": 8, "title": "Admin Search Console: primitives audit", "source": "Memory/Roadmap", "est": "1-2h", "priority": "P1", "notes": "Shipped — new panels verified against shared UI primitives", "status": "done" },
-        { "id": 9, "title": "Client dashboard: simplified search data", "source": "Memory/Roadmap", "est": "3-4h", "priority": "P1", "notes": "Traffic growth direction, top pages (plain language), device split", "status": "pending" },
+        { "id": 9, "title": "Client dashboard: simplified search data", "source": "Memory/Roadmap", "est": "3-4h", "priority": "P1", "notes": "SearchSnapshot component: traffic trend, top pages, device split with comparison badges", "status": "done" },
         { "id": 10, "title": "Admin GA4 dashboard upgrade", "source": "Memory/Roadmap", "est": "3-4h", "priority": "P1", "notes": "Shipped in Sprint 1", "status": "done" },
-        { "id": 11, "title": "Client dashboard: simplified analytics data", "source": "Memory/Roadmap", "est": "2-3h", "priority": "P1", "notes": "Simplified GA4 organic overview for client portal", "status": "pending" }
+        { "id": 11, "title": "Client dashboard: simplified analytics data", "source": "Memory/Roadmap", "est": "2-3h", "priority": "P1", "notes": "AnalyticsSnapshot + OrganicInsight components: GA4 organic overview, landing pages, new vs returning", "status": "done" }
       ]
     },
     {
@@ -46,10 +46,10 @@
       "hours": "6-9",
       "rationale": "Cross-pollinate data across tools for smarter recommendations.",
       "items": [
-        { "id": 12, "title": "SEO Audit Intelligence", "source": "Memory/Roadmap", "est": "3-4h", "priority": "P1", "notes": "Cross-reference audit findings with GSC/GA4 performance data", "status": "pending" },
+        { "id": 12, "title": "SEO Audit Intelligence", "source": "Memory/Roadmap", "est": "3-4h", "priority": "P1", "notes": "/api/audit-traffic endpoint, traffic badges on page cards, sort-by-traffic toggle", "status": "done" },
         { "id": 13, "title": "Content brief enrichment", "source": "Memory/Roadmap", "est": "1-2h", "priority": "P1", "notes": "Shipped — GSC queries + SEMRush volume/KD/CPC/related keywords injected into AI brief generation", "status": "done" },
-        { "id": 14, "title": "Monthly report enrichment", "source": "Memory/Roadmap", "est": "1h", "priority": "P2", "notes": "Period comparison data in auto-generated report narratives", "status": "pending" },
-        { "id": 15, "title": "AI chatbot: conversation memory", "source": "AI_CHATBOT_ROADMAP Phase 4", "est": "3-4h", "priority": "P2", "notes": "Session history, cross-session summaries, client preferences", "status": "pending" }
+        { "id": 14, "title": "Monthly report enrichment", "source": "Memory/Roadmap", "est": "1h", "priority": "P2", "notes": "GSC/GA4 period comparison fetched in gatherMonthlyData, traffic trends section in email template", "status": "done" },
+        { "id": 15, "title": "AI chatbot: conversation memory", "source": "AI_CHATBOT_ROADMAP Phase 4", "est": "3-4h", "priority": "P2", "notes": "chat-memory.ts: persistent sessions, conversation history in OpenAI calls, cross-session summaries, chat history UI", "status": "done" }
       ]
     },
     {
