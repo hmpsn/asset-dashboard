@@ -2980,6 +2980,79 @@ ${JSON.stringify(context, null, 2)}`;
   }
 });
 
+// ── Admin AI Chat (auth-gated, internal analyst persona) ──
+app.post('/api/admin-chat', async (req, res) => {
+  const { workspaceId, question, context } = req.body;
+  if (!question) return res.status(400).json({ error: 'question required' });
+  if (!workspaceId) return res.status(400).json({ error: 'workspaceId required' });
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return res.status(400).json({ error: 'Workspace not found' });
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (!openaiKey) return res.status(400).json({ error: 'OPENAI_API_KEY not configured' });
+
+  const { keywordBlock, brandVoiceBlock, businessContext: bizCtx } = buildSeoContext(workspaceId);
+  const kwMapContext = buildKeywordMapContext(workspaceId);
+
+  try {
+    const strategySection = (keywordBlock || kwMapContext || bizCtx)
+      ? `\n\nKEYWORD STRATEGY CONTEXT:\n${keywordBlock}${kwMapContext}${bizCtx ? `\nBusiness: ${bizCtx}` : ''}${brandVoiceBlock}`
+      : '';
+
+    const dataSources = [];
+    if (context?.search) dataSources.push('Google Search Console (queries, clicks, impressions, CTR, positions, trend)');
+    if (context?.ga4) dataSources.push('Google Analytics 4 (users, sessions, bounce rate, events, conversions, sources, devices)');
+    if (context?.comparison) dataSources.push('GA4 Period Comparison (current vs previous period deltas)');
+    if (context?.organic) dataSources.push('GA4 Organic Overview (organic users, engagement, bounce, share of total)');
+    if (context?.newVsReturning) dataSources.push('New vs Returning Users (segment breakdown, engagement rates)');
+    if (context?.landingPages) dataSources.push('Landing Pages (sessions, bounce, conversions by entry page)');
+    if (context?.conversions) dataSources.push('Key Events/Conversions (event counts, user counts, rates)');
+    if (context?.siteHealth) dataSources.push('Site Health Audit (score, errors, warnings, page issues)');
+    if (context?.rankings) dataSources.push('Rank Tracking (keyword positions, changes over time)');
+
+    const systemPrompt = `You are an expert internal analytics analyst for **${ws.webflowSiteName || ws.name}**. You're embedded in the admin dashboard of hmpsn studio's platform. The user is a team member managing this client's website — give them unfiltered, technical, data-driven analysis.
+
+AVAILABLE DATA:
+${dataSources.map(d => `• ${d}`).join('\n')}
+${strategySection}
+
+YOUR ROLE:
+1. **Deep technical analysis** — Cross-reference data sources to surface non-obvious insights. A page ranking #8 with high impressions + high bounce + no conversion tracking tells a multi-layered story.
+2. **Actionable recommendations** — Be specific: "Rewrite the meta description for /services to include 'free consultation' — it has 2.4K impressions at 1.2% CTR" not "improve your CTR."
+3. **Prioritize by ROI** — Time is limited. Lead with changes that have the biggest impact relative to effort.
+4. **Flag risks** — Dropping rankings, rising bounce rates, audit score declining, stale content — surface these proactively.
+5. **Client communication suggestions** — When you spot something the client should know about, suggest how to frame it: "You could tell the client: 'Your contact form submissions are up 40% — the landing page updates are paying off.'"
+
+TONE:
+- Direct, technical, no fluff — you're talking to a peer, not a client
+- Use markdown: tables for comparisons, bold for emphasis, code blocks for URLs/paths
+- Numbers first, narrative second
+- 200-400 words unless the question demands more
+
+Site: ${ws.webflowSiteName || ws.name}
+Date range: last ${context?.days || 28} days
+
+Full data context:
+${JSON.stringify(context, null, 2)}`;
+
+    const aiResult = await callOpenAI({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: question },
+      ],
+      temperature: 0.6,
+      maxTokens: 2000,
+      feature: 'admin-chat',
+      workspaceId: ws.id,
+    });
+
+    res.json({ answer: aiResult.text || 'No response generated.' });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: msg });
+  }
+});
+
 app.get('/api/google/search-overview/:siteId', async (req, res) => {
   const gscSiteUrl = req.query.gscSiteUrl as string;
   const days = parseInt(req.query.days as string) || 28;
@@ -4565,26 +4638,47 @@ app.post('/api/public/search-chat/:workspaceId', async (req, res) => {
   try {
     const hasSearch = !!(context?.search);
     const hasGA4 = !!(context?.ga4);
+    const hasHealth = !!(context?.siteHealth);
+    const hasStrategy = !!(context?.seoStrategy);
+    const hasRankings = !!(context?.rankings);
+    const hasActivity = !!(context?.recentActivity);
+    const hasApprovals = !!(context?.pendingApprovals);
+    const hasRequests = !!(context?.activeRequests);
 
     const teamName = 'your web team';
-    const systemPrompt = `You are a smart, friendly analytics advisor embedded in a client's website performance dashboard. You work alongside ${teamName} who manages this client's website. Your job is to help the client understand their data, spot opportunities, and feel confident about their website's direction.
+    const systemPrompt = `You are the **hmpsn studio Insights Engine** — a smart, data-driven analytics advisor embedded in a client's website performance dashboard. You work alongside ${teamName} who manages this client's website. Your job is to help the client understand their data, spot opportunities, and feel confident about their website's direction.
 
-${hasSearch ? 'You have access to their Google Search Console data (search queries, clicks, impressions, CTR, positions).' : ''}
-${hasGA4 ? `You have access to their Google Analytics 4 data including:
-- Site overview (users, sessions, pageviews, bounce rate, session duration)
-- Top pages by pageviews
-- Traffic sources and mediums
-- Device breakdown (desktop, mobile, tablet)
-- Tracked events (form submissions, button clicks, custom events, etc.) with event counts and user numbers
-- Conversion/key events with conversion rates
-- Top countries by users` : ''}
+DATA YOU HAVE ACCESS TO:
+${hasSearch ? '✅ **Google Search Console** — search queries, clicks, impressions, CTR, positions, top pages, search trend over time' : ''}
+${hasGA4 ? '✅ **Google Analytics 4** — users, sessions, pageviews, bounce rate, session duration, top pages, traffic sources, devices, events/conversions, countries' : ''}
+${hasHealth ? '✅ **Site Health Audit** — site score, errors, warnings, page-level issues, score history' : ''}
+${context?.siteHealthDetail ? '✅ **Audit Detail** — site-wide issues, top problem pages with specific issue descriptions' : ''}
+${hasStrategy ? '✅ **SEO Strategy** — keyword-to-page mapping, content gaps, quick wins, opportunities' : ''}
+${hasRankings ? '✅ **Rank Tracking** — tracked keyword positions, clicks, impressions, position changes' : ''}
+${hasActivity ? '✅ **Activity Log** — recent actions taken on the site' : ''}
+${hasApprovals ? `✅ **Pending Approvals** — ${context.pendingApprovals} SEO changes awaiting client review` : ''}
+${hasRequests ? '✅ **Active Requests** — open client requests with categories and statuses' : ''}
 
 YOUR APPROACH:
-1. **Be specific and data-driven** — Always reference actual numbers, queries, pages, and percentages from their data. Vague answers are useless. Show you've actually looked at their data.
-2. **Identify clear opportunities** — Don't just report numbers. Tell them what the data MEANS for their business. "Your top query has 10K impressions but 0 clicks — that's a huge untapped audience" is better than "your CTR is low."
-3. **Prioritize impact** — Lead with the biggest opportunities. If they ask a general question, highlight the 2-3 things that would move the needle most.
-4. **Give quick wins they can do themselves** — Small, non-technical things like "update your Google Business Profile" or "add this topic to your blog calendar" are great to share.
-5. **Naturally direct to ${teamName} for deeper work** — For anything involving technical SEO, site redesign, conversion optimization, content strategy, or development work, warmly recommend they bring it up with ${teamName}. Frame it as "this is exactly the kind of thing ${teamName} can help you capitalize on" — never pushy, always helpful.
+1. **Be specific and data-driven** — Always reference actual numbers, queries, pages, and percentages. Vague answers are useless. Show you've actually analyzed their data.
+2. **Connect the dots across data sources** — The most powerful insights come from cross-referencing: a page with high impressions but low CTR AND a high bounce rate tells a very specific story. Use all available data together.
+3. **Prioritize impact** — Lead with the 2-3 things that would move the needle most. Don't overwhelm with everything at once.
+4. **Give quick wins they can do themselves** — Small, non-technical things like "update your Google Business Profile" or "add this topic to your blog calendar."
+
+REVENUE HOOKS — When data reveals an opportunity, naturally connect it to a service:
+- **Low organic traffic share** → "A keyword strategy could unlock the organic traffic you're missing — ${teamName} can build one targeted to your business."
+- **High bounce rate on key pages** → "This page needs attention — ${teamName} can optimize the content and layout to keep visitors engaged."
+- **Missing or thin content for valuable keywords** → "There's a content gap here that's costing you traffic — ${teamName} can create a content brief or full post to capture it."
+- **Technical SEO issues (errors, warnings, broken links)** → "These technical issues are holding your rankings back — ${teamName} can run a cleanup sprint."
+- **No conversion tracking / low event counts** → "Without proper tracking, we can't measure what's working — ${teamName} can set up conversion tracking so you see the full picture."
+- **Keyword rankings dropping** → "Some of your rankings have slipped — ${teamName} can analyze why and build a recovery plan."
+- **Pending approvals** → "You have SEO improvements waiting for your review — approving them will help your rankings."
+- **Schema/structured data gaps** → "Adding structured data could get you rich snippets in search results — ${teamName} can implement the right schema types."
+
+IMPORTANT: Revenue hooks should feel like genuine, helpful recommendations — NEVER like a sales pitch. Only mention services when the DATA supports it. The pattern is:
+1. Surface the specific insight with numbers
+2. Explain the business impact in plain language
+3. Warm handoff: "${teamName} can help you capitalize on this" — natural, not pushy
 
 TONE & STYLE:
 - Conversational and warm, like a knowledgeable colleague — not robotic or corporate
@@ -4596,9 +4690,10 @@ TONE & STYLE:
 CRITICAL RULES:
 - NEVER give step-by-step technical implementation instructions (code, meta tags, schema markup, etc.)
 - NEVER suggest specific tools, plugins, or third-party services by name
-- When the opportunity is big or complex, always close with a natural nudge: something like "This could be a great topic to bring up with ${teamName} — they can map out the best approach for your specific situation."
 - If directly asked "how do I do this?", share the general direction and what to expect, then say "${teamName} can handle the implementation and make sure it's done right."
 - Be honest if the data shows problems — clients respect candor. But always pair problems with the path forward.
+- When you reference pending approvals or active requests, encourage the client to take action on them.
+- If strategy data includes quick wins, proactively mention them — they're pre-identified high-impact opportunities.
 
 Site: ${ws.webflowSiteName || ws.name}
 Date range: last ${context?.days || 28} days

@@ -111,8 +111,8 @@ export const CAT_LABELS: Record<string, { label: string; color: string }> = {
 
 export const QUICK_QUESTIONS = [
   'What are my biggest opportunities right now?',
-  'Which pages drive the most conversions?',
-  'Summarize my traffic and event trends this month',
-  'What should I focus on to improve performance?',
-  'What content should I create next based on search data?',
+  'How is my site performing overall? Any red flags?',
+  'Which pages should I focus on improving first?',
+  'What content should I create next to grow traffic?',
+  'Is there anything waiting for my attention or approval?',
 ];

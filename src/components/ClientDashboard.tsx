@@ -571,6 +571,9 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
           avgPosition: overview.avgPosition, topQueries: overview.topQueries.slice(0, 15), topPages: overview.topPages.slice(0, 10),
         };
       }
+      if (trend.length > 1) {
+        context.searchTrend = { firstDay: trend[0], lastDay: trend[trend.length - 1], totalDays: trend.length };
+      }
       if (ga4Overview) {
         context.ga4 = {
           overview: ga4Overview,
@@ -581,6 +584,49 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
           conversions: ga4Conversions.slice(0, 10),
           countries: ga4Countries.slice(0, 8),
         };
+      }
+      if (audit) {
+        context.siteHealth = {
+          score: audit.siteScore, totalPages: audit.totalPages,
+          errors: audit.errors, warnings: audit.warnings,
+          previousScore: audit.previousScore,
+        };
+      }
+      if (auditDetail) {
+        context.siteHealthDetail = {
+          siteWideIssues: auditDetail.audit.siteWideIssues.slice(0, 10),
+          scoreHistory: auditDetail.scoreHistory?.slice(0, 5),
+          topIssuePages: auditDetail.audit.pages
+            .filter(p => p.issues.length > 0)
+            .sort((a, b) => b.issues.length - a.issues.length)
+            .slice(0, 5)
+            .map(p => ({ page: p.page, score: p.score, issueCount: p.issues.length, topIssues: p.issues.slice(0, 3).map(i => ({ check: i.check, severity: i.severity, message: i.message })) })),
+        };
+      }
+      if (strategyData) {
+        context.seoStrategy = {
+          pageMap: strategyData.pageMap?.slice(0, 10),
+          opportunities: strategyData.opportunities?.slice(0, 5),
+          contentGaps: strategyData.contentGaps?.slice(0, 5),
+          quickWins: strategyData.quickWins?.slice(0, 5),
+        };
+      }
+      if (latestRanks.length > 0) {
+        context.rankings = latestRanks.slice(0, 15);
+      }
+      if (activityLog.length > 0) {
+        context.recentActivity = activityLog.slice(0, 10);
+      }
+      if (annotations.length > 0) {
+        context.annotations = annotations.slice(0, 10);
+      }
+      if (approvalBatches.length > 0) {
+        const pending = approvalBatches.filter(b => b.status === 'pending');
+        if (pending.length > 0) context.pendingApprovals = pending.length;
+      }
+      if (requests.length > 0) {
+        const active = requests.filter(r => r.status !== 'closed');
+        if (active.length > 0) context.activeRequests = active.slice(0, 5).map(r => ({ title: r.title, category: r.category, status: r.status }));
       }
       const res = await fetch(`/api/public/search-chat/${ws.id}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -2463,13 +2509,13 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         {!chatOpen && (
           <button onClick={() => setChatOpen(true)}
             className="fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 rounded-full bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-sm font-medium shadow-lg shadow-teal-900/30 transition-all z-50">
-            <Sparkles className="w-4 h-4" /> Ask AI
+            <Sparkles className="w-4 h-4" /> Insights Engine
           </button>
         )}
         {chatOpen && (
           <div className="fixed bottom-6 right-6 w-96 bg-zinc-900 rounded-2xl border border-zinc-800 shadow-2xl shadow-black/40 overflow-hidden z-50 flex flex-col max-h-[500px]">
             <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 flex-shrink-0">
-              <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-teal-400" /><span className="text-sm font-medium text-zinc-200">AI Assistant</span><span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">GPT-4o</span></div>
+              <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-teal-400" /><span className="text-sm font-medium text-zinc-200">Insights Engine</span><span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">by hmpsn studio</span></div>
               <button onClick={() => setChatOpen(false)} className="text-zinc-500 hover:text-zinc-300"><X className="w-4 h-4" /></button>
             </div>
             <div className="flex-1 overflow-y-auto">

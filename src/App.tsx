@@ -8,6 +8,7 @@ import { useWebSocket } from './hooks/useWebSocket';
 import { ToastProvider } from './components/Toast';
 import { BackgroundTaskProvider } from './hooks/useBackgroundTasks';
 import { TaskPanel } from './components/TaskPanel';
+import { AdminChat } from './components/AdminChat';
 import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, FileSearch, Search,
   Pencil, CornerDownRight, Share2, Target, Code2, LogOut, Swords, TrendingUp, Flag,
@@ -473,6 +474,14 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
           workspaceCount={workspaces.length}
         />
       </div>
+      {selected && health.hasOpenAIKey && (
+        <AdminChat
+          workspaceId={selected.id}
+          workspaceName={selected.webflowSiteName || selected.name}
+          ga4PropertyId={selected.ga4PropertyId}
+          gscPropertyUrl={selected.gscPropertyUrl}
+        />
+      )}
     </div>
   );
 }
