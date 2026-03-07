@@ -47,17 +47,13 @@ interface HealthStatus {
 // ScoreRing replaced by unified <MetricRingSvg /> from ./ui
 const ScoreRing = MetricRingSvg;
 
-/* ── Roadmap sprint definitions (mirrors Roadmap.tsx) ── */
-const SPRINT_META = [
-  { id: 'sprint-1', name: 'AI Chatbot Revenue Engine', hours: '10-13', itemIds: [1, 2, 3] },
-  { id: 'sprint-2', name: 'Authentication Foundation', hours: '15-20', itemIds: [4, 5, 6] },
-  { id: 'sprint-3', name: 'Data Quality & Dashboard Polish', hours: '8-12', itemIds: [7, 8, 9, 10] },
-  { id: 'sprint-4', name: 'Intelligence Upgrades', hours: '6-9', itemIds: [11, 12, 13, 14] },
-  { id: 'sprint-5', name: 'Team & Permissions', hours: '7-9', itemIds: [15, 16] },
-  { id: 'sprint-6', name: 'Platform Polish', hours: '10-15', itemIds: [17, 18, 19, 20] },
-  { id: 'backlog', name: 'Backlog', hours: '50+', itemIds: [21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34] },
-];
-const TOTAL_ROADMAP_ITEMS = 34;
+/* ── Roadmap sprint shape from API ── */
+interface RoadmapSprint {
+  id: string;
+  name: string;
+  hours: string;
+  items: Array<{ id: number; status: string }>;
+}
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -74,19 +70,19 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
   const [data, setData] = useState<WorkspaceSummary[]>([]);
   const [recentActivity, setRecentActivity] = useState<ActivityEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [roadmapStatus, setRoadmapStatus] = useState<Record<string, string>>({});
+  const [roadmapSprints, setRoadmapSprints] = useState<RoadmapSprint[]>([]);
   const [health, setHealth] = useState<HealthStatus | null>(null);
 
   useEffect(() => {
     Promise.all([
       fetch('/api/workspace-overview').then(r => r.json()),
       fetch('/api/activity?limit=15').then(r => r.json()).catch(() => []),
-      fetch('/api/roadmap-status').then(r => r.ok ? r.json() : {}).catch(() => ({})),
+      fetch('/api/roadmap').then(r => r.ok ? r.json() : null).catch(() => null),
       fetch('/api/health').then(r => r.json()).catch(() => null),
     ]).then(([d, act, rm, h]) => {
       if (Array.isArray(d)) setData(d);
       if (Array.isArray(act)) setRecentActivity(act);
-      if (rm && typeof rm === 'object') setRoadmapStatus(rm as Record<string, string>);
+      if (rm?.sprints && Array.isArray(rm.sprints)) setRoadmapSprints(rm.sprints);
       if (h) setHealth(h as HealthStatus);
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
@@ -120,14 +116,16 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
     ? Math.round(data.filter(w => w.audit).reduce((s, w) => s + (w.audit?.score || 0), 0) / data.filter(w => w.audit).length)
     : null;
 
-  // Roadmap stats
-  const roadmapDone = Object.values(roadmapStatus).filter(s => s === 'done').length;
-  const roadmapInProgress = Object.values(roadmapStatus).filter(s => s === 'in_progress').length;
-  const roadmapPct = TOTAL_ROADMAP_ITEMS > 0 ? Math.round((roadmapDone / TOTAL_ROADMAP_ITEMS) * 100) : 0;
+  // Roadmap stats (derived from API data)
+  const allRoadmapItems = roadmapSprints.flatMap(s => s.items);
+  const totalRoadmapItems = allRoadmapItems.length;
+  const roadmapDone = allRoadmapItems.filter(i => i.status === 'done').length;
+  const roadmapInProgress = allRoadmapItems.filter(i => i.status === 'in_progress').length;
+  const roadmapPct = totalRoadmapItems > 0 ? Math.round((roadmapDone / totalRoadmapItems) * 100) : 0;
 
   // Current sprint (first sprint with incomplete items)
-  const currentSprint = SPRINT_META.find(s =>
-    s.itemIds.some(id => roadmapStatus[String(id)] !== 'done')
+  const currentSprint = roadmapSprints.find(s =>
+    s.items.some(i => i.status !== 'done')
   );
 
   // Needs attention items
@@ -199,21 +197,21 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
           {/* Overall progress */}
           <div className="mb-4">
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs text-zinc-400">{roadmapDone}/{TOTAL_ROADMAP_ITEMS} items complete</span>
+              <span className="text-xs text-zinc-400">{roadmapDone}/{totalRoadmapItems} items complete</span>
               <span className="text-xs font-medium text-teal-400">{roadmapPct}%</span>
             </div>
             <div className="h-2.5 bg-zinc-800 rounded-full overflow-hidden flex">
-              {roadmapDone > 0 && <div className="h-full bg-green-500 transition-all" style={{ width: `${(roadmapDone / TOTAL_ROADMAP_ITEMS) * 100}%` }} />}
-              {roadmapInProgress > 0 && <div className="h-full bg-teal-400 transition-all" style={{ width: `${(roadmapInProgress / TOTAL_ROADMAP_ITEMS) * 100}%` }} />}
+              {roadmapDone > 0 && <div className="h-full bg-green-500 transition-all" style={{ width: `${totalRoadmapItems > 0 ? (roadmapDone / totalRoadmapItems) * 100 : 0}%` }} />}
+              {roadmapInProgress > 0 && <div className="h-full bg-teal-400 transition-all" style={{ width: `${totalRoadmapItems > 0 ? (roadmapInProgress / totalRoadmapItems) * 100 : 0}%` }} />}
             </div>
           </div>
 
           {/* Sprint list */}
           <div className="space-y-2">
-            {SPRINT_META.map(sprint => {
-              const sprintDone = sprint.itemIds.filter(id => roadmapStatus[String(id)] === 'done').length;
-              const sprintActive = sprint.itemIds.filter(id => roadmapStatus[String(id)] === 'in_progress').length;
-              const sprintTotal = sprint.itemIds.length;
+            {roadmapSprints.map(sprint => {
+              const sprintDone = sprint.items.filter(i => i.status === 'done').length;
+              const sprintActive = sprint.items.filter(i => i.status === 'in_progress').length;
+              const sprintTotal = sprint.items.length;
               const isCurrent = sprint.id === currentSprint?.id;
               const isComplete = sprintDone === sprintTotal;
 
@@ -292,11 +290,11 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
               <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-2">Platform</div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-zinc-400">Features shipped</span>
-                <span className="text-xs font-bold text-teal-400">35</span>
+                <span className="text-xs font-bold text-teal-400">37</span>
               </div>
               <div className="flex items-center justify-between mt-1">
                 <span className="text-xs text-zinc-400">Roadmap items</span>
-                <span className="text-xs font-medium text-zinc-200">{TOTAL_ROADMAP_ITEMS}</span>
+                <span className="text-xs font-medium text-zinc-200">{totalRoadmapItems}</span>
               </div>
             </div>
           </div>
