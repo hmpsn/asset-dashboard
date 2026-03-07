@@ -167,12 +167,15 @@ Track key decisions here as they're made:
 | 2026-03-07 | Roadmap moved to server-side JSON | Items managed via API, no code changes needed to add/reorder/update items |
 | 2026-03-07 | 18 missing items added from FEATURE_AUDIT + ACTION_PLAN | 34 → 52 total items; comprehensive coverage of all planned features |
 | 2026-03-07 | Sprint 1 shipped: full chatbot revenue engine | All 5 items (context, knowledge base, sales engine, admin chat, GA4 upgrade) shipped same day |
+| 2026-03-07 | Audit pipeline: error sort + flag + Fix→ + auto-fix | Pages sorted by errors, Flag for Client workflow, Fix→ routes to tools with auto-generation context |
+| 2026-03-07 | Workspace Home Dashboard added | Per-workspace landing page with parallel-fetched audit/search/GA4/ranks/requests/activity data |
+| 2026-03-07 | Sidebar restructured | Icon-only bottom bar, Command Center button, grouped nav (Analytics, Site Health, SEO, Manage) |
 | | | |
 
 ---
 
 *Compiled: March 7, 2026*
-*Last updated: March 7, 2026 (Sprint 1 complete)*
+*Last updated: March 7, 2026 (Sprint 1 complete + audit pipeline + workspace home)*
 *Next review: Before Sprint 2 kickoff*
 *Total items tracked: 52*
 *Data source: Server-side roadmap.json (managed via /api/roadmap)*

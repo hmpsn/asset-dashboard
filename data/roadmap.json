@@ -10,7 +10,10 @@
         { "id": 2, "title": "Client AI: Global knowledge base", "source": "AI_CHATBOT_ROADMAP Phase 2", "est": "4-5h", "priority": "P0", "notes": "Per-workspace knowledgeBase field + knowledge-docs/ folder, injected into both chatbots", "status": "done" },
         { "id": 3, "title": "Client AI: Sales engine behavior", "source": "AI_CHATBOT_ROADMAP Phase 3", "est": "3-4h", "priority": "P0", "notes": "8 revenue hooks, Insights Engine branding, warm handoff pattern", "status": "done" },
         { "id": 53, "title": "Admin AI chat panel", "source": "Sprint 1 addition", "est": "2-3h", "priority": "P0", "notes": "/api/admin-chat endpoint + AdminChat.tsx with internal analyst persona", "status": "done" },
-        { "id": 54, "title": "Admin GA4 dashboard upgrade", "source": "Memory/Roadmap", "est": "3-4h", "priority": "P1", "notes": "Sparklines, period comparison, organic, new vs returning, conversions", "status": "done" }
+        { "id": 54, "title": "Admin GA4 dashboard upgrade", "source": "Memory/Roadmap", "est": "3-4h", "priority": "P0", "notes": "Sparklines, period comparison, organic, new vs returning, conversions", "status": "done" },
+        { "id": 55, "title": "Workspace Home Dashboard", "source": "Sprint 1 addition", "est": "2-3h", "priority": "P0", "notes": "Per-workspace landing page with parallel-fetched audit/search/GA4/ranks/requests/activity data", "status": "done" },
+        { "id": 56, "title": "Audit pipeline: error sort + flag + Fix→ + auto-fix", "source": "Sprint 1 addition", "est": "3-4h", "priority": "P0", "notes": "Pages sorted by errors, Flag for Client workflow, Fix→ routes to tools with auto-generation context (Schema auto-generates, Editor auto-expands, Briefs pre-fill)", "status": "done" },
+        { "id": 57, "title": "Sidebar restructure + Command Center", "source": "Sprint 1 addition", "est": "1-2h", "priority": "P1", "notes": "Icon-only bottom bar, Command Center button, grouped nav (Analytics, Site Health, SEO, Manage)", "status": "done" }
       ]
     },
     {

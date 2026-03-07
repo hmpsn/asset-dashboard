@@ -29,13 +29,13 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 3. Site Health Audit
-**What it does:** Per-page SEO audit with 20+ checks: titles, meta descriptions, canonicals, H1s, heading hierarchy, content length, alt text, Open Graph, structured data, HTML size, orphan pages, indexability, and more. Weighted scoring prioritizes high-impact ranking factors. Integrates redirect chain detection and homepage Core Web Vitals inline. Auto-saves snapshots for historical comparison. Scheduled recurring audits with email alerts on score drops. **Auto-restore**: latest audit results load from disk on mount — no data loss between deploys or server restarts.
+**What it does:** Per-page SEO audit with 20+ checks: titles, meta descriptions, canonicals, H1s, heading hierarchy, content length, alt text, Open Graph, structured data, HTML size, orphan pages, indexability, and more. Weighted scoring prioritizes high-impact ranking factors. Integrates redirect chain detection and homepage Core Web Vitals inline. Auto-saves snapshots for historical comparison. Scheduled recurring audits with email alerts on score drops. **Auto-restore**: latest audit results load from disk on mount — no data loss between deploys or server restarts. **Error-sorted page list**: pages with the most errors display first so critical issues surface immediately. **Flag for Client**: send specific audit issues to the client request queue with an inline note for review/discussion — for issues that need client approval before the agency can act. **Fix→ routing**: each issue has a Fix button that routes to the appropriate tool (Schema Generator for structured data, SEO Editor for metadata, Content Briefs for thin content, Redirects for chain issues, Performance for speed). **Auto-fix context**: when Fix→ is clicked, the target tool receives the page context — Schema auto-generates for that specific page, SEO Editor auto-expands and scrolls to the page, Content Briefs pre-fills the keyword from the page name.
 
-**Agency value:** Replaces paid tools for Webflow-specific checks. Catches issues Screaming Frog misses (Webflow API vs. published HTML discrepancies). Historical snapshots track progress over time.
+**Agency value:** Replaces paid tools for Webflow-specific checks. Catches issues Screaming Frog misses (Webflow API vs. published HTML discrepancies). Historical snapshots track progress over time. Fix→ routing eliminates manual navigation — go from issue to solution in one click. Flag for Client handles issues that need sign-off without disrupting the workflow.
 
-**Client value:** A clear health score with specific, actionable recommendations — not a wall of jargon.
+**Client value:** A clear health score with specific, actionable recommendations — not a wall of jargon. Flagged issues arrive as structured requests with context and recommendations.
 
-**Mutual:** A shared language for site health. "We improved your score from 72 to 89" is visible in both dashboards. Trust through transparency.
+**Mutual:** A shared language for site health. "We improved your score from 72 to 89" is visible in both dashboards. The audit-to-fix pipeline means issues get resolved faster — no context-switching, no lost details between discovery and action. Trust through transparency.
 
 ---
 
@@ -62,7 +62,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 6. Schema Generator
-**What it does:** Analyzes every page's content and existing structured data, then generates unified `@graph` JSON-LD schemas (Organization, FAQ, Service, Article, BreadcrumbList, LocalBusiness, etc.) using AI. Validates against Google requirements. Supports **per-page generation** via a searchable page picker — generate for one page without scanning the whole site. Results stream incrementally with real-time progress via WebSocket. Schemas persist to disk and survive deploys (incremental saves every 10s during generation). One-click **Publish to Webflow** injects schema via the Custom Code API — plus **Bulk Publish All** publishes every unpublished schema sequentially with a live progress counter. **Schema Diff View** shows a side-by-side comparison of existing vs. suggested JSON-LD before publishing, so you can see exactly what changes. **Send to Client** creates an approval batch for client review before publishing. **CMS Template Schemas** generate dynamic schemas for collection pages using Webflow's `{{wf {...}}}` template syntax — one schema template auto-populates from CMS fields across all collection items. Prompt engineering enforces strict output: no empty arrays/objects, consistent `@id` naming, omitted empty properties.
+**What it does:** Analyzes every page's content and existing structured data, then generates unified `@graph` JSON-LD schemas (Organization, FAQ, Service, Article, BreadcrumbList, LocalBusiness, etc.) using AI. Validates against Google requirements. Supports **per-page generation** via a searchable page picker — generate for one page without scanning the whole site. Results stream incrementally with real-time progress via WebSocket. Schemas persist to disk and survive deploys (incremental saves every 10s during generation). One-click **Publish to Webflow** injects schema via the Custom Code API — plus **Bulk Publish All** publishes every unpublished schema sequentially with a live progress counter. **Schema Diff View** shows a side-by-side comparison of existing vs. suggested JSON-LD before publishing, so you can see exactly what changes. **Send to Client** creates an approval batch for client review before publishing. **CMS Template Schemas** generate dynamic schemas for collection pages using Webflow's `{{wf {...}}}` template syntax — one schema template auto-populates from CMS fields across all collection items. Prompt engineering enforces strict output: no empty arrays/objects, consistent `@id` naming, omitted empty properties. **Audit Fix→ auto-generation**: when arriving from the Site Health Audit Fix→ button for a schema issue, automatically generates JSON-LD for the specific affected page — no manual page selection needed.
 
 **Agency value:** Schema implementation is time-consuming and error-prone. This generates production-ready, validated JSON-LD in seconds — per-page or full-site. Direct Webflow publishing eliminates manual copy-paste. CMS templates mean one schema covers hundreds of collection items automatically.
 
@@ -84,7 +84,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 8. Content Brief Generator
-**What it does:** AI-generates full content briefs from keyword strategy data — suggested titles, outlines, word count targets, internal linking opportunities, competitor analysis, E-E-A-T guidelines, content checklists, and schema recommendations. Supports **Brief vs. Full Post** service tiers with configurable pricing. Branded HTML export and AI tool export formats. Full client approval workflow: submit topic → generate brief → client reviews → approve/decline/request changes → upgrade to full post. **SEMRush enrichment**: when configured, briefs include real keyword volume, difficulty, CPC, competition data, and related keywords from SEMRush instead of AI-estimated values. **Inline editing**: all key brief fields (title, meta, summary, outline headings/notes/word counts, audience, tone, CTAs, competitor insights, word count target, intent, format) are editable in-place with auto-save on blur. **Improved GSC filtering**: related queries now match any significant keyword word (length > 2) instead of only the first word.
+**What it does:** AI-generates full content briefs from keyword strategy data — suggested titles, outlines, word count targets, internal linking opportunities, competitor analysis, E-E-A-T guidelines, content checklists, and schema recommendations. Supports **Brief vs. Full Post** service tiers with configurable pricing. Branded HTML export and AI tool export formats. Full client approval workflow: submit topic → generate brief → client reviews → approve/decline/request changes → upgrade to full post. **SEMRush enrichment**: when configured, briefs include real keyword volume, difficulty, CPC, competition data, and related keywords from SEMRush instead of AI-estimated values. **Inline editing**: all key brief fields (title, meta, summary, outline headings/notes/word counts, audience, tone, CTAs, competitor insights, word count target, intent, format) are editable in-place with auto-save on blur. **Improved GSC filtering**: related queries now match any significant keyword word (length > 2) instead of only the first word. **Audit Fix→ pre-fill**: when arriving from the Site Health Audit Fix→ button for thin content issues, the keyword field is automatically pre-filled with the page name (hyphens converted to spaces) so the user can immediately generate a brief.
 
 **Agency value:** Briefs that used to take 1-2 hours each are generated in under a minute with real search data baked in. Service tier pricing built in. Inline editing lets the team refine AI output without regenerating.
 
@@ -95,9 +95,9 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 9. SEO Editor
-**What it does:** Edit page titles, meta descriptions, and OG tags directly through the Webflow API — with AI-powered suggestions based on actual page content and target keywords.
+**What it does:** Edit page titles, meta descriptions, and OG tags directly through the Webflow API — with AI-powered suggestions based on actual page content and target keywords. **Audit Fix→ auto-expand**: when arriving from the Site Health Audit Fix→ button for metadata issues, the target page automatically expands and scrolls into view so the user can immediately edit.
 
-**Agency value:** No more logging into Webflow, finding the page, editing, saving, and publishing. Batch-edit dozens of pages from one screen.
+**Agency value:** No more logging into Webflow, finding the page, editing, saving, and publishing. Batch-edit dozens of pages from one screen. Fix→ from audit eliminates the search step entirely.
 
 **Client value:** SEO changes happen faster. Optimizations that used to take days are done in minutes.
 
@@ -427,13 +427,24 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 37. Command Center Cockpit
-**What it does:** Upgraded Workspace Overview that serves as the platform's home screen when no workspace is selected. Shows: **Needs Attention** alerts (new requests, pending approvals, low health scores, unlinked workspaces), **Global Stats** bar (StatCard primitives for requests, approvals, content, health), **Roadmap Progress** panel (overall bar + sprint list with "Current" badge and "View Full →" link), **Platform Health** panel (API connection status for OpenAI, Webflow, Google Auth, Email; workspace counts; feature count), workspace cards, and recent activity feed. All using shared UI primitives (PageHeader, SectionCard, StatCard, Badge).
+**What it does:** Upgraded Workspace Overview that serves as the platform's home screen when no workspace is selected. Shows: **Needs Attention** alerts (new requests, pending approvals, low health scores, unlinked workspaces), **Global Stats** bar (StatCard primitives for requests, approvals, content, health), **Roadmap Progress** panel (overall bar + sprint list with "Current" badge and "View Full →" link), **Platform Health** panel (API connection status for OpenAI, Webflow, Google Auth, Email; workspace counts; feature count), workspace cards, and recent activity feed. All using shared UI primitives (PageHeader, SectionCard, StatCard, Badge). Sidebar restructured with icon-only bottom bar for Prospect and Roadmap tools, plus a Command Center quick-access button.
 
 **Agency value:** Instant situational awareness on login — see what needs attention across all clients without clicking into each workspace. Roadmap progress visible at a glance.
 
 **Client value:** N/A — admin-only view.
 
 **Mutual:** Reduces the "what should I work on next?" friction. Everything important is surfaced in one screen.
+
+---
+
+### 40. Workspace Home Dashboard
+**What it does:** Per-workspace landing page that loads as the default tab when selecting a workspace. Parallel-fetches and displays: **site health audit** score with delta, **Search Console** overview (clicks, impressions, CTR, position), **GA4** overview (users, sessions, pageviews) with period-over-period comparison, **rank tracking** summary (top keywords with position changes), **active requests** with status counts, **content pipeline** status, **recent activity** feed, and **annotations** timeline. All data loads in parallel with a 15-second timeout per endpoint and graceful fallback — sections with no data simply don't render. Uses shared UI primitives (StatCard, SectionCard, PageHeader, Badge).
+
+**Agency value:** One screen per client shows everything that matters — health, traffic, rankings, requests, and activity — without clicking into individual tools. Instant context when switching between clients.
+
+**Client value:** N/A — admin-only view (clients have their own portal).
+
+**Mutual:** Eliminates the "let me pull up the data" delay. Every workspace conversation starts from a position of full awareness.
 
 ---
 
@@ -447,9 +458,9 @@ A brief value assessment of every feature in the platform, covering what it does
 | Client Communication | 5 | Structured workflows replace email chaos |
 | Client Self-Service | 6 | 24/7 data access reduces reporting overhead |
 | AI & Intelligence | 3 | Full-spectrum AI advisor + revenue engine + knowledge base |
-| Platform & UX | 6 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit |
+| Platform & UX | 7 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home |
 
-**40 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**41 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
 ---
 
@@ -482,6 +493,10 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - ~~Redirect + CWV integration~~: ✅ Shipped — Redirect chains and homepage Core Web Vitals wired into audit.
 - ~~Contextual cross-link tips~~: ✅ Shipped — Audit results suggest SEO Editor, Redirects, Schema, Performance based on findings.
 - ~~Auto-restore after deploys~~: ✅ Shipped — Admin SeoAudit loads latest persisted snapshot from disk on mount when no in-memory job exists. No data loss between deploys.
+- ~~Error-sorted page list~~: ✅ Shipped — Pages sorted by error count descending so critical pages surface first.
+- ~~Flag for Client~~: ✅ Shipped — Send specific audit issues to client request queue with inline note for review/discussion.
+- ~~Fix→ routing~~: ✅ Shipped — Each issue maps to the appropriate tool (Schema, SEO Editor, Briefs, Redirects, Performance) with a one-click Fix button.
+- ~~Auto-fix context~~: ✅ Shipped — Fix→ passes page context to target tools: Schema auto-generates, SEO Editor auto-expands, Briefs pre-fill keyword.
 - **Full-site PageSpeed**: Offer a deeper multi-page PSI scan as a separate background job.
 - **Accessibility audit expansion**: Currently only checks img alt text. Could add WCAG contrast, ARIA, heading order, form label checks.
 - **Historical trend charts**: Track audit score over time per-page, not just site-wide.
@@ -550,4 +565,4 @@ When the user asks to update this document with recent features, follow this pro
 7. **Update Summary table**: Adjust category counts and total feature count.
 8. **Commit**: `git add FEATURE_AUDIT.md && git commit -m "docs: update FEATURE_AUDIT with recent features"`
 
-Current feature count: **40**. Last updated: March 7, 2026.
+Current feature count: **41**. Last updated: March 7, 2026.
