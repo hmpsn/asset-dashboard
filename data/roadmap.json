@@ -58,11 +58,11 @@
       "hours": "3-5",
       "rationale": "Cross-wire existing features for compounding intelligence. All data exists — just needs connecting.",
       "items": [
-        { "id": 58, "title": "Admin chat: conversation memory", "source": "Intelligence Wiring", "est": "30m", "priority": "P1", "notes": "Wire sessionId, addMessage, buildConversationContext into /api/admin-chat — parity with client chat", "status": "in_progress" },
-        { "id": 59, "title": "Client chat: comparison data in context", "source": "Intelligence Wiring", "est": "15m", "priority": "P1", "notes": "Pass searchComparison, ga4Comparison, ga4Organic, ga4NewVsReturning into askAi context", "status": "pending" },
-        { "id": 60, "title": "Chat activity logging", "source": "Intelligence Wiring", "est": "30m", "priority": "P1", "notes": "Log chat sessions to activity log so agency sees what clients are asking about", "status": "pending" },
-        { "id": 61, "title": "Audit traffic data in chatbot context", "source": "Intelligence Wiring", "est": "45m", "priority": "P2", "notes": "Fetch audit traffic for workspace, inject top-traffic pages with errors into chat context", "status": "pending" },
-        { "id": 62, "title": "Monthly reports: chat topic summaries", "source": "Intelligence Wiring", "est": "30m", "priority": "P2", "notes": "Include recent chat session summaries in monthly report for personalization", "status": "pending" }
+        { "id": 58, "title": "Admin chat: conversation memory", "source": "Intelligence Wiring", "est": "30m", "priority": "P1", "notes": "Wired sessionId, addMessage, buildConversationContext, history UI (New Chat + Chat History) into admin chat — full parity with client", "status": "done" },
+        { "id": 59, "title": "Client chat: comparison data in context", "source": "Intelligence Wiring", "est": "15m", "priority": "P1", "notes": "Client askAi now sends searchComparison, ga4Comparison, ga4Organic, ga4NewVsReturning; server prompt lists them as data sources", "status": "done" },
+        { "id": 60, "title": "Chat activity logging", "source": "Intelligence Wiring", "est": "30m", "priority": "P1", "notes": "First exchange of each session logged as chat_session activity type in both client + admin endpoints", "status": "done" },
+        { "id": 61, "title": "Audit traffic data in chatbot context", "source": "Intelligence Wiring", "est": "45m", "priority": "P2", "notes": "getAuditTrafficForWorkspace cached helper + HIGH-TRAFFIC PAGES WITH SEO ISSUES injected into both admin + client chat prompts", "status": "done" },
+        { "id": 62, "title": "Monthly reports: chat topic summaries", "source": "Intelligence Wiring", "est": "30m", "priority": "P2", "notes": "gatherMonthlyData fetches recent client chat summaries; email template renders 'Topics You Asked About' section", "status": "done" }
       ]
     },
     {

@@ -107,6 +107,18 @@ Client chatbot rebranded as "Insights Engine by hmpsn studio". System prompt inc
 - [x] Chat History panel listing past conversations with message counts and dates
 - [x] Click to resume any previous session
 
+#### Admin Chat Parity (shipped same session)
+- [x] Full conversation memory wired into `/api/admin-chat` (sessionId, addMessage, buildConversationContext)
+- [x] Admin Chat UI: New Chat button, Chat History panel, session resume — matching client chat UX
+- [x] Cross-session summaries injected into admin system prompt
+- [x] Auto-summarize after 6+ messages
+
+#### Intelligence Wiring (shipped same session)
+- [x] Client chat sends period comparison data (searchComparison, ga4Comparison, ga4Organic, ga4NewVsReturning)
+- [x] Audit traffic intelligence: `getAuditTrafficForWorkspace` cached helper injects high-traffic pages with SEO errors into both chat prompts
+- [x] Chat activity logging: first exchange of each session logged to activity log (`chat_session` type)
+- [x] Monthly reports include "Topics You Asked About" section from chat session summaries
+
 **Still TODO from Phase 4:**
 - [ ] Client preference tracking (auto-detect frequent topics)
 - [ ] History pruning (90-day cleanup cron)
