@@ -3,8 +3,9 @@ import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import {
   Loader2, Search as SearchIcon, ChevronDown, ChevronRight, Download,
   AlertTriangle, AlertCircle, Info, CheckCircle, Globe, FileText,
-  RefreshCw, X, Clock, Share2, Copy, ExternalLink, Flag, Send, Wrench,
+  RefreshCw, X, Clock, Share2, Copy, ExternalLink, Send, Wrench,
   TrendingUp, TrendingDown, Minus, Plus, ListChecks, Trash2, Circle, ClipboardList,
+  MoreVertical, Pencil,
 } from 'lucide-react';
 import { StatCard, scoreColorClass, scoreBgBarClass } from './ui';
 import type { FixContext } from '../App';
@@ -525,21 +526,25 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
   const [auditError, setAuditError] = useState<string | null>(null);
   const [applyingFix, setApplyingFix] = useState<string | null>(null);
   const [appliedFixes, setAppliedFixes] = useState<Set<string>>(new Set());
+  const [editedSuggestions, setEditedSuggestions] = useState<Record<string, string>>({});
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [actionMenuKey, setActionMenuKey] = useState<string | null>(null);
 
   const acceptSuggestion = async (pageId: string, issue: SeoIssue) => {
     if (!issue.suggestedFix) return;
     const fixKey = `${pageId}-${issue.check}`;
+    const text = editedSuggestions[fixKey] || issue.suggestedFix;
     setApplyingFix(fixKey);
     try {
       const fields: Record<string, unknown> = {};
       if (issue.check === 'title') {
-        fields.seo = { title: issue.suggestedFix };
+        fields.seo = { title: text };
       } else if (issue.check === 'meta-description') {
-        fields.seo = { description: issue.suggestedFix };
+        fields.seo = { description: text };
       } else if (issue.check === 'og-tags' && issue.message.includes('title')) {
-        fields.openGraph = { title: issue.suggestedFix };
+        fields.openGraph = { title: text };
       } else if (issue.check === 'og-tags' && issue.message.includes('description')) {
-        fields.openGraph = { description: issue.suggestedFix };
+        fields.openGraph = { description: text };
       }
       const res = await fetch(`/api/webflow/pages/${pageId}/seo`, {
         method: 'PUT',
@@ -563,7 +568,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
   const [batchCreating, setBatchCreating] = useState(false);
   const [batchResult, setBatchResult] = useState<{ count: number; timestamp: number } | null>(null);
 
-  // Flag-for-client state
+  // Send-to-client state
   const [flaggingKey, setFlaggingKey] = useState<string | null>(null);
   const [flagNote, setFlagNote] = useState('');
   const [flaggedIssues, setFlaggedIssues] = useState<Set<string>>(new Set());
@@ -580,7 +585,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
         body: JSON.stringify({
           workspaceId,
           title: `[Review Needed] ${issue.message.slice(0, 80)}`,
-          description: `**Page:** /${page.slug}\n**Issue:** ${issue.message}\n**Severity:** ${issue.severity}\n\n**Recommendation:** ${issue.recommendation}${issue.value ? `\n\n**Current value:** ${issue.value}` : ''}${note ? `\n\n**Note from your SEO team:**\n${note}` : ''}`,
+          description: `**Page:** /${page.slug}\n**Issue:** ${issue.message}\n**Severity:** ${issue.severity}\n\n**Recommendation:** ${issue.recommendation}${(() => { const fk = `${page.pageId}-${issue.check}`; const s = editedSuggestions[fk] || issue.suggestedFix; return s ? `\n\n**AI Suggestion:** ${s}` : ''; })()}${issue.value ? `\n\n**Current value:** ${issue.value}` : ''}${note ? `\n\n**Note from your SEO team:**\n${note}` : ''}`,
           category: 'seo',
           priority: issue.severity === 'error' ? 'high' : 'medium',
           status: 'new',
@@ -600,13 +605,18 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
   const issueToTaskKey = (page: PageSeoResult, issue: SeoIssue) =>
     `${page.pageId}-${issue.check}-${issue.message.slice(0, 30)}`;
 
-  const issueToTaskItem = (page: PageSeoResult, issue: SeoIssue) => ({
-    title: `[Audit] ${issue.severity === 'error' ? '🔴' : issue.severity === 'warning' ? '⚠️' : 'ℹ️'} ${issue.check}: ${issue.message.slice(0, 80)}`,
-    description: `Page: ${page.page}\nSlug: ${page.slug}\n\nIssue: ${issue.message}\n\nRecommendation: ${issue.recommendation}${issue.suggestedFix ? `\n\nAI Suggestion: ${issue.suggestedFix}` : ''}${issue.value ? `\n\nCurrent value: ${issue.value}` : ''}`,
-    category: 'seo',
-    priority: issue.severity === 'error' ? 'high' : 'medium',
-    pageUrl: page.slug,
-  });
+  const issueToTaskItem = (page: PageSeoResult, issue: SeoIssue) => {
+    const fixKey = `${page.pageId}-${issue.check}`;
+    const edited = editedSuggestions[fixKey];
+    const suggestion = edited || issue.suggestedFix;
+    return {
+      title: `[Audit] ${issue.severity === 'error' ? '🔴' : issue.severity === 'warning' ? '⚠️' : 'ℹ️'} ${issue.check}: ${issue.message.slice(0, 80)}`,
+      description: `Page: ${page.page}\nSlug: ${page.slug}\n\nIssue: ${issue.message}\n\nRecommendation: ${issue.recommendation}${suggestion ? `\n\nAI Suggestion: ${suggestion}` : ''}${issue.value ? `\n\nCurrent value: ${issue.value}` : ''}`,
+      category: 'seo',
+      priority: issue.severity === 'error' ? 'high' : 'medium',
+      pageUrl: page.slug,
+    };
+  };
 
   const createTaskFromIssue = async (page: PageSeoResult, issue: SeoIssue) => {
     if (!workspaceId) return;
@@ -1346,37 +1356,37 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
           <div className="flex items-center gap-2">
             {batchResult && Date.now() - batchResult.timestamp < 8000 && (
               <span className="text-[11px] text-emerald-400 flex items-center gap-1">
-                <CheckCircle className="w-3 h-3" /> {batchResult.count} tasks created
+                <CheckCircle className="w-3 h-3" /> {batchResult.count} added to tasks
               </span>
             )}
             {batchCreating ? (
               <span className="flex items-center gap-1.5 text-[11px] text-zinc-400">
-                <Loader2 className="w-3 h-3 animate-spin" /> Creating tasks...
+                <Loader2 className="w-3 h-3 animate-spin" /> Adding to tasks...
               </span>
             ) : (
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => batchCreateTasks('errors')}
                   className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors"
-                  title="Create tasks for all errors"
+                  title="Add all errors to tasks"
                 >
-                  <ClipboardList className="w-3 h-3" /> Add Errors ({data.errors})
+                  <ClipboardList className="w-3 h-3" /> Add Errors to Tasks ({data.errors})
                 </button>
                 {(severityFilter !== 'all' || categoryFilter !== 'all') && (
                   <button
                     onClick={() => batchCreateTasks('filtered')}
                     className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-teal-500/10 border border-teal-500/20 text-teal-400 hover:bg-teal-500/20 transition-colors"
-                    title="Create tasks for currently filtered issues"
+                    title="Add currently filtered issues to tasks"
                   >
-                    <ClipboardList className="w-3 h-3" /> Add Filtered
+                    <ClipboardList className="w-3 h-3" /> Add Filtered to Tasks
                   </button>
                 )}
                 <button
                   onClick={() => batchCreateTasks('all')}
                   className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-600 transition-colors"
-                  title="Create tasks for ALL findings"
+                  title="Add ALL findings to tasks"
                 >
-                  <ClipboardList className="w-3 h-3" /> Add All ({data.errors + data.warnings + data.infos})
+                  <ClipboardList className="w-3 h-3" /> Add All to Tasks ({data.errors + data.warnings + data.infos})
                 </button>
               </div>
             )}
@@ -1426,42 +1436,91 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
                         const cfg = SEVERITY_CONFIG[issue.severity];
                         const catCfg = issue.category ? CATEGORY_CONFIG[issue.category] : null;
                         const Icon = cfg.icon;
+                        const fixKey = `${page.pageId}-${issue.check}`;
+                        const taskKey = issueToTaskKey(page, issue);
+                        const isApplying = applyingFix === fixKey;
+                        const isApplied = appliedFixes.has(fixKey);
+                        const isEditing = editingKey === fixKey;
+                        const editedText = editedSuggestions[fixKey];
+                        const isFlagged = flaggedIssues.has(taskKey);
+                        const isCreated = createdTasks.has(taskKey);
+                        const isCreating = creatingTask === taskKey;
+                        const menuOpen = actionMenuKey === taskKey;
                         return (
-                          <div key={idx} className="flex items-start gap-3 px-4 py-2 rounded-lg hover:bg-zinc-900/30 transition-colors">
+                          <div key={idx} className="flex items-start gap-3 px-4 py-2 rounded-lg hover:bg-zinc-800/30 transition-colors group/issue">
                             <Icon className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${cfg.color}`} />
                             <div className="flex-1 min-w-0">
-                              <div className="text-xs text-zinc-300">{issue.message}</div>
+                              {/* Issue title + inline badges */}
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-xs text-zinc-300">{issue.message}</span>
+                                {catCfg && (
+                                  <span className={`text-[10px] px-1 py-px rounded border border-zinc-800 ${catCfg.color} leading-tight`}>
+                                    {catCfg.label}
+                                  </span>
+                                )}
+                                <span className={`text-[10px] px-1 py-px rounded border leading-tight ${cfg.bg} ${cfg.color}`}>
+                                  {issue.check}
+                                </span>
+                              </div>
                               <div className="text-[11px] text-zinc-500 mt-0.5">{issue.recommendation}</div>
                               {issue.value && <div className="text-[11px] text-zinc-500 mt-0.5 italic truncate">{issue.value}</div>}
-                              {issue.suggestedFix && (() => {
-                                const fixKey = `${page.pageId}-${issue.check}`;
-                                const isApplying = applyingFix === fixKey;
-                                const isApplied = appliedFixes.has(fixKey);
-                                return (
-                                  <div className="mt-1.5 px-2 py-1.5 rounded bg-emerald-950/40 border border-emerald-800/30">
-                                    <div className="flex items-center justify-between mb-0.5">
-                                      <div className="text-[11px] text-emerald-500 font-semibold uppercase tracking-wider">AI Suggestion</div>
-                                      {isApplied ? (
-                                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-medium flex items-center gap-1">
-                                          <CheckCircle className="w-2.5 h-2.5" /> Applied
-                                        </span>
-                                      ) : (
+                              {/* Editable AI suggestion */}
+                              {issue.suggestedFix && (
+                                <div className="mt-1.5 px-2 py-1.5 rounded bg-emerald-950/40 border border-emerald-800/30">
+                                  <div className="flex items-center justify-between mb-0.5">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[10px] text-emerald-500 font-semibold uppercase tracking-wider">AI Suggestion</span>
+                                      {!isApplied && !isEditing && (
                                         <button
-                                          onClick={() => acceptSuggestion(page.pageId, issue)}
-                                          disabled={isApplying}
-                                          className="text-[11px] px-1.5 py-0.5 rounded bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
+                                          onClick={() => { setEditingKey(fixKey); if (!editedText) setEditedSuggestions(prev => ({ ...prev, [fixKey]: issue.suggestedFix! })); }}
+                                          className="text-[10px] text-emerald-500/60 hover:text-emerald-400 flex items-center gap-0.5 transition-colors"
+                                          title="Edit before sending"
                                         >
-                                          {isApplying ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <CheckCircle className="w-2.5 h-2.5" />}
-                                          {isApplying ? 'Applying...' : 'Accept & Push to Webflow'}
+                                          <Pencil className="w-2.5 h-2.5" /> Edit
                                         </button>
                                       )}
                                     </div>
-                                    <div className="text-[11px] text-emerald-300">{issue.suggestedFix}</div>
+                                    {isApplied ? (
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-medium flex items-center gap-1">
+                                        <CheckCircle className="w-2.5 h-2.5" /> Applied
+                                      </span>
+                                    ) : (
+                                      <button
+                                        onClick={() => acceptSuggestion(page.pageId, issue)}
+                                        disabled={isApplying}
+                                        className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
+                                      >
+                                        {isApplying ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <CheckCircle className="w-2.5 h-2.5" />}
+                                        {isApplying ? 'Pushing...' : 'Accept & Push'}
+                                      </button>
+                                    )}
                                   </div>
-                                );
-                              })()}
+                                  {isEditing ? (
+                                    <textarea
+                                      value={editedText || issue.suggestedFix}
+                                      onChange={e => setEditedSuggestions(prev => ({ ...prev, [fixKey]: e.target.value }))}
+                                      onBlur={() => setEditingKey(null)}
+                                      onKeyDown={e => { if (e.key === 'Escape') setEditingKey(null); }}
+                                      className="w-full text-[11px] text-emerald-300 bg-emerald-950/60 border border-emerald-700/40 rounded px-1.5 py-1 focus:outline-none focus:border-emerald-500/50 resize-none"
+                                      rows={2}
+                                      autoFocus
+                                    />
+                                  ) : (
+                                    <div
+                                      className="text-[11px] text-emerald-300 cursor-text"
+                                      onClick={() => { setEditingKey(fixKey); if (!editedText) setEditedSuggestions(prev => ({ ...prev, [fixKey]: issue.suggestedFix! })); }}
+                                      title="Click to edit"
+                                    >
+                                      {editedText || issue.suggestedFix}
+                                      {editedText && editedText !== issue.suggestedFix && (
+                                        <span className="ml-1 text-[9px] text-emerald-500/50 italic">(edited)</span>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                               {/* Inline flag-for-client form */}
-                              {workspaceId && flaggingKey === issueToTaskKey(page, issue) && (
+                              {workspaceId && flaggingKey === taskKey && (
                                 <div className="mt-2 flex items-center gap-2">
                                   <input
                                     type="text"
@@ -1486,8 +1545,9 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
                                 </div>
                               )}
                             </div>
-                            <div className="flex items-center gap-1 flex-shrink-0">
-                              {/* Fix → button */}
+                            {/* Compact action bar: Fix + overflow menu */}
+                            <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
+                              {/* Fix → (primary) */}
                               {onNavigate && (() => {
                                 const fixTab = getFixTab(issue);
                                 if (!fixTab) return null;
@@ -1501,53 +1561,90 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
                                   </button>
                                 );
                               })()}
-                              {/* Flag for client review */}
-                              {workspaceId && (() => {
-                                const taskKey = issueToTaskKey(page, issue);
-                                const isFlagged = flaggedIssues.has(taskKey);
-                                if (isFlagged) return (
-                                  <span className="text-[11px] px-1 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center gap-0.5">
-                                    <Flag className="w-2.5 h-2.5" /> Flagged
-                                  </span>
-                                );
-                                return (
-                                  <button
-                                    onClick={() => { setFlaggingKey(flaggingKey === taskKey ? null : taskKey); setFlagNote(''); }}
-                                    className={`text-[11px] px-1 py-0.5 rounded border flex items-center gap-0.5 transition-colors ${
-                                      flaggingKey === taskKey
-                                        ? 'bg-purple-500/10 text-purple-400 border-purple-500/20'
-                                        : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 border-zinc-700'
-                                    }`}
-                                    title="Flag this issue for client review"
-                                  >
-                                    <Flag className="w-2.5 h-2.5" /> Flag
-                                  </button>
-                                );
-                              })()}
-                              {/* Create task */}
-                              {workspaceId && (() => {
-                                const taskKey = `${page.pageId}-${issue.check}-${issue.message.slice(0, 30)}`;
-                                const isCreated = createdTasks.has(taskKey);
-                                const isCreating = creatingTask === taskKey;
-                                return isCreated ? (
-                                  <span className="text-[11px] px-1 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 flex items-center gap-0.5">
-                                    <CheckCircle className="w-2.5 h-2.5" /> Task
-                                  </span>
-                                ) : (
-                                  <button onClick={() => createTaskFromIssue(page, issue)} disabled={isCreating}
-                                    className="text-[11px] px-1 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 border border-zinc-700 flex items-center gap-0.5 transition-colors disabled:opacity-50" title="Create request from this finding">
-                                    {isCreating ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <ClipboardList className="w-2.5 h-2.5" />} Task
-                                  </button>
-                                );
-                              })()}
-                              {catCfg && (
-                                <span className={`text-[11px] px-1 py-0.5 rounded border border-zinc-800 ${catCfg.color}`}>
-                                  {catCfg.label}
+                              {/* Status badges (show instead of actions when done) */}
+                              {isFlagged && (
+                                <span className="text-[10px] px-1 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center gap-0.5">
+                                  <Send className="w-2.5 h-2.5" /> Sent
                                 </span>
                               )}
-                              <span className={`text-[11px] px-1 py-0.5 rounded border ${cfg.bg} ${cfg.color}`}>
-                                {issue.check}
-                              </span>
+                              {isCreated && (
+                                <span className="text-[10px] px-1 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 flex items-center gap-0.5">
+                                  <CheckCircle className="w-2.5 h-2.5" /> Added
+                                </span>
+                              )}
+                              {/* Overflow menu for Flag + Task */}
+                              {workspaceId && !isFlagged && !isCreated && (
+                                <div className="relative">
+                                  <button
+                                    onClick={() => setActionMenuKey(menuOpen ? null : taskKey)}
+                                    className={`p-1 rounded transition-colors ${menuOpen ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 opacity-0 group-hover/issue:opacity-100'}`}
+                                    title="More actions"
+                                  >
+                                    <MoreVertical className="w-3 h-3" />
+                                  </button>
+                                  {menuOpen && (
+                                    <div className="absolute right-0 top-full mt-1 w-44 rounded-lg shadow-xl z-50 py-1 bg-zinc-900 border border-zinc-700">
+                                      <button
+                                        onClick={() => { setFlaggingKey(taskKey); setFlagNote(''); setActionMenuKey(null); }}
+                                        className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-purple-400 hover:bg-purple-500/10 transition-colors"
+                                      >
+                                        <Send className="w-3 h-3" /> Send to Client
+                                      </button>
+                                      <button
+                                        onClick={() => { createTaskFromIssue(page, issue); setActionMenuKey(null); }}
+                                        disabled={isCreating}
+                                        className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                                      >
+                                        {isCreating ? <Loader2 className="w-3 h-3 animate-spin" /> : <ClipboardList className="w-3 h-3" />} Add to Tasks
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              {/* Show individual done states when only one is done */}
+                              {workspaceId && isFlagged && !isCreated && (
+                                <div className="relative">
+                                  <button
+                                    onClick={() => setActionMenuKey(menuOpen ? null : taskKey)}
+                                    className={`p-1 rounded transition-colors ${menuOpen ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 opacity-0 group-hover/issue:opacity-100'}`}
+                                    title="More actions"
+                                  >
+                                    <MoreVertical className="w-3 h-3" />
+                                  </button>
+                                  {menuOpen && (
+                                    <div className="absolute right-0 top-full mt-1 w-44 rounded-lg shadow-xl z-50 py-1 bg-zinc-900 border border-zinc-700">
+                                      <button
+                                        onClick={() => { createTaskFromIssue(page, issue); setActionMenuKey(null); }}
+                                        disabled={isCreating}
+                                        className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                                      >
+                                        {isCreating ? <Loader2 className="w-3 h-3 animate-spin" /> : <ClipboardList className="w-3 h-3" />} Add to Tasks
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              {workspaceId && !isFlagged && isCreated && (
+                                <div className="relative">
+                                  <button
+                                    onClick={() => setActionMenuKey(menuOpen ? null : taskKey)}
+                                    className={`p-1 rounded transition-colors ${menuOpen ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 opacity-0 group-hover/issue:opacity-100'}`}
+                                    title="More actions"
+                                  >
+                                    <MoreVertical className="w-3 h-3" />
+                                  </button>
+                                  {menuOpen && (
+                                    <div className="absolute right-0 top-full mt-1 w-44 rounded-lg shadow-xl z-50 py-1 bg-zinc-900 border border-zinc-700">
+                                      <button
+                                        onClick={() => { setFlaggingKey(taskKey); setFlagNote(''); setActionMenuKey(null); }}
+                                        className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-purple-400 hover:bg-purple-500/10 transition-colors"
+                                      >
+                                        <Send className="w-3 h-3" /> Send to Client
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </div>
                         );
