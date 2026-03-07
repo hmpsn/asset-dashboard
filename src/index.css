@@ -33,10 +33,12 @@ body {
   background-color: var(--brand-bg);
   color: var(--brand-text-bright);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-weight: 420;
+  font-weight: 450;
   -webkit-font-smoothing: antialiased;
   letter-spacing: -0.01em;
 }
+
+/* ─── DIN Pro: headings, stats, nav chrome only ─── */
 
 h1, h2, h3, h4, h5, h6 {
   font-family: 'DIN Pro', 'Inter', sans-serif;
@@ -44,10 +46,18 @@ h1, h2, h3, h4, h5, h6 {
   letter-spacing: -0.02em;
 }
 
-/* DIN Pro for UI elements: nav labels, buttons, badges, uppercase labels */
-button, [class*="uppercase"], [class*="tracking-wider"], nav {
+/* Large display text: titles, stats, hero numbers */
+.text-lg, .text-xl, .text-2xl, .text-3xl, .text-4xl {
   font-family: 'DIN Pro', 'Inter', sans-serif;
 }
+
+/* UI chrome: nav labels, section dividers, uppercase badges */
+nav, [class*="tracking-wider"], [class*="tracking-widest"] {
+  font-family: 'DIN Pro', 'Inter', sans-serif;
+}
+
+/* Tabular/stat numbers — DIN Pro has excellent numeral clarity */
+.tabular-nums { font-family: 'DIN Pro', 'Inter', sans-serif; }
 
 /* Hide scrollbar utility */
 .scrollbar-none::-webkit-scrollbar { display: none; }
@@ -85,24 +95,106 @@ input::placeholder, textarea::placeholder {
   color: var(--brand-text-bright);
 }
 
-/* ─── Dark mode readability boost ───
-   Remap low-contrast zinc greys to brighter values.
-   .dashboard-light rules (higher specificity + !important) override these in light mode. */
-.text-zinc-500 { color: #d4d4d8 !important; }   /* was #71717a → zinc-300 */
-.text-zinc-600 { color: #a1a1aa !important; }   /* was #52525b → zinc-400 */
-.text-zinc-700 { color: #a1a1aa !important; }   /* was #3f3f46 → zinc-400 */
-.text-zinc-400 { color: #d4d4d8 !important; }   /* was #a1a1aa → zinc-300 */
-.placeholder-zinc-600::placeholder { color: #a1a1aa !important; }
-.placeholder-zinc-500::placeholder { color: #a1a1aa !important; }
-.hover\:text-zinc-400:hover { color: #e4e4e7 !important; }  /* zinc-200 */
-.hover\:text-zinc-300:hover { color: #f4f4f5 !important; }  /* zinc-100 */
-.hover\:text-zinc-500:hover { color: #d4d4d8 !important; }
+/* ─── Dark mode readability: subtle hierarchy-preserving boost ───
+   Only bump the worst offenders one notch. Keep separation between
+   primary (zinc-200), secondary (zinc-400), and muted (zinc-500).
+   .dashboard-light overrides (higher specificity) still win in light mode. */
+/* Primary text: push to near-white for crisp contrast on dark */
+.text-zinc-100 { color: #ffffff !important; }
+.text-zinc-200 { color: #f4f4f5 !important; }   /* was #e4e4e7 → zinc-100 level */
+.text-zinc-300 { color: #e4e4e7 !important; }   /* was #d4d4d8 → one notch brighter */
+/* Secondary text: readable but clearly subordinate */
+.text-zinc-400 { color: #b4b4bc !important; }   /* was #a1a1aa → halfway to zinc-300 */
+.text-zinc-500 { color: #a1a1aa !important; }   /* was #71717a → zinc-400 */
 
-/* ─── Minimum font size: 11px → 12px ─── */
+/* Muted text: still visible on dark bg */
+.text-zinc-600 { color: #71717a !important; }   /* was #52525b → zinc-500 */
+.text-zinc-700 { color: #71717a !important; }   /* was #3f3f46 → zinc-500 */
+
+.placeholder-zinc-600::placeholder { color: #71717a !important; }
+.placeholder-zinc-500::placeholder { color: #a1a1aa !important; }
+.hover\:text-zinc-500:hover { color: #d4d4d8 !important; }
+.hover\:text-zinc-400:hover { color: #e4e4e7 !important; }
+.hover\:text-zinc-300:hover { color: #f4f4f5 !important; }
+.hover\:text-zinc-200:hover { color: #ffffff !important; }
+
+/* ─── Type scale: only fix the inaccessible sizes ─── */
 .text-\[11px\] { font-size: 12px !important; line-height: 1.5 !important; }
 
-/* ─── Font weight boost on small text without explicit weight ─── */
-.text-xs:not(.font-medium):not(.font-semibold):not(.font-bold):not(.font-black) { font-weight: 450; }
+/* ─── Visual depth & premium interactions ─── */
+
+/* Card hover: subtle lift + border glow */
+[class*="rounded-xl"][class*="border"] {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+[class*="rounded-xl"][class*="border"]:hover {
+  border-color: rgba(63, 63, 70, 0.8);
+  box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.3);
+}
+
+/* Teal accent glow on active/selected elements */
+[class*="bg-teal-500\\/10"] {
+  box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.08);
+}
+
+/* Stat/metric numbers: the hero of every dashboard screen */
+.text-2xl {
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+.text-3xl {
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+.text-4xl {
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+/* Bold numbers get a subtle text-shadow for depth */
+.text-2xl.font-bold, .text-3xl.font-bold, .text-xl.font-bold {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Gradient shimmer on teal buttons */
+[class*="from-teal"][class*="to-emerald"] {
+  background-size: 200% 100%;
+  transition: background-position 0.4s ease, box-shadow 0.3s ease;
+}
+[class*="from-teal"][class*="to-emerald"]:hover {
+  background-position: 100% 0;
+  box-shadow: 0 4px 20px -4px rgba(45, 212, 191, 0.35);
+}
+
+/* Subtle inner glow on elevated surfaces */
+.bg-zinc-900 {
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.03);
+}
+
+/* Sidebar polish: subtle gradient background (dark mode only) */
+aside[class*="border-r"] {
+  background: linear-gradient(180deg, #0f1219 0%, #13151d 50%, #0f1219 100%);
+}
+.dashboard-light aside[class*="border-r"] {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 50%, #ffffff 100%) !important;
+}
+
+/* Disable dark-mode text-shadow + inner glow in light mode */
+.dashboard-light .text-2xl.font-bold,
+.dashboard-light .text-3xl.font-bold,
+.dashboard-light .text-xl.font-bold {
+  text-shadow: none !important;
+}
+.dashboard-light .bg-zinc-900 {
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
+}
+
+/* Active nav item: teal left accent bar */
+nav button[class*="bg-teal-500"] {
+  box-shadow: -2px 0 0 0 rgba(45, 212, 191, 0.7);
+}
+
+/* Scrollbar: teal tint on hover */
+::-webkit-scrollbar-thumb:hover { background: rgba(45, 212, 191, 0.15); }
 
 /* ─── Brand surface utilities (maps to zinc palette) ─── */
 .bg-brand-surface { background-color: #18181b; }
@@ -158,15 +250,15 @@ input::placeholder, textarea::placeholder {
 .dashboard-light .border-zinc-600 { border-color: #94a3b8 !important; }
 .dashboard-light .divide-zinc-800 > * + * { border-color: #e2e8f0 !important; }
 
-/* === Neutral Text === */
-.dashboard-light .text-zinc-100 { color: #0f172a !important; }
-.dashboard-light .text-zinc-200 { color: #1e293b !important; }
-.dashboard-light .text-zinc-300 { color: #334155 !important; }
-.dashboard-light .text-zinc-400 { color: #475569 !important; }
-.dashboard-light .text-zinc-500 { color: #64748b !important; }
-.dashboard-light .text-zinc-600 { color: #94a3b8 !important; }
+/* === Neutral Text — dark navy for authority on white === */
+.dashboard-light .text-zinc-100 { color: #0f172a !important; }  /* near-black navy */
+.dashboard-light .text-zinc-200 { color: #0f172a !important; }  /* primary → dark navy */
+.dashboard-light .text-zinc-300 { color: #1e293b !important; }  /* strong secondary */
+.dashboard-light .text-zinc-400 { color: #334155 !important; }  /* secondary */
+.dashboard-light .text-zinc-500 { color: #475569 !important; }  /* muted */
+.dashboard-light .text-zinc-600 { color: #64748b !important; }  /* subtle */
 .dashboard-light .text-zinc-700 { color: #334155 !important; }
-.dashboard-light .text-white { color: #ffffff !important; }
+/* .text-white stays white — used on teal/green button backgrounds in both modes */
 
 /* === Accent Text — accessible on white (≥4.5:1 WCAG AA) === */
 .dashboard-light .text-teal-400 { color: #0d9488 !important; }       /* 4.5:1 */
@@ -227,9 +319,9 @@ input::placeholder, textarea::placeholder {
 /* === Hover: Text === */
 .dashboard-light .hover\:text-zinc-100:hover { color: #0f172a !important; }
 .dashboard-light .hover\:text-zinc-200:hover { color: #0f172a !important; }
-.dashboard-light .hover\:text-zinc-300:hover { color: #1e293b !important; }
-.dashboard-light .hover\:text-zinc-400:hover { color: #334155 !important; }
-.dashboard-light .hover\:text-zinc-500:hover { color: #475569 !important; }
+.dashboard-light .hover\:text-zinc-300:hover { color: #0f172a !important; }
+.dashboard-light .hover\:text-zinc-400:hover { color: #1e293b !important; }
+.dashboard-light .hover\:text-zinc-500:hover { color: #334155 !important; }
 .dashboard-light .hover\:text-teal-300:hover { color: #0d9488 !important; }
 
 /* === Focus States === */
