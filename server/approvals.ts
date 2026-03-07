@@ -1,12 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
+import { getDataDir } from './data-dir.js';
 
-const DATA_BASE = process.env.DATA_DIR
-  || (process.env.NODE_ENV === 'production' ? '/tmp/asset-dashboard' : '');
-const APPROVALS_DIR = DATA_BASE
-  ? path.join(DATA_BASE, 'approvals')
-  : path.join(process.env.HOME || '', 'toUpload', 'approvals');
+const APPROVALS_DIR = getDataDir('approvals');
 
 fs.mkdirSync(APPROVALS_DIR, { recursive: true });
 

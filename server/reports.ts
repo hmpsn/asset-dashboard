@@ -2,12 +2,9 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import type { SeoAuditResult } from './seo-audit.js';
+import { getDataDir } from './data-dir.js';
 
-const DATA_BASE = process.env.DATA_DIR
-  || (process.env.NODE_ENV === 'production' ? '/tmp/asset-dashboard' : '');
-const REPORTS_DIR = DATA_BASE
-  ? path.join(DATA_BASE, 'reports')
-  : path.join(process.env.HOME || '', '.asset-dashboard', 'reports');
+const REPORTS_DIR = getDataDir('reports');
 
 export type ActionStatus = 'planned' | 'in-progress' | 'completed';
 export type ActionPriority = 'high' | 'medium' | 'low';

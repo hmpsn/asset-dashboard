@@ -6,11 +6,9 @@ import fs from 'fs';
 import path from 'path';
 import type { RedirectScanResult } from './redirect-scanner.js';
 
-const DATA_BASE = process.env.DATA_DIR
-  || (process.env.NODE_ENV === 'production' ? '/tmp/asset-dashboard' : '');
-const REDIRECTS_DIR = DATA_BASE
-  ? path.join(DATA_BASE, 'redirects')
-  : path.join(process.env.HOME || '', '.asset-dashboard', 'redirects');
+import { getDataDir } from './data-dir.js';
+
+const REDIRECTS_DIR = getDataDir('redirects');
 
 export interface RedirectSnapshot {
   id: string;

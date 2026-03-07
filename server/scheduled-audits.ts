@@ -7,11 +7,9 @@ import { addActivity } from './activity-log.js';
 import { isEmailConfigured } from './email.js';
 import nodemailer from 'nodemailer';
 
-const DATA_BASE = process.env.DATA_DIR
-  || (process.env.NODE_ENV === 'production' ? '/tmp/asset-dashboard' : '');
-const UPLOAD_ROOT = DATA_BASE
-  ? path.join(DATA_BASE, 'uploads')
-  : path.join(process.env.HOME || '', 'toUpload');
+import { getUploadRoot } from './data-dir.js';
+
+const UPLOAD_ROOT = getUploadRoot();
 const SCHEDULE_FILE = path.join(UPLOAD_ROOT, '.audit-schedules.json');
 
 export interface AuditSchedule {

@@ -1,11 +1,8 @@
 import fs from 'fs';
 import path from 'path';
+import { getUploadRoot } from './data-dir.js';
 
-const DATA_BASE = process.env.DATA_DIR
-  || (process.env.NODE_ENV === 'production' ? '/tmp/asset-dashboard' : '');
-const UPLOAD_ROOT = DATA_BASE
-  ? path.join(DATA_BASE, 'uploads')
-  : path.join(process.env.HOME || '', 'toUpload');
+const UPLOAD_ROOT = getUploadRoot();
 
 function getTrackingDir(workspaceId: string): string {
   const dir = path.join(UPLOAD_ROOT, workspaceId, '.rank-tracking');

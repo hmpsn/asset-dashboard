@@ -1,14 +1,9 @@
 import fs from 'fs';
 import path from 'path';
+import { getUploadRoot, getDataDir } from './data-dir.js';
 
-const DATA_BASE = process.env.DATA_DIR
-  || (process.env.NODE_ENV === 'production' ? '/tmp/asset-dashboard' : '');
-const UPLOAD_ROOT = DATA_BASE
-  ? path.join(DATA_BASE, 'uploads')
-  : path.join(process.env.HOME || '', 'toUpload');
-const CONTENT_REQUESTS_DIR = DATA_BASE
-  ? path.join(DATA_BASE, 'content-requests')
-  : path.join(process.env.HOME || '', 'toUpload', 'content-requests');
+const UPLOAD_ROOT = getUploadRoot();
+const CONTENT_REQUESTS_DIR = getDataDir('content-requests');
 
 fs.mkdirSync(CONTENT_REQUESTS_DIR, { recursive: true });
 

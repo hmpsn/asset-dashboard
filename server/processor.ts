@@ -6,12 +6,10 @@ import { getOptRoot, getUploadRoot, listWorkspaces } from './workspaces.js';
 import { generateAltText } from './alttext.js';
 import { uploadAsset } from './webflow.js';
 
+import { getDataDir } from './data-dir.js';
+
 // --- Persistent metadata ---
-const DATA_BASE = process.env.DATA_DIR
-  || (process.env.NODE_ENV === 'production' ? '/tmp/asset-dashboard' : '');
-const METADATA_DIR = DATA_BASE
-  ? path.join(DATA_BASE, 'metadata')
-  : path.join(process.env.HOME || '', '.asset-dashboard');
+const METADATA_DIR = getDataDir('metadata');
 const METADATA_FILE = path.join(METADATA_DIR, 'metadata.json');
 
 interface AssetMetadata {

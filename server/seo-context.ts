@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { getWorkspace, type KeywordStrategy } from './workspaces';
+import { getUploadRoot } from './data-dir.js';
 
 /**
  * Shared SEO context builder for all AI-powered endpoints.
@@ -85,12 +86,7 @@ export function buildSeoContext(workspaceId?: string, pagePath?: string): SeoCon
  * Returns concatenated content (truncated to ~4000 chars to fit in prompts).
  */
 function readBrandDocs(workspaceFolder: string): string {
-  const DATA_BASE = process.env.DATA_DIR
-    || (process.env.NODE_ENV === 'production' ? '/tmp/asset-dashboard' : '');
-  const uploadRoot = DATA_BASE
-    ? path.join(DATA_BASE, 'uploads')
-    : path.join(process.env.HOME || '', 'toUpload');
-  const brandDir = path.join(uploadRoot, workspaceFolder, 'brand-docs');
+  const brandDir = path.join(getUploadRoot(), workspaceFolder, 'brand-docs');
 
   if (!fs.existsSync(brandDir)) return '';
 

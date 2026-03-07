@@ -6,11 +6,9 @@ import fs from 'fs';
 import path from 'path';
 import type { SchemaPageSuggestion } from './schema-suggester.js';
 
-const DATA_BASE = process.env.DATA_DIR
-  || (process.env.NODE_ENV === 'production' ? '/tmp/asset-dashboard' : '');
-const SCHEMAS_DIR = DATA_BASE
-  ? path.join(DATA_BASE, 'schemas')
-  : path.join(process.env.HOME || '', '.asset-dashboard', 'schemas');
+import { getDataDir } from './data-dir.js';
+
+const SCHEMAS_DIR = getDataDir('schemas');
 
 export interface SchemaSnapshot {
   id: string;

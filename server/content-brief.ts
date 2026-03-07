@@ -1,15 +1,10 @@
 import fs from 'fs';
 import path from 'path';
 import { buildSeoContext, buildKeywordMapContext } from './seo-context.js';
+import { getUploadRoot, getDataDir } from './data-dir.js';
 
-const DATA_BASE = process.env.DATA_DIR
-  || (process.env.NODE_ENV === 'production' ? '/tmp/asset-dashboard' : '');
-const UPLOAD_ROOT = DATA_BASE
-  ? path.join(DATA_BASE, 'uploads')
-  : path.join(process.env.HOME || '', 'toUpload');
-const BRIEFS_DIR = DATA_BASE
-  ? path.join(DATA_BASE, 'content-briefs')
-  : path.join(process.env.HOME || '', 'toUpload', 'content-briefs');
+const UPLOAD_ROOT = getUploadRoot();
+const BRIEFS_DIR = getDataDir('content-briefs');
 
 fs.mkdirSync(BRIEFS_DIR, { recursive: true });
 

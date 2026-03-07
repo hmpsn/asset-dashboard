@@ -1,14 +1,9 @@
 import fs from 'fs';
 import path from 'path';
+import { getUploadRoot as _getUploadRoot, getOptRoot as _getOptRoot } from './data-dir.js';
 
-const DATA_BASE = process.env.DATA_DIR
-  || (process.env.NODE_ENV === 'production' ? '/tmp/asset-dashboard' : '');
-const UPLOAD_ROOT = DATA_BASE
-  ? path.join(DATA_BASE, 'uploads')
-  : path.join(process.env.HOME || '', 'toUpload');
-const OPT_ROOT = DATA_BASE
-  ? path.join(DATA_BASE, 'optimized')
-  : path.join(process.env.HOME || '', 'Optimized');
+const UPLOAD_ROOT = _getUploadRoot();
+const OPT_ROOT = _getOptRoot();
 const CONFIG_FILE = path.join(UPLOAD_ROOT, '.workspaces.json');
 
 export interface EventGroup {

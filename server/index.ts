@@ -15,10 +15,9 @@ import {
   updateWorkspace,
   deleteWorkspace,
   getWorkspace,
-  getUploadRoot,
-  getOptRoot,
   getTokenForSite,
 } from './workspaces.js';
+import { getUploadRoot, getOptRoot, getDataDir, DATA_BASE } from './data-dir.js';
 import { buildSeoContext, buildKeywordMapContext } from './seo-context.js';
 import { startWatcher, getQueue, triggerOptimize, getMetadata } from './processor.js';
 import {
@@ -80,6 +79,7 @@ import { listGscSites, getSearchOverview, getPerformanceTrend, getQueryPageData,
 import { listGA4Properties, getGA4Overview, getGA4DailyTrend, getGA4TopPages, getGA4TopSources, getGA4DeviceBreakdown, getGA4Countries, getGA4KeyEvents, getGA4EventTrend, getGA4Conversions, getGA4EventsByPage } from './google-analytics.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const DATA_ROOT = DATA_BASE || path.join(process.env.HOME || '', '.asset-dashboard');
 
 const app = express();
 const server = createServer(app);
@@ -238,7 +238,7 @@ app.get('/api/health/diag', async (_req, res) => {
   const envToken = process.env.WEBFLOW_API_TOKEN;
   const workspaces = listWorkspaces();
   const diag: Record<string, unknown> = {
-    dataDir: process.env.DATA_DIR || (IS_PROD ? '/tmp/asset-dashboard' : 'local'),
+    dataDir: DATA_ROOT,
     configFile: path.join(getUploadRoot(), '.workspaces.json'),
     configExists: fs.existsSync(path.join(getUploadRoot(), '.workspaces.json')),
     envTokenSet: !!envToken,
@@ -318,14 +318,6 @@ function broadcast(event: string, data: unknown) {
       ws.send(msg);
     }
   }
-}
-
-// --- Data directory helper (single source of truth) ---
-const DATA_ROOT = process.env.DATA_DIR || (IS_PROD ? '/tmp/asset-dashboard' : path.join(process.env.HOME || '', '.asset-dashboard'));
-function getDataDir(subdir: string): string {
-  const dir = path.join(DATA_ROOT, subdir);
-  fs.mkdirSync(dir, { recursive: true });
-  return dir;
 }
 
 // --- Background Jobs ---

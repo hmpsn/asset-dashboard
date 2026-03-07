@@ -6,11 +6,9 @@
 
 import fs from 'fs';
 import path from 'path';
+import { getDataDir } from './data-dir.js';
 
-const IS_PROD = process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT === 'production';
-const DATA_DIR = process.env.DATA_DIR || (IS_PROD ? '/tmp/asset-dashboard' : path.join(process.env.HOME || '', '.asset-dashboard'));
-
-const TOKEN_FILE = path.join(DATA_DIR, 'google-tokens.json');
+const TOKEN_FILE = path.join(getDataDir(''), 'google-tokens.json');
 
 interface GoogleTokens {
   access_token: string;
