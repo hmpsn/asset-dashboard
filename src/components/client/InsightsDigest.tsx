@@ -343,9 +343,10 @@ export function InsightsDigest(props: InsightsDigestProps) {
           const c = COLORS[insight.color] || COLORS.teal;
           const Icon = insight.icon;
           return (
-            <div
+            <button
               key={insight.id}
-              className="bg-zinc-900 rounded-xl border border-zinc-800 p-4"
+              onClick={() => insight.action && props.onNavigate(insight.action.tab)}
+              className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 text-left hover:border-zinc-700 transition-colors cursor-pointer group"
             >
               {/* Header */}
               <div className="flex items-center gap-1.5 mb-2">
@@ -354,7 +355,7 @@ export function InsightsDigest(props: InsightsDigestProps) {
                   {SENTIMENT_LABELS[insight.sentiment]}
                 </span>
               </div>
-              <h3 className="text-[13px] font-medium text-zinc-200 leading-snug mb-1.5">{insight.headline}</h3>
+              <h3 className="text-sm font-medium text-zinc-200 leading-snug mb-1.5">{insight.headline}</h3>
 
               {/* Body */}
               <p className="text-[11px] text-zinc-500 leading-relaxed mb-2">
@@ -372,16 +373,13 @@ export function InsightsDigest(props: InsightsDigestProps) {
                 </div>
               )}
 
-              {/* Action */}
+              {/* Destination hint */}
               {insight.action && (
-                <button
-                  onClick={() => props.onNavigate(insight.action!.tab)}
-                  className="text-[11px] text-teal-400 hover:text-teal-300 flex items-center gap-1 transition-colors"
-                >
+                <span className="text-[11px] text-teal-400 group-hover:text-teal-300 flex items-center gap-1 transition-colors">
                   {insight.action.label} <ArrowRight className="w-3 h-3" />
-                </button>
+                </span>
               )}
-            </div>
+            </button>
           );
         })}
       </div>
