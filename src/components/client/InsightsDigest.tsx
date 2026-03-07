@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import {
   TrendingUp, TrendingDown, Users, MousePointer, Shield, Zap,
   Target, FileText, Globe, Sparkles, CheckCircle2,
-  ArrowRight, type LucideIcon,
+  ArrowRight, ChevronDown, type LucideIcon,
 } from 'lucide-react';
 import type {
   SearchOverview, SearchQuery, AuditSummary, AuditDetail,
@@ -318,11 +319,14 @@ const SENTIMENT_LABELS: Record<string, string> = {
 
 export function InsightsDigest(props: InsightsDigestProps) {
   const insights = generateInsights(props);
+  const [expanded, setExpanded] = useState(false);
 
   if (insights.length === 0) return null;
 
-  // Show max 8 insights
-  const visible = insights.slice(0, 8);
+  const INITIAL_COUNT = 4;
+  const all = insights.slice(0, 8);
+  const visible = expanded ? all : all.slice(0, INITIAL_COUNT);
+  const hasMore = all.length > INITIAL_COUNT;
 
   return (
     <div className="space-y-3">
@@ -331,10 +335,10 @@ export function InsightsDigest(props: InsightsDigestProps) {
           <Sparkles className="w-3 h-3 text-teal-400" />
         </div>
         <span className="text-xs font-medium text-zinc-300">Insights</span>
-        <span className="text-[11px] text-zinc-500">{visible.length} things to know</span>
+        <span className="text-[11px] text-zinc-500">{all.length} things to know</span>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="space-y-3">
         {visible.map(insight => {
           const c = COLORS[insight.color] || COLORS.teal;
           const Icon = insight.icon;
@@ -381,6 +385,16 @@ export function InsightsDigest(props: InsightsDigestProps) {
           );
         })}
       </div>
+
+      {hasMore && !expanded && (
+        <button
+          onClick={() => setExpanded(true)}
+          className="flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
+        >
+          <ChevronDown className="w-3 h-3" />
+          Show {all.length - INITIAL_COUNT} more insight{all.length - INITIAL_COUNT > 1 ? 's' : ''}
+        </button>
+      )}
     </div>
   );
 }
