@@ -722,9 +722,17 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
       auditJobId.current = runningJob.id;
       setLoading(true);
       setHasRun(true);
-    } else if (!existingJob && !runningJob) {
-      setData(null);
-      setHasRun(false);
+    } else if (!existingJob && !runningJob && !data) {
+      // No in-memory job — try loading latest persisted snapshot from disk
+      fetch(`/api/reports/${siteId}/latest`)
+        .then(r => r.json())
+        .then(snapshot => {
+          if (snapshot && snapshot.audit && Array.isArray(snapshot.audit.pages)) {
+            setData({ ...snapshot.audit, snapshotId: snapshot.id } as SeoAuditResult & { snapshotId: string });
+            setHasRun(true);
+          }
+        })
+        .catch(() => {});
     }
     setAuditError(null);
     loadHistory();

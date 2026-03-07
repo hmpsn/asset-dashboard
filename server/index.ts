@@ -1248,6 +1248,13 @@ app.post('/api/reports/:siteId/snapshot', (req, res) => {
   }
 });
 
+// Get latest full snapshot for a site (used by admin SeoAudit to restore after deploy)
+app.get('/api/reports/:siteId/latest', (req, res) => {
+  const latest = getLatestSnapshot(req.params.siteId);
+  if (!latest) return res.json(null);
+  res.json(latest);
+});
+
 // List snapshots for a site
 app.get('/api/reports/:siteId/history', (req, res) => {
   const history = listSnapshots(req.params.siteId);
