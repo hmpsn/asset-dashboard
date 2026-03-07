@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { ChartPointDetail } from './ChartPointDetail';
 import { PageHeader, StatCard, SectionCard, TabBar, DateRangeSelector, EmptyState } from './ui';
+import { RenderMarkdown } from './client/helpers';
 import { DATE_PRESETS_SEARCH } from './ui/constants';
 
 interface SearchQuery {
@@ -140,30 +141,6 @@ function TrendChart({ data, metric, color, height = 80 }: { data: PerformanceTre
   );
 }
 
-// Simple markdown-ish renderer for AI chat responses
-function RenderMarkdown({ text }: { text: string }) {
-  const lines = text.split('\n');
-  return (
-    <div className="space-y-1.5">
-      {lines.map((line, i) => {
-        if (line.startsWith('### ')) return <h4 key={i} className="text-xs font-semibold text-zinc-200 mt-2">{line.slice(4)}</h4>;
-        if (line.startsWith('## ')) return <h3 key={i} className="text-sm font-semibold text-zinc-200 mt-2">{line.slice(3)}</h3>;
-        if (line.startsWith('# ')) return <h2 key={i} className="text-sm font-bold text-zinc-200 mt-2">{line.slice(2)}</h2>;
-        if (line.startsWith('- **')) {
-          const match = line.match(/^- \*\*(.+?)\*\*(.*)$/);
-          if (match) return <div key={i} className="flex gap-1.5 text-[11px]"><span className="text-zinc-500 mt-0.5">•</span><span><strong className="text-zinc-200">{match[1]}</strong><span className="text-zinc-400">{match[2]}</span></span></div>;
-        }
-        if (line.startsWith('- ')) return <div key={i} className="flex gap-1.5 text-[11px] text-zinc-400"><span className="text-zinc-500 mt-0.5">•</span><span>{line.slice(2)}</span></div>;
-        if (line.match(/^\d+\. /)) return <div key={i} className="text-[11px] text-zinc-400 ml-2">{line}</div>;
-        if (line.trim() === '') return <div key={i} className="h-1" />;
-        // Bold inline
-        const boldParsed = line.replace(/\*\*(.+?)\*\*/g, '<b class="text-zinc-200">$1</b>');
-        const codeParsed = boldParsed.replace(/`(.+?)`/g, '<code class="bg-zinc-800 px-1 rounded text-zinc-300 text-[11px]">$1</code>');
-        return <p key={i} className="text-[11px] text-zinc-400 leading-relaxed" dangerouslySetInnerHTML={{ __html: codeParsed }} />;
-      })}
-    </div>
-  );
-}
 
 type SortKey = 'clicks' | 'impressions' | 'ctr' | 'position';
 type DataTab = 'queries' | 'pages' | 'insights';

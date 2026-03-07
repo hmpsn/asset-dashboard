@@ -155,30 +155,111 @@ export function ScoreHistoryChart({ history }: { history: Array<{ id: string; cr
 export function RenderMarkdown({ text }: { text: string }) {
   const inlineMd = (s: string) =>
     s.replace(/\*\*(.+?)\*\*/g, '<b class="text-zinc-200">$1</b>')
-     .replace(/`(.+?)`/g, '<code class="bg-zinc-800 px-1 rounded text-zinc-300 text-[11px]">$1</code>');
+     .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em class="text-zinc-400">$1</em>')
+     .replace(/`([^`]+)`/g, '<code class="bg-zinc-800 px-1 py-0.5 rounded text-zinc-300 text-[11px]">$1</code>');
+  const stripBold = (s: string) => s.replace(/\*\*/g, '').trim();
   const lines = text.split('\n');
-  return (
-    <div className="space-y-1.5">
-      {lines.map((line, i) => {
-        const trimmed = line.trimStart();
-        const indent = line.length - trimmed.length;
-        if (trimmed.startsWith('### ')) return <h4 key={i} className="text-xs font-semibold text-zinc-200 mt-2">{trimmed.slice(4)}</h4>;
-        if (trimmed.startsWith('## ')) return <h3 key={i} className="text-sm font-semibold text-zinc-200 mt-2">{trimmed.slice(3)}</h3>;
-        if (trimmed.startsWith('# ')) return <h3 key={i} className="text-sm font-bold text-zinc-200 mt-3">{trimmed.slice(2)}</h3>;
-        if (trimmed.match(/^\d+\.\s/)) {
-          const content = trimmed.replace(/^\d+\.\s/, '');
-          const num = trimmed.match(/^(\d+)\./)?.[1];
-          return <div key={i} className="flex gap-1.5 text-[11px] text-zinc-400 mt-1" style={{ marginLeft: indent > 0 ? 12 : 0 }}><span className="text-zinc-500 shrink-0 w-4 text-right">{num}.</span><span dangerouslySetInnerHTML={{ __html: inlineMd(content) }} /></div>;
-        }
-        if (trimmed.startsWith('- ')) {
-          const content = trimmed.slice(2);
-          return <div key={i} className="flex gap-1.5 text-[11px] text-zinc-400" style={{ marginLeft: indent > 0 ? 12 : 0 }}><span className="text-zinc-500 shrink-0">•</span><span dangerouslySetInnerHTML={{ __html: inlineMd(content) }} /></div>;
-        }
-        if (trimmed === '') return <div key={i} className="h-1" />;
-        return <p key={i} className="text-[11px] text-zinc-400 leading-relaxed" dangerouslySetInnerHTML={{ __html: inlineMd(trimmed) }} />;
-      })}
-    </div>
-  );
+  const elements: React.ReactElement[] = [];
+  let idx = 0;
+
+  while (idx < lines.length) {
+    const line = lines[idx];
+    const trimmed = line.trimStart();
+    const indent = line.length - trimmed.length;
+
+    // Table: consecutive lines starting and ending with |
+    if (trimmed.startsWith('|') && trimmed.includes('|', 1)) {
+      const tableLines: string[] = [];
+      while (idx < lines.length) {
+        const tl = lines[idx].trim();
+        if (tl.startsWith('|') && tl.includes('|', 1)) { tableLines.push(tl); idx++; }
+        else break;
+      }
+      if (tableLines.length >= 2) {
+        const parseRow = (row: string) =>
+          row.split('|').slice(1, -1).map(c => c.trim());
+        const isSep = (row: string) => /^\|[\s\-:]+\|/.test(row);
+        const headers = parseRow(tableLines[0]);
+        const dataStart = tableLines.length > 1 && isSep(tableLines[1]) ? 2 : 1;
+        const rows = tableLines.slice(dataStart).filter(r => !isSep(r)).map(parseRow);
+        elements.push(
+          <div key={elements.length} className="overflow-x-auto my-1.5 rounded-lg border border-zinc-800">
+            <table className="text-[11px] w-full border-collapse">
+              <thead>
+                <tr className="bg-zinc-800/50">
+                  {headers.map((h, j) => (
+                    <th key={j} className="text-left px-2.5 py-1.5 text-zinc-400 font-medium whitespace-nowrap"
+                      dangerouslySetInnerHTML={{ __html: inlineMd(h) }} />
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, j) => (
+                  <tr key={j} className={j < rows.length - 1 ? 'border-b border-zinc-800/50' : ''}>
+                    {row.map((cell, k) => (
+                      <td key={k} className="px-2.5 py-1.5 text-zinc-300 whitespace-nowrap"
+                        dangerouslySetInnerHTML={{ __html: inlineMd(cell) }} />
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+        continue;
+      }
+    }
+
+    // Headings — strip bold markers inside (GPT sends ## **Overview**)
+    if (trimmed.startsWith('### ')) {
+      elements.push(<h4 key={elements.length} className="text-xs font-semibold text-zinc-200 mt-3 mb-0.5">{stripBold(trimmed.slice(4))}</h4>);
+      idx++; continue;
+    }
+    if (trimmed.startsWith('## ')) {
+      elements.push(<h3 key={elements.length} className="text-sm font-semibold text-zinc-200 mt-3 mb-0.5">{stripBold(trimmed.slice(3))}</h3>);
+      idx++; continue;
+    }
+    if (trimmed.startsWith('# ')) {
+      elements.push(<h3 key={elements.length} className="text-sm font-bold text-zinc-200 mt-3 mb-0.5">{stripBold(trimmed.slice(2))}</h3>);
+      idx++; continue;
+    }
+
+    // Bullet lists: - or • (handle both to avoid double-bullet)
+    if (trimmed.startsWith('- ') || trimmed.startsWith('• ')) {
+      const content = trimmed.slice(2);
+      elements.push(
+        <div key={elements.length} className="flex gap-1.5 text-[11px] text-zinc-400" style={{ marginLeft: indent > 0 ? 12 : 0 }}>
+          <span className="text-zinc-500 shrink-0 mt-px">•</span>
+          <span dangerouslySetInnerHTML={{ __html: inlineMd(content) }} />
+        </div>
+      );
+      idx++; continue;
+    }
+
+    // Numbered lists
+    if (trimmed.match(/^\d+\.\s/)) {
+      const content = trimmed.replace(/^\d+\.\s/, '');
+      const num = trimmed.match(/^(\d+)\./)?.[1];
+      elements.push(
+        <div key={elements.length} className="flex gap-1.5 text-[11px] text-zinc-400 mt-0.5" style={{ marginLeft: indent > 0 ? 12 : 0 }}>
+          <span className="text-zinc-500 shrink-0 w-4 text-right">{num}.</span>
+          <span dangerouslySetInnerHTML={{ __html: inlineMd(content) }} />
+        </div>
+      );
+      idx++; continue;
+    }
+
+    // Empty line → small spacer
+    if (trimmed === '') { elements.push(<div key={elements.length} className="h-1" />); idx++; continue; }
+
+    // Regular paragraph
+    elements.push(
+      <p key={elements.length} className="text-[11px] text-zinc-400 leading-relaxed" dangerouslySetInnerHTML={{ __html: inlineMd(trimmed) }} />
+    );
+    idx++;
+  }
+
+  return <div className="space-y-1">{elements}</div>;
 }
 
 // InsightCard needs icon prop typed loosely to avoid importing every icon

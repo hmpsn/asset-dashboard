@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Sparkles, X, Send, Loader2, MessageSquare, Bot } from 'lucide-react';
+import { RenderMarkdown } from './client/helpers';
 
 interface ChatMessage { role: 'user' | 'assistant'; content: string; }
 
@@ -10,20 +11,6 @@ const ADMIN_QUICK_QUESTIONS = [
   'Compare this period to last — what changed?',
   'What should I tell the client about their progress?',
 ];
-
-function RenderMarkdown({ text }: { text: string }) {
-  const html = text
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/`([^`]+)`/g, '<code class="bg-zinc-800 px-1 py-0.5 rounded text-teal-300 text-[11px]">$1</code>')
-    .replace(/^### (.*$)/gm, '<h4 class="text-xs font-semibold text-zinc-200 mt-3 mb-1">$1</h4>')
-    .replace(/^## (.*$)/gm, '<h3 class="text-sm font-semibold text-zinc-200 mt-3 mb-1">$1</h3>')
-    .replace(/^- (.*$)/gm, '<li class="ml-3 text-xs text-zinc-300 leading-relaxed">• $1</li>')
-    .replace(/^\d+\. (.*$)/gm, '<li class="ml-3 text-xs text-zinc-300 leading-relaxed">$1</li>')
-    .replace(/\n{2,}/g, '<br/><br/>')
-    .replace(/\n/g, '<br/>');
-  return <div className="prose-sm text-xs text-zinc-300 leading-relaxed [&_strong]:text-zinc-100 [&_em]:text-zinc-400" dangerouslySetInnerHTML={{ __html: html }} />;
-}
 
 interface AdminChatProps {
   workspaceId: string;
