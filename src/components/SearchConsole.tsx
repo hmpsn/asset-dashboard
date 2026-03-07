@@ -42,6 +42,37 @@ interface PerformanceTrend {
   position: number;
 }
 
+interface DeviceBreakdown {
+  device: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+}
+
+interface CountryBreakdown {
+  country: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+}
+
+interface SearchTypeBreakdown {
+  searchType: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+}
+
+interface PeriodComparison {
+  current: { clicks: number; impressions: number; ctr: number; position: number };
+  previous: { clicks: number; impressions: number; ctr: number; position: number };
+  change: { clicks: number; impressions: number; ctr: number; position: number };
+  changePercent: { clicks: number; impressions: number; ctr: number; position: number };
+}
+
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -147,6 +178,10 @@ const QUICK_QUESTIONS = [
 export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
   const [overview, setOverview] = useState<SearchOverview | null>(null);
   const [trend, setTrend] = useState<PerformanceTrend[]>([]);
+  const [devices, setDevices] = useState<DeviceBreakdown[]>([]);
+  const [countries, setCountries] = useState<CountryBreakdown[]>([]);
+  const [searchTypes, setSearchTypes] = useState<SearchTypeBreakdown[]>([]);
+  const [comparison, setComparison] = useState<PeriodComparison | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<DataTab>('queries');
@@ -178,15 +213,25 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
     if (!siteUrl) return;
     setDataLoading(true);
     setError(null);
+    const qs = `gscSiteUrl=${encodeURIComponent(siteUrl)}&days=${numDays}`;
     try {
-      const [overviewRes, trendRes] = await Promise.all([
-        fetch(`/api/google/search-overview/${siteId}?gscSiteUrl=${encodeURIComponent(siteUrl)}&days=${numDays}`),
-        fetch(`/api/google/performance-trend/${siteId}?gscSiteUrl=${encodeURIComponent(siteUrl)}&days=${numDays}`),
+      const [overviewRes, trendRes, devicesRes, countriesRes, typesRes, compRes] = await Promise.all([
+        fetch(`/api/google/search-overview/${siteId}?${qs}`),
+        fetch(`/api/google/performance-trend/${siteId}?${qs}`),
+        fetch(`/api/google/search-devices/${siteId}?${qs}`).catch(() => null),
+        fetch(`/api/google/search-countries/${siteId}?${qs}`).catch(() => null),
+        fetch(`/api/google/search-types/${siteId}?${qs}`).catch(() => null),
+        fetch(`/api/google/search-comparison/${siteId}?${qs}`).catch(() => null),
       ]);
       const [overviewData, trendData] = await Promise.all([overviewRes.json(), trendRes.json()]);
       if (overviewData.error) throw new Error(overviewData.error);
       setOverview(overviewData);
       setTrend(Array.isArray(trendData) ? trendData : []);
+      // Non-critical data — parse if available
+      if (devicesRes) try { const d = await devicesRes.json(); if (Array.isArray(d)) setDevices(d); } catch { /* */ }
+      if (countriesRes) try { const d = await countriesRes.json(); if (Array.isArray(d)) setCountries(d); } catch { /* */ }
+      if (typesRes) try { const d = await typesRes.json(); if (Array.isArray(d)) setSearchTypes(d); } catch { /* */ }
+      if (compRes) try { const d = await compRes.json(); if (d && !d.error) setComparison(d); } catch { /* */ }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data');
     } finally {
@@ -215,6 +260,10 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
           lastDay: trend[trend.length - 1],
           totalDays: trend.length,
         } : null,
+        devices: devices.length > 0 ? devices : undefined,
+        countries: countries.length > 0 ? countries.slice(0, 5) : undefined,
+        searchTypes: searchTypes.length > 0 ? searchTypes : undefined,
+        periodComparison: comparison || undefined,
       };
       const res = await fetch(`/api/google/search-chat/${siteId}`, {
         method: 'POST',
@@ -421,6 +470,41 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
             <StatCard label="Avg Position" value={overview.avgPosition} icon={BarChart3} iconColor="#fbbf24" sparklineData={trend.map(t => t.position)} sparklineColor="#fbbf24" />
           </div>
 
+          {/* Period comparison banner */}
+          {comparison && (
+            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <TrendingUp className="w-4 h-4 text-zinc-500" />
+                <span className="text-xs font-medium text-zinc-400">vs Previous {days} Days</span>
+              </div>
+              <div className="grid grid-cols-4 gap-4">
+                {([
+                  { label: 'Clicks', key: 'clicks' as const, color: 'blue' },
+                  { label: 'Impressions', key: 'impressions' as const, color: 'cyan' },
+                  { label: 'CTR', key: 'ctr' as const, color: 'emerald', suffix: '%' },
+                  { label: 'Position', key: 'position' as const, color: 'amber', invert: true },
+                ]).map(m => {
+                  const pct = comparison.changePercent[m.key];
+                  const abs = comparison.change[m.key];
+                  const isPositive = m.invert ? abs < 0 : abs > 0;
+                  const isNeutral = abs === 0;
+                  return (
+                    <div key={m.key} className="text-center">
+                      <div className="text-[11px] text-zinc-500 mb-1">{m.label}</div>
+                      <div className="text-sm font-semibold text-zinc-200">
+                        {m.suffix ? `${comparison.current[m.key]}${m.suffix}` : comparison.current[m.key].toLocaleString()}
+                      </div>
+                      <div className={`text-[11px] font-medium mt-0.5 ${isNeutral ? 'text-zinc-500' : isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {abs >= 0 && !m.invert ? '+' : ''}{m.suffix ? abs.toFixed(1) + m.suffix : abs.toLocaleString()}
+                        {' '}({pct >= 0 ? '+' : ''}{pct}%)
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Trend chart */}
           {trend.length > 2 && (
             <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
@@ -438,6 +522,88 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
                   <TrendChart data={trend} metric="impressions" color="#22d3ee" />
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Device + Country + Search Type breakdowns */}
+          {(devices.length > 0 || countries.length > 0 || searchTypes.length > 0) && (
+            <div className="grid grid-cols-3 gap-3">
+              {/* Device breakdown */}
+              {devices.length > 0 && (
+                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+                  <div className="text-xs font-medium text-zinc-400 mb-3">Devices</div>
+                  <div className="space-y-2.5">
+                    {devices.map(d => {
+                      const totalClicks = devices.reduce((s, x) => s + x.clicks, 0);
+                      const pct = totalClicks > 0 ? ((d.clicks / totalClicks) * 100).toFixed(0) : '0';
+                      return (
+                        <div key={d.device}>
+                          <div className="flex items-center justify-between text-[11px] mb-1">
+                            <span className="text-zinc-300 capitalize">{d.device.toLowerCase()}</span>
+                            <span className="text-zinc-500">{pct}% · pos {d.position}</span>
+                          </div>
+                          <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                          </div>
+                          <div className="flex items-center justify-between text-[10px] text-zinc-600 mt-0.5">
+                            <span>{d.clicks.toLocaleString()} clicks</span>
+                            <span>{d.ctr}% CTR</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Country breakdown */}
+              {countries.length > 0 && (
+                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+                  <div className="text-xs font-medium text-zinc-400 mb-3">Top Countries</div>
+                  <div className="space-y-1.5">
+                    {countries.slice(0, 8).map((c, i) => (
+                      <div key={c.country} className="flex items-center justify-between text-[11px] py-1 px-2 rounded bg-zinc-800/30">
+                        <div className="flex items-center gap-2">
+                          <span className="text-zinc-600 w-3 text-right">{i + 1}</span>
+                          <span className="text-zinc-300">{c.country}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-zinc-500">
+                          <span>{c.clicks.toLocaleString()} clicks</span>
+                          <span className="text-zinc-600">pos {c.position}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Search type breakdown */}
+              {searchTypes.length > 0 && (
+                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+                  <div className="text-xs font-medium text-zinc-400 mb-3">Search Types</div>
+                  <div className="space-y-2.5">
+                    {searchTypes.map(st => {
+                      const totalClicks = searchTypes.reduce((s, x) => s + x.clicks, 0);
+                      const pct = totalClicks > 0 ? ((st.clicks / totalClicks) * 100).toFixed(0) : '0';
+                      return (
+                        <div key={st.searchType}>
+                          <div className="flex items-center justify-between text-[11px] mb-1">
+                            <span className="text-zinc-300 capitalize">{st.searchType}</span>
+                            <span className="text-zinc-500">{pct}%</span>
+                          </div>
+                          <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-teal-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                          </div>
+                          <div className="flex items-center justify-between text-[10px] text-zinc-600 mt-0.5">
+                            <span>{st.clicks.toLocaleString()} clicks · {st.impressions.toLocaleString()} imp</span>
+                            <span>pos {st.position}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
