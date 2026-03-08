@@ -2,12 +2,13 @@
 
 > Created: March 8, 2026
 > Purpose: Map every data path through the platform, identify disconnects, and design a unified model.
+> **See also: [PLATFORM_AUDIT.md](./PLATFORM_AUDIT.md)** — comprehensive audit of all 18 admin + 11 client screens, 13 data stores, 4 background schedulers, 49 issues, 5-phase implementation plan.
 
 ---
 
 ## Current State: All Data Stores
 
-The platform has **6 independent data stores** with no cross-referencing:
+The platform has **13 independent data stores** with minimal cross-referencing:
 
 ```
 ┌─────────────────────── DATA STORES ───────────────────────────┐
@@ -15,6 +16,7 @@ The platform has **6 independent data stores** with no cross-referencing:
 │  1. Workspace Config       workspaces.json                     │
 │     └── seoEditTracking    Record<pageId, {status, updatedAt}> │
 │     └── auditSuppressions  {check, pageSlug, reason}[]         │
+│     └── keywordStrategy    {pageMap, contentGaps, quickWins}   │
 │                                                                │
 │  2. Approval Batches       approvals/<wsId>.json               │
 │     └── ApprovalBatch[]    {items: ApprovalItem[], status}     │
@@ -22,19 +24,51 @@ The platform has **6 independent data stores** with no cross-referencing:
 │  3. Content Requests       content-requests/<wsId>.json        │
 │     └── ContentTopicRequest[]  9-step lifecycle                │
 │                                                                │
-│  4. Activity Log           .activity-log.json                  │
+│  4. Client Requests        requests/<wsId>.json                │
+│     └── ClientRequest[]    ticket system, notes + attachments  │
+│                                                                │
+│  5. Payments               payments/<wsId>.json                │
+│     └── PaymentRecord[]    Stripe sessions, no work linkage    │
+│                                                                │
+│  6. Activity Log           .activity-log.json                  │
 │     └── ActivityEntry[]    append-only, 500 max                │
 │                                                                │
-│  5. Audit Snapshots        reports/<siteId>/                   │
+│  7. Audit Snapshots        reports/<siteId>/                   │
 │     └── {audit, pages, issues, scores}                         │
 │                                                                │
-│  6. Chat Memory            chat-sessions/                      │
+│  8. Chat Memory            chat-sessions/                      │
 │     └── per-session messages + summaries                       │
 │                                                                │
-│  ⚠️  NONE of these reference each other by ID.                │
+│  9. Recommendations        recommendations/<wsId>.json         │
+│     └── RecommendationSet  traffic-weighted, status-tracked    │
+│     ⚠️  Duplicated by client FixRecommendations.tsx            │
+│                                                                │
+│  10. Churn Signals         .churn-signals.json                 │
+│      └── ChurnSignal[]     background scheduler, every 6h     │
+│                                                                │
+│  11. Sales Reports         sales-reports/                      │
+│      └── Prospect audit reports (isolated from workspaces)     │
+│                                                                │
+│  12. Rank Tracking         rank-tracking/<wsId>/               │
+│      └── Keyword position snapshots over time                  │
+│                                                                │
+│  13. Annotations           per-workspace timeline annotations  │
+│                                                                │
+│  + Email Queue, Jobs (in-memory), Audit Schedules,             │
+│    Client Users (per-workspace login tracking)                 │
+│                                                                │
+│  ⚠️  Every store writes only to itself.                        │
+│  Cross-store writes: only Stripe webhook + trackSeoEdit.       │
+│  Cross-store reads:  only Monthly Report (reads 7 stores).     │
+│                                                                │
 │  There's no way to trace: audit issue → edit → approval → live │
+│  There's no way to trace: payment → work order → fulfillment   │
+│  There's no way to trace: brief → page → ROI                  │
+│  There's no way to trace: recommendation → fix → completion    │
 └────────────────────────────────────────────────────────────────┘
 ```
+
+**See [PLATFORM_AUDIT.md](./PLATFORM_AUDIT.md) Part 4** for the full server-side infrastructure audit including background schedulers, job types, email triggers, Stripe webhook flow, and the recommendations engine analysis.
 
 ## Full Bidirectional Flow Map
 
