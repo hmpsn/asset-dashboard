@@ -26,7 +26,7 @@ Before looking ahead, here's what you have access to today:
 | **Smart Health Scores** | Suppressed audit issues are excluded from all health scores, recommendations, and AI advice — scores reflect real priorities. | ✅ Live |
 | **CMS Sitemap Filtering** | Content editor only shows collection pages that exist in your sitemap, with full URL paths. No more noise from unpublished items. | ✅ Live |
 
-**67 features shipped.** Here's what's next.
+**59 documented features shipped.** Here's what's next.
 
 ---
 
@@ -50,6 +50,16 @@ The goal this month is to make the platform fully self-service — any business 
 - **SEO edit tracking** — Every page card in the SEO editor, CMS editor, and audit view now shows its edit status (Live / In Review / Flagged) with colored borders and badges
 - **Suppression-aware health scores** — Suppressed issues are excluded from all scores, issue lists, and AI recommendations across 6 data endpoints
 - **CMS sitemap filtering** — Collection items filtered by sitemap; full URL paths with parent collection slugs shown
+- **Unified Page Edit State** — Full lifecycle tracking per page (issue-detected → in-review → approved → rejected → live) visible across all tools
+- **Work order fulfillment** — Stripe-purchased SEO fixes create work orders with admin tracking and client order status view
+- **AI recommendations engine** — Traffic-weighted, auto-regenerated after audits, with client email notifications
+- **SEO self-service cart** — Clients add recommended fixes to a cart and checkout via Stripe
+- **Activity feed for client actions** — Approval/rejection actions logged with actor and context
+- **Approval context** — "Why" reasons from audit findings shown on each proposed change
+- **Command Center SEO status** — Page state summary pills on all workspace cards
+- **Request-to-page linkage** — Client requests linked to specific pages with auto page state updates
+- **Prospect onboarding CTA** — One-click "Onboard as Client" from Sales Report to workspace creation
+- **Expanded email notifications** — Recommendations ready + audit score improved notifications
 
 ---
 
@@ -124,8 +134,8 @@ Features that hit all three ship first. Everything else goes in the backlog unti
 As a beta client, you have outsized influence on what we build next. If something on this roadmap excites you — or if something's missing — tell us. The AI advisor is always listening, or just reply to any email from us.
 
 **Current platform stats:**
-- 67 features shipped
-- 31 features planned
+- 59 features shipped
+- 16 vision features planned (see FEATURE_VISION.md)
 - 3-tier pricing live (Starter / Growth / Premium)
 - AI advisor available 24/7
 

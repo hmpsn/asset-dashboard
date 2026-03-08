@@ -4,11 +4,30 @@
 > Purpose: Map every data path through the platform, identify disconnects, and design a unified model.
 > **See also: [PLATFORM_AUDIT.md](./PLATFORM_AUDIT.md)** — comprehensive audit of all 18 admin + 11 client screens, 13 data stores, 4 background schedulers, 49 issues, 5-phase implementation plan.
 
+> ### ✅ IMPLEMENTED — March 8, 2026
+>
+> **This document is now a historical reference.** The issues identified here have been resolved
+> through the 6-sprint implementation in [IMPLEMENTATION_ROADMAP.md](./IMPLEMENTATION_ROADMAP.md).
+>
+> **What changed since this audit:**
+> - `seoEditTracking` replaced by `PageEditState` model in `server/workspaces.ts` (flat model, not the nested `fields[]` proposed here)
+> - Cross-store writes now exist: audit → page state, approval → page state, work order → page state, request → page state
+> - Activity logging covers client actions (approve/reject), fix completions, and request resolution
+> - `WorkOrder` model added (14th data store) for Stripe-purchased fix fulfillment
+> - Content requests now have `pageId` linkage
+> - Approval items now have `reason` field for audit context
+> - 15 email notification types (up from 9)
+> - Client approval/rejection actions logged to activity feed
+> - Command Center shows page state summary per workspace
+> - WorkspaceHome shows SEO Work Status summary
+>
+> **The "What's Missing" gaps below are now largely resolved.** See `.windsurfrules` for current architecture.
+
 ---
 
-## Current State: All Data Stores
+## Pre-Implementation State: All Data Stores (Historical)
 
-The platform has **13 independent data stores** with minimal cross-referencing:
+The platform had **13 independent data stores** with minimal cross-referencing at the time of this audit:
 
 ```
 ┌─────────────────────── DATA STORES ───────────────────────────┐

@@ -534,6 +534,116 @@ A brief value assessment of every feature in the platform, covering what it does
 
 ---
 
+### 50. Unified Page Edit State Model
+**What it does:** `PageEditState` in `server/workspaces.ts` replaces the legacy `seoEditTracking` with a rich lifecycle model. Every page tracks: status (`clean` → `issue-detected` → `fix-proposed` → `in-review` → `approved` → `rejected` → `live`), source tool, approval/content/work-order linkages, rejection notes, and timestamps. `updatePageState()`, `getPageState()`, `getAllPageStates()` server helpers. `usePageEditStates()` React hook provides client-side summary counts. All tools (audit, editor, CMS, schema, approvals, work orders, requests) read and write through this shared model.
+
+**Agency value:** Single source of truth for every page's SEO lifecycle. No more disconnected tracking across tools. Admin sees the full picture — which pages have issues, which are in review, which were rejected by client.
+
+**Client value:** Approval decisions (approve/reject) immediately reflected across the platform. No more "I rejected that but it still shows as pending."
+
+**Mutual:** End-to-end traceability: audit issue → fix → client review → live. Every step is visible to both sides.
+
+---
+
+### 51. Work Order Fulfillment Pipeline
+**What it does:** `server/work-orders.ts` defines the `WorkOrder` model (pending → in_progress → completed → cancelled). Created automatically by Stripe webhook when a client purchases fixes via the SEO cart. Stores product type, page IDs, and payment session ID. Admin API endpoints for listing and updating work orders. Client-facing `OrderStatus.tsx` with visual status stepper. On completion, updates `PageEditState` to `live`, logs activity (`fix_completed`), and emails client (`notifyClientFixesApplied`). Work order counts surface in Command Center and WorkspaceHome action items.
+
+**Agency value:** Clear fulfillment queue — see what's been purchased and what needs work. Completion triggers automatic page state updates and client notification.
+
+**Client value:** Visual order tracking with status progression. Knows exactly where their purchased fixes stand.
+
+**Mutual:** Closes the loop from payment to delivery. Both sides have visibility into fulfillment status.
+
+---
+
+### 52. AI Recommendations Engine
+**What it does:** `server/recommendations.ts` generates traffic-weighted, prioritized SEO recommendations per workspace using audit data, GSC traffic, and AI analysis. Status-tracked (active → dismissed → completed). Auto-regenerated after every audit run. Client-facing `FixRecommendations.tsx` surfaces recommendations with severity badges and "Fix →" routing to appropriate tools. `InsightsEngine` on WorkspaceHome shows prioritized recommendations grouped by urgency. Recommendation flags appear in SEO Editor and Schema Generator via `useRecommendations` hook.
+
+**Agency value:** Automatically identifies the highest-impact SEO actions after every audit. No manual analysis needed — recommendations are prioritized by traffic impact.
+
+**Client value:** Clear, prioritized list of what to fix and why. Each recommendation links to the tool that can fix it.
+
+**Mutual:** Ensures both sides focus on the changes that will have the most impact on traffic and rankings.
+
+---
+
+### 53. SEO Self-Service Cart & Checkout
+**What it does:** Client-facing `SeoCart.tsx` and `useCart.tsx` enable clients to add recommended fixes to a cart (meta fixes, schema pages, redirect fixes) and checkout via Stripe. Cart items carry `pageIds` through to Stripe metadata, which flows into work order creation on payment. `FixRecommendations.tsx` surfaces purchasable fix actions based on audit findings.
+
+**Agency value:** Revenue from fix services without manual quoting or invoicing. Clients self-serve the purchase flow.
+
+**Client value:** One-click purchase of recommended fixes with transparent pricing. No back-and-forth negotiations.
+
+**Mutual:** Turns audit findings into revenue automatically. The platform identifies the problem, recommends the fix, and processes the payment.
+
+---
+
+### 54. Cross-Tool Activity Feed for Client Actions
+**What it does:** Client approval and rejection actions are logged to the activity feed with actor name, field changed, and context. Activity types include `approval_applied`, `changes_requested`, and `fix_completed`. Activity entries include `pageId` metadata for cross-referencing. Client actions visible in WorkspaceHome activity feed and Command Center.
+
+**Agency value:** Full visibility into client decisions without checking each approval batch individually. See rejections immediately with client notes.
+
+**Client value:** Their actions are acknowledged and visible — no "black hole" feeling after approving or rejecting.
+
+**Mutual:** Both sides have a shared timeline of all actions taken on the site.
+
+---
+
+### 55. Approval Context & Reason Field
+**What it does:** `ApprovalItem` now includes an optional `reason` field populated from audit findings when creating approval batches from `SeoAudit.tsx`. The client sees "Why: [recommendation]" context on each proposed change in `ApprovalsTab.tsx`. Confirmation dialog added before applying approved changes to the live website.
+
+**Agency value:** Clients understand why each change is proposed, reducing rejection rates and back-and-forth.
+
+**Client value:** Full context for every proposed change — not just "we want to change your title" but "your title is 72 characters, which gets truncated in search results."
+
+**Mutual:** Informed decisions lead to faster approvals. The confirmation dialog prevents accidental live deployments.
+
+---
+
+### 56. Command Center SEO Work Status
+**What it does:** The `/api/workspaces/overview` endpoint now includes `pageStates` per workspace (issueDetected, inReview, approved, rejected, live counts). `WorkspaceOverview.tsx` displays colored status pills on each workspace card. Rejected changes surface in the "Needs Attention" alerts. WorkspaceHome shows an SEO Work Status section with clickable status counts that navigate to the relevant tool.
+
+**Agency value:** At-a-glance visibility into SEO work status across all clients from the Command Center. Rejected items surface immediately as attention items.
+
+**Client value:** N/A — admin-only view.
+
+**Mutual:** Ensures no client workspace is overlooked. Rejected items trigger immediate attention.
+
+---
+
+### 57. Request-to-Page Linkage
+**What it does:** `ClientRequest` now includes an optional `pageId` field that links requests to specific pages. When a request is completed/closed, the linked page's `PageEditState` is updated to `live`. Internal request creation endpoint passes `pageId` through.
+
+**Agency value:** Requests are traceable to specific pages. Completing a request automatically updates the page lifecycle.
+
+**Client value:** Their requests about specific pages are properly linked, reducing confusion about what was fixed.
+
+**Mutual:** Closes the loop from "client reports an issue on page X" to "page X is marked as fixed."
+
+---
+
+### 58. Prospect-to-Client Onboarding CTA
+**What it does:** "Onboard as Client" button on the Sales Report results page. Extracts the domain from the audit URL and navigates to workspace creation with the URL and name pre-filled. Enables a seamless flow from prospect audit to client onboarding.
+
+**Agency value:** One-click transition from prospect audit to workspace setup. No manual data entry needed.
+
+**Client value:** N/A — internal agency tool.
+
+**Mutual:** Reduces friction in the sales-to-onboarding pipeline.
+
+---
+
+### 59. Expanded Email Notifications
+**What it does:** Two new email notification types: `notifyClientRecommendationsReady` (sent after audit auto-generates recommendations, includes count and dashboard link) and `notifyClientAuditImproved` (sent when audit score increases, shows score delta). Full HTML templates with branded layout. Total of 15 `EmailEventType`s across the platform.
+
+**Agency value:** Clients are automatically notified of positive progress and new recommendations without manual outreach.
+
+**Client value:** Proactive communication — know when your score improves and when new recommendations are available without logging in.
+
+**Mutual:** Automated touchpoints that demonstrate ongoing value and keep clients engaged with the platform.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
@@ -541,15 +651,16 @@ A brief value assessment of every feature in the platform, covering what it does
 | SEO & Technical | 12 | Audit, fix, and optimize faster than manual tools |
 | Analytics & Tracking | 5 | Unified data view replaces platform-hopping |
 | Content & Strategy | 3 | Strategy → brief → approval → production pipeline |
-| Client Communication | 6 | Structured workflows + automated reports replace email chaos |
-| Client Self-Service | 8 | 24/7 data access, onboarding, plans page, pricing transparency |
-| AI & Intelligence | 3 | Full-spectrum AI advisor + revenue engine + knowledge base + memory |
+| Client Communication | 7 | Structured workflows + automated reports + expanded notifications |
+| Client Self-Service | 10 | 24/7 data access, onboarding, plans, cart, order tracking |
+| AI & Intelligence | 4 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine |
 | Auth & Access Control | 3 | Internal user accounts, workspace ACL, client user accounts |
 | Security | 1 | Helmet, HTTPS, rate limiting, input sanitization |
 | Monetization | 1 | Stripe Checkout, admin settings, payment tracking, trials, encrypted config |
-| Platform & UX | 7 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home |
+| Platform & UX | 10 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home, page state model, work orders, request linkage |
+| Data Architecture | 3 | PageEditState model, cross-store writes, activity feed for client actions |
 
-**49 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**59 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
 ---
 
@@ -685,4 +796,4 @@ When the user asks to update this document with recent features, follow this pro
 7. **Update Summary table**: Adjust category counts and total feature count.
 8. **Commit**: `git add FEATURE_AUDIT.md && git commit -m "docs: update FEATURE_AUDIT with recent features"`
 
-Current feature count: **52**. Last updated: March 8, 2026 (session 8: suppression-aware health scores, SEO edit tracking with teal/purple/yellow statuses, CMS sitemap filtering with parent slugs).
+Current feature count: **59**. Last updated: March 8, 2026 (data flow unification sprints 0-5: PageEditState model, work orders, recommendations engine, SEO cart, activity feed for client actions, approval context, command center SEO status, request-page linkage, prospect onboarding CTA, expanded email notifications).

@@ -66,8 +66,8 @@ Every completed task — no matter how small — must include these steps:
 
 | File | Purpose | Notes |
 |------|---------|-------|
-| `index.ts` | **All Express routes** (~6,500 lines) | Chat endpoints, strategy generation, CRUD. The largest file. |
-| `workspaces.ts` | Workspace CRUD, `Workspace` interface, `KeywordStrategy` types | Core data model |
+| `index.ts` | **All Express routes** (~7,300 lines) | Chat endpoints, strategy generation, CRUD. The largest file. |
+| `workspaces.ts` | Workspace CRUD, `Workspace` interface, `PageEditState` model, `KeywordStrategy` types | Core data model. `updatePageState()`, `getPageState()`, `getAllPageStates()` manage the unified page lifecycle. |
 | `seo-context.ts` | `buildSeoContext()`, `buildKeywordMapContext()`, `buildKnowledgeBase()` | Shared AI prompt builders — used by chat, briefs, schema |
 | `chat-memory.ts` | Chat session persistence | `addMessage`, `buildConversationContext`, `generateSessionSummary` |
 | `content-brief.ts` | AI content brief generation | 7 page-type-specific prompts, SEMRush/GSC enrichment |
@@ -85,11 +85,18 @@ Every completed task — no matter how small — must include these steps:
 | `semrush.ts` | SEMRush API | Keyword overview, domain organic, gaps, related |
 | `seo-audit.ts` | Site health audit engine | Crawl + scoring |
 | `monthly-report.ts` | Auto-report scheduler | `gatherMonthlyData`, trial banner support |
-| `email-templates.ts` | HTML email builders | `renderMonthlyReport`, `renderApprovalReminder` |
-| `activity-log.ts` | Activity logging | `addActivity(workspaceId, type, title, detail, metadata?)` |
+| `email-templates.ts` | HTML email builders | 15 `EmailEventType`s: approval, request, content, audit, welcome, trial, password, churn, payment, fixes, recommendations, audit_improved |
+| `activity-log.ts` | Activity logging | `addActivity(workspaceId, type, title, detail, metadata?, actor?)`. Types: audit, seo_edit, schema, request, approval, content, chat, fix_completed, etc. |
 | `schema-suggester.ts` | JSON-LD schema generation per page | |
 | `rank-tracking.ts` | Keyword position tracking over time | |
-| `approvals.ts` | Client approval workflow | SEO changes → client review → Webflow push |
+| `approvals.ts` | Client approval workflow | SEO changes → client review → Webflow push. `ApprovalItem` includes `reason` field for audit context. |
+| `requests.ts` | Client request CRUD | `ClientRequest` with `pageId` linkage to `PageEditState` |
+| `work-orders.ts` | Work order lifecycle | `WorkOrder` (pending → in_progress → completed → cancelled). Created by Stripe webhook. |
+| `recommendations.ts` | AI recommendation engine | `generateRecommendations()`, traffic-weighted, status-tracked. Auto-regenerated after audits. |
+| `churn-signals.ts` | Churn risk detection | Background scheduler (6h), signals based on inactivity + score drops |
+| `roi.ts` | ROI calculations | Organic traffic value tracking |
+| `trial-reminders.ts` | Trial expiry emails | Scheduled daily check for expiring trials |
+| `backup.ts` | Data backup scheduler | Periodic JSON backup of all data stores |
 
 ### Frontend (`src/`)
 
@@ -108,13 +115,14 @@ Every completed task — no matter how small — must include these steps:
 | `components/LoginScreen.tsx` | Admin login UI | Setup flow + email/password |
 | `components/Styleguide.tsx` | Design system reference page | Color swatches, component demos |
 | `components/ui/` | **12 shared UI primitives** | See § 4 below |
-| `components/client/` | **Client tab components** | `types.ts` (interfaces + ClientTab type), `helpers.tsx`, `OverviewTab.tsx`, `SearchTab.tsx`, `AnalyticsTab.tsx`, `StrategyTab.tsx`, `ContentTab.tsx`, `ApprovalsTab.tsx`, `RequestsTab.tsx`, `PlansTab.tsx`, `InboxTab.tsx` (composes Approvals+Requests+Content), `HealthTab.tsx`, `InsightsDigest.tsx`, `InsightsEngine.tsx`, `MonthlySummary.tsx`, `DataSnapshots.tsx`, `ROIDashboard.tsx` |
+| `components/client/` | **Client tab components** | `types.ts` (interfaces + ClientTab type), `helpers.tsx`, `OverviewTab.tsx`, `SearchTab.tsx`, `AnalyticsTab.tsx`, `StrategyTab.tsx`, `ContentTab.tsx`, `ApprovalsTab.tsx`, `RequestsTab.tsx`, `PlansTab.tsx`, `InboxTab.tsx` (composes Approvals+Requests+Content), `HealthTab.tsx`, `InsightsDigest.tsx`, `InsightsEngine.tsx`, `MonthlySummary.tsx`, `DataSnapshots.tsx`, `ROIDashboard.tsx`, `OrderStatus.tsx`, `FixRecommendations.tsx`, `SeoCart.tsx`, `useCart.tsx`, `OnboardingWizard.tsx` |
 
 ### Data & Config
 
 | Path | Purpose |
 |------|---------|
 | `data/roadmap.json` | Sprint-level tracking (86+ items across 11 sprints) |
+| `IMPLEMENTATION_ROADMAP.md` | Data flow unification plan (6 sprints, all complete) — historical reference |
 | `~/.asset-dashboard/` | Runtime data directory (workspaces, uploads, payments, auth) |
 | `.env` / `.env.example` | Environment variables |
 

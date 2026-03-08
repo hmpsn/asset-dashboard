@@ -4,6 +4,23 @@
 > Scope: **Every screen, every data store, every communication path** in both admin and client dashboards
 > Goal: Identify every gap, design a unified flow, implement strategically
 
+> ### ✅ RESOLVED — March 8, 2026
+>
+> **This document is now a historical reference.** The 49 issues identified here were addressed
+> through the 6-sprint implementation in [IMPLEMENTATION_ROADMAP.md](./IMPLEMENTATION_ROADMAP.md).
+>
+> **Key resolutions:**
+> - `PageEditState` model replaces `seoEditTracking` — unified page lifecycle across all tools
+> - Cross-store writes implemented (audit → page state → approvals → activity)
+> - Client actions (approve/reject) now logged to activity feed and update page state
+> - Work order fulfillment pipeline added (Stripe → work order → page state)
+> - Request `pageId` linkage enables tracing requests back to specific pages
+> - Command Center and WorkspaceHome show page state summaries
+> - 15 email notification types cover all major events
+> - Approval items include `reason` field for audit context
+>
+> **For current architecture**, see `.windsurfrules` § 2 (File Map).
+
 ---
 
 ## Executive Summary
