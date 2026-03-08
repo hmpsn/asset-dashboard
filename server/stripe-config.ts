@@ -16,6 +16,7 @@ export interface StripeProductPrice {
 export interface StripeConfig {
   secretKey: string;           // encrypted at rest
   webhookSecret: string;       // encrypted at rest
+  publishableKey: string;      // NOT encrypted (public key, safe for frontend)
   products: StripeProductPrice[];
   updatedAt: string;
 }
@@ -57,7 +58,7 @@ function configPath(): string {
   return path.join(getDataDir('config'), 'stripe.json');
 }
 
-function readRawConfig(): { secretKey: string; webhookSecret: string; products: StripeProductPrice[]; updatedAt: string } | null {
+function readRawConfig(): { secretKey: string; webhookSecret: string; publishableKey?: string; products: StripeProductPrice[]; updatedAt: string } | null {
   const fp = configPath();
   if (!fs.existsSync(fp)) return null;
   try {
@@ -76,31 +77,36 @@ export function getStripeConfig(): StripeConfig | null {
   return {
     secretKey: decrypt(raw.secretKey),
     webhookSecret: decrypt(raw.webhookSecret),
+    publishableKey: raw.publishableKey || '',
     products: raw.products || [],
     updatedAt: raw.updatedAt,
   };
 }
 
 /** Read config safe for API response (keys masked) */
-export function getStripeConfigSafe(): { configured: boolean; hasSecretKey: boolean; hasWebhookSecret: boolean; products: StripeProductPrice[]; updatedAt: string | null } {
+export function getStripeConfigSafe(): { configured: boolean; hasSecretKey: boolean; hasWebhookSecret: boolean; hasPublishableKey: boolean; publishableKey: string; products: StripeProductPrice[]; updatedAt: string | null } {
   const raw = readRawConfig();
-  if (!raw) return { configured: false, hasSecretKey: false, hasWebhookSecret: false, products: [], updatedAt: null };
+  if (!raw) return { configured: false, hasSecretKey: false, hasWebhookSecret: false, hasPublishableKey: false, publishableKey: '', products: [], updatedAt: null };
   const sk = decrypt(raw.secretKey);
   const whs = decrypt(raw.webhookSecret);
+  const pk = raw.publishableKey || '';
   return {
     configured: !!sk,
     hasSecretKey: !!sk,
     hasWebhookSecret: !!whs,
+    hasPublishableKey: !!pk,
+    publishableKey: pk,
     products: raw.products || [],
     updatedAt: raw.updatedAt,
   };
 }
 
 /** Save Stripe keys (only updates non-empty values) */
-export function saveStripeKeys(secretKey?: string, webhookSecret?: string): void {
-  const raw = readRawConfig() || { secretKey: '', webhookSecret: '', products: [], updatedAt: '' };
+export function saveStripeKeys(secretKey?: string, webhookSecret?: string, publishableKey?: string): void {
+  const raw = readRawConfig() || { secretKey: '', webhookSecret: '', publishableKey: '', products: [], updatedAt: '' };
   if (secretKey !== undefined && secretKey !== '') raw.secretKey = encrypt(secretKey);
   if (webhookSecret !== undefined && webhookSecret !== '') raw.webhookSecret = encrypt(webhookSecret);
+  if (publishableKey !== undefined && publishableKey !== '') raw.publishableKey = publishableKey; // Not encrypted — public key
   raw.updatedAt = new Date().toISOString();
   fs.writeFileSync(configPath(), JSON.stringify(raw, null, 2));
 }
@@ -132,6 +138,13 @@ export function getStripeWebhookSecret(): string {
   if (process.env.STRIPE_WEBHOOK_SECRET) return process.env.STRIPE_WEBHOOK_SECRET;
   const config = getStripeConfig();
   return config?.webhookSecret || '';
+}
+
+/** Get the publishable key (safe for frontend) */
+export function getStripePublishableKey(): string {
+  if (process.env.STRIPE_PUBLISHABLE_KEY) return process.env.STRIPE_PUBLISHABLE_KEY;
+  const raw = readRawConfig();
+  return raw?.publishableKey || '';
 }
 
 /** Get the Price ID for a product type — checks on-disk config first, then env var */

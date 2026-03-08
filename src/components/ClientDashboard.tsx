@@ -8,6 +8,7 @@ import {
   Sun, Moon, Plus, Paperclip, FileText, Download, ExternalLink, Calendar,
 } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
+import { StripePaymentModal } from './StripePaymentForm';
 import { StatCard, CompactStatBar, EmptyState } from './ui';
 import { DualTrendChart, RenderMarkdown, InsightCard } from './client/helpers';
 import { HealthTab } from './client/HealthTab';
@@ -155,6 +156,16 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
     upgradeReqId?: string;
   } | null>(null);
   const [pricingConfirming, setPricingConfirming] = useState(false);
+  // Stripe Elements inline payment modal state
+  const [stripePayment, setStripePayment] = useState<{
+    clientSecret: string;
+    publishableKey: string;
+    amount: number;
+    productName: string;
+    topic: string;
+    targetKeyword: string;
+    isFull: boolean;
+  } | null>(null);
   const [expandedContentReq, setExpandedContentReq] = useState<string | null>(null);
   const [contentComment, setContentComment] = useState('');
   const [sendingContentComment, setSendingContentComment] = useState(false);
@@ -469,7 +480,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
     if (!pricingModal) return;
     setPricingConfirming(true);
     try {
-      // --- Stripe checkout redirect (when configured) ---
+      // --- Stripe Elements inline payment (when configured) ---
       if (ws?.stripeEnabled) {
         // First, create the content request so we have an ID to link the payment to
         let contentRequestId: string | undefined;
@@ -496,7 +507,32 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         // Map serviceType to Stripe product type
         const productType = pricingModal.serviceType === 'full_post' ? 'post_polished' : 'brief_blog';
 
-        // Create Stripe Checkout session and redirect
+        // Fetch publishable key
+        const pkRes = await fetch('/api/stripe/publishable-key');
+        const { publishableKey } = await pkRes.json();
+
+        if (publishableKey) {
+          // Use Stripe Elements inline payment form
+          const piRes = await fetch('/api/stripe/create-payment-intent', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ workspaceId, productType, contentRequestId, topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword }),
+          });
+          if (!piRes.ok) {
+            const err = await piRes.json().catch(() => ({ error: 'Payment failed' }));
+            throw new Error(err.error || 'Failed to create payment');
+          }
+          const { clientSecret, amount } = await piRes.json();
+          const isFull = pricingModal.serviceType === 'full_post';
+          const productName = isFull ? (ws?.contentPricing?.fullPostLabel || 'Full Blog Post') : (ws?.contentPricing?.briefLabel || 'Content Brief');
+
+          // Close pricing modal and open Stripe payment modal
+          setPricingModal(null);
+          setPricingConfirming(false);
+          setStripePayment({ clientSecret, publishableKey, amount, productName, topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, isFull });
+          return;
+        }
+
+        // Fallback to Stripe Checkout redirect if no publishable key
         const checkoutRes = await fetch('/api/stripe/create-checkout', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ workspaceId, productType, contentRequestId, topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword }),
@@ -507,8 +543,8 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         }
         const { url } = await checkoutRes.json();
         if (url) {
-          window.location.href = url; // Redirect to Stripe Checkout
-          return; // Don't close modal — page is navigating away
+          window.location.href = url;
+          return;
         }
       }
 
@@ -3395,6 +3431,27 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
           </div>
         );
       })()}
+
+      {/* Stripe Elements inline payment modal */}
+      {stripePayment && (
+        <StripePaymentModal
+          clientSecret={stripePayment.clientSecret}
+          publishableKey={stripePayment.publishableKey}
+          amount={stripePayment.amount}
+          productName={stripePayment.productName}
+          topic={stripePayment.topic}
+          targetKeyword={stripePayment.targetKeyword}
+          isFull={stripePayment.isFull}
+          onSuccess={() => {
+            setStripePayment(null);
+            setToast({ message: `Payment successful! Your ${stripePayment.productName.toLowerCase()} is being prepared.`, type: 'success' });
+            setTimeout(() => setToast(null), 6000);
+            // Refresh content requests
+            fetch(`/api/public/content-requests/${workspaceId}`).then(r => r.json()).then(setContentRequests).catch(() => {});
+          }}
+          onClose={() => setStripePayment(null)}
+        />
+      )}
 
       {/* Toast notification */}
       {toast && (

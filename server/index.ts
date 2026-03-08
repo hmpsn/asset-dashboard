@@ -79,9 +79,9 @@ import { isSemrushConfigured, getKeywordOverview, getDomainOrganicKeywords, getK
 import { callOpenAI, getTokenUsage } from './openai-helpers.js';
 import { addMessage, buildConversationContext, listSessions, getSession as getChatSession, deleteSession as deleteChatSession, generateSessionSummary } from './chat-memory.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
-import { isStripeConfigured, createCheckoutSession, constructWebhookEvent, handleWebhookEvent, getProductConfig, listProducts } from './stripe.js';
+import { isStripeConfigured, createCheckoutSession, createPaymentIntentForProduct, constructWebhookEvent, handleWebhookEvent, getProductConfig, listProducts } from './stripe.js';
 import { listPayments, getPayment } from './payments.js';
-import { getStripeConfigSafe, saveStripeKeys, saveStripeProducts, clearStripeConfig, type StripeProductPrice } from './stripe-config.js';
+import { getStripeConfigSafe, saveStripeKeys, saveStripeProducts, clearStripeConfig, getStripePublishableKey, type StripeProductPrice } from './stripe-config.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
 import { listGscSites, getSearchOverview, getPerformanceTrend, getQueryPageData, getAllGscPages, getSearchDeviceBreakdown, getSearchCountryBreakdown, getSearchTypeBreakdown, getSearchPeriodComparison } from './search-console.js';
 import { listGA4Properties, getGA4Overview, getGA4DailyTrend, getGA4TopPages, getGA4TopSources, getGA4DeviceBreakdown, getGA4Countries, getGA4KeyEvents, getGA4EventTrend, getGA4Conversions, getGA4EventsByPage, getGA4LandingPages, getGA4OrganicOverview, getGA4PeriodComparison, getGA4NewVsReturning, type CustomDateRange } from './google-analytics.js';
@@ -6042,9 +6042,9 @@ app.get('/api/stripe/config', (_req, res) => {
 
 // Save Stripe API keys
 app.post('/api/stripe/config/keys', (req, res) => {
-  const { secretKey, webhookSecret } = req.body;
-  if (!secretKey && !webhookSecret) return res.status(400).json({ error: 'Provide secretKey and/or webhookSecret' });
-  saveStripeKeys(secretKey, webhookSecret);
+  const { secretKey, webhookSecret, publishableKey } = req.body;
+  if (!secretKey && !webhookSecret && !publishableKey) return res.status(400).json({ error: 'Provide secretKey, webhookSecret, and/or publishableKey' });
+  saveStripeKeys(secretKey, webhookSecret, publishableKey);
   res.json({ ok: true, ...getStripeConfigSafe() });
 });
 
@@ -6060,6 +6060,35 @@ app.post('/api/stripe/config/products', (req, res) => {
 app.delete('/api/stripe/config', (_req, res) => {
   clearStripeConfig();
   res.json({ ok: true });
+});
+
+// Publishable key (safe for frontend — needed for Stripe Elements)
+app.get('/api/stripe/publishable-key', (_req, res) => {
+  const pk = getStripePublishableKey();
+  res.json({ publishableKey: pk || null });
+});
+
+// Create a PaymentIntent (for Stripe Elements inline form)
+app.post('/api/stripe/create-payment-intent', checkoutLimiter, async (req, res) => {
+  if (!isStripeConfigured()) return res.status(503).json({ error: 'Stripe is not configured' });
+  const { workspaceId, productType, contentRequestId, topic, targetKeyword } = req.body;
+  if (!workspaceId || !productType) return res.status(400).json({ error: 'workspaceId and productType are required' });
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  try {
+    const result = await createPaymentIntentForProduct({
+      workspaceId,
+      productType: sanitizeString(productType, 50) as import('./payments.js').ProductType,
+      contentRequestId: contentRequestId ? sanitizeString(contentRequestId, 100) : undefined,
+      topic: topic ? sanitizeString(topic, 200) : undefined,
+      targetKeyword: targetKeyword ? sanitizeString(targetKeyword, 200) : undefined,
+    });
+    res.json(result);
+  } catch (err) {
+    console.error('[stripe] PaymentIntent error:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to create payment intent' });
+  }
 });
 
 // --- Stripe Payments ---

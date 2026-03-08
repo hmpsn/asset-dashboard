@@ -17,6 +17,8 @@ interface StripeConfigState {
   configured: boolean;
   hasSecretKey: boolean;
   hasWebhookSecret: boolean;
+  hasPublishableKey: boolean;
+  publishableKey: string;
   products: StripeProduct[];
   updatedAt: string | null;
 }
@@ -49,6 +51,7 @@ export function StripeSettings() {
   // Key inputs
   const [secretKey, setSecretKey] = useState('');
   const [webhookSecret, setWebhookSecret] = useState('');
+  const [publishableKey, setPublishableKey] = useState('');
   const [showSecretKey, setShowSecretKey] = useState(false);
   const [showWebhookSecret, setShowWebhookSecret] = useState(false);
 
@@ -82,7 +85,7 @@ export function StripeSettings() {
   }, []);
 
   const saveKeys = async () => {
-    if (!secretKey && !webhookSecret) return;
+    if (!secretKey && !webhookSecret && !publishableKey) return;
     setSaving(true);
     try {
       const res = await fetch('/api/stripe/config/keys', {
@@ -91,6 +94,7 @@ export function StripeSettings() {
         body: JSON.stringify({
           secretKey: secretKey || undefined,
           webhookSecret: webhookSecret || undefined,
+          publishableKey: publishableKey || undefined,
         }),
       });
       if (!res.ok) throw new Error('Failed to save');
@@ -98,6 +102,7 @@ export function StripeSettings() {
       setConfig(data);
       setSecretKey('');
       setWebhookSecret('');
+      setPublishableKey('');
       showToast('Stripe keys saved successfully', 'success');
     } catch {
       showToast('Failed to save Stripe keys', 'error');
@@ -125,7 +130,7 @@ export function StripeSettings() {
     if (!confirm('Remove all Stripe configuration? This cannot be undone.')) return;
     try {
       await fetch('/api/stripe/config', { method: 'DELETE' });
-      setConfig({ configured: false, hasSecretKey: false, hasWebhookSecret: false, products: [], updatedAt: null });
+      setConfig({ configured: false, hasSecretKey: false, hasWebhookSecret: false, hasPublishableKey: false, publishableKey: '', products: [], updatedAt: null });
       setProducts(DEFAULT_PRODUCTS);
       showToast('Stripe configuration cleared', 'success');
     } catch {
@@ -183,6 +188,10 @@ export function StripeSettings() {
             <span className={config?.hasWebhookSecret ? 'text-zinc-300' : 'text-zinc-500'}>Webhook Secret</span>
           </div>
           <div className="flex items-center gap-1.5">
+            {config?.hasPublishableKey ? <CheckCircle2 className="w-3 h-3 text-green-400" /> : <AlertTriangle className="w-3 h-3 text-zinc-600" />}
+            <span className={config?.hasPublishableKey ? 'text-zinc-300' : 'text-zinc-500'}>Publishable Key</span>
+          </div>
+          <div className="flex items-center gap-1.5">
             <DollarSign className={`w-3 h-3 ${configuredCount > 0 ? 'text-green-400' : 'text-zinc-600'}`} />
             <span className={configuredCount > 0 ? 'text-zinc-300' : 'text-zinc-500'}>{configuredCount}/{products.length} products</span>
           </div>
@@ -232,10 +241,25 @@ export function StripeSettings() {
                 </div>
               </div>
             </div>
+            <div>
+              <label className="text-[11px] text-zinc-400 block mb-1">Publishable Key {config?.hasPublishableKey && <span className="text-green-400">(saved)</span>}</label>
+              <div className="flex items-center gap-1.5">
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    value={publishableKey}
+                    onChange={e => setPublishableKey(e.target.value)}
+                    placeholder={config?.hasPublishableKey ? config.publishableKey.slice(0, 12) + '...' : 'pk_test_... or pk_live_...'}
+                    className="w-full px-2.5 py-1.5 rounded-lg text-xs bg-zinc-800/50 border border-zinc-700 text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-teal-500/50 font-mono"
+                  />
+                </div>
+              </div>
+              <p className="text-[10px] text-zinc-600 mt-1">Required for inline payment form (Stripe Elements). Found in Stripe Dashboard → API keys.</p>
+            </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={saveKeys}
-                disabled={saving || (!secretKey && !webhookSecret)}
+                disabled={saving || (!secretKey && !webhookSecret && !publishableKey)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 border border-teal-500/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}

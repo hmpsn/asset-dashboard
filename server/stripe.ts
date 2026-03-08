@@ -119,6 +119,55 @@ export async function createCheckoutSession(params: CheckoutParams): Promise<{ s
   return { sessionId: session.id, url: session.url! };
 }
 
+// --- Payment Intent (for Stripe Elements inline form) ---
+
+export interface PaymentIntentParams {
+  workspaceId: string;
+  productType: ProductType;
+  contentRequestId?: string;
+  topic?: string;
+  targetKeyword?: string;
+}
+
+export async function createPaymentIntentForProduct(params: PaymentIntentParams): Promise<{ clientSecret: string; paymentIntentId: string; amount: number }> {
+  const stripe = getStripe();
+  if (!stripe) throw new Error('Stripe is not configured. Add your Secret Key in Command Center → Payments.');
+
+  const config = getProductConfig(params.productType);
+  if (!config) throw new Error(`Unknown product type: ${params.productType}`);
+
+  const amountCents = config.priceUsd * 100;
+
+  const metadata: Record<string, string> = {
+    workspaceId: params.workspaceId,
+    productType: params.productType,
+  };
+  if (params.contentRequestId) metadata.contentRequestId = params.contentRequestId;
+  if (params.topic) metadata.topic = params.topic;
+  if (params.targetKeyword) metadata.targetKeyword = params.targetKeyword;
+
+  const intent = await stripe.paymentIntents.create({
+    amount: amountCents,
+    currency: 'usd',
+    metadata,
+    automatic_payment_methods: { enabled: true },
+  });
+
+  // Create pending payment record
+  createPayment(params.workspaceId, {
+    workspaceId: params.workspaceId,
+    stripeSessionId: intent.id, // store PI id in session field for lookup
+    productType: params.productType,
+    amount: amountCents,
+    currency: 'usd',
+    status: 'pending',
+    contentRequestId: params.contentRequestId,
+    metadata,
+  });
+
+  return { clientSecret: intent.client_secret!, paymentIntentId: intent.id, amount: amountCents };
+}
+
 // --- Webhook Handler ---
 
 export function constructWebhookEvent(rawBody: Buffer, signature: string): Stripe.Event {
@@ -168,6 +217,46 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       );
 
       console.log(`[stripe] Payment completed: workspace=${workspaceId} product=${productType} amount=$${amount}`);
+      break;
+    }
+
+    case 'payment_intent.succeeded': {
+      const intent = event.data.object as Stripe.PaymentIntent;
+      const workspaceId = intent.metadata?.workspaceId;
+      if (!workspaceId) {
+        console.warn('[stripe] payment_intent.succeeded missing workspaceId in metadata');
+        return;
+      }
+
+      // Find payment record (we stored the PI id in stripeSessionId field)
+      const payment = getPaymentBySession(workspaceId, intent.id);
+      if (payment) {
+        updatePayment(workspaceId, payment.id, {
+          status: 'paid',
+          stripePaymentIntentId: intent.id,
+          paidAt: new Date().toISOString(),
+        });
+      }
+
+      const productType = intent.metadata?.productType || 'unknown';
+      const contentRequestId = intent.metadata?.contentRequestId;
+
+      // Update content request status if linked
+      if (contentRequestId) {
+        updateContentRequest(workspaceId, contentRequestId, { status: 'requested' });
+      }
+
+      // Log activity
+      const amount = (intent.amount / 100).toFixed(2);
+      addActivity(
+        workspaceId,
+        'payment_received',
+        `Payment received: $${amount} for ${productType.replace(/_/g, ' ')}`,
+        contentRequestId ? `Content request: ${contentRequestId}` : '',
+        { paymentId: payment?.id, productType, stripePaymentIntentId: intent.id }
+      );
+
+      console.log(`[stripe] PaymentIntent succeeded: workspace=${workspaceId} product=${productType} amount=$${amount}`);
       break;
     }
 
