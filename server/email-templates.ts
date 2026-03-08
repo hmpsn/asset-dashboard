@@ -142,7 +142,8 @@ export type EmailEventType =
   | 'content_brief_ready'
   | 'audit_alert'
   | 'client_welcome'
-  | 'trial_expiry_warning';
+  | 'trial_expiry_warning'
+  | 'password_reset';
 
 // ── Template renderers ──
 
@@ -170,6 +171,8 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
       return renderClientWelcome(events[0]);
     case 'trial_expiry_warning':
       return renderTrialExpiryWarning(events[0]);
+    case 'password_reset':
+      return renderPasswordReset(events[0]);
     default:
       return { subject: 'Notification', html: '' };
   }
@@ -349,6 +352,31 @@ function renderAuditAlert(events: EmailEvent[], _count: number, ws: string, dash
       subtitle: ws,
       body: items,
       cta: dashUrl ? { label: 'View Audit Results', url: dashUrl } : undefined,
+    }),
+  };
+}
+
+// ── Password reset email ──
+
+function renderPasswordReset(event: EmailEvent) {
+  const ws = event.workspaceName;
+  const resetUrl = event.data.resetUrl as string;
+
+  return {
+    subject: `Reset your password — ${ws}`,
+    html: layout({
+      preheader: 'Password reset requested',
+      headline: 'Reset Your Password',
+      subtitle: ws,
+      body: `
+        <p class="text-primary" style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 16px;">
+          We received a request to reset your dashboard password. Click the button below to set a new password.
+        </p>
+        <div style="margin-top:8px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px 16px;text-align:center;">
+          <span style="font-size:12px;color:#92400e;">This link expires in 1 hour. If you didn't request this, you can safely ignore this email.</span>
+        </div>`,
+      cta: { label: 'Reset Password', url: resetUrl },
+      footer: `You're receiving this because a password reset was requested for your account on ${esc(ws)}`,
     }),
   };
 }

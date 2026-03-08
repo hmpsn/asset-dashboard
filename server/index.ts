@@ -65,7 +65,7 @@ import { runSalesAudit } from './sales-audit.js';
 import { initJobs, createJob, updateJob, getJob, listJobs, cancelJob, registerAbort, isJobCancelled, hasActiveJob } from './jobs.js';
 import { createBatch, listBatches, getBatch, updateItem, markBatchApplied, deleteBatch } from './approvals.js';
 import { listRequests, createRequest, updateRequest, addNote, deleteRequest, getRequest, getAttachmentsDir, addAttachmentsToRequest, type RequestAttachment } from './requests.js';
-import { notifyTeamNewRequest, notifyClientTeamResponse, notifyClientStatusChange, notifyTeamContentRequest, notifyClientBriefReady, notifyApprovalReady, notifyClientWelcome, isEmailConfigured, initEmailQueue } from './email.js';
+import { notifyTeamNewRequest, notifyClientTeamResponse, notifyClientStatusChange, notifyTeamContentRequest, notifyClientBriefReady, notifyApprovalReady, notifyClientWelcome, isEmailConfigured, initEmailQueue, sendEmail } from './email.js';
 import { getQueueStats } from './email-queue.js';
 import { addActivity, listActivity } from './activity-log.js';
 import { getSchedule, listSchedules, upsertSchedule, deleteSchedule, startScheduler } from './scheduled-audits.js';
@@ -80,7 +80,7 @@ import { renderBriefHTML } from './brief-export-html.js';
 import { listContentRequests, getContentRequest, createContentRequest, updateContentRequest, deleteContentRequest, addComment } from './content-requests.js';
 import { isSemrushConfigured, getKeywordOverview, getDomainOrganicKeywords, getKeywordGap, getRelatedKeywords, estimateCreditCost, clearSemrushCache } from './semrush.js';
 import { createUser, verifyPassword, listUsers, getSafeUser, updateUser, changePassword, deleteUser, recordLogin, userCount } from './users.js';
-import { listClientUsers, createClientUser, updateClientUser, changeClientPassword, deleteClientUser, verifyClientPassword as verifyClientUserPassword, signClientToken, verifyClientToken, recordClientLogin, hasClientUsers, getSafeClientUser } from './client-users.js';
+import { listClientUsers, createClientUser, updateClientUser, changeClientPassword, deleteClientUser, verifyClientPassword as verifyClientUserPassword, signClientToken, verifyClientToken, recordClientLogin, hasClientUsers, getSafeClientUser, createResetToken, resetPasswordWithToken } from './client-users.js';
 import { signToken, verifyToken as verifyJwtToken, requireAuth, requireRole, requireWorkspaceAccess, optionalAuth } from './auth.js';
 import { callOpenAI, getTokenUsage } from './openai-helpers.js';
 import { addMessage, buildConversationContext, listSessions, getSession as getChatSession, deleteSession as deleteChatSession, generateSessionSummary, checkChatRateLimit } from './chat-memory.js';
@@ -4572,6 +4572,45 @@ app.get('/api/public/auth-mode/:id', (req, res) => {
     hasSharedPassword: !!ws.clientPassword,
     hasClientUsers: hasClientUsers(req.params.id),
   });
+});
+
+// --- Password Reset ---
+
+// Request password reset (sends email with reset link)
+app.post('/api/public/forgot-password/:id', clientLoginLimiter, async (req, res) => {
+  const ws = getWorkspace(req.params.id);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const email = sanitizeString(req.body.email, 200)?.toLowerCase().trim();
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+
+  // Always return success to prevent email enumeration
+  const result = createResetToken(email, req.params.id);
+  if (result) {
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const resetUrl = `${baseUrl}/client/${req.params.id}?reset_token=${result.token}`;
+    const { renderDigest } = await import('./email-templates.js');
+    const event = {
+      type: 'password_reset' as const,
+      recipient: email,
+      workspaceId: req.params.id,
+      workspaceName: ws.name,
+      data: { resetUrl },
+      createdAt: new Date().toISOString(),
+    };
+    const { subject, html } = renderDigest('password_reset', [event]);
+    sendEmail(email, subject, html).catch(err => console.error('[password-reset] Email failed:', err));
+  }
+
+  res.json({ ok: true, message: 'If an account with that email exists, a reset link has been sent.' });
+});
+
+// Complete password reset with token
+app.post('/api/public/reset-password', async (req, res) => {
+  const { token, newPassword } = req.body;
+  if (!token || !newPassword) return res.status(400).json({ error: 'Token and new password are required' });
+  const result = await resetPasswordWithToken(token, newPassword);
+  if (!result.success) return res.status(400).json({ error: result.error });
+  res.json({ ok: true });
 });
 
 // --- Admin: Client User Management (requires internal auth) ---

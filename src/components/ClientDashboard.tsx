@@ -112,6 +112,13 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
   const [loginPassword, setLoginPassword] = useState('');
   const [clientUser, setClientUser] = useState<{ id: string; name: string; email: string; role: string } | null>(null);
   const [loginTab, setLoginTab] = useState<'password' | 'user'>('user');
+  const [loginView, setLoginView] = useState<'login' | 'forgot' | 'reset'>('login');
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSent, setForgotSent] = useState(false);
+  const [resetToken, setResetToken] = useState('');
+  const [resetPassword, setResetPassword] = useState('');
+  const [resetConfirm, setResetConfirm] = useState('');
+  const [resetDone, setResetDone] = useState(false);
   const [approvalBatches, setApprovalBatches] = useState<ApprovalBatch[]>([]);
   const [approvalsLoading, setApprovalsLoading] = useState(false);
   const [applyingBatch, setApplyingBatch] = useState<string | null>(null);
@@ -258,8 +265,19 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
           setShowWelcome(true);
         }
 
-        // Detect Stripe payment redirect
+        // Detect password reset token in URL
         const params = new URLSearchParams(window.location.search);
+        const urlResetToken = params.get('reset_token');
+        if (urlResetToken) {
+          setResetToken(urlResetToken);
+          setLoginView('reset');
+          // Clean up URL
+          const cleanUrl = new URL(window.location.href);
+          cleanUrl.searchParams.delete('reset_token');
+          window.history.replaceState({}, '', cleanUrl.toString());
+        }
+
+        // Detect Stripe payment redirect
         const paymentStatus = params.get('payment');
         if (paymentStatus === 'success') {
           setToast({ message: 'Payment successful! Your content request is being processed.', type: 'success' });
@@ -1005,8 +1023,101 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
             </div>
           )}
 
-          {/* Individual user login form */}
+          {/* Individual user login / forgot / reset form */}
           {(loginTab === 'user' && (showsUserLogin || showsBothModes)) ? (
+            loginView === 'forgot' ? (
+              // Forgot password form
+              <div className="space-y-3">
+                {forgotSent ? (
+                  <>
+                    <div className="bg-teal-500/10 border border-teal-500/20 rounded-xl p-4 text-center">
+                      <p className="text-sm text-teal-400 font-medium">Check your email</p>
+                      <p className="text-xs text-zinc-400 mt-1">If an account exists with that email, we've sent a password reset link.</p>
+                    </div>
+                    <button onClick={() => { setLoginView('login'); setForgotSent(false); setForgotEmail(''); setAuthError(''); }}
+                      className="w-full py-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium transition-all">
+                      Back to Sign In
+                    </button>
+                  </>
+                ) : (
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!forgotEmail.trim()) return;
+                    setAuthLoading(true); setAuthError('');
+                    try {
+                      const res = await fetch(`/api/public/forgot-password/${workspaceId}`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: forgotEmail.trim() }),
+                      });
+                      if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Failed'); }
+                      setForgotSent(true);
+                    } catch (err) { setAuthError(err instanceof Error ? err.message : 'Something went wrong'); }
+                    setAuthLoading(false);
+                  }} className="space-y-3">
+                    <p className="text-xs text-zinc-400 text-center">Enter your email and we'll send you a link to reset your password.</p>
+                    <input type="email" value={forgotEmail} onChange={e => { setForgotEmail(e.target.value); setAuthError(''); }}
+                      placeholder="Email address" autoFocus
+                      className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors" />
+                    {authError && <p className="text-xs text-red-400">{authError}</p>}
+                    <button type="submit" disabled={authLoading || !forgotEmail.trim()}
+                      className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white text-sm font-medium transition-all flex items-center justify-center gap-2">
+                      {authLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send Reset Link'}
+                    </button>
+                    <button type="button" onClick={() => { setLoginView('login'); setAuthError(''); }}
+                      className="w-full py-2 text-xs text-zinc-500 hover:text-zinc-400 transition-colors">
+                      Back to Sign In
+                    </button>
+                  </form>
+                )}
+              </div>
+            ) : loginView === 'reset' ? (
+              // Reset password form (arrived via email link)
+              <div className="space-y-3">
+                {resetDone ? (
+                  <>
+                    <div className="bg-teal-500/10 border border-teal-500/20 rounded-xl p-4 text-center">
+                      <p className="text-sm text-teal-400 font-medium">Password updated!</p>
+                      <p className="text-xs text-zinc-400 mt-1">You can now sign in with your new password.</p>
+                    </div>
+                    <button onClick={() => { setLoginView('login'); setResetDone(false); setResetPassword(''); setResetConfirm(''); setAuthError(''); }}
+                      className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-sm font-medium transition-all">
+                      Sign In
+                    </button>
+                  </>
+                ) : (
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (resetPassword !== resetConfirm) { setAuthError('Passwords do not match'); return; }
+                    if (resetPassword.length < 8) { setAuthError('Password must be at least 8 characters'); return; }
+                    setAuthLoading(true); setAuthError('');
+                    try {
+                      const res = await fetch('/api/public/reset-password', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ token: resetToken, newPassword: resetPassword }),
+                      });
+                      const d = await res.json();
+                      if (!res.ok) throw new Error(d.error || 'Failed');
+                      setResetDone(true);
+                    } catch (err) { setAuthError(err instanceof Error ? err.message : 'Something went wrong'); }
+                    setAuthLoading(false);
+                  }} className="space-y-3">
+                    <p className="text-xs text-zinc-400 text-center">Choose a new password for your account.</p>
+                    <input type="password" value={resetPassword} onChange={e => { setResetPassword(e.target.value); setAuthError(''); }}
+                      placeholder="New password" autoFocus
+                      className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors" />
+                    <input type="password" value={resetConfirm} onChange={e => { setResetConfirm(e.target.value); setAuthError(''); }}
+                      placeholder="Confirm new password"
+                      className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors" />
+                    {authError && <p className="text-xs text-red-400">{authError}</p>}
+                    <button type="submit" disabled={authLoading || !resetPassword || !resetConfirm}
+                      className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white text-sm font-medium transition-all flex items-center justify-center gap-2">
+                      {authLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Set New Password'}
+                    </button>
+                  </form>
+                )}
+              </div>
+            ) : (
+            // Normal login form
             <form onSubmit={handleClientUserLogin} className="space-y-3">
               <div>
                 <input
@@ -1035,7 +1146,12 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
               >
                 {authLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Sign In'}
               </button>
+              <button type="button" onClick={() => { setLoginView('forgot'); setAuthError(''); }}
+                className="w-full py-1 text-xs text-zinc-500 hover:text-zinc-400 transition-colors">
+                Forgot your password?
+              </button>
             </form>
+            )
           ) : (
             /* Shared password form */
             <form onSubmit={handlePasswordSubmit} className="space-y-4">

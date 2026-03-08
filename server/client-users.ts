@@ -7,6 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { getDataDir } from './data-dir.js';
 
 export type ClientRole = 'client_owner' | 'client_member';
@@ -193,6 +194,76 @@ export function clientUserCount(workspaceId: string): number {
 
 export function hasClientUsers(workspaceId: string): boolean {
   return readUsers().some(u => u.workspaceId === workspaceId);
+}
+
+// ── Password Reset ──
+
+interface ResetToken {
+  token: string;
+  userId: string;
+  workspaceId: string;
+  email: string;
+  expiresAt: number;
+}
+
+function resetTokensFile(): string {
+  return path.join(getDataDir('auth'), 'reset-tokens.json');
+}
+
+function readResetTokens(): ResetToken[] {
+  try {
+    const fp = resetTokensFile();
+    if (fs.existsSync(fp)) return JSON.parse(fs.readFileSync(fp, 'utf-8'));
+  } catch { /* fresh */ }
+  return [];
+}
+
+function writeResetTokens(tokens: ResetToken[]): void {
+  const dir = path.dirname(resetTokensFile());
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(resetTokensFile(), JSON.stringify(tokens, null, 2));
+}
+
+export function createResetToken(email: string, workspaceId: string): { token: string; user: SafeClientUser } | null {
+  const user = getClientUserByEmail(email, workspaceId);
+  if (!user) return null;
+
+  const token = crypto.randomBytes(32).toString('hex');
+  const tokens = readResetTokens().filter(t => t.expiresAt > Date.now()); // prune expired
+  // Remove any existing tokens for this user
+  const cleaned = tokens.filter(t => !(t.userId === user.id && t.workspaceId === workspaceId));
+  cleaned.push({
+    token,
+    userId: user.id,
+    workspaceId,
+    email: user.email,
+    expiresAt: Date.now() + 60 * 60 * 1000, // 1 hour
+  });
+  writeResetTokens(cleaned);
+  return { token, user: stripPassword(user) };
+}
+
+export async function resetPasswordWithToken(token: string, newPassword: string): Promise<{ success: boolean; error?: string }> {
+  const tokens = readResetTokens();
+  const idx = tokens.findIndex(t => t.token === token);
+  if (idx === -1) return { success: false, error: 'Invalid or expired reset link' };
+
+  const resetToken = tokens[idx];
+  if (resetToken.expiresAt < Date.now()) {
+    tokens.splice(idx, 1);
+    writeResetTokens(tokens);
+    return { success: false, error: 'Reset link has expired. Please request a new one.' };
+  }
+
+  if (newPassword.length < 8) return { success: false, error: 'Password must be at least 8 characters' };
+
+  const changed = await changeClientPassword(resetToken.userId, newPassword);
+  if (!changed) return { success: false, error: 'User not found' };
+
+  // Remove used token
+  tokens.splice(idx, 1);
+  writeResetTokens(tokens);
+  return { success: true };
 }
 
 // ── Helpers ──
