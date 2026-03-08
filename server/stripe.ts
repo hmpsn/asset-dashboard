@@ -3,6 +3,7 @@ import { createPayment, updatePayment, getPaymentBySession, type ProductType } f
 import { updateContentRequest } from './content-requests.js';
 import { addActivity } from './activity-log.js';
 import { getStripeSecretKey, getStripeWebhookSecret, getStripePriceId } from './stripe-config.js';
+import { getWorkspace, updateWorkspace } from './workspaces.js';
 
 // --- Stripe SDK (lazy init — picks up keys saved via admin UI or env vars) ---
 
@@ -129,6 +130,29 @@ export interface PaymentIntentParams {
   targetKeyword?: string;
 }
 
+async function getOrCreateCustomer(stripe: Stripe, workspaceId: string): Promise<string> {
+  const ws = getWorkspace(workspaceId);
+  if (ws?.stripeCustomerId) {
+    // Verify customer still exists in Stripe
+    try {
+      await stripe.customers.retrieve(ws.stripeCustomerId);
+      return ws.stripeCustomerId;
+    } catch {
+      // Customer deleted in Stripe — create a new one
+    }
+  }
+
+  const customer = await stripe.customers.create({
+    name: ws?.name || workspaceId,
+    metadata: { workspaceId },
+    ...(ws?.clientEmail ? { email: ws.clientEmail } : {}),
+  });
+
+  // Persist the customer ID on the workspace
+  updateWorkspace(workspaceId, { stripeCustomerId: customer.id });
+  return customer.id;
+}
+
 export async function createPaymentIntentForProduct(params: PaymentIntentParams): Promise<{ clientSecret: string; paymentIntentId: string; amount: number }> {
   const stripe = getStripe();
   if (!stripe) throw new Error('Stripe is not configured. Add your Secret Key in Command Center → Payments.');
@@ -137,6 +161,9 @@ export async function createPaymentIntentForProduct(params: PaymentIntentParams)
   if (!config) throw new Error(`Unknown product type: ${params.productType}`);
 
   const amountCents = config.priceUsd * 100;
+
+  // Get or create a Stripe Customer so payment methods are saved
+  const customerId = await getOrCreateCustomer(stripe, params.workspaceId);
 
   const metadata: Record<string, string> = {
     workspaceId: params.workspaceId,
@@ -149,6 +176,8 @@ export async function createPaymentIntentForProduct(params: PaymentIntentParams)
   const intent = await stripe.paymentIntents.create({
     amount: amountCents,
     currency: 'usd',
+    customer: customerId,
+    setup_future_usage: 'off_session',
     metadata,
     automatic_payment_methods: { enabled: true },
   });

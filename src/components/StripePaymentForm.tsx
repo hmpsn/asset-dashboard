@@ -80,7 +80,7 @@ function PaymentFormInner({ amount, productName, onSuccess, onCancel, accentColo
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {/* Payment Element */}
-      <div className="rounded-xl border border-zinc-700/50 bg-zinc-800/30 p-4">
+      <div className="-mx-1">
         <PaymentElement
           options={{
             layout: 'tabs',
@@ -189,46 +189,88 @@ export function StripePaymentForm({
           theme: 'night',
           variables: {
             colorPrimary: accentColor === 'blue' ? '#3b82f6' : '#14b8a6',
-            colorBackground: '#18181b',
+            colorBackground: '#09090b',
             colorText: '#e4e4e7',
             colorTextSecondary: '#a1a1aa',
             colorTextPlaceholder: '#52525b',
             colorDanger: '#ef4444',
+            colorIcon: '#71717a',
+            colorIconTabSelected: accentColor === 'blue' ? '#3b82f6' : '#14b8a6',
             fontFamily: 'Inter, system-ui, sans-serif',
             fontSizeBase: '13px',
+            fontSizeSm: '12px',
+            fontSizeXs: '11px',
             borderRadius: '10px',
             spacingUnit: '4px',
-            spacingGridRow: '16px',
+            spacingGridRow: '14px',
+            spacingTab: '10px',
           },
           rules: {
             '.Input': {
-              backgroundColor: 'rgba(39, 39, 42, 0.5)',
-              border: '1px solid #3f3f46',
+              backgroundColor: 'rgba(24, 24, 27, 0.8)',
+              border: '1px solid rgba(63, 63, 70, 0.6)',
               boxShadow: 'none',
               padding: '10px 12px',
+              transition: 'border-color 0.15s ease',
             },
             '.Input:focus': {
               border: `1px solid ${accentColor === 'blue' ? 'rgba(59, 130, 246, 0.5)' : 'rgba(20, 184, 166, 0.5)'}`,
-              boxShadow: 'none',
+              boxShadow: `0 0 0 1px ${accentColor === 'blue' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(20, 184, 166, 0.1)'}`,
             },
             '.Label': {
-              color: '#a1a1aa',
-              fontSize: '11px',
-              fontWeight: '500',
+              color: '#71717a',
+              fontSize: '10px',
+              fontWeight: '600',
               textTransform: 'uppercase',
-              letterSpacing: '0.05em',
+              letterSpacing: '0.06em',
               marginBottom: '6px',
             },
             '.Tab': {
-              backgroundColor: 'rgba(39, 39, 42, 0.3)',
-              border: '1px solid #3f3f46',
-            },
-            '.Tab--selected': {
-              backgroundColor: 'rgba(39, 39, 42, 0.8)',
-              border: `1px solid ${accentColor === 'blue' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(20, 184, 166, 0.4)'}`,
+              backgroundColor: 'transparent',
+              border: '1px solid rgba(63, 63, 70, 0.4)',
+              borderRadius: '8px',
+              boxShadow: 'none',
+              transition: 'all 0.15s ease',
             },
             '.Tab:hover': {
-              backgroundColor: 'rgba(39, 39, 42, 0.6)',
+              backgroundColor: 'rgba(39, 39, 42, 0.5)',
+              border: '1px solid rgba(63, 63, 70, 0.7)',
+              color: '#e4e4e7',
+            },
+            '.Tab--selected': {
+              backgroundColor: accentColor === 'blue' ? 'rgba(59, 130, 246, 0.08)' : 'rgba(20, 184, 166, 0.08)',
+              border: `1px solid ${accentColor === 'blue' ? 'rgba(59, 130, 246, 0.35)' : 'rgba(20, 184, 166, 0.35)'}`,
+              boxShadow: `0 0 0 1px ${accentColor === 'blue' ? 'rgba(59, 130, 246, 0.08)' : 'rgba(20, 184, 166, 0.08)'}`,
+              color: '#e4e4e7',
+            },
+            '.Tab--selected:hover': {
+              backgroundColor: accentColor === 'blue' ? 'rgba(59, 130, 246, 0.12)' : 'rgba(20, 184, 166, 0.12)',
+              border: `1px solid ${accentColor === 'blue' ? 'rgba(59, 130, 246, 0.45)' : 'rgba(20, 184, 166, 0.45)'}`,
+            },
+            '.TabLabel': {
+              fontSize: '11px',
+              fontWeight: '500',
+            },
+            '.TabIcon': {
+              width: '16px',
+              height: '16px',
+            },
+            '.Block': {
+              backgroundColor: 'transparent',
+              borderColor: 'rgba(63, 63, 70, 0.4)',
+            },
+            '.CheckboxInput': {
+              backgroundColor: 'rgba(24, 24, 27, 0.8)',
+              borderColor: 'rgba(63, 63, 70, 0.6)',
+            },
+            '.PickerItem': {
+              backgroundColor: 'rgba(24, 24, 27, 0.8)',
+              borderColor: 'rgba(63, 63, 70, 0.4)',
+              padding: '10px 12px',
+            },
+            '.PickerItem--selected': {
+              backgroundColor: accentColor === 'blue' ? 'rgba(59, 130, 246, 0.08)' : 'rgba(20, 184, 166, 0.08)',
+              borderColor: accentColor === 'blue' ? 'rgba(59, 130, 246, 0.35)' : 'rgba(20, 184, 166, 0.35)',
             },
           },
         },
