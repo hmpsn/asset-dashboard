@@ -31,9 +31,9 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 | `server/seo-context.ts` | `buildSeoContext()`, `buildKeywordMapContext()`, `buildKnowledgeBase()` — shared AI prompt builders |
 | `server/chat-memory.ts` | Chat session persistence, `addMessage`, `buildConversationContext`, `generateSessionSummary` |
 | `server/activity-log.ts` | Activity logging, `addActivity`, `ActivityType` union |
-| `server/monthly-report.ts` | `gatherMonthlyData`, auto-report scheduler, `generateReportHTML` |
-| `server/email-templates.ts` | HTML email builders: `renderMonthlyReport`, `renderApprovalReminder`, etc. |
-| `server/content-brief.ts` | AI content brief generation with SEMRush/GSC enrichment, 7 page-type-specific prompts |
+| `server/monthly-report.ts` | `gatherMonthlyData`, auto-report scheduler, `generateReportHTML`. Trial banner: `isTrial`/`trialDaysRemaining` threaded to email template |
+| `server/email-templates.ts` | HTML email builders: `renderMonthlyReport` (with trial banner), `renderApprovalReminder`, etc. |
+| `server/content-brief.ts` | AI content brief generation with SEMRush/GSC enrichment, 7 page-type-specific prompts. `brief-export-html.ts` renders branded HTML/PDF with page type badge |
 | `server/content-requests.ts` | Content topic request CRUD, `ContentTopicRequest` interface (includes `pageType`, `serviceType`) |
 | `server/seo-audit.ts` | Site health audit engine |
 | `server/reports.ts` | Audit snapshot persistence, `getLatestSnapshot` |
@@ -55,7 +55,7 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 | Component | Purpose |
 |-----------|---------|
 | `src/App.tsx` | Router, workspace selector, admin tabs (lazy-loaded) |
-| `src/components/ClientDashboard.tsx` | Full client portal with chat, date picker, analytics, approvals, requests, content hub, onboarding welcome modal, plans/pricing page |
+| `src/components/ClientDashboard.tsx` | Full client portal with smart login gate (auth-mode detection, email+password or shared password with tab toggle), user menu (avatar+logout), chat, date picker, analytics, approvals, requests (auto-populated submittedBy), content hub, per-user welcome modal, plans/pricing page |
 | `src/components/AdminChat.tsx` | Floating admin chat panel with conversation memory + history UI |
 | `src/components/StripeSettings.tsx` | Stripe admin settings in Command Center: API keys (masked), product Price ID mapping, connection status |
 | `src/components/SeoStrategy.tsx` | Keyword strategy viewer/generator |
@@ -121,4 +121,4 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 - `AI_CHATBOT_ROADMAP.md` — Chatbot phases, shipped and planned
 - `AUTH_ROADMAP.md` — Authentication/authorization phases (Phases 1, 2, 4 shipped)
 - `DESIGN_SYSTEM.md` — UI primitives and design tokens
-- `data/roadmap.json` — Sprint-level tracking with item statuses (67 items, managed via /api/roadmap)
+- `data/roadmap.json` — Sprint-level tracking with item statuses (86 items across 11 sprints, managed via /api/roadmap)

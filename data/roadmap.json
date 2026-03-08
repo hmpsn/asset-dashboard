@@ -30,7 +30,7 @@
         { "id": 67, "title": "AI chatbot rate limiting (free tier)", "source": "MONETIZATION.md UX Spec", "est": "1h", "priority": "P0", "notes": "Shipped — checkChatRateLimit in chat-memory.ts, 3 convos/month free, usage counter badge in chat header, locked prompt when exhausted, 429 handling", "status": "done" },
         { "id": 5, "title": "Internal user accounts", "source": "AUTH_ROADMAP Phase 1", "est": "6-8h", "priority": "P0", "notes": "Shipped — server/users.ts + server/auth.ts. User model (owner/admin/member), bcrypt, JWT 7d, requireAuth/requireRole/optionalAuth middleware, setup/login/me/CRUD endpoints. Frontend login UI still TODO", "status": "done" },
         { "id": 6, "title": "Workspace access control", "source": "AUTH_ROADMAP Phase 2", "est": "3-4h", "priority": "P0", "notes": "Shipped — requireWorkspaceAccess middleware, applied to workspace routes, optionalAuth global, JWT accepted in admin gate. Frontend workspace filtering still TODO", "status": "done" },
-        { "id": 7, "title": "Client user accounts", "source": "AUTH_ROADMAP Phase 4", "est": "6-8h", "priority": "P0", "notes": "Shipped — server/client-users.ts. Per-workspace accounts (client_owner/client_member), bcrypt, JWT 24h, client-login/me/logout/auth-mode endpoints, admin CRUD, backward compat with shared password. Frontend login UI still TODO", "status": "done" }
+        { "id": 7, "title": "Client user accounts", "source": "AUTH_ROADMAP Phase 4", "est": "6-8h", "priority": "P0", "notes": "Shipped — server/client-users.ts. Per-workspace accounts (client_owner/client_member), bcrypt, JWT 24h, client-login/me/logout/auth-mode endpoints, admin CRUD, backward compat with shared password. Frontend: smart login form with auth-mode detection, email+password login, user menu with avatar+logout, admin client user management UI (CRUD + password reset)", "status": "done" }
       ]
     },
     {
@@ -39,12 +39,27 @@
       "hours": "12-18",
       "rationale": "Maximize conversion from free → paid. Trial drives upgrades, page types expand product catalog, inline pricing reduces friction.",
       "items": [
-        { "id": 68, "title": "14-day Growth trial for new workspaces", "source": "MONETIZATION.md Trial Strategy", "est": "1-2h", "priority": "P0", "notes": "trialEndsAt field on Workspace. Auto-resolve tier to growth during trial. Countdown banner at day 10+. Post-trial auto-downgrade to free", "status": "pending" },
-        { "id": 69, "title": "Inline price visibility", "source": "MONETIZATION.md Pricing", "est": "2-3h", "priority": "P0", "notes": "Show prices on all purchase buttons (brief $125, post $500, schema $35/pg). Bundle savings callouts. Prices from config, not hardcoded. Admin per-workspace price overrides", "status": "pending" },
-        { "id": 70, "title": "Page-type content briefs", "source": "MONETIZATION.md Products", "est": "3-4h", "priority": "P0", "notes": "Expand brief generator: landing page, service page, location page, product page, pillar/hub page, resource/guide. Page-type-specific AI prompts and templates. Page type selector in request flow", "status": "pending" },
-        { "id": 71, "title": "Page type → content opportunity mapping", "source": "MONETIZATION.md Products", "est": "2-3h", "priority": "P1", "notes": "Strategy engine recommends page types based on gap signals. Badge on content opportunity cards. Pre-selects page type in Request This Topic flow. AI chatbot recommends page types", "status": "pending" },
-        { "id": 72, "title": "Client onboarding welcome flow", "source": "ACTION_PLAN #25", "est": "2-3h", "priority": "P0", "notes": "First-login experience explaining tier, features, and trial period. What's included in your plan section", "status": "pending" },
-        { "id": 73, "title": "In-portal pricing/plans page", "source": "MONETIZATION.md Phase 3", "est": "2-3h", "priority": "P1", "notes": "Tier comparison page in client portal. Bundle cards with feature lists. Links to Stripe subscription checkout. Upgrade/downgrade flow", "status": "pending" }
+        { "id": 68, "title": "14-day Growth trial for new workspaces", "source": "MONETIZATION.md Trial Strategy", "est": "1-2h", "priority": "P0", "notes": "Shipped — trialEndsAt field on Workspace. Auto-resolve tier to growth during trial. Countdown banner at day 10+. Post-trial auto-downgrade to free. Trial badges in client dashboard, welcome modal, plans page", "status": "done" },
+        { "id": 69, "title": "Inline price visibility", "source": "MONETIZATION.md Pricing", "est": "2-3h", "priority": "P0", "notes": "Shipped — Prices on all purchase buttons, bundle savings callouts, prices from Stripe config with workspace overrides via /api/public/pricing/:id", "status": "done" },
+        { "id": 70, "title": "Page-type content briefs", "source": "MONETIZATION.md Products", "est": "3-4h", "priority": "P0", "notes": "Shipped — 7 page types with type-specific AI prompts (blog, landing, service, location, product, pillar, resource). Page type selector in pricing modal and topic submission. pageType on ContentBrief + ContentTopicRequest models", "status": "done" },
+        { "id": 71, "title": "Page type → content opportunity mapping", "source": "MONETIZATION.md Products", "est": "2-3h", "priority": "P1", "notes": "Shipped — Strategy AI recommends suggestedPageType per content gap. Violet badges on gap cards. Pre-fills page type in pricing modal from strategy recommendations", "status": "done" },
+        { "id": 72, "title": "Client onboarding welcome flow", "source": "ACTION_PLAN #25", "est": "2-3h", "priority": "P0", "notes": "Shipped — First-visit modal with tier badge, trial countdown, 2×3 feature grid, quick-action CTAs. Per-user localStorage key (user-aware welcome)", "status": "done" },
+        { "id": 73, "title": "In-portal pricing/plans page", "source": "MONETIZATION.md Phase 3", "est": "2-3h", "priority": "P1", "notes": "Shipped — Plans tab with 3-tier comparison cards, content pricing, bundle cards from Stripe config, upgrade CTAs, trial countdown banner", "status": "done" }
+      ]
+    },
+    {
+      "id": "sprint-2c",
+      "name": "Client UX & Polish",
+      "hours": "4-6",
+      "rationale": "Complete the client auth UX, improve per-user experience, and polish exports/reports.",
+      "items": [
+        { "id": 80, "title": "Client user management admin UI", "source": "AUTH_ROADMAP Phase 4", "est": "2h", "priority": "P0", "notes": "Shipped — WorkspaceSettings > Client Dashboard tab: add/edit/delete client users, reset passwords, role badges, last login display", "status": "done" },
+        { "id": 81, "title": "Client login form + user menu", "source": "AUTH_ROADMAP Phase 4", "est": "2h", "priority": "P0", "notes": "Shipped — Smart login gate: auth-mode detection (shared password vs individual accounts vs both with tabs), email+password form, auto-auth via JWT cookie, user menu with avatar initials + name + logout", "status": "done" },
+        { "id": 82, "title": "Welcome modal per-user awareness", "source": "Client UX", "est": "15m", "priority": "P1", "notes": "Shipped — localStorage key includes clientUser.id when logged in; each user sees welcome on their first visit", "status": "done" },
+        { "id": 83, "title": "Auto-populate submittedBy from client user", "source": "Client UX", "est": "15m", "priority": "P1", "notes": "Shipped — submittedBy auto-filled from clientUser.name, 'Your Name' field hidden when logged in", "status": "done" },
+        { "id": 84, "title": "Brief HTML export: page type badge", "source": "Content Pipeline", "est": "15m", "priority": "P1", "notes": "Shipped — Page type badge rendered in brief export header subtitle when pageType is present", "status": "done" },
+        { "id": 85, "title": "Monthly report: trial status banner", "source": "Monetization", "est": "30m", "priority": "P1", "notes": "Shipped — isTrial + trialDaysRemaining threaded through monthly-report.ts → email-templates.ts. Amber banner at top of email with days remaining + upgrade CTA", "status": "done" },
+        { "id": 86, "title": "Admin workspace cards: trial/tier badges", "source": "Admin UX", "est": "30m", "priority": "P1", "notes": "Shipped — /api/workspace-overview returns tier, isTrial, trialDaysRemaining. WorkspaceOverview.tsx renders amber trial badge with countdown and blue/violet tier badge", "status": "done" }
       ]
     },
     {

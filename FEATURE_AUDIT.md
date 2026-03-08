@@ -7,9 +7,9 @@ A brief value assessment of every feature in the platform, covering what it does
 ## Admin Dashboard (Internal)
 
 ### 1. Workspace Overview
-**What it does:** Multi-client dashboard showing health scores, pending requests, approval status, and key metrics at a glance.
+**What it does:** Multi-client dashboard showing health scores, pending requests, approval status, and key metrics at a glance. **Trial/tier badges**: each workspace card displays an amber "Trial · Xd" badge when on a Growth trial (with days remaining) or a blue/violet tier badge (Growth/Premium) for paid workspaces. `/api/workspace-overview` returns `tier`, `isTrial`, and `trialDaysRemaining` computed from `ws.trialEndsAt`.
 
-**Agency value:** One screen answers "which client needs attention right now?" — no digging required.
+**Agency value:** One screen answers "which client needs attention right now?" — no digging required. Trial badges surface which clients are about to need an upgrade conversation.
 
 **Client value:** Nothing falls through the cracks. Their site gets attention the moment something changes.
 
@@ -88,7 +88,7 @@ A brief value assessment of every feature in the platform, covering what it does
 
 **Agency value:** Briefs that used to take 1-2 hours each are generated in under a minute with real search data baked in. Service tier pricing built in. Inline editing lets the team refine AI output without regenerating.
 
-**Client value:** Professional, research-backed content briefs they can review, approve, decline, or request changes on directly from their portal. PDF export available. Real SEMRush data grounds the brief in actual market metrics.
+**Client value:** Professional, research-backed content briefs they can review, approve, decline, or request changes on directly from their portal. PDF/HTML export available with page type badge in the header. Real SEMRush data grounds the brief in actual market metrics.
 
 **Mutual:** Streamlines the entire content production pipeline from strategy → brief → review → approval → production. Pricing transparency builds trust. Editable briefs mean faster iteration; real data means better strategic decisions.
 
@@ -240,7 +240,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 22. Client Request System
-**What it does:** Clients submit requests (bug reports, change requests, new features) with categories, file attachments, and threaded notes. Team responds with status updates.
+**What it does:** Clients submit requests (bug reports, change requests, new features) with categories, file attachments, and threaded notes. Team responds with status updates. **Auto-populated submittedBy**: when a client user is logged in, the `submittedBy` field is automatically filled from `clientUser.name` and the manual "Your Name" input is hidden — reducing form friction and ensuring accurate attribution.
 
 **Agency value:** Replaces "can you also..." emails and Slack messages. Every request is tracked, categorized, and has a clear status.
 
@@ -458,7 +458,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 43. Automated Monthly Reports
-**What it does:** Auto-generated monthly report emails sent to clients on a configurable schedule. `gatherMonthlyData` aggregates site health audit (score, delta, errors, warnings), requests completed/open, approvals applied/pending, activity log, and now **traffic trends**: GSC period comparison (clicks, impressions with % change vs previous 28 days) and GA4 period comparison (users, sessions, pageviews with % change). **Chat topic summaries**: `listSessions` fetches recent client chat sessions with AI-generated summaries from the current month; up to 5 displayed in a "Topics You Asked About" section with green-tinted cards showing conversation title + summary. `renderMonthlyReport` in `email-templates.ts` generates a branded HTML email with a health score ring, traffic trends grid (each metric shows current value + arrow + % change vs previous period), metrics grid (requests, approvals, activities), recent activity feed, chat topics section, and pending approval alerts. Manual trigger via `triggerMonthlyReport()` or automatic via `startMonthlyReports()` scheduler.
+**What it does:** Auto-generated monthly report emails sent to clients on a configurable schedule. `gatherMonthlyData` aggregates site health audit (score, delta, errors, warnings), requests completed/open, approvals applied/pending, activity log, and now **traffic trends**: GSC period comparison (clicks, impressions with % change vs previous 28 days) and GA4 period comparison (users, sessions, pageviews with % change). **Chat topic summaries**: `listSessions` fetches recent client chat sessions with AI-generated summaries from the current month; up to 5 displayed in a "Topics You Asked About" section with green-tinted cards showing conversation title + summary. **Trial status banner**: when the workspace is on a Growth trial, an amber banner appears at the top of the email showing "Growth Trial · X days remaining" with an upgrade CTA — `isTrial` and `trialDaysRemaining` computed from `ws.trialEndsAt` and threaded through `monthly-report.ts` → `email-templates.ts`. `renderMonthlyReport` in `email-templates.ts` generates a branded HTML email with trial banner (when applicable), health score ring, traffic trends grid (each metric shows current value + arrow + % change vs previous period), metrics grid (requests, approvals, activities), recent activity feed, chat topics section, and pending approval alerts. Manual trigger via `triggerMonthlyReport()` or automatic via `startMonthlyReports()` scheduler.
 
 **Agency value:** Monthly reporting that writes itself. Traffic trends show clients their site is growing (or flag problems) without manual data pulls. Chat topic summaries show the agency what clients care about. Positions the agency as proactive — clients get a polished, personalized report without anyone remembering to send it.
 
@@ -502,7 +502,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 47. Client User Accounts
-**What it does:** Individual login accounts for client dashboard users, separate from internal team accounts. `server/client-users.ts` provides a ClientUser model with id, email, name, passwordHash, role (client_owner/client_member), workspaceId, and invitedBy. Per-workspace email uniqueness. Passwords hashed with bcrypt (12 rounds). Client JWT tokens (24h expiry) stored in per-workspace cookies (`client_user_token_<wsId>`). Public endpoints: `/api/public/client-login/:id` (email+password login), `/api/public/client-me/:id` (get current user), `/api/public/client-logout/:id`, `/api/public/auth-mode/:id` (check shared password vs individual accounts). Admin endpoints: `/api/workspaces/:id/client-users` CRUD for managing client users with workspace access control. Client login also sets the legacy session cookie for backward compatibility with the existing session enforcement middleware. Session middleware updated to accept client user JWT tokens alongside shared-password sessions.
+**What it does:** Individual login accounts for client dashboard users, separate from internal team accounts. `server/client-users.ts` provides a ClientUser model with id, email, name, passwordHash, role (client_owner/client_member), workspaceId, and invitedBy. Per-workspace email uniqueness. Passwords hashed with bcrypt (12 rounds). Client JWT tokens (24h expiry) stored in per-workspace cookies (`client_user_token_<wsId>`). Public endpoints: `/api/public/client-login/:id` (email+password login), `/api/public/client-me/:id` (get current user), `/api/public/client-logout/:id`, `/api/public/auth-mode/:id` (check shared password vs individual accounts). Admin endpoints: `/api/workspaces/:id/client-users` CRUD for managing client users with workspace access control. Client login also sets the legacy session cookie for backward compatibility with the existing session enforcement middleware. Session middleware updated to accept client user JWT tokens alongside shared-password sessions. **Frontend login form**: smart login gate in `ClientDashboard.tsx` detects auth mode on load — shows email+password form when individual accounts exist, shared password form when not, or tabbed toggle when both are configured. Auto-authenticates returning users via JWT cookie. **User menu** in dashboard header: avatar initials circle, user name, and logout button. **Admin management UI** in WorkspaceSettings > Client Dashboard tab: add users (name, email, password, role), inline edit name/email, delete with confirmation, reset passwords. Role badges and last login timestamps displayed.
 
 **Agency value:** Invite individual client team members with their own credentials. See who submitted which request, who approved what. Professional multi-user access replaces "everyone uses the same password."
 
@@ -513,7 +513,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 48. Client Onboarding Welcome Flow
-**What it does:** First-visit welcome modal for new client dashboard users. Detects first visit via `localStorage` key per workspace. Shows workspace name, tier badge (Starter/Growth/Premium with tier-specific colors), trial countdown (days remaining), and a 2×3 feature grid highlighting what's included at their tier (available features get blue icons, locked features show "Upgrade to unlock"). Trial callout panel with Zap icon explains the trial terms. Quick-action buttons: "Explore Your Dashboard" (→ overview) and "View SEO Strategy" (→ strategy, Growth+ only). Dismissible via backdrop click, skip button, or any CTA.
+**What it does:** First-visit welcome modal for new client dashboard users. Detects first visit via **per-user `localStorage` key** — includes `clientUser.id` when an individual user is logged in, so each team member sees the welcome on their own first visit (not just once per browser per workspace). Shows workspace name, tier badge (Starter/Growth/Premium with tier-specific colors), trial countdown (days remaining), and a 2×3 feature grid highlighting what's included at their tier (available features get blue icons, locked features show "Upgrade to unlock"). Trial callout panel with Zap icon explains the trial terms. Quick-action buttons: "Explore Your Dashboard" (→ overview) and "View SEO Strategy" (→ strategy, Growth+ only). Dismissible via backdrop click, skip button, or any CTA.
 
 **Agency value:** Professional first impression. New clients immediately understand their tier, what's available, and how to navigate — zero onboarding calls needed. Trial urgency is surfaced without being pushy.
 
@@ -672,4 +672,4 @@ When the user asks to update this document with recent features, follow this pro
 7. **Update Summary table**: Adjust category counts and total feature count.
 8. **Commit**: `git add FEATURE_AUDIT.md && git commit -m "docs: update FEATURE_AUDIT with recent features"`
 
-Current feature count: **49**. Last updated: March 7, 2026 (session 2: #68–#73 monetization + onboarding sprint).
+Current feature count: **49**. Last updated: March 7, 2026 (session 3: client user login UI, per-user welcome, submittedBy auto-fill, brief export pageType, monthly report trial banner, admin workspace trial/tier badges).
