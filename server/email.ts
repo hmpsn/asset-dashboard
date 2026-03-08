@@ -4,6 +4,7 @@ import type { EmailEvent } from './email-templates.js';
 
 // Configure via env vars:
 // SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
+// SMTP_FROM_NAME — display name for outgoing emails (e.g. "hmpsn studio")
 // NOTIFICATION_EMAIL — where team gets notified (your inbox)
 
 interface EmailConfig {
@@ -19,7 +20,9 @@ function getConfig(): EmailConfig | null {
   const port = parseInt(process.env.SMTP_PORT || '587', 10);
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
-  const from = process.env.SMTP_FROM || user;
+  const fromAddr = process.env.SMTP_FROM || user;
+  const fromName = process.env.SMTP_FROM_NAME;
+  const from = fromName ? `"${fromName}" <${fromAddr}>` : fromAddr;
   if (!host || !user || !pass) return null;
   return { host, port, user, pass, from: from! };
 }
