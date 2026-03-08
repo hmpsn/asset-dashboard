@@ -148,11 +148,17 @@ export function createWorkspace(name: string, webflowSiteId?: string, webflowSit
   const folder = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const id = `ws_${Date.now()}`;
 
+  // New workspaces start with a 14-day Growth trial
+  const trialEnd = new Date();
+  trialEnd.setDate(trialEnd.getDate() + 14);
+
   const workspace: Workspace = {
     id,
     name,
     webflowSiteId,
     webflowSiteName,
+    tier: 'free',
+    trialEndsAt: trialEnd.toISOString(),
     folder,
     createdAt: new Date().toISOString(),
   };

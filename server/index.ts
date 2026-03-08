@@ -4391,8 +4391,18 @@ app.get('/api/public/workspace/:id', (req, res) => {
     brandAccentColor: ws.brandAccentColor || '',
     // Content pricing
     contentPricing: ws.contentPricing || null,
-    // Monetization
-    tier: ws.tier || 'free',
+    // Monetization — trial-resolved tier
+    tier: (() => {
+      let t = ws.tier || 'free';
+      if (t === 'free' && ws.trialEndsAt && new Date(ws.trialEndsAt) > new Date()) t = 'growth';
+      return t;
+    })(),
+    baseTier: ws.tier || 'free',
+    isTrial: (ws.tier || 'free') === 'free' && !!ws.trialEndsAt && new Date(ws.trialEndsAt) > new Date(),
+    trialDaysRemaining: ws.trialEndsAt
+      ? Math.max(0, Math.ceil((new Date(ws.trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+      : 0,
+    trialEndsAt: ws.trialEndsAt || null,
     stripeEnabled: isStripeConfigured(),
     // Auth mode
     hasClientUsers: hasClientUsers(req.params.id),

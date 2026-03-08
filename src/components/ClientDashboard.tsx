@@ -5,7 +5,7 @@ import {
   Target, Zap, Shield, MessageSquare, X, ChevronDown, ChevronUp,
   CheckCircle2, LineChart, Lock, Trophy, Users,
   Activity, Filter, ClipboardCheck, Check, Edit3,
-  Sun, Moon, Plus, Paperclip, FileText, Download, ExternalLink, Calendar,
+  Sun, Moon, Plus, Paperclip, FileText, Download, ExternalLink, Calendar, Clock,
 } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 import { StripePaymentModal } from './StripePaymentForm';
@@ -970,7 +970,14 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
             <img src="/logo.svg" alt="hmpsn studio" className="h-8 opacity-80" style={theme === 'light' ? { filter: 'invert(1) brightness(0.3)' } : undefined} />
             <div className="w-px h-8 bg-zinc-800" />
             <div>
-              <h1 className="text-lg font-semibold">{ws.name}</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-semibold">{ws.name}</h1>
+                {ws.isTrial && (
+                  <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                    Growth Trial{ws.trialDaysRemaining ? ` · ${ws.trialDaysRemaining}d` : ''}
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-zinc-500 mt-0.5">Insights Engine{(overview || audit || ga4Overview) && <span className="ml-2 text-zinc-500">· Updated {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}</p>
             </div>
           </div>
@@ -1077,6 +1084,26 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
       </header>
 
       <main className="max-w-6xl mx-auto px-6 py-6 space-y-5">
+
+        {/* Trial countdown banner — shows at day 10 and under */}
+        {ws.isTrial && (ws.trialDaysRemaining ?? 0) <= 10 && (ws.trialDaysRemaining ?? 0) > 0 && (
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+            <Clock className="w-4 h-4 text-amber-400 flex-shrink-0" />
+            <p className="text-sm text-amber-300">
+              <strong>{ws.trialDaysRemaining} day{ws.trialDaysRemaining === 1 ? '' : 's'}</strong> left on your Growth trial.
+              {' '}Upgrade to keep access to all features.
+            </p>
+          </div>
+        )}
+        {ws.isTrial && (ws.trialDaysRemaining ?? 0) === 0 && (
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20">
+            <Clock className="w-4 h-4 text-red-400 flex-shrink-0" />
+            <p className="text-sm text-red-300">
+              Your Growth trial has ended. Some features are now limited.
+              {' '}Upgrade to restore full access.
+            </p>
+          </div>
+        )}
 
         {/* ════════════ OVERVIEW TAB ════════════ */}
         {tab === 'overview' && (<>
