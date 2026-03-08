@@ -7,6 +7,9 @@ import {
 } from 'lucide-react';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { useRecommendations } from '../hooks/useRecommendations';
+import { usePageEditStates } from '../hooks/usePageEditStates';
+import { StatusBadge } from './ui/StatusBadge';
+import { statusBorderClass } from './ui/statusConfig';
 
 interface SchemaSuggestion {
   type: string;
@@ -108,15 +111,8 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
   const [editedSchemaJson, setEditedSchemaJson] = useState<Record<string, string>>({});
   const [schemaParseError, setSchemaParseError] = useState<Record<string, string>>({});
 
-  // SEO edit tracking (#137)
-  const [editTracking, setEditTracking] = useState<Record<string, { status: 'flagged' | 'in-review' | 'live'; updatedAt: string; fields?: string[] }>>({});
-  useEffect(() => {
-    if (!workspaceId) return;
-    fetch(`/api/workspaces/${workspaceId}/seo-edit-tracking`)
-      .then(r => r.ok ? r.json() : {})
-      .then(d => setEditTracking(d || {}))
-      .catch(() => {});
-  }, [workspaceId]);
+  // Unified page edit states
+  const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
 
   // Load saved schema snapshot on mount
   const [snapshotDate, setSnapshotDate] = useState<string | null>(null);
@@ -188,12 +184,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
       });
       if (res.ok) {
         setSentToClient(true);
-        // Optimistic tracking update for all pages
-        setEditTracking(prev => {
-          const next = { ...prev };
-          for (const item of items) next[item.pageId] = { status: 'in-review', updatedAt: new Date().toISOString(), fields: ['schema'] };
-          return next;
-        });
+        refreshStates();
       }
     } catch { /* skip */ }
     setSendingToClient(false);
@@ -304,8 +295,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
         throw new Error(err.error || `HTTP ${res.status}`);
       }
       setPublished(prev => new Set(prev).add(pageId));
-      // Optimistic tracking update
-      setEditTracking(prev => ({ ...prev, [pageId]: { status: 'live', updatedAt: new Date().toISOString(), fields: ['schema'] } }));
+      refreshStates();
     } catch (err) {
       setPublishError(prev => ({ ...prev, [pageId]: err instanceof Error ? err.message : 'Publish failed' }));
     } finally {
@@ -835,6 +825,19 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
         </div>
       </div>
 
+      {/* Edit status summary bar */}
+      {summary.total > 0 && (
+        <div className="flex items-center gap-3 text-[11px] text-zinc-500 mb-2">
+          <span className="text-zinc-400 font-medium">{summary.total} tracked</span>
+          {summary.live > 0 && <><StatusBadge status="live" /><span className="text-teal-400">{summary.live}</span></>}
+          {summary.inReview > 0 && <><StatusBadge status="in-review" /><span className="text-purple-400">{summary.inReview}</span></>}
+          {summary.approved > 0 && <><StatusBadge status="approved" /><span className="text-green-400">{summary.approved}</span></>}
+          {summary.rejected > 0 && <><StatusBadge status="rejected" /><span className="text-red-400">{summary.rejected}</span></>}
+          {summary.issueDetected > 0 && <><StatusBadge status="issue-detected" /><span className="text-amber-400">{summary.issueDetected}</span></>}
+          {summary.fixProposed > 0 && <><StatusBadge status="fix-proposed" /><span className="text-blue-400">{summary.fixProposed}</span></>}
+        </div>
+      )}
+
       {/* Page list */}
       <div className="space-y-2">
         {data.map(page => {
@@ -844,7 +847,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
           const schema = page.suggestedSchemas[0];
           const graphTypes = schema ? ((schema.template?.['@graph'] as Record<string, unknown>[]) || []).map(n => n['@type'] as string).filter(Boolean) : [];
           return (
-            <div key={page.pageId} className={`bg-zinc-900 rounded-xl border overflow-hidden ${editTracking[page.pageId]?.status === 'live' ? 'border-teal-500/40' : editTracking[page.pageId]?.status === 'in-review' ? 'border-purple-500/40' : hasErrors ? 'border-amber-500/30' : 'border-zinc-800'}`}>
+            <div key={page.pageId} className={`bg-zinc-900 rounded-xl border overflow-hidden ${statusBorderClass(getState(page.pageId)?.status) || (hasErrors ? 'border-amber-500/30' : 'border-zinc-800')}`}>
               <div className="flex items-center gap-3 px-4 py-3">
                 <button
                   onClick={() => toggleExpand(page.pageId)}
@@ -857,15 +860,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
                   </div>
                 </button>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  {editTracking[page.pageId]?.status === 'live' && (
-                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/30 text-teal-400">Live</span>
-                  )}
-                  {editTracking[page.pageId]?.status === 'in-review' && (
-                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/30 text-purple-400">In Review</span>
-                  )}
-                  {editTracking[page.pageId]?.status === 'flagged' && (
-                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">Flagged</span>
-                  )}
+                  <StatusBadge status={getState(page.pageId)?.status} />
                   {page.existingSchemas.length > 0 && (
                     <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-500/10 text-green-400 border border-green-500/20">
                       <CheckCircle className="w-3 h-3" /> {page.existingSchemas.length} existing

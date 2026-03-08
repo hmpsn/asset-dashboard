@@ -8,6 +8,9 @@ import {
   MoreVertical, Pencil, EyeOff,
 } from 'lucide-react';
 import { StatCard, scoreColorClass, scoreBgBarClass } from './ui';
+import { StatusBadge } from './ui/StatusBadge';
+import { statusBorderClass } from './ui/statusConfig';
+import { usePageEditStates } from '../hooks/usePageEditStates';
 import type { FixContext } from '../App';
 
 // ── Lazy-loaded sub-tool chunks ──
@@ -538,8 +541,8 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
   const [trafficMap, setTrafficMap] = useState<Record<string, { clicks: number; impressions: number; sessions: number; pageviews: number }>>({});
   const [sortMode, setSortMode] = useState<'issues' | 'traffic'>('issues');
 
-  // SEO edit tracking (#137)
-  const [editTracking, setEditTracking] = useState<Record<string, { status: 'flagged' | 'in-review' | 'live'; updatedAt: string; fields?: string[] }>>({});
+  // Unified page edit states
+  const { getState, summary } = usePageEditStates(workspaceId);
 
   useEffect(() => {
     if (siteId) {
@@ -548,15 +551,6 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
       }).catch(() => {});
     }
   }, [siteId]);
-
-  useEffect(() => {
-    if (workspaceId) {
-      fetch(`/api/workspaces/${workspaceId}/seo-edit-tracking`)
-        .then(r => r.ok ? r.json() : {})
-        .then(data => setEditTracking(data || {}))
-        .catch(() => {});
-    }
-  }, [workspaceId]);
 
   // Audit issue suppressions
   const [suppressions, setSuppressions] = useState<{ check: string; pageSlug: string }[]>([]);
@@ -633,6 +627,40 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
     }
   };
 
+  // Send issue for client review via approval batch
+  const [sentForReview, setSentForReview] = useState<Set<string>>(new Set());
+  const [sendingReview, setSendingReview] = useState<string | null>(null);
+
+  const sendForReview = async (page: PageSeoResult, issue: SeoIssue) => {
+    if (!workspaceId) return;
+    const fixKey = `${page.pageId}-${issue.check}`;
+    const text = editedSuggestions[fixKey] || issue.suggestedFix || '';
+    const field = issue.check === 'title' ? 'seoTitle' : 'seoDescription';
+    setSendingReview(fixKey);
+    try {
+      const res = await fetch(`/api/approvals/${workspaceId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          siteId,
+          name: `Audit Fix: ${issue.message.slice(0, 60)}`,
+          items: [{
+            pageId: page.pageId,
+            pageTitle: page.page,
+            pageSlug: page.slug,
+            field,
+            currentValue: issue.value || '',
+            proposedValue: text,
+          }],
+        }),
+      });
+      if (res.ok) {
+        setSentForReview(prev => new Set(prev).add(fixKey));
+      }
+    } catch { /* skip */ }
+    finally { setSendingReview(null); }
+  };
+
   // Audit → Task pipeline
   const [createdTasks, setCreatedTasks] = useState<Set<string>>(new Set());
   const [creatingTask, setCreatingTask] = useState<string | null>(null);
@@ -648,20 +676,25 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
   const flagForClient = async (page: PageSeoResult, issue: SeoIssue, note: string) => {
     if (!workspaceId) return;
     const key = issueToTaskKey(page, issue);
+    const fixKey = `${page.pageId}-${issue.check}`;
+    const suggestion = editedSuggestions[fixKey] || issue.suggestedFix || '';
+    const field = issue.check === 'title' ? 'seoTitle' : issue.check === 'meta-description' ? 'seoDescription' : 'seoDescription';
     setFlagSending(true);
     try {
-      const res = await fetch('/api/requests', {
+      const res = await fetch(`/api/approvals/${workspaceId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          workspaceId,
-          title: `[Review Needed] ${issue.message.slice(0, 80)}`,
-          description: `**Page:** /${page.slug}\n**Issue:** ${issue.message}\n**Severity:** ${issue.severity}\n\n**Recommendation:** ${issue.recommendation}${(() => { const fk = `${page.pageId}-${issue.check}`; const s = editedSuggestions[fk] || issue.suggestedFix; return s ? `\n\n**AI Suggestion:** ${s}` : ''; })()}${issue.value ? `\n\n**Current value:** ${issue.value}` : ''}${note ? `\n\n**Note from your SEO team:**\n${note}` : ''}`,
-          category: 'seo',
-          priority: issue.severity === 'error' ? 'high' : 'medium',
-          status: 'new',
-          pageUrl: `/${page.slug}`,
-          submittedBy: 'team',
+          siteId,
+          name: `[Review] ${issue.message.slice(0, 60)}`,
+          items: [{
+            pageId: page.pageId,
+            pageTitle: page.page,
+            pageSlug: page.slug,
+            field,
+            currentValue: issue.value || '',
+            proposedValue: suggestion || `${issue.recommendation}${note ? `\n\nNote: ${note}` : ''}`,
+          }],
         }),
       });
       if (res.ok) {
@@ -1526,6 +1559,19 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
         )}
       </div>
 
+      {/* Edit status summary bar */}
+      {summary.total > 0 && (
+        <div className="flex items-center gap-3 text-[11px] text-zinc-500 mb-2">
+          <span className="text-zinc-400 font-medium">{summary.total} tracked</span>
+          {summary.live > 0 && <><StatusBadge status="live" /><span className="text-teal-400">{summary.live}</span></>}
+          {summary.inReview > 0 && <><StatusBadge status="in-review" /><span className="text-purple-400">{summary.inReview}</span></>}
+          {summary.approved > 0 && <><StatusBadge status="approved" /><span className="text-green-400">{summary.approved}</span></>}
+          {summary.rejected > 0 && <><StatusBadge status="rejected" /><span className="text-red-400">{summary.rejected}</span></>}
+          {summary.issueDetected > 0 && <><StatusBadge status="issue-detected" /><span className="text-amber-400">{summary.issueDetected}</span></>}
+          {summary.fixProposed > 0 && <><StatusBadge status="fix-proposed" /><span className="text-blue-400">{summary.fixProposed}</span></>}
+        </div>
+      )}
+
       {/* Page list */}
       <div className="space-y-2">
         {filteredPages.map(page => {
@@ -1533,8 +1579,8 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
           const errorCount = page.issues.filter(i => i.severity === 'error').length;
           const warningCount = page.issues.filter(i => i.severity === 'warning').length;
           const pageTraffic = trafficMap[`/${page.slug}`];
-          const pageTracking = editTracking[page.pageId];
-          const trackBorder = pageTracking?.status === 'live' ? 'border-teal-500/40' : pageTracking?.status === 'in-review' ? 'border-purple-500/40' : '';
+          const pageState = getState(page.pageId);
+          const trackBorder = statusBorderClass(pageState?.status);
 
           return (
             <div key={page.slug || page.page} className={`bg-zinc-900 rounded-xl border ${trackBorder || 'border-zinc-800'}`}>
@@ -1552,8 +1598,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
                   <div className="text-xs text-zinc-500 truncate">/{page.slug}</div>
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
-                  {pageTracking?.status === 'live' && <span className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/30 text-teal-400">Live</span>}
-                  {pageTracking?.status === 'in-review' && <span className="text-[11px] px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/30 text-purple-400">In Review</span>}
+                  <StatusBadge status={pageState?.status} />
                   {pageTraffic && (pageTraffic.clicks > 0 || pageTraffic.pageviews > 0) && (
                     <span className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400 tabular-nums" title={`${pageTraffic.clicks} clicks, ${pageTraffic.impressions} impressions, ${pageTraffic.pageviews} pageviews (28d)`}>
                       {pageTraffic.clicks > 0 ? `${pageTraffic.clicks.toLocaleString()} clicks` : ''}{pageTraffic.clicks > 0 && pageTraffic.pageviews > 0 ? ' · ' : ''}{pageTraffic.pageviews > 0 ? `${pageTraffic.pageviews.toLocaleString()} views` : ''}
@@ -1626,15 +1671,31 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
                                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-medium flex items-center gap-1">
                                         <CheckCircle className="w-2.5 h-2.5" /> Applied
                                       </span>
+                                    ) : sentForReview.has(fixKey) ? (
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 font-medium flex items-center gap-1">
+                                        <Send className="w-2.5 h-2.5" /> Sent for Review
+                                      </span>
                                     ) : (
-                                      <button
-                                        onClick={() => acceptSuggestion(page.pageId, issue)}
-                                        disabled={isApplying}
-                                        className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
-                                      >
-                                        {isApplying ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <CheckCircle className="w-2.5 h-2.5" />}
-                                        {isApplying ? 'Pushing...' : 'Accept & Push'}
-                                      </button>
+                                      <div className="flex items-center gap-1">
+                                        <button
+                                          onClick={() => acceptSuggestion(page.pageId, issue)}
+                                          disabled={isApplying || sendingReview === fixKey}
+                                          className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
+                                        >
+                                          {isApplying ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <CheckCircle className="w-2.5 h-2.5" />}
+                                          {isApplying ? 'Pushing...' : 'Apply Now'}
+                                        </button>
+                                        {workspaceId && (issue.check === 'title' || issue.check === 'meta-description') && (
+                                          <button
+                                            onClick={() => sendForReview(page, issue)}
+                                            disabled={isApplying || sendingReview === fixKey}
+                                            className="text-[10px] px-1.5 py-0.5 rounded bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
+                                          >
+                                            {sendingReview === fixKey ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Send className="w-2.5 h-2.5" />}
+                                            Send for Review
+                                          </button>
+                                        )}
+                                      </div>
                                     )}
                                   </div>
                                   {isEditing ? (

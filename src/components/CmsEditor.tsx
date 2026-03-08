@@ -3,6 +3,8 @@ import {
   Loader2, Save, ChevronDown, ChevronRight, Check, AlertCircle,
   Search, Sparkles, Wand2, Upload, Send,
 } from 'lucide-react';
+import { usePageEditStates } from '../hooks/usePageEditStates';
+import { StatusBadge } from './ui/StatusBadge';
 
 interface SeoField {
   id: string;
@@ -48,7 +50,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
   const [sendingApproval, setSendingApproval] = useState(false);
   const [approvalSent, setApprovalSent] = useState(false);
   const [variations, setVariations] = useState<Record<string, { fieldSlug: string; options: string[] }>>({});
-  const [editTracking, setEditTracking] = useState<Record<string, { status: 'flagged' | 'in-review' | 'live'; updatedAt: string; fields?: string[] }>>({});
+  const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
 
   const fetchData = async () => {
     setLoading(true);
@@ -80,14 +82,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
 
   useEffect(() => { fetchData(); }, [siteId]);
 
-  // Fetch edit tracking data
-  useEffect(() => {
-    if (!workspaceId) return;
-    fetch(`/api/workspaces/${workspaceId}/seo-edit-tracking`)
-      .then(r => r.ok ? r.json() : {})
-      .then(data => setEditTracking(data || {}))
-      .catch(() => {});
-  }, [workspaceId]);
+
 
   const updateField = (itemId: string, fieldSlug: string, value: string) => {
     setEdits(prev => ({
@@ -115,8 +110,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
       } else {
         setDirty(prev => { const n = new Set(prev); n.delete(itemId); return n; });
         setSaved(prev => new Set(prev).add(itemId));
-        // Update local tracking to live
-        setEditTracking(prev => ({ ...prev, [itemId]: { status: 'live', updatedAt: new Date().toISOString() } }));
+        refreshStates();
       }
     } catch {
       setErrors(prev => ({ ...prev, [itemId]: 'Network error' }));
@@ -226,15 +220,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
         body: JSON.stringify({ siteId, name: `CMS SEO Changes — ${new Date().toLocaleDateString()}`, items }),
       });
       setApprovalSent(true);
-      // Update local tracking to in-review for submitted items
-      const uniqueItemIds = [...new Set(items.map((i: { pageId: string }) => i.pageId))];
-      setEditTracking(prev => {
-        const next = { ...prev };
-        for (const iid of uniqueItemIds) {
-          next[iid] = { status: 'in-review', updatedAt: new Date().toISOString() };
-        }
-        return next;
-      });
+      refreshStates();
       setApprovalSelected(new Set());
       setTimeout(() => setApprovalSent(false), 4000);
     } catch (err) {
@@ -317,6 +303,19 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
           )}
         </div>
       </div>
+
+      {/* Edit status summary bar */}
+      {summary.total > 0 && (
+        <div className="flex items-center gap-3 text-[11px] text-zinc-500">
+          <span className="text-zinc-400 font-medium">{summary.total} tracked</span>
+          {summary.live > 0 && <><StatusBadge status="live" /><span className="text-teal-400">{summary.live}</span></>}
+          {summary.inReview > 0 && <><StatusBadge status="in-review" /><span className="text-purple-400">{summary.inReview}</span></>}
+          {summary.approved > 0 && <><StatusBadge status="approved" /><span className="text-green-400">{summary.approved}</span></>}
+          {summary.rejected > 0 && <><StatusBadge status="rejected" /><span className="text-red-400">{summary.rejected}</span></>}
+          {summary.issueDetected > 0 && <><StatusBadge status="issue-detected" /><span className="text-amber-400">{summary.issueDetected}</span></>}
+          {summary.fixProposed > 0 && <><StatusBadge status="fix-proposed" /><span className="text-blue-400">{summary.fixProposed}</span></>}
+        </div>
+      )}
 
       {/* Search */}
       <div className="relative">
@@ -414,9 +413,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                           <span className="text-[11px] text-zinc-500 font-mono flex-shrink-0">/{coll.collectionSlug}/{itemSlug}</span>
                         </div>
                         <div className="flex items-center gap-1.5 flex-shrink-0">
-                          {editTracking[item.id]?.status === 'live' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/30 text-teal-400">Live</span>}
-                          {editTracking[item.id]?.status === 'in-review' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/30 text-purple-400">In Review</span>}
-                          {editTracking[item.id]?.status === 'flagged' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">Flagged</span>}
+                          <StatusBadge status={getState(item.id)?.status} />
                           {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
                           {isSaved && <Check className="w-3 h-3 text-emerald-400" />}
                           {error && <AlertCircle className="w-3 h-3 text-red-400" />}

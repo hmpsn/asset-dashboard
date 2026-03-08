@@ -5,6 +5,9 @@ import {
 } from 'lucide-react';
 import type { FixContext } from '../App';
 import { useRecommendations } from '../hooks/useRecommendations';
+import { usePageEditStates } from '../hooks/usePageEditStates';
+import { StatusBadge } from './ui/StatusBadge';
+import { statusBorderClass } from './ui/statusConfig';
 
 interface PageMeta {
   id: string;
@@ -45,7 +48,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const [sendingApproval, setSendingApproval] = useState(false);
   const [approvalSent, setApprovalSent] = useState(false);
   const [variations, setVariations] = useState<Record<string, { field: string; options: string[] }>>({});
-  const [editTracking, setEditTracking] = useState<Record<string, { status: 'flagged' | 'in-review' | 'live'; updatedAt: string; fields?: string[] }>>({});
+  const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
 
   const fetchPages = async () => {
     setLoading(true);
@@ -70,15 +73,6 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   };
 
   useEffect(() => { fetchPages(); }, [siteId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Fetch edit tracking data
-  useEffect(() => {
-    if (!workspaceId) return;
-    fetch(`/api/workspaces/${workspaceId}/seo-edit-tracking`)
-      .then(r => r.ok ? r.json() : {})
-      .then(data => setEditTracking(data || {}))
-      .catch(() => {});
-  }, [workspaceId]);
 
   // Auto-expand target page from audit Fix→
   const fixConsumed = useRef(false);
@@ -130,8 +124,8 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       }
       setEdits(prev => ({ ...prev, [pageId]: { ...prev[pageId], dirty: false } }));
       setSaved(prev => new Set(prev).add(pageId));
-      // Update local tracking state to show teal/live immediately
-      setEditTracking(prev => ({ ...prev, [pageId]: { status: 'live', updatedAt: new Date().toISOString(), fields: ['title', 'description'] } }));
+      // Refresh page edit states to reflect the new 'live' status
+      refreshStates();
       setTimeout(() => setSaved(prev => { const n = new Set(prev); n.delete(pageId); return n; }), 2000);
     } catch (err) {
       console.error('Save failed:', err);
@@ -281,15 +275,8 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         body: JSON.stringify({ siteId, name: `SEO Changes — ${new Date().toLocaleDateString()}`, items }),
       });
       setApprovalSent(true);
-      // Update local tracking to in-review for all submitted pages
-      const uniquePageIds = [...new Set(items.map((i: { pageId: string }) => i.pageId))];
-      setEditTracking(prev => {
-        const next = { ...prev };
-        for (const pid of uniquePageIds) {
-          next[pid] = { status: 'in-review', updatedAt: new Date().toISOString() };
-        }
-        return next;
-      });
+      // Refresh page edit states to reflect the new 'in-review' status
+      refreshStates();
       setApprovalSelected(new Set());
       setTimeout(() => setApprovalSent(false), 4000);
     } catch (err) {
@@ -393,13 +380,22 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         </div>
       )}
 
-      {/* Edit tracking legend */}
-      {Object.keys(editTracking).length > 0 && (
-        <div className="flex items-center gap-4 text-[11px] text-zinc-500">
-          <span>Edit status:</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-teal-400" /> Live</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-400" /> In Review</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" /> Flagged</span>
+      {/* Edit status summary bar */}
+      {summary.total > 0 && (
+        <div className="flex items-center gap-3 text-[11px] text-zinc-500">
+          <span className="text-zinc-400 font-medium">{summary.total} tracked</span>
+          {summary.live > 0 && <StatusBadge status="live" />}
+          {summary.live > 0 && <span className="text-teal-400">{summary.live}</span>}
+          {summary.inReview > 0 && <StatusBadge status="in-review" />}
+          {summary.inReview > 0 && <span className="text-purple-400">{summary.inReview}</span>}
+          {summary.approved > 0 && <StatusBadge status="approved" />}
+          {summary.approved > 0 && <span className="text-green-400">{summary.approved}</span>}
+          {summary.rejected > 0 && <StatusBadge status="rejected" />}
+          {summary.rejected > 0 && <span className="text-red-400">{summary.rejected}</span>}
+          {summary.issueDetected > 0 && <StatusBadge status="issue-detected" />}
+          {summary.issueDetected > 0 && <span className="text-amber-400">{summary.issueDetected}</span>}
+          {summary.fixProposed > 0 && <StatusBadge status="fix-proposed" />}
+          {summary.fixProposed > 0 && <span className="text-blue-400">{summary.fixProposed}</span>}
         </div>
       )}
 
@@ -443,8 +439,8 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
           const pageRecs = recsLoaded ? recsForPage(page.slug) : [];
           const metaRecs = pageRecs.filter(r => r.type === 'metadata');
           const hasRecFlag = metaRecs.length > 0;
-          const tracking = editTracking[page.id];
-          const trackingBorder = tracking?.status === 'live' ? 'border-teal-500/50' : tracking?.status === 'in-review' ? 'border-purple-500/50' : tracking?.status === 'flagged' ? 'border-amber-500/50' : '';
+          const pageState = getState(page.id);
+          const trackingBorder = statusBorderClass(pageState?.status);
 
           return (
             <div key={page.id} id={`seo-editor-page-${page.id}`} className={`bg-zinc-900 rounded-xl border overflow-hidden ${trackingBorder || (hasRecFlag ? 'border-amber-500/30' : isSelected ? 'border-teal-500/40 bg-teal-500/5' : 'border-zinc-800')}`}>
@@ -467,9 +463,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
                   <div className="text-xs text-zinc-500 truncate">/{page.slug}</div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {tracking?.status === 'live' && <span className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/30 text-teal-400">Live</span>}
-                  {tracking?.status === 'in-review' && <span className="text-[11px] px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/30 text-purple-400">In Review</span>}
-                  {tracking?.status === 'flagged' && <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">Flagged</span>}
+                  <StatusBadge status={pageState?.status} />
                   {hasRecFlag && <span className="flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400"><AlertTriangle className="w-3 h-3" />{metaRecs.length} rec{metaRecs.length > 1 ? 's' : ''}</span>}
                   {!hasSeoTitle && <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">No title</span>}
                   {!hasSeoDesc && <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400">No desc</span>}

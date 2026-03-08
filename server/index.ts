@@ -5236,6 +5236,17 @@ app.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', (req, res) => {
   const { status, clientValue, clientNote } = req.body;
   const batch = updateItem(req.params.workspaceId, req.params.batchId, req.params.itemId, { status, clientValue, clientNote });
   if (!batch) return res.status(404).json({ error: 'Item not found' });
+  // Sync PageEditState when client approves or rejects
+  if (status === 'approved' || status === 'rejected') {
+    const item = batch.items.find(i => i.id === req.params.itemId);
+    if (item) {
+      updatePageState(req.params.workspaceId, item.pageId, {
+        status: status === 'approved' ? 'approved' : 'rejected',
+        updatedBy: 'client',
+        ...(status === 'rejected' && clientNote ? { rejectionNote: clientNote } : {}),
+      });
+    }
+  }
   res.json(batch);
 });
 
