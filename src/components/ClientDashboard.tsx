@@ -14,6 +14,9 @@ import { DualTrendChart, RenderMarkdown, InsightCard } from './client/helpers';
 import { HealthTab } from './client/HealthTab';
 import { OrganicInsight } from './client/DataSnapshots';
 import { InsightsDigest } from './client/InsightsDigest';
+import { OnboardingWizard } from './client/OnboardingWizard';
+import { MonthlySummary } from './client/MonthlySummary';
+import { ROIDashboard } from './client/ROIDashboard';
 import {
   QUICK_QUESTIONS,
   type SearchOverview, type PerformanceTrend, type WorkspaceInfo, type AuditSummary,
@@ -45,7 +48,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
   const [tab, setTabRaw] = useState<ClientTab>(() => {
     const params = new URLSearchParams(window.location.search);
     const t = params.get('tab');
-    if (t && ['overview','search','health','strategy','analytics','approvals','requests','content','plans'].includes(t)) return t as ClientTab;
+    if (t && ['overview','search','health','strategy','analytics','approvals','requests','content','plans','roi'].includes(t)) return t as ClientTab;
     return 'overview';
   });
   const setTab = (t: ClientTab) => {
@@ -1232,6 +1235,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
     { id: 'requests' as ClientTab, label: 'Requests', icon: MessageSquare, locked: false },
     ...(approvalBatches.length > 0 ? [{ id: 'approvals' as ClientTab, label: 'Approvals', icon: ClipboardCheck, locked: false }] : []),
     { id: 'plans' as ClientTab, label: 'Plans', icon: CreditCard, locked: false },
+    ...(effectiveTier !== 'free' ? [{ id: 'roi' as ClientTab, label: 'ROI', icon: Trophy, locked: false }] : []),
   ];
 
   return (
@@ -1479,6 +1483,19 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
               </div>
             );
           })()}
+
+          {/* What happened this month */}
+          <MonthlySummary
+            overview={overview}
+            searchComparison={searchComparison}
+            ga4Overview={ga4Overview}
+            ga4Comparison={ga4Comparison}
+            audit={audit}
+            contentRequests={contentRequests}
+            requests={requests}
+            approvalBatches={approvalBatches}
+            activityCount={activityLog.length}
+          />
 
           {/* Main content: insights + sidebar */}
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
@@ -3985,6 +4002,11 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         );
       })()}
 
+      {/* ════════════ ROI TAB ════════════ */}
+      {tab === 'roi' && (
+        <ROIDashboard workspaceId={workspaceId} tier={effectiveTier} />
+      )}
+
       {/* Stripe Elements inline payment modal */}
       {stripePayment && (
         <StripePaymentModal
@@ -4006,102 +4028,25 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         />
       )}
 
-      {/* Welcome onboarding modal */}
-      {showWelcome && ws && (() => {
-        const tier = (ws.tier as 'free' | 'growth' | 'premium') || 'free';
-        const tierLabel = tier === 'premium' ? 'Premium' : tier === 'growth' ? 'Growth' : 'Starter';
-        const tierColor = tier === 'premium' ? 'from-teal-400 to-emerald-400' : tier === 'growth' ? 'from-teal-500 to-emerald-500' : 'from-zinc-500 to-zinc-400';
-        const tierBg = tier !== 'free' ? 'bg-teal-500/15 border-teal-500/30 text-teal-300' : 'bg-zinc-800 border-zinc-700 text-zinc-300';
-        const isTrial = ws.isTrial && ws.trialDaysRemaining != null && ws.trialDaysRemaining > 0;
-        const features = [
-          { icon: Sparkles, label: 'AI-Powered Insights', desc: 'Real-time overview of your site performance', available: true },
-          { icon: Target, label: 'SEO Strategy', desc: 'Keyword mapping, content gaps, and quick wins', available: tier !== 'free' },
-          { icon: Shield, label: 'Site Health Audits', desc: 'Automated technical SEO checks', available: true },
-          { icon: LineChart, label: 'Analytics & Search', desc: 'Google Analytics and Search Console data', available: true },
-          { icon: FileText, label: 'Content Briefs', desc: 'AI-generated content briefs and full posts', available: tier !== 'free' },
-          { icon: MessageSquare, label: 'Request System', desc: 'Submit and track project requests', available: true },
-        ];
-        const dismissWelcome = () => {
-          const key = clientUser ? `welcome_seen_${workspaceId}_${clientUser.id}` : `welcome_seen_${workspaceId}`;
-          localStorage.setItem(key, 'true');
-          setShowWelcome(false);
-        };
-        return (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={dismissWelcome}>
-            <div className="bg-zinc-900 rounded-2xl border border-zinc-800 shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-              {/* Header with gradient */}
-              <div className={`relative px-6 pt-8 pb-6 overflow-hidden bg-gradient-to-br ${tierColor} bg-opacity-10`} style={{ background: `linear-gradient(135deg, ${tier !== 'free' ? 'rgba(45,212,191,0.10)' : 'rgba(113,113,122,0.08)'}, transparent)` }}>
-                <div className="absolute -top-20 -right-20 w-48 h-48 rounded-full blur-3xl opacity-15 bg-gradient-to-br from-teal-500 to-emerald-500" />
-                <div className="relative text-center">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-500/20 to-emerald-500/20 ring-1 ring-teal-500/20 flex items-center justify-center mx-auto mb-4">
-                    <Sparkles className="w-7 h-7 text-teal-400" />
-                  </div>
-                  <h2 className="text-xl font-bold text-zinc-100 mb-1">Welcome to your dashboard</h2>
-                  <p className="text-sm text-zinc-400">{ws.name}</p>
-                  <div className="flex items-center justify-center gap-2 mt-3">
-                    <span className={`text-[11px] px-2.5 py-1 rounded-full border font-semibold ${tierBg}`}>{tierLabel} Plan</span>
-                    {isTrial && (
-                      <span className="text-[11px] px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 font-medium">
-                        {ws.trialDaysRemaining} day{ws.trialDaysRemaining !== 1 ? 's' : ''} left in trial
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Feature grid */}
-              <div className="px-6 py-5">
-                <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-3">What&apos;s included</div>
-                <div className="grid grid-cols-2 gap-2">
-                  {features.map((f, i) => (
-                    <div key={i} className={`px-3 py-2.5 rounded-lg border transition-colors ${f.available ? 'bg-zinc-800/50 border-zinc-800 hover:border-zinc-700' : 'bg-zinc-900/50 border-zinc-800/50 opacity-50'}`}>
-                      <div className="flex items-center gap-2 mb-1">
-                        <f.icon className={`w-3.5 h-3.5 ${f.available ? 'text-blue-400' : 'text-zinc-600'}`} />
-                        <span className={`text-[11px] font-semibold ${f.available ? 'text-zinc-200' : 'text-zinc-500'}`}>{f.label}</span>
-                      </div>
-                      <div className="text-[10px] text-zinc-500 leading-relaxed">{f.desc}</div>
-                      {!f.available && <div className="text-[10px] text-zinc-600 mt-1 italic">Upgrade to unlock</div>}
-                    </div>
-                  ))}
-                </div>
-
-                {isTrial && (
-                  <div className="mt-4 px-3.5 py-3 rounded-xl bg-gradient-to-r from-blue-500/5 to-teal-500/5 border border-blue-500/15">
-                    <div className="flex items-start gap-2">
-                      <Zap className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <div className="text-xs font-semibold text-zinc-200">You&apos;re on a free trial</div>
-                        <div className="text-[11px] text-zinc-400 mt-0.5">Explore all {tierLabel} features for {ws.trialDaysRemaining} more day{ws.trialDaysRemaining !== 1 ? 's' : ''}. No credit card required during trial.</div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Actions */}
-              <div className="px-6 pb-6 flex flex-col gap-2">
-                <button
-                  onClick={() => { dismissWelcome(); setTab('overview'); }}
-                  className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 to-teal-600 text-sm text-white font-semibold hover:from-blue-500 hover:to-teal-500 transition-all"
-                >
-                  Explore Your Dashboard
-                </button>
-                {tier !== 'free' && (
-                  <button
-                    onClick={() => { dismissWelcome(); setTab('strategy'); }}
-                    className="w-full py-2.5 rounded-xl bg-zinc-800 border border-zinc-700 text-xs text-zinc-300 font-medium hover:bg-zinc-700 transition-colors"
-                  >
-                    View SEO Strategy
-                  </button>
-                )}
-                <button onClick={dismissWelcome} className="text-[11px] text-zinc-600 hover:text-zinc-400 transition-colors mt-1">
-                  Skip for now
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {/* Welcome onboarding wizard */}
+      {showWelcome && ws && (
+        <OnboardingWizard
+          workspaceName={ws.name}
+          tier={effectiveTier}
+          isTrial={!!(ws.isTrial && ws.trialDaysRemaining != null && ws.trialDaysRemaining > 0)}
+          trialDaysRemaining={ws.trialDaysRemaining ?? undefined}
+          hasGSC={!!ws.gscPropertyUrl}
+          hasGA4={!!ws.ga4PropertyId}
+          hasStrategy={!!strategyData}
+          hasAudit={!!audit}
+          onDismiss={() => {
+            const key = clientUser ? `welcome_seen_${workspaceId}_${clientUser.id}` : `welcome_seen_${workspaceId}`;
+            localStorage.setItem(key, 'true');
+            setShowWelcome(false);
+          }}
+          onNavigate={(t) => setTab(t as ClientTab)}
+        />
+      )}
 
       {/* Toast notification */}
       {toast && (

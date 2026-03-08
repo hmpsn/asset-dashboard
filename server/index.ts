@@ -87,6 +87,8 @@ import { addMessage, buildConversationContext, listSessions, getSession as getCh
 import { renderSalesReportHTML } from './sales-report-html.js';
 import { isStripeConfigured, createCheckoutSession, createPaymentIntentForProduct, constructWebhookEvent, handleWebhookEvent, getProductConfig, listProducts, clearTestModeCustomerIds } from './stripe.js';
 import { listPayments, getPayment } from './payments.js';
+import { computeROI } from './roi.js';
+import { startChurnSignalScheduler, listChurnSignals, dismissSignal } from './churn-signals.js';
 import { getStripeConfigSafe, saveStripeKeys, saveStripeProducts, clearStripeConfig, getStripePublishableKey, type StripeProductPrice } from './stripe-config.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
 import { listGscSites, getSearchOverview, getPerformanceTrend, getQueryPageData, getAllGscPages, getSearchDeviceBreakdown, getSearchCountryBreakdown, getSearchTypeBreakdown, getSearchPeriodComparison } from './search-console.js';
@@ -6652,6 +6654,28 @@ app.post('/api/monthly-report/:workspaceId', async (req, res) => {
   }
 });
 
+// --- ROI Dashboard ---
+app.get('/api/public/roi/:workspaceId', (req, res) => {
+  const roi = computeROI(req.params.workspaceId);
+  if (!roi) return res.status(404).json({ error: 'ROI data not available — requires keyword strategy with CPC data' });
+  res.json(roi);
+});
+
+// --- Churn Prevention Signals (admin) ---
+app.get('/api/churn-signals', (_req, res) => {
+  res.json(listChurnSignals());
+});
+
+app.get('/api/churn-signals/:workspaceId', (req, res) => {
+  res.json(listChurnSignals(req.params.workspaceId));
+});
+
+app.post('/api/churn-signals/:signalId/dismiss', (req, res) => {
+  const ok = dismissSignal(req.params.signalId);
+  if (!ok) return res.status(404).json({ error: 'Signal not found' });
+  res.json({ dismissed: true });
+});
+
 // --- Serve frontend in production (MUST be after all API routes) ---
 if (IS_PROD) {
   const distPath = path.join(__dirname, '..', 'dist');
@@ -6675,6 +6699,8 @@ startBackupScheduler();
 clearTestModeCustomerIds();
 // Start trial expiry reminders (day 10 + day 13)
 startTrialReminders();
+// Start churn prevention signal checks (every 6h)
+startChurnSignalScheduler();
 
 // Start
 const PORT = parseInt(process.env.PORT || '3001', 10);
