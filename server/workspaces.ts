@@ -84,7 +84,7 @@ export interface PageEditState {
   status: PageEditStatus;
   auditIssues?: string[];
   fields?: string[];
-  source?: 'audit' | 'editor' | 'cms' | 'schema' | 'bulk-fix' | 'cart-fix' | 'content-delivery' | 'recommendation';
+  source?: 'audit' | 'editor' | 'cms' | 'schema' | 'bulk-fix' | 'cart-fix' | 'content-delivery' | 'recommendation' | 'request-resolved';
   approvalBatchId?: string;
   contentRequestId?: string;
   workOrderId?: string;

@@ -150,7 +150,9 @@ export type EmailEventType =
   | 'password_reset'
   | 'churn_signal'
   | 'payment_received'
-  | 'fixes_applied';
+  | 'fixes_applied'
+  | 'recommendations_ready'
+  | 'audit_improved';
 
 // ── Template renderers ──
 
@@ -195,6 +197,10 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
       return renderPaymentReceived(events, count, ws, dashUrl, logoUrl);
     case 'fixes_applied':
       return renderFixesApplied(events, count, ws, dashUrl, logoUrl);
+    case 'recommendations_ready':
+      return renderRecommendationsReady(events, count, ws, dashUrl, logoUrl);
+    case 'audit_improved':
+      return renderAuditImproved(events, count, ws, dashUrl, logoUrl);
     default:
       return { subject: 'Notification', html: '' };
   }
@@ -644,6 +650,42 @@ function renderFixesApplied(events: EmailEvent[], count: number, ws: string, das
       headline: 'Fixes Applied',
       subtitle: ws,
       body: (count > 1 ? countPill(count, 'fix completed') : '') + items,
+      cta: dashUrl ? { label: 'View Your Dashboard', url: dashUrl } : undefined,
+      logoUrl,
+    }),
+  };
+}
+
+function renderRecommendationsReady(_events: EmailEvent[], _count: number, ws: string, dashUrl?: string, logoUrl?: string) {
+  const recCount = _events.reduce((s, e) => s + ((e.data.recCount as number) || 0), 0);
+  return {
+    subject: `📋 ${recCount} new recommendation${recCount !== 1 ? 's' : ''} — ${ws}`,
+    html: layout({
+      preheader: 'New SEO recommendations are ready for review',
+      headline: 'Recommendations Ready',
+      subtitle: ws,
+      body: `<div style="padding:16px 24px;font-size:14px;color:#a1a1aa;">${recCount} prioritized recommendation${recCount !== 1 ? 's' : ''} based on your latest audit are ready for review.</div>`,
+      cta: dashUrl ? { label: 'View Recommendations', url: dashUrl } : undefined,
+      logoUrl,
+    }),
+  };
+}
+
+function renderAuditImproved(_events: EmailEvent[], _count: number, ws: string, dashUrl?: string, logoUrl?: string) {
+  const e = _events[0];
+  const score = (e.data.score as number) || 0;
+  const prev = (e.data.previousScore as number) || 0;
+  const delta = score - prev;
+  return {
+    subject: `🎉 Your site health improved to ${score} — ${ws}`,
+    html: layout({
+      preheader: `Site health went from ${prev} to ${score}`,
+      headline: 'Site Health Improved!',
+      subtitle: ws,
+      body: `<div style="padding:16px 24px;text-align:center;">
+        <div style="font-size:48px;font-weight:800;color:#4ade80;">${score}</div>
+        <div style="font-size:14px;color:#a1a1aa;margin-top:4px;">Up ${delta} point${delta !== 1 ? 's' : ''} from ${prev}</div>
+      </div>`,
       cta: dashUrl ? { label: 'View Your Dashboard', url: dashUrl } : undefined,
       logoUrl,
     }),

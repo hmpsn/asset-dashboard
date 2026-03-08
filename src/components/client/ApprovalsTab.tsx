@@ -67,6 +67,7 @@ export function ApprovalsTab({
   };
 
   const applyApprovedBatch = async (batchId: string) => {
+    if (!window.confirm('This will update your live website with the approved changes. Continue?')) return;
     setApplyingBatch(batchId);
     try {
       const res = await fetch(`/api/public/approvals/${workspaceId}/${batchId}/apply`, { method: 'POST' });
@@ -213,6 +214,13 @@ export function ApprovalsTab({
                                     <span key={t} className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-300">{t}</span>
                                   ))}
                                 </div>
+
+                                {/* Reason / context from audit */}
+                                {item.reason && (
+                                  <div className="mt-2 px-3 py-2 rounded-lg bg-blue-500/5 border border-blue-500/10 text-[11px] text-blue-300/80">
+                                    <span className="font-medium text-blue-400">Why: </span>{item.reason}
+                                  </div>
+                                )}
 
                                 {/* Schema preview or Current vs proposed */}
                                 {isSchema ? (

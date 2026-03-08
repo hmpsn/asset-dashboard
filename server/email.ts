@@ -234,6 +234,33 @@ export function notifyTeamPaymentReceived(opts: {
   }));
 }
 
+export function notifyClientRecommendationsReady(opts: {
+  clientEmail: string;
+  workspaceName: string;
+  workspaceId: string;
+  recCount: number;
+  dashboardUrl?: string;
+}): void {
+  if (!isEmailConfigured()) return;
+  queueEmail(makeEvent('recommendations_ready', opts.clientEmail, opts.workspaceId, opts.workspaceName, opts.dashboardUrl, {
+    recCount: opts.recCount,
+  }));
+}
+
+export function notifyClientAuditImproved(opts: {
+  clientEmail: string;
+  workspaceName: string;
+  workspaceId: string;
+  score: number;
+  previousScore: number;
+  dashboardUrl?: string;
+}): void {
+  if (!isEmailConfigured()) return;
+  queueEmail(makeEvent('audit_improved', opts.clientEmail, opts.workspaceId, opts.workspaceName, opts.dashboardUrl, {
+    score: opts.score, previousScore: opts.previousScore,
+  }));
+}
+
 export function notifyTeamChurnSignal(opts: {
   workspaceName: string;
   workspaceId: string;

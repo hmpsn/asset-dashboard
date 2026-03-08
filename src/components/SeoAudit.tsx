@@ -651,6 +651,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
             field,
             currentValue: issue.value || '',
             proposedValue: text,
+            reason: issue.recommendation || issue.message,
           }],
         }),
       });
@@ -694,6 +695,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
             field,
             currentValue: issue.value || '',
             proposedValue: suggestion || `${issue.recommendation}${note ? `\n\nNote: ${note}` : ''}`,
+            reason: issue.recommendation || issue.message,
           }],
         }),
       });

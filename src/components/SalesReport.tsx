@@ -266,6 +266,16 @@ export function SalesReport() {
               Client Report
             </button>
           )}
+          <button
+            onClick={() => {
+              const domain = r.url.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+              window.location.hash = `#new-workspace?url=${encodeURIComponent(r.url)}&name=${encodeURIComponent(domain)}`;
+            }}
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700"
+          >
+            <Zap className="w-3.5 h-3.5" />
+            Onboard as Client
+          </button>
         </div>
       </div>
 

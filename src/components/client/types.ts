@@ -135,6 +135,7 @@ export interface ApprovalItem {
   id: string; pageId: string; pageTitle: string; pageSlug: string;
   field: 'seoTitle' | 'seoDescription' | 'schema'; currentValue: string; proposedValue: string;
   clientValue?: string; status: 'pending' | 'approved' | 'rejected' | 'applied'; clientNote?: string;
+  reason?: string;
 }
 export interface ApprovalBatch {
   id: string; workspaceId: string; siteId: string; name: string;

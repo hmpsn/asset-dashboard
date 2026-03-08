@@ -37,6 +37,7 @@ interface WorkspaceSummary {
   approvals: { pending: number; total: number };
   contentRequests?: { pending: number; inProgress: number; delivered: number; total: number };
   workOrders?: { pending: number; total: number };
+  pageStates?: { issueDetected: number; inReview: number; approved: number; rejected: number; live: number; total: number };
   tier?: 'free' | 'growth' | 'premium';
   isTrial?: boolean;
   trialDaysRemaining?: number;
@@ -143,6 +144,9 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
   if (totalPendingApprovals > 0) attentionItems.push({ label: `${totalPendingApprovals} pending approval${totalPendingApprovals > 1 ? 's' : ''}`, value: 'Approvals', color: 'text-teal-400', icon: ClipboardCheck });
   if (totalPendingContent > 0) attentionItems.push({ label: `${totalPendingContent} content brief${totalPendingContent > 1 ? 's' : ''} awaiting review`, value: 'Content', color: 'text-amber-400', icon: FileText });
   if (totalPendingWorkOrders > 0) attentionItems.push({ label: `${totalPendingWorkOrders} purchased fix${totalPendingWorkOrders > 1 ? 'es' : ''} awaiting fulfillment`, value: 'Work Orders', color: 'text-teal-400', icon: ClipboardCheck });
+  const rejectedWorkspaces = data.filter(w => (w.pageStates?.rejected || 0) > 0);
+  const totalRejected = rejectedWorkspaces.reduce((s, w) => s + (w.pageStates?.rejected || 0), 0);
+  if (totalRejected > 0) attentionItems.push({ label: `${totalRejected} rejected change${totalRejected > 1 ? 's' : ''} need revision`, value: 'Rejected', color: 'text-red-400', icon: AlertTriangle });
   const lowScoreWorkspaces = data.filter(w => w.audit && w.audit.score < 60);
   if (lowScoreWorkspaces.length > 0) attentionItems.push({ label: `${lowScoreWorkspaces.length} workspace${lowScoreWorkspaces.length > 1 ? 's' : ''} with health score below 60`, value: 'Health', color: 'text-red-400', icon: AlertTriangle });
   const unlinkWorkspaces = data.filter(w => !w.webflowSiteId);
@@ -320,6 +324,20 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
                       <div className="text-[11px] text-zinc-500">None</div>
                     )}
                   </div>
+
+                  {/* SEO Work Status */}
+                  {(ws.pageStates?.total || 0) > 0 && (
+                    <div className="col-span-full">
+                      <div className="text-[11px] font-medium mb-1 text-zinc-500">SEO Status</div>
+                      <div className="flex flex-wrap gap-1">
+                        {(ws.pageStates?.issueDetected || 0) > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400">{ws.pageStates!.issueDetected} issues</span>}
+                        {(ws.pageStates?.inReview || 0) > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-purple-400">{ws.pageStates!.inReview} in review</span>}
+                        {(ws.pageStates?.approved || 0) > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-green-400">{ws.pageStates!.approved} approved</span>}
+                        {(ws.pageStates?.rejected || 0) > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-red-400">{ws.pageStates!.rejected} rejected</span>}
+                        {(ws.pageStates?.live || 0) > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400">{ws.pageStates!.live} live</span>}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Content Pipeline */}
                   <div>

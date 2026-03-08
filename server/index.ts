@@ -69,7 +69,7 @@ import { runSalesAudit } from './sales-audit.js';
 import { initJobs, createJob, updateJob, getJob, listJobs, cancelJob, registerAbort, isJobCancelled, hasActiveJob } from './jobs.js';
 import { createBatch, listBatches, getBatch, updateItem, markBatchApplied, deleteBatch } from './approvals.js';
 import { listRequests, createRequest, updateRequest, addNote, deleteRequest, getRequest, getAttachmentsDir, addAttachmentsToRequest, type RequestAttachment } from './requests.js';
-import { notifyTeamNewRequest, notifyClientTeamResponse, notifyClientStatusChange, notifyTeamContentRequest, notifyClientBriefReady, notifyApprovalReady, notifyClientWelcome, notifyClientFixesApplied, isEmailConfigured, initEmailQueue, sendEmail } from './email.js';
+import { notifyTeamNewRequest, notifyClientTeamResponse, notifyClientStatusChange, notifyTeamContentRequest, notifyClientBriefReady, notifyApprovalReady, notifyClientWelcome, notifyClientFixesApplied, notifyClientRecommendationsReady, notifyClientAuditImproved, isEmailConfigured, initEmailQueue, sendEmail } from './email.js';
 import { getQueueStats } from './email-queue.js';
 import { addActivity, listActivity } from './activity-log.js';
 import { getSchedule, listSchedules, upsertSchedule, deleteSchedule, startScheduler } from './scheduled-audits.js';
@@ -648,6 +648,18 @@ app.get('/api/workspace-overview', (_req, res) => {
     const workOrders = listWorkOrders(ws.id);
     const pendingWorkOrders = workOrders.filter(o => o.status === 'pending' || o.status === 'in_progress').length;
 
+    // Page edit states summary
+    const allStates = getAllPageStates(ws.id);
+    const stateVals = Object.values(allStates);
+    const pageStates = {
+      issueDetected: stateVals.filter((s: { status: string }) => s.status === 'issue-detected').length,
+      inReview: stateVals.filter((s: { status: string }) => s.status === 'in-review').length,
+      approved: stateVals.filter((s: { status: string }) => s.status === 'approved').length,
+      rejected: stateVals.filter((s: { status: string }) => s.status === 'rejected').length,
+      live: stateVals.filter((s: { status: string }) => s.status === 'live').length,
+      total: stateVals.length,
+    };
+
     const trialEnd = ws.trialEndsAt ? new Date(ws.trialEndsAt) : null;
     const isTrial = trialEnd ? trialEnd > new Date() : false;
     const trialDaysRemaining = isTrial && trialEnd ? Math.max(0, Math.ceil((trialEnd.getTime() - Date.now()) / 86400000)) : undefined;
@@ -668,6 +680,7 @@ app.get('/api/workspace-overview', (_req, res) => {
       approvals: { pending: pendingApprovals, total: totalApprovalItems },
       contentRequests: { pending: pendingContentReqs, inProgress: inProgressContentReqs, delivered: deliveredContentReqs, total: contentReqs.length },
       workOrders: { pending: pendingWorkOrders, total: workOrders.length },
+      pageStates,
     };
   });
   res.json(overview);
@@ -5266,6 +5279,22 @@ app.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', (req, res) => {
         updatedBy: 'client',
         ...(status === 'rejected' && clientNote ? { rejectionNote: clientNote } : {}),
       });
+      // Activity feed for client actions
+      const actorInfo = getClientActor(req, req.params.workspaceId);
+      const actorName = actorInfo?.name || 'Client';
+      if (status === 'approved') {
+        addActivity(req.params.workspaceId, 'approval_applied',
+          `${actorName} approved ${item.field} change on ${item.pageId}`,
+          item.proposedValue ? `New value: ${item.proposedValue.slice(0, 80)}` : undefined,
+          { batchId: req.params.batchId, itemId: item.id, pageId: item.pageId },
+          actorInfo);
+      } else {
+        addActivity(req.params.workspaceId, 'changes_requested',
+          `${actorName} rejected ${item.field} change on ${item.pageId}`,
+          clientNote || undefined,
+          { batchId: req.params.batchId, itemId: item.id, pageId: item.pageId },
+          actorInfo);
+      }
     }
   }
   res.json(batch);
@@ -5370,9 +5399,9 @@ app.post('/api/public/requests/:workspaceId/:requestId/notes', (req, res) => {
 
 // Internal: create request (e.g. from audit finding)
 app.post('/api/requests', (req, res) => {
-  const { workspaceId, title, description, category, priority, pageUrl } = req.body;
+  const { workspaceId, title, description, category, priority, pageUrl, pageId } = req.body;
   if (!workspaceId || !title || !description) return res.status(400).json({ error: 'workspaceId, title, and description required' });
-  const request = createRequest(workspaceId, { title, description, category: category || 'seo', priority, pageUrl, submittedBy: 'Web Team' });
+  const request = createRequest(workspaceId, { title, description, category: category || 'seo', priority, pageUrl, pageId, submittedBy: 'Web Team' });
   broadcast('request:created', request);
   res.json(request);
 });
@@ -5432,6 +5461,10 @@ app.patch('/api/requests/:id', (req, res) => {
     if (status === 'completed' || status === 'closed') {
       addActivity(updated.workspaceId, 'request_resolved', `Resolved request: ${updated.title}`,
         updated.description?.slice(0, 120), { requestId: updated.id, category: updated.category });
+      // Update page state if request has a pageId
+      if (updated.pageId) {
+        updatePageState(updated.workspaceId, updated.pageId, { status: 'live', source: 'request-resolved', updatedBy: 'admin' });
+      }
     }
   }
   res.json(updated);
@@ -6120,8 +6153,22 @@ app.post('/api/jobs', async (req, res) => {
               try {
                 await generateRecommendations(ws.id);
                 console.log(`[audit] Auto-regenerated recommendations for ${ws.id}`);
+                // Notify client that recommendations are ready
+                if (ws.clientEmail) {
+                  const dashUrl = ws.liveDomain ? `${ws.liveDomain.startsWith('http') ? '' : 'https://'}${ws.liveDomain}/client/${ws.id}` : undefined;
+                  const recSet = loadRecommendations(ws.id);
+                  const recs = recSet?.recommendations || [];
+                  if (recs.length > 0) {
+                    notifyClientRecommendationsReady({ clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: ws.id, recCount: recs.length, dashboardUrl: dashUrl });
+                  }
+                }
               } catch (recErr) {
                 console.error('[audit] Failed to regenerate recommendations:', recErr);
+              }
+              // Notify client if audit score improved
+              if (snapshot.previousScore != null && result.siteScore > snapshot.previousScore && ws.clientEmail) {
+                const dashUrl = ws.liveDomain ? `${ws.liveDomain.startsWith('http') ? '' : 'https://'}${ws.liveDomain}/client/${ws.id}` : undefined;
+                notifyClientAuditImproved({ clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: ws.id, score: result.siteScore, previousScore: snapshot.previousScore, dashboardUrl: dashUrl });
               }
             }
           } catch (err) {

@@ -35,6 +35,7 @@ export interface ClientRequest {
   status: RequestStatus;
   submittedBy?: string;
   pageUrl?: string;
+  pageId?: string;
   attachments?: RequestAttachment[];
   notes: RequestNote[];
   createdAt: string;
@@ -72,6 +73,7 @@ export function createRequest(workspaceId: string, data: {
   priority?: RequestPriority;
   submittedBy?: string;
   pageUrl?: string;
+  pageId?: string;
 }): ClientRequest {
   const requests = readRequests();
   const now = new Date().toISOString();
@@ -85,6 +87,7 @@ export function createRequest(workspaceId: string, data: {
     status: 'new',
     submittedBy: data.submittedBy,
     pageUrl: data.pageUrl,
+    pageId: data.pageId,
     notes: [],
     createdAt: now,
     updatedAt: now,

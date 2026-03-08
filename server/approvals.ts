@@ -19,6 +19,7 @@ export interface ApprovalItem {
   clientValue?: string;       // client's edited version (if they modify it)
   status: 'pending' | 'approved' | 'rejected' | 'applied';
   clientNote?: string;
+  reason?: string;
   createdAt: string;
   updatedAt: string;
 }
