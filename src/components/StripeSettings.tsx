@@ -282,7 +282,16 @@ export function StripeSettings() {
                   <span className={`text-[11px] w-36 truncate flex-shrink-0 ${product.enabled ? 'text-zinc-300' : 'text-zinc-600'}`}>
                     {product.displayName}
                   </span>
-                  <span className="text-[11px] text-zinc-500 w-12 text-right flex-shrink-0">${product.priceUsd}</span>
+                  <div className="flex items-center w-16 flex-shrink-0">
+                    <span className="text-[11px] text-zinc-500">$</span>
+                    <input
+                      type="number"
+                      value={product.priceUsd}
+                      onChange={e => updateProduct(idx, { priceUsd: Math.max(0, Number(e.target.value)) })}
+                      disabled={!product.enabled}
+                      className="w-full px-1 py-0.5 rounded text-[11px] text-right bg-zinc-800/50 border border-zinc-700 text-zinc-200 focus:outline-none focus:border-teal-500/50 disabled:opacity-30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                  </div>
                   <input
                     type="text"
                     value={product.stripePriceId}
