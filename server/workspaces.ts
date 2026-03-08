@@ -52,6 +52,7 @@ export interface ContentGap {
   intent: 'informational' | 'commercial' | 'transactional' | 'navigational';
   priority: 'high' | 'medium' | 'low';
   rationale: string;       // why this content should be created
+  suggestedPageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource';
 }
 
 export interface QuickWin {

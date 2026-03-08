@@ -1628,6 +1628,9 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                             <div className="flex items-center gap-2 flex-wrap mb-1.5">
                               <span className="text-[11px] text-zinc-500 uppercase tracking-wider">{gap.intent}</span>
                               <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${prioColor}`}>{gap.priority}</span>
+                              {gap.suggestedPageType && gap.suggestedPageType !== 'blog' && (
+                                <span className="text-[11px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20 font-medium capitalize">{gap.suggestedPageType}</span>
+                              )}
                             </div>
                             <div className="text-xs font-semibold text-zinc-100 mb-1">{gap.topic}</div>
                             <div className="text-[11px] text-teal-400 font-medium mb-1">&ldquo;{gap.targetKeyword}&rdquo;</div>
@@ -1638,14 +1641,14 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                               ) : (
                                 <div className="flex items-center gap-2">
                                   <button
-                                    onClick={() => setPricingModal({ serviceType: 'brief_only', topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, source: 'strategy' })}
+                                    onClick={() => setPricingModal({ serviceType: 'brief_only', topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, source: 'strategy', pageType: gap.suggestedPageType || 'blog' })}
                                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 font-medium hover:bg-teal-600/40 transition-all"
                                   >
                                     <FileText className="w-3 h-3" /> Get a Brief
                                     {briefPrice != null && <span className="text-[11px] opacity-70 ml-0.5">{fmtPrice(briefPrice)}</span>}
                                   </button>
                                   <button
-                                    onClick={() => setPricingModal({ serviceType: 'full_post', topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, source: 'strategy' })}
+                                    onClick={() => setPricingModal({ serviceType: 'full_post', topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, source: 'strategy', pageType: gap.suggestedPageType || 'blog' })}
                                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600/30 to-teal-600/30 border border-blue-500/30 text-[11px] text-blue-200 font-medium hover:from-blue-600/50 hover:to-teal-600/50 transition-all"
                                   >
                                     <Sparkles className="w-3 h-3" /> Get Full Post

@@ -114,7 +114,7 @@ export interface ClientKeywordStrategy {
   siteKeywordMetrics?: { keyword: string; volume: number; difficulty: number }[];
   pageMap: { pagePath: string; pageTitle?: string; primaryKeyword: string; secondaryKeywords?: string[]; searchIntent?: string; currentPosition?: number; impressions?: number; clicks?: number; volume?: number; difficulty?: number }[];
   opportunities: string[];
-  contentGaps?: { topic: string; targetKeyword: string; intent: string; priority: string; rationale: string }[];
+  contentGaps?: { topic: string; targetKeyword: string; intent: string; priority: string; rationale: string; suggestedPageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource' }[];
   quickWins?: { pagePath: string; action: string; estimatedImpact: string; rationale: string }[];
   keywordGaps?: { keyword: string; volume?: number; difficulty?: number }[];
   businessContext?: string;

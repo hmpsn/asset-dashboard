@@ -38,6 +38,7 @@ interface ContentGap {
   intent: string;
   priority: string;
   rationale: string;
+  suggestedPageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource';
 }
 
 interface QuickWin {
@@ -737,6 +738,9 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                         <div className="flex items-center gap-2">
                           <span className={`text-[11px] uppercase px-1.5 py-0.5 rounded-full border font-medium ${intentColor(gap.intent)}`}>{gap.intent}</span>
                           <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded border ${prioColor}`}>{gap.priority}</span>
+                          {gap.suggestedPageType && gap.suggestedPageType !== 'blog' && (
+                            <span className="text-[11px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20 font-medium capitalize">{gap.suggestedPageType}</span>
+                          )}
                         </div>
                       </div>
                       <div className="text-[11px] text-teal-400 mt-1">Target keyword: &ldquo;{gap.targetKeyword}&rdquo;</div>

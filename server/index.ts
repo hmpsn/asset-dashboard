@@ -4081,7 +4081,8 @@ Return JSON with this EXACT structure (do NOT include a pageMap — it's already
       "targetKeyword": "primary keyword",
       "intent": "informational|commercial|transactional|navigational",
       "priority": "high|medium|low",
-      "rationale": "Why and expected impact"
+      "rationale": "Why and expected impact",
+      "suggestedPageType": "blog|landing|service|location|product|pillar|resource"
     }
   ],
   "quickWins": [
@@ -4100,6 +4101,7 @@ Return JSON with this EXACT structure (do NOT include a pageMap — it's already
 Rules:
 - siteKeywords: 8-15 broad themes covering the full site
 - contentGaps: 6-10 NEW pages/posts to create. Vary intent (informational, commercial, transactional). Mix high and medium priority${hasSemrush ? '. Prioritize competitor gap keywords.' : ''}
+- suggestedPageType: Choose the best page type for each content gap. Use "blog" for informational articles, "landing" for conversion pages, "service" for service descriptions, "location" for local SEO, "product" for product pages, "pillar" for topic hubs, "resource" for guides/downloads.
 - quickWins: 3-5 existing pages where small changes boost rankings. Use GSC data if available (high impressions + poor position = opportunity).
 - If DEVICE BREAKDOWN shows mobile ranking gaps, include a mobile-optimization quick win.
 - If PERIOD COMPARISON shows declining metrics, flag defensive content gaps to recover traffic.
@@ -4620,6 +4622,7 @@ app.get('/api/public/seo-strategy/:workspaceId', (req, res) => {
       intent: g.intent,
       priority: g.priority,
       rationale: g.rationale,
+      suggestedPageType: g.suggestedPageType || 'blog',
     })),
     quickWins: (strategy.quickWins || []).map(q => ({
       pagePath: q.pagePath,
