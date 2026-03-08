@@ -12,6 +12,7 @@ import { StripePaymentModal } from './StripePaymentForm';
 import { StatCard, CompactStatBar, EmptyState, TierGate, type Tier } from './ui';
 import { DualTrendChart, RenderMarkdown, InsightCard } from './client/helpers';
 import { HealthTab } from './client/HealthTab';
+import { InsightsEngine } from './client/InsightsEngine';
 import { CartProvider } from './client/useCart';
 import { SeoCartButton, SeoCartDrawer } from './client/SeoCart';
 import { OrganicInsight } from './client/DataSnapshots';
@@ -1578,6 +1579,9 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                 </button>
               )}
 
+              {/* Action Plan — compact insights */}
+              {workspaceId && <InsightsEngine workspaceId={workspaceId} tier={effectiveTier} compact />}
+
               {/* Activity timeline */}
               {activityLog.length > 0 && (
                 <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
@@ -1822,7 +1826,14 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         </>)}
 
         {/* ════════════ SITE HEALTH TAB ════════════ */}
-        {tab === 'health' && <HealthTab audit={audit} auditDetail={auditDetail} liveDomain={ws.liveDomain} tier={effectiveTier} workspaceId={workspaceId} initialSeverity={(() => { const s = new URLSearchParams(window.location.search).get('severity'); return s && ['error','warning','info'].includes(s) ? s as 'error' | 'warning' | 'info' : 'all'; })()} />}
+        {tab === 'health' && (<>
+          <HealthTab audit={audit} auditDetail={auditDetail} liveDomain={ws.liveDomain} tier={effectiveTier} workspaceId={workspaceId} initialSeverity={(() => { const s = new URLSearchParams(window.location.search).get('severity'); return s && ['error','warning','info'].includes(s) ? s as 'error' | 'warning' | 'info' : 'all'; })()} />
+          {workspaceId && auditDetail && (
+            <div className="mt-5">
+              <InsightsEngine workspaceId={workspaceId} tier={effectiveTier} />
+            </div>
+          )}
+        </>)}
 
         {/* ════════════ SEO STRATEGY TAB ════════════ */}
         {tab === 'strategy' && (<>
