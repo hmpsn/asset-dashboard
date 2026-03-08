@@ -27,7 +27,7 @@ export interface ContentTopicRequest {
   intent: string;
   priority: string;
   rationale: string;
-  status: 'pending_payment' | 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'delivered' | 'declined';
+  status: 'pending_payment' | 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'delivered' | 'published' | 'declined';
   briefId?: string;
   clientNote?: string;
   internalNote?: string;
@@ -39,6 +39,8 @@ export interface ContentTopicRequest {
   upgradedAt?: string;
   deliveryUrl?: string;
   deliveryNotes?: string;
+  targetPageId?: string;
+  targetPageSlug?: string;
   comments?: ContentRequestComment[];
   requestedAt: string;
   updatedAt: string;
@@ -84,7 +86,7 @@ export function getContentRequest(workspaceId: string, id: string): ContentTopic
 
 export function createContentRequest(
   workspaceId: string,
-  data: { topic: string; targetKeyword: string; intent: string; priority: string; rationale: string; clientNote?: string; source?: 'strategy' | 'client'; serviceType?: 'brief_only' | 'full_post'; pageType?: ContentTopicRequest['pageType']; initialStatus?: 'pending_payment' | 'requested' }
+  data: { topic: string; targetKeyword: string; intent: string; priority: string; rationale: string; clientNote?: string; source?: 'strategy' | 'client'; serviceType?: 'brief_only' | 'full_post'; pageType?: ContentTopicRequest['pageType']; initialStatus?: 'pending_payment' | 'requested'; targetPageId?: string; targetPageSlug?: string }
 ): ContentTopicRequest {
   const items = read(workspaceId);
 
@@ -104,6 +106,8 @@ export function createContentRequest(
     source: data.source || 'strategy',
     serviceType: data.serviceType || 'brief_only',
     pageType: data.pageType || 'blog',
+    targetPageId: data.targetPageId,
+    targetPageSlug: data.targetPageSlug,
     comments: [],
     status: data.initialStatus || 'requested',
     requestedAt: new Date().toISOString(),

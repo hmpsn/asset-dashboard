@@ -136,6 +136,8 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
     source: 'strategy' | 'client' | 'upgrade';
     upgradeReqId?: string;
     pageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource';
+    targetPageId?: string;
+    targetPageSlug?: string;
   } | null>(null);
   const [pricingConfirming, setPricingConfirming] = useState(false);
   // Inline pricing data from server
@@ -360,7 +362,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         } else if (pricingModal.source === 'strategy') {
           const res = await fetch(`/api/public/content-request/${workspaceId}`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, intent: pricingModal.intent, priority: pricingModal.priority, rationale: pricingModal.rationale, serviceType: pricingModal.serviceType, pageType: pricingModal.pageType || 'blog', initialStatus: 'pending_payment' }),
+            body: JSON.stringify({ topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, intent: pricingModal.intent, priority: pricingModal.priority, rationale: pricingModal.rationale, serviceType: pricingModal.serviceType, pageType: pricingModal.pageType || 'blog', initialStatus: 'pending_payment', targetPageId: pricingModal.targetPageId, targetPageSlug: pricingModal.targetPageSlug }),
           });
           if (!res.ok) throw new Error(`Server returned ${res.status}`);
           const created = await res.json();
@@ -368,7 +370,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         } else {
           const res = await fetch(`/api/public/content-request/${workspaceId}/submit`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, notes: pricingModal.notes || undefined, serviceType: pricingModal.serviceType, pageType: pricingModal.pageType || 'blog', initialStatus: 'pending_payment' }),
+            body: JSON.stringify({ topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, notes: pricingModal.notes || undefined, serviceType: pricingModal.serviceType, pageType: pricingModal.pageType || 'blog', initialStatus: 'pending_payment', targetPageId: pricingModal.targetPageId, targetPageSlug: pricingModal.targetPageSlug }),
           });
           if (!res.ok) throw new Error(`Server returned ${res.status}`);
           const created = await res.json();
@@ -432,7 +434,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         setRequestingTopic(pricingModal.targetKeyword);
         const res = await fetch(`/api/public/content-request/${workspaceId}`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, intent: pricingModal.intent, priority: pricingModal.priority, rationale: pricingModal.rationale, serviceType: pricingModal.serviceType, pageType: pricingModal.pageType || 'blog' }),
+          body: JSON.stringify({ topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, intent: pricingModal.intent, priority: pricingModal.priority, rationale: pricingModal.rationale, serviceType: pricingModal.serviceType, pageType: pricingModal.pageType || 'blog', targetPageId: pricingModal.targetPageId, targetPageSlug: pricingModal.targetPageSlug }),
         });
         if (!res.ok) throw new Error(`Server returned ${res.status}`);
         setRequestedTopics(prev => new Set(prev).add(pricingModal.targetKeyword));
@@ -446,7 +448,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
       } else {
         const res = await fetch(`/api/public/content-request/${workspaceId}/submit`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, notes: pricingModal.notes || undefined, serviceType: pricingModal.serviceType, pageType: pricingModal.pageType || 'blog' }),
+          body: JSON.stringify({ topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, notes: pricingModal.notes || undefined, serviceType: pricingModal.serviceType, pageType: pricingModal.pageType || 'blog', targetPageId: pricingModal.targetPageId, targetPageSlug: pricingModal.targetPageSlug }),
         });
         if (res.ok) {
           const created = await res.json();
@@ -1153,7 +1155,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
 
         {/* ════════════ SEO STRATEGY TAB ════════════ */}
         {tab === 'strategy' && (
-          <StrategyTab strategyData={strategyData} requestedTopics={requestedTopics} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} />
+          <StrategyTab strategyData={strategyData} requestedTopics={requestedTopics} contentRequests={contentRequests} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} />
         )}
 
 

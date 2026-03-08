@@ -43,7 +43,7 @@ interface ContentTopicRequest {
   intent: string;
   priority: string;
   rationale: string;
-  status: 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'delivered' | 'declined';
+  status: 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'delivered' | 'published' | 'declined';
   briefId?: string;
   clientNote?: string;
   internalNote?: string;
@@ -54,6 +54,8 @@ interface ContentTopicRequest {
   upgradedAt?: string;
   deliveryUrl?: string;
   deliveryNotes?: string;
+  targetPageId?: string;
+  targetPageSlug?: string;
   comments?: { id: string; author: 'client' | 'team'; content: string; createdAt: string }[];
   requestedAt: string;
   updatedAt: string;
@@ -283,7 +285,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
       const res = await fetch(`/api/content-briefs/${workspaceId}/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetKeyword: keyword.trim(), businessContext: businessCtx.trim() || undefined }),
+        body: JSON.stringify({ targetKeyword: keyword.trim(), businessContext: businessCtx.trim() || undefined, targetPageId: fixContext?.pageId, targetPageSlug: fixContext?.pageSlug }),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -382,6 +384,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
                 changes_requested: { icon: Clock, color: 'text-orange-400', label: 'Changes Requested' },
                 in_progress: { icon: Zap, color: 'text-teal-400', label: 'In Progress' },
                 delivered: { icon: CheckCircle2, color: 'text-green-400', label: 'Delivered' },
+                published: { icon: CheckCircle2, color: 'text-teal-400', label: 'Published' },
                 declined: { icon: XCircle, color: 'text-zinc-500', label: 'Declined' },
               };
               const sc = statusConfig[req.status] || statusConfig.requested;
@@ -454,8 +457,15 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
                         </div>
                       </div>
                     )}
+                    {/* Mark Published button for delivered content */}
+                    {req.status === 'delivered' && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <button onClick={() => handleUpdateRequestStatus(req.id, 'published')} className="px-3 py-1.5 rounded-lg bg-teal-600/20 border border-teal-500/30 text-[11px] font-medium text-teal-300 hover:bg-teal-600/30 transition-colors flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Mark Published</button>
+                        {req.targetPageId && <span className="text-[11px] text-zinc-500">Will mark target page as Live</span>}
+                      </div>
+                    )}
                     {/* Show delivery info */}
-                    {req.status === 'delivered' && req.deliveryUrl && (
+                    {(req.status === 'delivered' || req.status === 'published') && req.deliveryUrl && (
                       <div className="mt-2 bg-green-500/5 border border-green-500/20 rounded-lg px-3 py-2">
                         <div className="flex items-center gap-2">
                           <ExternalLink className="w-3 h-3 text-green-400 flex-shrink-0" />

@@ -4,6 +4,7 @@
  */
 
 import { getWorkspace } from './workspaces.js';
+import { listContentRequests } from './content-requests.js';
 
 export interface ROIData {
   /** Total estimated dollar value of organic traffic this period */
@@ -21,6 +22,8 @@ export interface ROIData {
   trackedPages: number;
   /** Content investment ROI (if content pricing is configured) */
   contentROI: ContentROIMetrics | null;
+  /** Per-content-request ROI attribution */
+  contentItems: ContentItemROI[];
   /** Computed at */
   computedAt: string;
 }
@@ -41,6 +44,18 @@ export interface ContentROIMetrics {
   totalContentValue: number;
   roi: number; // percentage
   postsPublished: number;
+}
+
+export interface ContentItemROI {
+  requestId: string;
+  topic: string;
+  targetKeyword: string;
+  targetPageId: string;
+  targetPageSlug?: string;
+  status: string;
+  clicks: number;
+  impressions: number;
+  trafficValue: number;
 }
 
 /**
@@ -99,22 +114,68 @@ export function computeROI(workspaceId: string): ROIData | null {
   // Use a 20% markup over raw CPC as typical agency management fee
   const adSpendEquivalent = totalValue * 1.2;
 
-  // Content ROI (if workspace has content pricing + delivered content)
+  // Content ROI — cross-reference content requests with traffic data
+  const contentReqs = listContentRequests(workspaceId);
+  const deliveredReqs = contentReqs.filter(r => (r.status === 'delivered' || r.status === 'published') && r.targetPageId);
+
+  // Build a lookup from pagePath to traffic data
+  const pathTraffic = new Map<string, { clicks: number; impressions: number; cpc: number }>();
+  for (const page of pages) {
+    pathTraffic.set(page.pagePath, { clicks: page.clicks || 0, impressions: page.impressions || 0, cpc: page.cpc || 0 });
+  }
+
+  const contentItems: ContentItemROI[] = [];
+  let totalContentValue = 0;
+
+  for (const req of deliveredReqs) {
+    // Try to match by targetPageSlug or targetPageId
+    const slug = req.targetPageSlug;
+    const traffic = slug ? pathTraffic.get(slug) || pathTraffic.get(`/${slug}`) : undefined;
+    const clicks = traffic?.clicks || 0;
+    const impressions = traffic?.impressions || 0;
+    const cpc = traffic?.cpc || avgCPC;
+    const value = clicks * cpc;
+    totalContentValue += value;
+
+    contentItems.push({
+      requestId: req.id,
+      topic: req.topic,
+      targetKeyword: req.targetKeyword,
+      targetPageId: req.targetPageId!,
+      targetPageSlug: req.targetPageSlug,
+      status: req.status,
+      clicks,
+      impressions,
+      trafficValue: Math.round(value * 100) / 100,
+    });
+  }
+
+  // Sort by traffic value descending
+  contentItems.sort((a, b) => b.trafficValue - a.trafficValue);
+
+  // Content ROI metrics
   let contentROI: ContentROIMetrics | null = null;
-  if (ws.contentPricing) {
-    // Count delivered content by reading content requests
-    // (simplified — full implementation would read content-requests store)
+  const postsPublished = deliveredReqs.length;
+  if (postsPublished > 0 && ws.contentPricing) {
+    const briefPrice = ws.contentPricing.briefPrice || 0;
     const fullPostPrice = ws.contentPricing.fullPostPrice || 0;
-    // Rough estimation: average post generates 50 clicks/month at avg CPC
-    const estimatedPostValue = 50 * avgCPC;
-    if (fullPostPrice > 0 && estimatedPostValue > 0) {
-      contentROI = {
-        totalContentSpend: fullPostPrice,
-        totalContentValue: estimatedPostValue * 12, // annualized
-        roi: ((estimatedPostValue * 12 - fullPostPrice) / fullPostPrice) * 100,
-        postsPublished: 0, // would be populated from content request data
-      };
-    }
+    const totalSpend = deliveredReqs.reduce((s, r) => {
+      return s + ((r.serviceType === 'full_post') ? fullPostPrice : briefPrice);
+    }, 0);
+    const annualizedValue = totalContentValue * 12;
+    contentROI = {
+      totalContentSpend: totalSpend,
+      totalContentValue: Math.round(annualizedValue * 100) / 100,
+      roi: totalSpend > 0 ? Math.round(((annualizedValue - totalSpend) / totalSpend) * 10000) / 100 : 0,
+      postsPublished,
+    };
+  } else if (postsPublished > 0) {
+    contentROI = {
+      totalContentSpend: 0,
+      totalContentValue: Math.round(totalContentValue * 12 * 100) / 100,
+      roi: 0,
+      postsPublished,
+    };
   }
 
   return {
@@ -127,6 +188,7 @@ export function computeROI(workspaceId: string): ROIData | null {
     avgCPC: Math.round(avgCPC * 100) / 100,
     trackedPages: pageBreakdown.length,
     contentROI,
+    contentItems,
     computedAt: new Date().toISOString(),
   };
 }

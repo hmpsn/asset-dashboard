@@ -35,7 +35,7 @@ interface WorkspaceSummary {
   } | null;
   requests: { total: number; new: number; active: number; latestDate: string | null };
   approvals: { pending: number; total: number };
-  contentRequests?: { pending: number; total: number };
+  contentRequests?: { pending: number; inProgress: number; delivered: number; total: number };
   tier?: 'free' | 'growth' | 'premium';
   isTrial?: boolean;
   trialDaysRemaining?: number;
@@ -117,6 +117,8 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
   const totalActiveRequests = data.reduce((s, w) => s + w.requests.active, 0);
   const totalPendingApprovals = data.reduce((s, w) => s + w.approvals.pending, 0);
   const totalPendingContent = data.reduce((s, w) => s + (w.contentRequests?.pending || 0), 0);
+  const totalInProgressContent = data.reduce((s, w) => s + (w.contentRequests?.inProgress || 0), 0);
+  const totalDeliveredContent = data.reduce((s, w) => s + (w.contentRequests?.delivered || 0), 0);
   const avgScore = data.filter(w => w.audit).length > 0
     ? Math.round(data.filter(w => w.audit).reduce((s, w) => s + (w.audit?.score || 0), 0) / data.filter(w => w.audit).length)
     : null;
@@ -192,7 +194,7 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <StatCard label="New Requests" value={totalNewRequests} icon={Bell} iconColor={totalNewRequests > 0 ? '#f87171' : '#71717a'} />
         <StatCard label="Active Requests" value={totalActiveRequests} icon={MessageSquare} iconColor={totalActiveRequests > 0 ? '#fbbf24' : '#71717a'} />
-        <StatCard label="Content Briefs" value={totalPendingContent} icon={ClipboardCheck} iconColor={totalPendingContent > 0 ? '#f59e0b' : '#71717a'} />
+        <StatCard label="Content Pipeline" value={`${totalPendingContent + totalInProgressContent}/${totalDeliveredContent}`} icon={FileText} iconColor={totalPendingContent > 0 ? '#f59e0b' : totalInProgressContent > 0 ? '#60a5fa' : '#71717a'} />
         <StatCard label="Approvals" value={totalPendingApprovals} icon={ClipboardCheck} iconColor={totalPendingApprovals > 0 ? '#2dd4bf' : '#71717a'} />
         <StatCard label="Avg Health" value={avgScore !== null ? avgScore : '—'} icon={Shield} iconColor={avgScore !== null ? (avgScore >= 80 ? '#4ade80' : avgScore >= 60 ? '#fbbf24' : '#f87171') : '#71717a'} />
       </div>
@@ -249,7 +251,7 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
                 </div>
 
                 {/* Metrics row */}
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-4 gap-3">
                   {/* Audit score */}
                   <div className="flex items-center gap-3">
                     {ws.audit ? (
@@ -310,6 +312,20 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
                             <CheckCircle2 className="w-2.5 h-2.5" /> All clear
                           </div>
                         )}
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-zinc-500">None</div>
+                    )}
+                  </div>
+
+                  {/* Content Pipeline */}
+                  <div>
+                    <div className="text-[11px] font-medium mb-1 text-zinc-500">Content</div>
+                    {(ws.contentRequests?.total || 0) > 0 ? (
+                      <div className="space-y-0.5">
+                        {(ws.contentRequests?.pending || 0) > 0 && <div className="text-[11px] text-amber-400 font-medium">{ws.contentRequests!.pending} pending</div>}
+                        {(ws.contentRequests?.inProgress || 0) > 0 && <div className="text-[11px] text-blue-400">{ws.contentRequests!.inProgress} in progress</div>}
+                        {(ws.contentRequests?.delivered || 0) > 0 && <div className="text-[11px] text-teal-400">{ws.contentRequests!.delivered} delivered</div>}
                       </div>
                     ) : (
                       <div className="text-[11px] text-zinc-500">None</div>

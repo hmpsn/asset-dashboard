@@ -199,17 +199,17 @@ export function ContentTab({
         const isBriefOnly = (req.serviceType || 'brief_only') === 'brief_only' && !req.upgradedAt;
         const isPending = req.status === 'pending_payment';
         const steps = isBriefOnly
-          ? ['requested', 'brief_generated', 'client_review', 'approved', 'delivered'] as const
-          : ['requested', 'brief_generated', 'client_review', 'approved', 'in_progress', 'delivered'] as const;
+          ? ['requested', 'brief_generated', 'client_review', 'approved', 'delivered', 'published'] as const
+          : ['requested', 'brief_generated', 'client_review', 'approved', 'in_progress', 'delivered', 'published'] as const;
         const stepLabels = isBriefOnly
-          ? [isPending ? 'Awaiting Payment' : 'Requested', 'Brief Ready', 'Your Review', 'Approved', 'Brief Delivered']
-          : [isPending ? 'Awaiting Payment' : 'Requested', 'Brief Ready', 'Your Review', 'Approved', 'In Production', 'Delivered'];
+          ? [isPending ? 'Awaiting Payment' : 'Requested', 'Brief Ready', 'Your Review', 'Approved', 'Brief Delivered', 'Published']
+          : [isPending ? 'Awaiting Payment' : 'Requested', 'Brief Ready', 'Your Review', 'Approved', 'In Production', 'Delivered', 'Published'];
         // Map pending_payment and changes_requested back for timeline display
         const displayStatus = req.status === 'pending_payment' ? 'requested' : req.status === 'changes_requested' ? 'client_review' : req.status;
         const currentIdx = (steps as readonly string[]).indexOf(displayStatus);
         const isExpanded = expandedContentReq === req.id;
         const brief = req.briefId ? briefPreviews[req.briefId] : null;
-        const canUpgrade = isBriefOnly && ['approved', 'delivered'].includes(req.status);
+        const canUpgrade = isBriefOnly && ['approved', 'delivered', 'published'].includes(req.status);
 
         return (
           <div key={req.id} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
@@ -583,7 +583,7 @@ export function ContentTab({
                 )}
 
                 {/* Add comment */}
-                {!['delivered', 'declined'].includes(req.status) && (
+                {!['delivered', 'published', 'declined'].includes(req.status) && (
                   <div className="flex items-center gap-2">
                     <input type="text" value={expandedContentReq === req.id ? contentComment : ''} onChange={e => setContentComment(e.target.value)} placeholder="Add a comment..." className="flex-1 px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600" onKeyDown={e => { if (e.key === 'Enter') addContentComment(req.id); }} />
                     <button onClick={() => addContentComment(req.id)} disabled={!contentComment.trim() || sendingContentComment} className="px-3 py-2 rounded-lg bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors disabled:opacity-50">

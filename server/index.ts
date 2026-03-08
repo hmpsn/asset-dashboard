@@ -640,6 +640,8 @@ app.get('/api/workspace-overview', (_req, res) => {
     // Content requests (from client portal)
     const contentReqs = listContentRequests(ws.id);
     const pendingContentReqs = contentReqs.filter(r => r.status === 'requested').length;
+    const inProgressContentReqs = contentReqs.filter(r => ['brief_generated', 'client_review', 'approved', 'in_progress'].includes(r.status)).length;
+    const deliveredContentReqs = contentReqs.filter(r => r.status === 'delivered' || r.status === 'published').length;
 
     const trialEnd = ws.trialEndsAt ? new Date(ws.trialEndsAt) : null;
     const isTrial = trialEnd ? trialEnd > new Date() : false;
@@ -659,7 +661,7 @@ app.get('/api/workspace-overview', (_req, res) => {
       audit,
       requests: { total: reqTotal, new: reqNew, active: reqActive, latestDate: latestReq?.updatedAt || null },
       approvals: { pending: pendingApprovals, total: totalApprovalItems },
-      contentRequests: { pending: pendingContentReqs, total: contentReqs.length },
+      contentRequests: { pending: pendingContentReqs, inProgress: inProgressContentReqs, delivered: deliveredContentReqs, total: contentReqs.length },
     };
   });
   res.json(overview);
@@ -5011,8 +5013,10 @@ app.post('/api/public/content-request/:workspaceId', (req, res) => {
   const serviceType = validateEnum(req.body.serviceType, ['brief_only', 'full_post'], 'brief_only');
   const pageType = validateEnum(req.body.pageType, ['blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource'], 'blog');
   const initialStatus = req.body.initialStatus === 'pending_payment' ? 'pending_payment' as const : undefined;
+  const targetPageId = sanitizeString(req.body.targetPageId, 100);
+  const targetPageSlug = sanitizeString(req.body.targetPageSlug, 200);
   if (!topic || !targetKeyword) return res.status(400).json({ error: 'topic and targetKeyword are required' });
-  const request = createContentRequest(req.params.workspaceId, { topic, targetKeyword, intent, priority, rationale, clientNote, serviceType, pageType, initialStatus });
+  const request = createContentRequest(req.params.workspaceId, { topic, targetKeyword, intent, priority, rationale, clientNote, serviceType, pageType, initialStatus, targetPageId: targetPageId || undefined, targetPageSlug: targetPageSlug || undefined });
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'content_requested', `${actor?.name || 'Client'} requested topic: "${topic}"`, `Keyword: "${targetKeyword}" · Priority: ${priority}`, { requestId: request.id }, actor);
   notifyTeamContentRequest({ workspaceName: ws.name, workspaceId: req.params.workspaceId, topic, targetKeyword, priority, rationale: rationale || '' });
@@ -5044,11 +5048,14 @@ app.post('/api/public/content-request/:workspaceId/submit', (req, res) => {
   const serviceType = validateEnum(req.body.serviceType, ['brief_only', 'full_post'], 'brief_only');
   const pageType = validateEnum(req.body.pageType, ['blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource'], 'blog');
   const initialStatus = req.body.initialStatus === 'pending_payment' ? 'pending_payment' as const : undefined;
+  const targetPageId = sanitizeString(req.body.targetPageId, 100);
+  const targetPageSlug = sanitizeString(req.body.targetPageSlug, 200);
   if (!topic || !targetKeyword) return res.status(400).json({ error: 'topic and targetKeyword are required' });
   const request = createContentRequest(req.params.workspaceId, {
     topic, targetKeyword, intent: 'informational', priority: 'medium',
     rationale: notes || `Client-submitted topic: ${topic}`,
     clientNote: notes, source: 'client', serviceType, pageType, initialStatus,
+    targetPageId: targetPageId || undefined, targetPageSlug: targetPageSlug || undefined,
   });
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'content_requested', `${actor?.name || 'Client'} submitted topic: "${topic}"`, `Keyword: "${targetKeyword}"`, { requestId: request.id }, actor);
@@ -5142,6 +5149,14 @@ app.patch('/api/content-requests/:workspaceId/:id', (req, res) => {
       const dashUrl = origin ? `${origin}/dashboard/${req.params.workspaceId}?tab=content` : undefined;
       notifyClientBriefReady({ clientEmail: wsInfo.clientEmail, workspaceName: wsInfo.name, workspaceId: req.params.workspaceId, topic: updated.topic, targetKeyword: updated.targetKeyword, dashboardUrl: dashUrl });
     }
+  }
+  // When content is marked as published and has a target page, update page state to live
+  if (status === 'published' && updated.targetPageId) {
+    updatePageState(req.params.workspaceId, updated.targetPageId, {
+      status: 'live',
+      source: 'content-delivery',
+      contentRequestId: updated.id,
+    });
   }
   res.json(updated);
 });

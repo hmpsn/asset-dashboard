@@ -3,7 +3,7 @@ import {
   Eye, MousePointerClick, Trophy, Zap, FileText, Sparkles, Target, Search, CheckCircle2,
 } from 'lucide-react';
 import { TierGate, type Tier } from '../ui';
-import type { ClientKeywordStrategy } from './types';
+import type { ClientKeywordStrategy, ClientContentRequest } from './types';
 
 export interface PricingModalState {
   serviceType: 'brief_only' | 'full_post';
@@ -21,6 +21,7 @@ export interface PricingModalState {
 interface StrategyTabProps {
   strategyData: ClientKeywordStrategy | null;
   requestedTopics: Set<string>;
+  contentRequests?: ClientContentRequest[];
   effectiveTier: Tier;
   briefPrice: number | null;
   fullPostPrice: number | null;
@@ -28,7 +29,7 @@ interface StrategyTabProps {
   setPricingModal: (modal: PricingModalState | null) => void;
 }
 
-export function StrategyTab({ strategyData, requestedTopics, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal }: StrategyTabProps) {
+export function StrategyTab({ strategyData, requestedTopics, contentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal }: StrategyTabProps) {
   const [mapSearch, setMapSearch] = useState('');
   const [mapSort, setMapSort] = useState<'default' | 'position' | 'impressions' | 'clicks'>('default');
   const [mapIntent, setMapIntent] = useState<string>('all');
@@ -141,7 +142,8 @@ export function StrategyTab({ strategyData, requestedTopics, effectiveTier, brie
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {strategyData.contentGaps.map((gap, i) => {
-                const alreadyRequested = requestedTopics.has(gap.targetKeyword);
+                const matchingReq = contentRequests?.find(r => r.targetKeyword === gap.targetKeyword && r.status !== 'declined');
+                const alreadyRequested = matchingReq != null || requestedTopics.has(gap.targetKeyword);
                 const pageType = gap.suggestedPageType || 'blog';
                 const pageTypeLabel = ({ blog: 'Blog Post', landing: 'Landing Page', service: 'Service Page', location: 'Location Page', product: 'Product Page', pillar: 'Pillar Page', resource: 'Resource Guide' } as Record<string, string>)[pageType] || 'Blog Post';
                 const keywordDiffers = gap.targetKeyword.toLowerCase().replace(/[^a-z0-9]/g, '') !== gap.topic.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -158,7 +160,13 @@ export function StrategyTab({ strategyData, requestedTopics, effectiveTier, brie
                         <span className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20 font-medium flex-shrink-0">{pageTypeLabel}</span>
                       </div>
                       {alreadyRequested ? (
-                        <span className="flex items-center gap-1 text-[11px] text-teal-400 bg-teal-500/10 px-2.5 py-1.5 rounded-lg border border-teal-500/20 flex-shrink-0"><CheckCircle2 className="w-3.5 h-3.5" /> Requested</span>
+                        (() => {
+                          const s = matchingReq?.status;
+                          if (s === 'delivered' || s === 'published') return <span className="flex items-center gap-1 text-[11px] text-teal-400 bg-teal-500/10 px-2.5 py-1.5 rounded-lg border border-teal-500/20 flex-shrink-0"><CheckCircle2 className="w-3.5 h-3.5" /> {s === 'published' ? 'Published' : 'Delivered'} ✓</span>;
+                          if (s === 'approved' || s === 'in_progress') return <span className="flex items-center gap-1 text-[11px] text-blue-400 bg-blue-500/10 px-2.5 py-1.5 rounded-lg border border-blue-500/20 flex-shrink-0"><Sparkles className="w-3.5 h-3.5" /> In Progress</span>;
+                          if (s === 'brief_generated' || s === 'client_review') return <span className="flex items-center gap-1 text-[11px] text-purple-400 bg-purple-500/10 px-2.5 py-1.5 rounded-lg border border-purple-500/20 flex-shrink-0"><FileText className="w-3.5 h-3.5" /> In Review</span>;
+                          return <span className="flex items-center gap-1 text-[11px] text-blue-400 bg-blue-500/10 px-2.5 py-1.5 rounded-lg border border-blue-500/20 flex-shrink-0"><CheckCircle2 className="w-3.5 h-3.5" /> Brief Ordered</span>;
+                        })()
                       ) : (
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <button

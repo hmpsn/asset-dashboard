@@ -15,6 +15,18 @@ interface PageROI {
   position: number | null;
 }
 
+interface ContentItemROI {
+  requestId: string;
+  topic: string;
+  targetKeyword: string;
+  targetPageId: string;
+  targetPageSlug?: string;
+  status: string;
+  clicks: number;
+  impressions: number;
+  trafficValue: number;
+}
+
 interface ROIData {
   organicTrafficValue: number;
   adSpendEquivalent: number;
@@ -25,6 +37,7 @@ interface ROIData {
   avgCPC: number;
   trackedPages: number;
   contentROI: { totalContentSpend: number; totalContentValue: number; roi: number; postsPublished: number } | null;
+  contentItems: ContentItemROI[];
   computedAt: string;
 }
 
@@ -199,6 +212,67 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
               >
                 {showAllPages ? 'Show less' : `Show all ${data.pageBreakdown.length} pages`}
               </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Content ROI Attribution */}
+      {data.contentItems && data.contentItems.length > 0 && (
+        <div className="bg-zinc-900/60 rounded-xl border border-zinc-800 overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-zinc-800/60 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-emerald-400" />
+              <span className="text-xs font-semibold text-zinc-200">Content ROI Attribution</span>
+            </div>
+            <div className="flex items-center gap-3">
+              {data.contentROI && (
+                <>
+                  <span className="text-[10px] text-zinc-500">{data.contentROI.postsPublished} published</span>
+                  {data.contentROI.totalContentSpend > 0 && (
+                    <span className={`text-[10px] font-medium ${data.contentROI.roi > 0 ? 'text-emerald-400' : 'text-zinc-500'}`}>
+                      {data.contentROI.roi > 0 ? '+' : ''}{data.contentROI.roi.toFixed(0)}% ROI
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+          <div className="divide-y divide-zinc-800/40">
+            {data.contentItems.map((item) => (
+              <div key={item.requestId} className="px-5 py-3 hover:bg-zinc-800/20 transition-colors">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex-1 min-w-0 mr-4">
+                    <div className="text-xs font-medium text-zinc-200 truncate">{item.topic}</div>
+                    <div className="flex items-center gap-3 mt-0.5">
+                      <span className="text-[10px] text-teal-400/70">&ldquo;{item.targetKeyword}&rdquo;</span>
+                      {item.targetPageSlug && <span className="text-[10px] text-zinc-500 font-mono">{item.targetPageSlug}</span>}
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${item.status === 'published' ? 'bg-teal-500/10 text-teal-400' : 'bg-green-500/10 text-green-400'}`}>
+                        {item.status === 'published' ? 'Published' : 'Delivered'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <div className="text-xs font-bold text-emerald-300">{item.trafficValue > 0 ? fmtMoney(item.trafficValue) : '$0'}<span className="text-zinc-600 font-normal">/mo</span></div>
+                    <div className="flex items-center justify-end gap-2 mt-0.5">
+                      <span className="flex items-center gap-0.5 text-[10px] text-zinc-500">
+                        <MousePointerClick className="w-2.5 h-2.5" /> {item.clicks}
+                      </span>
+                      <span className="flex items-center gap-0.5 text-[10px] text-zinc-500">
+                        <Eye className="w-2.5 h-2.5" /> {item.impressions.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          {data.contentROI && data.contentROI.totalContentSpend > 0 && (
+            <div className="px-5 py-3 border-t border-zinc-800/60 bg-emerald-500/5">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-zinc-400">Content investment: <span className="text-zinc-300 font-medium">{fmtMoneyFull(data.contentROI.totalContentSpend)}</span></span>
+                <span className="text-zinc-400">Annualized traffic value: <span className="text-emerald-400 font-medium">{fmtMoneyFull(data.contentROI.totalContentValue)}</span></span>
+              </div>
             </div>
           )}
         </div>
