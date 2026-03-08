@@ -45,6 +45,9 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 | `server/stripe.ts` | Stripe SDK setup (lazy init from config), product config (14 types), checkout session creation, webhook handler (checkout.session.completed, payment_intent.payment_failed) |
 | `server/stripe-config.ts` | Encrypted on-disk persistence for Stripe keys + product Price IDs. AES-256-GCM encryption. Falls back to env vars for CI/Docker. |
 | `server/payments.ts` | Payment record CRUD (JSON on disk), per-workspace payment history, lookup by session ID |
+| `server/users.ts` | Internal user model (owner/admin/member), bcrypt hashing (12 rounds), CRUD, `verifyPassword`, JSON-on-disk persistence in `auth/users.json` |
+| `server/auth.ts` | JWT sign/verify (7-day expiry), Express middleware: `requireAuth`, `requireRole`, `requireWorkspaceAccess`, `optionalAuth`. Augments `Express.Request` with `user` and `jwtPayload` |
+| `server/client-users.ts` | Client user model (client_owner/client_member), per-workspace accounts, bcrypt hashing, JWT (24h expiry), CRUD, `verifyClientPassword`, `signClientToken`/`verifyClientToken` |
 
 ## Key Frontend Components
 
@@ -89,9 +92,14 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 
 - **Helmet**: Security headers on all responses. CSP whitelists `js.stripe.com`, `api.stripe.com`, `hooks.stripe.com` in production. Disabled in dev for Vite HMR.
 - **HTTPS enforcement**: 301 redirect for non-HTTPS in production. Trusts `X-Forwarded-Proto` from proxy (Render/Heroku).
-- **Rate limiting**: In-memory per-IP+path. 3 tiers: 60 req/min on all public routes, 10/min on writes (POST/PATCH/DELETE), 5/min on checkout (pre-wired).
-- **Auth**: Admin — `APP_PASSWORD` env → HMAC token in httpOnly cookie. Client — per-workspace password → HMAC session cookie. Both use timing-safe compare.
-- **Session enforcement**: `/api/public/*` routes check client session cookie for password-protected workspaces.
+- **Rate limiting**: In-memory per-IP+path. 3 tiers: 60 req/min on all public routes, 10/min on writes (POST/PATCH/DELETE), 5/min on checkout/login.
+- **Auth (dual system, backward compatible)**:
+  - **Legacy admin**: `APP_PASSWORD` env → HMAC token in httpOnly cookie. Global middleware gates all `/api` routes.
+  - **Internal user JWT**: `server/auth.ts` — bcrypt + JWT (7-day expiry). `optionalAuth` runs globally to populate `req.user`. Global middleware accepts JWT tokens alongside legacy `APP_PASSWORD`.
+  - **Client user JWT**: `server/client-users.ts` — per-workspace bcrypt + JWT (24h expiry). Stored in `client_user_token_<wsId>` cookie.
+  - **Client shared password**: per-workspace `clientPassword` → HMAC session cookie (legacy, still supported alongside client user JWT).
+- **Middleware stack**: `optionalAuth` (global) → `requireAuth` → `requireRole(…)` → `requireWorkspaceAccess(paramName)`. Workspace access soft-enforces for JWT users; passes through for legacy auth.
+- **Session enforcement**: `/api/public/*` routes check client session cookie OR client user JWT for password-protected workspaces.
 - **Input sanitization**: `sanitizeString()` (trim, length limit, strip control chars) + `validateEnum()` on all content request write endpoints.
 - **CORS**: Configurable via `ALLOWED_ORIGINS` env var. Defaults to allow-all in dev.
 
@@ -108,6 +116,6 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 - `MONETIZATION.md` — Full monetization strategy: tiers, products (8 page types), bundles, UX soft-gating spec, trial strategy, inline pricing, ROI dashboard, churn signals, credits system, white-label resale, Stripe integration spec
 - `ACTION_PLAN.md` — Prioritized execution plan, 67 items across 10 sprints, decision log
 - `AI_CHATBOT_ROADMAP.md` — Chatbot phases, shipped and planned
-- `AUTH_ROADMAP.md` — Authentication/authorization phases
+- `AUTH_ROADMAP.md` — Authentication/authorization phases (Phases 1, 2, 4 shipped)
 - `DESIGN_SYSTEM.md` — UI primitives and design tokens
 - `data/roadmap.json` — Sprint-level tracking with item statuses (67 items, managed via /api/roadmap)

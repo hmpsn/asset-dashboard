@@ -479,6 +479,39 @@ A brief value assessment of every feature in the platform, covering what it does
 
 ---
 
+### 45. Internal User Accounts
+**What it does:** Full user account system for internal team members. `server/users.ts` provides a User model with id, email, name, passwordHash, role (owner/admin/member), and workspaceIds. Passwords hashed with bcrypt (12 rounds). `server/auth.ts` provides JWT authentication (7-day expiry) with Express middleware: `requireAuth` (enforces valid JWT), `requireRole(…)` (role-based access), `requireWorkspaceAccess()` (workspace-scoped permissions), and `optionalAuth` (non-blocking, runs globally). First user created via `/api/auth/setup` becomes the owner with access to all workspaces. Full CRUD: create, update, delete users, change passwords. The global admin middleware accepts both legacy `APP_PASSWORD` tokens and new JWT tokens for backward compatibility. Setup status endpoint lets the frontend detect first-run.
+
+**Agency value:** Named user accounts replace the shared password. Every action can be attributed to a specific team member. Role hierarchy (owner > admin > member) controls who can manage workspaces, users, and settings.
+
+**Client value:** N/A — internal agency tool.
+
+**Mutual:** Foundation for all future auth features. Activity attribution, audit trails, and access control all depend on knowing who is logged in.
+
+---
+
+### 46. Workspace Access Control
+**What it does:** `requireWorkspaceAccess(paramName)` middleware in `server/auth.ts` checks that the authenticated user's `workspaceIds` array includes the workspace being accessed. Owners bypass all checks. Applied to GET/PATCH/DELETE `/api/workspaces/:id` routes. Soft enforcement: passes through for legacy `APP_PASSWORD` auth (no `req.user`), enforces only for JWT-authenticated users. `optionalAuth` runs globally to populate `req.user` from JWT when present, enabling workspace access checks on all routes without breaking existing flows.
+
+**Agency value:** Team members only see and modify the workspaces they're assigned to. Prevents accidental cross-client data access as the team grows.
+
+**Client value:** N/A — internal access control.
+
+**Mutual:** Security boundary that scales with team size. Essential before onboarding contractors or junior team members.
+
+---
+
+### 47. Client User Accounts
+**What it does:** Individual login accounts for client dashboard users, separate from internal team accounts. `server/client-users.ts` provides a ClientUser model with id, email, name, passwordHash, role (client_owner/client_member), workspaceId, and invitedBy. Per-workspace email uniqueness. Passwords hashed with bcrypt (12 rounds). Client JWT tokens (24h expiry) stored in per-workspace cookies (`client_user_token_<wsId>`). Public endpoints: `/api/public/client-login/:id` (email+password login), `/api/public/client-me/:id` (get current user), `/api/public/client-logout/:id`, `/api/public/auth-mode/:id` (check shared password vs individual accounts). Admin endpoints: `/api/workspaces/:id/client-users` CRUD for managing client users with workspace access control. Client login also sets the legacy session cookie for backward compatibility with the existing session enforcement middleware. Session middleware updated to accept client user JWT tokens alongside shared-password sessions.
+
+**Agency value:** Invite individual client team members with their own credentials. See who submitted which request, who approved what. Professional multi-user access replaces "everyone uses the same password."
+
+**Client value:** Individual logins mean personal dashboards, attributed actions, and proper team management. Marketing directors, content managers, and developers each have their own access.
+
+**Mutual:** Transforms the client portal from a shared-password view into a proper multi-user platform. Every action has a name attached. Foundation for role-based client permissions (client_owner vs client_member).
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
@@ -489,11 +522,12 @@ A brief value assessment of every feature in the platform, covering what it does
 | Client Communication | 6 | Structured workflows + automated reports replace email chaos |
 | Client Self-Service | 6 | 24/7 data access reduces reporting overhead |
 | AI & Intelligence | 3 | Full-spectrum AI advisor + revenue engine + knowledge base + memory |
+| Auth & Access Control | 3 | Internal user accounts, workspace ACL, client user accounts |
 | Security | 1 | Helmet, HTTPS, rate limiting, input sanitization |
 | Monetization | 1 | Stripe Checkout, admin settings, payment tracking, encrypted config |
 | Platform & UX | 7 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home |
 
-**44 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**47 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
 ---
 
@@ -609,4 +643,4 @@ When the user asks to update this document with recent features, follow this pro
 7. **Update Summary table**: Adjust category counts and total feature count.
 8. **Commit**: `git add FEATURE_AUDIT.md && git commit -m "docs: update FEATURE_AUDIT with recent features"`
 
-Current feature count: **43**. Last updated: March 7, 2026.
+Current feature count: **47**. Last updated: March 7, 2026.

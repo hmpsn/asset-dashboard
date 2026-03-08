@@ -71,50 +71,47 @@ User {
 
 ## Implementation Phases
 
-### Phase 1: Internal User Accounts (Priority: HIGH)
-**Estimated effort: 6-8 hours**
+### ~~Phase 1: Internal User Accounts~~ ✅ SHIPPED
+**Shipped: March 7, 2026**
 
-The foundation. Everything else depends on individual identity.
+#### What was built
+- [x] `server/users.ts` — User model (id, email, name, passwordHash, role, workspaceIds), bcrypt (12 rounds), CRUD, JSON persistence in `auth/users.json`
+- [x] `server/auth.ts` — JWT sign/verify (7-day expiry), `requireAuth`, `requireRole`, `optionalAuth` middleware, Express Request augmentation
+- [x] `POST /api/auth/setup` — first user creation (becomes owner with all workspaces)
+- [x] `GET /api/auth/setup-status` — detect first-run
+- [x] `POST /api/auth/user-login` — email + password → JWT + httpOnly cookie
+- [x] `GET /api/auth/me` — current authenticated user
+- [x] `POST /api/auth/user-logout` — clear JWT cookie
+- [x] `GET/POST /api/users` — list/create users (admin+)
+- [x] `GET/PATCH /api/users/:id` — get/update user (admin+)
+- [x] `POST /api/users/:id/password` — change password (self or admin)
+- [x] `DELETE /api/users/:id` — delete user (owner only)
+- [x] Global admin middleware accepts both legacy `APP_PASSWORD` and JWT tokens
+- [x] Roles: owner, admin, member
 
-#### Backend
-- [ ] Create `users.ts` data module (JSON file storage, like workspaces)
-- [ ] `bcrypt` password hashing for stored credentials
-- [ ] JWT or session-based auth replacing the single shared password
-- [ ] Auth middleware rewrite: validate JWT/session → attach `req.user`
-- [ ] `/api/auth/login` — email + password → JWT + httpOnly cookie
-- [ ] `/api/auth/me` — return current user profile
-- [ ] `/api/auth/logout` — clear session
-- [ ] Seed the initial superadmin account (you) on first boot from env vars
-- [ ] Migrate existing `APP_PASSWORD` users to a transitional login flow
-
-#### Frontend
+#### Still TODO (frontend)
 - [ ] Login screen with email/password (replaces single password field)
 - [ ] User context provider — `useCurrentUser()` hook
 - [ ] Display current user name in sidebar/header
 - [ ] Protect routes by role
-
-#### Activity log enrichment
-- [ ] Every activity log entry includes `userId` and `userName`
-- [ ] "Josh ran an audit on ClientX" instead of "Audit ran on ClientX"
-
-**Why this is #1:** Every subsequent feature depends on knowing *who* is performing actions. Without this, nothing else works.
+- [ ] Activity log enrichment (userId/userName on every entry)
 
 ---
 
-### Phase 2: Workspace Access Control (Priority: HIGH)
-**Estimated effort: 3-4 hours**
+### ~~Phase 2: Workspace Access Control~~ ✅ SHIPPED
+**Shipped: March 7, 2026**
 
-#### Backend
-- [ ] Workspace access check middleware: `requireWorkspaceAccess(workspaceId, minRole)`
-- [ ] API endpoints enforce workspace membership — no more "any admin sees everything"
-- [ ] Superadmin bypasses all workspace checks
+#### What was built
+- [x] `requireWorkspaceAccess(paramName)` middleware in `server/auth.ts`
+- [x] Checks `user.workspaceIds` against route param; owners bypass all checks
+- [x] Applied to GET/PATCH/DELETE `/api/workspaces/:id`
+- [x] Soft enforcement: passes through for legacy `APP_PASSWORD` auth, enforces for JWT users
+- [x] `optionalAuth` runs globally to populate `req.user` from JWT
 
-#### Frontend
+#### Still TODO (frontend)
 - [ ] Sidebar only shows workspaces the user has access to
 - [ ] Workspace settings restricted to `owner` role
 - [ ] Visual indicator of role (e.g., "Editor" badge next to workspace name)
-
-**Why this is #2:** Necessary before onboarding any team member. You don't want a contractor seeing all client data.
 
 ---
 
@@ -137,32 +134,27 @@ The foundation. Everything else depends on individual identity.
 
 ---
 
-### Phase 4: Client User Accounts (Priority: HIGH)
-**Estimated effort: 6-8 hours**
+### ~~Phase 4: Client User Accounts~~ ✅ SHIPPED
+**Shipped: March 7, 2026**
 
-Replace the shared workspace password with individual client accounts.
+#### What was built
+- [x] `server/client-users.ts` — separate model from internal users (client_owner/client_member roles)
+- [x] Per-workspace email uniqueness, bcrypt (12 rounds), JWT (24h expiry)
+- [x] `POST /api/public/client-login/:id` — email + password → JWT + legacy session cookie
+- [x] `GET /api/public/client-me/:id` — current client user from token
+- [x] `POST /api/public/client-logout/:id` — clear cookies
+- [x] `GET /api/public/auth-mode/:id` — check shared password vs individual accounts
+- [x] Admin CRUD: `GET/POST /api/workspaces/:id/client-users`, `PATCH/:userId`, `DELETE/:userId`, password change
+- [x] Client session middleware updated to accept client user JWT alongside shared-password sessions
+- [x] Public workspace info includes `hasClientUsers` flag
+- [x] Backward compatibility: shared password still works as fallback
 
-#### Backend
-- [ ] Client user model (same `users.ts` module, `client_admin` / `client_member` roles)
-- [ ] `/api/public/auth/login` — client email + password → session cookie scoped to workspace
-- [ ] `/api/public/auth/register` — invite-only registration (token from email)
-- [ ] `/api/public/users/:workspaceId` — list team members (client_admin only)
-- [ ] `/api/public/users/:workspaceId/invite` — invite team member (client_admin only)
-- [ ] `/api/public/users/:workspaceId/:userId` — remove team member (client_admin only)
-- [ ] Backward compatibility: keep shared password as a fallback during migration
-
-#### Frontend (Client Portal)
+#### Still TODO (frontend)
 - [ ] Client login page: email + password (replaces single password field)
 - [ ] "Forgot password" flow
-- [ ] Team management section for client_admin:
-  - Invite member by email
-  - View team list
-  - Remove member
-  - See last login dates
+- [ ] Team management section for client_admin (invite, list, remove)
 - [ ] User profile: name, email, notification preferences
-- [ ] `submittedBy` auto-populated from logged-in user (no more freeform text)
-
-**Why this is high:** Unlocks the entire team collaboration value prop for clients.
+- [ ] `submittedBy` auto-populated from logged-in user
 
 ---
 
@@ -290,4 +282,5 @@ Realistically, Phases 1 + 2 + 4 (the critical path) = **15-20 hours** of focused
 ---
 
 *Created: March 7, 2026*
-*Status: Planning — not yet started*
+*Last updated: March 7, 2026*
+*Status: Phases 1, 2, 4 backend shipped. Frontend integration + Phases 3, 5, 6 pending.*

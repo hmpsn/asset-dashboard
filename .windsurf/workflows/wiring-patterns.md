@@ -78,6 +78,40 @@ All GSC and GA4 data fetching supports optional `startDate`/`endDate` query para
 - Call `addActivity(workspaceId, type, title, detail, metadata?)` at the relevant endpoint
 - Activities show in the client dashboard Activity tab and admin Workspace Home
 
+## 8. Auth & User Identity
+
+When adding new endpoints or modifying existing ones, follow these patterns for auth integration:
+
+### Protecting admin routes
+```typescript
+// Any logged-in internal user
+app.get('/api/my-route', requireAuth, handler);
+
+// Role-restricted (admin or owner only)
+app.post('/api/my-route', requireAuth, requireRole('admin', 'owner'), handler);
+
+// Workspace-scoped (checks user.workspaceIds)
+app.get('/api/workspaces/:id/data', requireWorkspaceAccess(), handler);
+```
+
+### Accessing current user in handlers
+- `req.user` — populated by `optionalAuth` (global) or `requireAuth`. Contains `SafeUser` (no passwordHash).
+- `req.user?.id`, `req.user?.name`, `req.user?.role`, `req.user?.workspaceIds`
+- Always check `req.user` existence before accessing properties (may be `undefined` if only legacy auth)
+
+### Client user identity
+- Client user JWT is in `client_user_token_<wsId>` cookie
+- Use `verifyClientToken(token)` to get `{ clientUserId, email, role, workspaceId }`
+- Use `getSafeClientUser(id)` to get full client user profile
+
+### Adding user attribution to features
+1. Check `req.user` in the handler
+2. Pass `userId`/`userName` to `addActivity()` metadata
+3. Store `userId` on any records that should track authorship (requests, approvals, comments)
+
+### Reference
+See `.windsurf/workflows/auth-system.md` for full auth system documentation including all endpoints, middleware stack, and common tasks.
+
 ## Caching Pattern
 
 For expensive cross-API data (e.g., audit + traffic):
