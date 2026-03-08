@@ -8,9 +8,9 @@ export type ProductType =
   | 'brief_blog' | 'brief_landing' | 'brief_service' | 'brief_location'
   | 'brief_product' | 'brief_pillar' | 'brief_resource'
   | 'post_draft' | 'post_polished' | 'post_premium'
-  | 'schema_page' | 'schema_site'
+  | 'schema_page' | 'schema_10'
   | 'strategy' | 'strategy_refresh'
-  | 'fix_meta' | 'fix_alt' | 'fix_redirect' | 'fix_meta_sweep'
+  | 'fix_meta' | 'fix_alt' | 'fix_redirect' | 'fix_meta_10'
   | 'plan_growth' | 'plan_premium';
 
 export interface PaymentRecord {

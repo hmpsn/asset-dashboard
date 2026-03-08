@@ -157,12 +157,12 @@ AI generates fixes, published programmatically via Webflow API. Minimal human to
 
 | Product | Price | API Method | Agency Cost | Margin | What's Delivered |
 |---------|:-----:|-----------|:-----------:|:------:|------------------|
-| **Metadata Optimization** | $29/page | Page PATCH | ~$0.05 tokens + 5min | ~90% | AI-optimized title, meta description, OG tags — published to Webflow |
+| **Metadata Optimization** | $20/page | Page PATCH | ~$0.05 tokens + 5min | ~90% | AI-optimized title, meta description, OG tags — published to Webflow |
 | **Alt Text Optimization** | $19/page | Asset PATCH | ~$0.03 tokens (GPT-4o-mini vision) | ~95% | AI-generated context-aware alt text, written back to Webflow asset |
 | **Redirect Fix** | $19/redirect | CSV export | ~2min labor | ~90% | 301 redirect rule exported in Webflow-compatible CSV format |
-| **Full Metadata Sweep** | $199 flat | Batch Page PATCH | ~$1 tokens + 45min | ~85% | Titles + descriptions optimized for all pages |
+| **Metadata Pack (10pg)** | $179 | Batch Page PATCH | ~$0.50 tokens + 30min | ~85% | Titles + descriptions optimized for 10 pages (save $21 vs individual) |
 | **Schema — Per Page** | $39/page | Custom Code API | ~$0.10 tokens + 5min | ~95% | JSON-LD schema generated, validated, and published |
-| **Schema — Full Site** | $249 flat | Custom Code API | ~$2–5 tokens + 30min | ~90% | Schema for all pages, generated + published |
+| **Schema Pack (10pg)** | $299 | Custom Code API | ~$1 tokens + 20min | ~90% | Schema for 10 pages, generated + published (save $91 vs individual) |
 
 > **Why these are API-safe:** Meta titles, descriptions, and OG tags are editable via Webflow's Page PATCH endpoint. Alt text writes back via Asset PATCH API (already built — GPT-4o-mini vision + bulk generation + NDJSON streaming). Schema publishes via Custom Code API (already built). Redirects export as CSV for import in Webflow Settings → Hosting → 301 Redirects.
 
@@ -226,10 +226,10 @@ Client visits Site Health tab
 
 #### Smart Bundle Pricing
 
-When a client selects multiple automated fixes of the same type, auto-offer a bundle discount:
-- 5-9 pages: 15% off per-page rate
-- 10-19 pages: 25% off per-page rate
-- 20+ pages: suggest Full Metadata Sweep ($199) or Full-Site Schema ($249) instead
+When a client selects multiple automated fixes of the same type, auto-offer the 10-page pack:
+- 1-9 pages: per-page rate ($20 meta, $39 schema, $19 alt text)
+- 10+ pages: suggest pack purchase — Metadata Pack ($179/10pg) or Schema Pack ($299/10pg)
+- Need more than 10? Buy multiple packs or upgrade to Premium
 
 For manual implementation (Product B), there is no self-service bundling — it’s always a custom quote.
 
@@ -239,8 +239,8 @@ For manual implementation (Product B), there is no self-service bundling — it�
 |--------|--------|---------|
 | AI generates recommendations | Free | Free |
 | View recommendations in dashboard | Free | Free |
-| Metadata optimization | $29/page (cart) | Included in 3 hrs |
-| Schema generation + publishing | $39/page (cart) | Included in 3 hrs |
+| Metadata optimization | $20/page or $179/10pg (cart) | Included in 3 hrs |
+| Schema generation + publishing | $39/page or $299/10pg (cart) | Included in 3 hrs |
 | Redirect fixes | $19/redirect (cart) | Included in 3 hrs |
 | Alt text optimization | $19/page (cart) | Included in 3 hrs |
 | Heading, link, layout fixes | Contact for quote (Designer access) | Included in 3 hrs* |
@@ -264,7 +264,7 @@ Premium clients receive a **10% discount on all content purchases** (briefs and 
 | Product | Price | Agency Cost | Margin |
 |---------|:-----:|:-----------:|:------:|
 | Per-page schema (generate + publish) | $39/page | ~$0.10 tokens | ~95% |
-| Full-site schema package (all pages) | $249 flat | ~$2–5 tokens | ~95% |
+| Schema Pack (10 pages) | $299 | ~$1 tokens | ~90% |
 
 ### Keyword Strategy
 
