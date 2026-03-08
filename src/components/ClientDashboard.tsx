@@ -157,6 +157,13 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
     upgradeReqId?: string;
   } | null>(null);
   const [pricingConfirming, setPricingConfirming] = useState(false);
+  // Inline pricing data from server
+  const [pricingData, setPricingData] = useState<{
+    products: Record<string, { displayName: string; price: number; category: string; enabled: boolean }>;
+    bundles: { id: string; name: string; monthlyPrice: number; includes: string[]; savings: string }[];
+    currency: string;
+    stripeEnabled: boolean;
+  } | null>(null);
   // Stripe Elements inline payment modal state
   const [stripePayment, setStripePayment] = useState<{
     clientSecret: string;
@@ -319,6 +326,8 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
     if (data.seoClientView) {
       fetch(`/api/public/seo-strategy/${data.id}`).then(r => r.ok ? r.json() : null).then(s => { if (s) setStrategyData(s); }).catch(() => {});
     }
+    // Load product pricing for inline price display
+    fetch(`/api/public/pricing/${data.id}`).then(r => r.ok ? r.json() : null).then(p => { if (p) setPricingData(p); }).catch(() => {});
     // Always load content requests (powers the Content tab independently)
     fetch(`/api/public/content-requests/${data.id}`).then(r => r.ok ? r.json() : []).then((reqs: ClientContentRequest[]) => {
       if (Array.isArray(reqs) && reqs.length > 0) {
@@ -947,6 +956,11 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
   const unreadTeamNotes = requests.filter(r => r.notes.length > 0 && r.notes[r.notes.length - 1].author === 'team' && r.status !== 'completed' && r.status !== 'closed').length;
 
   const effectiveTier: Tier = (ws?.tier as Tier) || 'free';
+  // Inline price helpers — prefer pricingData (from Stripe config), fall back to ws.contentPricing
+  const pCurrency = pricingData?.currency || ws?.contentPricing?.currency || 'USD';
+  const fmtPrice = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: pCurrency, minimumFractionDigits: 0 }).format(n);
+  const briefPrice = pricingData?.products?.brief_blog?.price ?? ws?.contentPricing?.briefPrice ?? null;
+  const fullPostPrice = pricingData?.products?.post_polished?.price ?? ws?.contentPricing?.fullPostPrice ?? null;
   const strategyLocked = !ws?.seoClientView;
   const NAV = [
     { id: 'overview' as ClientTab, label: 'Insights', icon: Sparkles, locked: false },
@@ -1626,14 +1640,14 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 font-medium hover:bg-teal-600/40 transition-all"
                                   >
                                     <FileText className="w-3 h-3" /> Get a Brief
-                                    {ws?.contentPricing && <span className="text-[11px] opacity-70 ml-0.5">{new Intl.NumberFormat('en-US', { style: 'currency', currency: ws.contentPricing.currency || 'USD', minimumFractionDigits: 0 }).format(ws.contentPricing.briefPrice)}</span>}
+                                    {briefPrice != null && <span className="text-[11px] opacity-70 ml-0.5">{fmtPrice(briefPrice)}</span>}
                                   </button>
                                   <button
                                     onClick={() => setPricingModal({ serviceType: 'full_post', topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, source: 'strategy' })}
                                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600/30 to-teal-600/30 border border-blue-500/30 text-[11px] text-blue-200 font-medium hover:from-blue-600/50 hover:to-teal-600/50 transition-all"
                                   >
                                     <Sparkles className="w-3 h-3" /> Get Full Post
-                                    {ws?.contentPricing && <span className="text-[11px] opacity-70 ml-0.5">{new Intl.NumberFormat('en-US', { style: 'currency', currency: ws.contentPricing.currency || 'USD', minimumFractionDigits: 0 }).format(ws.contentPricing.fullPostPrice)}</span>}
+                                    {fullPostPrice != null && <span className="text-[11px] opacity-70 ml-0.5">{fmtPrice(fullPostPrice)}</span>}
                                   </button>
                                 </div>
                               )}
@@ -2239,7 +2253,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                           >
                             <Sparkles className="w-3.5 h-3.5" />
                             Upgrade to Full Post
-                            {ws?.contentPricing && <span className="text-[11px] opacity-70 ml-0.5">+{new Intl.NumberFormat('en-US', { style: 'currency', currency: ws.contentPricing.currency || 'USD', minimumFractionDigits: 0 }).format(Math.max(0, ws.contentPricing.fullPostPrice - ws.contentPricing.briefPrice))}</span>}
+                            {briefPrice != null && fullPostPrice != null && <span className="text-[11px] opacity-70 ml-0.5">+{fmtPrice(Math.max(0, fullPostPrice - briefPrice))}</span>}
                           </button>
                         </div>
                       )}
@@ -3356,12 +3370,13 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         const pricing = ws?.contentPricing;
         const isUpgrade = pricingModal.source === 'upgrade';
         const isFull = pricingModal.serviceType === 'full_post';
-        const price = pricing ? (isFull ? pricing.fullPostPrice : pricing.briefPrice) : null;
-        const upgradePrice = isUpgrade && pricing ? Math.max(0, pricing.fullPostPrice - pricing.briefPrice) : null;
+        const price = isFull ? fullPostPrice : briefPrice;
+        const upgradePrice = isUpgrade && briefPrice != null && fullPostPrice != null ? Math.max(0, fullPostPrice - briefPrice) : null;
         const displayPrice = isUpgrade ? upgradePrice : price;
-        const currency = pricing?.currency || 'USD';
-        const fmt = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency, minimumFractionDigits: 0 }).format(n);
+        const fmt = fmtPrice;
         const accentColor = isFull ? 'blue' : 'teal';
+        // Bundle savings callout
+        const showBundleSavings = !isUpgrade && pricingData?.bundles && pricingData.bundles.length > 0;
 
         const briefIncludes = [
           'SEO-optimized content strategy',
@@ -3457,6 +3472,17 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                   <div className="text-[11px] text-zinc-500 mt-3 leading-relaxed pl-6">{isFull ? pricing.fullPostDescription : pricing.briefDescription}</div>
                 )}
               </div>
+
+              {/* Bundle savings callout */}
+              {showBundleSavings && (
+                <div className="mx-6 mb-1 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-violet-500/5 to-blue-500/5 border border-violet-500/15">
+                  <div className="text-[10px] text-violet-300 font-semibold uppercase tracking-wider mb-1">Save with a bundle</div>
+                  <div className="text-[11px] text-zinc-400 leading-relaxed">
+                    {pricingData!.bundles[0].name} — <span className="text-violet-300 font-medium">{fmtPrice(pricingData!.bundles[0].monthlyPrice)}/mo</span>
+                    {' · '}{pricingData!.bundles[0].savings}
+                  </div>
+                </div>
+              )}
 
               {/* Actions */}
               <div className="px-6 pb-5 space-y-3">

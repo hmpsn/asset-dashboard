@@ -4434,6 +4434,33 @@ app.get('/api/public/tier/:id', (req, res) => {
   });
 });
 
+// Public pricing endpoint — returns product prices for a workspace
+app.get('/api/public/pricing/:id', (req, res) => {
+  const ws = getWorkspace(req.params.id);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const products = listProducts();
+  const pricing = ws.contentPricing;
+  // Merge per-workspace overrides on top of Stripe product config
+  const priceMap: Record<string, { displayName: string; price: number; category: string; enabled: boolean }> = {};
+  for (const p of products) {
+    priceMap[p.type] = { displayName: p.displayName, price: p.priceUsd, category: p.category, enabled: !!p.stripePriceId };
+  }
+  // Apply workspace content pricing overrides for brief/post
+  if (pricing) {
+    for (const key of Object.keys(priceMap)) {
+      if (key.startsWith('brief_') && pricing.briefPrice) priceMap[key].price = pricing.briefPrice;
+    }
+    if (priceMap['post_polished'] && pricing.fullPostPrice) priceMap['post_polished'].price = pricing.fullPostPrice;
+  }
+  // Bundle definitions
+  const bundles = [
+    { id: 'content_starter', name: 'Content Starter', monthlyPrice: 500, includes: ['2 content briefs', '1 polished blog post'], savings: 'Save ~15% vs individual pricing' },
+    { id: 'content_engine', name: 'Content Engine', monthlyPrice: 1500, includes: ['4 content briefs', '3 polished blog posts', '1 keyword strategy refresh'], savings: 'Save ~25% vs individual pricing' },
+    { id: 'full_service', name: 'Full Service SEO', monthlyPrice: 3500, includes: ['Unlimited briefs', '6 polished blog posts', 'Full keyword strategy', 'Schema site-wide', 'Monthly audit'], savings: 'Best value — all-inclusive' },
+  ];
+  res.json({ products: priceMap, bundles, currency: pricing?.currency || 'USD', stripeEnabled: isStripeConfigured() });
+});
+
 const clientLoginLimiter = rateLimit(60 * 1000, 5); // 5 attempts per minute per IP
 app.post('/api/public/auth/:id', clientLoginLimiter, (req, res) => {
   const ws = getWorkspace(req.params.id);
