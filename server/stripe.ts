@@ -55,7 +55,7 @@ const PRODUCT_MAP: Record<ProductType, { displayName: string; category: ProductC
   fix_redirect:     { displayName: 'Redirect Fix',            category: 'fix',      priceUsd: 19,   envKey: 'STRIPE_PRICE_FIX_REDIRECT' },
   fix_meta_sweep:   { displayName: 'Full Metadata Sweep',     category: 'fix',      priceUsd: 199,  envKey: 'STRIPE_PRICE_FIX_META_SWEEP' },
   fix_audit_5:      { displayName: 'Audit Fix Bundle (5pg)',   category: 'fix',      priceUsd: 99,   envKey: 'STRIPE_PRICE_FIX_AUDIT_5' },
-  fix_audit_all:    { displayName: 'Audit Fix Bundle (all)',   category: 'fix',      priceUsd: 299,  envKey: 'STRIPE_PRICE_FIX_AUDIT_ALL' },
+  fix_audit_10:     { displayName: 'Audit Fix Bundle (10pg)',  category: 'fix',      priceUsd: 179,  envKey: 'STRIPE_PRICE_FIX_AUDIT_10' },
   plan_growth:      { displayName: 'Growth Plan',              category: 'strategy', priceUsd: 249,  envKey: 'STRIPE_PRICE_PLAN_GROWTH' },
   plan_premium:     { displayName: 'Premium Plan',             category: 'strategy', priceUsd: 999,  envKey: 'STRIPE_PRICE_PLAN_PREMIUM' },
 };

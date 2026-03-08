@@ -167,7 +167,9 @@ Growth clients don't have implementation hours — they purchase technical SEO f
 | **Full-Site Schema Package** | $249 flat | ~$2–5 tokens + 30min | ~90% | Schema for all pages, generated + published |
 | **Full Metadata Sweep** | $199 flat | ~$1 tokens + 45min | ~85% | Titles + descriptions optimized for all pages |
 | **Audit Fix Bundle (5 pages)** | $99 | ~$0.50 tokens + 20min | ~85% | Fix all critical audit issues on 5 highest-priority pages |
-| **Audit Fix Bundle (all pages)** | $299 | ~$2 tokens + 1-2hr | ~75% | Fix all critical audit issues site-wide |
+| **Audit Fix Bundle (10 pages)** | $179 | ~$1 tokens + 40min | ~80% | Fix all critical audit issues on 10 highest-priority pages |
+
+> **No uncapped "fix all" option.** Sites can have hundreds of pages. Bundles of 5 and 10 keep scope manageable and margins healthy. Clients with large sites buy multiple bundles or upgrade to Premium where implementation hours cover the work.
 
 #### How the Cart Works (UX Flow)
 
@@ -216,12 +218,11 @@ The cart is fed from multiple recommendation sources across the dashboard:
 
 #### Smart Bundle Pricing
 
-When a client selects 5+ items of the same type, auto-offer a bundle discount:
+When a client selects multiple items of the same type, auto-offer a bundle discount:
 - 5-9 pages: 15% off per-page rate
-- 10-19 pages: 25% off per-page rate
-- 20+ pages: flat site-wide package price
+- 10+ pages: 25% off per-page rate (capped at 10 pages per bundle)
 
-This incentivizes larger purchases while keeping per-item pricing transparent.
+No uncapped "fix everything" option. Clients with large sites buy multiple bundles or upgrade to Premium. This keeps scope predictable and margins healthy.
 
 #### Premium vs Growth: Technical SEO Pricing
 
@@ -233,8 +234,18 @@ This incentivizes larger purchases while keeping per-item pricing transparent.
 | Schema generation + publishing | $39/page (cart) | Included in 3 hrs |
 | Redirect fixes | $19/redirect (cart) | Included in 3 hrs |
 | Alt text optimization | $19/page (cart) | Included in 3 hrs |
-| Content briefs | $75-350 (purchase) | $75-350 (purchase) |
-| Full content posts | $250-2,500 (purchase) | $250-2,500 (purchase) |
+| Content briefs | $75-350 (purchase) | **10% off** — $68-315 |
+| Full content posts | $250-2,500 (purchase) | **10% off** — $225-2,250 |
+
+#### Premium Content Discount (10%)
+
+Premium clients receive a **10% discount on all content purchases** (briefs and full posts). This:
+- Rewards commitment to the $999/mo tier
+- Incentivizes content purchasing over DIY
+- Creates a visible perk beyond implementation hours
+- Still maintains strong margins (85%+ on briefs, 55%+ on premium posts)
+
+**Implementation:** Apply discount at checkout time based on workspace `tier`. Display original price with strikethrough + discounted price in the content purchase flow. Example: ~~$125~~ **$113** for a blog brief.
 
 ### Schema Generation (Legacy — now part of Technical SEO Products)
 

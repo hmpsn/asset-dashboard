@@ -11,7 +11,7 @@ export type ProductType =
   | 'schema_page' | 'schema_site'
   | 'strategy' | 'strategy_refresh'
   | 'fix_meta' | 'fix_alt' | 'fix_redirect'
-  | 'fix_meta_sweep' | 'fix_audit_5' | 'fix_audit_all'
+  | 'fix_meta_sweep' | 'fix_audit_5' | 'fix_audit_10'
   | 'plan_growth' | 'plan_premium';
 
 export interface PaymentRecord {

@@ -44,7 +44,7 @@ const DEFAULT_PRODUCTS: StripeProduct[] = [
   { productType: 'fix_redirect',     displayName: 'Redirect Fix',         priceUsd: 19,   stripePriceId: '', enabled: true },
   { productType: 'fix_meta_sweep',   displayName: 'Full Metadata Sweep',  priceUsd: 199,  stripePriceId: '', enabled: true },
   { productType: 'fix_audit_5',      displayName: 'Audit Fix Bundle (5pg)', priceUsd: 99,  stripePriceId: '', enabled: true },
-  { productType: 'fix_audit_all',    displayName: 'Audit Fix Bundle (all)', priceUsd: 299, stripePriceId: '', enabled: true },
+  { productType: 'fix_audit_10',     displayName: 'Audit Fix Bundle (10pg)', priceUsd: 179, stripePriceId: '', enabled: true },
 ];
 
 export function StripeSettings() {
