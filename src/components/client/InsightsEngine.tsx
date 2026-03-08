@@ -428,7 +428,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                     const effortBadge = EFFORT_BADGE[rec.effort];
                     const isRecExpanded = expandedRecs.has(rec.id);
                     const isCompleted = rec.status === 'completed';
-                    const inCart = rec.productType && cart.items.some(i => i.productType === rec.productType);
+                    const inCart = rec.productType && cart?.items.some(i => i.productType === rec.productType);
 
                     return (
                       <div key={rec.id} className={`border-b border-zinc-800/20 last:border-b-0 ${isCompleted ? 'opacity-50' : ''}`}>
@@ -567,7 +567,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                                   {/* Growth/Free: purchase CTA or action guidance */}
                                   {rec.productType && rec.productPrice && !inCart ? (
                                     <button
-                                      onClick={() => cart.addItem({
+                                      onClick={() => cart?.addItem({
                                         productType: rec.productType as ProductType,
                                         displayName: rec.title,
                                         priceUsd: rec.productPrice!,
