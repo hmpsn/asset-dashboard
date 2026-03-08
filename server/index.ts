@@ -77,6 +77,7 @@ import { renderBriefHTML } from './brief-export-html.js';
 import { listContentRequests, getContentRequest, createContentRequest, updateContentRequest, deleteContentRequest, addComment } from './content-requests.js';
 import { isSemrushConfigured, getKeywordOverview, getDomainOrganicKeywords, getKeywordGap, getRelatedKeywords, estimateCreditCost, clearSemrushCache } from './semrush.js';
 import { createUser, verifyPassword, listUsers, getSafeUser, updateUser, changePassword, deleteUser, recordLogin, userCount } from './users.js';
+import { listClientUsers, createClientUser, updateClientUser, changeClientPassword, deleteClientUser, verifyClientPassword as verifyClientUserPassword, signClientToken, verifyClientToken, recordClientLogin, hasClientUsers, getSafeClientUser } from './client-users.js';
 import { signToken, verifyToken as verifyJwtToken, requireAuth, requireRole, requireWorkspaceAccess, optionalAuth } from './auth.js';
 import { callOpenAI, getTokenUsage } from './openai-helpers.js';
 import { addMessage, buildConversationContext, listSessions, getSession as getChatSession, deleteSession as deleteChatSession, generateSessionSummary, checkChatRateLimit } from './chat-memory.js';
@@ -286,14 +287,20 @@ app.use((req, res, next) => {
   const parts = req.path.split('/');
   // Patterns: /api/public/workspace/:id, /api/public/auth/:id, /api/public/<resource>/:workspaceId/...
   // Allow auth and workspace-info endpoints through (needed before login)
-  if (parts[3] === 'auth' || parts[3] === 'workspace') return next();
+  if (parts[3] === 'auth' || parts[3] === 'workspace' || parts[3] === 'client-login' || parts[3] === 'client-logout' || parts[3] === 'client-me' || parts[3] === 'auth-mode') return next();
   const workspaceId = parts[4]; // /api/public/<resource>/<workspaceId>
   if (!workspaceId) return next();
   const ws = getWorkspace(workspaceId);
   if (!ws || !ws.clientPassword) return next(); // No password = open access
-  // Verify session cookie
+  // Verify session cookie (legacy shared password)
   const sessionToken = req.cookies?.[`client_session_${workspaceId}`];
   if (sessionToken && verifyClientSession(workspaceId, sessionToken)) return next();
+  // Verify client user JWT token
+  const clientToken = req.cookies?.[`client_user_token_${workspaceId}`];
+  if (clientToken) {
+    const payload = verifyClientToken(clientToken);
+    if (payload && payload.workspaceId === workspaceId) return next();
+  }
   return res.status(401).json({ error: 'Authentication required. Please log in to the dashboard.' });
 });
 
@@ -4387,6 +4394,8 @@ app.get('/api/public/workspace/:id', (req, res) => {
     // Monetization
     tier: ws.tier || 'free',
     stripeEnabled: isStripeConfigured(),
+    // Auth mode
+    hasClientUsers: hasClientUsers(req.params.id),
   });
 });
 
@@ -4433,6 +4442,115 @@ app.post('/api/public/auth/:id', clientLoginLimiter, (req, res) => {
     return res.json({ ok: true });
   }
   return res.status(401).json({ error: 'Incorrect password' });
+});
+
+// --- Client User Auth (individual logins) ---
+
+// Client user login (email + password, per workspace)
+app.post('/api/public/client-login/:id', clientLoginLimiter, async (req, res) => {
+  try {
+    const ws = getWorkspace(req.params.id);
+    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'email and password are required' });
+    const user = await verifyClientUserPassword(email, req.params.id, password);
+    if (!user) return res.status(401).json({ error: 'Invalid email or password' });
+    recordClientLogin(user.id);
+    const { passwordHash: _pw, ...safe } = user;
+    void _pw;
+    const token = signClientToken(safe);
+    // Also set the legacy session cookie so existing session middleware works
+    const legacySessionToken = signClientSession(ws.id);
+    res.cookie(`client_session_${ws.id}`, legacySessionToken, {
+      httpOnly: true, sameSite: 'lax', maxAge: 24 * 60 * 60 * 1000, secure: IS_PROD,
+    });
+    res.cookie(`client_user_token_${ws.id}`, token, {
+      httpOnly: true, sameSite: 'lax', maxAge: 24 * 60 * 60 * 1000, secure: IS_PROD,
+    });
+    res.json({ ok: true, user: safe, token });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// Get current client user from token
+app.get('/api/public/client-me/:id', (req, res) => {
+  const token = req.cookies?.[`client_user_token_${req.params.id}`];
+  if (!token) return res.json({ user: null });
+  const payload = verifyClientToken(token);
+  if (!payload || payload.workspaceId !== req.params.id) return res.json({ user: null });
+  const user = getSafeClientUser(payload.clientUserId);
+  res.json({ user: user || null });
+});
+
+// Client user logout
+app.post('/api/public/client-logout/:id', (_req, res) => {
+  res.clearCookie(`client_user_token_${_req.params.id}`);
+  res.clearCookie(`client_session_${_req.params.id}`);
+  res.json({ ok: true });
+});
+
+// Workspace auth info: does this workspace use shared password, individual accounts, or both?
+app.get('/api/public/auth-mode/:id', (req, res) => {
+  const ws = getWorkspace(req.params.id);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  res.json({
+    hasSharedPassword: !!ws.clientPassword,
+    hasClientUsers: hasClientUsers(req.params.id),
+  });
+});
+
+// --- Admin: Client User Management (requires internal auth) ---
+
+// List client users for a workspace
+app.get('/api/workspaces/:id/client-users', requireWorkspaceAccess(), (_req, res) => {
+  res.json(listClientUsers(_req.params.id));
+});
+
+// Create/invite a client user
+app.post('/api/workspaces/:id/client-users', requireWorkspaceAccess(), express.json(), async (req, res) => {
+  try {
+    const { email, password, name, role } = req.body;
+    if (!email || !password || !name) return res.status(400).json({ error: 'email, password, and name are required' });
+    if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    const invitedBy = req.user?.id;
+    const user = await createClientUser(email, password, name, req.params.id, role || 'client_member', invitedBy);
+    res.json(user);
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// Update a client user
+app.patch('/api/workspaces/:id/client-users/:userId', requireWorkspaceAccess(), express.json(), async (req, res) => {
+  try {
+    const { name, email, role, avatarUrl } = req.body;
+    const user = await updateClientUser(req.params.userId, { name, email, role, avatarUrl });
+    if (!user) return res.status(404).json({ error: 'Client user not found' });
+    res.json(user);
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// Change client user password
+app.post('/api/workspaces/:id/client-users/:userId/password', requireWorkspaceAccess(), express.json(), async (req, res) => {
+  try {
+    const { password } = req.body;
+    if (!password || password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    const ok = await changeClientPassword(req.params.userId, password);
+    if (!ok) return res.status(404).json({ error: 'Client user not found' });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// Delete a client user
+app.delete('/api/workspaces/:id/client-users/:userId', requireWorkspaceAccess(), (req, res) => {
+  const ok = deleteClientUser(req.params.userId);
+  if (!ok) return res.status(404).json({ error: 'Client user not found' });
+  res.json({ ok: true });
 });
 
 // --- Public SEO Strategy (client dashboard, gated behind seoClientView) ---
