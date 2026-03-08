@@ -19,6 +19,7 @@ function layout(opts: {
   body: string;
   cta?: { label: string; url: string };
   footer?: string;
+  logoUrl?: string;
 }): string {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -47,7 +48,10 @@ function layout(opts: {
 
       <!-- Logo -->
       <div style="text-align:center;margin-bottom:24px;">
-        <span style="font-size:15px;font-weight:700;letter-spacing:0.5px;color:#202945;">hmpsn studio</span>
+        ${opts.logoUrl
+          ? `<img src="${esc(opts.logoUrl)}" alt="hmpsn studio" height="22" style="height:22px;width:auto;" />`
+          : `<span style="font-size:15px;font-weight:700;letter-spacing:0.5px;color:#202945;">hmpsn studio</span>`
+        }
       </div>
 
       <!-- Card -->
@@ -147,32 +151,41 @@ export type EmailEventType =
 
 // ── Template renderers ──
 
+function deriveLogoUrl(dashUrl?: string): string | undefined {
+  if (!dashUrl) return undefined;
+  try {
+    const u = new URL(dashUrl);
+    return `${u.origin}/logo.svg`;
+  } catch { return undefined; }
+}
+
 export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subject: string; html: string } {
   const count = events.length;
   const ws = events[0].workspaceName;
   const dashUrl = events.find(e => e.dashboardUrl)?.dashboardUrl;
+  const logoUrl = deriveLogoUrl(dashUrl);
 
   switch (type) {
     case 'approval_ready':
-      return renderApprovalReady(events, count, ws, dashUrl);
+      return renderApprovalReady(events, count, ws, dashUrl, logoUrl);
     case 'request_new':
-      return renderRequestNew(events, count, ws, dashUrl);
+      return renderRequestNew(events, count, ws, dashUrl, logoUrl);
     case 'request_status':
-      return renderRequestStatus(events, count, ws, dashUrl);
+      return renderRequestStatus(events, count, ws, dashUrl, logoUrl);
     case 'request_response':
-      return renderRequestResponse(events, count, ws, dashUrl);
+      return renderRequestResponse(events, count, ws, dashUrl, logoUrl);
     case 'content_request':
-      return renderContentRequest(events, count, ws, dashUrl);
+      return renderContentRequest(events, count, ws, dashUrl, logoUrl);
     case 'content_brief_ready':
-      return renderContentBriefReady(events, count, ws, dashUrl);
+      return renderContentBriefReady(events, count, ws, dashUrl, logoUrl);
     case 'audit_alert':
-      return renderAuditAlert(events, count, ws, dashUrl);
+      return renderAuditAlert(events, count, ws, dashUrl, logoUrl);
     case 'client_welcome':
-      return renderClientWelcome(events[0]);
+      return renderClientWelcome(events[0], logoUrl);
     case 'trial_expiry_warning':
-      return renderTrialExpiryWarning(events[0]);
+      return renderTrialExpiryWarning(events[0], logoUrl);
     case 'password_reset':
-      return renderPasswordReset(events[0]);
+      return renderPasswordReset(events[0], logoUrl);
     default:
       return { subject: 'Notification', html: '' };
   }
@@ -180,7 +193,7 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
 
 // ── Individual template renderers ──
 
-function renderApprovalReady(events: EmailEvent[], _count: number, ws: string, dashUrl?: string) {
+function renderApprovalReady(events: EmailEvent[], _count: number, ws: string, dashUrl?: string, logoUrl?: string) {
   const totalItems = events.reduce((sum, e) => sum + ((e.data.itemCount as number) || 1), 0);
   const items = events.map((e, i) => itemRow({
     title: (e.data.batchName as string) || 'SEO Changes',
@@ -196,11 +209,12 @@ function renderApprovalReady(events: EmailEvent[], _count: number, ws: string, d
       subtitle: ws,
       body: countPill(totalItems, 'item awaiting approval') + items,
       cta: dashUrl ? { label: 'Review Changes', url: dashUrl } : undefined,
+      logoUrl,
     }),
   };
 }
 
-function renderRequestNew(events: EmailEvent[], count: number, ws: string, dashUrl?: string) {
+function renderRequestNew(events: EmailEvent[], count: number, ws: string, dashUrl?: string, logoUrl?: string) {
   const items = events.map((e, i) => itemRow({
     title: (e.data.title as string) || 'New Request',
     detail: (e.data.description as string)?.slice(0, 120) || undefined,
@@ -218,11 +232,12 @@ function renderRequestNew(events: EmailEvent[], count: number, ws: string, dashU
       subtitle: ws,
       body: (count > 1 ? countPill(count, 'new request') : '') + items,
       cta: dashUrl ? { label: 'View Requests', url: dashUrl } : undefined,
+      logoUrl,
     }),
   };
 }
 
-function renderRequestStatus(events: EmailEvent[], count: number, ws: string, dashUrl?: string) {
+function renderRequestStatus(events: EmailEvent[], count: number, ws: string, dashUrl?: string, logoUrl?: string) {
   const statusLabels: Record<string, string> = {
     new: 'New', in_review: 'In Review', in_progress: 'In Progress',
     on_hold: 'On Hold', completed: 'Completed', closed: 'Closed',
@@ -256,11 +271,12 @@ function renderRequestStatus(events: EmailEvent[], count: number, ws: string, da
       subtitle: ws,
       body: items,
       cta: dashUrl ? { label: 'View in Dashboard', url: dashUrl } : undefined,
+      logoUrl,
     }),
   };
 }
 
-function renderRequestResponse(events: EmailEvent[], count: number, ws: string, dashUrl?: string) {
+function renderRequestResponse(events: EmailEvent[], count: number, ws: string, dashUrl?: string, logoUrl?: string) {
   const items = events.map((e, i) => itemRow({
     title: (e.data.requestTitle as string) || 'Request',
     detail: (e.data.noteContent as string)?.slice(0, 150) || 'New response from your web team',
@@ -277,11 +293,12 @@ function renderRequestResponse(events: EmailEvent[], count: number, ws: string, 
       subtitle: ws,
       body: items,
       cta: dashUrl ? { label: 'View Conversation', url: dashUrl } : undefined,
+      logoUrl,
     }),
   };
 }
 
-function renderContentRequest(events: EmailEvent[], count: number, ws: string, dashUrl?: string) {
+function renderContentRequest(events: EmailEvent[], count: number, ws: string, dashUrl?: string, logoUrl?: string) {
   const items = events.map((e, i) => itemRow({
     title: (e.data.topic as string) || 'Content Topic',
     detail: `Keyword: "${(e.data.targetKeyword as string) || '—'}"`,
@@ -299,11 +316,12 @@ function renderContentRequest(events: EmailEvent[], count: number, ws: string, d
       subtitle: ws,
       body: (count > 1 ? countPill(count, 'topic requested') : '') + items,
       cta: dashUrl ? { label: 'View in Dashboard', url: dashUrl } : undefined,
+      logoUrl,
     }),
   };
 }
 
-function renderContentBriefReady(events: EmailEvent[], count: number, ws: string, dashUrl?: string) {
+function renderContentBriefReady(events: EmailEvent[], count: number, ws: string, dashUrl?: string, logoUrl?: string) {
   const items = events.map((e, i) => itemRow({
     title: (e.data.topic as string) || 'Content Brief',
     detail: e.data.targetKeyword ? `Keyword: "${e.data.targetKeyword as string}"` : undefined,
@@ -320,11 +338,12 @@ function renderContentBriefReady(events: EmailEvent[], count: number, ws: string
       subtitle: ws,
       body: (count > 1 ? countPill(count, 'brief ready') : '') + items,
       cta: dashUrl ? { label: 'Review Briefs', url: dashUrl } : undefined,
+      logoUrl,
     }),
   };
 }
 
-function renderAuditAlert(events: EmailEvent[], _count: number, ws: string, dashUrl?: string) {
+function renderAuditAlert(events: EmailEvent[], _count: number, ws: string, dashUrl?: string, logoUrl?: string) {
   const count = events.length;
   const items = events.map((e, i) => {
     const score = e.data.score as number | undefined;
@@ -352,13 +371,14 @@ function renderAuditAlert(events: EmailEvent[], _count: number, ws: string, dash
       subtitle: ws,
       body: items,
       cta: dashUrl ? { label: 'View Audit Results', url: dashUrl } : undefined,
+      logoUrl,
     }),
   };
 }
 
 // ── Password reset email ──
 
-function renderPasswordReset(event: EmailEvent) {
+function renderPasswordReset(event: EmailEvent, logoUrl?: string) {
   const ws = event.workspaceName;
   const resetUrl = event.data.resetUrl as string;
 
@@ -377,13 +397,14 @@ function renderPasswordReset(event: EmailEvent) {
         </div>`,
       cta: { label: 'Reset Password', url: resetUrl },
       footer: `You're receiving this because a password reset was requested for your account on ${esc(ws)}`,
+      logoUrl: logoUrl || deriveLogoUrl(resetUrl),
     }),
   };
 }
 
 // ── Trial expiry warning email ──
 
-function renderTrialExpiryWarning(event: EmailEvent) {
+function renderTrialExpiryWarning(event: EmailEvent, logoUrl?: string) {
   const ws = event.workspaceName;
   const daysLeft = (event.data.daysRemaining as number) || 0;
   const dashUrl = event.dashboardUrl || '';
@@ -425,13 +446,14 @@ function renderTrialExpiryWarning(event: EmailEvent) {
         </div>`,
       cta: dashUrl ? { label: 'Open Your Dashboard', url: dashUrl } : undefined,
       footer: `You're receiving this because your Growth trial on ${esc(ws)} is ending soon`,
+      logoUrl: logoUrl || deriveLogoUrl(dashUrl),
     }),
   };
 }
 
 // ── Client welcome email ──
 
-function renderClientWelcome(event: EmailEvent) {
+function renderClientWelcome(event: EmailEvent, logoUrl?: string) {
   const ws = event.workspaceName;
   const name = (event.data.clientName as string) || 'there';
   const dashUrl = event.dashboardUrl || '';
@@ -460,6 +482,7 @@ function renderClientWelcome(event: EmailEvent) {
         </div>`,
       cta: dashUrl ? { label: 'Open Your Dashboard', url: dashUrl } : undefined,
       footer: `You're receiving this because an account was created for you on ${esc(ws)}`,
+      logoUrl: logoUrl || deriveLogoUrl(dashUrl),
     }),
   };
 }
@@ -590,6 +613,7 @@ export function renderMonthlyReport(data: {
       body: trialBanner + scoreSection + trafficSection + metricsGrid + activitySection + chatSection + pendingAlert,
       cta: d.dashboardUrl ? { label: 'Open Dashboard', url: d.dashboardUrl } : undefined,
       footer: 'Automated monthly summary from your web team',
+      logoUrl: deriveLogoUrl(d.dashboardUrl),
     }),
   };
 }
@@ -620,6 +644,7 @@ export function renderApprovalReminder(data: {
           isLast: true,
         })}`,
       cta: data.dashboardUrl ? { label: 'Review Changes', url: data.dashboardUrl } : undefined,
+      logoUrl: deriveLogoUrl(data.dashboardUrl),
     }),
   };
 }

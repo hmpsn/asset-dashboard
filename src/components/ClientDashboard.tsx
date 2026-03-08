@@ -1920,13 +1920,24 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                               {alreadyRequested ? (
                                 <span className="flex items-center gap-1 text-[11px] text-teal-400 bg-teal-500/10 px-2.5 py-1.5 rounded-lg border border-teal-500/20 flex-shrink-0"><CheckCircle2 className="w-3.5 h-3.5" /> Requested</span>
                               ) : (
-                                <button
-                                  onClick={() => setPricingModal({ serviceType: 'brief_only', topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, source: 'strategy', pageType })}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 font-medium hover:bg-teal-600/40 transition-all flex-shrink-0"
-                                >
-                                  <FileText className="w-3 h-3" /> Get a Brief
-                                  {briefPrice != null && <span className="opacity-70 ml-0.5">{fmtPrice(briefPrice)}</span>}
-                                </button>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <button
+                                    onClick={() => setPricingModal({ serviceType: 'brief_only', topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, source: 'strategy', pageType })}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 font-medium hover:bg-teal-600/40 transition-all"
+                                  >
+                                    <FileText className="w-3 h-3" /> Get a Brief
+                                    {briefPrice != null && <span className="opacity-70 ml-0.5">{fmtPrice(briefPrice)}</span>}
+                                  </button>
+                                  {fullPostPrice != null && (
+                                    <button
+                                      onClick={() => setPricingModal({ serviceType: 'full_post', topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, source: 'strategy', pageType })}
+                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-teal-600/30 to-emerald-600/30 border border-teal-500/40 text-[11px] text-teal-200 font-medium hover:from-teal-600/50 hover:to-emerald-600/50 transition-all"
+                                    >
+                                      <Sparkles className="w-3 h-3" /> Full Post
+                                      <span className="opacity-70 ml-0.5">{fmtPrice(fullPostPrice)}</span>
+                                    </button>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </div>
@@ -3864,11 +3875,11 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         const fmt = fmtPrice;
         return (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[70] flex items-center justify-center p-4" onClick={() => !pricingConfirming && setPricingModal(null)}>
-            <div className="bg-zinc-900 border border-zinc-700/50 rounded-2xl shadow-2xl shadow-black/50 w-full max-w-md overflow-hidden animate-[scaleIn_0.2s_ease-out]" onClick={e => e.stopPropagation()}>
+            <div className="relative bg-zinc-900 border border-zinc-700/50 rounded-2xl shadow-2xl shadow-black/50 w-full max-w-md overflow-hidden animate-[scaleIn_0.2s_ease-out]" onClick={e => e.stopPropagation()}>
               {/* Close button */}
               <button
                 onClick={() => !pricingConfirming && setPricingModal(null)}
-                className="absolute top-0 right-0 m-4 text-zinc-600 hover:text-zinc-300 transition-colors z-10"
+                className="absolute top-3 right-3 w-7 h-7 rounded-lg flex items-center justify-center bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors z-10"
               >
                 <X className="w-4 h-4" />
               </button>

@@ -18,7 +18,7 @@
       "rationale": "Direct revenue impact: justify retainer with ROI data, prevent churn, enable self-service upgrades, and unlock prepaid revenue via credits.",
       "items": [
         { "id": 74, "title": "ROI dashboard (Premium)", "source": "MONETIZATION.md ROI Spec", "est": "3-4h", "priority": "P0", "notes": "Organic traffic value in dollars (GSC clicks × SEMRush CPC). Ad spend equivalent. Content ROI. Growth trend. Blurred soft-gate for free/growth. GET /api/public/roi/:wsId", "status": "pending" },
-        { "id": 88, "title": "Self-service tier upgrade via Stripe", "source": "MONETIZATION.md Phase 3", "est": "3-4h", "priority": "P0", "notes": "Replace mailto upgrade CTAs with Stripe Checkout subscription flows for tier changes. Biggest conversion friction point.", "status": "pending" },
+        { "id": 88, "title": "Self-service tier upgrade via Stripe", "source": "MONETIZATION.md Phase 3", "est": "3-4h", "priority": "P0", "notes": "Shipped — plan_growth/plan_premium product types, Stripe Checkout for tier upgrades, webhook auto-upgrades tier, all mailto links replaced", "status": "done" },
         { "id": 75, "title": "Churn prevention signals", "source": "MONETIZATION.md Churn Spec", "est": "2-3h", "priority": "P0", "notes": "Daily background job: no-login 14d, chat drop-off, no requests 30d, health score drop, trial ending, payment failed. Positive signals: traffic up 20%, high engagement. Alerts in Command Center", "status": "pending" },
         { "id": 77, "title": "Usage tracking + limits", "source": "MONETIZATION.md Phase 4", "est": "2-3h", "priority": "P1", "notes": "Track AI conversations, briefs, strategies per workspace per month. Usage indicators (3 of 4 briefs remaining). Overage prompts. Admin usage dashboard", "status": "pending" },
         { "id": 76, "title": "Credits system", "source": "MONETIZATION.md Credits Spec", "est": "2-3h", "priority": "P1", "notes": "Prepaid credit packs ($500/5cr, $900/10cr, $1600/20cr). Per-product credit costs. Purchase via Stripe. Admin can grant credits. Deduct on fulfillment", "status": "pending" }
@@ -189,6 +189,22 @@
         { "id": 61, "title": "Audit traffic data in chatbot context", "source": "Intelligence Wiring", "est": "45m", "priority": "P2", "notes": "Shipped — High-traffic pages with SEO issues in chat prompts", "status": "done" },
         { "id": 62, "title": "Monthly reports: chat topic summaries", "source": "Intelligence Wiring", "est": "30m", "priority": "P2", "notes": "Shipped — Topics You Asked About section in monthly email", "status": "done" },
         { "id": 63, "title": "Strategy Flow Enrichment", "source": "Intelligence Wiring", "est": "30m", "priority": "P1", "notes": "Shipped — GA4 conversions + audit data in strategy prompt", "status": "done" }
+      ]
+    },
+    {
+      "id": "archive-sprint-7",
+      "name": "✅ SHIPPED — Client Experience & Monetization Polish",
+      "hours": "6-8",
+      "rationale": "Client-facing polish: transactional emails, password reset, payment guards, branding, and self-service upgrades.",
+      "items": [
+        { "id": 92, "title": "Welcome email on client user creation", "source": "P1-2", "est": "30m", "priority": "P1", "notes": "Shipped — notifyClientWelcome helper, branded HTML template, fires on user creation", "status": "done" },
+        { "id": 93, "title": "\"Powered by hmpsn studio\" footer", "source": "P1-3", "est": "15m", "priority": "P1", "notes": "Shipped — Footer on client dashboard linking to hmpsn.studio", "status": "done" },
+        { "id": 94, "title": "Trial expiry emails (day 10 + day 13)", "source": "P1-4", "est": "1-2h", "priority": "P1", "notes": "Shipped — trial-reminders.ts scheduler, trial_expiry_warning email template, checks every 6h", "status": "done" },
+        { "id": 95, "title": "Forgot password flow for client users", "source": "P1-5", "est": "2-3h", "priority": "P1", "notes": "Shipped — Reset token generation/storage, password_reset email, public API endpoints, client UI forms", "status": "done" },
+        { "id": 96, "title": "Payment status pending_payment guard", "source": "P1-6", "est": "30m", "priority": "P1", "notes": "Shipped — pending_payment status on content requests during Stripe flow, amber badge/timeline in UI", "status": "done" },
+        { "id": 97, "title": "Logo in email templates", "source": "Client UX", "est": "30m", "priority": "P1", "notes": "Shipped — Logo image derived from dashboardUrl, all email templates updated", "status": "done" },
+        { "id": 98, "title": "Payment modal close button fix", "source": "Bug fix", "est": "15m", "priority": "P0", "notes": "Shipped — Fixed missing relative positioning, visible close button with background", "status": "done" },
+        { "id": 99, "title": "Content strategy card: Full Post button", "source": "Bug fix", "est": "15m", "priority": "P0", "notes": "Shipped — Restored Full Post purchase button alongside Get a Brief on content opportunity cards", "status": "done" }
       ]
     },
     {
