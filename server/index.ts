@@ -723,6 +723,37 @@ app.delete('/api/workspaces/:id', requireWorkspaceAccess(), (req, res) => {
   res.json({ ok: true });
 });
 
+// --- Audit Issue Suppressions ---
+app.get('/api/workspaces/:id/audit-suppressions', requireWorkspaceAccess(), (req, res) => {
+  const ws = getWorkspace(req.params.id);
+  if (!ws) return res.status(404).json({ error: 'Not found' });
+  res.json(ws.auditSuppressions || []);
+});
+
+app.post('/api/workspaces/:id/audit-suppressions', requireWorkspaceAccess(), (req, res) => {
+  const ws = getWorkspace(req.params.id);
+  if (!ws) return res.status(404).json({ error: 'Not found' });
+  const { check, pageSlug, reason } = req.body;
+  if (!check || !pageSlug) return res.status(400).json({ error: 'check and pageSlug required' });
+  const suppressions = ws.auditSuppressions || [];
+  if (suppressions.some(s => s.check === check && s.pageSlug === pageSlug)) {
+    return res.json({ ok: true, suppressions });
+  }
+  suppressions.push({ check, pageSlug, reason: reason || undefined, createdAt: new Date().toISOString() });
+  updateWorkspace(req.params.id, { auditSuppressions: suppressions });
+  res.json({ ok: true, suppressions });
+});
+
+app.delete('/api/workspaces/:id/audit-suppressions', requireWorkspaceAccess(), (req, res) => {
+  const ws = getWorkspace(req.params.id);
+  if (!ws) return res.status(404).json({ error: 'Not found' });
+  const { check, pageSlug } = req.body;
+  if (!check || !pageSlug) return res.status(400).json({ error: 'check and pageSlug required' });
+  const suppressions = (ws.auditSuppressions || []).filter(s => !(s.check === check && s.pageSlug === pageSlug));
+  updateWorkspace(req.params.id, { auditSuppressions: suppressions });
+  res.json({ ok: true, suppressions });
+});
+
 // File upload
 app.post('/api/upload/:workspaceId', upload.array('files'), (req, res) => {
   const files = req.files as Express.Multer.File[];

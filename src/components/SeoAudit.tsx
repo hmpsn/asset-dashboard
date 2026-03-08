@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from 'react';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import {
   Loader2, Search as SearchIcon, ChevronDown, ChevronRight, Download,
   AlertTriangle, AlertCircle, Info, CheckCircle, Globe, FileText,
   RefreshCw, X, Clock, Share2, Copy, ExternalLink, Send, Wrench,
   TrendingUp, TrendingDown, Minus, Plus, ListChecks, Trash2, Circle, ClipboardList,
-  MoreVertical, Pencil,
+  MoreVertical, Pencil, EyeOff,
 } from 'lucide-react';
 import { StatCard, scoreColorClass, scoreBgBarClass } from './ui';
 import type { FixContext } from '../App';
@@ -66,6 +66,10 @@ function getFixTab(issue: SeoIssue): string | null {
   if (issue.category === 'performance') return 'performance';
   return null;
 }
+
+// Scoring constants (must match server/seo-audit.ts) — module-level for stable memo deps
+const CRITICAL_CHECKS = new Set(['title', 'meta-description', 'canonical', 'h1', 'robots', 'duplicate-title', 'mixed-content', 'ssl', 'robots-txt']);
+const MODERATE_CHECKS = new Set(['content-length', 'heading-hierarchy', 'internal-links', 'img-alt', 'og-tags', 'og-image', 'link-text', 'url', 'lang', 'viewport', 'duplicate-description', 'img-filesize', 'html-size']);
 
 interface PageSeoResult {
   pageId: string;
@@ -542,6 +546,49 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
     }
   }, [siteId]);
 
+  // Audit issue suppressions
+  const [suppressions, setSuppressions] = useState<{ check: string; pageSlug: string }[]>([]);
+
+  useEffect(() => {
+    if (workspaceId) {
+      fetch(`/api/workspaces/${workspaceId}/audit-suppressions`)
+        .then(r => r.ok ? r.json() : [])
+        .then(s => { if (Array.isArray(s)) setSuppressions(s); })
+        .catch(() => {});
+    }
+  }, [workspaceId]);
+
+  const suppressIssue = async (check: string, pageSlug: string) => {
+    if (!workspaceId) return;
+    try {
+      const res = await fetch(`/api/workspaces/${workspaceId}/audit-suppressions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ check, pageSlug }),
+      });
+      if (res.ok) {
+        const { suppressions: updated } = await res.json();
+        setSuppressions(updated);
+      }
+    } catch {}
+    setActionMenuKey(null);
+  };
+
+  const unsuppressIssue = async (check: string, pageSlug: string) => {
+    if (!workspaceId) return;
+    try {
+      const res = await fetch(`/api/workspaces/${workspaceId}/audit-suppressions`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ check, pageSlug }),
+      });
+      if (res.ok) {
+        const { suppressions: updated } = await res.json();
+        setSuppressions(updated);
+      }
+    } catch {}
+  };
+
   const acceptSuggestion = async (pageId: string, issue: SeoIssue) => {
     if (!issue.suggestedFix) return;
     const fixKey = `${pageId}-${issue.check}`;
@@ -999,6 +1046,35 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
     setReportView('csv');
   };
 
+  // Effective audit data with suppressions applied (filters issues, recalculates scores)
+  const effectiveData = useMemo(() => {
+    if (!data) return null;
+    const suppSet = new Set(suppressions.map(s => `${s.check}:${s.pageSlug}`));
+    if (suppSet.size === 0) return data;
+
+    const pages = data.pages.map(page => {
+      const filtered = page.issues.filter(i => !suppSet.has(`${i.check}:${page.slug}`));
+      if (filtered.length === page.issues.length) return page;
+      let score = 100;
+      for (const issue of filtered) {
+        const isCritical = CRITICAL_CHECKS.has(issue.check);
+        const isModerate = MODERATE_CHECKS.has(issue.check);
+        if (issue.severity === 'error') score -= isCritical ? 20 : 12;
+        else if (issue.severity === 'warning') score -= isCritical ? 10 : isModerate ? 6 : 4;
+        else score -= 1;
+      }
+      score = Math.max(0, Math.min(100, score));
+      return { ...page, issues: filtered, score };
+    });
+
+    const errors = pages.reduce((sum, p) => sum + p.issues.filter(i => i.severity === 'error').length, 0);
+    const warnings = pages.reduce((sum, p) => sum + p.issues.filter(i => i.severity === 'warning').length, 0);
+    const infos = pages.reduce((sum, p) => sum + p.issues.filter(i => i.severity === 'info').length, 0);
+    const siteScore = pages.length > 0 ? Math.round(pages.reduce((sum, p) => sum + p.score, 0) / pages.length) : 0;
+
+    return { ...data, pages, errors, warnings, infos, siteScore };
+  }, [data, suppressions]);
+
   // ── View-based routing (controlled by parent) ──
   if (view === 'editor') return <Suspense fallback={<SubToolFallback />}><SeoEditorWrapper siteId={siteId} workspaceId={workspaceId} fixContext={fixContext} /></Suspense>;
   if (view === 'strategy') return <Suspense fallback={<SubToolFallback />}><KeywordStrategyPanel workspaceId={workspaceId || ''} siteId={siteId} /></Suspense>;
@@ -1093,7 +1169,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
     </div>
   );
 
-  const filteredPages = data.pages
+  const filteredPages = effectiveData!.pages
     .filter(p => {
       if (severityFilter === 'all') return true;
       return p.issues.some(i => i.severity === severityFilter);
@@ -1136,20 +1212,20 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
           <div className="flex items-center gap-1.5 mb-1.5">
             <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Site Score</span>
           </div>
-          <div className={`text-3xl font-bold ${scoreColorClass(data.siteScore)}`}>{data.siteScore}</div>
+          <div className={`text-3xl font-bold ${scoreColorClass(effectiveData!.siteScore)}`}>{effectiveData!.siteScore}</div>
           <div className="mt-2 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-            <div className={`h-full rounded-full ${scoreBgBarClass(data.siteScore)}`} style={{ width: `${data.siteScore}%` }} />
+            <div className={`h-full rounded-full ${scoreBgBarClass(effectiveData!.siteScore)}`} style={{ width: `${effectiveData!.siteScore}%` }} />
           </div>
         </div>
-        <StatCard label="Pages Scanned" value={data.totalPages} />
-        <StatCard label="Errors" value={data.errors} valueColor="text-red-400" onClick={() => setSeverityFilter(severityFilter === 'error' ? 'all' : 'error')} className={severityFilter === 'error' ? 'border-red-500/50' : ''} />
-        <StatCard label="Warnings" value={data.warnings} valueColor="text-amber-400" onClick={() => setSeverityFilter(severityFilter === 'warning' ? 'all' : 'warning')} className={severityFilter === 'warning' ? 'border-amber-500/50' : ''} />
-        <StatCard label="Info" value={data.infos} valueColor="text-blue-400" onClick={() => setSeverityFilter(severityFilter === 'info' ? 'all' : 'info')} className={severityFilter === 'info' ? 'border-blue-500/50' : ''} />
+        <StatCard label="Pages Scanned" value={effectiveData!.totalPages} />
+        <StatCard label="Errors" value={effectiveData!.errors} valueColor="text-red-400" onClick={() => setSeverityFilter(severityFilter === 'error' ? 'all' : 'error')} className={severityFilter === 'error' ? 'border-red-500/50' : ''} />
+        <StatCard label="Warnings" value={effectiveData!.warnings} valueColor="text-amber-400" onClick={() => setSeverityFilter(severityFilter === 'warning' ? 'all' : 'warning')} className={severityFilter === 'warning' ? 'border-amber-500/50' : ''} />
+        <StatCard label="Info" value={effectiveData!.infos} valueColor="text-blue-400" onClick={() => setSeverityFilter(severityFilter === 'info' ? 'all' : 'info')} className={severityFilter === 'info' ? 'border-blue-500/50' : ''} />
       </div>
 
       {/* Contextual tool tips based on audit findings */}
       {(() => {
-        const allIssues = data.pages.flatMap(p => p.issues);
+        const allIssues = effectiveData!.pages.flatMap(p => p.issues);
         const hasMetaIssues = allIssues.some(i => ['missing_title', 'title_length', 'missing_meta', 'meta_length', 'missing_h1', 'duplicate_h1'].includes(i.check));
         const hasRedirectIssues = allIssues.some(i => ['redirect_chain', 'broken_link', 'missing_canonical'].includes(i.check));
         const hasPerformanceIssues = allIssues.some(i => i.category === 'performance');
@@ -1295,7 +1371,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
             <FileText className="w-3.5 h-3.5" /> Export
           </button>
           {(() => {
-            const pendingFixes = data.pages.reduce((count, page) =>
+            const pendingFixes = effectiveData!.pages.reduce((count, page) =>
               count + page.issues.filter(i => i.suggestedFix && !appliedFixes.has(`${page.pageId}-${i.check}`)).length, 0);
             if (pendingFixes === 0) return null;
             return (
@@ -1366,7 +1442,13 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
       {/* Showing count + batch actions */}
       <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-3 text-xs text-zinc-500">
-          <span>Showing {filteredPages.length} of {data.pages.length} pages</span>
+          <span>Showing {filteredPages.length} of {effectiveData!.pages.length} pages</span>
+          {suppressions.length > 0 && (
+            <span className="flex items-center gap-1 text-[11px] text-zinc-500">
+              <EyeOff className="w-3 h-3" /> {suppressions.length} suppressed
+              <button onClick={async () => { for (const s of suppressions) await unsuppressIssue(s.check, s.pageSlug); }} className="text-zinc-500 hover:text-zinc-300 underline ml-0.5" title="Remove all suppressions">clear</button>
+            </span>
+          )}
           {(severityFilter !== 'all' || categoryFilter !== 'all') && (
             <button onClick={() => { setSeverityFilter('all'); setCategoryFilter('all'); }} className="text-zinc-500 hover:text-zinc-300 underline">
               Clear filters
@@ -1408,7 +1490,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
                   className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors"
                   title="Add all errors to tasks"
                 >
-                  <ClipboardList className="w-3 h-3" /> Add Errors to Tasks ({data.errors})
+                  <ClipboardList className="w-3 h-3" /> Add Errors to Tasks ({effectiveData!.errors})
                 </button>
                 {(severityFilter !== 'all' || categoryFilter !== 'all') && (
                   <button
@@ -1424,7 +1506,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
                   className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-600 transition-colors"
                   title="Add ALL findings to tasks"
                 >
-                  <ClipboardList className="w-3 h-3" /> Add All to Tasks ({data.errors + data.warnings + data.infos})
+                  <ClipboardList className="w-3 h-3" /> Add All to Tasks ({effectiveData!.errors + effectiveData!.warnings + effectiveData!.infos})
                 </button>
               </div>
             )}
@@ -1641,6 +1723,12 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
                                       >
                                         {isCreating ? <Loader2 className="w-3 h-3 animate-spin" /> : <ClipboardList className="w-3 h-3" />} Add to Tasks
                                       </button>
+                                      <button
+                                        onClick={() => suppressIssue(issue.check, page.slug)}
+                                        className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-zinc-500 hover:bg-zinc-800 transition-colors"
+                                      >
+                                        <EyeOff className="w-3 h-3" /> Suppress Issue
+                                      </button>
                                     </div>
                                   )}
                                 </div>
@@ -1664,6 +1752,12 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
                                       >
                                         {isCreating ? <Loader2 className="w-3 h-3 animate-spin" /> : <ClipboardList className="w-3 h-3" />} Add to Tasks
                                       </button>
+                                      <button
+                                        onClick={() => suppressIssue(issue.check, page.slug)}
+                                        className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-zinc-500 hover:bg-zinc-800 transition-colors"
+                                      >
+                                        <EyeOff className="w-3 h-3" /> Suppress Issue
+                                      </button>
                                     </div>
                                   )}
                                 </div>
@@ -1684,6 +1778,12 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
                                         className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-purple-400 hover:bg-purple-500/10 transition-colors"
                                       >
                                         <Send className="w-3 h-3" /> Send to Client
+                                      </button>
+                                      <button
+                                        onClick={() => suppressIssue(issue.check, page.slug)}
+                                        className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-zinc-500 hover:bg-zinc-800 transition-colors"
+                                      >
+                                        <EyeOff className="w-3 h-3" /> Suppress Issue
                                       </button>
                                     </div>
                                   )}

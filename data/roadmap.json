@@ -246,6 +246,19 @@
         { "id": 102, "title": "Multi-item SEO fix checkout flow", "source": "MONETIZATION.md Checkout Flow", "est": "4-5h", "priority": "P0", "notes": "Shipped — useCart hook (localStorage persistence, context provider), SeoCart slide-out drawer (items, quantities, pack upsells, Premium nudge at $500+), FixRecommendations component (maps audit issues to purchasable fixes with smart pricing), OrderStatus component (post-purchase fulfillment tracking), createCartCheckoutSession for multi-item Stripe sessions, /api/stripe/cart-checkout endpoint, /api/public/fix-orders/:wsId endpoint. CartProvider wraps ClientDashboard, SeoCartButton in header.", "status": "done" },
         { "id": 103, "title": "Lead generation landing page", "source": "PRODUCT_ROADMAP Month 1", "est": "2-3h", "priority": "P0", "notes": "Shipped — Public-facing page at hmpsn.studio explaining the platform with free trial CTA.", "status": "done" }
       ]
+    },
+    {
+      "id": "archive-sprint-9",
+      "name": "✅ SHIPPED — Recommendation Flags & Editor Enhancements",
+      "hours": "3-4",
+      "rationale": "Surface AI recommendations inline in editors, add schema editing, and wire InsightsEngine navigation.",
+      "items": [
+        { "id": 121, "title": "Direct JSON editing in Schema Generator", "source": "Session work", "est": "1h", "priority": "P1", "notes": "Shipped — Edit toggle, editable textarea with JSON validation, edited schemas used in copy/publish/bulk-publish flows", "status": "done" },
+        { "id": 122, "title": "Recommendation flags in SEO Editor + Schema Generator", "source": "Session work", "est": "1h", "priority": "P1", "notes": "Shipped — useRecommendations hook, amber badge counts per page, expandable banners with title/insight/traffic-at-risk/priority", "status": "done" },
+        { "id": 123, "title": "InsightsEngine in Workspace Home with click-through", "source": "Session work", "est": "30m", "priority": "P1", "notes": "Shipped — Compact InsightsEngine embedded in WorkspaceHome, onNavigate prop with REC_TYPE_TAB mapping, Fix → buttons route to correct editor tool", "status": "done" },
+        { "id": 124, "title": "Audit context in SEO rewrite prompts", "source": "Session work", "est": "30m", "priority": "P1", "notes": "Shipped — /api/webflow/seo-rewrite looks up latest audit snapshot, injects page-specific issues (title, description, H1, duplicates) into AI prompt", "status": "done" },
+        { "id": 125, "title": "Schema gen workspaceId cost tracking", "source": "Session work", "est": "15m", "priority": "P1", "notes": "Shipped — workspaceId added to SchemaContext, passed through callOpenAI for per-workspace token cost attribution", "status": "done" }
+      ]
     }
   ]
 }
