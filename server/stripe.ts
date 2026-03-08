@@ -3,7 +3,7 @@ import { createPayment, updatePayment, getPaymentBySession, type ProductType } f
 import { updateContentRequest } from './content-requests.js';
 import { addActivity } from './activity-log.js';
 import { getStripeSecretKey, getStripeWebhookSecret, getStripePriceId } from './stripe-config.js';
-import { getWorkspace, updateWorkspace } from './workspaces.js';
+import { getWorkspace, updateWorkspace, listWorkspaces } from './workspaces.js';
 
 // --- Stripe SDK (lazy init — picks up keys saved via admin UI or env vars) ---
 
@@ -202,16 +202,13 @@ export async function createPaymentIntentForProduct(params: PaymentIntentParams)
 export function clearTestModeCustomerIds(): number {
   const key = getStripeSecretKey();
   if (!key || !key.startsWith('sk_live_')) return 0;
-  const { listWorkspaces, updateWorkspace: updateWs } = require('./workspaces.js');
   const workspaces = listWorkspaces();
   let cleared = 0;
   for (const ws of workspaces) {
-    if (ws.stripeCustomerId && ws.stripeCustomerId.startsWith('cus_') && !ws.stripeCustomerId.startsWith('cus_live_')) {
-      // Test-mode customer IDs won't start with 'cus_live_' — but there's no reliable prefix.
-      // Instead, just try to retrieve it and clear if it fails.
-      // For a simpler heuristic: clear any stored ID when switching to live mode.
+    if (ws.stripeCustomerId) {
+      // Clear any stored customer ID when switching to live mode.
       // The getOrCreateCustomer function will create a fresh live customer on next payment.
-      updateWs(ws.id, { stripeCustomerId: '' });
+      updateWorkspace(ws.id, { stripeCustomerId: '' });
       cleared++;
     }
   }
