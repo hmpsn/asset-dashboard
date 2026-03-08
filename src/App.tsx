@@ -19,6 +19,7 @@ import {
 // ── Lazy-loaded route-level chunks ──
 const ClientDashboard = lazy(() => import('./components/ClientDashboard').then(m => ({ default: m.ClientDashboard })));
 const Styleguide = lazy(() => import('./components/Styleguide').then(m => ({ default: m.Styleguide })));
+const LandingPage = lazy(() => import('./components/LandingPage').then(m => ({ default: m.LandingPage })));
 
 // ── Lazy-loaded admin tab chunks ──
 const SettingsPanel = lazy(() => import('./components/SettingsPanel').then(m => ({ default: m.SettingsPanel })));
@@ -62,6 +63,10 @@ export interface FixContext {
 }
 
 function App() {
+  // Landing page route: /welcome (public, no auth)
+  if (window.location.pathname === '/welcome') {
+    return <Suspense fallback={<ChunkFallback />}><LandingPage /></Suspense>;
+  }
   // Styleguide route: /styleguide (no auth)
   if (window.location.pathname === '/styleguide') {
     return <Suspense fallback={<ChunkFallback />}><Styleguide /></Suspense>;
