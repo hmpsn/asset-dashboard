@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 
+interface ClientUserSafe { id: string; email: string; name: string; role: 'client_owner' | 'client_member'; workspaceId: string; avatarUrl?: string; lastLoginAt?: string; createdAt: string; updatedAt: string; }
 interface EventGroup { id: string; name: string; order: number; color: string; defaultPageFilter?: string; allowedPages?: string[]; }
 interface EventDisplayConfig { eventName: string; displayName: string; pinned: boolean; group?: string; }
 interface GscSite { siteUrl: string; permissionLevel: string; }
@@ -77,6 +78,20 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
   const [pricingFull, setPricingFull] = useState(0);
   const [pricingCurrency, setPricingCurrency] = useState('USD');
   const [savingPricing, setSavingPricing] = useState(false);
+  // Client user management state
+  const [clientUsers, setClientUsers] = useState<ClientUserSafe[]>([]);
+  const [clientUsersLoading, setClientUsersLoading] = useState(false);
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserRole, setNewUserRole] = useState<'client_owner' | 'client_member'>('client_member');
+  const [addingUser, setAddingUser] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editUserName, setEditUserName] = useState('');
+  const [editUserEmail, setEditUserEmail] = useState('');
+  const [resetPasswordUserId, setResetPasswordUserId] = useState<string | null>(null);
+  const [resetPasswordValue, setResetPasswordValue] = useState('');
 
   const GROUP_COLORS = ['#14b8a6', '#60a5fa', '#34d399', '#fbbf24', '#f472b6', '#fb923c', '#2dd4bf', '#e879f9'];
 
@@ -227,6 +242,68 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
     finally { setSavingEvents(false); }
   };
 
+  // Client user CRUD
+  const loadClientUsers = async () => {
+    setClientUsersLoading(true);
+    try {
+      const res = await fetch(`/api/workspaces/${workspaceId}/client-users`);
+      if (res.ok) setClientUsers(await res.json());
+    } catch { /* ignore */ }
+    finally { setClientUsersLoading(false); }
+  };
+
+  const addClientUser = async () => {
+    if (!newUserEmail.trim() || !newUserName.trim() || !newUserPassword.trim()) return;
+    setAddingUser(true);
+    try {
+      const res = await fetch(`/api/workspaces/${workspaceId}/client-users`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: newUserEmail.trim(), name: newUserName.trim(), password: newUserPassword.trim(), role: newUserRole }),
+      });
+      if (!res.ok) { const err = await res.json(); toast(err.error || 'Failed to add user', 'error'); return; }
+      toast(`${newUserName.trim()} added`);
+      setNewUserName(''); setNewUserEmail(''); setNewUserPassword(''); setNewUserRole('client_member'); setShowAddUser(false);
+      loadClientUsers();
+    } catch { toast('Failed to add user', 'error'); }
+    finally { setAddingUser(false); }
+  };
+
+  const saveEditUser = async (userId: string) => {
+    try {
+      const res = await fetch(`/api/workspaces/${workspaceId}/client-users/${userId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editUserName.trim(), email: editUserEmail.trim() }),
+      });
+      if (!res.ok) { const err = await res.json(); toast(err.error || 'Failed to update', 'error'); return; }
+      toast('User updated');
+      setEditingUserId(null);
+      loadClientUsers();
+    } catch { toast('Failed to update user', 'error'); }
+  };
+
+  const deleteClientUser = async (userId: string, userName: string) => {
+    if (!confirm(`Remove ${userName} from this workspace?`)) return;
+    try {
+      const res = await fetch(`/api/workspaces/${workspaceId}/client-users/${userId}`, { method: 'DELETE' });
+      if (!res.ok) { toast('Failed to remove user', 'error'); return; }
+      toast(`${userName} removed`);
+      loadClientUsers();
+    } catch { toast('Failed to remove user', 'error'); }
+  };
+
+  const resetClientPassword = async (userId: string) => {
+    if (!resetPasswordValue.trim()) return;
+    try {
+      const res = await fetch(`/api/workspaces/${workspaceId}/client-users/${userId}/password`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: resetPasswordValue.trim() }),
+      });
+      if (!res.ok) { toast('Failed to reset password', 'error'); return; }
+      toast('Password reset');
+      setResetPasswordUserId(null); setResetPasswordValue('');
+    } catch { toast('Failed to reset password', 'error'); }
+  };
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       {/* Header */}
@@ -240,7 +317,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
       {/* Tab nav */}
       <nav className="flex items-center gap-1 border-b border-zinc-800">
         {([['connections', 'Connections'], ['features', 'Features'], ['dashboard', 'Client Dashboard']] as [SectionTab, string][]).map(([id, label]) => (
-          <button key={id} onClick={() => setTab(id)}
+          <button key={id} onClick={() => { setTab(id); if (id === 'dashboard') loadClientUsers(); }}
             className="px-4 py-2.5 text-xs font-medium border-b-2 transition-colors -mb-px"
             style={tab === id ? { borderColor: '#2dd4bf', color: '#2dd4bf' } : { borderColor: 'transparent', color: '#71717a' }}>
             {label}
@@ -718,6 +795,167 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                     </button>
                   </div>
                 </div>
+              </div>
+            </section>
+
+            {/* Client Users */}
+            <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+              <div className="px-5 py-4 border-b border-zinc-800">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
+                    <Shield className="w-4 h-4 text-violet-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-semibold text-zinc-200">Client Users</h3>
+                    <p className="text-xs text-zinc-500">Individual login accounts for your clients. Each user gets their own credentials.</p>
+                  </div>
+                  <button onClick={() => { setShowAddUser(!showAddUser); setNewUserName(''); setNewUserEmail(''); setNewUserPassword(''); }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white">
+                    <Plus className="w-3 h-3" /> Add User
+                  </button>
+                </div>
+              </div>
+
+              <div className="px-5 py-4 space-y-3">
+                {/* Add user form */}
+                {showAddUser && (
+                  <div className="rounded-lg border border-teal-500/20 bg-teal-500/5 p-4 space-y-3">
+                    <div className="text-[11px] font-medium text-teal-400 uppercase tracking-wider">New Client User</div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <div className="text-[11px] font-medium mb-1 text-zinc-500">Name</div>
+                        <input value={newUserName} onChange={e => setNewUserName(e.target.value)} placeholder="Jane Smith"
+                          className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-teal-500" />
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-medium mb-1 text-zinc-500">Email</div>
+                        <input value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} placeholder="jane@company.com" type="email"
+                          className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-teal-500" />
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-medium mb-1 text-zinc-500">Password</div>
+                        <input value={newUserPassword} onChange={e => setNewUserPassword(e.target.value)} placeholder="Temporary password" type="text"
+                          className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-teal-500" />
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-medium mb-1 text-zinc-500">Role</div>
+                        <select value={newUserRole} onChange={e => setNewUserRole(e.target.value as 'client_owner' | 'client_member')}
+                          className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-teal-500">
+                          <option value="client_member">Member</option>
+                          <option value="client_owner">Owner</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 pt-1">
+                      <button onClick={addClientUser} disabled={addingUser || !newUserName.trim() || !newUserEmail.trim() || !newUserPassword.trim()}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-xs font-medium transition-all disabled:opacity-50">
+                        {addingUser ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />} Add User
+                      </button>
+                      <button onClick={() => setShowAddUser(false)}
+                        className="px-3 py-2 rounded-lg text-xs font-medium text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* User list */}
+                {clientUsersLoading ? (
+                  <div className="flex items-center gap-2 justify-center py-6 text-xs text-zinc-500">
+                    <Loader2 className="w-3 h-3 animate-spin" /> Loading users...
+                  </div>
+                ) : clientUsers.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 gap-2">
+                    <div className="w-10 h-10 rounded-xl bg-zinc-800 flex items-center justify-center">
+                      <Users className="w-5 h-5 text-zinc-600" />
+                    </div>
+                    <p className="text-xs text-zinc-500">No client users yet</p>
+                    <p className="text-[11px] text-zinc-600 max-w-xs text-center">Add individual accounts so clients can log in with their own credentials. Activity will be attributed to each user.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {clientUsers.map(user => (
+                      <div key={user.id} className="group rounded-lg border border-zinc-800 hover:border-zinc-700 transition-colors">
+                        <div className="flex items-center gap-3 px-4 py-3">
+                          {/* Avatar */}
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-600 to-teal-500 flex items-center justify-center text-white text-[11px] font-bold shrink-0">
+                            {user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                          </div>
+
+                          {/* Info */}
+                          {editingUserId === user.id ? (
+                            <div className="flex-1 flex items-center gap-2 min-w-0">
+                              <input value={editUserName} onChange={e => setEditUserName(e.target.value)} placeholder="Name"
+                                className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-teal-500" />
+                              <input value={editUserEmail} onChange={e => setEditUserEmail(e.target.value)} placeholder="Email"
+                                className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-teal-500" />
+                              <button onClick={() => saveEditUser(user.id)} className="text-emerald-400 hover:text-emerald-300"><Check className="w-3.5 h-3.5" /></button>
+                              <button onClick={() => setEditingUserId(null)} className="text-zinc-500 hover:text-zinc-300"><X className="w-3.5 h-3.5" /></button>
+                            </div>
+                          ) : (
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium text-zinc-200 truncate">{user.name}</span>
+                                <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${user.role === 'client_owner' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-zinc-800 text-zinc-500'}`}>
+                                  {user.role === 'client_owner' ? 'Owner' : 'Member'}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-[11px] text-zinc-500 truncate">{user.email}</span>
+                                {user.lastLoginAt && (
+                                  <span className="text-[11px] text-zinc-600">Last login {new Date(user.lastLoginAt).toLocaleDateString()}</span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Actions */}
+                          {editingUserId !== user.id && (
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => { setEditingUserId(user.id); setEditUserName(user.name); setEditUserEmail(user.email); }}
+                                title="Edit" className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors">
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                              <button onClick={() => { setResetPasswordUserId(resetPasswordUserId === user.id ? null : user.id); setResetPasswordValue(''); }}
+                                title="Reset password" className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors">
+                                <KeyRound className="w-3 h-3" />
+                              </button>
+                              <button onClick={() => deleteClientUser(user.id, user.name)}
+                                title="Remove" className="p-1.5 rounded-md text-zinc-500 hover:text-red-400 hover:bg-zinc-800 transition-colors">
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Password reset inline */}
+                        {resetPasswordUserId === user.id && (
+                          <div className="px-4 pb-3 flex items-center gap-2">
+                            <KeyRound className="w-3 h-3 text-zinc-500 shrink-0" />
+                            <input value={resetPasswordValue} onChange={e => setResetPasswordValue(e.target.value)}
+                              placeholder="New password" type="text" autoFocus
+                              onKeyDown={e => e.key === 'Enter' && resetPasswordValue.trim() && resetClientPassword(user.id)}
+                              className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-teal-500" />
+                            <button onClick={() => resetClientPassword(user.id)} disabled={!resetPasswordValue.trim()}
+                              className="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-xs font-medium transition-colors">
+                              Reset
+                            </button>
+                            <button onClick={() => { setResetPasswordUserId(null); setResetPasswordValue(''); }}
+                              className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-300 transition-colors">
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {clientUsers.length > 0 && (
+                  <div className="text-[11px] text-zinc-600 pt-1">
+                    {clientUsers.length} user{clientUsers.length !== 1 ? 's' : ''} with individual access to this dashboard
+                  </div>
+                )}
               </div>
             </section>
 

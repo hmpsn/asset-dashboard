@@ -137,8 +137,12 @@ async function gatherMonthlyData(ws: Workspace): Promise<MonthlyData> {
 
 export function generateReportHTML(data: MonthlyData): string {
   const monthName = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const ws = data.workspace;
+  const trialEnd = ws.trialEndsAt ? new Date(ws.trialEndsAt) : null;
+  const isTrial = trialEnd ? trialEnd > new Date() : false;
+  const trialDaysRemaining = isTrial && trialEnd ? Math.max(0, Math.ceil((trialEnd.getTime() - Date.now()) / 86400000)) : undefined;
   const { html } = renderMonthlyReport({
-    workspaceName: data.workspace.name,
+    workspaceName: ws.name,
     monthName,
     siteScore: data.siteScore,
     previousScore: data.previousScore,
@@ -153,6 +157,8 @@ export function generateReportHTML(data: MonthlyData): string {
     topActivities: data.topActivities,
     traffic: data.traffic,
     chatTopics: data.chatTopics,
+    isTrial,
+    trialDaysRemaining,
   });
   return html;
 }
@@ -161,6 +167,9 @@ async function sendMonthlyReportEmail(ws: Workspace, data: MonthlyData) {
   if (!isEmailConfigured() || !ws.clientEmail) return;
 
   const monthName = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const trialEnd = ws.trialEndsAt ? new Date(ws.trialEndsAt) : null;
+  const isTrial = trialEnd ? trialEnd > new Date() : false;
+  const trialDaysRemaining = isTrial && trialEnd ? Math.max(0, Math.ceil((trialEnd.getTime() - Date.now()) / 86400000)) : undefined;
   const { subject, html } = renderMonthlyReport({
     workspaceName: ws.name,
     monthName,
@@ -177,6 +186,8 @@ async function sendMonthlyReportEmail(ws: Workspace, data: MonthlyData) {
     topActivities: data.topActivities,
     traffic: data.traffic,
     chatTopics: data.chatTopics,
+    isTrial,
+    trialDaysRemaining,
   });
   await sendEmail(ws.clientEmail, subject, html);
 }

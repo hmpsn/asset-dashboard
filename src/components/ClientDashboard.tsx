@@ -106,13 +106,19 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
   const [passwordInput, setPasswordInput] = useState('');
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
+  // Individual client user auth
+  const [authMode, setAuthMode] = useState<{ hasSharedPassword: boolean; hasClientUsers: boolean } | null>(null);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [clientUser, setClientUser] = useState<{ id: string; name: string; email: string; role: string } | null>(null);
+  const [loginTab, setLoginTab] = useState<'password' | 'user'>('user');
   const [approvalBatches, setApprovalBatches] = useState<ApprovalBatch[]>([]);
   const [approvalsLoading, setApprovalsLoading] = useState(false);
   const [applyingBatch, setApplyingBatch] = useState<string | null>(null);
   const [editingApproval, setEditingApproval] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
   // Activity log
-  const [activityLog, setActivityLog] = useState<{ id: string; type: string; title: string; description?: string; createdAt: string }[]>([]);
+  const [activityLog, setActivityLog] = useState<{ id: string; type: string; title: string; description?: string; actorName?: string; createdAt: string }[]>([]);
   // Rank tracking
   const [rankHistory, setRankHistory] = useState<{ date: string; positions: Record<string, number> }[]>([]);
   const [latestRanks, setLatestRanks] = useState<{ query: string; position: number; clicks: number; impressions: number; ctr: number; change?: number }[]>([]);
@@ -195,25 +201,57 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         if (r.status === 403) { setError('This dashboard is currently unavailable. Please contact your web team for access.'); setLoading(false); throw new Error('portal_disabled'); }
         return r.json();
       })
-      .then((data: WorkspaceInfo) => {
+      .then(async (data: WorkspaceInfo) => {
         if (!data.id) { setError('Workspace not found'); setLoading(false); return; }
         setWs(data);
         document.title = `${data.name} — Insights Engine`;
-        // Check if already authenticated via sessionStorage
-        if (data.requiresPassword) {
-          const stored = sessionStorage.getItem(`dash_auth_${workspaceId}`);
-          if (stored === 'true') {
+
+        // Fetch auth mode (shared password vs individual accounts)
+        try {
+          const amRes = await fetch(`/api/public/auth-mode/${workspaceId}`);
+          if (amRes.ok) {
+            const am = await amRes.json();
+            setAuthMode(am);
+            // Default login tab: if individual accounts exist, show user login; otherwise shared password
+            setLoginTab(am.hasClientUsers ? 'user' : 'password');
+          }
+        } catch { /* ignore */ }
+
+        // Check if already authenticated via client user JWT cookie
+        let autoAuthed = false;
+        let resolvedUserId: string | undefined;
+        try {
+          const meRes = await fetch(`/api/public/client-me/${workspaceId}`);
+          if (meRes.ok) {
+            const meData = await meRes.json();
+            if (meData.user) {
+              setClientUser(meData.user);
+              resolvedUserId = meData.user.id;
+              setAuthenticated(true);
+              autoAuthed = true;
+              loadDashboardData(data);
+            }
+          }
+        } catch { /* ignore */ }
+
+        // Fall back to legacy session check
+        if (!autoAuthed) {
+          if (data.requiresPassword) {
+            const stored = sessionStorage.getItem(`dash_auth_${workspaceId}`);
+            if (stored === 'true') {
+              setAuthenticated(true);
+              loadDashboardData(data);
+            }
+          } else {
             setAuthenticated(true);
             loadDashboardData(data);
           }
-        } else {
-          setAuthenticated(true);
-          loadDashboardData(data);
         }
         setLoading(false);
 
-        // Show welcome modal on first visit
-        const welcomeKey = `welcome_seen_${workspaceId}`;
+        // Show welcome modal on first visit (user-aware key when logged in)
+        const welcomeUserId = resolvedUserId;
+        const welcomeKey = welcomeUserId ? `welcome_seen_${workspaceId}_${welcomeUserId}` : `welcome_seen_${workspaceId}`;
         if (!localStorage.getItem(welcomeKey)) {
           setShowWelcome(true);
         }
@@ -272,7 +310,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
     try {
       const res = await fetch(`/api/public/requests/${workspaceId}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: newReqTitle.trim(), description: newReqDesc.trim(), category: newReqCategory, pageUrl: newReqPage.trim() || undefined, submittedBy: newReqName.trim() || undefined }),
+        body: JSON.stringify({ title: newReqTitle.trim(), description: newReqDesc.trim(), category: newReqCategory, pageUrl: newReqPage.trim() || undefined, submittedBy: clientUser?.name || newReqName.trim() || undefined }),
       });
       if (res.ok) {
         const created = await res.json();
@@ -672,6 +710,40 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
     } finally { setAuthLoading(false); }
   };
 
+  const handleClientUserLogin = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!loginEmail.trim() || !loginPassword.trim()) return;
+    setAuthLoading(true);
+    setAuthError('');
+    try {
+      const res = await fetch(`/api/public/client-login/${workspaceId}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginEmail.trim(), password: loginPassword.trim() }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setClientUser(data.user);
+        setAuthenticated(true);
+        sessionStorage.setItem(`dash_auth_${workspaceId}`, 'true');
+        if (ws) loadDashboardData(ws);
+      } else {
+        const err = await res.json();
+        setAuthError(err.error || 'Invalid email or password');
+      }
+    } catch {
+      setAuthError('Authentication failed');
+    } finally { setAuthLoading(false); }
+  };
+
+  const handleClientLogout = async () => {
+    try {
+      await fetch(`/api/public/client-logout/${workspaceId}`, { method: 'POST' });
+    } catch { /* ignore */ }
+    setClientUser(null);
+    setAuthenticated(false);
+    sessionStorage.removeItem(`dash_auth_${workspaceId}`);
+  };
+
   const loadSearchData = async (wsId: string, numDays: number, dateRange?: { startDate: string; endDate: string }) => {
     try {
       const drParams = dateRange ? `&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}` : '';
@@ -893,8 +965,12 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
     </div>
   );
 
-  // Password gate
-  if (ws.requiresPassword && !authenticated) return (
+  // Password gate — smart login with auth mode detection
+  const showsUserLogin = authMode?.hasClientUsers;
+  const showsPasswordLogin = authMode?.hasSharedPassword && !authMode?.hasClientUsers;
+  const showsBothModes = authMode?.hasSharedPassword && authMode?.hasClientUsers;
+
+  if ((ws.requiresPassword || showsUserLogin) && !authenticated) return (
     <div className="min-h-screen bg-[#0f1219] flex items-center justify-center">
       <div className="w-full max-w-sm">
         <div className="bg-zinc-900 rounded-2xl border border-zinc-800 p-8 shadow-2xl shadow-black/40">
@@ -904,28 +980,79 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
               <Lock className="w-6 h-6 text-teal-400" />
             </div>
             <h2 className="text-lg font-semibold text-zinc-200">{ws.name}</h2>
-            <p className="text-xs text-zinc-500 mt-1">Enter the password to access this dashboard</p>
+            <p className="text-xs text-zinc-500 mt-1">
+              {loginTab === 'user' ? 'Sign in with your account' : 'Enter the password to access this dashboard'}
+            </p>
           </div>
-          <form onSubmit={handlePasswordSubmit} className="space-y-4">
-            <div>
-              <input
-                type="password"
-                value={passwordInput}
-                onChange={e => { setPasswordInput(e.target.value); setAuthError(''); }}
-                placeholder="Dashboard password"
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors"
-                autoFocus
-              />
-              {authError && <p className="text-xs text-red-400 mt-2">{authError}</p>}
+
+          {/* Tab toggle when both modes are available */}
+          {showsBothModes && (
+            <div className="flex items-center gap-1 mb-5 bg-zinc-800 rounded-xl p-1">
+              <button onClick={() => { setLoginTab('user'); setAuthError(''); }}
+                className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${loginTab === 'user' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-400'}`}>
+                Email Login
+              </button>
+              <button onClick={() => { setLoginTab('password'); setAuthError(''); }}
+                className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${loginTab === 'password' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-400'}`}>
+                Shared Password
+              </button>
             </div>
-            <button
-              type="submit"
-              disabled={authLoading || !passwordInput.trim()}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white text-sm font-medium transition-all flex items-center justify-center gap-2"
-            >
-              {authLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Access Dashboard'}
-            </button>
-          </form>
+          )}
+
+          {/* Individual user login form */}
+          {(loginTab === 'user' && (showsUserLogin || showsBothModes)) ? (
+            <form onSubmit={handleClientUserLogin} className="space-y-3">
+              <div>
+                <input
+                  type="email"
+                  value={loginEmail}
+                  onChange={e => { setLoginEmail(e.target.value); setAuthError(''); }}
+                  placeholder="Email address"
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <input
+                  type="password"
+                  value={loginPassword}
+                  onChange={e => { setLoginPassword(e.target.value); setAuthError(''); }}
+                  placeholder="Password"
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors"
+                />
+              </div>
+              {authError && <p className="text-xs text-red-400">{authError}</p>}
+              <button
+                type="submit"
+                disabled={authLoading || !loginEmail.trim() || !loginPassword.trim()}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white text-sm font-medium transition-all flex items-center justify-center gap-2"
+              >
+                {authLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Sign In'}
+              </button>
+            </form>
+          ) : (
+            /* Shared password form */
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              <div>
+                <input
+                  type="password"
+                  value={passwordInput}
+                  onChange={e => { setPasswordInput(e.target.value); setAuthError(''); }}
+                  placeholder="Dashboard password"
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors"
+                  autoFocus={loginTab === 'password' || showsPasswordLogin}
+                />
+                {authError && <p className="text-xs text-red-400 mt-2">{authError}</p>}
+              </div>
+              <button
+                type="submit"
+                disabled={authLoading || !passwordInput.trim()}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white text-sm font-medium transition-all flex items-center justify-center gap-2"
+              >
+                {authLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Access Dashboard'}
+              </button>
+            </form>
+          )}
         </div>
       </div>
     </div>
@@ -1006,6 +1133,19 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {/* Client user menu */}
+            {clientUser && (
+              <div className="flex items-center gap-2 pr-2 border-r border-zinc-800">
+                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-600 to-teal-500 flex items-center justify-center text-white text-[10px] font-bold">
+                  {clientUser.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                </div>
+                <span className="text-xs text-zinc-400 hidden sm:block">{clientUser.name}</span>
+                <button onClick={handleClientLogout} title="Sign out"
+                  className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                </button>
+              </div>
+            )}
             <button onClick={toggleTheme} title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
               className="p-2 rounded-lg border border-zinc-800 hover:border-zinc-700 transition-colors">
               {theme === 'dark' ? <Sun className="w-4 h-4 text-zinc-400" /> : <Moon className="w-4 h-4 text-zinc-400" />}
@@ -3133,12 +3273,14 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                     ))}
                   </div>
                 </div>
+                {!clientUser && (
                 <div>
                   <label className="text-[11px] text-zinc-500 mb-1 block">Your Name</label>
                   <input value={newReqName} onChange={e => setNewReqName(e.target.value)}
                     placeholder="So we know who to follow up with..."
                     className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500" />
                 </div>
+                )}
                 <div>
                   <label className="text-[11px] text-zinc-500 mb-1 block">Title</label>
                   <input value={newReqTitle} onChange={e => setNewReqTitle(e.target.value)}
@@ -3839,7 +3981,8 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
           { icon: MessageSquare, label: 'Request System', desc: 'Submit and track project requests', available: true },
         ];
         const dismissWelcome = () => {
-          localStorage.setItem(`welcome_seen_${workspaceId}`, 'true');
+          const key = clientUser ? `welcome_seen_${workspaceId}_${clientUser.id}` : `welcome_seen_${workspaceId}`;
+          localStorage.setItem(key, 'true');
           setShowWelcome(false);
         };
         return (

@@ -201,7 +201,7 @@ export function renderBriefHTML(brief: ContentBrief): string {
     <div class="header-left">
       <div class="kw">${esc(b.targetKeyword)}</div>
       <h1>${esc(b.suggestedTitle)}</h1>
-      <div class="subtitle">Content Brief &mdash; Prepared ${date}</div>
+      <div class="subtitle">Content Brief${b.pageType ? ` · <span style="display:inline-block;padding:2px 10px;border-radius:6px;background:#f0fdfa;border:1px solid #99f6e4;color:#0d9488;font-weight:600;font-size:11px;text-transform:capitalize;letter-spacing:0.3px">${esc(b.pageType)} Page</span>` : ''} &mdash; Prepared ${date}</div>
     </div>
     <div class="logo">${LOGO_SVG}</div>
   </div>

@@ -304,6 +304,16 @@ app.use((req, res, next) => {
   return res.status(401).json({ error: 'Authentication required. Please log in to the dashboard.' });
 });
 
+// Helper: extract client user actor info from request cookies (for activity attribution)
+function getClientActor(req: import('express').Request, workspaceId: string): { id?: string; name?: string } | undefined {
+  const clientToken = req.cookies?.[`client_user_token_${workspaceId}`];
+  if (!clientToken) return undefined;
+  const payload = verifyClientToken(clientToken);
+  if (!payload || payload.workspaceId !== workspaceId) return undefined;
+  const user = getSafeClientUser(payload.clientUserId);
+  return user ? { id: user.id, name: user.name } : undefined;
+}
+
 // Auth login endpoint
 const loginLimiter = rateLimit(60 * 1000, 5); // 5 attempts per minute
 app.post('/api/auth/login', loginLimiter, express.json(), (req, res) => {
@@ -621,6 +631,10 @@ app.get('/api/workspace-overview', (_req, res) => {
     const contentReqs = listContentRequests(ws.id);
     const pendingContentReqs = contentReqs.filter(r => r.status === 'requested').length;
 
+    const trialEnd = ws.trialEndsAt ? new Date(ws.trialEndsAt) : null;
+    const isTrial = trialEnd ? trialEnd > new Date() : false;
+    const trialDaysRemaining = isTrial && trialEnd ? Math.max(0, Math.ceil((trialEnd.getTime() - Date.now()) / 86400000)) : undefined;
+
     return {
       id: ws.id,
       name: ws.name,
@@ -629,6 +643,9 @@ app.get('/api/workspace-overview', (_req, res) => {
       hasGsc: !!ws.gscPropertyUrl,
       hasGa4: !!ws.ga4PropertyId,
       hasPassword: !!ws.clientPassword,
+      tier: ws.tier || 'free',
+      isTrial,
+      trialDaysRemaining,
       audit,
       requests: { total: reqTotal, new: reqNew, active: reqActive, latestDate: latestReq?.updatedAt || null },
       approvals: { pending: pendingApprovals, total: totalApprovalItems },
@@ -4654,7 +4671,8 @@ app.post('/api/public/content-request/:workspaceId', (req, res) => {
   const pageType = validateEnum(req.body.pageType, ['blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource'], 'blog');
   if (!topic || !targetKeyword) return res.status(400).json({ error: 'topic and targetKeyword are required' });
   const request = createContentRequest(req.params.workspaceId, { topic, targetKeyword, intent, priority, rationale, clientNote, serviceType, pageType });
-  addActivity(req.params.workspaceId, 'content_requested', `Content topic requested: "${topic}"`, `Keyword: "${targetKeyword}" · Priority: ${priority}`, { requestId: request.id });
+  const actor = getClientActor(req, req.params.workspaceId);
+  addActivity(req.params.workspaceId, 'content_requested', `${actor?.name || 'Client'} requested topic: "${topic}"`, `Keyword: "${targetKeyword}" · Priority: ${priority}`, { requestId: request.id }, actor);
   notifyTeamContentRequest({ workspaceName: ws.name, workspaceId: req.params.workspaceId, topic, targetKeyword, priority, rationale: rationale || '' });
   res.json(request);
 });
@@ -4689,7 +4707,8 @@ app.post('/api/public/content-request/:workspaceId/submit', (req, res) => {
     rationale: notes || `Client-submitted topic: ${topic}`,
     clientNote: notes, source: 'client', serviceType, pageType,
   });
-  addActivity(req.params.workspaceId, 'content_requested', `Client submitted topic: "${topic}"`, `Keyword: "${targetKeyword}"`, { requestId: request.id });
+  const actor = getClientActor(req, req.params.workspaceId);
+  addActivity(req.params.workspaceId, 'content_requested', `${actor?.name || 'Client'} submitted topic: "${topic}"`, `Keyword: "${targetKeyword}"`, { requestId: request.id }, actor);
   notifyTeamContentRequest({ workspaceName: ws.name, workspaceId: req.params.workspaceId, topic, targetKeyword, priority: 'medium', rationale: notes || '' });
   res.json(request);
 });
@@ -4701,7 +4720,8 @@ app.post('/api/public/content-request/:workspaceId/:id/decline', (req, res) => {
     status: 'declined', declineReason: reason,
   });
   if (!updated) return res.status(404).json({ error: 'Request not found' });
-  addActivity(req.params.workspaceId, 'content_declined', `Client declined topic: "${updated.topic}"`, reason || 'No reason given', { requestId: updated.id });
+  const actor = getClientActor(req, req.params.workspaceId);
+  addActivity(req.params.workspaceId, 'content_declined', `${actor?.name || 'Client'} declined topic: "${updated.topic}"`, reason || 'No reason given', { requestId: updated.id }, actor);
   res.json(updated);
 });
 
@@ -4709,7 +4729,8 @@ app.post('/api/public/content-request/:workspaceId/:id/decline', (req, res) => {
 app.post('/api/public/content-request/:workspaceId/:id/approve', (req, res) => {
   const updated = updateContentRequest(req.params.workspaceId, req.params.id, { status: 'approved' });
   if (!updated) return res.status(404).json({ error: 'Request not found' });
-  addActivity(req.params.workspaceId, 'brief_approved', `Client approved brief for "${updated.topic}"`, '', { requestId: updated.id, briefId: updated.briefId });
+  const actor = getClientActor(req, req.params.workspaceId);
+  addActivity(req.params.workspaceId, 'brief_approved', `${actor?.name || 'Client'} approved brief for "${updated.topic}"`, '', { requestId: updated.id, briefId: updated.briefId }, actor);
   res.json(updated);
 });
 
@@ -4720,7 +4741,8 @@ app.post('/api/public/content-request/:workspaceId/:id/request-changes', (req, r
     status: 'changes_requested', clientFeedback: feedback,
   });
   if (!updated) return res.status(404).json({ error: 'Request not found' });
-  addActivity(req.params.workspaceId, 'changes_requested', `Client requested changes on "${updated.topic}"`, feedback || '', { requestId: updated.id });
+  const actor = getClientActor(req, req.params.workspaceId);
+  addActivity(req.params.workspaceId, 'changes_requested', `${actor?.name || 'Client'} requested changes on "${updated.topic}"`, feedback || '', { requestId: updated.id }, actor);
   res.json(updated);
 });
 
@@ -4731,7 +4753,8 @@ app.post('/api/public/content-request/:workspaceId/:id/upgrade', (req, res) => {
     upgradedAt: new Date().toISOString(),
   });
   if (!updated) return res.status(404).json({ error: 'Request not found' });
-  addActivity(req.params.workspaceId, 'content_upgraded', `Client upgraded "${updated.topic}" to full blog post`, '', { requestId: updated.id });
+  const actor = getClientActor(req, req.params.workspaceId);
+  addActivity(req.params.workspaceId, 'content_upgraded', `${actor?.name || 'Client'} upgraded "${updated.topic}" to full blog post`, '', { requestId: updated.id }, actor);
   res.json(updated);
 });
 
@@ -6315,7 +6338,7 @@ app.patch('/api/content-briefs/:workspaceId/:briefId', (req, res) => {
 // Generate a new content brief
 app.post('/api/content-briefs/:workspaceId/generate', async (req, res) => {
   try {
-    const { targetKeyword, businessContext } = req.body;
+    const { targetKeyword, businessContext, pageType } = req.body;
     if (!targetKeyword) return res.status(400).json({ error: 'targetKeyword required' });
 
     const ws = getWorkspace(req.params.workspaceId);
@@ -6349,12 +6372,16 @@ app.post('/api/content-briefs/:workspaceId/generate', async (req, res) => {
       } catch (e) { console.error('SEMRush brief enrichment error:', e); }
     }
 
+    const validPageTypes = ['blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource'];
+    const resolvedPageType = validPageTypes.includes(pageType) ? pageType : undefined;
+
     const brief = await generateBrief(req.params.workspaceId, targetKeyword, {
       relatedQueries,
       businessContext: businessContext || ws?.keywordStrategy?.businessContext,
       existingPages,
       semrushMetrics,
       semrushRelated,
+      pageType: resolvedPageType,
     });
     res.json(brief);
   } catch (err) {

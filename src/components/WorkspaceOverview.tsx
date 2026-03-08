@@ -36,6 +36,9 @@ interface WorkspaceSummary {
   requests: { total: number; new: number; active: number; latestDate: string | null };
   approvals: { pending: number; total: number };
   contentRequests?: { pending: number; total: number };
+  tier?: 'free' | 'growth' | 'premium';
+  isTrial?: boolean;
+  trialDaysRemaining?: number;
 }
 
 interface HealthStatus {
@@ -221,7 +224,19 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
                 {/* Top row: name + site */}
                 <div className="flex items-start justify-between gap-3 mb-4">
                   <div className="min-w-0">
-                    <h3 className="text-sm font-semibold truncate group-hover:text-teal-400 transition-colors text-zinc-200">{ws.name}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-semibold truncate group-hover:text-teal-400 transition-colors text-zinc-200">{ws.name}</h3>
+                      {ws.isTrial && (
+                        <span className="flex-shrink-0 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                          Trial{ws.trialDaysRemaining != null ? ` · ${ws.trialDaysRemaining}d` : ''}
+                        </span>
+                      )}
+                      {ws.tier && ws.tier !== 'free' && !ws.isTrial && (
+                        <span className={`flex-shrink-0 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md border ${
+                          ws.tier === 'premium' ? 'bg-violet-500/15 text-violet-400 border-violet-500/20' : 'bg-blue-500/15 text-blue-400 border-blue-500/20'
+                        }`}>{ws.tier}</span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 mt-1 text-[11px] text-zinc-500">
                       {ws.webflowSiteName && <span className="flex items-center gap-1"><Globe className="w-2.5 h-2.5" />{ws.webflowSiteName}</span>}
                       {!ws.webflowSiteId && <span className="flex items-center gap-1 text-amber-400"><AlertTriangle className="w-2.5 h-2.5" />No site linked</span>}

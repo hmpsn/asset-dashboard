@@ -36,6 +36,8 @@ export interface ActivityEntry {
   title: string;
   description?: string;
   metadata?: Record<string, unknown>;
+  actorId?: string;
+  actorName?: string;
   createdAt: string;
 }
 
@@ -53,7 +55,7 @@ function writeLog(entries: ActivityEntry[]) {
   fs.writeFileSync(LOG_FILE, JSON.stringify(entries, null, 2));
 }
 
-export function addActivity(workspaceId: string, type: ActivityType, title: string, description?: string, metadata?: Record<string, unknown>): ActivityEntry {
+export function addActivity(workspaceId: string, type: ActivityType, title: string, description?: string, metadata?: Record<string, unknown>, actor?: { id?: string; name?: string }): ActivityEntry {
   const entries = readLog();
   const entry: ActivityEntry = {
     id: `act_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -62,6 +64,8 @@ export function addActivity(workspaceId: string, type: ActivityType, title: stri
     title,
     description,
     metadata,
+    actorId: actor?.id,
+    actorName: actor?.name,
     createdAt: new Date().toISOString(),
   };
   entries.push(entry);

@@ -372,6 +372,8 @@ export function renderMonthlyReport(data: {
     pageviews?: { current: number; previous: number; changePct: number };
   };
   chatTopics?: { title: string; summary: string }[];
+  isTrial?: boolean;
+  trialDaysRemaining?: number;
 }): { subject: string; html: string } {
   const d = data;
   const scoreColor = (d.siteScore ?? 0) >= 80 ? '#059669' : (d.siteScore ?? 0) >= 60 ? '#d97706' : '#dc2626';
@@ -456,13 +458,19 @@ export function renderMonthlyReport(data: {
       </div>`).join('')}
     </div>` : '';
 
+  const trialBanner = d.isTrial ? `
+    <div style="margin-bottom:16px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:14px 16px;text-align:center;">
+      <div style="font-size:13px;font-weight:600;color:#92400e;">Growth Trial${d.trialDaysRemaining != null ? ` · ${d.trialDaysRemaining} day${d.trialDaysRemaining !== 1 ? 's' : ''} remaining` : ''}</div>
+      <div style="font-size:11px;color:#a16207;margin-top:4px;">You're currently on a 14-day Growth trial. Contact your web team to discuss plans and pricing.</div>
+    </div>` : '';
+
   return {
     subject: `Monthly Report — ${d.workspaceName} (${d.monthName})`,
     html: layout({
       preheader: `Your ${d.monthName} summary for ${d.workspaceName}`,
       headline: 'Monthly Report',
       subtitle: `${d.workspaceName} · ${d.monthName}`,
-      body: scoreSection + trafficSection + metricsGrid + activitySection + chatSection + pendingAlert,
+      body: trialBanner + scoreSection + trafficSection + metricsGrid + activitySection + chatSection + pendingAlert,
       cta: d.dashboardUrl ? { label: 'Open Dashboard', url: d.dashboardUrl } : undefined,
       footer: 'Automated monthly summary from your web team',
     }),
