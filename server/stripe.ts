@@ -50,8 +50,8 @@ const PRODUCT_MAP: Record<ProductType, { displayName: string; category: ProductC
   schema_site:      { displayName: 'Schema — Full Site',      category: 'schema',   priceUsd: 350,  envKey: 'STRIPE_PRICE_SCHEMA_SITE' },
   strategy:         { displayName: 'Keyword Strategy',        category: 'strategy', priceUsd: 400,  envKey: 'STRIPE_PRICE_STRATEGY' },
   strategy_refresh: { displayName: 'Strategy Refresh',        category: 'strategy', priceUsd: 200,  envKey: 'STRIPE_PRICE_STRATEGY_REFRESH' },
-  plan_growth:      { displayName: 'Growth Plan',              category: 'strategy', priceUsd: 99,   envKey: 'STRIPE_PRICE_PLAN_GROWTH' },
-  plan_premium:     { displayName: 'Premium Plan',             category: 'strategy', priceUsd: 249,  envKey: 'STRIPE_PRICE_PLAN_PREMIUM' },
+  plan_growth:      { displayName: 'Growth Plan',              category: 'strategy', priceUsd: 249,  envKey: 'STRIPE_PRICE_PLAN_GROWTH' },
+  plan_premium:     { displayName: 'Premium Plan',             category: 'strategy', priceUsd: 999,  envKey: 'STRIPE_PRICE_PLAN_PREMIUM' },
 };
 
 export function getProductConfig(type: ProductType): ProductConfig | null {

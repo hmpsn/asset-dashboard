@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Sparkles, Target, Shield, LineChart, FileText, MessageSquare,
+  Sparkles, Target, Shield, LineChart, FileText,
   Zap, ChevronRight, ChevronLeft, Check, BarChart3, Trophy,
   MousePointerClick, ArrowRight,
 } from 'lucide-react';
@@ -36,8 +36,8 @@ export function OnboardingWizard({
     { icon: LineChart, label: 'Analytics', desc: 'GA4 + Search Console data in one place', available: true, tab: 'analytics' },
     { icon: Sparkles, label: 'AI Advisor', desc: 'Ask questions about your traffic and strategy', available: true, tab: 'overview' },
     { icon: Target, label: 'SEO Strategy', desc: 'Keyword mapping, content gaps, and quick wins', available: tier !== 'free', tab: 'strategy' },
-    { icon: FileText, label: 'Content Pipeline', desc: 'Briefs, blog posts, and approval workflows', available: tier !== 'free', tab: 'content' },
-    { icon: MessageSquare, label: 'Request System', desc: 'Submit and track project requests', available: true, tab: 'requests' },
+    { icon: FileText, label: 'Content Engine', desc: 'AI-generated briefs and content purchasing', available: tier !== 'free', tab: 'content' },
+    { icon: Trophy, label: 'ROI Dashboard', desc: 'Track the value of your organic traffic', available: tier !== 'free', tab: 'roi' },
   ];
 
   const suggestedActions = [

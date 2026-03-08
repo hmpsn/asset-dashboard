@@ -17,11 +17,11 @@
       "hours": "13-18",
       "rationale": "Direct revenue impact: justify retainer with ROI data, prevent churn, enable self-service upgrades, and unlock prepaid revenue via credits.",
       "items": [
-        { "id": 74, "title": "ROI dashboard (Premium)", "source": "MONETIZATION.md ROI Spec", "est": "3-4h", "priority": "P0", "notes": "Organic traffic value in dollars (GSC clicks × SEMRush CPC). Ad spend equivalent. Content ROI. Growth trend. Blurred soft-gate for free/growth. GET /api/public/roi/:wsId", "status": "pending" },
+        { "id": 74, "title": "ROI dashboard (Growth+)", "source": "MONETIZATION.md ROI Spec", "est": "3-4h", "priority": "P0", "notes": "Shipped — Organic traffic value (GSC clicks × CPC), ad spend equivalent, page breakdown table. GET /api/public/roi/:wsId. Growth+ only tab.", "status": "done" },
         { "id": 88, "title": "Self-service tier upgrade via Stripe", "source": "MONETIZATION.md Phase 3", "est": "3-4h", "priority": "P0", "notes": "Shipped — plan_growth/plan_premium product types, Stripe Checkout for tier upgrades, webhook auto-upgrades tier, all mailto links replaced", "status": "done" },
-        { "id": 75, "title": "Churn prevention signals", "source": "MONETIZATION.md Churn Spec", "est": "2-3h", "priority": "P0", "notes": "Daily background job: no-login 14d, chat drop-off, no requests 30d, health score drop, trial ending, payment failed. Positive signals: traffic up 20%, high engagement. Alerts in Command Center", "status": "pending" },
+        { "id": 75, "title": "Churn prevention signals", "source": "MONETIZATION.md Churn Spec", "est": "2-3h", "priority": "P0", "notes": "Shipped — 6h scheduler: no-login-14d, chat-dropoff, no-requests-30d, health-drop, trial-ending, payment-failed, high-engagement. Admin API: list, per-ws, dismiss.", "status": "done" },
         { "id": 77, "title": "Usage tracking + limits", "source": "MONETIZATION.md Phase 4", "est": "2-3h", "priority": "P1", "notes": "Track AI conversations, briefs, strategies per workspace per month. Usage indicators (3 of 4 briefs remaining). Overage prompts. Admin usage dashboard", "status": "pending" },
-        { "id": 76, "title": "Credits system", "source": "MONETIZATION.md Credits Spec", "est": "2-3h", "priority": "P1", "notes": "Prepaid credit packs ($500/5cr, $900/10cr, $1600/20cr). Per-product credit costs. Purchase via Stripe. Admin can grant credits. Deduct on fulfillment", "status": "pending" }
+        { "id": 76, "title": "Strategy & implementation hours system", "source": "Tier audit discussion", "est": "4-6h", "priority": "P1", "notes": "Premium includes 3 strategy & implementation hrs/mo. Additional hours: $200/hr ad-hoc, $175/hr 5-hr block, $150/hr 10-hr block. Scoped to SEO execution only (meta tags, schema, redirects, content publishing, audit fixes). Separate from dev work. Requests tab appears when active package. Hour tracking, usage dashboard, Stripe add-on products.", "status": "pending" }
       ]
     },
     {
@@ -30,8 +30,8 @@
       "hours": "13-18",
       "rationale": "Features that keep clients engaged, prove value, and reduce churn. Each one adds a reason to stay.",
       "items": [
-        { "id": 25, "title": "Client onboarding wizard", "source": "ACTION_PLAN", "est": "2-3h", "priority": "P0", "notes": "Guided first-time experience: connect site, run first audit, explore key features. Reduces early drop-off", "status": "pending" },
-        { "id": 30, "title": "\"What happened this month\" summary", "source": "ACTION_PLAN", "est": "2-3h", "priority": "P0", "notes": "Auto-generated plain-English monthly summary. AI synthesizes GSC/GA4/audit changes into 3-5 bullet insights. Shows on Overview + email", "status": "pending" },
+        { "id": 25, "title": "Client onboarding wizard", "source": "ACTION_PLAN", "est": "2-3h", "priority": "P0", "notes": "Shipped — 3-step guided first-run (welcome → tour → actions). Tier-aware feature grid, suggested actions based on connected data.", "status": "done" },
+        { "id": 30, "title": "\"What happened this month\" summary", "source": "ACTION_PLAN", "est": "2-3h", "priority": "P0", "notes": "Shipped — MonthlySummary component on overview tab. Traffic deltas, content activity, request counts, approval stats.", "status": "done" },
         { "id": 31, "title": "Content performance tracker", "source": "ACTION_PLAN", "est": "3-4h", "priority": "P1", "notes": "Track GSC/GA4 performance per published post. Proves content ROI to clients — clicks, impressions, rankings over time since publish date", "status": "pending" },
         { "id": 33, "title": "AI anomaly detection", "source": "ACTION_PLAN", "est": "4-5h", "priority": "P1", "notes": "Background job to flag traffic/conversion anomalies. Alerts admin and client when significant changes detected. Proactive value.", "status": "pending" },
         { "id": 29, "title": "Automated competitive monitoring", "source": "ACTION_PLAN", "est": "3-4h", "priority": "P2", "notes": "Monthly competitor audit, alert on improvements. Shows clients you're watching the landscape", "status": "pending" }

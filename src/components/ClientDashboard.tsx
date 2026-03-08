@@ -1222,20 +1222,21 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
   const fmtPrice = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: pCurrency, minimumFractionDigits: 0 }).format(n);
   const briefPrice = pricingData?.products?.brief_blog?.price ?? ws?.contentPricing?.briefPrice ?? null;
   const fullPostPrice = pricingData?.products?.post_polished?.price ?? ws?.contentPricing?.fullPostPrice ?? null;
-  const strategyLocked = !ws?.seoClientView;
+  const strategyLocked = effectiveTier === 'free' || !ws?.seoClientView;
+  const isPaid = effectiveTier !== 'free';
+  const isPremium = effectiveTier === 'premium';
   const NAV = [
     { id: 'overview' as ClientTab, label: 'Insights', icon: Sparkles, locked: false },
-    { id: 'strategy' as ClientTab, label: 'SEO Strategy', icon: Target, locked: strategyLocked },
+    ...(isPaid ? [{ id: 'strategy' as ClientTab, label: 'SEO Strategy', icon: Target, locked: strategyLocked }] : []),
     { id: 'health' as ClientTab, label: 'Site Health', icon: Shield, locked: false },
     ...(ws?.analyticsClientView !== false ? [
       { id: 'analytics' as ClientTab, label: 'Analytics', icon: LineChart, locked: false },
       { id: 'search' as ClientTab, label: 'Search', icon: Search, locked: false },
     ] : []),
-    ...(contentRequests.length > 0 || strategyData ? [{ id: 'content' as ClientTab, label: 'Content', icon: FileText, locked: false }] : []),
-    { id: 'requests' as ClientTab, label: 'Requests', icon: MessageSquare, locked: false },
-    ...(approvalBatches.length > 0 ? [{ id: 'approvals' as ClientTab, label: 'Approvals', icon: ClipboardCheck, locked: false }] : []),
+    ...(isPaid && (contentRequests.length > 0 || strategyData) ? [{ id: 'content' as ClientTab, label: 'Content', icon: FileText, locked: false }] : []),
+    ...(isPremium && approvalBatches.length > 0 ? [{ id: 'approvals' as ClientTab, label: 'Approvals', icon: ClipboardCheck, locked: false }] : []),
     { id: 'plans' as ClientTab, label: 'Plans', icon: CreditCard, locked: false },
-    ...(effectiveTier !== 'free' ? [{ id: 'roi' as ClientTab, label: 'ROI', icon: Trophy, locked: false }] : []),
+    ...(isPaid ? [{ id: 'roi' as ClientTab, label: 'ROI', icon: Trophy, locked: false }] : []),
   ];
 
   return (
@@ -2016,7 +2017,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
 
               {/* ── COMPETITOR KEYWORD GAPS ── */}
               {strategyData.keywordGaps && strategyData.keywordGaps.length > 0 && (
-                <TierGate tier={effectiveTier} required="growth" feature="Competitor Keyword Gaps" teaser={`${strategyData.keywordGaps.length} keyword gaps found — upgrade to see what competitors rank for`}>
+                <TierGate tier={effectiveTier} required="premium" feature="Competitor Keyword Gaps" teaser={`${strategyData.keywordGaps.length} keyword gaps found — upgrade to Premium to see what competitors rank for`}>
                 <div className="bg-gradient-to-br from-orange-950/20 to-zinc-900 rounded-xl border border-orange-500/20 p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="w-6 h-6 rounded-lg bg-orange-500/20 flex items-center justify-center">
@@ -3649,56 +3650,56 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         {tab === 'plans' && (() => {
           const tier = effectiveTier;
           const isTrial = ws.isTrial && ws.trialDaysRemaining != null && ws.trialDaysRemaining > 0;
-          const plans: { id: Tier; name: string; tagline: string; color: string; borderColor: string; bgColor: string; features: { label: string; included: boolean }[] }[] = [
+          const plans: { id: Tier; name: string; price: string; tagline: string; color: string; borderColor: string; bgColor: string; features: { label: string; included: boolean }[] }[] = [
             {
-              id: 'free', name: 'Starter', tagline: 'Essential visibility into your site',
+              id: 'free', name: 'Starter', price: 'Free', tagline: 'Your site at a glance',
               color: 'text-zinc-300', borderColor: 'border-zinc-700', bgColor: 'bg-zinc-900',
               features: [
                 { label: 'AI-powered site insights', included: true },
                 { label: 'Site health audits', included: true },
                 { label: 'Google Analytics overview', included: true },
                 { label: 'Search Console data', included: true },
-                { label: 'Request submission', included: true },
-                { label: 'Custom date ranges', included: false },
+                { label: 'AI chat advisor (3/mo)', included: true },
+                { label: 'Monthly summary digest', included: true },
                 { label: 'SEO keyword strategy', included: false },
-                { label: 'Content opportunities', included: false },
                 { label: 'Content briefs & posts', included: false },
+                { label: 'ROI tracking', included: false },
+                { label: 'Custom date ranges', included: false },
                 { label: 'Competitor analysis', included: false },
-                { label: 'AI strategy chat', included: false },
               ],
             },
             {
-              id: 'growth', name: 'Growth', tagline: 'Full SEO strategy & content engine',
+              id: 'growth', name: 'Growth', price: '$249', tagline: 'AI-powered SEO engine',
               color: 'text-teal-300', borderColor: 'border-teal-500/30', bgColor: 'bg-teal-500/5',
               features: [
                 { label: 'Everything in Starter', included: true },
                 { label: 'Custom date ranges', included: true },
                 { label: 'SEO keyword strategy', included: true },
-                { label: 'Content opportunities', included: true },
-                { label: 'Content briefs & posts', included: true },
-                { label: 'Competitor keyword gaps', included: true },
+                { label: 'Content gaps & quick wins', included: true },
                 { label: 'Page keyword mapping', included: true },
-                { label: 'Quick win recommendations', included: true },
-                { label: 'AI strategy chat', included: true },
-                { label: 'Priority support', included: false },
+                { label: 'Content briefs & posts', included: true },
+                { label: 'ROI dashboard', included: true },
+                { label: 'Unlimited AI chat', included: true },
+                { label: 'Competitor analysis', included: false },
+                { label: '3 strategy & implementation hrs', included: false },
                 { label: 'Dedicated strategist', included: false },
               ],
             },
             {
-              id: 'premium', name: 'Premium', tagline: 'White-glove SEO partnership',
+              id: 'premium', name: 'Premium', price: '$999', tagline: 'Managed SEO partnership',
               color: 'text-teal-200', borderColor: 'border-teal-400/30', bgColor: 'bg-teal-500/5',
               features: [
                 { label: 'Everything in Growth', included: true },
-                { label: 'Priority support', included: true },
-                { label: 'Dedicated strategist', included: true },
-                { label: 'Monthly strategy reviews', included: true },
-                { label: 'Custom reporting', included: true },
+                { label: 'Competitor keyword analysis', included: true },
                 { label: 'Advanced competitor intel', included: true },
-                { label: 'Conversion optimization', included: true },
+                { label: 'Dedicated strategist', included: true },
+                { label: '3 strategy & implementation hrs/mo', included: true },
+                { label: 'Monthly strategy reviews', included: true },
+                { label: 'SEO change approvals', included: true },
                 { label: 'Content calendar planning', included: true },
-                { label: 'Technical SEO audits', included: true },
-                { label: 'Schema markup implementation', included: true },
-                { label: 'Link building strategy', included: true },
+                { label: 'Technical SEO implementation', included: true },
+                { label: 'Schema markup', included: true },
+                { label: 'Priority support', included: true },
               ],
             },
           ];
@@ -3730,7 +3731,11 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                       )}
                       <div className="pt-2">
                         <h3 className={`text-lg font-bold ${plan.color}`}>{plan.name}</h3>
-                        <p className="text-[11px] text-zinc-500 mt-0.5 mb-4">{plan.tagline}</p>
+                        <div className="flex items-baseline gap-1 mt-1">
+                          <span className={`text-2xl font-bold ${plan.color}`}>{plan.price}</span>
+                          {plan.price !== 'Free' && <span className="text-xs text-zinc-500">/month</span>}
+                        </div>
+                        <p className="text-[11px] text-zinc-500 mt-1.5 mb-4">{plan.tagline}</p>
                         <div className="space-y-2">
                           {plan.features.map((f, i) => (
                             <div key={i} className="flex items-center gap-2">
