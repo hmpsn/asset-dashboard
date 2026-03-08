@@ -4,7 +4,6 @@ import {
   Sparkles, Send, AlertTriangle,
   Target, Zap, Shield, MessageSquare, X, ChevronDown, ChevronUp,
   CheckCircle2, LineChart, Lock, Trophy, Check,
-  ClipboardCheck,
   Sun, Moon, Plus, FileText, Download, ExternalLink, Calendar, Clock, CreditCard,
 } from 'lucide-react';
 import { StripePaymentModal } from './StripePaymentForm';
@@ -17,12 +16,10 @@ import { SeoCartButton, SeoCartDrawer } from './client/SeoCart';
 import { OnboardingWizard } from './client/OnboardingWizard';
 import { ROIDashboard } from './client/ROIDashboard';
 import { PlansTab } from './client/PlansTab';
-import { RequestsTab } from './client/RequestsTab';
 import { StrategyTab } from './client/StrategyTab';
-import { ContentTab } from './client/ContentTab';
 import { AnalyticsTab } from './client/AnalyticsTab';
-import { ApprovalsTab } from './client/ApprovalsTab';
 import { SearchTab } from './client/SearchTab';
+import { InboxTab } from './client/InboxTab';
 import { OverviewTab } from './client/OverviewTab';
 import { ErrorBoundary } from './ErrorBoundary';
 import {
@@ -56,7 +53,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
   const [tab, setTabRaw] = useState<ClientTab>(() => {
     const params = new URLSearchParams(window.location.search);
     const t = params.get('tab');
-    if (t && ['overview','search','health','strategy','analytics','approvals','requests','content','plans','roi'].includes(t)) return t as ClientTab;
+    if (t && ['overview','search','health','strategy','analytics','inbox','approvals','requests','content','plans','roi'].includes(t)) return t as ClientTab;
     return 'overview';
   });
   const setTab = (t: ClientTab) => {
@@ -950,7 +947,6 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
   const fullPostPrice = pricingData?.products?.post_polished?.price ?? ws?.contentPricing?.fullPostPrice ?? null;
   const strategyLocked = effectiveTier === 'free' || !ws?.seoClientView;
   const isPaid = effectiveTier !== 'free';
-  const isPremium = effectiveTier === 'premium';
   const NAV = [
     { id: 'overview' as ClientTab, label: 'Insights', icon: Sparkles, locked: false },
     ...(isPaid ? [{ id: 'strategy' as ClientTab, label: 'SEO Strategy', icon: Target, locked: strategyLocked }] : []),
@@ -959,8 +955,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
       { id: 'analytics' as ClientTab, label: 'Analytics', icon: LineChart, locked: false },
       { id: 'search' as ClientTab, label: 'Search', icon: Search, locked: false },
     ] : []),
-    ...(isPaid && (contentRequests.length > 0 || strategyData) ? [{ id: 'content' as ClientTab, label: 'Content', icon: FileText, locked: false }] : []),
-    ...(isPremium && approvalBatches.length > 0 ? [{ id: 'approvals' as ClientTab, label: 'Approvals', icon: ClipboardCheck, locked: false }] : []),
+    ...(isPaid ? [{ id: 'inbox' as ClientTab, label: 'Inbox', icon: Zap, locked: false }] : []),
     { id: 'plans' as ClientTab, label: 'Plans', icon: CreditCard, locked: false },
     ...(isPaid ? [{ id: 'roi' as ClientTab, label: 'ROI', icon: Trophy, locked: false }] : []),
   ];
@@ -1080,8 +1075,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                 (t.id === 'search' && !!overview) ||
                 (t.id === 'health' && !!audit) ||
                 (t.id === 'analytics' && !!ga4Overview) ||
-                (t.id === 'content' && (contentRequests.length > 0 || !!strategyData)) ||
-                (t.id === 'approvals' && approvalBatches.length > 0);
+                (t.id === 'inbox');
               const pendingReviews = contentRequests.filter(r => r.status === 'client_review').length;
               return (
                 <button key={t.id} onClick={() => t.locked ? setShowUpgradeModal(true) : setTab(t.id)}
@@ -1092,10 +1086,8 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                   }`}>
                   <Icon className="w-3.5 h-3.5" /> {t.label}
                   {t.locked && <Lock className="w-3 h-3 ml-0.5 text-zinc-500" />}
-                  {t.id === 'approvals' && pendingApprovals > 0 && <span className="ml-1 px-1.5 py-0.5 text-[11px] font-bold rounded-full bg-teal-500 text-white">{pendingApprovals}</span>}
-                  {t.id === 'requests' && unreadTeamNotes > 0 && <span className="ml-1 px-1.5 py-0.5 text-[11px] font-bold rounded-full bg-teal-500 text-white">{unreadTeamNotes}</span>}
-                  {t.id === 'content' && pendingReviews > 0 && <span className="ml-1 px-1.5 py-0.5 text-[11px] font-bold rounded-full bg-blue-500 text-white">{pendingReviews}</span>}
-                  {!t.locked && hasData && !active && t.id !== 'approvals' && t.id !== 'requests' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" />}
+                  {t.id === 'inbox' && (pendingApprovals + pendingReviews + unreadTeamNotes) > 0 && <span className="ml-1 px-1.5 py-0.5 text-[11px] font-bold rounded-full bg-teal-500 text-white">{pendingApprovals + pendingReviews + unreadTeamNotes}</span>}
+                  {!t.locked && hasData && !active && t.id !== 'inbox' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" />}
                 </button>
               );
             })}
@@ -1137,7 +1129,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
 
         {/* ════════════ OVERVIEW TAB ════════════ */}
         {tab === 'overview' && (
-          <OverviewTab workspaceId={workspaceId} ws={ws!} effectiveTier={effectiveTier} overview={overview} searchComparison={searchComparison} trend={trend} ga4Overview={ga4Overview} ga4Trend={ga4Trend} ga4Comparison={ga4Comparison} ga4Organic={ga4Organic} ga4Conversions={ga4Conversions} ga4NewVsReturning={ga4NewVsReturning} audit={audit} auditDetail={auditDetail} strategyData={strategyData} insights={insights} contentRequests={contentRequests} requests={requests} approvalBatches={approvalBatches} activityLog={activityLog} pendingApprovals={pendingApprovals} unreadTeamNotes={unreadTeamNotes} eventDisplayName={eventDisplayName} isEventPinned={isEventPinned} setTab={setTab} onAskAi={askAi} onOpenChat={() => setChatOpen(true)} />
+          <OverviewTab ws={ws!} overview={overview} searchComparison={searchComparison} trend={trend} ga4Overview={ga4Overview} ga4Trend={ga4Trend} ga4Comparison={ga4Comparison} ga4Organic={ga4Organic} ga4Conversions={ga4Conversions} ga4NewVsReturning={ga4NewVsReturning} audit={audit} auditDetail={auditDetail} strategyData={strategyData} insights={insights} contentRequests={contentRequests} requests={requests} approvalBatches={approvalBatches} activityLog={activityLog} pendingApprovals={pendingApprovals} unreadTeamNotes={unreadTeamNotes} eventDisplayName={eventDisplayName} isEventPinned={isEventPinned} setTab={setTab} onAskAi={askAi} onOpenChat={() => setChatOpen(true)} />
         )}
 
         {/* ════════════ SEARCH TAB ════════════ */}
@@ -1165,9 +1157,9 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         )}
 
 
-        {/* ════════════ CONTENT TAB ════════════ */}
-        {tab === 'content' && (
-          <ContentTab contentRequests={contentRequests} setContentRequests={setContentRequests} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} pricingConfirming={pricingConfirming} workspaceId={workspaceId} setTab={setTab} setToast={setToast} />
+        {/* ════════════ INBOX TAB (Approvals + Requests + Content) ════════════ */}
+        {tab === 'inbox' && (
+          <InboxTab workspaceId={workspaceId} effectiveTier={effectiveTier} approvalBatches={approvalBatches} approvalsLoading={approvalsLoading} pendingApprovals={pendingApprovals} setApprovalBatches={setApprovalBatches} loadApprovals={loadApprovals} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} contentRequests={contentRequests} setContentRequests={setContentRequests} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} pricingConfirming={pricingConfirming} setTab={setTab} setToast={setToast} />
         )}
 
         {/* ════════════ ANALYTICS TAB ════════════ */}
@@ -1285,15 +1277,6 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         )}
       </>)}
 
-        {/* ════════════ APPROVALS TAB ════════════ */}
-        {tab === 'approvals' && (
-          <ApprovalsTab workspaceId={workspaceId} approvalBatches={approvalBatches} approvalsLoading={approvalsLoading} pendingApprovals={pendingApprovals} effectiveTier={effectiveTier} setApprovalBatches={setApprovalBatches} loadApprovals={loadApprovals} setToast={setToast} />
-        )}
-
-        {/* ════════════ REQUESTS TAB ════════════ */}
-        {tab === 'requests' && (
-          <RequestsTab workspaceId={workspaceId} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} setToast={setToast} />
-        )}
 
         {/* ════════════ PLANS TAB ════════════ */}
         {tab === 'plans' && (

@@ -3,7 +3,6 @@ import {
   Sparkles, Activity,
 } from 'lucide-react';
 import { StatCard } from '../ui';
-import { InsightsEngine } from './InsightsEngine';
 import { MonthlySummary } from './MonthlySummary';
 import { InsightsDigest } from './InsightsDigest';
 import { ErrorBoundary } from '../ErrorBoundary';
@@ -15,7 +14,6 @@ import type {
   ClientContentRequest, ClientKeywordStrategy, ClientRequest, ApprovalBatch,
   ClientTab,
 } from './types';
-import type { Tier } from '../ui';
 
 interface SearchInsights {
   lowHanging: { query: string; position: number; impressions: number; clicks: number; ctr: number }[];
@@ -27,9 +25,7 @@ interface SearchInsights {
 }
 
 interface OverviewTabProps {
-  workspaceId: string;
   ws: WorkspaceInfo;
-  effectiveTier: Tier;
   // Data
   overview: SearchOverview | null;
   searchComparison: SearchComparison | null;
@@ -62,7 +58,7 @@ interface OverviewTabProps {
 }
 
 export function OverviewTab({
-  workspaceId, ws, effectiveTier,
+  ws,
   overview, searchComparison, trend,
   ga4Overview, ga4Trend, ga4Comparison, ga4Organic, ga4Conversions, ga4NewVsReturning,
   audit, auditDetail, strategyData, insights,
@@ -81,10 +77,10 @@ export function OverviewTab({
     {/* Action-needed banner */}
     {(() => {
       const actions: { label: string; count: number; tab: ClientTab; color: string }[] = [];
-      if (pendingApprovals > 0) actions.push({ label: `${pendingApprovals} SEO change${pendingApprovals > 1 ? 's' : ''} to review`, count: pendingApprovals, tab: 'approvals', color: 'text-amber-400' });
+      if (pendingApprovals > 0) actions.push({ label: `${pendingApprovals} SEO change${pendingApprovals > 1 ? 's' : ''} to review`, count: pendingApprovals, tab: 'inbox', color: 'text-amber-400' });
       const contentReviews = contentRequests.filter(r => r.status === 'client_review').length;
-      if (contentReviews > 0) actions.push({ label: `${contentReviews} content brief${contentReviews > 1 ? 's' : ''} ready for review`, count: contentReviews, tab: 'content', color: 'text-blue-400' });
-      if (unreadTeamNotes > 0) actions.push({ label: `${unreadTeamNotes} request${unreadTeamNotes > 1 ? 's' : ''} with new team replies`, count: unreadTeamNotes, tab: 'requests', color: 'text-teal-400' });
+      if (contentReviews > 0) actions.push({ label: `${contentReviews} content brief${contentReviews > 1 ? 's' : ''} ready for review`, count: contentReviews, tab: 'inbox', color: 'text-blue-400' });
+      if (unreadTeamNotes > 0) actions.push({ label: `${unreadTeamNotes} request${unreadTeamNotes > 1 ? 's' : ''} with new team replies`, count: unreadTeamNotes, tab: 'inbox', color: 'text-teal-400' });
       if (actions.length === 0) return null;
       const total = actions.reduce((s, a) => s + a.count, 0);
       return (
@@ -222,27 +218,6 @@ export function OverviewTab({
           </div>
         </div>
 
-        {/* Site health compact */}
-        {audit && (
-          <button onClick={() => setTab('health')} className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 text-left hover:border-zinc-700 transition-colors w-full">
-            <div className="flex items-center gap-2 mb-2"><Shield className="w-4 h-4" style={{ color: audit.siteScore >= 80 ? '#34d399' : audit.siteScore >= 60 ? '#fbbf24' : '#f87171' }} /><span className="text-xs font-medium text-zinc-300">Site Health</span></div>
-            <div className="flex items-center gap-3">
-              <div className={`text-2xl font-bold ${audit.siteScore >= 80 ? 'text-green-400' : audit.siteScore >= 60 ? 'text-amber-400' : 'text-red-400'}`}>{audit.siteScore}/100</div>
-              <div className="flex-1">
-                <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full transition-all" style={{ width: `${audit.siteScore}%`, backgroundColor: audit.siteScore >= 80 ? '#34d399' : audit.siteScore >= 60 ? '#fbbf24' : '#f87171' }} />
-                </div>
-              </div>
-            </div>
-            {auditDetail && auditDetail.audit.errors > 0 && (
-              <div className="mt-2 text-[11px] text-red-400">{auditDetail.audit.errors} issue{auditDetail.audit.errors !== 1 ? 's' : ''} to fix</div>
-            )}
-            {audit.siteScore >= 80 && <div className="mt-2 text-[11px] text-emerald-400">Looking good — your site is healthy</div>}
-          </button>
-        )}
-
-        {/* Action Plan — compact insights */}
-        {workspaceId && <ErrorBoundary label="Action Plan"><InsightsEngine workspaceId={workspaceId} tier={effectiveTier} compact /></ErrorBoundary>}
 
         {/* Activity timeline */}
         {activityLog.length > 0 && (
