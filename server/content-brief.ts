@@ -171,6 +171,7 @@ export async function generateBrief(
     semrushMetrics?: KeywordMetrics;
     semrushRelated?: RelatedKeyword[];
     pageType?: string;
+    ga4PagePerformance?: { landingPage: string; sessions: number; users: number; bounceRate: number; avgEngagementTime: number; conversions: number }[];
   }
 ): Promise<ContentBrief> {
   const openaiKey = process.env.OPENAI_API_KEY;
@@ -208,6 +209,17 @@ export async function generateBrief(
       .join('\n');
   }
 
+  // GA4 page performance data (for existing-page content refreshes)
+  let ga4Block = '';
+  if (context.ga4PagePerformance?.length) {
+    ga4Block = `\n\nEXISTING PAGE PERFORMANCE DATA (from GA4 — last 28 days, use to inform content strategy):\n`;
+    ga4Block += context.ga4PagePerformance.slice(0, 10).map(p => {
+      const engMin = (p.avgEngagementTime / 60).toFixed(1);
+      return `- ${p.landingPage}: ${p.sessions} sessions, ${p.users} users, ${p.bounceRate}% bounce rate, ${engMin}m avg engagement, ${p.conversions} conversions`;
+    }).join('\n');
+    ga4Block += `\n\nUse this data to:\n- Identify which existing pages perform well (low bounce, high engagement) and why\n- Spot underperforming pages that a content refresh could improve\n- Recommend internal links to high-traffic pages\n- Set realistic traffic expectations based on current performance`;
+  }
+
   // Page-type-specific instructions
   const pageTypeBlock = context.pageType && PAGE_TYPE_PROMPTS[context.pageType]
     ? `\n\n${PAGE_TYPE_PROMPTS[context.pageType]}\n\nTailor ALL aspects of the brief (outline structure, word count, CTA, schema, content format) to this page type.`
@@ -221,7 +233,7 @@ Related search queries from Google Search Console:
 ${relatedStr}
 
 Existing pages on the site:
-${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${semrushBlock}
+${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${semrushBlock}${ga4Block}
 
 Generate a content brief in the following JSON format:
 {

@@ -106,3 +106,13 @@ export function isJobCancelled(id: string): boolean {
   const ac = abortControllers.get(id);
   return ac?.signal.aborted ?? false;
 }
+
+/** Check if an active (pending/running) job of the given type already exists for a workspace. */
+export function hasActiveJob(type: string, workspaceId?: string): Job | undefined {
+  for (const job of jobs.values()) {
+    if (job.type === type && (job.status === 'pending' || job.status === 'running')) {
+      if (!workspaceId || job.workspaceId === workspaceId) return job;
+    }
+  }
+  return undefined;
+}

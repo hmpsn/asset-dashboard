@@ -61,7 +61,7 @@ import { runSiteSpeed, runSinglePageSpeed } from './pagespeed.js';
 import { generateSchemaSuggestions, generateSchemaForPage, generateCmsTemplateSchema, type SchemaContext } from './schema-suggester.js';
 import { saveSchemaSnapshot, getSchemaSnapshot } from './schema-store.js';
 import { runSalesAudit } from './sales-audit.js';
-import { initJobs, createJob, updateJob, getJob, listJobs, cancelJob, registerAbort, isJobCancelled } from './jobs.js';
+import { initJobs, createJob, updateJob, getJob, listJobs, cancelJob, registerAbort, isJobCancelled, hasActiveJob } from './jobs.js';
 import { createBatch, listBatches, getBatch, updateItem, markBatchApplied, deleteBatch } from './approvals.js';
 import { listRequests, createRequest, updateRequest, addNote, deleteRequest, getRequest, getAttachmentsDir, addAttachmentsToRequest, type RequestAttachment } from './requests.js';
 import { notifyTeamNewRequest, notifyClientTeamResponse, notifyClientStatusChange, notifyTeamContentRequest, notifyClientBriefReady, notifyApprovalReady, isEmailConfigured, initEmailQueue } from './email.js';
@@ -4844,6 +4844,15 @@ app.post('/api/content-requests/:workspaceId/:id/generate-brief', async (req, re
       } catch (e) { console.error('SEMRush brief enrichment error:', e); }
     }
 
+    // Gather GA4 landing page performance if connected
+    let ga4PagePerformance: { landingPage: string; sessions: number; users: number; bounceRate: number; avgEngagementTime: number; conversions: number }[] | undefined;
+    if (ws.ga4PropertyId) {
+      try {
+        const pages = await getGA4LandingPages(ws.ga4PropertyId, 28, 25);
+        if (pages.length > 0) ga4PagePerformance = pages;
+      } catch { /* GA4 unavailable */ }
+    }
+
     const existingPages = ws.keywordStrategy?.pageMap?.map(p => p.pagePath) || [];
     const brief = await generateBrief(req.params.workspaceId, request.targetKeyword, {
       relatedQueries,
@@ -4852,6 +4861,7 @@ app.post('/api/content-requests/:workspaceId/:id/generate-brief', async (req, re
       semrushMetrics,
       semrushRelated,
       pageType: request.pageType || 'blog',
+      ga4PagePerformance,
     });
 
     // Link brief to request and update status
@@ -5700,6 +5710,8 @@ app.post('/api/jobs', async (req, res) => {
       case 'seo-audit': {
         const siteId = params.siteId as string;
         if (!siteId) return res.status(400).json({ error: 'siteId required' });
+        const activeAudit = hasActiveJob('seo-audit', params.workspaceId as string);
+        if (activeAudit) return res.status(409).json({ error: 'An SEO audit is already running for this workspace', jobId: activeAudit.id });
         const token = getTokenForSite(siteId) || undefined;
         if (!token) return res.status(400).json({ error: 'No Webflow API token configured' });
         const job = createJob('seo-audit', { message: 'Running SEO audit...', workspaceId: params.workspaceId as string });
@@ -5797,6 +5809,8 @@ app.post('/api/jobs', async (req, res) => {
       case 'bulk-compress': {
         const { assets, siteId } = params as { assets: Array<{ assetId: string; imageUrl: string; altText?: string; fileName?: string }>; siteId: string };
         if (!assets?.length || !siteId) return res.status(400).json({ error: 'assets and siteId required' });
+        const activeBulkCompress = hasActiveJob('bulk-compress', params.workspaceId as string);
+        if (activeBulkCompress) return res.status(409).json({ error: 'A bulk compression is already running', jobId: activeBulkCompress.id });
         const job = createJob('bulk-compress', { message: `Compressing ${assets.length} assets...`, total: assets.length, workspaceId: params.workspaceId as string });
         res.json({ jobId: job.id });
         (async () => {
@@ -5831,6 +5845,8 @@ app.post('/api/jobs', async (req, res) => {
       case 'bulk-alt': {
         const { assets: altAssets, siteId: altSiteId } = params as { assets: Array<{ assetId: string; imageUrl: string }>; siteId?: string };
         if (!altAssets?.length) return res.status(400).json({ error: 'assets required' });
+        const activeBulkAlt = hasActiveJob('bulk-alt', params.workspaceId as string);
+        if (activeBulkAlt) return res.status(409).json({ error: 'Bulk alt text generation is already running', jobId: activeBulkAlt.id });
         const job = createJob('bulk-alt', { message: `Generating alt text for ${altAssets.length} images...`, total: altAssets.length, workspaceId: params.workspaceId as string });
         res.json({ jobId: job.id });
         (async () => {
@@ -5881,6 +5897,8 @@ app.post('/api/jobs', async (req, res) => {
       case 'bulk-seo-fix': {
         const { siteId: seoSiteId, pages, field, workspaceId: bwsId } = params as { siteId: string; pages: Array<{ pageId: string; title: string; slug?: string; currentSeoTitle?: string; currentDescription?: string }>; field: 'title' | 'description'; workspaceId?: string };
         if (!seoSiteId || !pages?.length || !field) return res.status(400).json({ error: 'siteId, pages, field required' });
+        const activeBulkSeo = hasActiveJob('bulk-seo-fix', bwsId);
+        if (activeBulkSeo) return res.status(409).json({ error: 'A bulk SEO fix is already running', jobId: activeBulkSeo.id });
         const job = createJob('bulk-seo-fix', { message: `Fixing ${field}s for ${pages.length} pages...`, total: pages.length, workspaceId: bwsId });
         res.json({ jobId: job.id });
         (async () => {
@@ -5953,6 +5971,8 @@ app.post('/api/jobs', async (req, res) => {
       case 'keyword-strategy': {
         const wsId = params.workspaceId as string;
         if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
+        const activeStrat = hasActiveJob('keyword-strategy', wsId);
+        if (activeStrat) return res.status(409).json({ error: 'A keyword strategy is already being generated for this workspace', jobId: activeStrat.id });
         const stratWs = getWorkspace(wsId);
         if (!stratWs) return res.status(404).json({ error: 'Workspace not found' });
         if (!stratWs.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
@@ -5994,6 +6014,8 @@ app.post('/api/jobs', async (req, res) => {
       case 'schema-generator': {
         const schemaSiteId = params.siteId as string;
         if (!schemaSiteId) return res.status(400).json({ error: 'siteId required' });
+        const activeSchema = hasActiveJob('schema-generator', params.workspaceId as string);
+        if (activeSchema) return res.status(409).json({ error: 'Schema generation is already running for this workspace', jobId: activeSchema.id });
         const schemaToken = getTokenForSite(schemaSiteId) || undefined;
         if (!schemaToken) return res.status(400).json({ error: 'No Webflow API token configured' });
         const job = createJob('schema-generator', { message: 'Generating schemas...', workspaceId: params.workspaceId as string });

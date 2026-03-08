@@ -3,13 +3,12 @@
     {
       "id": "sprint-A",
       "name": "Quick Wins",
-      "hours": "3-5",
+      "hours": "2-4",
       "rationale": "No-brainer items: one-line changes, inject existing data into existing features, and small guards. Ship in a single session.",
       "items": [
-        { "id": 90, "title": "Schema generator → gpt-4o upgrade", "source": "FEATURE_AUDIT", "est": "15m", "priority": "P0", "notes": "One-line model change in schema-suggester.ts. Switch from gpt-4o-mini to gpt-4o for better schema quality", "status": "pending" },
-        { "id": 91, "title": "SEO audit AI → gpt-4o-mini cost savings", "source": "FEATURE_AUDIT", "est": "15m", "priority": "P0", "notes": "One-line model change. Switch audit AI recommendations from gpt-4o to gpt-4o-mini for cost savings with minimal quality loss", "status": "pending" },
-        { "id": 87, "title": "Content brief: GA4 page performance injection", "source": "FEATURE_AUDIT", "est": "1-2h", "priority": "P0", "notes": "GA4 landing page data (sessions, bounce rate, engagement) already fetched — inject into brief generation prompt for existing-page content refreshes", "status": "pending" },
-        { "id": 50, "title": "Concurrent background job limits", "source": "FEATURE_AUDIT", "est": "1-2h", "priority": "P1", "notes": "Add guard to prevent duplicate audits/crawls on same site. Simple in-memory lock per workspace", "status": "pending" }
+        { "id": 91, "title": "SEO audit AI → gpt-4o-mini cost savings", "source": "FEATURE_AUDIT", "est": "15m", "priority": "P0", "notes": "Switched seo-audit AI recommendations from gpt-4o to gpt-4o-mini. ~17x cost reduction per audit.", "status": "done" },
+        { "id": 87, "title": "Content brief: GA4 page performance injection", "source": "FEATURE_AUDIT", "est": "1-2h", "priority": "P0", "notes": "GA4 landing page data (sessions, bounce rate, engagement, conversions) now injected into brief generation prompt when GA4 is connected.", "status": "done" },
+        { "id": 50, "title": "Concurrent background job limits", "source": "FEATURE_AUDIT", "est": "1-2h", "priority": "P1", "notes": "hasActiveJob guard on 7 job types: seo-audit, schema-generator, keyword-strategy, bulk-compress, bulk-alt, bulk-seo-fix. Returns 409 with existing jobId.", "status": "done" }
       ]
     },
     {
@@ -87,7 +86,8 @@
         { "id": 48, "title": "Sales report: branded PDF export", "source": "FEATURE_AUDIT", "est": "3-4h", "priority": "P4", "notes": "Downloadable prospect reports with agency branding", "status": "pending" },
         { "id": 49, "title": "Sales report: email delivery", "source": "FEATURE_AUDIT", "est": "2h", "priority": "P4", "notes": "Send reports directly to prospects", "status": "pending" },
         { "id": 51, "title": "Heavy dependency audit / tree-shaking", "source": "FEATURE_AUDIT", "est": "2h", "priority": "P4", "notes": "Verify Lucide tree-shaking, audit chart libs", "status": "pending" },
-        { "id": 89, "title": "Sales report: CRM integration", "source": "FEATURE_AUDIT", "est": "3-4h", "priority": "P4", "notes": "Push prospect data to HubSpot/Pipedrive when a report is generated", "status": "pending" }
+        { "id": 89, "title": "Sales report: CRM integration", "source": "FEATURE_AUDIT", "est": "3-4h", "priority": "P4", "notes": "Push prospect data to HubSpot/Pipedrive when a report is generated", "status": "pending" },
+        { "id": 90, "title": "Schema generator → gpt-4o upgrade", "source": "FEATURE_AUDIT", "est": "15m", "priority": "P3", "notes": "CONDITIONAL: One-line model change in schema-suggester.ts. Blocked by 30K TPM limit on current OpenAI org tier. Switch when tier reaches 200K+ TPM on gpt-4o.", "status": "pending" }
       ]
     },
     {
