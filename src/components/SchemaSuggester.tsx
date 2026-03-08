@@ -3,9 +3,10 @@ import type { FixContext } from '../App';
 import {
   Loader2, ChevronDown, ChevronRight, Copy, CheckCircle,
   AlertCircle, Info, Sparkles, RefreshCw, Upload, Send, Search, Plus, Database,
-  ArrowRight, GitCompareArrows,
+  ArrowRight, GitCompareArrows, Pencil, AlertTriangle,
 } from 'lucide-react';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
+import { useRecommendations } from '../hooks/useRecommendations';
 
 interface SchemaSuggestion {
   type: string;
@@ -49,6 +50,7 @@ interface Props {
 }
 
 export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
+  const { forPage: recsForPage, loaded: recsLoaded } = useRecommendations(workspaceId);
   const [data, setData] = useState<SchemaPageSuggestion[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [started, setStarted] = useState(false);
@@ -100,6 +102,11 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
   const [showDiff, setShowDiff] = useState<Set<string>>(new Set());
   const [cmsCopied, setCmsCopied] = useState(false);
   const [cmsError, setCmsError] = useState<string | null>(null);
+
+  // Schema editing state — stores edited JSON string per pageId
+  const [editingSchema, setEditingSchema] = useState<Set<string>>(new Set());
+  const [editedSchemaJson, setEditedSchemaJson] = useState<Record<string, string>>({});
+  const [schemaParseError, setSchemaParseError] = useState<Record<string, string>>({});
 
   // Load saved schema snapshot on mount
   const [snapshotDate, setSnapshotDate] = useState<string | null>(null);
@@ -159,7 +166,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
         pageSlug: page.slug,
         field: 'schema',
         currentValue: page.existingSchemas.length > 0 ? page.existingSchemas.join(', ') : '',
-        proposedValue: JSON.stringify(page.suggestedSchemas[0]?.template || {}, null, 2),
+        proposedValue: JSON.stringify(getEffectiveSchema(page.pageId, page.suggestedSchemas[0]?.template || {}), null, 2),
       }));
       const token = localStorage.getItem('auth_token');
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -298,8 +305,52 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
     });
   };
 
+  // Get effective schema for a page (edited version or original)
+  const getEffectiveSchema = (pageId: string, original: Record<string, unknown>): Record<string, unknown> => {
+    if (editedSchemaJson[pageId]) {
+      try { return JSON.parse(editedSchemaJson[pageId]); } catch { /* fall through to original */ }
+    }
+    return original;
+  };
+
+  const toggleSchemaEdit = (pageId: string, template: Record<string, unknown>) => {
+    setEditingSchema(prev => {
+      const next = new Set(prev);
+      if (next.has(pageId)) {
+        next.delete(pageId);
+        // Validate on close
+        if (editedSchemaJson[pageId]) {
+          try {
+            JSON.parse(editedSchemaJson[pageId]);
+            setSchemaParseError(prev => { const n = { ...prev }; delete n[pageId]; return n; });
+          } catch (e) {
+            setSchemaParseError(prev => ({ ...prev, [pageId]: e instanceof Error ? e.message : 'Invalid JSON' }));
+          }
+        }
+      } else {
+        next.add(pageId);
+        // Initialize editor with current JSON if not already edited
+        if (!editedSchemaJson[pageId]) {
+          setEditedSchemaJson(prev => ({ ...prev, [pageId]: JSON.stringify(template, null, 2) }));
+        }
+      }
+      return next;
+    });
+  };
+
+  const handleSchemaJsonChange = (pageId: string, value: string) => {
+    setEditedSchemaJson(prev => ({ ...prev, [pageId]: value }));
+    try {
+      JSON.parse(value);
+      setSchemaParseError(prev => { const n = { ...prev }; delete n[pageId]; return n; });
+    } catch (e) {
+      setSchemaParseError(prev => ({ ...prev, [pageId]: e instanceof Error ? e.message : 'Invalid JSON' }));
+    }
+  };
+
   const copyTemplate = (suggestion: SchemaSuggestion, pageId: string) => {
-    const json = JSON.stringify(suggestion.template, null, 2);
+    const effective = getEffectiveSchema(pageId, suggestion.template);
+    const json = JSON.stringify(effective, null, 2);
     const script = `<script type="application/ld+json">\n${json}\n</script>`;
     navigator.clipboard.writeText(script);
     setCopiedId(`${pageId}-${suggestion.type}`);
@@ -316,7 +367,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
         pageSlug: page.slug,
         field: 'schema',
         currentValue: page.existingSchemas.length > 0 ? page.existingSchemas.join(', ') : '',
-        proposedValue: JSON.stringify(page.suggestedSchemas[0]?.template || {}, null, 2),
+        proposedValue: JSON.stringify(getEffectiveSchema(page.pageId, page.suggestedSchemas[0]?.template || {}), null, 2),
       }];
       const token = localStorage.getItem('auth_token');
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -408,7 +459,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
     setBulkProgress({ done: 0, total: publishable.length });
     for (let i = 0; i < publishable.length; i++) {
       const page = publishable[i];
-      await publishToWebflow(page.pageId, page.suggestedSchemas[0].template);
+      await publishToWebflow(page.pageId, getEffectiveSchema(page.pageId, page.suggestedSchemas[0].template));
       setBulkProgress({ done: i + 1, total: publishable.length });
     }
     setBulkPublishing(false);
@@ -801,6 +852,14 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
                       <AlertCircle className="w-3 h-3" /> {page.validationErrors!.length}
                     </span>
                   )}
+                  {(() => {
+                    const schemaRecs = recsLoaded ? recsForPage(page.slug).filter(r => r.type === 'schema') : [];
+                    return schemaRecs.length > 0 ? (
+                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                        <AlertTriangle className="w-3 h-3" /> {schemaRecs.length} rec{schemaRecs.length > 1 ? 's' : ''}
+                      </span>
+                    ) : null;
+                  })()}
                   <button
                     onClick={(e) => { e.stopPropagation(); regeneratePage(page.pageId); }}
                     disabled={isRegenLoading}
@@ -838,6 +897,36 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
                     </div>
                   )}
 
+                  {/* Recommendation banners */}
+                  {(() => {
+                    const schemaRecs = recsLoaded ? recsForPage(page.slug).filter(r => r.type === 'schema') : [];
+                    return schemaRecs.length > 0 ? (
+                      <div className="px-4 py-2 border-b border-amber-500/20 bg-amber-500/5 space-y-1.5">
+                        {schemaRecs.map(rec => (
+                          <div key={rec.id} className="flex items-start gap-2">
+                            <AlertTriangle className="w-3 h-3 text-amber-400 flex-shrink-0 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[11px] font-medium text-amber-300">{rec.title}</div>
+                              <div className="text-[11px] text-zinc-400">{rec.insight}</div>
+                              {rec.trafficAtRisk > 0 && (
+                                <div className="text-[10px] text-amber-400/70 mt-0.5">
+                                  {rec.trafficAtRisk.toLocaleString()} clicks at risk · {rec.estimatedGain}
+                                </div>
+                              )}
+                            </div>
+                            <span className={`flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                              rec.priority === 'fix_now' ? 'bg-red-500/15 text-red-400' :
+                              rec.priority === 'fix_soon' ? 'bg-amber-500/15 text-amber-400' :
+                              'bg-zinc-500/15 text-zinc-400'
+                            }`}>
+                              {rec.priority.replace('_', ' ')}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null;
+                  })()}
+
                   {/* Graph types */}
                   <div className="px-4 py-2 border-b border-zinc-800/50">
                     <div className="text-xs font-medium text-zinc-400 mb-1.5">@graph types</div>
@@ -870,16 +959,29 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
                           </button>
                         )}
                       </div>
-                      <button
-                        onClick={() => copyTemplate(schema, page.pageId)}
-                        className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors"
-                      >
-                        {copiedId === `${page.pageId}-${schema.type}` ? (
-                          <><CheckCircle className="w-3 h-3 text-green-400" /> Copied</>
-                        ) : (
-                          <><Copy className="w-3 h-3" /> Copy</>
-                        )}
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => toggleSchemaEdit(page.pageId, schema.template)}
+                          className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+                            editingSchema.has(page.pageId)
+                              ? 'bg-teal-500/15 text-teal-400 border border-teal-500/30'
+                              : 'bg-zinc-800 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700'
+                          }`}
+                        >
+                          <Pencil className="w-3 h-3" />
+                          {editingSchema.has(page.pageId) ? 'Done Editing' : 'Edit'}
+                        </button>
+                        <button
+                          onClick={() => copyTemplate(schema, page.pageId)}
+                          className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors"
+                        >
+                          {copiedId === `${page.pageId}-${schema.type}` ? (
+                            <><CheckCircle className="w-3 h-3 text-green-400" /> Copied</>
+                          ) : (
+                            <><Copy className="w-3 h-3" /> Copy</>
+                          )}
+                        </button>
+                      </div>
                     </div>
 
                     {showDiff.has(page.pageId) && page.existingSchemaJson ? (
@@ -901,9 +1003,30 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
                           </pre>
                         </div>
                       </div>
+                    ) : editingSchema.has(page.pageId) ? (
+                      <div className="relative">
+                        <textarea
+                          value={editedSchemaJson[page.pageId] || JSON.stringify(schema.template, null, 2)}
+                          onChange={e => handleSchemaJsonChange(page.pageId, e.target.value)}
+                          className={`w-full text-xs font-mono bg-zinc-950 rounded-lg p-3 text-zinc-300 border ${schemaParseError[page.pageId] ? 'border-red-500/50' : 'border-teal-500/30'} max-h-96 min-h-[200px] overflow-y-auto resize-y focus:outline-none focus:border-teal-500/60`}
+                          spellCheck={false}
+                        />
+                        {schemaParseError[page.pageId] && (
+                          <div className="flex items-center gap-1.5 mt-1.5 text-[11px] text-red-400">
+                            <AlertCircle className="w-3 h-3" />
+                            {schemaParseError[page.pageId]}
+                          </div>
+                        )}
+                        {editedSchemaJson[page.pageId] && !schemaParseError[page.pageId] && (
+                          <div className="flex items-center gap-1.5 mt-1.5 text-[11px] text-teal-400">
+                            <CheckCircle className="w-3 h-3" />
+                            Valid JSON — edits will be used for copy &amp; publish
+                          </div>
+                        )}
+                      </div>
                     ) : (
                       <pre className="text-xs font-mono bg-zinc-950 rounded-lg p-3 overflow-x-auto text-zinc-400 border border-zinc-800 max-h-64 overflow-y-auto">
-                        {JSON.stringify(schema.template, null, 2)}
+                        {JSON.stringify(getEffectiveSchema(page.pageId, schema.template), null, 2)}
                       </pre>
                     )}
 
@@ -916,10 +1039,10 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
                           </span>
                         ) : confirmPublish === page.pageId ? (
                           <div className="flex items-center gap-2">
-                            <span className="text-xs text-amber-400">Publish schema to this page's &lt;head&gt;?</span>
+                            <span className="text-xs text-amber-400">Publish {editedSchemaJson[page.pageId] ? 'edited ' : ''}schema to this page's &lt;head&gt;?</span>
                             <button
-                              onClick={() => publishToWebflow(page.pageId, schema.template)}
-                              disabled={publishing.has(page.pageId)}
+                              onClick={() => publishToWebflow(page.pageId, getEffectiveSchema(page.pageId, schema.template))}
+                              disabled={publishing.has(page.pageId) || !!schemaParseError[page.pageId]}
                               className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 bg-green-600 hover:bg-green-500 text-white"
                             >
                               {publishing.has(page.pageId) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}

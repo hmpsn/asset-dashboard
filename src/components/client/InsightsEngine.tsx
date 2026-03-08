@@ -60,7 +60,19 @@ interface InsightsEngineProps {
   workspaceId: string;
   tier?: 'free' | 'growth' | 'premium';
   compact?: boolean; // for embedding in overview tab
+  onNavigate?: (tab: string, context?: { pageSlug?: string; recType?: string }) => void;
 }
+
+// Map recommendation types to the admin dashboard tab that handles them
+const REC_TYPE_TAB: Record<RecType, string> = {
+  metadata: 'seo-editor',
+  schema: 'seo-schema',
+  technical: 'seo-audit',
+  performance: 'performance',
+  accessibility: 'seo-audit',
+  content: 'seo-briefs',
+  strategy: 'seo-strategy',
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────
 
@@ -128,7 +140,7 @@ const EFFORT_BADGE: Record<string, { label: string; color: string }> = {
 
 // ─── Component ────────────────────────────────────────────────────
 
-export function InsightsEngine({ workspaceId, tier, compact }: InsightsEngineProps) {
+export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: InsightsEngineProps) {
   const cart = useCart();
   const [data, setData] = useState<RecommendationSet | null>(null);
   const [loading, setLoading] = useState(true);
@@ -306,6 +318,14 @@ export function InsightsEngine({ workspaceId, tier, compact }: InsightsEnginePro
                     <MousePointerClick className="w-3 h-3" />
                     {num(rec.trafficAtRisk)}
                   </span>
+                )}
+                {onNavigate && (
+                  <button
+                    onClick={() => onNavigate(REC_TYPE_TAB[rec.type] || 'seo-audit', { pageSlug: rec.affectedPages[0], recType: rec.type })}
+                    className="flex items-center gap-0.5 text-[10px] text-teal-400 hover:text-teal-300 transition-colors flex-shrink-0"
+                  >
+                    Fix <ArrowUpRight className="w-3 h-3" />
+                  </button>
                 )}
               </div>
             );

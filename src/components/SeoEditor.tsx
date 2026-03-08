@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Loader2, Save, Sparkles, Upload, ChevronDown, ChevronRight,
-  Check, AlertCircle, Wand2, Send, CheckSquare, Square,
+  Check, AlertCircle, Wand2, Send, CheckSquare, Square, AlertTriangle,
 } from 'lucide-react';
 import type { FixContext } from '../App';
+import { useRecommendations } from '../hooks/useRecommendations';
 
 interface PageMeta {
   id: string;
@@ -26,7 +27,8 @@ interface Props {
 }
 
 export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
-  const [pages, setPages] = useState<PageMeta[]>([]);
+  const { forPage: recsForPage, loaded: recsLoaded } = useRecommendations(workspaceId);
+  const [pages, setPages] = useState<PageMeta[]>([]);  
   const [loading, setLoading] = useState(false);
   const [edits, setEdits] = useState<Record<string, EditState>>({});
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -407,9 +409,12 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
           const hasSeoTitle = !!(page.seo?.title);
           const hasSeoDesc = !!(page.seo?.description);
           const isSelected = approvalSelected.has(page.id);
+          const pageRecs = recsLoaded ? recsForPage(page.slug) : [];
+          const metaRecs = pageRecs.filter(r => r.type === 'metadata');
+          const hasRecFlag = metaRecs.length > 0;
 
           return (
-            <div key={page.id} id={`seo-editor-page-${page.id}`} className={`bg-zinc-900 rounded-xl border overflow-hidden ${isSelected ? 'border-teal-500/40 bg-teal-500/5' : 'border-zinc-800'}`}>
+            <div key={page.id} id={`seo-editor-page-${page.id}`} className={`bg-zinc-900 rounded-xl border overflow-hidden ${hasRecFlag ? 'border-amber-500/30' : isSelected ? 'border-teal-500/40 bg-teal-500/5' : 'border-zinc-800'}`}>
               <div className="flex items-center">
                 {workspaceId && (
                   <button
@@ -429,6 +434,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
                   <div className="text-xs text-zinc-500 truncate">/{page.slug}</div>
                 </div>
                 <div className="flex items-center gap-2">
+                  {hasRecFlag && <span className="flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400"><AlertTriangle className="w-3 h-3" />{metaRecs.length} rec{metaRecs.length > 1 ? 's' : ''}</span>}
                   {!hasSeoTitle && <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">No title</span>}
                   {!hasSeoDesc && <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400">No desc</span>}
                   {edit?.dirty && <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400">Unsaved</span>}
@@ -438,6 +444,28 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
 
               {isExpanded && edit && (
                 <div className="px-4 pb-4 space-y-3 bg-zinc-900/30">
+                  {/* Recommendation banners */}
+                  {metaRecs.map(rec => (
+                    <div key={rec.id} className="flex items-start gap-2.5 px-3 py-2.5 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-medium text-amber-300">{rec.title}</div>
+                        <div className="text-[11px] text-zinc-400 mt-0.5">{rec.insight}</div>
+                        {rec.trafficAtRisk > 0 && (
+                          <div className="text-[11px] text-amber-400/70 mt-1">
+                            {rec.trafficAtRisk.toLocaleString()} clicks at risk · {rec.estimatedGain}
+                          </div>
+                        )}
+                      </div>
+                      <span className={`flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                        rec.priority === 'fix_now' ? 'bg-red-500/15 text-red-400' :
+                        rec.priority === 'fix_soon' ? 'bg-amber-500/15 text-amber-400' :
+                        'bg-zinc-500/15 text-zinc-400'
+                      }`}>
+                        {rec.priority.replace('_', ' ')}
+                      </span>
+                    </div>
+                  ))}
                   {/* SEO Title */}
                   <div>
                     <div className="flex items-center justify-between mb-1">

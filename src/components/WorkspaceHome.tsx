@@ -6,6 +6,7 @@ import {
   Image, ExternalLink, Minus, MessageSquare,
 } from 'lucide-react';
 import { StatCard, SectionCard, PageHeader, Badge } from './ui';
+import { InsightsEngine } from './client/InsightsEngine';
 
 interface WorkspaceHomeProps {
   workspaceId: string;
@@ -262,6 +263,11 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             })}
           </div>
         </SectionCard>
+      )}
+
+      {/* ── Action Plan (InsightsEngine) ── */}
+      {workspaceId && (
+        <InsightsEngine workspaceId={workspaceId} tier="premium" compact onNavigate={(tab) => onNavigate(tab)} />
       )}
 
       {/* ── Two-column: Activity + Rankings ── */}

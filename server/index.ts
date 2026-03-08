@@ -1363,6 +1363,7 @@ function buildSchemaContext(siteId: string): { ctx: SchemaContext; pageKeywordMa
     ctx.businessContext = ws.keywordStrategy?.businessContext;
     ctx.siteKeywords = ws.keywordStrategy?.siteKeywords;
     ctx.logoUrl = ws.brandLogoUrl;
+    ctx.workspaceId = ws.id;
   }
   const pageKeywordMap = ws?.keywordStrategy?.pageMap?.map(p => ({
     pagePath: p.pagePath,
@@ -1833,6 +1834,31 @@ app.post('/api/webflow/seo-rewrite', async (req, res) => {
   // Build shared keyword strategy + brand voice context
   const { keywordBlock: keywordContext, brandVoiceBlock } = buildSeoContext(workspaceId, pagePath);
 
+  // Build audit context for this page (if available)
+  let auditBlock = '';
+  if (workspaceId) {
+    try {
+      const ws = getWorkspace(workspaceId);
+      if (ws?.webflowSiteId) {
+        const snapshot = getLatestSnapshot(ws.webflowSiteId);
+        if (snapshot) {
+          const pageSlug = pagePath ? pagePath.replace(/^\//, '') : '';
+          const pageAudit = snapshot.audit.pages.find(p =>
+            p.slug === pageSlug || p.url?.includes(pageSlug) || (pagePath && p.page === pagePath)
+          );
+          if (pageAudit && pageAudit.issues.length > 0) {
+            const relevant = pageAudit.issues
+              .filter(i => ['title', 'meta-description', 'content-length', 'h1', 'duplicate-title', 'duplicate-description'].includes(i.check))
+              .slice(0, 5);
+            if (relevant.length > 0) {
+              auditBlock = `\n\nAUDIT FINDINGS FOR THIS PAGE (address these in your rewrite):\n${relevant.map(i => `- [${i.severity}] ${i.message}${i.recommendation ? ' → ' + i.recommendation : ''}`).join('\n')}`;
+            }
+          }
+        }
+      }
+    } catch { /* non-critical */ }
+  }
+
   // Enforce character limits helper
   const enforceLimit = (text: string, maxLen: number): string => {
     let t = text.replace(/^["']|["']$/g, '').trim();
@@ -1853,7 +1879,7 @@ app.post('/api/webflow/seo-rewrite', async (req, res) => {
 Page title: ${pageTitle}
 Current meta description: ${currentDescription || '(none)'}
 Site context: ${siteContext || 'N/A'}
-Page content excerpt: ${pageContent ? pageContent.slice(0, 1500) : 'N/A'}${keywordContext}${brandVoiceBlock}
+Page content excerpt: ${pageContent ? pageContent.slice(0, 1500) : 'N/A'}${keywordContext}${brandVoiceBlock}${auditBlock}
 
 Requirements for EACH variation:
 - Between 150-160 characters (hard limit: 160)
@@ -1875,7 +1901,7 @@ Page title: ${pageTitle}
 Current SEO title: ${currentSeoTitle || '(none)'}
 Current meta description: ${currentDescription || '(none)'}
 Site context: ${siteContext || 'N/A'}
-Page content excerpt: ${pageContent ? pageContent.slice(0, 1500) : 'N/A'}${keywordContext}${brandVoiceBlock}
+Page content excerpt: ${pageContent ? pageContent.slice(0, 1500) : 'N/A'}${keywordContext}${brandVoiceBlock}${auditBlock}
 
 Requirements for EACH variation:
 - Between 50-60 characters (hard limit: 60)

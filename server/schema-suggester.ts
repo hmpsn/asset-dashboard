@@ -35,6 +35,7 @@ export interface SchemaContext {
   pageKeywords?: { primary: string; secondary: string[] };
   searchIntent?: string;
   siteKeywords?: string[];
+  workspaceId?: string;
 }
 
 // Google required fields per @type (for validation)
@@ -307,7 +308,7 @@ Return ONLY the JSON-LD object. No markdown, no explanation, no wrapping.`;
       maxTokens: 3000,
       temperature: 0.2,
       feature: 'schema-generation',
-      workspaceId: undefined,
+      workspaceId: ctx.workspaceId,
       maxRetries: 4,
     });
 
