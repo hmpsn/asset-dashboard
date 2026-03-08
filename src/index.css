@@ -216,6 +216,12 @@ nav button[class*="bg-teal-500"] {
 .border-brand { border-color: #27272a; }
 .border-brand-hover { border-color: #3f3f46; }
 
+/* ─── Modal animation ─── */
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
 /* ─── Toast animation ─── */
 @keyframes slideUp {
   from { opacity: 0; transform: translate(-50%, 12px); }

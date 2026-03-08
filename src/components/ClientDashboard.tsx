@@ -3249,6 +3249,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         const displayPrice = isUpgrade ? upgradePrice : price;
         const currency = pricing?.currency || 'USD';
         const fmt = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency, minimumFractionDigits: 0 }).format(n);
+        const accentColor = isFull ? 'blue' : 'teal';
 
         const briefIncludes = [
           'SEO-optimized content strategy',
@@ -3266,83 +3267,128 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         ];
 
         return (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => !pricingConfirming && setPricingModal(null)}>
-            <div className="bg-zinc-900 border border-zinc-700/50 rounded-2xl shadow-2xl shadow-black/40 w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
-              {/* Header */}
-              <div className={`px-6 pt-6 pb-4 ${isFull ? 'bg-gradient-to-br from-blue-600/10 via-teal-600/10 to-transparent' : 'bg-gradient-to-br from-teal-600/10 to-transparent'}`}>
-                <div className="flex items-center gap-3 mb-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isFull ? 'bg-gradient-to-br from-blue-500/20 to-teal-500/20' : 'bg-teal-500/20'}`}>
-                    {isFull ? <Sparkles className="w-5 h-5 text-blue-400" /> : <FileText className="w-5 h-5 text-teal-400" />}
-                  </div>
-                  <div>
-                    <div className="text-sm font-semibold text-zinc-100">
-                      {isUpgrade ? 'Upgrade to Full Blog Post' : isFull ? (pricing?.fullPostLabel || 'Full Blog Post') : (pricing?.briefLabel || 'Content Brief')}
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[70] flex items-center justify-center p-4" onClick={() => !pricingConfirming && setPricingModal(null)}>
+            <div className="bg-zinc-900 border border-zinc-700/50 rounded-2xl shadow-2xl shadow-black/50 w-full max-w-md overflow-hidden animate-[scaleIn_0.2s_ease-out]" onClick={e => e.stopPropagation()}>
+              {/* Close button */}
+              <button
+                onClick={() => !pricingConfirming && setPricingModal(null)}
+                className="absolute top-0 right-0 m-4 text-zinc-600 hover:text-zinc-300 transition-colors z-10"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              {/* Header with gradient */}
+              <div className={`relative px-6 pt-6 pb-5 overflow-hidden ${isFull ? 'bg-gradient-to-br from-blue-600/15 via-indigo-600/10 to-transparent' : 'bg-gradient-to-br from-teal-600/15 via-emerald-600/10 to-transparent'}`}>
+                {/* Decorative glow */}
+                <div className={`absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl opacity-20 ${isFull ? 'bg-blue-500' : 'bg-teal-500'}`} />
+
+                <div className="relative flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center ring-1 ${isFull ? 'bg-gradient-to-br from-blue-500/25 to-indigo-500/25 ring-blue-500/20' : 'bg-gradient-to-br from-teal-500/25 to-emerald-500/25 ring-teal-500/20'}`}>
+                      {isFull ? <Sparkles className="w-5 h-5 text-blue-400" /> : <FileText className="w-5 h-5 text-teal-400" />}
                     </div>
-                    <div className="text-[11px] text-zinc-500 mt-0.5">
-                      {isUpgrade ? 'Continue from your approved brief' : 'Confirm your content request'}
+                    <div>
+                      <div className="text-sm font-semibold text-zinc-100">
+                        {isUpgrade ? 'Upgrade to Full Blog Post' : isFull ? (pricing?.fullPostLabel || 'Full Blog Post') : (pricing?.briefLabel || 'Content Brief')}
+                      </div>
+                      <div className="text-[11px] text-zinc-500 mt-0.5">
+                        {isUpgrade ? 'Continue from your approved brief' : 'Confirm your content request'}
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Topic info */}
-                <div className="bg-zinc-950/50 rounded-lg px-3 py-2.5 border border-zinc-800">
-                  <div className="text-xs text-zinc-300 font-medium">{pricingModal.topic}</div>
-                  <div className="text-[11px] text-teal-400 mt-0.5">&ldquo;{pricingModal.targetKeyword}&rdquo;</div>
+                {/* Topic card */}
+                <div className={`rounded-xl px-3.5 py-3 border ${isFull ? 'bg-blue-950/30 border-blue-500/10' : 'bg-teal-950/30 border-teal-500/10'}`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Target className={`w-3 h-3 ${isFull ? 'text-blue-400/70' : 'text-teal-400/70'}`} />
+                    <span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Topic</span>
+                  </div>
+                  <div className="text-xs text-zinc-200 font-medium leading-relaxed">{pricingModal.topic}</div>
+                  <div className={`text-[11px] mt-1 ${isFull ? 'text-blue-400/80' : 'text-teal-400/80'}`}>Keyword: &ldquo;{pricingModal.targetKeyword}&rdquo;</div>
                 </div>
               </div>
 
+              {/* Price banner */}
+              {displayPrice != null && (
+                <div className={`mx-6 -mt-0 mb-0 flex items-center justify-between px-4 py-3 rounded-xl border ${isFull ? 'bg-blue-500/5 border-blue-500/15' : 'bg-teal-500/5 border-teal-500/15'}`}>
+                  <div>
+                    <div className={`text-2xl font-bold tracking-tight ${isFull ? 'text-blue-300' : 'text-teal-300'}`}>{fmt(displayPrice)}</div>
+                    <div className="text-[10px] text-zinc-500 mt-0.5">{isUpgrade ? 'Upgrade difference' : 'One-time payment'}</div>
+                  </div>
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${isFull ? 'bg-blue-500/10' : 'bg-teal-500/10'}`}>
+                    <Shield className={`w-4 h-4 ${isFull ? 'text-blue-400/60' : 'text-teal-400/60'}`} />
+                  </div>
+                </div>
+              )}
+              {displayPrice == null && (
+                <div className="mx-6 mt-0 mb-0 text-[11px] text-zinc-500 bg-zinc-800/40 rounded-xl px-4 py-3 border border-zinc-700/30">
+                  <Lock className="w-3 h-3 inline mr-1.5 -mt-0.5" />
+                  Pricing will be confirmed by your team after submission.
+                </div>
+              )}
+
               {/* What's included */}
-              <div className="px-6 py-4 border-t border-zinc-800/50">
-                <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-2.5">What&apos;s included</div>
-                <div className="space-y-1.5">
+              <div className="px-6 py-4">
+                <div className="text-[10px] text-zinc-500 font-semibold uppercase tracking-widest mb-3">What&apos;s included</div>
+                <div className="grid grid-cols-1 gap-1.5">
                   {(isFull ? fullPostIncludes : briefIncludes).map((item, i) => (
-                    <div key={i} className="flex items-start gap-2">
-                      <Check className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${isFull ? 'text-blue-400' : 'text-teal-400'}`} />
-                      <span className="text-[11px] text-zinc-400">{item}</span>
+                    <div key={i} className="flex items-center gap-2.5 group">
+                      <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${accentColor === 'blue' ? 'bg-blue-500/10' : 'bg-teal-500/10'}`}>
+                        <Check className={`w-2.5 h-2.5 ${accentColor === 'blue' ? 'text-blue-400' : 'text-teal-400'}`} />
+                      </div>
+                      <span className="text-[11px] text-zinc-400 group-hover:text-zinc-300 transition-colors">{item}</span>
                     </div>
                   ))}
                 </div>
                 {pricing && (isFull ? pricing.fullPostDescription : pricing.briefDescription) && (
-                  <div className="text-[11px] text-zinc-500 mt-3 leading-relaxed">{isFull ? pricing.fullPostDescription : pricing.briefDescription}</div>
+                  <div className="text-[11px] text-zinc-500 mt-3 leading-relaxed pl-6">{isFull ? pricing.fullPostDescription : pricing.briefDescription}</div>
                 )}
               </div>
 
-              {/* Pricing + Actions */}
-              <div className="px-6 pb-6 pt-2">
-                {displayPrice != null && (
-                  <div className="flex items-baseline gap-2 mb-4">
-                    <span className={`text-2xl font-bold ${isFull ? 'text-blue-300' : 'text-teal-300'}`}>{fmt(displayPrice)}</span>
-                    {isUpgrade && <span className="text-[11px] text-zinc-500">upgrade difference</span>}
-                    {!isUpgrade && <span className="text-[11px] text-zinc-500">one-time</span>}
-                  </div>
-                )}
-                {displayPrice == null && (
-                  <div className="text-[11px] text-zinc-500 mb-4 bg-zinc-800/50 rounded-lg px-3 py-2 border border-zinc-700/50">
-                    Pricing will be confirmed by your team after submission.
-                  </div>
-                )}
+              {/* Actions */}
+              <div className="px-6 pb-5 space-y-3">
+                <button
+                  disabled={pricingConfirming}
+                  onClick={confirmPricingAndSubmit}
+                  className={`w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 shadow-lg active:scale-[0.98] ${isFull ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-500 hover:to-indigo-500 shadow-blue-900/40' : 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:from-teal-500 hover:to-emerald-500 shadow-teal-900/40'}`}
+                >
+                  {pricingConfirming ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Processing…</span>
+                    </>
+                  ) : displayPrice != null ? (
+                    <>
+                      <Lock className="w-3.5 h-3.5" />
+                      <span>Pay {fmt(displayPrice)} securely</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>Confirm Request</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  disabled={pricingConfirming}
+                  onClick={() => setPricingModal(null)}
+                  className="w-full px-4 py-2 rounded-xl text-xs text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-all"
+                >
+                  Cancel
+                </button>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    disabled={pricingConfirming}
-                    onClick={confirmPricingAndSubmit}
-                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-50 shadow-lg ${isFull ? 'bg-gradient-to-r from-blue-600 to-teal-600 text-white hover:from-blue-500 hover:to-teal-500 shadow-blue-900/30' : 'bg-teal-600 text-white hover:bg-teal-500 shadow-teal-900/30'}`}
-                  >
-                    {pricingConfirming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                    {pricingConfirming ? 'Submitting...' : displayPrice != null ? `Confirm & Pay ${fmt(displayPrice)}` : 'Confirm Request'}
-                  </button>
-                  <button
-                    disabled={pricingConfirming}
-                    onClick={() => setPricingModal(null)}
-                    className="px-4 py-2.5 rounded-xl text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-                <div className="text-center mt-3">
-                  <span className="text-[11px] text-zinc-500">
-                    {displayPrice != null ? 'Payment will be processed securely. You can review your invoice anytime.' : 'No charge until pricing is confirmed by your team.'}
-                  </span>
+                {/* Trust footer */}
+                <div className="flex items-center justify-center gap-4 pt-1">
+                  <div className="flex items-center gap-1.5">
+                    <Shield className="w-3 h-3 text-zinc-600" />
+                    <span className="text-[10px] text-zinc-600">SSL Encrypted</span>
+                  </div>
+                  <div className="w-px h-3 bg-zinc-800" />
+                  <div className="flex items-center gap-1.5">
+                    <svg className="w-3 h-3 text-zinc-600" viewBox="0 0 24 24" fill="currentColor"><path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z"/></svg>
+                    <span className="text-[10px] text-zinc-600">Powered by Stripe</span>
+                  </div>
                 </div>
               </div>
             </div>
