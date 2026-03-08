@@ -36,7 +36,7 @@ export interface GA4EventPageBreakdown { eventName: string; pagePath: string; ev
 
 export interface ClientContentRequest {
   id: string; topic: string; targetKeyword: string; intent: string; priority: string;
-  status: 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'delivered' | 'declined';
+  status: 'pending_payment' | 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'delivered' | 'declined';
   source?: 'strategy' | 'client'; briefId?: string;
   serviceType?: 'brief_only' | 'full_post'; pageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource'; upgradedAt?: string;
   deliveryUrl?: string; deliveryNotes?: string;

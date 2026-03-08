@@ -374,6 +374,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
           <div className="space-y-2">
             {clientRequests.map(req => {
               const statusConfig: Record<string, { icon: typeof Clock; color: string; label: string }> = {
+                pending_payment: { icon: Clock, color: 'text-amber-400', label: 'Awaiting Payment' },
                 requested: { icon: Clock, color: 'text-amber-400', label: 'Awaiting Review' },
                 brief_generated: { icon: FileText, color: 'text-blue-400', label: 'Brief Ready' },
                 client_review: { icon: Clock, color: 'text-cyan-400', label: 'Client Review' },

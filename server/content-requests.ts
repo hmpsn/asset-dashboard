@@ -27,7 +27,7 @@ export interface ContentTopicRequest {
   intent: string;
   priority: string;
   rationale: string;
-  status: 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'delivered' | 'declined';
+  status: 'pending_payment' | 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'delivered' | 'declined';
   briefId?: string;
   clientNote?: string;
   internalNote?: string;
@@ -84,7 +84,7 @@ export function getContentRequest(workspaceId: string, id: string): ContentTopic
 
 export function createContentRequest(
   workspaceId: string,
-  data: { topic: string; targetKeyword: string; intent: string; priority: string; rationale: string; clientNote?: string; source?: 'strategy' | 'client'; serviceType?: 'brief_only' | 'full_post'; pageType?: ContentTopicRequest['pageType'] }
+  data: { topic: string; targetKeyword: string; intent: string; priority: string; rationale: string; clientNote?: string; source?: 'strategy' | 'client'; serviceType?: 'brief_only' | 'full_post'; pageType?: ContentTopicRequest['pageType']; initialStatus?: 'pending_payment' | 'requested' }
 ): ContentTopicRequest {
   const items = read(workspaceId);
 
@@ -105,7 +105,7 @@ export function createContentRequest(
     serviceType: data.serviceType || 'brief_only',
     pageType: data.pageType || 'blog',
     comments: [],
-    status: 'requested',
+    status: data.initialStatus || 'requested',
     requestedAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };

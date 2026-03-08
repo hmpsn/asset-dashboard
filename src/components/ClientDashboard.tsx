@@ -552,7 +552,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         } else if (pricingModal.source === 'strategy') {
           const res = await fetch(`/api/public/content-request/${workspaceId}`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, intent: pricingModal.intent, priority: pricingModal.priority, rationale: pricingModal.rationale, serviceType: pricingModal.serviceType, pageType: pricingModal.pageType || 'blog' }),
+            body: JSON.stringify({ topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, intent: pricingModal.intent, priority: pricingModal.priority, rationale: pricingModal.rationale, serviceType: pricingModal.serviceType, pageType: pricingModal.pageType || 'blog', initialStatus: 'pending_payment' }),
           });
           if (!res.ok) throw new Error(`Server returned ${res.status}`);
           const created = await res.json();
@@ -560,7 +560,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         } else {
           const res = await fetch(`/api/public/content-request/${workspaceId}/submit`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, notes: pricingModal.notes || undefined, serviceType: pricingModal.serviceType, pageType: pricingModal.pageType || 'blog' }),
+            body: JSON.stringify({ topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, notes: pricingModal.notes || undefined, serviceType: pricingModal.serviceType, pageType: pricingModal.pageType || 'blog', initialStatus: 'pending_payment' }),
           });
           if (!res.ok) throw new Error(`Server returned ${res.status}`);
           const created = await res.json();
@@ -2086,14 +2086,15 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
               return diff !== 0 ? diff : b.updatedAt.localeCompare(a.updatedAt);
             }).map(req => {
               const isBriefOnly = (req.serviceType || 'brief_only') === 'brief_only' && !req.upgradedAt;
+              const isPending = req.status === 'pending_payment';
               const steps = isBriefOnly
                 ? ['requested', 'brief_generated', 'client_review', 'approved', 'delivered'] as const
                 : ['requested', 'brief_generated', 'client_review', 'approved', 'in_progress', 'delivered'] as const;
               const stepLabels = isBriefOnly
-                ? ['Requested', 'Brief Ready', 'Your Review', 'Approved', 'Brief Delivered']
-                : ['Requested', 'Brief Ready', 'Your Review', 'Approved', 'In Production', 'Delivered'];
-              // Map changes_requested back to client_review step for timeline display
-              const displayStatus = req.status === 'changes_requested' ? 'client_review' : req.status;
+                ? [isPending ? 'Awaiting Payment' : 'Requested', 'Brief Ready', 'Your Review', 'Approved', 'Brief Delivered']
+                : [isPending ? 'Awaiting Payment' : 'Requested', 'Brief Ready', 'Your Review', 'Approved', 'In Production', 'Delivered'];
+              // Map pending_payment and changes_requested back for timeline display
+              const displayStatus = req.status === 'pending_payment' ? 'requested' : req.status === 'changes_requested' ? 'client_review' : req.status;
               const currentIdx = (steps as readonly string[]).indexOf(displayStatus);
               const isExpanded = expandedContentReq === req.id;
               const brief = req.briefId ? briefPreviews[req.briefId] : null;
@@ -2122,6 +2123,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                       </div>
                       <div className="flex items-center gap-2">
                         {req.source === 'client' && <span className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20">You submitted</span>}
+                        {req.status === 'pending_payment' && <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse">Awaiting Payment</span>}
                         {req.status === 'changes_requested' && <span className="text-[11px] px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20">Changes Requested</span>}
                         {req.status === 'client_review' && <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 animate-pulse">Needs Your Review</span>}
                         {isExpanded ? <ChevronUp className="w-4 h-4 text-zinc-500" /> : <ChevronDown className="w-4 h-4 text-zinc-500" />}
@@ -2135,8 +2137,8 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                         return (
                           <div key={step} className="flex items-center flex-1">
                             <div className="flex flex-col items-center flex-1">
-                              <div className={`w-full h-1.5 rounded-full ${isComplete ? (isCurrent ? (req.status === 'changes_requested' ? 'bg-orange-400' : 'bg-teal-400') : 'bg-teal-500/40') : 'bg-zinc-800'}`} />
-                              <span className={`text-[11px] mt-1 ${isCurrent ? (req.status === 'changes_requested' ? 'text-orange-400 font-medium' : 'text-teal-400 font-medium') : isComplete ? 'text-zinc-500' : 'text-zinc-700'}`}>{stepLabels[i]}</span>
+                              <div className={`w-full h-1.5 rounded-full ${isComplete ? (isCurrent ? (req.status === 'pending_payment' ? 'bg-amber-400' : req.status === 'changes_requested' ? 'bg-orange-400' : 'bg-teal-400') : 'bg-teal-500/40') : 'bg-zinc-800'}`} />
+                              <span className={`text-[11px] mt-1 ${isCurrent ? (req.status === 'pending_payment' ? 'text-amber-400 font-medium' : req.status === 'changes_requested' ? 'text-orange-400 font-medium' : 'text-teal-400 font-medium') : isComplete ? 'text-zinc-500' : 'text-zinc-700'}`}>{stepLabels[i]}</span>
                             </div>
                           </div>
                         );

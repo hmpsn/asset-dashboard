@@ -4686,8 +4686,9 @@ app.post('/api/public/content-request/:workspaceId', (req, res) => {
   const clientNote = sanitizeString(req.body.clientNote, 1000);
   const serviceType = validateEnum(req.body.serviceType, ['brief_only', 'full_post'], 'brief_only');
   const pageType = validateEnum(req.body.pageType, ['blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource'], 'blog');
+  const initialStatus = req.body.initialStatus === 'pending_payment' ? 'pending_payment' as const : undefined;
   if (!topic || !targetKeyword) return res.status(400).json({ error: 'topic and targetKeyword are required' });
-  const request = createContentRequest(req.params.workspaceId, { topic, targetKeyword, intent, priority, rationale, clientNote, serviceType, pageType });
+  const request = createContentRequest(req.params.workspaceId, { topic, targetKeyword, intent, priority, rationale, clientNote, serviceType, pageType, initialStatus });
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'content_requested', `${actor?.name || 'Client'} requested topic: "${topic}"`, `Keyword: "${targetKeyword}" · Priority: ${priority}`, { requestId: request.id }, actor);
   notifyTeamContentRequest({ workspaceName: ws.name, workspaceId: req.params.workspaceId, topic, targetKeyword, priority, rationale: rationale || '' });
@@ -4718,11 +4719,12 @@ app.post('/api/public/content-request/:workspaceId/submit', (req, res) => {
   const notes = sanitizeString(req.body.notes, 1000);
   const serviceType = validateEnum(req.body.serviceType, ['brief_only', 'full_post'], 'brief_only');
   const pageType = validateEnum(req.body.pageType, ['blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource'], 'blog');
+  const initialStatus = req.body.initialStatus === 'pending_payment' ? 'pending_payment' as const : undefined;
   if (!topic || !targetKeyword) return res.status(400).json({ error: 'topic and targetKeyword are required' });
   const request = createContentRequest(req.params.workspaceId, {
     topic, targetKeyword, intent: 'informational', priority: 'medium',
     rationale: notes || `Client-submitted topic: ${topic}`,
-    clientNote: notes, source: 'client', serviceType, pageType,
+    clientNote: notes, source: 'client', serviceType, pageType, initialStatus,
   });
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'content_requested', `${actor?.name || 'Client'} submitted topic: "${topic}"`, `Keyword: "${targetKeyword}"`, { requestId: request.id }, actor);
