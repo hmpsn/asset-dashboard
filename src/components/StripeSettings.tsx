@@ -40,11 +40,8 @@ const DEFAULT_PRODUCTS: StripeProduct[] = [
   { productType: 'strategy',         displayName: 'Keyword Strategy',      priceUsd: 400,  stripePriceId: '', enabled: true },
   { productType: 'strategy_refresh', displayName: 'Strategy Refresh',      priceUsd: 200,  stripePriceId: '', enabled: true },
   { productType: 'fix_meta',         displayName: 'Metadata Optimization', priceUsd: 29,   stripePriceId: '', enabled: true },
-  { productType: 'fix_alt',          displayName: 'Alt Text Optimization', priceUsd: 19,   stripePriceId: '', enabled: true },
   { productType: 'fix_redirect',     displayName: 'Redirect Fix',         priceUsd: 19,   stripePriceId: '', enabled: true },
   { productType: 'fix_meta_sweep',   displayName: 'Full Metadata Sweep',  priceUsd: 199,  stripePriceId: '', enabled: true },
-  { productType: 'fix_audit_5',      displayName: 'Audit Fix Bundle (5pg)', priceUsd: 99,  stripePriceId: '', enabled: true },
-  { productType: 'fix_audit_10',     displayName: 'Audit Fix Bundle (10pg)', priceUsd: 179, stripePriceId: '', enabled: true },
 ];
 
 export function StripeSettings() {

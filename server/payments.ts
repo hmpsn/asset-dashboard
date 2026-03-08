@@ -10,8 +10,7 @@ export type ProductType =
   | 'post_draft' | 'post_polished' | 'post_premium'
   | 'schema_page' | 'schema_site'
   | 'strategy' | 'strategy_refresh'
-  | 'fix_meta' | 'fix_alt' | 'fix_redirect'
-  | 'fix_meta_sweep' | 'fix_audit_5' | 'fix_audit_10'
+  | 'fix_meta' | 'fix_redirect' | 'fix_meta_sweep'
   | 'plan_growth' | 'plan_premium';
 
 export interface PaymentRecord {

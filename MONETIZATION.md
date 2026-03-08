@@ -149,27 +149,46 @@ Transactional revenue items — purchased inside the platform, fulfilled through
 
 ### Technical SEO Products (Growth Tier — Self-Service Cart)
 
-Growth clients don't have implementation hours — they purchase technical SEO fixes à la carte. The platform generates recommendations, the client selects what they want done, pays via Stripe, and we fulfill.
+Growth clients don't have implementation hours — they purchase technical SEO fixes à la carte. Products are split into two categories based on what the Webflow API can handle programmatically vs. what requires hands-on Designer access.
 
-#### Per-Page Products
+#### Product A: Automated Fixes (via Webflow API — Stripe Checkout)
 
-| Product | Price | Agency Cost | Margin | What's Delivered |
-|---------|:-----:|:-----------:|:------:|------------------|
-| **Metadata Optimization** | $29/page | ~$0.05 tokens + 5min | ~90% | AI-optimized title, meta description, OG tags — published to Webflow |
-| **Schema Generation + Publishing** | $39/page | ~$0.10 tokens + 5min | ~90% | JSON-LD schema generated, validated, and published via Webflow API |
-| **Alt Text Optimization** | $19/page | ~$0.05 tokens + 3min | ~90% | AI-generated descriptive alt text for all images on the page |
-| **Redirect Fix** | $19/redirect | ~2min labor | ~90% | Fix redirect chain or 404 with proper 301 rule |
+AI generates fixes, published programmatically via Webflow API. Minimal human touchpoint. Sold in the self-service cart.
 
-#### Site-Wide Packages
+| Product | Price | API Method | Agency Cost | Margin | What's Delivered |
+|---------|:-----:|-----------|:-----------:|:------:|------------------|
+| **Metadata Optimization** | $29/page | Page PATCH | ~$0.05 tokens + 5min | ~90% | AI-optimized title, meta description, OG tags — published to Webflow |
+| **Redirect Fix** | $19/redirect | CSV export | ~2min labor | ~90% | 301 redirect rule exported in Webflow-compatible CSV format |
+| **Full Metadata Sweep** | $199 flat | Batch Page PATCH | ~$1 tokens + 45min | ~85% | Titles + descriptions optimized for all pages |
+| **Schema — Per Page** | $39/page | Custom Code API | ~$0.10 tokens + 5min | ~95% | JSON-LD schema generated, validated, and published |
+| **Schema — Full Site** | $249 flat | Custom Code API | ~$2–5 tokens + 30min | ~90% | Schema for all pages, generated + published |
 
-| Product | Price | Agency Cost | Margin | What's Delivered |
-|---------|:-----:|:-----------:|:------:|------------------|
-| **Full-Site Schema Package** | $249 flat | ~$2–5 tokens + 30min | ~90% | Schema for all pages, generated + published |
-| **Full Metadata Sweep** | $199 flat | ~$1 tokens + 45min | ~85% | Titles + descriptions optimized for all pages |
-| **Audit Fix Bundle (5 pages)** | $99 | ~$0.50 tokens + 20min | ~85% | Fix all critical audit issues on 5 highest-priority pages |
-| **Audit Fix Bundle (10 pages)** | $179 | ~$1 tokens + 40min | ~80% | Fix all critical audit issues on 10 highest-priority pages |
+> **Why these are API-safe:** Meta titles, descriptions, and OG tags are editable via Webflow’s Page PATCH endpoint. Schema publishes via Custom Code API (already built). Redirects export as CSV for import in Webflow Settings → Hosting → 301 Redirects.
 
-> **No uncapped "fix all" option.** Sites can have hundreds of pages. Bundles of 5 and 10 keep scope manageable and margins healthy. Clients with large sites buy multiple bundles or upgrade to Premium where implementation hours cover the work.
+#### Product B: Manual Implementation (Webflow Designer Access — Custom Quote)
+
+Fixes that require editing page body content, visual elements, or site structure. **Not a Stripe product** — surfaced as “Contact us for a quote” in the dashboard.
+
+| Fix Type | Why It Needs Designer Access | Typical Scope |
+|----------|----------------------------|---------------|
+| Alt text on images | Images in rich text / body content aren't API-patchable | Per-page, varies by image count |
+| Heading structure (H1/H2/H3) | Page body content structure | Per-page |
+| Internal link additions | Rich text body edits | Per-page, varies by link count |
+| Page speed fixes | Image compression, lazy loading, layout changes | Per-page or site-wide |
+| Content edits | Thin content, duplicate content, cannibalization | Per-page, significant effort |
+| Layout / UX fixes | Above-the-fold, mobile, CTA placement | Per-page or site-wide |
+
+**Pricing model:** Quoted per-project after a scope call. Recommended minimums:
+- **Small scope** (5-10 pages, simple fixes): $500-1,000
+- **Medium scope** (10-25 pages, mixed fixes): $1,500-3,000
+- **Large scope** (25+ pages or site-wide structural changes): $3,000-5,000+
+
+**Client flow:**
+1. Audit surfaces issues → platform shows “This fix requires Designer access”
+2. Client clicks “Request a Quote” → creates a request with issue details pre-filled
+3. Agency scopes the work, sends a custom quote
+4. Client approves → grants Webflow Designer/Editor invite
+5. Agency implements, QAs, publishes → re-runs audit to verify
 
 #### How the Cart Works (UX Flow)
 
@@ -205,24 +224,14 @@ Client visits Site Health tab
         └─ Client notified: "3 fixes applied to your site"
 ```
 
-#### Where Recommendations Surface
-
-The cart is fed from multiple recommendation sources across the dashboard:
-
-| Source | Recommendation Type | Cart Action |
-|--------|-------------------|-------------|
-| **Site Health** audit | Missing meta, no schema, alt text, redirects | "Fix this" per issue or "Fix all" bundle |
-| **SEO Strategy** tab | Quick wins (positions 5-20), content gaps | "Get a Brief" or "Optimize this page" |
-| **AI Chat Advisor** | Contextual recommendations mid-conversation | "Want me to add that to your cart?" |
-| **Monthly Report** email | "3 new issues found this month" | CTA → dashboard → cart |
-
 #### Smart Bundle Pricing
 
-When a client selects multiple items of the same type, auto-offer a bundle discount:
+When a client selects multiple automated fixes of the same type, auto-offer a bundle discount:
 - 5-9 pages: 15% off per-page rate
-- 10+ pages: 25% off per-page rate (capped at 10 pages per bundle)
+- 10-19 pages: 25% off per-page rate
+- 20+ pages: suggest Full Metadata Sweep ($199) or Full-Site Schema ($249) instead
 
-No uncapped "fix everything" option. Clients with large sites buy multiple bundles or upgrade to Premium. This keeps scope predictable and margins healthy.
+For manual implementation (Product B), there is no self-service bundling — it’s always a custom quote.
 
 #### Premium vs Growth: Technical SEO Pricing
 
@@ -233,9 +242,11 @@ No uncapped "fix everything" option. Clients with large sites buy multiple bundl
 | Metadata optimization | $29/page (cart) | Included in 3 hrs |
 | Schema generation + publishing | $39/page (cart) | Included in 3 hrs |
 | Redirect fixes | $19/redirect (cart) | Included in 3 hrs |
-| Alt text optimization | $19/page (cart) | Included in 3 hrs |
+| Alt text, heading, link fixes | Contact for quote (Designer access) | Included in 3 hrs* |
 | Content briefs | $75-350 (purchase) | **10% off** — $68-315 |
 | Full content posts | $250-2,500 (purchase) | **10% off** — $225-2,250 |
+
+*\* Premium implementation hours can cover manual Designer fixes if the client grants Webflow access.*
 
 #### Premium Content Discount (10%)
 
