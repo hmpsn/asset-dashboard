@@ -22,8 +22,11 @@ Before looking ahead, here's what you have access to today:
 | **Self-Service Upgrades** | Upgrade your plan instantly via Stripe | ✅ Live |
 | **Onboarding Wizard** | Guided first-run experience tailored to your plan | ✅ Live |
 | **Transactional Emails** | Welcome, trial reminders, password reset, monthly reports | ✅ Live |
+| **SEO Edit Tracking** | Every edit shows its status — teal for live, purple for in-review, yellow for flagged. No more guessing what's been touched. | ✅ Live |
+| **Smart Health Scores** | Suppressed audit issues are excluded from all health scores, recommendations, and AI advice — scores reflect real priorities. | ✅ Live |
+| **CMS Sitemap Filtering** | Content editor only shows collection pages that exist in your sitemap, with full URL paths. No more noise from unpublished items. | ✅ Live |
 
-**64 features shipped.** Here's what's next.
+**67 features shipped.** Here's what's next.
 
 ---
 
@@ -42,6 +45,11 @@ The goal this month is to make the platform fully self-service — any business 
 ### Also in progress:
 - GSC/GA4 self-service OAuth connection (so you can connect Google data without sharing credentials)
 - Beta feedback collection from first 3-5 clients
+
+### Recently shipped (March 8):
+- **SEO edit tracking** — Every page card in the SEO editor, CMS editor, and audit view now shows its edit status (Live / In Review / Flagged) with colored borders and badges
+- **Suppression-aware health scores** — Suppressed issues are excluded from all scores, issue lists, and AI recommendations across 6 data endpoints
+- **CMS sitemap filtering** — Collection items filtered by sitemap; full URL paths with parent collection slugs shown
 
 ---
 
@@ -116,8 +124,8 @@ Features that hit all three ship first. Everything else goes in the backlog unti
 As a beta client, you have outsized influence on what we build next. If something on this roadmap excites you — or if something's missing — tell us. The AI advisor is always listening, or just reply to any email from us.
 
 **Current platform stats:**
-- 64 features shipped
-- 34 features planned
+- 67 features shipped
+- 31 features planned
 - 3-tier pricing live (Starter / Growth / Premium)
 - AI advisor available 24/7
 

@@ -9,7 +9,7 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 ## Architecture
 
 - **Frontend**: React 18 + Vite + TailwindCSS. Entry: `src/App.tsx`. Client portal: `src/components/ClientDashboard.tsx`. Admin tabs are lazy-loaded.
-- **Backend**: Express server in `server/index.ts` (~6000 lines). All API endpoints defined here. No database — JSON files on disk via `data/` and per-workspace upload folders.
+- **Backend**: Express server in `server/index.ts` (~7100 lines). All API endpoints defined here. No database — JSON files on disk via `data/` and per-workspace upload folders.
 - **AI**: OpenAI GPT-4o/4o-mini via `server/openai-helpers.ts` (`callOpenAI` wrapper with retry, timeout, token tracking).
 
 ## Monetization Model
@@ -27,7 +27,7 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 | Module | Purpose |
 |--------|---------|
 | `server/index.ts` | All Express routes, chat endpoints, strategy generation |
-| `server/workspaces.ts` | Workspace CRUD, `Workspace` interface, `KeywordStrategy` types |
+| `server/workspaces.ts` | Workspace CRUD, `Workspace` interface, `KeywordStrategy` types, `seoEditTracking` (per-page edit status) |
 | `server/seo-context.ts` | `buildSeoContext()`, `buildKeywordMapContext()`, `buildKnowledgeBase()` — shared AI prompt builders |
 | `server/chat-memory.ts` | Chat session persistence, `addMessage`, `buildConversationContext`, `generateSessionSummary` |
 | `server/activity-log.ts` | Activity logging, `addActivity`, `ActivityType` union |
@@ -35,7 +35,7 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 | `server/email-templates.ts` | HTML email builders: `renderMonthlyReport` (with trial banner), `renderApprovalReminder`, etc. |
 | `server/content-brief.ts` | AI content brief generation with SEMRush/GSC enrichment, 7 page-type-specific prompts. `brief-export-html.ts` renders branded HTML/PDF with page type badge |
 | `server/content-requests.ts` | Content topic request CRUD, `ContentTopicRequest` interface (includes `pageType`, `serviceType`) |
-| `server/seo-audit.ts` | Site health audit engine |
+| `server/seo-audit.ts` | Site health audit engine. `applySuppressionsToAudit()` in index.ts filters suppressed issues and recalculates scores |
 | `server/reports.ts` | Audit snapshot persistence, `getLatestSnapshot` |
 | `server/google-analytics.ts` | GA4 API: overview, landing pages, organic, conversions, events, period comparison, new vs returning. Exports `CustomDateRange` type; all functions accept optional `dateRange` param |
 | `server/search-console.ts` | GSC API: queries, pages, devices, countries, period comparison. All functions accept optional `dateRange?: CustomDateRange` param |
@@ -59,7 +59,9 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 | `src/components/AdminChat.tsx` | Floating admin chat panel with conversation memory + history UI |
 | `src/components/StripeSettings.tsx` | Stripe admin settings in Command Center: API keys (masked), product Price ID mapping, connection status |
 | `src/components/SeoStrategy.tsx` | Keyword strategy viewer/generator |
-| `src/components/SeoAudit.tsx` | Site health audit viewer |
+| `src/components/SeoAudit.tsx` | Site health audit viewer, edit tracking badges |
+| `src/components/SeoEditor.tsx` | Page-level SEO field editor with AI rewrite, approval workflow, edit tracking (teal=live, purple=in-review, yellow=flagged) |
+| `src/components/CmsEditor.tsx` | CMS collection item SEO editor with sitemap filtering, parent slug display, edit tracking |
 
 ## AI-Powered Features & Their Data Sources
 
@@ -112,14 +114,17 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 2. **Shared context builders**: `buildSeoContext`, `buildKeywordMapContext`, `buildKnowledgeBase` in `seo-context.ts` — used by chat, briefs, schema
 3. **Activity logging**: `addActivity(workspaceId, type, title, detail)` — all major actions logged
 4. **Chat memory**: `addMessage` → `buildConversationContext` → `generateSessionSummary` (auto after 6+ msgs)
+5. **Audit suppressions**: `applySuppressionsToAudit()` filters suppressed issues + recalculates scores. Applied to all 6 data exit points (audit-summary, audit-detail, reports/latest, admin/client/strategy chat)
+6. **SEO edit tracking**: `trackSeoEdit(wsId, pageId, status)` with priority guard (won't downgrade live→flagged). Auto-wired into save, approval, audit flows. CRUD endpoints at `/api/workspaces/:id/seo-edit-tracking`
+7. **CMS sitemap filtering**: `/api/webflow/cms-seo/:siteId` fetches sitemap.xml to filter collection items. Falls back to all items if sitemap unavailable
 
 ## Documentation
 
-- `FEATURE_AUDIT.md` — Comprehensive feature inventory (49 features) with agency/client/mutual value
+- `FEATURE_AUDIT.md` — Comprehensive feature inventory (52 features) with agency/client/mutual value
 - `MONETIZATION.md` — Full monetization strategy: tiers, products (8 page types), bundles, UX soft-gating spec, trial strategy, inline pricing, ROI dashboard, churn signals, credits system, white-label resale, Stripe integration spec
 - `ACTION_PLAN.md` — Prioritized execution plan, 67 items across 10 sprints, decision log
 - `AI_CHATBOT_ROADMAP.md` — Chatbot phases, shipped and planned
 - `AUTH_ROADMAP.md` — Authentication/authorization phases (Phases 1, 2, 4 shipped)
 - `DESIGN_SYSTEM.md` — UI primitives, component specs, typography, spacing, Tailwind classes
 - `BRAND_DESIGN_LANGUAGE.md` — Color rules (Three Laws), per-component color map, admin vs client rules, AI prompting guidelines. **Read before any UI work.**
-- `data/roadmap.json` — Sprint-level tracking with item statuses (86 items across 11 sprints, managed via /api/roadmap)
+- `data/roadmap.json` — Sprint-level tracking with item statuses (89 items across 11 sprints, managed via /api/roadmap). 67 features shipped total.

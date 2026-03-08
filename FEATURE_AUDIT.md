@@ -624,9 +624,9 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - ~~Slim Overview tab~~: ✅ Shipped — Removed redundant site health card and InsightsEngine from Overview sidebar. Cleaner focus: metrics + monthly summary + insights digest + activity.
 - **Content brief: GA4 page performance** — Inject GA4 landing page performance (bounce rate, sessions, engagement) into brief generation for existing-page content refreshes.
 - **Self-service tier upgrade via Stripe** — Replace mailto upgrade CTAs with Stripe Checkout subscription flows for tier changes.
-- **Suppression-aware health scores** — Recalculate site health score excluding suppressed issues. Feed suppressions into InsightsEngine and AI chat so suppressed items aren't re-flagged.
-- **SEO edit tracking (teal=live, purple=in-review)** — Visual status on editor cards showing what's been published vs. pending client review. Prevents re-touching already-edited items.
-- **Hide non-sitemap collection pages** — Filter collection list pages that don't exist in sitemap from content editor. Add parent collection slug to collection items (e.g., /locations/houston-midtown).
+- ~~Suppression-aware health scores~~: ✅ Shipped — applySuppressionsToAudit() filters suppressed issues and recalculates scores. Wired into all 6 data exit points (audit-summary, audit-detail, reports/latest, admin/client/strategy chat contexts). Suppressed issues excluded from all scores, issue lists, and AI recommendations.
+- ~~SEO edit tracking (teal=live, purple=in-review, yellow=flagged)~~: ✅ Shipped — seoEditTracking on Workspace model with trackSeoEdit() helper. Auto-wired into SEO save→live, CMS save→live, approval→in-review, audit→flagged. Colored borders + badge pills in SeoEditor, CmsEditor, and SeoAudit page cards. Optimistic local state updates.
+- ~~Hide non-sitemap collection pages~~: ✅ Shipped — Server fetches sitemap.xml, filters collection items to sitemap matches (falls back to all). Frontend shows full path with parent collection slug (e.g., /locations/houston-midtown).
 - **Real-time data updates** — WebSocket/SSE for live dashboard sync between admin and client (audit results, activity, requests).
 - **Unified Performance tab** — Merge Analytics + Search into single client tab showing complementary Google data.
 
@@ -685,4 +685,4 @@ When the user asks to update this document with recent features, follow this pro
 7. **Update Summary table**: Adjust category counts and total feature count.
 8. **Commit**: `git add FEATURE_AUDIT.md && git commit -m "docs: update FEATURE_AUDIT with recent features"`
 
-Current feature count: **49**. Last updated: March 8, 2026 (session 7: ClientDashboard tab extraction, unified Inbox tab, slimmed Overview tab, badge squishing fix, roadmap additions for suppressions/edit-tracking/collection-filtering/real-time/unified-performance).
+Current feature count: **52**. Last updated: March 8, 2026 (session 8: suppression-aware health scores, SEO edit tracking with teal/purple/yellow statuses, CMS sitemap filtering with parent slugs).
