@@ -141,7 +141,8 @@ export type EmailEventType =
   | 'content_request'
   | 'content_brief_ready'
   | 'audit_alert'
-  | 'client_welcome';
+  | 'client_welcome'
+  | 'trial_expiry_warning';
 
 // ── Template renderers ──
 
@@ -167,6 +168,8 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
       return renderAuditAlert(events, count, ws, dashUrl);
     case 'client_welcome':
       return renderClientWelcome(events[0]);
+    case 'trial_expiry_warning':
+      return renderTrialExpiryWarning(events[0]);
     default:
       return { subject: 'Notification', html: '' };
   }
@@ -346,6 +349,54 @@ function renderAuditAlert(events: EmailEvent[], _count: number, ws: string, dash
       subtitle: ws,
       body: items,
       cta: dashUrl ? { label: 'View Audit Results', url: dashUrl } : undefined,
+    }),
+  };
+}
+
+// ── Trial expiry warning email ──
+
+function renderTrialExpiryWarning(event: EmailEvent) {
+  const ws = event.workspaceName;
+  const daysLeft = (event.data.daysRemaining as number) || 0;
+  const dashUrl = event.dashboardUrl || '';
+  const isUrgent = daysLeft <= 1;
+
+  const urgencyColor = isUrgent ? '#dc2626' : '#d97706';
+  const urgencyBg = isUrgent ? '#fef2f2' : '#fffbeb';
+  const urgencyBorder = isUrgent ? '#fecaca' : '#fde68a';
+
+  return {
+    subject: isUrgent
+      ? `Your Growth trial expires tomorrow — ${ws}`
+      : `${daysLeft} days left on your Growth trial — ${ws}`,
+    html: layout({
+      preheader: `${daysLeft} day${daysLeft !== 1 ? 's' : ''} remaining on your Growth trial`,
+      headline: isUrgent ? 'Your Trial Expires Tomorrow' : `${daysLeft} Days Left on Your Trial`,
+      subtitle: ws,
+      body: `
+        <div style="background:${urgencyBg};border:1px solid ${urgencyBorder};border-radius:8px;padding:20px;text-align:center;margin-bottom:16px;">
+          <div style="font-size:36px;font-weight:700;color:${urgencyColor};">${daysLeft}</div>
+          <div style="font-size:13px;color:${urgencyColor};margin-top:2px;">day${daysLeft !== 1 ? 's' : ''} remaining</div>
+        </div>
+        <p class="text-primary" style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 16px;">
+          Your 14-day Growth trial gives you access to advanced analytics, AI-powered insights, and content tools. When it ends, your dashboard will revert to the Free tier with limited features.
+        </p>
+        <div style="margin-top:12px;">
+          <div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">What you'll keep on Free</div>
+          ${itemRow({ title: 'Basic site health audits', isLast: false })}
+          ${itemRow({ title: 'Search Console overview', isLast: true })}
+        </div>
+        <div style="margin-top:12px;">
+          <div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">What you'll lose</div>
+          ${itemRow({ title: 'AI Insights Advisor', detail: 'Unlimited conversations and proactive recommendations', isLast: false })}
+          ${itemRow({ title: 'Advanced analytics', detail: 'GA4 integration, traffic comparisons, landing pages', isLast: false })}
+          ${itemRow({ title: 'Content pipeline', detail: 'Brief generation, content requests, approval workflows', isLast: true })}
+        </div>
+        <div style="margin-top:16px;background:#f0fdf9;border:1px solid #ccfbf1;border-radius:8px;padding:14px 16px;text-align:center;">
+          <span style="font-size:12px;color:#0d9488;">Want to keep Growth features? Contact your web team to discuss plans.</span>
+        </div>`,
+      cta: dashUrl ? { label: 'Open Your Dashboard', url: dashUrl } : undefined,
+      footer: `You're receiving this because your Growth trial on ${esc(ws)} is ending soon`,
     }),
   };
 }

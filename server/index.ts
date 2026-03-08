@@ -72,6 +72,7 @@ import { getSchedule, listSchedules, upsertSchedule, deleteSchedule, startSchedu
 import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword, togglePinKeyword, storeRankSnapshot, getRankHistory, getLatestRanks } from './rank-tracking.js';
 import { listAnnotations, addAnnotation, deleteAnnotation } from './annotations.js';
 import { startApprovalReminders } from './approval-reminders.js';
+import { startTrialReminders } from './trial-reminders.js';
 import { startBackupScheduler } from './backup.js';
 import { startMonthlyReports, triggerMonthlyReport } from './monthly-report.js';
 import { listBriefs, getBrief, updateBrief, deleteBrief, generateBrief } from './content-brief.js';
@@ -6601,6 +6602,8 @@ startMonthlyReports();
 startBackupScheduler();
 // Clear stale test-mode Stripe customer IDs (one-time on startup when using live keys)
 clearTestModeCustomerIds();
+// Start trial expiry reminders (day 10 + day 13)
+startTrialReminders();
 
 // Start
 const PORT = parseInt(process.env.PORT || '3001', 10);
