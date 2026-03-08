@@ -40,7 +40,7 @@ const DEFAULT_PRODUCTS: StripeProduct[] = [
   { productType: 'strategy',         displayName: 'Keyword Strategy',      priceUsd: 400,  stripePriceId: '', enabled: true },
   { productType: 'strategy_refresh', displayName: 'Strategy Refresh',      priceUsd: 200,  stripePriceId: '', enabled: true },
   { productType: 'fix_meta',         displayName: 'Metadata Optimization', priceUsd: 20,   stripePriceId: '', enabled: true },
-  { productType: 'fix_alt',          displayName: 'Alt Text Optimization', priceUsd: 19,  stripePriceId: '', enabled: true },
+  { productType: 'fix_alt',          displayName: 'Alt Text — Full Site', priceUsd: 50,  stripePriceId: '', enabled: true },
   { productType: 'fix_redirect',     displayName: 'Redirect Fix',         priceUsd: 19,   stripePriceId: '', enabled: true },
   { productType: 'fix_meta_10',      displayName: 'Metadata Pack (10pg)', priceUsd: 179,  stripePriceId: '', enabled: true },
 ];

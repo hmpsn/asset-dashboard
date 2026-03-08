@@ -158,7 +158,7 @@ AI generates fixes, published programmatically via Webflow API. Minimal human to
 | Product | Price | API Method | Agency Cost | Margin | What's Delivered |
 |---------|:-----:|-----------|:-----------:|:------:|------------------|
 | **Metadata Optimization** | $20/page | Page PATCH | ~$0.05 tokens + 5min | ~90% | AI-optimized title, meta description, OG tags — published to Webflow |
-| **Alt Text Optimization** | $19/page | Asset PATCH | ~$0.03 tokens (GPT-4o-mini vision) | ~95% | AI-generated context-aware alt text, written back to Webflow asset |
+| **Alt Text — Full Site** | $50 flat | Asset PATCH (bulk) | ~$0.50 tokens (GPT-4o-mini vision) | ~95% | AI-generated context-aware alt text for all site images, written back to Webflow |
 | **Redirect Fix** | $19/redirect | CSV export | ~2min labor | ~90% | 301 redirect rule exported in Webflow-compatible CSV format |
 | **Metadata Pack (10pg)** | $179 | Batch Page PATCH | ~$0.50 tokens + 30min | ~85% | Titles + descriptions optimized for 10 pages (save $21 vs individual) |
 | **Schema — Per Page** | $39/page | Custom Code API | ~$0.10 tokens + 5min | ~95% | JSON-LD schema generated, validated, and published |
@@ -227,9 +227,10 @@ Client visits Site Health tab
 #### Smart Bundle Pricing
 
 When a client selects multiple automated fixes of the same type, auto-offer the 10-page pack:
-- 1-9 pages: per-page rate ($20 meta, $39 schema, $19 alt text)
+- 1-9 pages: per-page rate ($20 meta, $39 schema)
 - 10+ pages: suggest pack purchase — Metadata Pack ($179/10pg) or Schema Pack ($299/10pg)
-- Need more than 10? Buy multiple packs or upgrade to Premium
+- Alt text is always full-site ($50 flat) — runs bulk generation on all missing alt text
+- Need more than 10 pages of meta/schema? Buy multiple packs or upgrade to Premium
 
 For manual implementation (Product B), there is no self-service bundling — it’s always a custom quote.
 
@@ -242,7 +243,7 @@ For manual implementation (Product B), there is no self-service bundling — it�
 | Metadata optimization | $20/page or $179/10pg (cart) | Included in 3 hrs |
 | Schema generation + publishing | $39/page or $299/10pg (cart) | Included in 3 hrs |
 | Redirect fixes | $19/redirect (cart) | Included in 3 hrs |
-| Alt text optimization | $19/page (cart) | Included in 3 hrs |
+| Alt text optimization | $50 flat (full site) | Included in 3 hrs |
 | Heading, link, layout fixes | Contact for quote (Designer access) | Included in 3 hrs* |
 | Content briefs | $75-350 (purchase) | **10% off** — $68-315 |
 | Full content posts | $250-2,500 (purchase) | **10% off** — $225-2,250 |
