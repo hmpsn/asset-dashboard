@@ -96,7 +96,7 @@ Every completed task — no matter how small — must include these steps:
 | File | Purpose | Notes |
 |------|---------|-------|
 | `App.tsx` | Router, workspace selector, admin tabs (lazy-loaded) | `Page` type union defines all admin routes |
-| `components/ClientDashboard.tsx` | **Full client portal** (~3,950 lines) | Login gate, chat, analytics, approvals, requests, content hub, plans, welcome modal |
+| `components/ClientDashboard.tsx` | **Client portal shell** (~1,520 lines) | Login gate, shared state, tab routing, chat, Stripe modals. Tab rendering delegated to extracted components. |
 | `components/AdminChat.tsx` | Admin AI chat (purple accent) | Conversation memory + history |
 | `components/KeywordStrategy.tsx` | SEO strategy + content gaps | Admin keyword strategy viewer/generator |
 | `components/ContentBriefs.tsx` | Admin content brief management | Brief preview, status management |
@@ -108,7 +108,7 @@ Every completed task — no matter how small — must include these steps:
 | `components/LoginScreen.tsx` | Admin login UI | Setup flow + email/password |
 | `components/Styleguide.tsx` | Design system reference page | Color swatches, component demos |
 | `components/ui/` | **12 shared UI primitives** | See § 4 below |
-| `components/client/` | Client sub-components | `types.ts` (interfaces), `helpers.tsx`, `HealthTab.tsx`, `DataSnapshots.tsx`, `InsightsDigest.tsx` |
+| `components/client/` | **Client tab components** | `types.ts` (interfaces + ClientTab type), `helpers.tsx`, `OverviewTab.tsx`, `SearchTab.tsx`, `AnalyticsTab.tsx`, `StrategyTab.tsx`, `ContentTab.tsx`, `ApprovalsTab.tsx`, `RequestsTab.tsx`, `PlansTab.tsx`, `InboxTab.tsx` (composes Approvals+Requests+Content), `HealthTab.tsx`, `InsightsDigest.tsx`, `InsightsEngine.tsx`, `MonthlySummary.tsx`, `DataSnapshots.tsx`, `ROIDashboard.tsx` |
 
 ### Data & Config
 

@@ -394,7 +394,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
                     <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${active ? 'text-teal-400' : ''}`} />
                     <span className="truncate">{item.label}</span>
                     {item.id === 'seo-briefs' && pendingContentRequests > 0 && (
-                      <span className="ml-auto text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 tabular-nums">
+                      <span className="ml-auto text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 tabular-nums flex-shrink-0 min-w-[20px] text-center leading-tight">
                         {pendingContentRequests}
                       </span>
                     )}

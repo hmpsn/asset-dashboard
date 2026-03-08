@@ -619,8 +619,16 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - ~~Plans page color unification~~: ✅ Shipped — All violet/blue tier highlights replaced with teal. Bundle cards hidden pre-launch.
 - ~~Full UI/UX color audit~~: ✅ Shipped — Violet→teal across all page type badges, welcome modal, avatar gradient, content form, review banners, upgrade CTAs, and payment modal. Blue reserved for data metrics only.
 - ~~Brand design language doc~~: ✅ Shipped — Created `BRAND_DESIGN_LANGUAGE.md` with brand identity, color rules, product design principles, component guidelines.
+- ~~Tab-level component extraction~~: ✅ Shipped — ClientDashboard.tsx broken from 3,265→1,536 lines. All 8 tabs extracted into `src/components/client/` (OverviewTab, SearchTab, AnalyticsTab, StrategyTab, ContentTab, ApprovalsTab, RequestsTab, PlansTab).
+- ~~Unified Inbox tab~~: ✅ Shipped — Merged Approvals + Requests + Content into single InboxTab with type filters (All / SEO Changes / Requests / Content). Unified badge count.
+- ~~Slim Overview tab~~: ✅ Shipped — Removed redundant site health card and InsightsEngine from Overview sidebar. Cleaner focus: metrics + monthly summary + insights digest + activity.
 - **Content brief: GA4 page performance** — Inject GA4 landing page performance (bounce rate, sessions, engagement) into brief generation for existing-page content refreshes.
 - **Self-service tier upgrade via Stripe** — Replace mailto upgrade CTAs with Stripe Checkout subscription flows for tier changes.
+- **Suppression-aware health scores** — Recalculate site health score excluding suppressed issues. Feed suppressions into InsightsEngine and AI chat so suppressed items aren't re-flagged.
+- **SEO edit tracking (teal=live, purple=in-review)** — Visual status on editor cards showing what's been published vs. pending client review. Prevents re-touching already-edited items.
+- **Hide non-sitemap collection pages** — Filter collection list pages that don't exist in sitemap from content editor. Add parent collection slug to collection items (e.g., /locations/houston-midtown).
+- **Real-time data updates** — WebSocket/SSE for live dashboard sync between admin and client (audit results, activity, requests).
+- **Unified Performance tab** — Merge Analytics + Search into single client tab showing complementary Google data.
 
 ### Content Pipeline
 - ~~Service tiers~~: ✅ Shipped — Brief vs. Full Post with configurable pricing.
@@ -677,4 +685,4 @@ When the user asks to update this document with recent features, follow this pro
 7. **Update Summary table**: Adjust category counts and total feature count.
 8. **Commit**: `git add FEATURE_AUDIT.md && git commit -m "docs: update FEATURE_AUDIT with recent features"`
 
-Current feature count: **49**. Last updated: March 8, 2026 (session 5: schema direct JSON editing, recommendation flags in SEO Editor + Schema Generator, InsightsEngine in Workspace Home with click-through navigation, audit-aware AI rewrites, workspaceId cost tracking).
+Current feature count: **49**. Last updated: March 8, 2026 (session 7: ClientDashboard tab extraction, unified Inbox tab, slimmed Overview tab, badge squishing fix, roadmap additions for suppressions/edit-tracking/collection-filtering/real-time/unified-performance).

@@ -1079,14 +1079,14 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
               const pendingReviews = contentRequests.filter(r => r.status === 'client_review').length;
               return (
                 <button key={t.id} onClick={() => t.locked ? setShowUpgradeModal(true) : setTab(t.id)}
-                  className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium border-b-2 transition-colors ${
+                  className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
                     t.locked ? 'border-transparent text-zinc-500 cursor-default' :
                     active ? 'border-teal-500 text-teal-300' :
                     'border-transparent text-zinc-500 hover:text-zinc-300 hover:border-zinc-700'
                   }`}>
                   <Icon className="w-3.5 h-3.5" /> {t.label}
                   {t.locked && <Lock className="w-3 h-3 ml-0.5 text-zinc-500" />}
-                  {t.id === 'inbox' && (pendingApprovals + pendingReviews + unreadTeamNotes) > 0 && <span className="ml-1 px-1.5 py-0.5 text-[11px] font-bold rounded-full bg-teal-500 text-white">{pendingApprovals + pendingReviews + unreadTeamNotes}</span>}
+                  {t.id === 'inbox' && (pendingApprovals + pendingReviews + unreadTeamNotes) > 0 && <span className="ml-1 px-1.5 py-0.5 text-[11px] font-bold rounded-full bg-teal-500 text-white flex-shrink-0 min-w-[20px] text-center leading-tight">{pendingApprovals + pendingReviews + unreadTeamNotes}</span>}
                   {!t.locked && hasData && !active && t.id !== 'inbox' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" />}
                 </button>
               );
