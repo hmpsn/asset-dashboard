@@ -76,6 +76,23 @@ export interface KeywordStrategy {
   generatedAt: string;
 }
 
+export type PageEditStatus = 'clean' | 'issue-detected' | 'fix-proposed' | 'in-review' | 'approved' | 'rejected' | 'live';
+
+export interface PageEditState {
+  pageId: string;
+  slug?: string;
+  status: PageEditStatus;
+  auditIssues?: string[];
+  fields?: string[];
+  source?: 'audit' | 'editor' | 'cms' | 'schema' | 'bulk-fix' | 'cart-fix' | 'content-delivery';
+  approvalBatchId?: string;
+  contentRequestId?: string;
+  workOrderId?: string;
+  rejectionNote?: string;
+  updatedAt: string;
+  updatedBy?: 'admin' | 'client' | 'system';
+}
+
 export interface Workspace {
   id: string;
   name: string;
@@ -108,8 +125,10 @@ export interface Workspace {
   stripeCustomerId?: string;         // Stripe Customer ID for subscriptions
   // Audit issue suppressions (per-page check exclusions)
   auditSuppressions?: { check: string; pageSlug: string; reason?: string; createdAt: string }[];
-  // SEO edit tracking (per-page status: flagged/in-review/live)
+  // SEO edit tracking (legacy — kept for backward compat, written by updatePageState)
   seoEditTracking?: Record<string, { status: 'flagged' | 'in-review' | 'live'; updatedAt: string; fields?: string[] }>;
+  // Unified page edit states (new — replaces seoEditTracking)
+  pageEditStates?: Record<string, PageEditState>;
   // Content pricing (per-workspace, exposed to client portal)
   contentPricing?: {
     briefPrice: number;       // e.g. 150 (in dollars)
@@ -183,7 +202,7 @@ export function createWorkspace(name: string, webflowSiteId?: string, webflowSit
   return workspace;
 }
 
-export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'tier' | 'trialEndsAt' | 'auditSuppressions' | 'seoEditTracking'>>): Workspace | null {
+export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'tier' | 'trialEndsAt' | 'auditSuppressions' | 'seoEditTracking' | 'pageEditStates'>>): Workspace | null {
   const workspaces = readConfig();
   const idx = workspaces.findIndex(w => w.id === id);
   if (idx === -1) return null;
@@ -209,3 +228,94 @@ export function getWorkspace(id: string): Workspace | undefined {
 
 export function getUploadRoot() { return UPLOAD_ROOT; }
 export function getOptRoot() { return OPT_ROOT; }
+
+// --- Unified Page Edit State helpers ---
+
+const STATUS_PRIORITY: Record<PageEditStatus, number> = {
+  clean: 0, 'issue-detected': 1, 'fix-proposed': 2, 'in-review': 3, approved: 4, rejected: 4, live: 5,
+};
+
+// Map new statuses down to legacy seoEditTracking format
+function toLegacyStatus(status: PageEditStatus): 'flagged' | 'in-review' | 'live' | null {
+  switch (status) {
+    case 'issue-detected': case 'fix-proposed': return 'flagged';
+    case 'in-review': return 'in-review';
+    case 'approved': case 'live': return 'live';
+    case 'rejected': return 'flagged';
+    default: return null;
+  }
+}
+
+export function updatePageState(
+  workspaceId: string,
+  pageId: string,
+  updates: Partial<Omit<PageEditState, 'pageId' | 'updatedAt'>>,
+): PageEditState | null {
+  const workspaces = readConfig();
+  const idx = workspaces.findIndex(w => w.id === workspaceId);
+  if (idx === -1) return null;
+
+  const ws = workspaces[idx];
+  const states = ws.pageEditStates || {};
+  const existing = states[pageId];
+
+  // Don't downgrade status unless explicitly setting to clean or rejected
+  if (existing && updates.status && updates.status !== 'clean' && updates.status !== 'rejected') {
+    if (STATUS_PRIORITY[existing.status] > STATUS_PRIORITY[updates.status]) {
+      // Still merge non-status fields
+      const { status: _s, ...rest } = updates; // eslint-disable-line @typescript-eslint/no-unused-vars
+      if (Object.keys(rest).length === 0) return existing;
+      updates = rest;
+    }
+  }
+
+  const now = new Date().toISOString();
+  const base: PageEditState = existing
+    ? { ...existing }
+    : { pageId, status: 'clean', updatedAt: now };
+  const merged: PageEditState = Object.assign(base, updates, { pageId, updatedAt: now });
+
+  states[pageId] = merged;
+  ws.pageEditStates = states;
+
+  // Sync legacy seoEditTracking
+  const legacy = toLegacyStatus(merged.status);
+  if (legacy) {
+    const tracking = ws.seoEditTracking || {};
+    tracking[pageId] = { status: legacy, updatedAt: now, fields: merged.fields };
+    ws.seoEditTracking = tracking;
+  } else if (merged.status === 'clean') {
+    // Remove from legacy tracking
+    const tracking = ws.seoEditTracking || {};
+    delete tracking[pageId];
+    ws.seoEditTracking = tracking;
+  }
+
+  writeConfig(workspaces);
+  return merged;
+}
+
+export function getPageState(workspaceId: string, pageId: string): PageEditState | undefined {
+  const ws = getWorkspace(workspaceId);
+  return ws?.pageEditStates?.[pageId];
+}
+
+export function getAllPageStates(workspaceId: string): Record<string, PageEditState> {
+  const ws = getWorkspace(workspaceId);
+  return ws?.pageEditStates || {};
+}
+
+export function clearPageState(workspaceId: string, pageId: string): boolean {
+  const workspaces = readConfig();
+  const idx = workspaces.findIndex(w => w.id === workspaceId);
+  if (idx === -1) return false;
+  const ws = workspaces[idx];
+  if (ws.pageEditStates?.[pageId]) {
+    delete ws.pageEditStates[pageId];
+  }
+  if (ws.seoEditTracking?.[pageId]) {
+    delete ws.seoEditTracking[pageId];
+  }
+  writeConfig(workspaces);
+  return true;
+}

@@ -18,6 +18,10 @@ import {
   deleteWorkspace,
   getWorkspace,
   getTokenForSite,
+  updatePageState,
+  getPageState,
+  getAllPageStates,
+  clearPageState,
 } from './workspaces.js';
 import { getUploadRoot, getOptRoot, getDataDir, DATA_BASE } from './data-dir.js';
 import { buildSeoContext, buildKeywordMapContext, buildKnowledgeBase } from './seo-context.js';
@@ -832,19 +836,6 @@ app.delete('/api/workspaces/:id/audit-suppressions', requireWorkspaceAccess(), (
 });
 
 // --- SEO Edit Tracking ---
-// Helper: update tracking status for a page/item
-function trackSeoEdit(workspaceId: string, pageId: string, status: 'flagged' | 'in-review' | 'live', fields?: string[]) {
-  const ws = getWorkspace(workspaceId);
-  if (!ws) return;
-  const tracking = ws.seoEditTracking || {};
-  const existing = tracking[pageId];
-  // Don't downgrade: live > in-review > flagged
-  const priority = { live: 3, 'in-review': 2, flagged: 1 };
-  if (existing && priority[existing.status] > priority[status]) return;
-  tracking[pageId] = { status, updatedAt: new Date().toISOString(), fields: fields || existing?.fields };
-  updateWorkspace(workspaceId, { seoEditTracking: tracking });
-}
-
 // GET edit tracking for a workspace
 app.get('/api/workspaces/:id/seo-edit-tracking', requireWorkspaceAccess(), (req, res) => {
   const ws = getWorkspace(req.params.id);
@@ -882,6 +873,40 @@ app.delete('/api/workspaces/:id/seo-edit-tracking', requireWorkspaceAccess(), (r
   delete tracking[pageId];
   updateWorkspace(req.params.id, { seoEditTracking: tracking });
   res.json({ ok: true, tracking });
+});
+
+// --- Unified Page Edit States ---
+// GET all page states for a workspace (admin)
+app.get('/api/workspaces/:id/page-states', requireWorkspaceAccess(), (req, res) => {
+  res.json(getAllPageStates(req.params.id));
+});
+
+// GET all page states for a workspace (client/public)
+app.get('/api/public/page-states/:workspaceId', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Not found' });
+  res.json(getAllPageStates(req.params.workspaceId));
+});
+
+// GET single page state (admin)
+app.get('/api/workspaces/:id/page-states/:pageId', requireWorkspaceAccess(), (req, res) => {
+  const state = getPageState(req.params.id, req.params.pageId);
+  if (!state) return res.status(404).json({ error: 'No state for this page' });
+  res.json(state);
+});
+
+// PATCH: update page state (admin)
+app.patch('/api/workspaces/:id/page-states/:pageId', requireWorkspaceAccess(), (req, res) => {
+  const result = updatePageState(req.params.id, req.params.pageId, req.body);
+  if (!result) return res.status(404).json({ error: 'Workspace not found' });
+  res.json(result);
+});
+
+// DELETE: clear page state (admin)
+app.delete('/api/workspaces/:id/page-states/:pageId', requireWorkspaceAccess(), (req, res) => {
+  const ok = clearPageState(req.params.id, req.params.pageId);
+  if (!ok) return res.status(404).json({ error: 'Not found' });
+  res.json({ ok: true });
 });
 
 // File upload
@@ -1246,7 +1271,7 @@ app.get('/api/webflow/seo-audit/:siteId', async (req, res) => {
     if (auditWs) {
       for (const page of result.pages) {
         if (page.issues.length > 0) {
-          trackSeoEdit(auditWs.id, page.pageId, 'flagged');
+          updatePageState(auditWs.id, page.pageId, { status: 'issue-detected', source: 'audit', auditIssues: page.issues.map((i: { check: string }) => i.check), updatedBy: 'system' });
         }
       }
     }
@@ -1604,7 +1629,7 @@ app.post('/api/webflow/schema-publish/:siteId', async (req, res) => {
     const pubWs = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
     if (pubWs) {
       addActivity(pubWs.id, 'schema_published', 'Schema published to Webflow', `Page ${pageId.slice(0, 8)}… — ${published ? 'site published' : 'saved as draft'}`, { pageId });
-      trackSeoEdit(pubWs.id, pageId, 'live', ['schema']);
+      updatePageState(pubWs.id, pageId, { status: 'live', source: 'schema', fields: ['schema'], updatedBy: 'admin' });
     }
 
     res.json({ success: true, published });
@@ -1893,7 +1918,7 @@ app.put('/api/webflow/pages/:pageId/seo', async (req, res) => {
         const changedFields = [seo?.title && 'title', seo?.description && 'description', openGraph && 'OG'].filter(Boolean) as string[];
         addActivity(seoWs.id, 'seo_updated', `Updated SEO ${changedFields.join(', ')} for a page`, undefined, { pageId: req.params.pageId });
         // Mark as live (saved to Webflow draft, ready for publish)
-        trackSeoEdit(seoWs.id, req.params.pageId, 'live', changedFields);
+        updatePageState(seoWs.id, req.params.pageId, { status: 'live', source: 'editor', fields: changedFields, updatedBy: 'admin' });
       }
     }
     res.json(result);
@@ -2202,7 +2227,7 @@ app.post('/api/webflow/seo-bulk-fix/:siteId', async (req, res) => {
           ? { seo: { description: text } }
           : { seo: { title: text } };
         await updatePageSeo(page.pageId, seoFields, token);
-        if (ws) trackSeoEdit(ws.id, page.pageId, 'live', [field]);
+        if (ws) updatePageState(ws.id, page.pageId, { status: 'live', source: 'bulk-fix', fields: [field], updatedBy: 'admin' });
         results.push({ pageId: page.pageId, text, applied: true });
       } else {
         results.push({ pageId: page.pageId, text: '', applied: false, error: 'Empty AI response' });
@@ -3280,7 +3305,7 @@ app.patch('/api/webflow/collections/:collectionId/items/:itemId', async (req, re
   const result = await updateCollectionItem(req.params.collectionId, req.params.itemId, req.body.fieldData);
   // Track CMS item edit as live
   if (req.body.workspaceId) {
-    trackSeoEdit(req.body.workspaceId, req.params.itemId, 'live');
+    updatePageState(req.body.workspaceId, req.params.itemId, { status: 'live', source: 'cms', updatedBy: 'admin' });
   }
   res.json(result);
 });
@@ -4618,7 +4643,7 @@ app.post('/api/approvals/:workspaceId', (req, res) => {
   const batch = createBatch(req.params.workspaceId, siteId, name || 'SEO Changes', items);
   // Track all pages in this batch as in-review
   for (const item of items) {
-    if (item.pageId) trackSeoEdit(req.params.workspaceId, item.pageId, 'in-review', [item.field]);
+    if (item.pageId) updatePageState(req.params.workspaceId, item.pageId, { status: 'in-review', fields: [item.field], approvalBatchId: batch.id, updatedBy: 'admin' });
   }
   // Notify client that items are ready for review
   const ws = getWorkspace(req.params.workspaceId);
@@ -5260,7 +5285,7 @@ app.post('/api/public/approvals/:workspaceId/:batchId/apply', async (req, res) =
     markBatchApplied(req.params.workspaceId, req.params.batchId, appliedIds);
     // Mark applied pages as live in edit tracking
     for (const r of results) {
-      if (r.success) trackSeoEdit(req.params.workspaceId, r.pageId, 'live');
+      if (r.success) updatePageState(req.params.workspaceId, r.pageId, { status: 'live', updatedBy: 'admin' });
     }
     // Log activity
     const batchData = getBatch(req.params.workspaceId, req.params.batchId);
@@ -6257,7 +6282,7 @@ app.post('/api/jobs', async (req, res) => {
                 if (text) {
                   const seoFields = field === 'description' ? { seo: { description: text } } : { seo: { title: text } };
                   await updatePageSeo(page.pageId, seoFields, token);
-                  if (bwsId) trackSeoEdit(bwsId, page.pageId, 'live', [field]);
+                  if (bwsId) updatePageState(bwsId, page.pageId, { status: 'live', source: 'bulk-fix', fields: [field], updatedBy: 'system' });
                   results.push({ pageId: page.pageId, text, applied: true });
                 } else {
                   results.push({ pageId: page.pageId, text: '', applied: false, error: 'Empty AI response' });
