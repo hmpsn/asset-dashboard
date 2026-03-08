@@ -5,6 +5,8 @@ import { ScoreHistoryChart } from './helpers';
 import { toLiveUrl } from './utils';
 import { SEV, CAT_LABELS } from './types';
 import type { AuditSummary, AuditDetail } from './types';
+import { FixRecommendations } from './FixRecommendations';
+import { OrderStatus } from './OrderStatus';
 
 const ScoreRing = MetricRing;
 
@@ -13,9 +15,11 @@ export interface HealthTabProps {
   auditDetail: AuditDetail | null;
   liveDomain?: string;
   initialSeverity?: 'all' | 'error' | 'warning' | 'info';
+  tier?: 'free' | 'growth' | 'premium';
+  workspaceId?: string;
 }
 
-export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity = 'all' }: HealthTabProps) {
+export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity = 'all', tier, workspaceId }: HealthTabProps) {
   const [severityFilter, setSeverityFilter] = useState<'all' | 'error' | 'warning' | 'info'>(initialSeverity);
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
   const [auditSearch, setAuditSearch] = useState('');
@@ -103,6 +107,12 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity = 'a
           </div>
         </div>
       </div>
+
+      {/* Fix recommendations with cart CTAs */}
+      <FixRecommendations auditDetail={auditDetail} tier={tier} />
+
+      {/* Order status — recent fix purchases */}
+      {workspaceId && <OrderStatus workspaceId={workspaceId} />}
 
       {/* Site-wide issues */}
       {auditDetail.audit.siteWideIssues.length > 0 && (

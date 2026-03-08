@@ -126,6 +126,65 @@ export async function createCheckoutSession(params: CheckoutParams): Promise<{ s
   return { sessionId: session.id, url: session.url! };
 }
 
+// --- Cart Checkout (multiple products in one session) ---
+
+export interface CartCheckoutParams {
+  workspaceId: string;
+  items: Array<{ productType: ProductType; quantity: number }>;
+  successUrl: string;
+  cancelUrl: string;
+}
+
+export async function createCartCheckoutSession(params: CartCheckoutParams): Promise<{ sessionId: string; url: string }> {
+  const stripe = getStripe();
+  if (!stripe) throw new Error('Stripe is not configured. Add your Secret Key in Command Center → Payments.');
+  if (!params.items.length) throw new Error('Cart is empty');
+
+  const lineItems: Array<{ price: string; quantity: number }> = [];
+  const productTypes: string[] = [];
+
+  for (const item of params.items) {
+    const config = getProductConfig(item.productType);
+    if (!config) throw new Error(`Unknown product type: ${item.productType}`);
+    if (!config.stripePriceId) throw new Error(`No Stripe Price ID configured for ${item.productType}. Configure it in Command Center → Payments.`);
+    lineItems.push({ price: config.stripePriceId, quantity: item.quantity });
+    productTypes.push(item.productType);
+  }
+
+  const metadata: Record<string, string> = {
+    workspaceId: params.workspaceId,
+    cartItems: JSON.stringify(params.items),
+    productTypes: productTypes.join(','),
+  };
+
+  const customerId = await getOrCreateCustomer(stripe, params.workspaceId);
+
+  const session = await stripe.checkout.sessions.create({
+    mode: 'payment',
+    customer: customerId,
+    line_items: lineItems,
+    metadata,
+    success_url: params.successUrl,
+    cancel_url: params.cancelUrl,
+  });
+
+  // Create a pending payment record per product
+  for (const item of params.items) {
+    const config = getProductConfig(item.productType)!;
+    createPayment(params.workspaceId, {
+      workspaceId: params.workspaceId,
+      stripeSessionId: session.id,
+      productType: item.productType,
+      amount: config.priceUsd * item.quantity * 100,
+      currency: 'usd',
+      status: 'pending',
+      metadata: { ...metadata, productType: item.productType, quantity: String(item.quantity) },
+    });
+  }
+
+  return { sessionId: session.id, url: session.url! };
+}
+
 // --- Payment Intent (for Stripe Elements inline form) ---
 
 export interface PaymentIntentParams {

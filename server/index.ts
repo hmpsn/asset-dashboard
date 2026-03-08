@@ -85,7 +85,7 @@ import { signToken, verifyToken as verifyJwtToken, requireAuth, requireRole, req
 import { callOpenAI, getTokenUsage } from './openai-helpers.js';
 import { addMessage, buildConversationContext, listSessions, getSession as getChatSession, deleteSession as deleteChatSession, generateSessionSummary, checkChatRateLimit } from './chat-memory.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
-import { isStripeConfigured, createCheckoutSession, createPaymentIntentForProduct, constructWebhookEvent, handleWebhookEvent, getProductConfig, listProducts, clearTestModeCustomerIds } from './stripe.js';
+import { isStripeConfigured, createCheckoutSession, createCartCheckoutSession, createPaymentIntentForProduct, constructWebhookEvent, handleWebhookEvent, getProductConfig, listProducts, clearTestModeCustomerIds } from './stripe.js';
 import { listPayments, getPayment } from './payments.js';
 import { computeROI } from './roi.js';
 import { startChurnSignalScheduler, listChurnSignals, dismissSignal } from './churn-signals.js';
@@ -6586,6 +6586,35 @@ app.post('/api/stripe/create-checkout', checkoutLimiter, async (req, res) => {
   }
 });
 
+// Cart checkout: multiple SEO fix products in one Stripe session
+app.post('/api/stripe/cart-checkout', checkoutLimiter, async (req, res) => {
+  if (!isStripeConfigured()) return res.status(503).json({ error: 'Stripe is not configured' });
+  const { workspaceId, items } = req.body;
+  if (!workspaceId || !Array.isArray(items) || !items.length) return res.status(400).json({ error: 'workspaceId and items[] are required' });
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  const successUrl = `${baseUrl}/client/${workspaceId}?tab=health&payment=success&session_id={CHECKOUT_SESSION_ID}`;
+  const cancelUrl = `${baseUrl}/client/${workspaceId}?tab=health&payment=cancelled`;
+
+  try {
+    const { sessionId, url } = await createCartCheckoutSession({
+      workspaceId,
+      items: items.map((i: { productType: string; quantity: number }) => ({
+        productType: sanitizeString(i.productType, 50) as import('./payments.js').ProductType,
+        quantity: Math.max(1, Math.min(100, Number(i.quantity) || 1)),
+      })),
+      successUrl,
+      cancelUrl,
+    });
+    res.json({ sessionId, url });
+  } catch (err) {
+    console.error('[stripe] Cart checkout error:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to create cart checkout session' });
+  }
+});
+
 // Public: tier upgrade checkout (client-facing)
 app.post('/api/public/upgrade-checkout/:workspaceId', checkoutLimiter, async (req, res) => {
   if (!isStripeConfigured()) return res.status(503).json({ error: 'Stripe is not configured' });
@@ -6629,6 +6658,24 @@ app.get('/api/public/stripe/status/:workspaceId/:sessionId', (req, res) => {
   const payment = payments.find(p => p.stripeSessionId === req.params.sessionId);
   if (!payment) return res.status(404).json({ error: 'Payment not found' });
   res.json({ id: payment.id, status: payment.status, productType: payment.productType, paidAt: payment.paidAt });
+});
+
+// Client lists their fix orders (public, no auth needed — filtered to fix category only)
+app.get('/api/public/fix-orders/:workspaceId', (req, res) => {
+  const payments = listPayments(req.params.workspaceId);
+  const fixOrders = payments
+    .filter(p => p.productType.startsWith('fix_') || p.productType.startsWith('schema_'))
+    .map(p => ({
+      id: p.id,
+      productType: p.productType,
+      status: p.status,
+      amount: p.amount,
+      createdAt: p.createdAt,
+      paidAt: p.paidAt,
+    }))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 20);
+  res.json(fixOrders);
 });
 
 // List available products with prices

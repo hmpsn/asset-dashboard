@@ -12,6 +12,8 @@ import { StripePaymentModal } from './StripePaymentForm';
 import { StatCard, CompactStatBar, EmptyState, TierGate, type Tier } from './ui';
 import { DualTrendChart, RenderMarkdown, InsightCard } from './client/helpers';
 import { HealthTab } from './client/HealthTab';
+import { CartProvider } from './client/useCart';
+import { SeoCartButton, SeoCartDrawer } from './client/SeoCart';
 import { OrganicInsight } from './client/DataSnapshots';
 import { InsightsDigest } from './client/InsightsDigest';
 import { OnboardingWizard } from './client/OnboardingWizard';
@@ -1240,7 +1242,9 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
   ];
 
   return (
+    <CartProvider>
     <div className={`min-h-screen bg-[#0f1219] text-zinc-200 ${theme === 'light' ? 'dashboard-light' : ''}`}>
+      <SeoCartDrawer workspaceId={workspaceId} tier={effectiveTier} />
       {/* Header */}
       <header className="border-b border-zinc-800">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
@@ -1273,6 +1277,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                 </button>
               </div>
             )}
+            <SeoCartButton />
             <button onClick={toggleTheme} title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
               className="p-2 rounded-lg border border-zinc-800 hover:border-zinc-700 transition-colors">
               {theme === 'dark' ? <Sun className="w-4 h-4 text-zinc-400" /> : <Moon className="w-4 h-4 text-zinc-400" />}
@@ -1817,7 +1822,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         </>)}
 
         {/* ════════════ SITE HEALTH TAB ════════════ */}
-        {tab === 'health' && <HealthTab audit={audit} auditDetail={auditDetail} liveDomain={ws.liveDomain} initialSeverity={(() => { const s = new URLSearchParams(window.location.search).get('severity'); return s && ['error','warning','info'].includes(s) ? s as 'error' | 'warning' | 'info' : 'all'; })()} />}
+        {tab === 'health' && <HealthTab audit={audit} auditDetail={auditDetail} liveDomain={ws.liveDomain} tier={effectiveTier} workspaceId={workspaceId} initialSeverity={(() => { const s = new URLSearchParams(window.location.search).get('severity'); return s && ['error','warning','info'].includes(s) ? s as 'error' | 'warning' | 'info' : 'all'; })()} />}
 
         {/* ════════════ SEO STRATEGY TAB ════════════ */}
         {tab === 'strategy' && (<>
@@ -4070,5 +4075,6 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         </div>
       </footer>
     </div>
+    </CartProvider>
   );
 }
