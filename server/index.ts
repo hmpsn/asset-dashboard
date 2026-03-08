@@ -4253,6 +4253,31 @@ app.get('/api/public/workspace/:id', (req, res) => {
   });
 });
 
+// Public tier endpoint — returns effective tier for a workspace
+app.get('/api/public/tier/:id', (req, res) => {
+  const ws = getWorkspace(req.params.id);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  let effectiveTier = ws.tier || 'free';
+  // If in trial period, treat as growth
+  if (effectiveTier === 'free' && ws.trialEndsAt) {
+    const trialEnd = new Date(ws.trialEndsAt);
+    if (trialEnd > new Date()) effectiveTier = 'growth';
+  }
+
+  const trialDaysRemaining = ws.trialEndsAt
+    ? Math.max(0, Math.ceil((new Date(ws.trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : 0;
+
+  res.json({
+    tier: effectiveTier,
+    baseTier: ws.tier || 'free',
+    isTrial: effectiveTier === 'growth' && (ws.tier || 'free') === 'free' && trialDaysRemaining > 0,
+    trialDaysRemaining,
+    trialEndsAt: ws.trialEndsAt || null,
+  });
+});
+
 const clientLoginLimiter = rateLimit(60 * 1000, 5); // 5 attempts per minute per IP
 app.post('/api/public/auth/:id', clientLoginLimiter, (req, res) => {
   const ws = getWorkspace(req.params.id);

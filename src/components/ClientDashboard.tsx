@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 import { StripePaymentModal } from './StripePaymentForm';
-import { StatCard, CompactStatBar, EmptyState } from './ui';
+import { StatCard, CompactStatBar, EmptyState, TierGate, type Tier } from './ui';
 import { DualTrendChart, RenderMarkdown, InsightCard } from './client/helpers';
 import { HealthTab } from './client/HealthTab';
 import { OrganicInsight } from './client/DataSnapshots';
@@ -930,6 +930,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
   const pendingApprovals = approvalBatches.reduce((sum, b) => sum + b.items.filter(i => i.status === 'pending').length, 0);
   const unreadTeamNotes = requests.filter(r => r.notes.length > 0 && r.notes[r.notes.length - 1].author === 'team' && r.status !== 'completed' && r.status !== 'closed').length;
 
+  const effectiveTier: Tier = (ws?.tier as Tier) || 'free';
   const strategyLocked = !ws?.seoClientView;
   const NAV = [
     { id: 'overview' as ClientTab, label: 'Insights', icon: Sparkles, locked: false },
@@ -969,9 +970,9 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                     className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${!customDateRange && days === d ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}
                   >{d >= 365 ? '1y' : d >= 180 ? '6mo' : `${d}d`}</button>
                 ))}
-                <button onClick={() => setShowDatePicker(p => !p)}
-                  className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${customDateRange ? 'bg-teal-600/20 text-teal-300 border border-teal-500/30' : 'text-zinc-500 hover:text-zinc-300'}`}
-                  title="Custom date range"
+                <button onClick={() => effectiveTier !== 'free' && setShowDatePicker(p => !p)}
+                  className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${effectiveTier === 'free' ? 'text-zinc-600 cursor-not-allowed' : customDateRange ? 'bg-teal-600/20 text-teal-300 border border-teal-500/30' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  title={effectiveTier === 'free' ? 'Upgrade to Growth for custom date ranges' : 'Custom date range'}
                 >
                   <Calendar className="w-3.5 h-3.5" />
                   {customDateRange ? (
@@ -1540,6 +1541,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
 
               {/* ── CONTENT OPPORTUNITIES (conversion moment) ── */}
               {strategyData.contentGaps && strategyData.contentGaps.length > 0 && (
+                <TierGate tier={effectiveTier} required="growth" feature="Content Opportunities" teaser={`${strategyData.contentGaps.length} content topics identified — upgrade to unlock recommendations`}>
                 <div className="bg-gradient-to-br from-teal-950/40 to-zinc-900 rounded-xl border border-teal-500/30 p-5 relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-40 h-40 bg-teal-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
                   <div className="relative">
@@ -1599,6 +1601,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                     </div>
                   </div>
                 </div>
+                </TierGate>
               )}
 
               {/* ── KEYWORD OPPORTUNITIES + TARGET KEYWORDS (side by side) ── */}
@@ -1651,6 +1654,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
 
               {/* ── COMPETITOR KEYWORD GAPS ── */}
               {strategyData.keywordGaps && strategyData.keywordGaps.length > 0 && (
+                <TierGate tier={effectiveTier} required="growth" feature="Competitor Keyword Gaps" teaser={`${strategyData.keywordGaps.length} keyword gaps found — upgrade to see what competitors rank for`}>
                 <div className="bg-gradient-to-br from-orange-950/20 to-zinc-900 rounded-xl border border-orange-500/20 p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="w-6 h-6 rounded-lg bg-orange-500/20 flex items-center justify-center">
@@ -1675,9 +1679,11 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                     ))}
                   </div>
                 </div>
+                </TierGate>
               )}
 
               {/* ── PAGE KEYWORD MAP (detailed reference with search/sort/filter) ── */}
+              <TierGate tier={effectiveTier} required="growth" feature="Page Keyword Map" teaser={`${strategyData.pageMap.length} pages with keyword targets — upgrade to view detailed assignments`}>
               {(() => {
                 const intents = Array.from(new Set(strategyData.pageMap.map(p => p.searchIntent).filter(Boolean)));
                 let filtered = strategyData.pageMap.filter(p => {
@@ -1767,6 +1773,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                   </div>
                 );
               })()}
+              </TierGate>
             </div>
           ) : (
             <div className="text-center py-16">
@@ -2142,6 +2149,9 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
 
                       {/* Action buttons for client_review */}
                       {req.status === 'client_review' && (
+                        effectiveTier === 'free' ? (
+                          <TierGate tier={effectiveTier} required="growth" feature="Brief Review Actions" compact className="mt-1"><span /></TierGate>
+                        ) : (
                         <div className="flex items-center gap-2 pt-1">
                           <button onClick={() => approveBrief(req.id)} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-green-600/20 border border-green-500/30 text-xs text-green-300 font-medium hover:bg-green-600/30 transition-colors">
                             <Check className="w-3.5 h-3.5" /> Approve Brief
@@ -2153,6 +2163,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                             <X className="w-3.5 h-3.5" /> Decline
                           </button>
                         </div>
+                        )
                       )}
 
                       {/* Delivery link */}
@@ -2911,6 +2922,9 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
 
                           {/* Actions */}
                           {item.status === 'pending' && !isEditing && (
+                            effectiveTier === 'free' ? (
+                              <TierGate tier={effectiveTier} required="growth" feature="Approve & Edit Changes" compact className="mt-3"><span /></TierGate>
+                            ) : (
                             <div className="flex items-center gap-2 mt-3">
                               <button
                                 onClick={() => updateApprovalItem(batch.id, item.id, { status: 'approved' })}
@@ -2933,6 +2947,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                                 <X className="w-3 h-3" /> Reject
                               </button>
                             </div>
+                            )
                           )}
                           {item.status === 'approved' && (
                             <div className="flex items-center gap-2 mt-3 text-[11px] text-green-400">

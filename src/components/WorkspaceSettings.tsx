@@ -4,7 +4,7 @@ import {
   Globe, Search, BarChart3, Loader2, Check, Unplug, ExternalLink, LogIn, LogOut,
   Copy, CheckCircle, Lock, KeyRound, X, Users, ChevronRight,
   Pin, PinOff, Pencil, Save, RefreshCw, Plus, Trash2, ArrowUp, ArrowDown, Palette,
-  Shield, SlidersHorizontal, Mail, Image as ImageIcon, DollarSign, BookOpen,
+  Shield, SlidersHorizontal, Mail, Image as ImageIcon, DollarSign, BookOpen, Sparkles,
 } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 
@@ -29,6 +29,8 @@ interface WorkspaceData {
   brandAccentColor?: string;
   knowledgeBase?: string;
   contentPricing?: { briefPrice: number; fullPostPrice: number; currency: string; briefLabel?: string; fullPostLabel?: string; briefDescription?: string; fullPostDescription?: string } | null;
+  tier?: 'free' | 'growth' | 'premium';
+  trialEndsAt?: string;
 }
 
 interface Props {
@@ -345,6 +347,57 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
       {/* ═══ FEATURES ═══ */}
       {tab === 'features' && (
         <div className="space-y-5">
+          {/* Workspace Tier */}
+          <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+            <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
+              <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                <Sparkles className="w-4 h-4 text-amber-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-zinc-200">Workspace Tier</h3>
+                <p className="text-xs text-zinc-500">Controls which features the client can access</p>
+              </div>
+              <span className={`text-[11px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full border ${
+                (ws?.tier || 'free') === 'premium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+                  : (ws?.tier || 'free') === 'growth' ? 'text-teal-400 bg-teal-500/10 border-teal-500/20'
+                  : 'text-zinc-400 bg-zinc-500/10 border-zinc-500/20'
+              }`}>
+                {ws?.tier || 'free'}
+              </span>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div className="flex items-center gap-2">
+                {(['free', 'growth', 'premium'] as const).map(t => (
+                  <button
+                    key={t}
+                    onClick={async () => {
+                      await patchWorkspace({ tier: t });
+                      toast(`Tier set to ${t}`);
+                    }}
+                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${
+                      (ws?.tier || 'free') === t
+                        ? t === 'premium' ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+                          : t === 'growth' ? 'bg-teal-500/15 border-teal-500/30 text-teal-300'
+                          : 'bg-zinc-700/50 border-zinc-600 text-zinc-200'
+                        : 'bg-zinc-800/30 border-zinc-800 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700'
+                    }`}
+                  >
+                    {t === 'premium' && <Sparkles className="w-3 h-3 inline mr-1" />}
+                    {t.charAt(0).toUpperCase() + t.slice(1)}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-zinc-600">
+                Free: limited features &amp; chat • Growth: all features, full chat • Premium: priority support, advanced analytics
+              </p>
+              {ws?.trialEndsAt && (
+                <div className="text-[11px] text-teal-400/80 bg-teal-500/5 border border-teal-500/15 rounded-lg px-3 py-2">
+                  Trial active — expires {new Date(ws.trialEndsAt).toLocaleDateString()}
+                </div>
+              )}
+            </div>
+          </section>
+
           {/* Client Portal Toggles */}
           <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
             <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">

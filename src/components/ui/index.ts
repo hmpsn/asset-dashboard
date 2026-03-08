@@ -7,6 +7,7 @@ export { DataList } from './DataList';
 export { Badge } from './Badge';
 export { EmptyState } from './EmptyState';
 export { TabBar } from './TabBar';
+export { TierGate, TierBadge, type Tier } from './TierGate';
 export {
   scoreColor,
   scoreColorClass,
