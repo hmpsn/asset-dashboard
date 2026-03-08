@@ -48,7 +48,7 @@ import {
   discoverSitemapUrls,
 } from './webflow.js';
 import { generateAltText } from './alttext.js';
-import { runSeoAudit } from './seo-audit.js';
+import { runSeoAudit, type SeoAuditResult } from './seo-audit.js';
 import { checkSiteLinks } from './link-checker.js';
 import { scanRedirects } from './redirect-scanner.js';
 import { saveRedirectSnapshot, getRedirectSnapshot } from './redirect-store.js';
@@ -722,6 +722,83 @@ app.delete('/api/workspaces/:id', requireWorkspaceAccess(), (req, res) => {
   broadcast('workspace:deleted', { id: req.params.id });
   res.json({ ok: true });
 });
+
+// --- Suppression-aware audit helper ---
+// Scoring weights must mirror seo-audit.ts auditPage() exactly
+const CRITICAL_CHECKS_SET = new Set([
+  'title', 'meta-description', 'canonical', 'h1', 'robots',
+  'duplicate-title', 'mixed-content', 'ssl', 'robots-txt',
+]);
+const MODERATE_CHECKS_SET = new Set([
+  'content-length', 'heading-hierarchy', 'internal-links', 'img-alt',
+  'og-tags', 'og-image', 'link-text', 'url', 'lang', 'viewport',
+  'duplicate-description', 'img-filesize', 'html-size',
+]);
+
+interface AuditSuppression { check: string; pageSlug: string; reason?: string; createdAt: string }
+
+function applySuppressionsToAudit(
+  audit: SeoAuditResult,
+  suppressions: AuditSuppression[],
+): SeoAuditResult {
+  if (!suppressions || suppressions.length === 0) return audit;
+
+  // Build a fast lookup: "check::pageSlug" → true
+  const suppSet = new Set(suppressions.map(s => `${s.check}::${s.pageSlug}`));
+
+  let totalErrors = 0, totalWarnings = 0, totalInfos = 0;
+
+  const filteredPages = audit.pages.map(page => {
+    const filteredIssues = page.issues.filter(issue => {
+      const key = `${issue.check}::${page.slug}`;
+      return !suppSet.has(key);
+    });
+
+    // Recalculate page score with remaining issues
+    let score = 100;
+    for (const issue of filteredIssues) {
+      const isCritical = CRITICAL_CHECKS_SET.has(issue.check);
+      const isModerate = MODERATE_CHECKS_SET.has(issue.check);
+      if (issue.severity === 'error') {
+        score -= isCritical ? 20 : 12;
+      } else if (issue.severity === 'warning') {
+        score -= isCritical ? 10 : isModerate ? 6 : 4;
+      } else {
+        score -= 1;
+      }
+    }
+    score = Math.max(0, Math.min(100, score));
+
+    for (const i of filteredIssues) {
+      if (i.severity === 'error') totalErrors++;
+      else if (i.severity === 'warning') totalWarnings++;
+      else totalInfos++;
+    }
+
+    return { ...page, issues: filteredIssues, score };
+  });
+
+  // Site-wide issues are not per-page, so they aren't suppressed
+  for (const i of audit.siteWideIssues) {
+    if (i.severity === 'error') totalErrors++;
+    else if (i.severity === 'warning') totalWarnings++;
+    else totalInfos++;
+  }
+
+  const siteScore = filteredPages.length > 0
+    ? Math.round(filteredPages.reduce((s, r) => s + r.score, 0) / filteredPages.length)
+    : 100;
+
+  return {
+    siteScore,
+    totalPages: filteredPages.length,
+    errors: totalErrors,
+    warnings: totalWarnings,
+    infos: audit.infos !== undefined ? totalInfos : totalInfos,
+    pages: filteredPages,
+    siteWideIssues: audit.siteWideIssues,
+  };
+}
 
 // --- Audit Issue Suppressions ---
 app.get('/api/workspaces/:id/audit-suppressions', requireWorkspaceAccess(), (req, res) => {
@@ -1645,6 +1722,12 @@ app.post('/api/reports/:siteId/snapshot', (req, res) => {
 app.get('/api/reports/:siteId/latest', (req, res) => {
   const latest = getLatestSnapshot(req.params.siteId);
   if (!latest) return res.json(null);
+  // Apply suppressions so admin sees filtered scores matching client view
+  const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+  if (ws && ws.auditSuppressions && ws.auditSuppressions.length > 0) {
+    const filtered = applySuppressionsToAudit(latest.audit, ws.auditSuppressions);
+    return res.json({ ...latest, audit: filtered });
+  }
   res.json(latest);
 });
 
@@ -3138,6 +3221,21 @@ app.get('/api/webflow/cms-seo/:siteId', async (req, res) => {
     const collections = await listCollections(req.params.siteId, token);
     const SEO_FIELD_PATTERNS = ['seo title', 'meta title', 'title tag', 'seo description', 'meta description', 'og title', 'og description', 'open graph'];
 
+    // Fetch sitemap to filter out collection list pages that don't exist in it
+    let sitemapPaths: Set<string> | null = null;
+    try {
+      const subdomain = await getSiteSubdomain(req.params.siteId, token);
+      if (subdomain) {
+        const baseUrl = `https://${subdomain}.webflow.io`;
+        const sitemapUrls = await discoverSitemapUrls(baseUrl);
+        if (sitemapUrls.length > 0) {
+          sitemapPaths = new Set(sitemapUrls.map(u => {
+            try { return new URL(u).pathname.replace(/\/$/, '').toLowerCase(); } catch { return ''; }
+          }).filter(Boolean));
+        }
+      }
+    } catch { /* sitemap fetch is best-effort — show all items if it fails */ }
+
     const results: Array<{
       collectionId: string;
       collectionName: string;
@@ -3174,8 +3272,23 @@ app.get('/api/webflow/cms-seo/:siteId', async (req, res) => {
       });
       if (liveItems.length === 0) continue;
 
+      // Filter by sitemap: only include items whose full path exists in sitemap
+      const collSlug = coll.slug;
+      const sitemapFiltered = sitemapPaths
+        ? liveItems.filter(item => {
+            const fd = (item.fieldData || item) as Record<string, unknown>;
+            const itemSlug = String(fd['slug'] || '').toLowerCase();
+            if (!itemSlug) return false;
+            // Check both /{collSlug}/{itemSlug} and /{itemSlug} patterns
+            const fullPath = `/${collSlug}/${itemSlug}`;
+            return sitemapPaths!.has(fullPath) || sitemapPaths!.has(`/${itemSlug}`);
+          })
+        : liveItems; // No sitemap available — show all items
+
+      if (sitemapFiltered.length === 0) continue;
+
       // Extract only the relevant field data from each item
-      const cleanItems = liveItems.map(item => {
+      const cleanItems = sitemapFiltered.map(item => {
         const fd = (item.fieldData || item) as Record<string, unknown>;
         const relevant: Record<string, unknown> = {};
         relevant['name'] = fd['name'] || '';
@@ -3194,7 +3307,7 @@ app.get('/api/webflow/cms-seo/:siteId', async (req, res) => {
         collectionSlug: coll.slug,
         seoFields,
         items: cleanItems,
-        total: liveItems.length,
+        total: sitemapFiltered.length,
       });
     }
 
@@ -3414,7 +3527,9 @@ app.post('/api/admin-chat', async (req, res) => {
         const trafficMap = await getAuditTrafficForWorkspace(ws);
         const latestAudit = getLatestSnapshot(ws.webflowSiteId);
         if (latestAudit && Object.keys(trafficMap).length > 0) {
-          const pagesWithTraffic = latestAudit.audit.pages
+          // Apply suppressions so chat doesn't recommend fixing suppressed issues
+          const filteredAudit = applySuppressionsToAudit(latestAudit.audit, ws.auditSuppressions || []);
+          const pagesWithTraffic = filteredAudit.pages
             .filter(p => p.issues.length > 0)
             .map(p => {
               const slug = p.slug.startsWith('/') ? p.slug : `/${p.slug}`;
@@ -4124,7 +4239,9 @@ Rules:
         const trafficMap = await getAuditTrafficForWorkspace(ws);
         const latestAudit = getLatestSnapshot(ws.webflowSiteId);
         if (latestAudit && Object.keys(trafficMap).length > 0) {
-          const pagesWithIssues = latestAudit.audit.pages
+          // Apply suppressions so strategy chat excludes suppressed issues
+          const filteredAudit = applySuppressionsToAudit(latestAudit.audit, ws.auditSuppressions || []);
+          const pagesWithIssues = filteredAudit.pages
             .filter(p => p.issues.length > 0)
             .map(p => {
               const slug = p.slug.startsWith('/') ? p.slug : `/${p.slug}`;
@@ -4137,8 +4254,8 @@ Rules:
           if (pagesWithIssues.length > 0) {
             auditContext = `\n\nSEO AUDIT: HIGH-TRAFFIC PAGES WITH ERRORS (fix these for immediate impact):\n` +
               pagesWithIssues.map(p => `- ${p.slug}: ${p.issues} issues, score ${p.score}/100 | ${p.traffic!.clicks} clicks, ${p.traffic!.pageviews} pageviews`).join('\n');
-            if (latestAudit.audit.siteScore != null) {
-              auditContext += `\nOverall site health score: ${latestAudit.audit.siteScore}/100`;
+            if (filteredAudit.siteScore != null) {
+              auditContext += `\nOverall site health score: ${filteredAudit.siteScore}/100`;
             }
           }
         }
@@ -5369,14 +5486,15 @@ app.get('/api/public/audit-summary/:workspaceId', (req, res) => {
   if (!ws?.webflowSiteId) return res.status(400).json({ error: 'No site linked' });
   const latest = getLatestSnapshot(ws.webflowSiteId);
   if (!latest) return res.json(null);
-  // Return a safe summary
+  // Apply suppressions so scores exclude suppressed issues
+  const filtered = applySuppressionsToAudit(latest.audit, ws.auditSuppressions || []);
   res.json({
     id: latest.id,
     createdAt: latest.createdAt,
-    siteScore: latest.audit.siteScore,
-    totalPages: latest.audit.totalPages,
-    errors: latest.audit.errors,
-    warnings: latest.audit.warnings,
+    siteScore: filtered.siteScore,
+    totalPages: filtered.totalPages,
+    errors: filtered.errors,
+    warnings: filtered.warnings,
     previousScore: latest.previousScore,
   });
 });
@@ -5386,6 +5504,8 @@ app.get('/api/public/audit-detail/:workspaceId', (req, res) => {
   if (!ws?.webflowSiteId) return res.status(400).json({ error: 'No site linked' });
   const latest = getLatestSnapshot(ws.webflowSiteId);
   if (!latest) return res.json(null);
+  // Apply suppressions so client sees filtered issues and recalculated scores
+  const filtered = applySuppressionsToAudit(latest.audit, ws.auditSuppressions || []);
   const history = listSnapshots(ws.webflowSiteId);
   res.json({
     id: latest.id,
@@ -5393,7 +5513,7 @@ app.get('/api/public/audit-detail/:workspaceId', (req, res) => {
     siteName: latest.siteName,
     logoUrl: latest.logoUrl,
     previousScore: latest.previousScore,
-    audit: latest.audit,
+    audit: filtered,
     scoreHistory: history.map(h => ({ id: h.id, createdAt: h.createdAt, siteScore: h.siteScore })),
   });
 });
@@ -5481,7 +5601,9 @@ app.post('/api/public/search-chat/:workspaceId', async (req, res) => {
         const trafficMap = await getAuditTrafficForWorkspace(ws);
         const latestAudit = getLatestSnapshot(ws.webflowSiteId);
         if (latestAudit && Object.keys(trafficMap).length > 0) {
-          const pagesWithTraffic = latestAudit.audit.pages
+          // Apply suppressions so client chat doesn't surface suppressed issues
+          const filteredAudit = applySuppressionsToAudit(latestAudit.audit, ws.auditSuppressions || []);
+          const pagesWithTraffic = filteredAudit.pages
             .filter(p => p.issues.length > 0)
             .map(p => {
               const slug = p.slug.startsWith('/') ? p.slug : `/${p.slug}`;

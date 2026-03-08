@@ -390,7 +390,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                           )}
                           {isItemExpanded ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />}
                           <span className="text-xs text-zinc-300 truncate">{itemName || '(untitled)'}</span>
-                          <span className="text-[11px] text-zinc-500 font-mono flex-shrink-0">/{itemSlug}</span>
+                          <span className="text-[11px] text-zinc-500 font-mono flex-shrink-0">/{coll.collectionSlug}/{itemSlug}</span>
                         </div>
                         <div className="flex items-center gap-1.5 flex-shrink-0">
                           {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
