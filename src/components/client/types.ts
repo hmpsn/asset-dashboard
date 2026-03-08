@@ -38,7 +38,7 @@ export interface ClientContentRequest {
   id: string; topic: string; targetKeyword: string; intent: string; priority: string;
   status: 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'delivered' | 'declined';
   source?: 'strategy' | 'client'; briefId?: string;
-  serviceType?: 'brief_only' | 'full_post'; upgradedAt?: string;
+  serviceType?: 'brief_only' | 'full_post'; pageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource'; upgradedAt?: string;
   deliveryUrl?: string; deliveryNotes?: string;
   comments?: { id: string; author: 'client' | 'team'; content: string; createdAt: string }[];
   requestedAt: string; updatedAt: string;

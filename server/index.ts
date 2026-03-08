@@ -4648,8 +4648,9 @@ app.post('/api/public/content-request/:workspaceId', (req, res) => {
   const rationale = sanitizeString(req.body.rationale, 1000);
   const clientNote = sanitizeString(req.body.clientNote, 1000);
   const serviceType = validateEnum(req.body.serviceType, ['brief_only', 'full_post'], 'brief_only');
+  const pageType = validateEnum(req.body.pageType, ['blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource'], 'blog');
   if (!topic || !targetKeyword) return res.status(400).json({ error: 'topic and targetKeyword are required' });
-  const request = createContentRequest(req.params.workspaceId, { topic, targetKeyword, intent, priority, rationale, clientNote, serviceType });
+  const request = createContentRequest(req.params.workspaceId, { topic, targetKeyword, intent, priority, rationale, clientNote, serviceType, pageType });
   addActivity(req.params.workspaceId, 'content_requested', `Content topic requested: "${topic}"`, `Keyword: "${targetKeyword}" · Priority: ${priority}`, { requestId: request.id });
   notifyTeamContentRequest({ workspaceName: ws.name, workspaceId: req.params.workspaceId, topic, targetKeyword, priority, rationale: rationale || '' });
   res.json(request);
@@ -4663,7 +4664,7 @@ app.get('/api/public/content-requests/:workspaceId', (req, res) => {
   res.json(requests.map(r => ({
     id: r.id, topic: r.topic, targetKeyword: r.targetKeyword, intent: r.intent,
     priority: r.priority, status: r.status, source: r.source,
-    serviceType: r.serviceType || 'brief_only', upgradedAt: r.upgradedAt,
+    serviceType: r.serviceType || 'brief_only', pageType: r.pageType || 'blog', upgradedAt: r.upgradedAt,
     comments: r.comments || [], requestedAt: r.requestedAt, updatedAt: r.updatedAt,
     // Include briefId only when in client_review or later
     briefId: ['client_review', 'approved', 'changes_requested', 'in_progress', 'delivered'].includes(r.status) ? r.briefId : undefined,
@@ -4678,11 +4679,12 @@ app.post('/api/public/content-request/:workspaceId/submit', (req, res) => {
   const targetKeyword = sanitizeString(req.body.targetKeyword, 200);
   const notes = sanitizeString(req.body.notes, 1000);
   const serviceType = validateEnum(req.body.serviceType, ['brief_only', 'full_post'], 'brief_only');
+  const pageType = validateEnum(req.body.pageType, ['blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource'], 'blog');
   if (!topic || !targetKeyword) return res.status(400).json({ error: 'topic and targetKeyword are required' });
   const request = createContentRequest(req.params.workspaceId, {
     topic, targetKeyword, intent: 'informational', priority: 'medium',
     rationale: notes || `Client-submitted topic: ${topic}`,
-    clientNote: notes, source: 'client', serviceType,
+    clientNote: notes, source: 'client', serviceType, pageType,
   });
   addActivity(req.params.workspaceId, 'content_requested', `Client submitted topic: "${topic}"`, `Keyword: "${targetKeyword}"`, { requestId: request.id });
   notifyTeamContentRequest({ workspaceName: ws.name, workspaceId: req.params.workspaceId, topic, targetKeyword, priority: 'medium', rationale: notes || '' });
@@ -4823,6 +4825,7 @@ app.post('/api/content-requests/:workspaceId/:id/generate-brief', async (req, re
       existingPages,
       semrushMetrics,
       semrushRelated,
+      pageType: request.pageType || 'blog',
     });
 
     // Link brief to request and update status

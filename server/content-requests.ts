@@ -35,6 +35,7 @@ export interface ContentTopicRequest {
   clientFeedback?: string;
   source?: 'strategy' | 'client';
   serviceType?: 'brief_only' | 'full_post';
+  pageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource';
   upgradedAt?: string;
   deliveryUrl?: string;
   deliveryNotes?: string;
@@ -83,7 +84,7 @@ export function getContentRequest(workspaceId: string, id: string): ContentTopic
 
 export function createContentRequest(
   workspaceId: string,
-  data: { topic: string; targetKeyword: string; intent: string; priority: string; rationale: string; clientNote?: string; source?: 'strategy' | 'client'; serviceType?: 'brief_only' | 'full_post' }
+  data: { topic: string; targetKeyword: string; intent: string; priority: string; rationale: string; clientNote?: string; source?: 'strategy' | 'client'; serviceType?: 'brief_only' | 'full_post'; pageType?: ContentTopicRequest['pageType'] }
 ): ContentTopicRequest {
   const items = read(workspaceId);
 
@@ -102,6 +103,7 @@ export function createContentRequest(
     clientNote: data.clientNote,
     source: data.source || 'strategy',
     serviceType: data.serviceType || 'brief_only',
+    pageType: data.pageType || 'blog',
     comments: [],
     status: 'requested',
     requestedAt: new Date().toISOString(),

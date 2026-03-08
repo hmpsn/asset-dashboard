@@ -143,6 +143,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
   const [newTopicKeyword, setNewTopicKeyword] = useState('');
   const [newTopicNotes, setNewTopicNotes] = useState('');
   const [newTopicServiceType, setNewTopicServiceType] = useState<'brief_only' | 'full_post'>('brief_only');
+  const [newTopicPageType, setNewTopicPageType] = useState<'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource'>('blog');
   const [upgradingReqId, setUpgradingReqId] = useState<string | null>(null);
   // Pricing confirmation modal state
   const [pricingModal, setPricingModal] = useState<{
@@ -155,6 +156,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
     notes?: string;
     source: 'strategy' | 'client' | 'upgrade';
     upgradeReqId?: string;
+    pageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource';
   } | null>(null);
   const [pricingConfirming, setPricingConfirming] = useState(false);
   // Inline pricing data from server
@@ -499,7 +501,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         } else if (pricingModal.source === 'strategy') {
           const res = await fetch(`/api/public/content-request/${workspaceId}`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, intent: pricingModal.intent, priority: pricingModal.priority, rationale: pricingModal.rationale, serviceType: pricingModal.serviceType }),
+            body: JSON.stringify({ topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, intent: pricingModal.intent, priority: pricingModal.priority, rationale: pricingModal.rationale, serviceType: pricingModal.serviceType, pageType: pricingModal.pageType || 'blog' }),
           });
           if (!res.ok) throw new Error(`Server returned ${res.status}`);
           const created = await res.json();
@@ -507,7 +509,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         } else {
           const res = await fetch(`/api/public/content-request/${workspaceId}/submit`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, notes: pricingModal.notes || undefined, serviceType: pricingModal.serviceType }),
+            body: JSON.stringify({ topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, notes: pricingModal.notes || undefined, serviceType: pricingModal.serviceType, pageType: pricingModal.pageType || 'blog' }),
           });
           if (!res.ok) throw new Error(`Server returned ${res.status}`);
           const created = await res.json();
@@ -565,7 +567,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         setRequestingTopic(pricingModal.targetKeyword);
         const res = await fetch(`/api/public/content-request/${workspaceId}`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, intent: pricingModal.intent, priority: pricingModal.priority, rationale: pricingModal.rationale, serviceType: pricingModal.serviceType }),
+          body: JSON.stringify({ topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, intent: pricingModal.intent, priority: pricingModal.priority, rationale: pricingModal.rationale, serviceType: pricingModal.serviceType, pageType: pricingModal.pageType || 'blog' }),
         });
         if (!res.ok) throw new Error(`Server returned ${res.status}`);
         setRequestedTopics(prev => new Set(prev).add(pricingModal.targetKeyword));
@@ -579,13 +581,13 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
       } else {
         const res = await fetch(`/api/public/content-request/${workspaceId}/submit`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, notes: pricingModal.notes || undefined, serviceType: pricingModal.serviceType }),
+          body: JSON.stringify({ topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, notes: pricingModal.notes || undefined, serviceType: pricingModal.serviceType, pageType: pricingModal.pageType || 'blog' }),
         });
         if (res.ok) {
           const created = await res.json();
           setContentRequests(prev => [created, ...prev]);
           setRequestedTopics(prev => new Set(prev).add(created.targetKeyword));
-          setNewTopicName(''); setNewTopicKeyword(''); setNewTopicNotes(''); setNewTopicServiceType('brief_only'); setShowTopicForm(false);
+          setNewTopicName(''); setNewTopicKeyword(''); setNewTopicNotes(''); setNewTopicServiceType('brief_only'); setNewTopicPageType('blog'); setShowTopicForm(false);
           setToast({ message: 'Topic submitted! Your team will review it.', type: 'success' });
           setTimeout(() => setToast(null), 5000);
         }
@@ -1894,10 +1896,28 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                 </div>
                 <div className="text-[11px] text-zinc-500 mt-1">{newTopicServiceType === 'brief_only' ? 'A detailed content strategy document for this topic' : 'Brief + professionally written article delivered ready to publish'}</div>
               </div>
+              <div>
+                <div className="text-[11px] text-zinc-500 mb-1.5">Page type</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {([
+                    { value: 'blog' as const, label: 'Blog Post' },
+                    { value: 'landing' as const, label: 'Landing' },
+                    { value: 'service' as const, label: 'Service' },
+                    { value: 'location' as const, label: 'Location' },
+                    { value: 'product' as const, label: 'Product' },
+                    { value: 'pillar' as const, label: 'Pillar' },
+                    { value: 'resource' as const, label: 'Resource' },
+                  ]).map(pt => (
+                    <button key={pt.value} onClick={() => setNewTopicPageType(pt.value)} className={`px-2 py-1 rounded-lg text-[11px] font-medium transition-all border ${newTopicPageType === pt.value ? 'bg-blue-500/15 border-blue-500/30 text-blue-300' : 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700'}`}>
+                      {pt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="flex items-center gap-2">
                 <button onClick={() => {
                   if (!newTopicName.trim() || !newTopicKeyword.trim()) return;
-                  setPricingModal({ serviceType: newTopicServiceType, topic: newTopicName.trim(), targetKeyword: newTopicKeyword.trim(), notes: newTopicNotes.trim() || undefined, source: 'client' });
+                  setPricingModal({ serviceType: newTopicServiceType, topic: newTopicName.trim(), targetKeyword: newTopicKeyword.trim(), notes: newTopicNotes.trim() || undefined, source: 'client', pageType: newTopicPageType });
                 }} disabled={!newTopicName.trim() || !newTopicKeyword.trim() || pricingConfirming} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 text-xs text-white font-medium hover:bg-blue-500 transition-colors disabled:opacity-50">
                   <Send className="w-3.5 h-3.5" /> Submit Topic
                 </button>
@@ -1952,6 +1972,9 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                           <span className={`text-[11px] px-1.5 py-0.5 rounded border font-medium ${(req.serviceType || 'brief_only') === 'full_post' ? 'bg-gradient-to-r from-blue-500/10 to-teal-500/10 text-blue-300 border-blue-500/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
                             {(req.serviceType || 'brief_only') === 'full_post' ? '✦ Full Post' : 'Brief'}
                           </span>
+                          {req.pageType && req.pageType !== 'blog' && (
+                            <span className="text-[11px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20 font-medium capitalize">{req.pageType}</span>
+                          )}
                           {req.upgradedAt && <span className="text-[11px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 font-medium">Upgraded</span>}
                         </div>
                         <div className="text-xs text-teal-400 mt-0.5">&ldquo;{req.targetKeyword}&rdquo;</div>
@@ -3435,6 +3458,36 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                   <div className={`text-[11px] mt-1 ${isFull ? 'text-blue-400/80' : 'text-teal-400/80'}`}>Keyword: &ldquo;{pricingModal.targetKeyword}&rdquo;</div>
                 </div>
               </div>
+
+              {/* Page type selector */}
+              {!isUpgrade && (
+                <div className="mx-6 mt-3 mb-0">
+                  <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-1.5">Page Type</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {([
+                      { value: 'blog', label: 'Blog Post' },
+                      { value: 'landing', label: 'Landing Page' },
+                      { value: 'service', label: 'Service Page' },
+                      { value: 'location', label: 'Location Page' },
+                      { value: 'product', label: 'Product Page' },
+                      { value: 'pillar', label: 'Pillar / Hub' },
+                      { value: 'resource', label: 'Resource / Guide' },
+                    ] as const).map(pt => (
+                      <button
+                        key={pt.value}
+                        onClick={() => setPricingModal(prev => prev ? { ...prev, pageType: pt.value } : null)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all border ${
+                          (pricingModal.pageType || 'blog') === pt.value
+                            ? (isFull ? 'bg-blue-500/15 border-blue-500/30 text-blue-300' : 'bg-teal-500/15 border-teal-500/30 text-teal-300')
+                            : 'bg-zinc-900/50 border-zinc-800 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700'
+                        }`}
+                      >
+                        {pt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Price banner */}
               {displayPrice != null && (

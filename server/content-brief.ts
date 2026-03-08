@@ -43,6 +43,8 @@ export interface ContentBrief {
   eeatGuidance?: { experience: string; expertise: string; authority: string; trust: string };
   contentChecklist?: string[];
   schemaRecommendations?: { type: string; notes: string }[];
+  // Page type (v4)
+  pageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource';
 }
 
 function getBriefFile(workspaceId: string): string {
@@ -100,6 +102,65 @@ export function deleteBrief(workspaceId: string, briefId: string): boolean {
   return true;
 }
 
+// Page-type-specific prompt instructions
+const PAGE_TYPE_PROMPTS: Record<string, string> = {
+  blog: `PAGE TYPE: Blog Post
+- Format as an educational, long-form article (1,500-2,500 words)
+- Include an engaging introduction that hooks the reader
+- Use a mix of informational and slightly commercial intent
+- Suggest internal links to service/product pages where relevant
+- Schema: Article or BlogPosting`,
+
+  landing: `PAGE TYPE: Landing Page
+- Format as a conversion-focused landing page (800-1,200 words)
+- Lead with the primary value proposition in the H1
+- Structure: Hero → Problem → Solution → Benefits → Social Proof → CTA
+- Every section should drive toward a single conversion action
+- Include trust signals (testimonials, stats, logos) in the outline
+- Schema: WebPage with potential Organization or Product`,
+
+  service: `PAGE TYPE: Service Page
+- Format as a service description page (1,000-1,500 words)
+- Lead with what the service solves, not what it is
+- Structure: Overview → What's Included → Process → Benefits → Pricing Signals → FAQ → CTA
+- Include specific deliverables and outcomes
+- E-E-A-T emphasis: expertise and authority signals are critical
+- Schema: Service, FAQPage`,
+
+  location: `PAGE TYPE: Location Page
+- Format as a local SEO page (800-1,200 words)
+- Include the city/region name naturally in headings and body
+- Structure: Local intro → Services in [Location] → Local expertise → Testimonials → Map/Directions → Contact CTA
+- Reference local landmarks, neighborhoods, or regional specifics
+- Include NAP (Name, Address, Phone) consistency guidance
+- Schema: LocalBusiness, FAQPage`,
+
+  product: `PAGE TYPE: Product Page
+- Format as a product description page (600-1,000 words)
+- Lead with the key benefit, not features
+- Structure: Product Overview → Key Features → Specifications → Use Cases → Comparison → Reviews → Purchase CTA
+- Include comparison elements vs alternatives
+- Pricing and availability signals
+- Schema: Product with Review, FAQPage`,
+
+  pillar: `PAGE TYPE: Pillar / Hub Page
+- Format as a comprehensive topic hub (2,500-4,000 words)
+- This is the authoritative centerpiece for a topic cluster
+- Structure: Comprehensive overview → Major subtopics (each linking to cluster content) → FAQ → Resources
+- Each section should link to or reference more detailed supporting content
+- Cover the topic broadly; linked cluster pages go deep
+- Internal linking strategy is critical — map every subtopic to an existing or planned page
+- Schema: Article, FAQPage, BreadcrumbList`,
+
+  resource: `PAGE TYPE: Resource / Guide
+- Format as a downloadable or in-depth reference guide (2,000-3,000 words)
+- Include actionable frameworks, templates, or step-by-step processes
+- Structure: Executive Summary → Background → Step-by-Step Guide → Tools/Resources → Checklist → Next Steps
+- Include visual aids guidance (tables, diagrams, checklists)
+- Lead magnet potential — note where a gated PDF version could be offered
+- Schema: Article, HowTo`,
+};
+
 export async function generateBrief(
   workspaceId: string,
   targetKeyword: string,
@@ -109,6 +170,7 @@ export async function generateBrief(
     existingPages?: string[];
     semrushMetrics?: KeywordMetrics;
     semrushRelated?: RelatedKeyword[];
+    pageType?: string;
   }
 ): Promise<ContentBrief> {
   const openaiKey = process.env.OPENAI_API_KEY;
@@ -146,7 +208,12 @@ export async function generateBrief(
       .join('\n');
   }
 
-  const prompt = `You are an expert content strategist and SEO specialist. Generate a comprehensive, production-ready content brief for a new piece of content targeting the keyword "${targetKeyword}".
+  // Page-type-specific instructions
+  const pageTypeBlock = context.pageType && PAGE_TYPE_PROMPTS[context.pageType]
+    ? `\n\n${PAGE_TYPE_PROMPTS[context.pageType]}\n\nTailor ALL aspects of the brief (outline structure, word count, CTA, schema, content format) to this page type.`
+    : '';
+
+  const prompt = `You are an expert content strategist and SEO specialist. Generate a comprehensive, production-ready content brief for a new piece of content targeting the keyword "${targetKeyword}".${pageTypeBlock}
 
 ${bizCtx ? `Business context: ${bizCtx}` : ''}
 
@@ -262,6 +329,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     eeatGuidance: (parsed.eeatGuidance as ContentBrief['eeatGuidance']) || undefined,
     contentChecklist: (parsed.contentChecklist as string[]) || undefined,
     schemaRecommendations: (parsed.schemaRecommendations as ContentBrief['schemaRecommendations']) || undefined,
+    pageType: (context.pageType as ContentBrief['pageType']) || undefined,
   };
 
   const briefs = readBriefs(workspaceId);
