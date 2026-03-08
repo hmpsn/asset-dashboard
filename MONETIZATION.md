@@ -47,57 +47,58 @@ A comprehensive monetization plan for the asset dashboard platform, covering tie
 
 ## Tier Structure
 
-### 🟢 Free Tier — "Dashboard"
+### 🟢 Free Tier — "Starter"
 
-**$0/mo** — included with any active web project
+**$0/mo** — your site at a glance
 
 | Feature | Purpose |
 |---------|---------|
+| AI-powered site insights | Overview tab with data-driven summaries |
 | Search Console dashboard | Data access builds login habit |
 | Google Analytics dashboard | Same — free data, frequent visits |
-| Site Health score (view only) | Shows problems → creates upgrade pressure |
-| Rank tracking (view only) | Awareness of keyword positions |
-| Request system | Clients ask for work = revenue |
-| Activity log | Transparency builds trust |
-| Monthly report email | Keeps agency top-of-mind |
+| Site Health audits (read-only) | Shows problems → creates upgrade pressure |
+| AI chat advisor (3 convos/month) | Taste of the AI value → upgrade incentive |
+| Monthly summary digest | Keeps agency top-of-mind |
 
-**Strategy:** Free tier gives clients a reason to log in weekly. Every dashboard shows data they can't act on alone → natural upgrade pressure from the platform itself.
+**Strategy:** Free tier costs zero team effort. Clients see their data and the AI gives them a taste. Every insight naturally pushes toward Growth. No requests, no approvals, no content — zero labor.
 
 ---
 
-### 🟡 Mid Tier — "Growth"
+### 🟡 Growth Tier — "AI-Powered SEO Engine"
 
-**$149–249/mo** (or bundled into retainer)
+**$249/mo** — AI does the work, you sell content
 
 | Feature | Revenue Driver |
 |---------|---------------|
-| AI Insights Engine (full chatbot) | The advisor that suggests services |
+| Everything in Starter | — |
+| Unlimited AI chat advisor | The advisor that suggests services |
 | Proactive insights greeting | Surfaces opportunities on every visit |
-| SEO Strategy view (full) | Shows content gaps → upsell to briefs |
-| Content Pipeline (brief requests) | Entry point for paid content |
-| Approval workflow (SEO changes) | Unlocks agency doing active SEO work |
+| SEO Strategy (lite: keywords, page map, content gaps, quick wins) | Shows gaps → upsell to briefs |
+| Content purchasing (briefs & posts) | On-ramp to paid deliverables |
+| ROI dashboard | Justifies the subscription every month |
 | Custom date ranges | Power user feature |
-| Competitor comparison (1 competitor) | Creates urgency |
 
-**Strategy:** The AI chatbot is the engine. Every conversation naturally suggests services. Strategy view shows gaps the client can't fill alone. Content pipeline is the on-ramp to paid deliverables.
+**Strategy:** Growth is the scale play — pure SaaS margin with zero human touch. AI generates strategy, client self-serves, and you make money when they buy content. No requests, no approvals, no team hours. Competitor analysis held back for Premium.
 
 ---
 
-### 🔴 Premium Tier — "Performance"
+### 🔴 Premium Tier — "Managed SEO Partnership"
 
-**$349–499/mo** (or bundled into retainer)
+**$999/mo** — we work for you (3 strategy & implementation hours included)
 
 | Feature | Revenue Driver |
 |---------|---------------|
 | Everything in Growth | — |
-| Unlimited AI conversations | Heavy users get full access |
-| Schema generation + publishing | High-value SEO deliverable |
-| Multi-competitor monitoring | Ongoing competitive intelligence |
-| Priority request queue | Faster turnaround |
-| Dedicated knowledge base tuning | AI knows their business deeply |
-| White-label domain (future) | Enterprise perception |
+| Competitor keyword analysis | Creates urgency, shows gaps |
+| Advanced competitor intel | Ongoing competitive intelligence |
+| SEO change approvals | Unlocks agency doing active SEO work |
+| 3 strategy & implementation hrs/mo | Meta tags, schema, redirects, content publishing, audit fixes |
+| Monthly strategy reviews | Dedicated strategist touch |
+| Content calendar planning | Proactive content roadmap |
+| Technical SEO implementation | Schema markup, structured data |
+| Priority support | Faster turnaround |
 
-**Strategy:** Premium clients are fully invested. Schema + competitor monitoring + priority queue create significant switching cost. Knowledge base tuning makes the AI uniquely valuable to their business.
+**Strategy:** Premium is the managed partnership. The 3 included hours (at $150/hr floor rate = $450) plus $549 software margin makes the unit economics work. Clients feel like they have an SEO team. Additional hours available as add-on ($200/hr ad-hoc, $175/hr 5-hr block, $150/hr 10-hr block). Strategy & implementation hours are scoped to SEO execution only — not general development.
 
 ---
 
@@ -281,11 +282,11 @@ Client lands on dashboard (free)
 
 | Scenario | Clients | Avg Monthly/Client | Annual Revenue |
 |----------|:-------:|:------------------:|:--------------:|
-| Early stage: 5 clients, Growth tier + occasional briefs | 5 | $300 | $18,000 |
-| Growing: 10 clients, mixed tiers + content bundles | 10 | $800 | $96,000 |
-| Established: 20 clients, full service mix | 20 | $1,200 | $288,000 |
+| Early stage: 3 Growth + 1 Premium + occasional briefs | 4 | $550 | $26,400 |
+| Growing: 6 Growth + 3 Premium + content purchases | 9 | $700 | $75,600 |
+| Established: 8 Growth + 5 Premium + content + hour add-ons | 13 | $900 | $140,400 |
 
-These are **platform revenue only** — on top of any retainer/hourly/project work.
+These are **platform revenue only** — on top of content purchases, hour add-ons, and any separate development work.
 
 ---
 
@@ -301,9 +302,9 @@ The chatbot is the highest-conversion feature — it literally tells clients wha
 The brief → post → publish pipeline is the most natural transaction point. Clients are already in the flow of reviewing content — adding a payment step feels natural, not forced. Stripe Checkout keeps it frictionless.
 
 ### Switching cost increases with tier
-- **Free:** Low switching cost, but the data access creates habit
-- **Growth:** AI chatbot builds relationship, strategy shows roadmap
-- **Premium:** Knowledge base tuning + schema investment + conversation history = very high switching cost
+- **Free:** Low switching cost, but the data access creates login habit
+- **Growth ($249):** AI chat history + strategy data + content pipeline = moderate switching cost. ROI dashboard proves value monthly.
+- **Premium ($999):** Strategist relationship + implementation history + competitor intel + conversation history = very high switching cost. The 3 included hours create ongoing dependency.
 
 ---
 
@@ -347,8 +348,8 @@ Clients should never be surprised by a price. Every purchasable action shows cos
 | Strategy tab → content gap cards | Page type badge + "Request Brief — $150" |
 | AI chatbot → content recommendation | "I can generate a brief for this topic — $125" |
 | Schema tab → generate button | "Generate Schema — $35/page" or "Full Site — $350" |
-| Chat upgrade prompt | "Upgrade to Growth — $199/mo" |
-| Soft gate overlay | Tier price + "Starting at $149/mo" |
+| Chat upgrade prompt | "Upgrade to Growth — $249/mo" |
+| Soft gate overlay | Tier price + "Starting at $249/mo" |
 
 ### Bundle Savings Callouts
 When a client is on a bundle, show the savings:
@@ -516,27 +517,27 @@ The dashboard shell, tabs, layout, and navigation stay **identical across all ti
 
 | Tab / Feature | Experience |
 |---------------|-----------|
-| Overview (Welcome back, metric cards, InsightsDigest) | Identical |
+| Overview (Welcome back, metric cards, InsightsDigest, MonthlySummary) | Identical |
 | Search (full GSC data, charts, queries, pages) | Identical |
 | Analytics (full GA4 data, charts, sources, devices) | Identical |
 | Site Health (score ring, severity, page list) | Identical |
-| Requests (submit, track, comment) | Identical |
-| Activity Log | Identical |
-| Monthly Report Emails | Identical |
+| Plans (tier comparison, upgrade CTA) | Identical |
+| Onboarding Wizard (first-run) | Tier-aware feature grid |
 
 ### Gated Feature Matrix
 
-| Feature | Free | Growth | Premium |
-|---------|------|--------|---------|
-| AI Chatbot | 3 convos/month → soft upgrade prompt | Unlimited | Unlimited |
-| Proactive Insights greeting | Disabled (no greeting on chat open) | Full greeting + follow-ups | Full |
-| Strategy tab | Teaser: summary cards visible, page map + content gaps blurred with "Upgrade to see your full keyword strategy" overlay | Full view + "Request This Topic" | Full + multi-competitor |
-| Content Pipeline | Can request topics; brief generation requires per-brief Stripe payment | Brief requests → Stripe checkout | Included in bundle allowance |
-| Approvals | View proposed changes (read-only) | Full approve / reject / edit | Full + priority queue |
-| Schema generation | Tab not visible | Not visible | Full generation + publishing |
+| Feature | Free (Starter) | Growth ($249) | Premium ($999) |
+|---------|----------------|---------------|----------------|
+| AI Chatbot | 3 convos/month → upgrade prompt | Unlimited | Unlimited |
+| Proactive Insights greeting | Disabled | Full greeting + follow-ups | Full |
+| SEO Strategy tab | **Hidden** | Lite: keywords, page map, content gaps, quick wins | Full + competitor keyword gaps |
+| Content tab | **Hidden** | Brief/post purchasing via Stripe | Same |
+| ROI Dashboard tab | **Hidden** | Full organic traffic value view | Full |
+| Approvals tab | **Hidden** | **Hidden** | Full approve / reject / edit |
+| Requests tab | **Hidden** | **Hidden** | **Hidden** (returns with Strategy & Implementation Hours system) |
 | Custom date ranges | Locked to 28d default | Full presets + custom calendar | Full |
-| Competitor comparison | Not available | 1 competitor | Multiple competitors |
-| Knowledge base tuning | Default only | Default only | Dedicated per-client tuning |
+| Competitor keyword analysis | Not available | Blurred with Premium upgrade CTA | Full |
+| Strategy & implementation hours | Not available | Not available | 3 hrs/mo included |
 
 ### Soft Gate UX Pattern
 
@@ -571,34 +572,16 @@ Each gated section uses the same visual treatment:
 - Counter shown in chat header: "2 of 3 free conversations remaining"
 - Proactive insights greeting disabled on free tier (saves tokens + creates upgrade incentive)
 
-### Implementation Checklist
+### Implementation Status
 
-1. **Add `tier` to Workspace interface** — `tier: 'free' | 'growth' | 'premium'` in `server/workspaces.ts`
-2. **Create `<TierGate>` component** — accepts `requiredTier`, renders children or upgrade overlay
-   ```tsx
-   <TierGate tier={ws.tier} required="growth" feature="Full Keyword Strategy" teaser="12 content opportunities identified">
-     {/* Strategy page map, content gaps, etc. */}
-   </TierGate>
-   ```
-3. **Wrap gated sections** (~10-15 spots across ClientDashboard.tsx):
-   - Strategy tab: page map + content gaps + quick wins
-   - Content Pipeline: brief generation button
-   - Approvals: approve/reject buttons
-   - Chat: input field after limit reached
-   - Date range: custom calendar popover
-4. **Chat rate limiting** — monthly counter in `chat-memory.ts`, checked at `/api/public/search-chat/`
-5. **Tier endpoint** — `GET /api/public/tier/:workspaceId` returns current tier for frontend
-6. **Stripe subscription sync** — webhook updates `ws.tier` on subscription create/cancel/change
-7. **Admin tier management** — Workspace Settings dropdown to manually set tier (override)
-
-### Estimated Effort: 3-4 hours
-
-- `<TierGate>` component: 30min
-- Workspace `tier` field + endpoint: 30min
-- Wrap 10-15 gated sections: 1-1.5h
-- Chat rate limiting: 30min
-- Admin tier management UI: 30min
-- Testing across tiers: 30min
+1. ✅ **`tier` on Workspace interface** — `tier: 'free' | 'growth' | 'premium'` in `server/workspaces.ts`
+2. ✅ **`<TierGate>` component** — blur overlay with upgrade CTA, used across Strategy and Content sections
+3. ✅ **Tab-level gating in NAV array** — `isPaid` / `isPremium` booleans control tab visibility
+4. ✅ **Chat rate limiting** — `checkChatRateLimit()` in `chat-memory.ts`, 3 convos/month for free tier
+5. ✅ **Competitor gaps gated to Premium** — `TierGate required="premium"` on keyword gaps section
+6. 🟡 **Strategy & Implementation Hours system** — roadmapped (item #76). Requests tab returns when active.
+7. ✅ **Stripe subscription sync** — webhook updates `ws.tier` on subscription create/cancel/change
+8. ✅ **Admin tier management** — Workspace Settings dropdown to manually set tier
 
 ---
 

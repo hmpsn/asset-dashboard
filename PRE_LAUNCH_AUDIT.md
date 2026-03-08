@@ -37,11 +37,11 @@ The platform has **49 shipped features** across 75-108 hours of development — 
 
 1. **🔴 Stripe is on test keys.** The `REMINDER: Switch Stripe to production keys before launch` is still pending. No real payments can be processed. This is your #1 pre-launch blocker.
 
-2. **🔴 Self-service upgrade uses `mailto` links.** The Plans page and all upgrade CTAs point to email — not Stripe subscription checkout. This is the single biggest conversion friction point. Every upgrade requires a manual email exchange instead of an instant click. Sprint B item #88 addresses this.
+2. **✅ Self-service upgrade via Stripe.** SHIPPED — Plans page uses Stripe Checkout for tier upgrades (Growth @ $249/mo, Premium @ $999/mo). Webhook auto-upgrades workspace tier.
 
-3. **🟠 No subscription billing.** Stripe is wired for one-time Checkout sessions (briefs, posts), but there's no recurring subscription flow for tier upgrades (Growth @ $149-249/mo, Premium @ $349-499/mo). The monthly recurring revenue engine doesn't exist yet.
+3. **✅ Subscription billing.** SHIPPED — `plan_growth` ($249) and `plan_premium` ($999) Stripe products configured. Checkout sessions created via `/api/public/upgrade-checkout/:workspaceId`.
 
-4. **🟠 Payment-before-fulfillment gap.** In `confirmPricingAndSubmit()`, the content request is created *before* payment completes. If the client abandons checkout or payment fails, an unpaid content request exists in the system. Consider: create the request in `pending_payment` status and only activate it on webhook confirmation.
+4. **✅ Payment-before-fulfillment gap.** SHIPPED — Content requests now created in `pending_payment` status during Stripe flow, activated on webhook confirmation.
 
 5. **🟠 Brief product types all share one Stripe Price ID.** `PRODUCT_MAP` maps 7 brief types (`brief_blog`, `brief_landing`, etc.) all to the same `STRIPE_PRICE_BRIEF` env key, but they have different display prices ($125-$200). Either create separate Stripe prices per type or use Stripe's `unit_amount` override at checkout time.
 
