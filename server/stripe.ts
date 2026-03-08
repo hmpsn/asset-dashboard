@@ -31,7 +31,7 @@ export interface ProductConfig {
   stripePriceId: string;
   displayName: string;
   priceUsd: number;       // display price in dollars (canonical price lives in Stripe)
-  category: 'brief' | 'content' | 'schema' | 'strategy';
+  category: 'brief' | 'content' | 'schema' | 'strategy' | 'fix';
 }
 
 // Map env vars to product configs
@@ -46,10 +46,16 @@ const PRODUCT_MAP: Record<ProductType, { displayName: string; category: ProductC
   post_draft:       { displayName: 'Blog Post — AI Draft',    category: 'content',  priceUsd: 350,  envKey: 'STRIPE_PRICE_POST_DRAFT' },
   post_polished:    { displayName: 'Blog Post — Polished',    category: 'content',  priceUsd: 500,  envKey: 'STRIPE_PRICE_POST_POLISHED' },
   post_premium:     { displayName: 'Blog Post — Premium',     category: 'content',  priceUsd: 1000, envKey: 'STRIPE_PRICE_POST_PREMIUM' },
-  schema_page:      { displayName: 'Schema — Per Page',       category: 'schema',   priceUsd: 35,   envKey: 'STRIPE_PRICE_SCHEMA_PAGE' },
-  schema_site:      { displayName: 'Schema — Full Site',      category: 'schema',   priceUsd: 350,  envKey: 'STRIPE_PRICE_SCHEMA_SITE' },
+  schema_page:      { displayName: 'Schema — Per Page',       category: 'schema',   priceUsd: 39,   envKey: 'STRIPE_PRICE_SCHEMA_PAGE' },
+  schema_site:      { displayName: 'Schema — Full Site',      category: 'schema',   priceUsd: 249,  envKey: 'STRIPE_PRICE_SCHEMA_SITE' },
   strategy:         { displayName: 'Keyword Strategy',        category: 'strategy', priceUsd: 400,  envKey: 'STRIPE_PRICE_STRATEGY' },
   strategy_refresh: { displayName: 'Strategy Refresh',        category: 'strategy', priceUsd: 200,  envKey: 'STRIPE_PRICE_STRATEGY_REFRESH' },
+  fix_meta:         { displayName: 'Metadata Optimization',   category: 'fix',      priceUsd: 29,   envKey: 'STRIPE_PRICE_FIX_META' },
+  fix_alt:          { displayName: 'Alt Text Optimization',   category: 'fix',      priceUsd: 19,   envKey: 'STRIPE_PRICE_FIX_ALT' },
+  fix_redirect:     { displayName: 'Redirect Fix',            category: 'fix',      priceUsd: 19,   envKey: 'STRIPE_PRICE_FIX_REDIRECT' },
+  fix_meta_sweep:   { displayName: 'Full Metadata Sweep',     category: 'fix',      priceUsd: 199,  envKey: 'STRIPE_PRICE_FIX_META_SWEEP' },
+  fix_audit_5:      { displayName: 'Audit Fix Bundle (5pg)',   category: 'fix',      priceUsd: 99,   envKey: 'STRIPE_PRICE_FIX_AUDIT_5' },
+  fix_audit_all:    { displayName: 'Audit Fix Bundle (all)',   category: 'fix',      priceUsd: 299,  envKey: 'STRIPE_PRICE_FIX_AUDIT_ALL' },
   plan_growth:      { displayName: 'Growth Plan',              category: 'strategy', priceUsd: 249,  envKey: 'STRIPE_PRICE_PLAN_GROWTH' },
   plan_premium:     { displayName: 'Premium Plan',             category: 'strategy', priceUsd: 999,  envKey: 'STRIPE_PRICE_PLAN_PREMIUM' },
 };

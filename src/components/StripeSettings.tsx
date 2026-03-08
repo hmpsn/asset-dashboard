@@ -35,10 +35,16 @@ const DEFAULT_PRODUCTS: StripeProduct[] = [
   { productType: 'post_draft',       displayName: 'Blog Post — AI Draft',  priceUsd: 350,  stripePriceId: '', enabled: true },
   { productType: 'post_polished',    displayName: 'Blog Post — Polished',  priceUsd: 500,  stripePriceId: '', enabled: true },
   { productType: 'post_premium',     displayName: 'Blog Post — Premium',   priceUsd: 1000, stripePriceId: '', enabled: true },
-  { productType: 'schema_page',      displayName: 'Schema — Per Page',     priceUsd: 35,   stripePriceId: '', enabled: true },
-  { productType: 'schema_site',      displayName: 'Schema — Full Site',    priceUsd: 350,  stripePriceId: '', enabled: true },
+  { productType: 'schema_page',      displayName: 'Schema — Per Page',     priceUsd: 39,   stripePriceId: '', enabled: true },
+  { productType: 'schema_site',      displayName: 'Schema — Full Site',    priceUsd: 249,  stripePriceId: '', enabled: true },
   { productType: 'strategy',         displayName: 'Keyword Strategy',      priceUsd: 400,  stripePriceId: '', enabled: true },
   { productType: 'strategy_refresh', displayName: 'Strategy Refresh',      priceUsd: 200,  stripePriceId: '', enabled: true },
+  { productType: 'fix_meta',         displayName: 'Metadata Optimization', priceUsd: 29,   stripePriceId: '', enabled: true },
+  { productType: 'fix_alt',          displayName: 'Alt Text Optimization', priceUsd: 19,   stripePriceId: '', enabled: true },
+  { productType: 'fix_redirect',     displayName: 'Redirect Fix',         priceUsd: 19,   stripePriceId: '', enabled: true },
+  { productType: 'fix_meta_sweep',   displayName: 'Full Metadata Sweep',  priceUsd: 199,  stripePriceId: '', enabled: true },
+  { productType: 'fix_audit_5',      displayName: 'Audit Fix Bundle (5pg)', priceUsd: 99,  stripePriceId: '', enabled: true },
+  { productType: 'fix_audit_all',    displayName: 'Audit Fix Bundle (all)', priceUsd: 299, stripePriceId: '', enabled: true },
 ];
 
 export function StripeSettings() {
