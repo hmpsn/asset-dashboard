@@ -107,7 +107,7 @@ export interface GA4LandingPage {
 }
 
 export type SortKey = 'clicks' | 'impressions' | 'ctr' | 'position';
-export type ClientTab = 'overview' | 'search' | 'health' | 'strategy' | 'analytics' | 'approvals' | 'requests' | 'content';
+export type ClientTab = 'overview' | 'search' | 'health' | 'strategy' | 'analytics' | 'approvals' | 'requests' | 'content' | 'plans';
 
 export interface ClientKeywordStrategy {
   siteKeywords: string[];

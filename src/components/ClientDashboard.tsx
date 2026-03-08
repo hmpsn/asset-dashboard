@@ -5,7 +5,7 @@ import {
   Target, Zap, Shield, MessageSquare, X, ChevronDown, ChevronUp,
   CheckCircle2, LineChart, Lock, Trophy, Users,
   Activity, Filter, ClipboardCheck, Check, Edit3,
-  Sun, Moon, Plus, Paperclip, FileText, Download, ExternalLink, Calendar, Clock,
+  Sun, Moon, Plus, Paperclip, FileText, Download, ExternalLink, Calendar, Clock, CreditCard,
 } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 import { StripePaymentModal } from './StripePaymentForm';
@@ -45,7 +45,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
   const [tab, setTabRaw] = useState<ClientTab>(() => {
     const params = new URLSearchParams(window.location.search);
     const t = params.get('tab');
-    if (t && ['overview','search','health','strategy','analytics','approvals','requests','content'].includes(t)) return t as ClientTab;
+    if (t && ['overview','search','health','strategy','analytics','approvals','requests','content','plans'].includes(t)) return t as ClientTab;
     return 'overview';
   });
   const setTab = (t: ClientTab) => {
@@ -982,6 +982,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
     ...(contentRequests.length > 0 || strategyData ? [{ id: 'content' as ClientTab, label: 'Content', icon: FileText, locked: false }] : []),
     { id: 'requests' as ClientTab, label: 'Requests', icon: MessageSquare, locked: false },
     ...(approvalBatches.length > 0 ? [{ id: 'approvals' as ClientTab, label: 'Approvals', icon: ClipboardCheck, locked: false }] : []),
+    { id: 'plans' as ClientTab, label: 'Plans', icon: CreditCard, locked: false },
   ];
 
   return (
@@ -3365,6 +3366,210 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
             )}
           </div>
         </>)}
+
+        {/* ════════════ PLANS TAB ════════════ */}
+        {tab === 'plans' && (() => {
+          const tier = effectiveTier;
+          const isTrial = ws.isTrial && ws.trialDaysRemaining != null && ws.trialDaysRemaining > 0;
+          const plans: { id: Tier; name: string; tagline: string; color: string; borderColor: string; bgColor: string; features: { label: string; included: boolean }[] }[] = [
+            {
+              id: 'free', name: 'Starter', tagline: 'Essential visibility into your site',
+              color: 'text-zinc-300', borderColor: 'border-zinc-700', bgColor: 'bg-zinc-900',
+              features: [
+                { label: 'AI-powered site insights', included: true },
+                { label: 'Site health audits', included: true },
+                { label: 'Google Analytics overview', included: true },
+                { label: 'Search Console data', included: true },
+                { label: 'Request submission', included: true },
+                { label: 'Custom date ranges', included: false },
+                { label: 'SEO keyword strategy', included: false },
+                { label: 'Content opportunities', included: false },
+                { label: 'Content briefs & posts', included: false },
+                { label: 'Competitor analysis', included: false },
+                { label: 'AI strategy chat', included: false },
+              ],
+            },
+            {
+              id: 'growth', name: 'Growth', tagline: 'Full SEO strategy & content engine',
+              color: 'text-blue-300', borderColor: 'border-blue-500/30', bgColor: 'bg-blue-500/5',
+              features: [
+                { label: 'Everything in Starter', included: true },
+                { label: 'Custom date ranges', included: true },
+                { label: 'SEO keyword strategy', included: true },
+                { label: 'Content opportunities', included: true },
+                { label: 'Content briefs & posts', included: true },
+                { label: 'Competitor keyword gaps', included: true },
+                { label: 'Page keyword mapping', included: true },
+                { label: 'Quick win recommendations', included: true },
+                { label: 'AI strategy chat', included: true },
+                { label: 'Priority support', included: false },
+                { label: 'Dedicated strategist', included: false },
+              ],
+            },
+            {
+              id: 'premium', name: 'Premium', tagline: 'White-glove SEO partnership',
+              color: 'text-violet-300', borderColor: 'border-violet-500/30', bgColor: 'bg-violet-500/5',
+              features: [
+                { label: 'Everything in Growth', included: true },
+                { label: 'Priority support', included: true },
+                { label: 'Dedicated strategist', included: true },
+                { label: 'Monthly strategy reviews', included: true },
+                { label: 'Custom reporting', included: true },
+                { label: 'Advanced competitor intel', included: true },
+                { label: 'Conversion optimization', included: true },
+                { label: 'Content calendar planning', included: true },
+                { label: 'Technical SEO audits', included: true },
+                { label: 'Schema markup implementation', included: true },
+                { label: 'Link building strategy', included: true },
+              ],
+            },
+          ];
+          return (<>
+            <div className="space-y-8">
+              {/* Header */}
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-zinc-100">Plans & Pricing</h2>
+                <p className="text-sm text-zinc-500 mt-2 max-w-md mx-auto">Choose the right plan for your business. All plans include your dedicated client dashboard.</p>
+                {isTrial && (
+                  <div className="inline-flex items-center gap-2 mt-3 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/20">
+                    <Zap className="w-3.5 h-3.5 text-amber-400" />
+                    <span className="text-xs text-amber-300 font-medium">You&apos;re trialing {plans.find(p => p.id === tier)?.name} — {ws.trialDaysRemaining} day{ws.trialDaysRemaining !== 1 ? 's' : ''} remaining</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Tier comparison cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {plans.map(plan => {
+                  const isCurrent = plan.id === tier;
+                  const isUpgrade = (plan.id === 'growth' && tier === 'free') || (plan.id === 'premium' && tier !== 'premium');
+                  return (
+                    <div key={plan.id} className={`relative rounded-xl border p-5 transition-all ${isCurrent ? `${plan.bgColor} ${plan.borderColor} ring-1 ring-offset-0 ${plan.id === 'premium' ? 'ring-violet-500/20' : plan.id === 'growth' ? 'ring-blue-500/20' : 'ring-zinc-700'}` : `bg-zinc-900/50 border-zinc-800 hover:border-zinc-700`}`}>
+                      {isCurrent && (
+                        <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider border ${plan.id === 'premium' ? 'bg-violet-500/20 border-violet-500/30 text-violet-300' : plan.id === 'growth' ? 'bg-blue-500/20 border-blue-500/30 text-blue-300' : 'bg-zinc-800 border-zinc-700 text-zinc-400'}`}>
+                          {isTrial ? 'Current Trial' : 'Current Plan'}
+                        </div>
+                      )}
+                      <div className="pt-2">
+                        <h3 className={`text-lg font-bold ${plan.color}`}>{plan.name}</h3>
+                        <p className="text-[11px] text-zinc-500 mt-0.5 mb-4">{plan.tagline}</p>
+                        <div className="space-y-2">
+                          {plan.features.map((f, i) => (
+                            <div key={i} className="flex items-center gap-2">
+                              {f.included ? (
+                                <CheckCircle2 className={`w-3.5 h-3.5 flex-shrink-0 ${plan.id === 'premium' ? 'text-violet-400' : plan.id === 'growth' ? 'text-blue-400' : 'text-teal-400'}`} />
+                              ) : (
+                                <X className="w-3.5 h-3.5 flex-shrink-0 text-zinc-700" />
+                              )}
+                              <span className={`text-xs ${f.included ? 'text-zinc-300' : 'text-zinc-600'}`}>{f.label}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-5">
+                          {isCurrent ? (
+                            <div className={`w-full py-2 rounded-lg text-xs font-medium text-center border ${plan.id === 'premium' ? 'bg-violet-500/10 border-violet-500/20 text-violet-300' : plan.id === 'growth' ? 'bg-blue-500/10 border-blue-500/20 text-blue-300' : 'bg-zinc-800 border-zinc-700 text-zinc-400'}`}>
+                              {isTrial ? 'Trialing Now' : 'Your Plan'}
+                            </div>
+                          ) : isUpgrade ? (
+                            <a href={`mailto:josh@hmpsn.studio?subject=Upgrade%20to%20${plan.name}&body=I'd%20like%20to%20upgrade%20my%20dashboard%20(${ws.name})%20to%20the%20${plan.name}%20plan.`}
+                              className={`block w-full py-2.5 rounded-lg text-xs font-semibold text-center transition-all ${plan.id === 'premium' ? 'bg-violet-600 hover:bg-violet-500 text-white' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}>
+                              Upgrade to {plan.name}
+                            </a>
+                          ) : (
+                            <div className="w-full py-2 rounded-lg text-xs font-medium text-center bg-zinc-800/50 border border-zinc-800 text-zinc-600">
+                              Included
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Content pricing section */}
+              {(briefPrice != null || fullPostPrice != null || (pricingData?.bundles && pricingData.bundles.length > 0)) && (
+                <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
+                  <div className="flex items-center gap-2 mb-1">
+                    <FileText className="w-5 h-5 text-teal-400" />
+                    <h3 className="text-lg font-semibold text-zinc-100">Content Services</h3>
+                  </div>
+                  <p className="text-xs text-zinc-500 mb-5">Professional content created by our team, tailored to your SEO strategy.</p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    {briefPrice != null && (
+                      <div className="px-5 py-4 rounded-xl bg-teal-500/5 border border-teal-500/20 hover:border-teal-500/30 transition-colors">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-teal-400" />
+                            <span className="text-sm font-semibold text-zinc-200">Content Brief</span>
+                          </div>
+                          <span className="text-lg font-bold text-teal-300">{fmtPrice(briefPrice)}</span>
+                        </div>
+                        <p className="text-[11px] text-zinc-500 leading-relaxed">Detailed content strategy document with keyword targets, outline, competitor analysis, and SEO recommendations.</p>
+                      </div>
+                    )}
+                    {fullPostPrice != null && (
+                      <div className="px-5 py-4 rounded-xl bg-blue-500/5 border border-blue-500/20 hover:border-blue-500/30 transition-colors">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-blue-400" />
+                            <span className="text-sm font-semibold text-zinc-200">Full Blog Post</span>
+                          </div>
+                          <span className="text-lg font-bold text-blue-300">{fmtPrice(fullPostPrice)}</span>
+                        </div>
+                        <p className="text-[11px] text-zinc-500 leading-relaxed">Complete brief + professionally written article, ready to publish with SEO optimization built in.</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Bundle cards */}
+                  {pricingData?.bundles && pricingData.bundles.length > 0 && (
+                    <div>
+                      <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-3">Monthly Bundles</div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {pricingData.bundles.map(bundle => (
+                          <div key={bundle.id} className="px-4 py-3.5 rounded-xl bg-gradient-to-br from-blue-500/5 to-teal-500/5 border border-blue-500/15 hover:border-blue-500/30 transition-colors">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs font-semibold text-zinc-200">{bundle.name}</span>
+                              <span className="text-sm font-bold text-blue-300">{fmtPrice(bundle.monthlyPrice)}<span className="text-[10px] text-zinc-500 font-normal">/mo</span></span>
+                            </div>
+                            <div className="space-y-1 mb-2">
+                              {bundle.includes.map((item, i) => (
+                                <div key={i} className="flex items-center gap-1.5">
+                                  <Check className="w-3 h-3 text-teal-400 flex-shrink-0" />
+                                  <span className="text-[11px] text-zinc-400">{item}</span>
+                                </div>
+                              ))}
+                            </div>
+                            {bundle.savings && <div className="text-[10px] text-emerald-400 font-medium">{bundle.savings}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {tier !== 'free' && (
+                    <div className="mt-5 text-center">
+                      <button onClick={() => setTab('content')} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-xs text-white font-medium transition-colors">
+                        <FileText className="w-3.5 h-3.5" /> Browse Content Opportunities
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Contact CTA */}
+              <div className="text-center py-6 bg-zinc-900/50 rounded-xl border border-zinc-800">
+                <p className="text-sm text-zinc-400 mb-3">Have questions about which plan is right for you?</p>
+                <a href="mailto:josh@hmpsn.studio?subject=Dashboard%20Plans%20Question"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-sm text-zinc-200 font-medium transition-colors">
+                  <MessageSquare className="w-4 h-4" /> Talk to Our Team
+                </a>
+              </div>
+            </div>
+          </>);
+        })()}
 
       </main>
 
