@@ -73,7 +73,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 7. SEO Strategy (Keyword Mapping)
-**What it does:** Maps every page to primary/secondary keywords using GSC data, competitor analysis, SEMRush metrics (volume, KD%, intent), and AI. Batched parallel AI processing for large sites. Identifies content gaps, quick wins, low-hanging fruit, and keyword opportunities. Summary dashboard with performance tiers, search intent badges, and sortable/filterable page map. Runs as a background job with real-time progress. Smart page filtering excludes utility pages. **Conversion-aware**: GA4 conversion events and events-by-page data injected into the master synthesis prompt; AI protects "money pages" and references specific conversion events in quickWin rationales. **Audit-aware**: `getAuditTrafficForWorkspace` cross-references SEO audit errors with traffic data; high-traffic pages with issues surfaced as quickWins with specific fix actions.
+**What it does:** Maps every page to primary/secondary keywords using GSC data, competitor analysis, SEMRush metrics (volume, KD%, intent), and AI. Batched parallel AI processing for large sites. Identifies content gaps, quick wins, low-hanging fruit, and keyword opportunities. Summary dashboard with performance tiers, search intent badges, and sortable/filterable page map. Runs as a background job with real-time progress. Smart page filtering excludes utility pages. **Conversion-aware**: GA4 conversion events and events-by-page data injected into the master synthesis prompt; AI protects "money pages" and references specific conversion events in quickWin rationales. **Audit-aware**: `getAuditTrafficForWorkspace` cross-references SEO audit errors with traffic data; high-traffic pages with issues surfaced as quickWins with specific fix actions. **Page type mapping**: content gap recommendations now include `suggestedPageType` (blog, landing, service, location, product, pillar, resource) — the AI selects the best format for each opportunity based on intent and keyword context. Page type badges (violet) display on content gap cards in both admin and client views.
 
 **Agency value:** Automates the most labor-intensive part of SEO — the keyword strategy document. Pulls real data from GSC + GA4 conversions + SEMRush + audit intelligence instead of guesswork. Batched processing handles 100+ page sites efficiently. Conversion data ensures the strategy never deprioritizes pages that drive revenue.
 
@@ -84,7 +84,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 8. Content Brief Generator
-**What it does:** AI-generates full content briefs from keyword strategy data — suggested titles, outlines, word count targets, internal linking opportunities, competitor analysis, E-E-A-T guidelines, content checklists, and schema recommendations. Supports **Brief vs. Full Post** service tiers with configurable pricing. Branded HTML export and AI tool export formats. Full client approval workflow: submit topic → generate brief → client reviews → approve/decline/request changes → upgrade to full post. **SEMRush enrichment**: when configured, briefs include real keyword volume, difficulty, CPC, competition data, and related keywords from SEMRush instead of AI-estimated values. **Inline editing**: all key brief fields (title, meta, summary, outline headings/notes/word counts, audience, tone, CTAs, competitor insights, word count target, intent, format) are editable in-place with auto-save on blur. **Improved GSC filtering**: related queries now match any significant keyword word (length > 2) instead of only the first word. **Audit Fix→ pre-fill**: when arriving from the Site Health Audit Fix→ button for thin content issues, the keyword field is automatically pre-filled with the page name (hyphens converted to spaces) so the user can immediately generate a brief.
+**What it does:** AI-generates full content briefs from keyword strategy data — suggested titles, outlines, word count targets, internal linking opportunities, competitor analysis, E-E-A-T guidelines, content checklists, and schema recommendations. Supports **Brief vs. Full Post** service tiers with configurable pricing. Branded HTML export and AI tool export formats. Full client approval workflow: submit topic → generate brief → client reviews → approve/decline/request changes → upgrade to full post. **SEMRush enrichment**: when configured, briefs include real keyword volume, difficulty, CPC, competition data, and related keywords from SEMRush instead of AI-estimated values. **Inline editing**: all key brief fields (title, meta, summary, outline headings/notes/word counts, audience, tone, CTAs, competitor insights, word count target, intent, format) are editable in-place with auto-save on blur. **Improved GSC filtering**: related queries now match any significant keyword word (length > 2) instead of only the first word. **Audit Fix→ pre-fill**: when arriving from the Site Health Audit Fix→ button for thin content issues, the keyword field is automatically pre-filled with the page name (hyphens converted to spaces) so the user can immediately generate a brief. **Page-type briefs**: 7 page types (blog, landing, service, location, product, pillar, resource) with type-specific AI prompt instructions — each type gets tailored guidance for word count, structure, schema, CTAs, outline format, and content approach. `pageType` stored on both `ContentBrief` and `ContentTopicRequest` models. Page type selector in pricing modal and topic submission form. Brief generation endpoint passes `pageType` to the AI prompt. Content request cards show page type badges.
 
 **Agency value:** Briefs that used to take 1-2 hours each are generated in under a minute with real search data baked in. Service tier pricing built in. Inline editing lets the team refine AI output without regenerating.
 
@@ -229,7 +229,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 21. Client Content Hub
-**What it does:** Clients can request content topics (from strategy recommendations or their own ideas), review AI-generated briefs, approve/decline, request changes, upgrade from brief to full post, and track production status with comments.
+**What it does:** Clients can request content topics (from strategy recommendations or their own ideas), review AI-generated briefs, approve/decline, request changes, upgrade from brief to full post, and track production status with comments. **Inline price visibility**: brief and full post prices displayed directly on request buttons ("Get a Brief $49"), bundle savings callouts surfaced contextually. Prices pulled from Stripe config or workspace content pricing. **Page type selection**: clients choose a page type (blog, landing, service, location, product, pillar, resource) when requesting content — pre-filled from strategy recommendations when available.
 
 **Agency value:** Structured content pipeline replaces scattered email threads. Every request has a status, every brief has a review trail.
 
@@ -469,7 +469,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 44. Stripe Payment Integration
-**What it does:** Full Stripe Checkout integration for content deliverables. **Server:** `server/stripe.ts` lazily initializes the Stripe SDK (picks up keys from admin UI or env vars), defines 14 product types (7 brief types, 3 post tiers, 2 schema, 2 strategy), creates Checkout sessions with workspace/content-request metadata, handles webhooks (`checkout.session.completed` → marks payment paid + logs activity, `payment_intent.payment_failed` → logs failure). `server/payments.ts` provides PaymentRecord CRUD with JSON-on-disk persistence per workspace. `server/stripe-config.ts` stores Stripe keys encrypted at rest (AES-256-GCM) on disk — no env vars needed. **Admin UI:** `StripeSettings.tsx` in the Command Center lets you paste API keys (masked inputs), map Stripe Price IDs to each product, enable/disable individual products, and see connection status. **Frontend:** `ClientDashboard.tsx` `confirmPricingAndSubmit()` creates the content request first, then redirects to Stripe Checkout when `stripeEnabled`. Payment success/cancel detected via URL params on return with toast + URL cleanup. Falls back to direct submit when Stripe isn't configured. **Workspace:** `tier` (free/growth/premium), `trialEndsAt`, `stripeCustomerId` fields added.
+**What it does:** Full Stripe Checkout integration for content deliverables. **Server:** `server/stripe.ts` lazily initializes the Stripe SDK (picks up keys from admin UI or env vars), defines 14 product types (7 brief types, 3 post tiers, 2 schema, 2 strategy), creates Checkout sessions with workspace/content-request metadata, handles webhooks (`checkout.session.completed` → marks payment paid + logs activity, `payment_intent.payment_failed` → logs failure). `server/payments.ts` provides PaymentRecord CRUD with JSON-on-disk persistence per workspace. `server/stripe-config.ts` stores Stripe keys encrypted at rest (AES-256-GCM) on disk — no env vars needed. **Admin UI:** `StripeSettings.tsx` in the Command Center lets you paste API keys (masked inputs), map Stripe Price IDs to each product, enable/disable individual products, and see connection status. **Frontend:** `ClientDashboard.tsx` `confirmPricingAndSubmit()` creates the content request first, then redirects to Stripe Checkout when `stripeEnabled`. Payment success/cancel detected via URL params on return with toast + URL cleanup. Falls back to direct submit when Stripe isn't configured. **Workspace:** `tier` (free/growth/premium), `trialEndsAt`, `stripeCustomerId` fields added. **14-day Growth trial**: new workspaces auto-provisioned with Growth tier + 14-day trial via `initializeNewWorkspaceTrial()`. `isTrial`, `trialDaysRemaining`, and `baseTier` computed at API time. `checkTrialExpiry()` scheduled job runs daily to downgrade expired trials to `baseTier`. Trial status surfaced across client dashboard (badges, welcome modal, plans page).
 
 **Agency value:** Direct revenue from content deliverables without invoicing friction. Admin manages everything from the dashboard — no code deploys needed to change keys or products. Encrypted key storage meets security requirements.
 
@@ -512,6 +512,28 @@ A brief value assessment of every feature in the platform, covering what it does
 
 ---
 
+### 48. Client Onboarding Welcome Flow
+**What it does:** First-visit welcome modal for new client dashboard users. Detects first visit via `localStorage` key per workspace. Shows workspace name, tier badge (Starter/Growth/Premium with tier-specific colors), trial countdown (days remaining), and a 2×3 feature grid highlighting what's included at their tier (available features get blue icons, locked features show "Upgrade to unlock"). Trial callout panel with Zap icon explains the trial terms. Quick-action buttons: "Explore Your Dashboard" (→ overview) and "View SEO Strategy" (→ strategy, Growth+ only). Dismissible via backdrop click, skip button, or any CTA.
+
+**Agency value:** Professional first impression. New clients immediately understand their tier, what's available, and how to navigate — zero onboarding calls needed. Trial urgency is surfaced without being pushy.
+
+**Client value:** No confusion on first login. Clear understanding of what they can access and what's locked behind upgrades. Trial terms explained upfront.
+
+**Mutual:** Reduces support questions about "what can I do here?" and increases feature adoption from day one. Trial awareness drives upgrade conversations naturally.
+
+---
+
+### 49. In-Portal Plans & Pricing Page
+**What it does:** Dedicated "Plans" tab in the client dashboard with a full pricing comparison view. Three-column tier cards (Starter, Growth, Premium) with feature checklists, tier-specific color coding (zinc/blue/violet), and "Current Plan" / "Current Trial" badges. Upgrade buttons (mailto CTA) on higher tiers. Content services section showing brief and full post pricing with descriptions. Monthly bundle cards from Stripe config with included items and savings badges. "Browse Content Opportunities" CTA links to the Content tab. Contact footer for plan questions. Trial countdown banner when applicable.
+
+**Agency value:** Upsell happens inside the product — clients see what they're missing every time they visit the Plans tab. No external pricing page needed. Bundle cards drive recurring revenue conversations.
+
+**Client value:** Full transparency into pricing and what each tier includes. Can self-evaluate upgrade options without scheduling a call.
+
+**Mutual:** Pricing transparency builds trust. The plans page is a passive sales tool that works 24/7 — clients upgrade when they're ready, not when they're pressured.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
@@ -520,14 +542,14 @@ A brief value assessment of every feature in the platform, covering what it does
 | Analytics & Tracking | 5 | Unified data view replaces platform-hopping |
 | Content & Strategy | 3 | Strategy → brief → approval → production pipeline |
 | Client Communication | 6 | Structured workflows + automated reports replace email chaos |
-| Client Self-Service | 6 | 24/7 data access reduces reporting overhead |
+| Client Self-Service | 8 | 24/7 data access, onboarding, plans page, pricing transparency |
 | AI & Intelligence | 3 | Full-spectrum AI advisor + revenue engine + knowledge base + memory |
 | Auth & Access Control | 3 | Internal user accounts, workspace ACL, client user accounts |
 | Security | 1 | Helmet, HTTPS, rate limiting, input sanitization |
-| Monetization | 1 | Stripe Checkout, admin settings, payment tracking, encrypted config |
+| Monetization | 1 | Stripe Checkout, admin settings, payment tracking, trials, encrypted config |
 | Platform & UX | 7 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home |
 
-**47 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**49 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
 ---
 
@@ -589,7 +611,11 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - ~~Chat activity logging~~: ✅ Shipped — First exchange of each new chat session logged to activity log (`chat_session` type) for both client and admin endpoints.
 - ~~Audit traffic in chatbot~~: ✅ Shipped — `getAuditTrafficForWorkspace` cached helper injects high-traffic pages with SEO errors into both chat system prompts.
 - ~~Strategy: conversion + audit data~~: ✅ Shipped — GA4 conversions + events by page + audit high-traffic error pages injected into strategy master prompt with money-page protection rules.
+- ~~Client onboarding welcome~~: ✅ Shipped — First-visit modal with tier badge, trial countdown, feature grid, and quick-action CTAs.
+- ~~In-portal plans page~~: ✅ Shipped — Plans tab with tier comparison cards, content pricing, bundle cards, upgrade CTAs.
+- ~~14-day Growth trial~~: ✅ Shipped — Auto-provisioned trial for new workspaces, daily expiry check, trial badges across UI.
 - **Content brief: GA4 page performance** — Inject GA4 landing page performance (bounce rate, sessions, engagement) into brief generation for existing-page content refreshes.
+- **Self-service tier upgrade via Stripe** — Replace mailto upgrade CTAs with Stripe Checkout subscription flows for tier changes.
 
 ### Content Pipeline
 - ~~Service tiers~~: ✅ Shipped — Brief vs. Full Post with configurable pricing.
@@ -597,6 +623,9 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - ~~Inline brief editing~~: ✅ Shipped — All key fields editable in-place with auto-save (title, meta, summary, outline, audience, tone, CTAs, word count, intent, format, competitor insights).
 - ~~SEMRush brief enrichment~~: ✅ Shipped — Real keyword volume, difficulty, CPC, competition, trend, and related keywords feed into AI prompt when SEMRush is configured.
 - ~~GSC query filtering fix~~: ✅ Shipped — Related queries now match any keyword word (len > 2) instead of only the first word.
+- ~~Page-type briefs~~: ✅ Shipped — 7 page types (blog, landing, service, location, product, pillar, resource) with type-specific AI prompt instructions for word count, structure, schema, CTAs, outline.
+- ~~Inline price visibility~~: ✅ Shipped — Brief/post prices on request buttons, bundle savings callouts, prices from Stripe config.
+- ~~Page type → content gap mapping~~: ✅ Shipped — Strategy AI recommends `suggestedPageType` per content gap; pre-fills page type in pricing modal.
 - **Content calendar**: Visual calendar view of content in production with due dates.
 - **Writer assignment**: Assign content pieces to specific writers with notifications.
 - **Content delivery**: Attach deliverables (Google Doc links, uploaded files) to completed requests.
@@ -643,4 +672,4 @@ When the user asks to update this document with recent features, follow this pro
 7. **Update Summary table**: Adjust category counts and total feature count.
 8. **Commit**: `git add FEATURE_AUDIT.md && git commit -m "docs: update FEATURE_AUDIT with recent features"`
 
-Current feature count: **47**. Last updated: March 7, 2026.
+Current feature count: **49**. Last updated: March 7, 2026 (session 2: #68–#73 monetization + onboarding sprint).

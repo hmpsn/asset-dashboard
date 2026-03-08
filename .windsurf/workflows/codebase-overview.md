@@ -17,7 +17,7 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 - **3 tiers**: Free (dashboard only), Growth ($149-249/mo), Premium ($349-499/mo)
 - **UX soft-gating**: All tabs visible at every tier; gated content shown as blurred preview + upgrade CTA overlay (`<TierGate>` component)
 - **Products**: Content briefs (8 page types), full content (8 page types), schemas, keyword strategies — purchased via Stripe Checkout
-- **Trial**: 14-day Growth trial for new workspaces, auto-downgrade to Free
+- **Trial**: 14-day Growth trial for new workspaces (`initializeNewWorkspaceTrial` in `workspaces.ts`), `checkTrialExpiry` daily job auto-downgrades expired trials to `baseTier`
 - **Bundles**: Content Starter ($500/mo), Content Engine ($1,500-2,000/mo), Full Service SEO ($3,000-5,000/mo)
 - **Credits**: Prepaid credit packs as alternative to per-item checkout
 - **Key docs**: `MONETIZATION.md` (full strategy + specs), `ACTION_PLAN.md` (execution roadmap)
@@ -33,7 +33,8 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 | `server/activity-log.ts` | Activity logging, `addActivity`, `ActivityType` union |
 | `server/monthly-report.ts` | `gatherMonthlyData`, auto-report scheduler, `generateReportHTML` |
 | `server/email-templates.ts` | HTML email builders: `renderMonthlyReport`, `renderApprovalReminder`, etc. |
-| `server/content-brief.ts` | AI content brief generation with SEMRush/GSC enrichment |
+| `server/content-brief.ts` | AI content brief generation with SEMRush/GSC enrichment, 7 page-type-specific prompts |
+| `server/content-requests.ts` | Content topic request CRUD, `ContentTopicRequest` interface (includes `pageType`, `serviceType`) |
 | `server/seo-audit.ts` | Site health audit engine |
 | `server/reports.ts` | Audit snapshot persistence, `getLatestSnapshot` |
 | `server/google-analytics.ts` | GA4 API: overview, landing pages, organic, conversions, events, period comparison, new vs returning. Exports `CustomDateRange` type; all functions accept optional `dateRange` param |
@@ -54,7 +55,7 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 | Component | Purpose |
 |-----------|---------|
 | `src/App.tsx` | Router, workspace selector, admin tabs (lazy-loaded) |
-| `src/components/ClientDashboard.tsx` | Full client portal with chat (proactive insights greeting), custom date range picker, analytics snapshots, approvals, requests |
+| `src/components/ClientDashboard.tsx` | Full client portal with chat, date picker, analytics, approvals, requests, content hub, onboarding welcome modal, plans/pricing page |
 | `src/components/AdminChat.tsx` | Floating admin chat panel with conversation memory + history UI |
 | `src/components/StripeSettings.tsx` | Stripe admin settings in Command Center: API keys (masked), product Price ID mapping, connection status |
 | `src/components/SeoStrategy.tsx` | Keyword strategy viewer/generator |
@@ -86,7 +87,9 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 ### Content Briefs (`generateBrief` in `content-brief.ts`)
 - GSC related queries, SEMRush metrics + related keywords
 - Keyword strategy context (`buildSeoContext`), brand voice, keyword map
-- Supports 8 page types: blog post, landing page, service page, location page, product page, pillar/hub page, resource/guide *(page-type-specific prompts planned)*
+- 7 page types with type-specific AI prompts: blog, landing, service, location, product, pillar, resource
+- `PAGE_TYPE_PROMPTS` dict provides tailored word count, structure, schema, CTA, and outline guidance per type
+- `pageType` stored on `ContentBrief` and `ContentTopicRequest` models
 
 ## Security Layer
 
@@ -112,7 +115,7 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 
 ## Documentation
 
-- `FEATURE_AUDIT.md` — Comprehensive feature inventory (44 features) with agency/client/mutual value
+- `FEATURE_AUDIT.md` — Comprehensive feature inventory (49 features) with agency/client/mutual value
 - `MONETIZATION.md` — Full monetization strategy: tiers, products (8 page types), bundles, UX soft-gating spec, trial strategy, inline pricing, ROI dashboard, churn signals, credits system, white-label resale, Stripe integration spec
 - `ACTION_PLAN.md` — Prioritized execution plan, 67 items across 10 sprints, decision log
 - `AI_CHATBOT_ROADMAP.md` — Chatbot phases, shipped and planned
