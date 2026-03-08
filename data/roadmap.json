@@ -66,6 +66,24 @@
       ]
     },
     {
+      "id": "sprint-F",
+      "name": "UX/Architecture Cleanup",
+      "hours": "20-30",
+      "rationale": "Address structural debt, eliminate feature duplication, and improve maintainability. Findings from comprehensive UX/UI audit of both dashboards.",
+      "items": [
+        { "id": 126, "title": "Add ErrorBoundary wrappers around major sections", "source": "UX Audit P0-1", "est": "1-2h", "priority": "P0", "notes": "Shipped — ErrorBoundary.tsx component with retry button. Wrapped: Admin main content area, AdminChat, WorkspaceHome InsightsEngine. Client: MonthlySummary, InsightsDigest, InsightsEngine (overview + health), HealthTab, ROIDashboard.", "status": "done" },
+        { "id": 127, "title": "Break ClientDashboard.tsx into tab-level components", "source": "UX Audit P0-2", "est": "4-6h", "priority": "P0", "notes": "ClientDashboard.tsx is 4,092 lines with ~200 useState calls. Extract each tab (Search, Analytics, Strategy, Content, Approvals, Health, Overview) into its own component file, mirroring how admin tools are each their own lazy-loaded chunk. Keep shared state in parent, pass via props.", "status": "pending" },
+        { "id": 128, "title": "Unify client Approvals + Requests + Content into Inbox tab", "source": "UX Audit P1-3", "est": "4-6h", "priority": "P1", "notes": "Client has 3 confusing communication surfaces: Approvals (SEO changes to review), Requests (general asks), Content (briefs/posts). From client perspective these are all 'tasks between me and my team.' Merge into single Inbox/Tasks tab with type filters.", "status": "pending" },
+        { "id": 129, "title": "Slim down client Overview tab", "source": "UX Audit P1-4", "est": "1-2h", "priority": "P1", "notes": "Overview shows 8-10 widgets. Remove site health compact card (redundant with Health tab) and InsightsEngine compact (also on Health tab). Overview becomes: metrics + monthly summary + insights digest + activity. Cleaner focus.", "status": "pending" },
+        { "id": 130, "title": "Remove WorkspaceHome All Tools grid", "source": "UX Audit P1-5", "est": "15m", "priority": "P1", "notes": "Shipped — Removed All Tools SectionCard and quickLinks array from WorkspaceHome. Cleaned up unused imports (ExternalLink, Image, Gauge, Share2, Swords).", "status": "done" },
+        { "id": 131, "title": "Split SeoAudit into standalone route components", "source": "UX Audit P2-6", "est": "8-12h", "priority": "P2", "notes": "SeoAudit handles 9 sub-views (audit, editor, redirects, internal, strategy, schema, briefs, competitors, ranks). These are fundamentally different tools. Extract Editor, Schema, Briefs, Strategy, Competitors, Ranks into their own lazy-loaded route components. SeoAudit keeps audit/redirects/internal.", "status": "pending" },
+        { "id": 132, "title": "Extract shared data-fetching hooks", "source": "UX Audit P2-7", "est": "3-4h", "priority": "P2", "notes": "Create useSearchData(wsId), useAuditSummary(wsId), useGA4Overview(wsId) hooks with built-in caching. Eliminates duplicate fetch logic between WorkspaceHome, ClientDashboard, and individual tool components. Both admin and client dashboards can share these.", "status": "pending" },
+        { "id": 133, "title": "Unify chat into shared ChatPanel component", "source": "UX Audit P2-8", "est": "3-4h", "priority": "P2", "notes": "Admin (AdminChat) and client (inline chat) implement separate AI chat with different UIs but similar functionality. Extract shared ChatPanel with admin/client mode flag.", "status": "pending" },
+        { "id": 134, "title": "Consider merging client Analytics + Search tabs", "source": "UX Audit P3-9", "est": "2-3h", "priority": "P3", "notes": "Both show complementary data about 'how is my site doing in Google.' Could merge into a single Performance tab. Evaluate whether clients find the split confusing.", "status": "pending" },
+        { "id": 135, "title": "Shared RankTable component", "source": "UX Audit P3-10", "est": "1-2h", "priority": "P3", "notes": "Rank tracking UI exists in 3 places (admin Rank Tracker, client Search tab, WorkspaceHome card) with separate implementations. Extract one shared <RankTable> component.", "status": "pending" }
+      ]
+    },
+    {
       "id": "backlog",
       "name": "Backlog",
       "hours": "60+",

@@ -1523,7 +1523,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
           const pageTraffic = trafficMap[`/${page.slug}`];
 
           return (
-            <div key={page.slug || page.page} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+            <div key={page.slug || page.page} className="bg-zinc-900 rounded-xl border border-zinc-800">
               <button
                 onClick={() => toggleExpand(page.page)}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/50 transition-colors text-left"

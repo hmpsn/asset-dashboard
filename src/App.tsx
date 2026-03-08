@@ -10,6 +10,7 @@ import { ToastProvider } from './components/Toast';
 import { BackgroundTaskProvider } from './hooks/useBackgroundTasks';
 import { TaskPanel } from './components/TaskPanel';
 import { AdminChat } from './components/AdminChat';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, Search,
   Pencil, CornerDownRight, Share2, Target, Code2, LogOut, Swords, TrendingUp, Flag,
@@ -457,9 +458,11 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
                 <span className="text-[11px] text-zinc-500">View →</span>
               </button>
             )}
-            <Suspense fallback={<ChunkFallback />}>
-              {renderContent()}
-            </Suspense>
+            <ErrorBoundary label={tab}>
+              <Suspense fallback={<ChunkFallback />}>
+                {renderContent()}
+              </Suspense>
+            </ErrorBoundary>
           </div>
         </main>
         <StatusBar
@@ -470,12 +473,14 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
         />
       </div>
       {selected && health.hasOpenAIKey && (
-        <AdminChat
-          workspaceId={selected.id}
-          workspaceName={selected.webflowSiteName || selected.name}
-          ga4PropertyId={selected.ga4PropertyId}
-          gscPropertyUrl={selected.gscPropertyUrl}
-        />
+        <ErrorBoundary label="Admin Chat">
+          <AdminChat
+            workspaceId={selected.id}
+            workspaceName={selected.webflowSiteName || selected.name}
+            ga4PropertyId={selected.ga4PropertyId}
+            gscPropertyUrl={selected.gscPropertyUrl}
+          />
+        </ErrorBoundary>
       )}
     </div>
   );

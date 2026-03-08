@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import {
   Shield, Search, BarChart3, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
   Loader2, Bell, ClipboardCheck, FileText, AlertTriangle, Activity, Clipboard,
-  Globe, Gauge, Target, Pencil, Code2, Swords, Flag, CornerDownRight, Share2,
-  Image, ExternalLink, Minus, MessageSquare,
+  Globe, Target, Pencil, Code2, CornerDownRight, Flag,
+  Minus, MessageSquare,
 } from 'lucide-react';
 import { StatCard, SectionCard, PageHeader, Badge } from './ui';
 import { InsightsEngine } from './client/InsightsEngine';
+import { ErrorBoundary } from './ErrorBoundary';
 
 interface WorkspaceHomeProps {
   workspaceId: string;
@@ -136,24 +137,6 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   if (!gscPropertyUrl) actions.push({ label: 'Google Search Console not connected', sub: 'Connect GSC for search data', color: 'amber', icon: Search, tab: 'workspace-settings' });
   if (!ga4PropertyId) actions.push({ label: 'Google Analytics not connected', sub: 'Connect GA4 for traffic data', color: 'amber', icon: BarChart3, tab: 'workspace-settings' });
 
-  // Quick links
-  const quickLinks: Array<{ label: string; icon: typeof Globe; tab: string; disabled?: boolean }> = [
-    { label: 'Site Audit', icon: Globe, tab: 'seo-audit', disabled: !webflowSiteId },
-    { label: 'Search Console', icon: Search, tab: 'search', disabled: !gscPropertyUrl },
-    { label: 'Analytics', icon: BarChart3, tab: 'analytics', disabled: !ga4PropertyId },
-    { label: 'Strategy', icon: Target, tab: 'seo-strategy', disabled: !webflowSiteId },
-    { label: 'SEO Editor', icon: Pencil, tab: 'seo-editor', disabled: !webflowSiteId },
-    { label: 'Performance', icon: Gauge, tab: 'performance', disabled: !webflowSiteId },
-    { label: 'Redirects', icon: CornerDownRight, tab: 'seo-redirects', disabled: !webflowSiteId },
-    { label: 'Schema', icon: Code2, tab: 'seo-schema', disabled: !webflowSiteId },
-    { label: 'Competitors', icon: Swords, tab: 'seo-competitors', disabled: !webflowSiteId },
-    { label: 'Internal Links', icon: Share2, tab: 'seo-internal', disabled: !webflowSiteId },
-    { label: 'Rank Tracker', icon: TrendingUp, tab: 'seo-ranks', disabled: !gscPropertyUrl },
-    { label: 'Assets', icon: Image, tab: 'media' },
-    { label: 'Requests', icon: Clipboard, tab: 'requests' },
-    { label: 'Annotations', icon: Flag, tab: 'annotations', disabled: !webflowSiteId },
-  ];
-
   const activityIconMap: Record<string, typeof Activity> = {
     audit_completed: Globe,
     content_requested: FileText,
@@ -267,7 +250,9 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
 
       {/* ── Action Plan (InsightsEngine) ── */}
       {workspaceId && (
-        <InsightsEngine workspaceId={workspaceId} tier="premium" compact onNavigate={(tab) => onNavigate(tab)} />
+        <ErrorBoundary label="Action Plan">
+          <InsightsEngine workspaceId={workspaceId} tier="premium" compact onNavigate={(tab) => onNavigate(tab)} />
+        </ErrorBoundary>
       )}
 
       {/* ── Two-column: Activity + Rankings ── */}
@@ -382,28 +367,6 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
         </div>
       )}
 
-      {/* ── Quick Navigation ── */}
-      <SectionCard title="All Tools" titleIcon={<ExternalLink className="w-4 h-4 text-zinc-500" />}>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-          {quickLinks.map(link => {
-            const Icon = link.icon;
-            return (
-              <button
-                key={link.tab}
-                onClick={() => !link.disabled && onNavigate(link.tab)}
-                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
-                  link.disabled
-                    ? 'text-zinc-700 cursor-not-allowed bg-zinc-900'
-                    : 'text-zinc-300 hover:text-teal-300 hover:bg-teal-500/5 bg-zinc-800/30 border border-zinc-800 hover:border-teal-500/20'
-                }`}
-              >
-                <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${link.disabled ? '' : 'text-zinc-500'}`} />
-                <span className="truncate">{link.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </SectionCard>
     </div>
   );
 }

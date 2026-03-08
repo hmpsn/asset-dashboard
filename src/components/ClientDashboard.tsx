@@ -20,6 +20,7 @@ import { InsightsDigest } from './client/InsightsDigest';
 import { OnboardingWizard } from './client/OnboardingWizard';
 import { MonthlySummary } from './client/MonthlySummary';
 import { ROIDashboard } from './client/ROIDashboard';
+import { ErrorBoundary } from './ErrorBoundary';
 import {
   QUICK_QUESTIONS,
   type SearchOverview, type PerformanceTrend, type WorkspaceInfo, type AuditSummary,
@@ -1492,39 +1493,43 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
           })()}
 
           {/* What happened this month */}
-          <MonthlySummary
-            overview={overview}
-            searchComparison={searchComparison}
-            ga4Overview={ga4Overview}
-            ga4Comparison={ga4Comparison}
-            audit={audit}
-            contentRequests={contentRequests}
-            requests={requests}
-            approvalBatches={approvalBatches}
-            activityCount={activityLog.length}
-          />
+          <ErrorBoundary label="Monthly Summary">
+            <MonthlySummary
+              overview={overview}
+              searchComparison={searchComparison}
+              ga4Overview={ga4Overview}
+              ga4Comparison={ga4Comparison}
+              audit={audit}
+              contentRequests={contentRequests}
+              requests={requests}
+              approvalBatches={approvalBatches}
+              activityCount={activityLog.length}
+            />
+          </ErrorBoundary>
 
           {/* Main content: insights + sidebar */}
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
             {/* Left column (3/5) — Insights feed */}
             <div className="lg:col-span-3 space-y-5">
               {/* AI-generated insights digest */}
-              <InsightsDigest
-                overview={overview}
-                searchComparison={searchComparison}
-                ga4Overview={ga4Overview}
-                ga4Comparison={ga4Comparison}
-                ga4Organic={ga4Organic}
-                ga4Conversions={ga4Conversions}
-                ga4NewVsReturning={ga4NewVsReturning}
-                audit={audit}
-                auditDetail={auditDetail}
-                strategyData={strategyData}
-                searchInsights={insights ? { lowHanging: insights.lowHanging, topPerformers: insights.topPerformers } : null}
-                eventDisplayName={eventDisplayName}
-                isEventPinned={isEventPinned}
-                onNavigate={setTab}
-              />
+              <ErrorBoundary label="Insights Digest">
+                <InsightsDigest
+                  overview={overview}
+                  searchComparison={searchComparison}
+                  ga4Overview={ga4Overview}
+                  ga4Comparison={ga4Comparison}
+                  ga4Organic={ga4Organic}
+                  ga4Conversions={ga4Conversions}
+                  ga4NewVsReturning={ga4NewVsReturning}
+                  audit={audit}
+                  auditDetail={auditDetail}
+                  strategyData={strategyData}
+                  searchInsights={insights ? { lowHanging: insights.lowHanging, topPerformers: insights.topPerformers } : null}
+                  eventDisplayName={eventDisplayName}
+                  isEventPinned={isEventPinned}
+                  onNavigate={setTab}
+                />
+              </ErrorBoundary>
 
               {/* Empty state */}
               {!overview && !audit && !ga4Overview && (
@@ -1580,7 +1585,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
               )}
 
               {/* Action Plan — compact insights */}
-              {workspaceId && <InsightsEngine workspaceId={workspaceId} tier={effectiveTier} compact />}
+              {workspaceId && <ErrorBoundary label="Action Plan"><InsightsEngine workspaceId={workspaceId} tier={effectiveTier} compact /></ErrorBoundary>}
 
               {/* Activity timeline */}
               {activityLog.length > 0 && (
@@ -1827,10 +1832,14 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
 
         {/* ════════════ SITE HEALTH TAB ════════════ */}
         {tab === 'health' && (<>
-          <HealthTab audit={audit} auditDetail={auditDetail} liveDomain={ws.liveDomain} tier={effectiveTier} workspaceId={workspaceId} initialSeverity={(() => { const s = new URLSearchParams(window.location.search).get('severity'); return s && ['error','warning','info'].includes(s) ? s as 'error' | 'warning' | 'info' : 'all'; })()} />
+          <ErrorBoundary label="Site Health">
+            <HealthTab audit={audit} auditDetail={auditDetail} liveDomain={ws.liveDomain} tier={effectiveTier} workspaceId={workspaceId} initialSeverity={(() => { const s = new URLSearchParams(window.location.search).get('severity'); return s && ['error','warning','info'].includes(s) ? s as 'error' | 'warning' | 'info' : 'all'; })()} />
+          </ErrorBoundary>
           {workspaceId && auditDetail && (
             <div className="mt-5">
-              <InsightsEngine workspaceId={workspaceId} tier={effectiveTier} />
+              <ErrorBoundary label="Action Plan">
+                <InsightsEngine workspaceId={workspaceId} tier={effectiveTier} />
+              </ErrorBoundary>
             </div>
           )}
         </>)}
@@ -4025,7 +4034,9 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
 
       {/* ════════════ ROI TAB ════════════ */}
       {tab === 'roi' && (
-        <ROIDashboard workspaceId={workspaceId} tier={effectiveTier} />
+        <ErrorBoundary label="ROI Dashboard">
+          <ROIDashboard workspaceId={workspaceId} tier={effectiveTier} />
+        </ErrorBoundary>
       )}
 
       {/* Stripe Elements inline payment modal */}
