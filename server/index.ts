@@ -76,6 +76,8 @@ import { listBriefs, getBrief, updateBrief, deleteBrief, generateBrief } from '.
 import { renderBriefHTML } from './brief-export-html.js';
 import { listContentRequests, getContentRequest, createContentRequest, updateContentRequest, deleteContentRequest, addComment } from './content-requests.js';
 import { isSemrushConfigured, getKeywordOverview, getDomainOrganicKeywords, getKeywordGap, getRelatedKeywords, estimateCreditCost, clearSemrushCache } from './semrush.js';
+import { createUser, verifyPassword, listUsers, getSafeUser, updateUser, changePassword, deleteUser, recordLogin, userCount } from './users.js';
+import { signToken, requireAuth, requireRole } from './auth.js';
 import { callOpenAI, getTokenUsage } from './openai-helpers.js';
 import { addMessage, buildConversationContext, listSessions, getSession as getChatSession, deleteSession as deleteChatSession, generateSessionSummary, checkChatRateLimit } from './chat-memory.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
@@ -313,6 +315,131 @@ app.get('/api/auth/check', (req, res) => {
   if (!APP_PASSWORD) return res.json({ required: false });
   const token = (req.headers['x-auth-token'] || req.cookies?.auth_token || '') as string;
   res.json({ required: true, authenticated: token === APP_PASSWORD || verifyAdminToken(token) });
+});
+
+// ── User-based JWT Auth ──
+
+// Setup: create the first user (owner). Only works when no users exist.
+app.post('/api/auth/setup', express.json(), async (req, res) => {
+  try {
+    if (userCount() > 0) return res.status(400).json({ error: 'Setup already completed. Use invite to add users.' });
+    const { email, password, name } = req.body;
+    if (!email || !password || !name) return res.status(400).json({ error: 'email, password, and name are required' });
+    if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    // First user gets all workspaces
+    const allWs = listWorkspaces().map(w => w.id);
+    const user = await createUser(email, password, name, 'owner', allWs);
+    const token = signToken({ userId: user.id, email: user.email, role: user.role });
+    res.cookie('token', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000, secure: IS_PROD });
+    res.json({ user, token });
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// Check if setup is needed
+app.get('/api/auth/setup-status', (_req, res) => {
+  res.json({ needsSetup: userCount() === 0 });
+});
+
+// User login with email + password
+app.post('/api/auth/user-login', loginLimiter, express.json(), async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'email and password are required' });
+    const user = await verifyPassword(email, password);
+    if (!user) return res.status(401).json({ error: 'Invalid email or password' });
+    recordLogin(user.id);
+    const token = signToken({ userId: user.id, email: user.email, role: user.role });
+    res.cookie('token', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000, secure: IS_PROD });
+    const { passwordHash: _pw, ...safe } = user;
+    void _pw;
+    res.json({ user: safe, token });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// User logout
+app.post('/api/auth/user-logout', (_req, res) => {
+  res.clearCookie('token');
+  res.json({ ok: true });
+});
+
+// Get current authenticated user
+app.get('/api/auth/me', requireAuth, (req, res) => {
+  res.json({ user: req.user });
+});
+
+// ── User Management (admin/owner only) ──
+
+app.get('/api/users', requireAuth, requireRole('owner', 'admin'), (_req, res) => {
+  res.json(listUsers());
+});
+
+app.get('/api/users/:id', requireAuth, requireRole('owner', 'admin'), (req, res) => {
+  const user = getSafeUser(req.params.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  res.json(user);
+});
+
+// Invite / create a new user
+app.post('/api/users', requireAuth, requireRole('owner', 'admin'), express.json(), async (req, res) => {
+  try {
+    const { email, password, name, role, workspaceIds } = req.body;
+    if (!email || !password || !name) return res.status(400).json({ error: 'email, password, and name are required' });
+    if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    // Only owner can create admin/owner users
+    const callerRole = req.user!.role;
+    if ((role === 'owner' || role === 'admin') && callerRole !== 'owner') {
+      return res.status(403).json({ error: 'Only owners can create admin users' });
+    }
+    const user = await createUser(email, password, name, role || 'member', workspaceIds || []);
+    res.json(user);
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// Update a user
+app.patch('/api/users/:id', requireAuth, requireRole('owner', 'admin'), express.json(), async (req, res) => {
+  try {
+    const { name, email, role, workspaceIds, avatarUrl } = req.body;
+    // Only owner can change roles to admin/owner
+    if ((role === 'owner' || role === 'admin') && req.user!.role !== 'owner') {
+      return res.status(403).json({ error: 'Only owners can assign admin roles' });
+    }
+    const user = await updateUser(req.params.id, { name, email, role, workspaceIds, avatarUrl });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json(user);
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// Change password (self or admin)
+app.post('/api/users/:id/password', requireAuth, express.json(), async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    const isSelf = req.user!.id === targetId;
+    const isAdmin = req.user!.role === 'owner' || req.user!.role === 'admin';
+    if (!isSelf && !isAdmin) return res.status(403).json({ error: 'Insufficient permissions' });
+    const { password } = req.body;
+    if (!password || password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    const ok = await changePassword(targetId, password);
+    if (!ok) return res.status(404).json({ error: 'User not found' });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// Delete a user
+app.delete('/api/users/:id', requireAuth, requireRole('owner'), (req, res) => {
+  if (req.params.id === req.user!.id) return res.status(400).json({ error: 'Cannot delete yourself' });
+  const ok = deleteUser(req.params.id);
+  if (!ok) return res.status(404).json({ error: 'User not found' });
+  res.json({ ok: true });
 });
 
 // Diagnostic endpoint - test Webflow API connection
