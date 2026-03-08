@@ -104,10 +104,10 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 
 ## Documentation
 
-- `FEATURE_AUDIT.md` — Comprehensive feature inventory (42 features) with agency/client/mutual value
+- `FEATURE_AUDIT.md` — Comprehensive feature inventory (44 features) with agency/client/mutual value
 - `MONETIZATION.md` — Full monetization strategy: tiers, products (8 page types), bundles, UX soft-gating spec, trial strategy, inline pricing, ROI dashboard, churn signals, credits system, white-label resale, Stripe integration spec
-- `ACTION_PLAN.md` — Prioritized execution plan, 66 items across 10 sprints, decision log
+- `ACTION_PLAN.md` — Prioritized execution plan, 67 items across 10 sprints, decision log
 - `AI_CHATBOT_ROADMAP.md` — Chatbot phases, shipped and planned
 - `AUTH_ROADMAP.md` — Authentication/authorization phases
 - `DESIGN_SYSTEM.md` — UI primitives and design tokens
-- `data/roadmap.json` — Sprint-level tracking with item statuses (66 items, managed via /api/roadmap)
+- `data/roadmap.json` — Sprint-level tracking with item statuses (67 items, managed via /api/roadmap)
