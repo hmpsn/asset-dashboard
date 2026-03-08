@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Sparkles, ShoppingCart, Image, FileText, Code2, ArrowRightLeft, Wrench, Crown, MessageSquare } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Sparkles, ShoppingCart, Image, FileText, Code2, ArrowRightLeft, Wrench, Crown, MessageSquare, TrendingUp, Eye, MousePointerClick, ChevronDown, Lightbulb } from 'lucide-react';
 import { useCart } from './useCart';
 import type { AuditDetail } from './types';
 import type { ProductType } from '../../../server/payments';
@@ -7,19 +7,39 @@ import type { ProductType } from '../../../server/payments';
 const fmt = (usd: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(usd);
 
+const num = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString();
+
+interface TrafficMap {
+  [path: string]: { clicks: number; impressions: number; sessions: number; pageviews: number };
+}
+
 interface FixRecommendationsProps {
   auditDetail: AuditDetail;
   tier?: 'free' | 'growth' | 'premium';
+  workspaceId?: string;
 }
 
-interface FixOption {
+interface AffectedPage {
+  name: string;
+  slug: string;
+  clicks: number;
+  impressions: number;
+  pageviews: number;
+  issueCount: number;
+  topIssue: string;
+}
+
+interface FixCategory {
   id: string;
   icon: typeof FileText;
   label: string;
-  description: string;
-  count: number;
-  unit: string;
-  /** Available purchase options for this fix */
+  pages: AffectedPage[];
+  totalPages: number;
+  highTrafficPages: number;
+  totalClicks: number;
+  totalImpressions: number;
+  insight: string;
+  whyItMatters: string;
   options: Array<{
     productType: string;
     displayName: string;
@@ -28,52 +48,50 @@ interface FixOption {
     isFlat?: boolean;
     quantity?: number;
     isSuggested?: boolean;
+    tier?: 'starter' | 'full';
   }>;
-  /** If true, this fix is manual and requires a quote */
   isManual?: boolean;
 }
 
-/** Map audit issue checks to fix categories */
-function categorizeIssues(audit: AuditDetail) {
-  const counts = { missingMeta: 0, missingAlt: 0, missingSchema: 0, redirectIssues: 0, manualIssues: 0 };
-  const metaPages = new Set<string>();
-  const altPages = new Set<string>();
-  const schemaPages = new Set<string>();
+/** Categorize pages by fix type, enriched with traffic */
+function buildFixCategories(audit: AuditDetail, traffic: TrafficMap): FixCategory[] {
+  const metaPages: Map<string, AffectedPage> = new Map();
+  const altPages: Map<string, AffectedPage> = new Map();
+  const schemaPages: Map<string, AffectedPage> = new Map();
+  let redirectIssues = 0;
+  let manualIssues = 0;
 
   for (const page of audit.audit.pages) {
+    const slug = `/${page.slug}`;
+    const t = traffic[slug] || { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
+
     for (const issue of page.issues) {
       const chk = issue.check?.toLowerCase() || '';
       const msg = issue.message?.toLowerCase() || '';
       const cat = issue.category?.toLowerCase() || '';
 
-      // Meta description / title issues
       if (chk.includes('meta') || chk.includes('title') || msg.includes('meta description') || msg.includes('title tag')) {
         if (!metaPages.has(page.pageId)) {
-          counts.missingMeta++;
-          metaPages.add(page.pageId);
+          metaPages.set(page.pageId, { name: page.page, slug, clicks: t.clicks, impressions: t.impressions, pageviews: t.pageviews, issueCount: 1, topIssue: issue.message });
+        } else {
+          metaPages.get(page.pageId)!.issueCount++;
         }
-      }
-      // Alt text issues
-      else if (chk.includes('alt') || msg.includes('alt text') || msg.includes('alt attribute')) {
+      } else if (chk.includes('alt') || msg.includes('alt text') || msg.includes('alt attribute')) {
         if (!altPages.has(page.pageId)) {
-          counts.missingAlt++;
-          altPages.add(page.pageId);
+          altPages.set(page.pageId, { name: page.page, slug, clicks: t.clicks, impressions: t.impressions, pageviews: t.pageviews, issueCount: 1, topIssue: issue.message });
+        } else {
+          altPages.get(page.pageId)!.issueCount++;
         }
-      }
-      // Schema issues
-      else if (chk.includes('schema') || msg.includes('schema') || msg.includes('structured data')) {
+      } else if (chk.includes('schema') || msg.includes('schema') || msg.includes('structured data')) {
         if (!schemaPages.has(page.pageId)) {
-          counts.missingSchema++;
-          schemaPages.add(page.pageId);
+          schemaPages.set(page.pageId, { name: page.page, slug, clicks: t.clicks, impressions: t.impressions, pageviews: t.pageviews, issueCount: 1, topIssue: issue.message });
+        } else {
+          schemaPages.get(page.pageId)!.issueCount++;
         }
-      }
-      // Redirect issues
-      else if (chk.includes('redirect') || msg.includes('redirect') || msg.includes('301') || msg.includes('302')) {
-        counts.redirectIssues++;
-      }
-      // Heading, link, layout — manual
-      else if (cat === 'content' || chk.includes('heading') || chk.includes('h1') || chk.includes('link') || chk.includes('performance')) {
-        counts.manualIssues++;
+      } else if (chk.includes('redirect') || msg.includes('redirect') || msg.includes('301') || msg.includes('302')) {
+        redirectIssues++;
+      } else if (cat === 'content' || chk.includes('heading') || chk.includes('h1') || chk.includes('link') || chk.includes('performance')) {
+        manualIssues++;
       }
     }
   }
@@ -82,234 +100,294 @@ function categorizeIssues(audit: AuditDetail) {
   for (const issue of audit.audit.siteWideIssues) {
     const chk = issue.check?.toLowerCase() || '';
     const msg = issue.message?.toLowerCase() || '';
-    if (chk.includes('schema') || msg.includes('schema')) counts.missingSchema++;
-    else if (chk.includes('redirect') || msg.includes('redirect')) counts.redirectIssues++;
+    if (chk.includes('redirect') || msg.includes('redirect')) redirectIssues++;
   }
 
-  return counts;
+  const sortByTraffic = (pages: AffectedPage[]) =>
+    [...pages].sort((a, b) => (b.clicks + b.pageviews) - (a.clicks + a.pageviews));
+
+  const categories: FixCategory[] = [];
+
+  // --- Metadata ---
+  if (metaPages.size > 0) {
+    const pages = sortByTraffic([...metaPages.values()]);
+    const count = pages.length;
+    const highTraffic = pages.filter(p => p.clicks > 0 || p.pageviews > 0).length;
+    const totalClicks = pages.reduce((s, p) => s + p.clicks, 0);
+    const totalImpressions = pages.reduce((s, p) => s + p.impressions, 0);
+
+    const hasTraffic = totalClicks > 0 || totalImpressions > 0;
+    const insight = hasTraffic
+      ? `${highTraffic} of these ${count} pages are receiving organic traffic — ${num(totalClicks)} clicks and ${num(totalImpressions)} impressions in the last 28 days. Optimizing metadata on these pages will directly improve click-through rates from search results.`
+      : `${count} pages have missing or suboptimal meta titles and descriptions. Proper metadata is the single biggest factor in whether someone clicks your result in Google — it's your first impression.`;
+
+    const opts: FixCategory['options'] = [];
+    if (count <= 9) {
+      opts.push({ productType: 'fix_meta', displayName: 'Metadata Optimization', priceUsd: 20, buttonLabel: `Optimize ${count} page${count !== 1 ? 's' : ''} — ${fmt(count * 20)}`, quantity: count, isSuggested: true, tier: 'full' });
+    } else {
+      // Offer "Start with top 10" + "Fix all"
+      opts.push({ productType: 'fix_meta_10', displayName: 'Metadata Pack (10pg)', priceUsd: 179, buttonLabel: `Start with top 10 pages — $179`, quantity: 1, isSuggested: true, tier: 'starter' });
+      const packs = Math.ceil(count / 10);
+      const packPrice = packs * 179;
+      const individualPrice = count * 20;
+      opts.push({ productType: 'fix_meta_10', displayName: 'Metadata Pack (10pg)', priceUsd: 179, buttonLabel: `Optimize all ${count} pages — ${fmt(packPrice)} (save ${fmt(individualPrice - packPrice)})`, quantity: packs, tier: 'full' });
+    }
+
+    categories.push({
+      id: 'meta', icon: FileText, label: 'Metadata Optimization', pages, totalPages: count,
+      highTrafficPages: highTraffic, totalClicks, totalImpressions,
+      insight, whyItMatters: 'Meta titles and descriptions control how your site appears in Google search results. Missing or generic metadata means lower click-through rates — even if you rank well.',
+      options: opts,
+    });
+  }
+
+  // --- Schema ---
+  if (schemaPages.size > 0) {
+    const pages = sortByTraffic([...schemaPages.values()]);
+    const count = pages.length;
+    const highTraffic = pages.filter(p => p.clicks > 0 || p.pageviews > 0).length;
+    const totalClicks = pages.reduce((s, p) => s + p.clicks, 0);
+    const totalImpressions = pages.reduce((s, p) => s + p.impressions, 0);
+
+    const hasTraffic = totalClicks > 0;
+    const insight = hasTraffic
+      ? `${highTraffic} of these ${count} pages already receive search traffic (${num(totalClicks)} clicks/mo). Adding structured data can unlock rich snippets — star ratings, FAQs, breadcrumbs — which typically increase CTR by 20-30%.`
+      : `${count} pages are missing structured data markup. Schema markup helps Google understand your content and can unlock rich snippets in search results — the enhanced listings that stand out and get more clicks.`;
+
+    const opts: FixCategory['options'] = [];
+    if (count <= 9) {
+      opts.push({ productType: 'schema_page', displayName: 'Schema — Per Page', priceUsd: 39, buttonLabel: `Add schema to ${count} page${count !== 1 ? 's' : ''} — ${fmt(count * 39)}`, quantity: count, isSuggested: true, tier: 'full' });
+    } else {
+      opts.push({ productType: 'schema_10', displayName: 'Schema Pack (10pg)', priceUsd: 299, buttonLabel: `Start with top 10 pages — $299`, quantity: 1, isSuggested: true, tier: 'starter' });
+      const packs = Math.ceil(count / 10);
+      const packPrice = packs * 299;
+      const individualPrice = count * 39;
+      opts.push({ productType: 'schema_10', displayName: 'Schema Pack (10pg)', priceUsd: 299, buttonLabel: `All ${count} pages — ${fmt(packPrice)} (save ${fmt(individualPrice - packPrice)})`, quantity: packs, tier: 'full' });
+    }
+
+    categories.push({
+      id: 'schema', icon: Code2, label: 'Schema Markup', pages, totalPages: count,
+      highTrafficPages: highTraffic, totalClicks, totalImpressions,
+      insight, whyItMatters: 'Structured data helps search engines understand your content and can unlock rich snippets — enhanced listings with stars, FAQs, and breadcrumbs that significantly increase click-through rates.',
+      options: opts,
+    });
+  }
+
+  // --- Alt Text ---
+  if (altPages.size > 0) {
+    const pages = sortByTraffic([...altPages.values()]);
+    const count = pages.length;
+    const highTraffic = pages.filter(p => p.clicks > 0 || p.pageviews > 0).length;
+    const totalClicks = pages.reduce((s, p) => s + p.clicks, 0);
+    const totalImpressions = pages.reduce((s, p) => s + p.impressions, 0);
+
+    const hasTraffic = totalClicks > 0;
+    const insight = hasTraffic
+      ? `${count} pages have images without alt text — including ${highTraffic} pages that drive ${num(totalClicks)} organic clicks/mo. Alt text improves image search visibility and accessibility compliance.`
+      : `${count} pages have images missing alt text. This is both an SEO and accessibility issue — Google Image Search drives significant traffic for visual content, and missing alt text hurts accessibility compliance.`;
+
+    categories.push({
+      id: 'alt', icon: Image, label: 'Alt Text Optimization', pages, totalPages: count,
+      highTrafficPages: highTraffic, totalClicks, totalImpressions,
+      insight, whyItMatters: 'Alt text helps Google understand your images (driving Image Search traffic) and is required for web accessibility compliance. A full-site optimization covers every image across all pages.',
+      options: [{ productType: 'fix_alt', displayName: 'Alt Text — Full Site', priceUsd: 50, buttonLabel: 'Optimize full site — $50', isFlat: true, isSuggested: true, tier: 'full' }],
+    });
+  }
+
+  // --- Redirects ---
+  if (redirectIssues > 0) {
+    categories.push({
+      id: 'redirect', icon: ArrowRightLeft, label: 'Redirect Fixes', pages: [], totalPages: redirectIssues,
+      highTrafficPages: 0, totalClicks: 0, totalImpressions: 0,
+      insight: `${redirectIssues} redirect chain${redirectIssues !== 1 ? 's' : ''} detected. Redirect chains slow down page loads and dilute link equity — each hop loses ~10-15% of the SEO value being passed.`,
+      whyItMatters: 'Redirect chains (301 → 301 → final page) waste crawl budget and dilute the SEO value of inbound links. Cleaning them up is a quick technical win.',
+      options: [{ productType: 'fix_redirect', displayName: 'Redirect Fix', priceUsd: 19, buttonLabel: `Fix ${redirectIssues} redirect${redirectIssues !== 1 ? 's' : ''} — ${fmt(redirectIssues * 19)}`, quantity: redirectIssues, isSuggested: true, tier: 'full' }],
+    });
+  }
+
+  // --- Manual ---
+  if (manualIssues > 0) {
+    categories.push({
+      id: 'manual', icon: Wrench, label: 'Heading, Link & Layout Fixes', pages: [], totalPages: manualIssues,
+      highTrafficPages: 0, totalClicks: 0, totalImpressions: 0,
+      insight: `${manualIssues} issue${manualIssues !== 1 ? 's' : ''} require manual review — heading structure, broken internal links, and layout optimizations that need human judgment to implement correctly.`,
+      whyItMatters: 'These issues affect content structure and user experience. Proper heading hierarchy, working internal links, and clean layouts all contribute to better rankings and lower bounce rates.',
+      options: [], isManual: true,
+    });
+  }
+
+  return categories;
 }
 
-export function FixRecommendations({ auditDetail, tier }: FixRecommendationsProps) {
+export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecommendationsProps) {
   const cart = useCart();
+  const [traffic, setTraffic] = useState<TrafficMap>({});
+  const [trafficLoaded, setTrafficLoaded] = useState(!workspaceId);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
-  const counts = useMemo(() => categorizeIssues(auditDetail), [auditDetail]);
+  useEffect(() => {
+    if (!workspaceId) return;
+    fetch(`/api/public/audit-traffic/${workspaceId}`)
+      .then(r => r.ok ? r.json() : {})
+      .then((m: TrafficMap) => { if (m && typeof m === 'object') setTraffic(m); setTrafficLoaded(true); })
+      .catch(() => setTrafficLoaded(true));
+  }, [workspaceId]);
 
-  const fixes = useMemo<FixOption[]>(() => {
-    const result: FixOption[] = [];
+  const categories = useMemo(() => buildFixCategories(auditDetail, traffic), [auditDetail, traffic]);
 
-    if (counts.missingAlt > 0) {
-      result.push({
-        id: 'alt',
-        icon: Image,
-        label: 'Alt Text Optimization',
-        description: `${counts.missingAlt} page${counts.missingAlt !== 1 ? 's' : ''} with images missing alt text`,
-        count: counts.missingAlt,
-        unit: 'pages',
-        options: [{
-          productType: 'fix_alt',
-          displayName: 'Alt Text — Full Site',
-          priceUsd: 50,
-          buttonLabel: 'Fix All — $50',
-          isFlat: true,
-          isSuggested: true,
-        }],
-      });
-    }
+  const toggleCategory = (id: string) =>
+    setExpandedCategories(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
-    if (counts.missingMeta > 0) {
-      const opts: FixOption['options'] = [];
-      if (counts.missingMeta <= 9) {
-        opts.push({
-          productType: 'fix_meta',
-          displayName: 'Metadata Optimization',
-          priceUsd: 20,
-          buttonLabel: `Fix ${counts.missingMeta} page${counts.missingMeta !== 1 ? 's' : ''} — ${fmt(counts.missingMeta * 20)}`,
-          quantity: counts.missingMeta,
-          isSuggested: true,
-        });
-      } else {
-        // Suggest packs
-        const packs = Math.ceil(counts.missingMeta / 10);
-        const remainder = counts.missingMeta % 10;
-        const packPrice = packs * 179 + (remainder > 0 ? 0 : 0); // packs cover all when rounded up
-        const individualPrice = counts.missingMeta * 20;
-        opts.push({
-          productType: 'fix_meta_10',
-          displayName: 'Metadata Pack (10pg)',
-          priceUsd: 179,
-          buttonLabel: `${packs} pack${packs !== 1 ? 's' : ''} — ${fmt(packPrice)} (save ${fmt(individualPrice - packPrice)})`,
-          quantity: packs,
-          isSuggested: true,
-        });
-        if (remainder > 0 && remainder <= 5) {
-          // Also offer individual for the remainder
-          opts.push({
-            productType: 'fix_meta',
-            displayName: 'Metadata Optimization',
-            priceUsd: 20,
-            buttonLabel: `Or ${counts.missingMeta} individual — ${fmt(individualPrice)}`,
-            quantity: counts.missingMeta,
-          });
-        }
-      }
-      result.push({
-        id: 'meta',
-        icon: FileText,
-        label: 'Metadata Optimization',
-        description: `${counts.missingMeta} page${counts.missingMeta !== 1 ? 's' : ''} with missing or poor meta descriptions`,
-        count: counts.missingMeta,
-        unit: 'pages',
-        options: opts,
-      });
-    }
-
-    if (counts.missingSchema > 0) {
-      const opts: FixOption['options'] = [];
-      if (counts.missingSchema <= 9) {
-        opts.push({
-          productType: 'schema_page',
-          displayName: 'Schema — Per Page',
-          priceUsd: 39,
-          buttonLabel: `Add to ${counts.missingSchema} page${counts.missingSchema !== 1 ? 's' : ''} — ${fmt(counts.missingSchema * 39)}`,
-          quantity: counts.missingSchema,
-          isSuggested: true,
-        });
-      } else {
-        const packs = Math.ceil(counts.missingSchema / 10);
-        const packPrice = packs * 299;
-        const individualPrice = counts.missingSchema * 39;
-        opts.push({
-          productType: 'schema_10',
-          displayName: 'Schema Pack (10pg)',
-          priceUsd: 299,
-          buttonLabel: `${packs} pack${packs !== 1 ? 's' : ''} — ${fmt(packPrice)} (save ${fmt(individualPrice - packPrice)})`,
-          quantity: packs,
-          isSuggested: true,
-        });
-      }
-      result.push({
-        id: 'schema',
-        icon: Code2,
-        label: 'Schema Markup',
-        description: `${counts.missingSchema} page${counts.missingSchema !== 1 ? 's' : ''} without structured data`,
-        count: counts.missingSchema,
-        unit: 'pages',
-        options: opts,
-      });
-    }
-
-    if (counts.redirectIssues > 0) {
-      result.push({
-        id: 'redirect',
-        icon: ArrowRightLeft,
-        label: 'Redirect Fixes',
-        description: `${counts.redirectIssues} redirect issue${counts.redirectIssues !== 1 ? 's' : ''} detected`,
-        count: counts.redirectIssues,
-        unit: 'redirects',
-        options: [{
-          productType: 'fix_redirect',
-          displayName: 'Redirect Fix',
-          priceUsd: 19,
-          buttonLabel: `Fix ${counts.redirectIssues} — ${fmt(counts.redirectIssues * 19)}`,
-          quantity: counts.redirectIssues,
-          isSuggested: true,
-        }],
-      });
-    }
-
-    if (counts.manualIssues > 0) {
-      result.push({
-        id: 'manual',
-        icon: Wrench,
-        label: 'Heading, Link & Layout Fixes',
-        description: `${counts.manualIssues} issue${counts.manualIssues !== 1 ? 's' : ''} requiring manual implementation`,
-        count: counts.manualIssues,
-        unit: 'issues',
-        options: [],
-        isManual: true,
-      });
-    }
-
-    return result;
-  }, [counts]);
-
-  const totalAutoFixes = fixes.filter(f => !f.isManual).length;
-  const estimatedTotal = fixes.filter(f => !f.isManual).reduce((sum, f) => {
-    const suggested = f.options.find(o => o.isSuggested);
+  const autoCategories = categories.filter(c => !c.isManual);
+  const estimatedTotal = autoCategories.reduce((sum, c) => {
+    const suggested = c.options.find(o => o.isSuggested);
     if (!suggested) return sum;
     return sum + suggested.priceUsd * (suggested.quantity || 1);
   }, 0);
 
-  if (fixes.length === 0) return null;
+  if (categories.length === 0) return null;
+  if (!trafficLoaded) return null;
 
   const isPremium = tier === 'premium';
+  const hasTrafficData = Object.keys(traffic).length > 0;
+  const totalHighTraffic = categories.reduce((s, c) => s + c.highTrafficPages, 0);
 
   return (
     <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-      <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2">
-        <Sparkles className="w-4 h-4 text-teal-400" />
-        <span className="text-xs font-semibold text-zinc-200">Recommended Fixes</span>
-        {totalAutoFixes > 0 && !isPremium && (
-          <span className="text-[11px] text-zinc-500 ml-auto">
-            Est. total: <span className="text-teal-400 font-medium">{fmt(estimatedTotal)}</span>
-          </span>
+      {/* Header */}
+      <div className="px-5 py-4 border-b border-zinc-800">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-teal-400" />
+          <span className="text-sm font-semibold text-zinc-200">Recommended Fixes</span>
+          {autoCategories.length > 0 && !isPremium && (
+            <span className="text-[11px] text-zinc-500 ml-auto">
+              Est. total: <span className="text-teal-400 font-medium">{fmt(estimatedTotal)}</span>
+            </span>
+          )}
+        </div>
+        {hasTrafficData && totalHighTraffic > 0 && (
+          <p className="text-[12px] text-zinc-400 mt-1.5 leading-relaxed">
+            Based on your traffic data, we've identified <span className="text-teal-400 font-medium">{totalHighTraffic} high-traffic pages</span> with fixable SEO issues. Prioritizing these will have the biggest impact on your organic performance.
+          </p>
         )}
       </div>
 
+      {/* Categories */}
       <div className="divide-y divide-zinc-800/50">
-        {fixes.map(fix => {
-          const Icon = fix.icon;
-          const inCart = cart.items.some(i => fix.options.some(o => o.productType === i.productType));
+        {categories.map(cat => {
+          const Icon = cat.icon;
+          const inCart = cart.items.some(i => cat.options.some(o => o.productType === i.productType));
+          const isExpanded = expandedCategories.has(cat.id);
+          const topPages = cat.pages.slice(0, 5);
+          const hasPages = topPages.length > 0 && (topPages[0].clicks > 0 || topPages[0].pageviews > 0);
 
           return (
-            <div key={fix.id} className="px-4 py-3.5">
+            <div key={cat.id} className="px-5 py-4">
+              {/* Category header */}
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <div className="w-9 h-9 rounded-lg bg-zinc-800 flex items-center justify-center flex-shrink-0 mt-0.5">
                   <Icon className="w-4 h-4 text-zinc-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-zinc-200">{fix.label}</div>
-                  <div className="text-[11px] text-zinc-500 mt-0.5">{fix.description}</div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-zinc-200">{cat.label}</span>
+                    <span className="text-[11px] text-zinc-500">{cat.totalPages} {cat.id === 'redirect' ? 'issue' : 'page'}{cat.totalPages !== 1 ? 's' : ''}</span>
+                    {cat.highTrafficPages > 0 && (
+                      <span className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400 flex items-center gap-1">
+                        <TrendingUp className="w-3 h-3" />
+                        {cat.highTrafficPages} with traffic
+                      </span>
+                    )}
+                  </div>
 
-                  {isPremium ? (
-                    <div className="mt-2 flex items-center gap-1.5">
-                      <Crown className="w-3 h-3 text-amber-400" />
-                      <span className="text-[11px] text-amber-400">Included in your Premium plan</span>
-                    </div>
-                  ) : fix.isManual ? (
-                    <button className="mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors">
-                      <MessageSquare className="w-3 h-3" />
-                      Request a Quote
-                    </button>
-                  ) : inCart ? (
-                    <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-teal-500/10 text-teal-400 border border-teal-500/20">
-                      <ShoppingCart className="w-3 h-3" />
-                      In cart
-                    </div>
-                  ) : (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {fix.options.map((opt, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => cart.addItem({
-                            productType: opt.productType as ProductType,
-                            displayName: opt.displayName,
-                            priceUsd: opt.priceUsd,
-                            quantity: opt.quantity || 1,
-                            isFlat: opt.isFlat,
-                          })}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
-                            opt.isSuggested
-                              ? 'bg-teal-600 hover:bg-teal-500 text-white'
-                              : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
-                          }`}
-                        >
-                          <ShoppingCart className="w-3 h-3" />
-                          {opt.buttonLabel}
-                        </button>
-                      ))}
+                  {/* Insight text */}
+                  <div className="mt-1.5 flex items-start gap-1.5">
+                    <Lightbulb className="w-3 h-3 text-amber-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-[12px] text-zinc-400 leading-relaxed">{cat.insight}</p>
+                  </div>
+
+                  {/* Top affected pages (traffic-sorted) */}
+                  {hasPages && !cat.isManual && (
+                    <div className="mt-3">
+                      <button onClick={() => toggleCategory(cat.id)} className="flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors mb-1.5">
+                        <ChevronDown className={`w-3 h-3 transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
+                        Top pages that would benefit most
+                      </button>
+                      {isExpanded && (
+                        <div className="rounded-lg bg-zinc-800/40 border border-zinc-800 overflow-hidden">
+                          <div className="grid grid-cols-[1fr,auto,auto] gap-x-4 px-3 py-1.5 text-[10px] text-zinc-500 uppercase tracking-wider border-b border-zinc-800">
+                            <span>Page</span>
+                            <span className="text-right">Clicks</span>
+                            <span className="text-right">Impressions</span>
+                          </div>
+                          {topPages.filter(p => p.clicks > 0 || p.impressions > 0).slice(0, 5).map((p, i) => (
+                            <div key={i} className="grid grid-cols-[1fr,auto,auto] gap-x-4 px-3 py-2 text-[11px] border-b border-zinc-800/50 last:border-b-0">
+                              <div className="truncate">
+                                <span className="text-zinc-300">{p.name}</span>
+                                <span className="text-zinc-600 ml-1.5">{p.slug}</span>
+                              </div>
+                              <span className="text-right tabular-nums flex items-center gap-1 text-zinc-400">
+                                <MousePointerClick className="w-3 h-3 text-teal-400" />
+                                {num(p.clicks)}
+                              </span>
+                              <span className="text-right tabular-nums flex items-center gap-1 text-zinc-500">
+                                <Eye className="w-3 h-3" />
+                                {num(p.impressions)}
+                              </span>
+                            </div>
+                          ))}
+                          {topPages.filter(p => p.clicks > 0 || p.impressions > 0).length > 5 && (
+                            <div className="px-3 py-1.5 text-[10px] text-zinc-500 text-center">
+                              + {topPages.filter(p => p.clicks > 0 || p.impressions > 0).length - 5} more pages with traffic
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
+
+                  {/* Purchase options */}
+                  <div className="mt-3">
+                    {isPremium ? (
+                      <div className="flex items-center gap-1.5">
+                        <Crown className="w-3 h-3 text-amber-400" />
+                        <span className="text-[11px] text-amber-400">Included in your Premium plan</span>
+                      </div>
+                    ) : cat.isManual ? (
+                      <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors">
+                        <MessageSquare className="w-3 h-3" />
+                        Request a Quote
+                      </button>
+                    ) : inCart ? (
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                        <ShoppingCart className="w-3 h-3" />
+                        In cart
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {cat.options.map((opt, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => cart.addItem({
+                              productType: opt.productType as ProductType,
+                              displayName: opt.displayName,
+                              priceUsd: opt.priceUsd,
+                              quantity: opt.quantity || 1,
+                              isFlat: opt.isFlat,
+                            })}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
+                              opt.isSuggested
+                                ? 'bg-teal-600 hover:bg-teal-500 text-white'
+                                : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
+                            }`}
+                          >
+                            <ShoppingCart className="w-3 h-3" />
+                            {opt.buttonLabel}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -318,8 +396,8 @@ export function FixRecommendations({ auditDetail, tier }: FixRecommendationsProp
       </div>
 
       {/* Fix everything CTA */}
-      {!isPremium && totalAutoFixes > 1 && (
-        <div className="px-4 py-3 border-t border-zinc-800 bg-zinc-800/30">
+      {!isPremium && autoCategories.length > 1 && (
+        <div className="px-5 py-3.5 border-t border-zinc-800 bg-zinc-800/30">
           <div className="flex items-center justify-between">
             <div>
               <div className="text-[11px] font-medium text-zinc-300">
@@ -333,8 +411,8 @@ export function FixRecommendations({ auditDetail, tier }: FixRecommendationsProp
             </div>
             <button
               onClick={() => {
-                fixes.filter(f => !f.isManual).forEach(fix => {
-                  const suggested = fix.options.find(o => o.isSuggested);
+                autoCategories.forEach(cat => {
+                  const suggested = cat.options.find(o => o.isSuggested);
                   if (suggested) {
                     cart.addItem({
                       productType: suggested.productType as ProductType,

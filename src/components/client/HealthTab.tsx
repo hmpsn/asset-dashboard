@@ -109,7 +109,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity = 'a
       </div>
 
       {/* Fix recommendations with cart CTAs */}
-      <FixRecommendations auditDetail={auditDetail} tier={tier} />
+      <FixRecommendations auditDetail={auditDetail} tier={tier} workspaceId={workspaceId} />
 
       {/* Order status — recent fix purchases */}
       {workspaceId && <OrderStatus workspaceId={workspaceId} />}

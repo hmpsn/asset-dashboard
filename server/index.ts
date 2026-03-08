@@ -6661,6 +6661,46 @@ app.get('/api/public/stripe/status/:workspaceId/:sessionId', (req, res) => {
 });
 
 // Client lists their fix orders (public, no auth needed — filtered to fix category only)
+// Client-facing audit traffic map (public, by workspaceId)
+app.get('/api/public/audit-traffic/:workspaceId', async (req, res) => {
+  try {
+    const ws = getWorkspace(req.params.workspaceId);
+    if (!ws) return res.json({});
+
+    const trafficMap: Record<string, { clicks: number; impressions: number; sessions: number; pageviews: number }> = {};
+
+    if (ws.gscPropertyUrl) {
+      try {
+        const gscPages = await getAllGscPages(ws.id, ws.gscPropertyUrl, 28);
+        for (const p of gscPages) {
+          try {
+            const pagePath = new URL(p.page).pathname;
+            if (!trafficMap[pagePath]) trafficMap[pagePath] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
+            trafficMap[pagePath].clicks += p.clicks;
+            trafficMap[pagePath].impressions += p.impressions;
+          } catch { /* skip malformed URLs */ }
+        }
+      } catch { /* GSC unavailable */ }
+    }
+
+    if (ws.ga4PropertyId) {
+      try {
+        const ga4Pages = await getGA4TopPages(ws.ga4PropertyId, 28, 500);
+        for (const p of ga4Pages) {
+          const pagePath = p.path.startsWith('/') ? p.path : `/${p.path}`;
+          if (!trafficMap[pagePath]) trafficMap[pagePath] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
+          trafficMap[pagePath].pageviews += p.pageviews;
+          trafficMap[pagePath].sessions += p.users;
+        }
+      } catch { /* GA4 unavailable */ }
+    }
+
+    res.json(trafficMap);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 app.get('/api/public/fix-orders/:workspaceId', (req, res) => {
   const payments = listPayments(req.params.workspaceId);
   const fixOrders = payments
