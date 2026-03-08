@@ -2,6 +2,10 @@
 
 > This document is the single source of truth for all UI patterns across the admin dashboard
 > and client dashboard. Every component should reference these specs. When in doubt, check here.
+>
+> **For color rules, per-component color map, admin vs. client decisions, and AI prompting
+> guidelines, see `BRAND_DESIGN_LANGUAGE.md`.** This doc covers component specs and Tailwind
+> classes; the brand doc covers *when and why* to use each color.
 
 ---
 
@@ -86,7 +90,7 @@ Inter loaded from Google Fonts: 300–700.
 | Cyan | #22d3ee | #0e7490 | 5.6:1 | Asset tools, social, navigational intent |
 | Sky | #38bdf8 | #0369a1 | 7.0:1 | Accessibility category |
 | Yellow | #eab308 | #a16207 | 5.2:1 | Warnings (SalesReport, AssetAudit) |
-| Purple | #a78bfa | #7c3aed | 4.6:1 | Sessions, secondary metrics |
+| Purple | #a78bfa | #7c3aed | 4.6:1 | **Admin AI chat only** (AdminChat, SeoAudit "Flag for Client"). Never client-facing. See `BRAND_DESIGN_LANGUAGE.md` § 2 |
 
 > **Contrast column** = ratio against white (#fff) in light mode. All meet WCAG AA (≥4.5:1).
 

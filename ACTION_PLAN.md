@@ -36,8 +36,8 @@ Priority tiers:
 | 3a | ~~**Admin AI chat panel**~~ | Sprint 1 addition | 2-3h | 🔴 P0 | ✅ Shipped — /api/admin-chat endpoint + AdminChat.tsx with internal analyst persona |
 | 3b | ~~**GA4 admin dashboard upgrade**~~ | Memory/Roadmap | 3-4h | � P1 | ✅ Shipped — sparklines, period comparison, organic, new vs returning, conversions |
 
-### Sprint 2: Stripe Payments & Auth Foundation (26-37 hrs)
-*Rationale: Monetize content deliverables, establish tier gating, and build user identity. Revenue + infrastructure.*
+### ~~Sprint 2: Stripe Payments & Auth Foundation~~ ✅ SHIPPED
+*Shipped: March 7, 2026*
 
 | # | Item | Source | Est. | Priority | Notes |
 |---|------|--------|:----:|:--------:|-------|
@@ -51,8 +51,8 @@ Priority tiers:
 | 6 | **Workspace access control** — Restrict workspaces by user, role-based middleware | AUTH_ROADMAP Phase 2 | 3-4h | 🔴 P0 | Required before any team onboarding |
 | 7 | **Client user accounts** — Individual client logins, client_admin/member roles, team management UI | AUTH_ROADMAP Phase 4 | 6-8h | 🔴 P0 | Replaces shared passwords, unlocks client team features |
 
-### Sprint 2b: Monetization UX (12-18 hrs)
-*Rationale: Maximize conversion from free → paid. Trial drives upgrades, page types expand product catalog, inline pricing reduces friction.*
+### ~~Sprint 2b: Monetization UX~~ ✅ SHIPPED
+*Shipped: March 7, 2026*
 
 | # | Item | Source | Est. | Priority | Notes |
 |---|------|--------|:----:|:--------:|-------|
@@ -63,8 +63,8 @@ Priority tiers:
 | 72 | **Client onboarding welcome flow** — First-login experience explaining tier, features, and trial period. "What's included in your plan" section | ACTION_PLAN #25 | 2-3h | 🔴 P0 | Currently clients land cold on a password prompt |
 | 73 | **In-portal pricing/plans page** — Tier comparison in client portal. Bundle cards with feature lists. Stripe subscription checkout links. Upgrade/downgrade flow | MONETIZATION.md Phase 3 | 2-3h | 🟠 P1 | Where upgrade CTAs point to |
 
-### Sprint 3: Data Quality & Dashboard Polish (8-12 hrs)
-*Rationale: Clean up recently shipped work, extend to client side, audit primitives.*
+### ~~Sprint 3: Data Quality & Dashboard Polish~~ ✅ SHIPPED
+*Shipped: March 7, 2026*
 
 | # | Item | Source | Est. | Priority | Notes |
 |---|------|--------|:----:|:--------:|-------|
@@ -95,106 +95,111 @@ Priority tiers:
 | 62 | ~~**Monthly report: chat topics**~~ | Intelligence Wiring | 30m | � P1 | ✅ Shipped — "Topics You Asked About" section from session summaries |
 | 63 | ~~**Strategy: conversion data**~~ | Intelligence Wiring | 30m | 🟠 P1 | ✅ Shipped — GA4 conversions + events by page + audit errors in strategy prompt |
 
-### Sprint 5: Revenue Intelligence (10-14 hrs)
-*Rationale: Features that directly retain clients and increase lifetime value. ROI dashboard justifies retainer; churn signals prevent loss; credits increase prepaid revenue.*
+### ~~Sprint 5–6 + Backlog: Reorganized into Sprints A–E~~ (see below)
+*All remaining work has been reorganized as of March 7, 2026. See new sprint structure.*
 
-| # | Item | Source | Est. | Priority | Notes |
-|---|------|--------|:----:|:--------:|-------|
-| 74 | **ROI dashboard (Premium)** — Organic traffic value in dollars (GSC clicks × SEMRush CPC). Ad spend equivalent. Content ROI. Growth trend. Blurred soft-gate for free/growth | MONETIZATION.md ROI Spec | 3-4h | 🟠 P1 | Single most powerful retention tool |
-| 75 | **Churn prevention signals** — Daily background job: no-login 14d, chat drop-off, no requests 30d, health score drop, trial ending, payment failed. Positive signals: traffic up 20%+, high engagement | MONETIZATION.md Churn Spec | 2-3h | 🟠 P1 | Extends Command Center "Needs Attention" |
-| 76 | **Credits system** — Prepaid credit packs ($500/5cr, $900/10cr, $1600/20cr). Per-product credit costs. Purchase via Stripe. Admin can grant credits | MONETIZATION.md Credits Spec | 2-3h | 🟡 P2 | Cash flow positive, reduces checkout friction |
-| 77 | **Usage tracking + limits** — Track AI convos, briefs, strategies per workspace per month. Usage indicators ("3 of 4 briefs remaining"). Overage prompts. Admin usage dashboard | MONETIZATION.md Phase 4 | 2-3h | 🟡 P2 | Required for bundle enforcement |
+---
 
-### Sprint 5b: Team & Permissions (7-9 hrs)
-*Rationale: Only needed when actually hiring/contracting. Do when the need arises.*
+## Current Execution Plan (Sprints A–E)
 
-| # | Item | Source | Est. | Priority | Notes |
-|---|------|--------|:----:|:--------:|-------|
-| 16 | **Internal team management** — Invite, manage, assign workspaces, disable accounts | AUTH_ROADMAP Phase 3 | 4-5h | 🟡 P2 | When you hire someone |
-| 17 | **Permission-based feature access** — Fine-grained: client_member view-only on approvals, admin member can't delete workspaces | AUTH_ROADMAP Phase 5 | 3-4h | 🟡 P2 | When a client asks "can my intern see but not approve?" |
+*Reorganized: March 7, 2026. Old numbered sprints (1–6) archived in `data/roadmap.json`. New lettered sprints reflect current priorities.*
 
-### Sprint 6: Platform Polish (10-15 hrs)
-*Rationale: Quality-of-life improvements. Do in batches between major features.*
+### Sprint A: Quick Wins (3-5 hrs)
+*No-brainer items: one-line changes, inject existing data, small guards. Ship in a single session.*
 
-| # | Item | Source | Est. | Priority | Notes |
-|---|------|--------|:----:|:--------:|-------|
-| 18 | ~~**AI chatbot: proactive insights**~~ | AI_CHATBOT_ROADMAP Phase 5 | 4-5h | 🟡 P2 | ✅ Shipped — Auto-greeting with 2-3 data-driven insights on chat open, quick question follow-ups |
-| 19 | ~~**Custom date range picker**~~ | FEATURE_AUDIT | 2-3h | 🟡 P2 | ✅ Shipped — Preset buttons + Custom calendar popover; backend: all GSC + GA4 routes accept startDate/endDate |
-| 20 | **Notification preferences** — Per-user email settings, digest frequency, in-app notification bell | AUTH_ROADMAP Phase 6 | 2-3h | 🟢 P3 | After user accounts exist |
-| 21 | **Content calendar** — Visual calendar view of content in production with due dates | FEATURE_AUDIT | 3-4h | 🟢 P3 | Nice visualization, not blocking |
+| # | Item | Est. | Priority | Notes |
+|---|------|:----:|:--------:|-------|
+| 90 | **Schema generator → gpt-4o upgrade** | 15m | � P0 | One-line model change in schema-suggester.ts |
+| 91 | **SEO audit AI → gpt-4o-mini cost savings** | 15m | � P0 | One-line model change for cost savings |
+| 87 | **Content brief: GA4 page performance injection** | 1-2h | � P0 | Inject existing GA4 data into brief generation prompt |
+| 50 | **Concurrent background job limits** | 1-2h | � P1 | In-memory lock to prevent duplicate audits/crawls |
 
-### Backlog: Advanced Features (80+ hrs total)
-*Revisit quarterly. Do when a specific client need or sales opportunity justifies it.*
+### Sprint B: Revenue Engine (13-18 hrs)
+*Direct revenue impact: justify retainer with ROI data, prevent churn, enable self-service upgrades, unlock prepaid revenue.*
 
-| # | Item | Source | Est. | Priority | Notes |
-|---|------|--------|:----:|:--------:|-------|
-| 22 | **AI chatbot: multi-modal responses** — Inline charts, data tables, "show me" commands, email/export | AI_CHATBOT_ROADMAP Phase 6 | 3-4h | 🟢 P3 | Polish |
-| 23 | **Writer assignment** — Assign content to specific writers with notifications | FEATURE_AUDIT | 2-3h | 🟢 P3 | When content volume justifies it |
-| 24 | **Multi-competitor analysis** — Compare against 2-3 competitors simultaneously | FEATURE_AUDIT | 3-4h | 🟢 P3 | Sales tool enhancement |
-| 25 | **Client onboarding wizard** — Guided first-time experience for new clients | ACTION_PLAN | 2-3h | 🔴 P0 | Currently clients land cold on a password prompt |
-| 26 | **Webhook / Zapier triggers** — Fire webhooks on key events | ACTION_PLAN | 3-4h | 🔴 P0 | Low effort, high perceived value for enterprise-ish clients |
-| 27 | **White-label domain support** — CNAME + reverse proxy for client portals | ACTION_PLAN | 2-3h | 🟠 P1 | Massively increases perceived value for larger clients |
-| 28 | **ROI calculator / value dashboard** — Show dollar value of organic traffic | ACTION_PLAN | 3-4h | 🟠 P1 | Powerful retention tool |
-| 29 | **Automated competitive monitoring** — Monthly competitor audit, alert on improvements | ACTION_PLAN | 3-4h | 🟠 P1 | Creates urgency for ongoing work |
-| 30 | **"What happened this month" summary** — Auto-generated plain-English monthly summary | ACTION_PLAN | 2-3h | 🟠 P1 | Replaces the monthly report call |
-| 31 | **Content performance tracker** — Track GSC/GA4 performance per published post | ACTION_PLAN | 3-4h | 🟡 P2 | Proves content ROI |
-| 32 | **Shared notes / wiki per workspace** — Team-internal notes about a client | ACTION_PLAN | 2-3h | 🟡 P2 | Valuable when team grows |
-| 33 | **AI anomaly detection** — Background job to flag traffic/conversion anomalies | ACTION_PLAN | 4-5h | 🟡 P2 | Proactive monitoring |
-| 34 | **Client NPS survey** — Periodic in-dashboard satisfaction survey | ACTION_PLAN | 2h | 🟡 P2 | Simple churn risk signal |
-| 35 | **Content delivery attachments** — Attach Google Docs or uploaded files to completed requests | FEATURE_AUDIT | 2-3h | 🟡 P2 | Content pipeline completion |
-| 36 | **GSC 404 import for redirect scanner** — Pull crawl errors from GSC to seed scanner | FEATURE_AUDIT | 2-3h | 🟡 P2 | Better redirect coverage |
-| 37 | **Audit historical trend charts** — Track audit score over time per-page | FEATURE_AUDIT | 3-4h | 🟡 P2 | Nice for ongoing monitoring |
-| 38 | **Schema auto-schedule** — Re-generate schemas on cadence, flag stale pages | FEATURE_AUDIT | 2-3h | 🟢 P3 | Automation |
-| 39 | **Competitor historical comparisons** — Track competitor gap over time | FEATURE_AUDIT | 3-4h | 🟢 P3 | Deeper competitive analysis |
-| 40 | **Competitor keyword overlap** — Show shared keywords and where you win/lose | FEATURE_AUDIT | 3-4h | 🟢 P3 | Competitive insight |
-| 41 | **Historical redirect comparison** — Track redirect status over time, detect new 404s | FEATURE_AUDIT | 2-3h | 🟢 P3 | Nice for ongoing monitoring |
-| 42 | **Full-site PageSpeed scan** — Multi-page PSI scan as background job | FEATURE_AUDIT | 3-4h | 🟢 P3 | Expensive API calls, niche use |
-| 43 | **Accessibility audit expansion** — WCAG contrast, ARIA, heading order, form labels | FEATURE_AUDIT | 3-4h | 🟢 P3 | Differentiation for accessibility-conscious clients |
-| 44 | **WCAG AA full compliance** — Focus indicators, keyboard nav for all interactive elements | FEATURE_AUDIT | 3-4h | 🟢 P3 | Full accessibility |
-| 45 | **GSC Phase 4: URL Inspection API** — Per-URL indexing status, crawl info | Memory/Roadmap | 3-4h | ⚪ P4 | API access may require verification |
-| 46 | **GA4 Phase 4: Exit pages + attribution** — Exit pages, first-touch attribution | Memory/Roadmap | 3-4h | ⚪ P4 | Advanced analytics |
-| 47 | **Webflow Enterprise API: 301 redirects** — Push rules via API (Enterprise-only) | FEATURE_AUDIT | 1-2h | ⚪ P4 | Blocked by Enterprise access |
-| 48 | **Sales report: branded PDF export** — Downloadable prospect reports with agency branding | FEATURE_AUDIT | 3-4h | ⚪ P4 | Sales tool polish |
-| 49 | **Sales report: email delivery** — Send reports directly to prospects | FEATURE_AUDIT | 2h | ⚪ P4 | Depends on #48 |
-| 50 | **Concurrent background job limits** — Prevent duplicate audits on same site | FEATURE_AUDIT | 1-2h | ⚪ P4 | Edge case protection |
-| 51 | **Heavy dependency audit / tree-shaking** — Verify Lucide tree-shaking, audit chart libs | FEATURE_AUDIT | 2h | ⚪ P4 | Performance micro-optimization |
-| 52 | **Responsive mobile layout** — Sidebar → bottom nav, stacked cards on small screens | FEATURE_AUDIT | 4-6h | ⚪ P4 | Large effort, admin is desktop-primary |
+| # | Item | Est. | Priority | Notes |
+|---|------|:----:|:--------:|-------|
+| 74 | **ROI dashboard (Premium)** | 3-4h | 🔴 P0 | GSC clicks × SEMRush CPC = organic traffic value in dollars. Biggest retention tool. |
+| 88 | **Self-service tier upgrade via Stripe** | 3-4h | � P0 | Replace mailto CTAs with Stripe subscription checkout. Biggest conversion friction point. |
+| 75 | **Churn prevention signals** | 2-3h | 🔴 P0 | Background job: no-login, chat drop-off, score drops. Alerts in Command Center. |
+| 77 | **Usage tracking + limits** | 2-3h | 🟠 P1 | Per-workspace monthly usage. "3 of 4 briefs remaining" indicators. |
+| 76 | **Credits system** | 2-3h | � P1 | Prepaid credit packs. Purchase via Stripe. Admin can grant credits. |
+
+### Sprint C: Client Value & Retention (13-18 hrs)
+*Keep clients engaged, prove value, reduce churn. Each feature adds a reason to stay.*
+
+| # | Item | Est. | Priority | Notes |
+|---|------|:----:|:--------:|-------|
+| 25 | **Client onboarding wizard** | 2-3h | � P0 | Guided first-time experience. Reduces early drop-off. |
+| 30 | **"What happened this month" summary** | 2-3h | � P0 | AI-synthesized monthly summary. Overview + email. |
+| 31 | **Content performance tracker** | 3-4h | 🟠 P1 | Track GSC/GA4 per published post. Proves content ROI. |
+| 33 | **AI anomaly detection** | 4-5h | � P1 | Flag traffic/conversion anomalies. Proactive value. |
+| 29 | **Automated competitive monitoring** | 3-4h | � P2 | Monthly competitor audit. Shows you're watching the landscape. |
+
+### Sprint D: Platform Scale & Integrations (12-18 hrs)
+*Expand reach: white-label for resale revenue, webhooks for automation, multi-modal chat.*
+
+| # | Item | Est. | Priority | Notes |
+|---|------|:----:|:--------:|-------|
+| 27 | **White-label domain support** | 4-6h | � P0 | CNAME + branding. Agency resale tiers ($299-999/mo). New revenue stream. |
+| 26 | **Webhook / Zapier triggers** | 3-4h | � P1 | Fire on key events. Enables automation integrations. |
+| 22 | **AI chatbot: multi-modal responses** | 3-4h | � P1 | Inline charts, data tables in chat. Differentiator. |
+| 52 | **Responsive mobile layout** | 4-6h | � P2 | Required for white-label clients on mobile. |
+
+### Sprint E: Team, Workflow & Polish (16-22 hrs)
+*Internal team features (when hiring), content workflow, quality-of-life.*
+
+| # | Item | Est. | Priority | Notes |
+|---|------|:----:|:--------:|-------|
+| 16 | **Internal team management** | 4-5h | 🟠 P1 | Invite, manage, assign workspaces. When hiring/contracting. |
+| 17 | **Permission-based feature access** | 3-4h | � P1 | client_member view-only, member can't delete workspaces. |
+| 23 | **Writer assignment** | 2-3h | 🟡 P2 | Assign briefs to writers. Track who's working on what. |
+| 21 | **Content calendar** | 3-4h | 🟡 P2 | Visual calendar of content pipeline with due dates. |
+| 20 | **Notification preferences** | 2-3h | � P3 | Per-user email settings, digest frequency, in-app bell. |
+
+### Backlog (60+ hrs)
+*Revisit quarterly. See `data/roadmap.json` for full item list (19 items).*
 
 ---
 
 ## Summary View
 
-### By effort bucket
+### Shipped work
 
-| Bucket | Items | Total Hours |
-|--------|:-----:|:-----------:|
-| 🔴 P0 — Do now | 16 items (#1-7, #25-26, #65-70, #72, #78) | 55-76h |
-| 🟠 P1 — Do next | 12 items (#8-13, #27-30, #71, #73-75) | 30-44h |
-| 🟡 P2 — Do soon | 14 items (#14-17, #18-19, #31-37, #76-77) | 33-48h |
-| 🟢 P3 — Backlog | 13 items (#20-24, #38-44) | 32-46h |
-| ⚪ P4 — Someday | 8 items (#45-52) | 19-26h |
-| **Total** | **66 items** | **169-240h** |
+| Sprint | Items | Hours | Status |
+|--------|:-----:|:-----:|--------|
+| Sprint 1: AI Chatbot Revenue Engine | 8 | 10-13h | ✅ Shipped |
+| Sprint 2: Stripe Payments & Auth | 9 | 26-37h | ✅ Shipped |
+| Sprint 2b: Monetization UX | 6 | 12-18h | ✅ Shipped |
+| Sprint 2c: Client UX & Polish | 7 | 4-6h | ✅ Shipped |
+| Sprint 3: Data Quality & Dashboard | 5 | 8-12h | ✅ Shipped |
+| Sprint 4/4b: Intelligence | 10 | 9-14h | ✅ Shipped |
+| Sprint 6 (partial): Platform Polish | 3 | 6-8h | ✅ Shipped |
+| **Total shipped** | **48** | **75-108h** | |
 
-### Critical path (first 4 sprints)
+### Remaining work
+
+| Sprint | Items | Hours | Focus |
+|--------|:-----:|:-----:|-------|
+| A: Quick Wins | 4 | 3-5h | One-line changes, data injection, guards |
+| B: Revenue Engine | 5 | 13-18h | ROI dashboard, self-service upgrades, churn prevention |
+| C: Client Value & Retention | 5 | 13-18h | Onboarding, monthly summaries, content tracking |
+| D: Platform Scale & Integrations | 4 | 12-18h | White-label, webhooks, multi-modal chat, mobile |
+| E: Team, Workflow & Polish | 5 | 16-22h | Team management, permissions, content calendar |
+| Backlog | 19 | 60+h | Revisit quarterly |
+| **Total remaining** | **42** | **117-141h** | |
+
+### Execution cadence
 
 ```
-Sprint 1:  AI Chatbot Revenue Engine  ✅     →  10-13 hrs  →  Shipped
-Sprint 2:  Stripe + Tiers + Auth              →  26-37 hrs  →  Revenue + tier gating + identity
-Sprint 2b: Monetization UX                    →  12-18 hrs  →  Trial, pricing, page types, onboarding
-Sprint 3:  Data Quality + Dashboard  ✅       →   8-12 hrs  →  Shipped
-                                                 ─────────
-                                                 56-80 hrs total for the critical path
+Sprint A:  Quick Wins            →   3-5 hrs   →  Ship in one session
+Sprint B:  Revenue Engine        →  13-18 hrs  →  ROI + upgrades + churn prevention
+Sprint C:  Client Retention      →  13-18 hrs  →  Onboarding + monthly insights + tracking
+Sprint D:  Platform Scale        →  12-18 hrs  →  White-label + webhooks + mobile
+Sprint E:  Team & Polish         →  16-22 hrs  →  When hiring/scaling
+                                    ─────────
+                                    57-81 hrs for Sprints A-D (revenue-focused)
 ```
-
-### Recommended execution cadence
-
-- **Sprint 1**: ✅ Shipped.
-- **Sprint 2**: Security hardening shipped. Stripe next. Tier gating + auth can interleave.
-- **Sprint 2b**: Immediately after Sprint 2. Trial + pricing + page types maximize conversion.
-- **Sprint 3**: ✅ Shipped.
-- **Sprint 4/4b**: ✅ Shipped.
-- **Sprint 5**: Revenue Intelligence — do after first paying clients are live.
-- **Sprint 5b+**: Pull from backlog as needs arise.
 
 ---
 
@@ -225,12 +230,15 @@ Track key decisions here as they're made:
 | 2026-03-07 | Pre-Stripe security hardening shipped | Helmet (CSP for Stripe domains), HTTPS enforcement, 3-tier rate limiting on public routes, input sanitization on all content endpoints. Item #78. |
 | 2026-03-07 | Stripe integration shipped | server/stripe.ts + server/payments.ts. 14 product types, Stripe Checkout redirect, webhook handler (checkout.session.completed + payment_intent.payment_failed), payment record persistence, frontend success/cancel detection. Item #4. |
 | 2026-03-07 | Stripe admin settings shipped | StripeSettings.tsx in Command Center. Encrypted on-disk config (AES-256-GCM) via stripe-config.ts. Lazy SDK init picks up new keys without restart. Product Price ID mapping with enable/disable. Zero env vars required — env vars still work as fallback for CI/Docker. Item #79. |
-| | | |
+| 2026-03-07 | Sprint 2, 2b, 2c all shipped | Full Stripe payments, tier gating, trial, page-type briefs, client user accounts, welcome flow, plans page. 30 items across 3 sprints. |
+| 2026-03-07 | Design system unified | Comprehensive UI/UX audit: all violet/indigo/blue-CTA → teal. BRAND_DESIGN_LANGUAGE.md created with Three Laws of Color, per-component color map, AI prompting guidelines. |
+| 2026-03-07 | .windsurfrules created | Global rules file with session protocol, file map, design enforcement, mandatory doc updates, quality gates. Loaded at start of every Cascade session. |
+| 2026-03-07 | Roadmap reorganized into Sprints A–E | 48 items shipped, 42 remaining. Old numbered sprints archived. New structure: Quick Wins → Revenue Engine → Client Retention → Platform Scale → Team & Polish. Prioritized by: easy wins first, then revenue/robustness. |
 
 ---
 
 *Compiled: March 7, 2026*
-*Last updated: March 7, 2026 (Monetization strategy: tiers, trial, page types, ROI, churn, credits wired into roadmap)*
-*Next review: During Sprint 2 (Stripe integration)*
-*Total items tracked: 67*
-*Data source: Server-side roadmap.json (managed via /api/roadmap)*
+*Last updated: March 7, 2026 (Roadmap reorganized: Sprints A–E, 48 shipped / 42 remaining)*
+*Next up: Sprint A — Quick Wins (3-5 hrs)*
+*Total items tracked: 90 (48 shipped, 42 pending)*
+*Data source: Server-side `data/roadmap.json` (managed via /api/roadmap)*

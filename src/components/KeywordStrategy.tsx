@@ -739,7 +739,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                           <span className={`text-[11px] uppercase px-1.5 py-0.5 rounded-full border font-medium ${intentColor(gap.intent)}`}>{gap.intent}</span>
                           <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded border ${prioColor}`}>{gap.priority}</span>
                           {gap.suggestedPageType && gap.suggestedPageType !== 'blog' && (
-                            <span className="text-[11px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20 font-medium capitalize">{gap.suggestedPageType}</span>
+                            <span className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20 font-medium capitalize">{gap.suggestedPageType}</span>
                           )}
                         </div>
                       </div>

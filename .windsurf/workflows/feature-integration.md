@@ -63,10 +63,13 @@ When adding a new tool/tab to the admin panel:
 
 When a new admin tool produces data the client should see:
 
-1. Add a summary card to `ClientDashboard.tsx` in the appropriate tab
-2. Use shared primitives (`StatCard`, `MetricRing`, `SectionCard`)
-3. Link to the relevant client tab from the overview cards
-4. Ensure light mode CSS overrides exist for any new accent colors
+1. **Read `BRAND_DESIGN_LANGUAGE.md` first** — check the Per-Component Color Map (§ 4) and Color Decision Tree (§ 10) before choosing any colors
+2. Add a summary card to `ClientDashboard.tsx` in the appropriate tab
+3. Use shared primitives (`StatCard`, `MetricRing`, `SectionCard`) — see `use-primitives.md` workflow
+4. Link to the relevant client tab from the overview cards
+5. Ensure light mode CSS overrides exist for any new accent colors
+6. **No purple in client views** — teal for actions, blue for data only
+7. Update the Per-Component Color Map in `BRAND_DESIGN_LANGUAGE.md` with any new elements
 
 ## 4. Approval Workflow Integration
 
@@ -91,8 +94,9 @@ For long-running operations (audits, crawls, reports):
 When adding or significantly modifying a feature:
 
 1. Add/update entry in `FEATURE_AUDIT.md` with: what it does, agency value, client value, mutual value
-2. Update `DESIGN_SYSTEM.md` if new UI patterns are introduced
-3. Note any new cross-links in this workflow file
+2. Update `DESIGN_SYSTEM.md` if new UI patterns or primitives are introduced
+3. Update `BRAND_DESIGN_LANGUAGE.md` Per-Component Color Map (§ 4) if any colors or UI elements changed
+4. Note any new cross-links in this workflow file
 4. **Update global knowledge memories** — check the File → Memory Update Map (in memory rules) and update any affected memories. Key ones:
    - New/moved endpoints in `server/index.ts` → update **Server index.ts Section Map**
    - New server files → update **Server File Map**

@@ -614,6 +614,11 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - ~~Client onboarding welcome~~: ✅ Shipped — First-visit modal with tier badge, trial countdown, feature grid, and quick-action CTAs.
 - ~~In-portal plans page~~: ✅ Shipped — Plans tab with tier comparison cards, content pricing, bundle cards, upgrade CTAs.
 - ~~14-day Growth trial~~: ✅ Shipped — Auto-provisioned trial for new workspaces, daily expiry check, trial badges across UI.
+- ~~Content opportunity card redesign~~: ✅ Shipped — Removed priority badges, single CTA (Get a Brief), auto-recommended page type from strategy data, keyword shown only when different from topic.
+- ~~Payment modal simplification~~: ✅ Shipped — Removed page type selector, "What's included" list, and bundle savings callout. Focused on Topic → Price → Pay.
+- ~~Plans page color unification~~: ✅ Shipped — All violet/blue tier highlights replaced with teal. Bundle cards hidden pre-launch.
+- ~~Full UI/UX color audit~~: ✅ Shipped — Violet→teal across all page type badges, welcome modal, avatar gradient, content form, review banners, upgrade CTAs, and payment modal. Blue reserved for data metrics only.
+- ~~Brand design language doc~~: ✅ Shipped — Created `BRAND_DESIGN_LANGUAGE.md` with brand identity, color rules, product design principles, component guidelines.
 - **Content brief: GA4 page performance** — Inject GA4 landing page performance (bounce rate, sessions, engagement) into brief generation for existing-page content refreshes.
 - **Self-service tier upgrade via Stripe** — Replace mailto upgrade CTAs with Stripe Checkout subscription flows for tier changes.
 
@@ -672,4 +677,4 @@ When the user asks to update this document with recent features, follow this pro
 7. **Update Summary table**: Adjust category counts and total feature count.
 8. **Commit**: `git add FEATURE_AUDIT.md && git commit -m "docs: update FEATURE_AUDIT with recent features"`
 
-Current feature count: **49**. Last updated: March 7, 2026 (session 3: client user login UI, per-user welcome, submittedBy auto-fill, brief export pageType, monthly report trial banner, admin workspace trial/tier badges).
+Current feature count: **49**. Last updated: March 7, 2026 (session 4: UI/UX audit — content card redesign, payment modal simplification, plans page teal unification, full violet→teal color audit, auto page type, hidden bundles, BRAND_DESIGN_LANGUAGE.md).

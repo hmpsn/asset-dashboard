@@ -1,162 +1,79 @@
 {
   "sprints": [
     {
-      "id": "sprint-1",
-      "name": "AI Chatbot Revenue Engine",
-      "hours": "10-13",
-      "rationale": "Fastest path to visible client value and upsell potential. No dependencies.",
-      "items": [
-        { "id": 1, "title": "Client AI: Full dashboard context", "source": "AI_CHATBOT_ROADMAP Phase 1", "est": "3-4h", "priority": "P0", "notes": "Feed audit, strategy, ranks, content pipeline, approvals, activity, annotations into chatbot", "status": "done" },
-        { "id": 2, "title": "Client AI: Global knowledge base", "source": "AI_CHATBOT_ROADMAP Phase 2", "est": "4-5h", "priority": "P0", "notes": "Per-workspace knowledgeBase field + knowledge-docs/ folder, injected into both chatbots", "status": "done" },
-        { "id": 3, "title": "Client AI: Sales engine behavior", "source": "AI_CHATBOT_ROADMAP Phase 3", "est": "3-4h", "priority": "P0", "notes": "8 revenue hooks, Insights Engine branding, warm handoff pattern", "status": "done" },
-        { "id": 53, "title": "Admin AI chat panel", "source": "Sprint 1 addition", "est": "2-3h", "priority": "P0", "notes": "/api/admin-chat endpoint + AdminChat.tsx with internal analyst persona", "status": "done" },
-        { "id": 54, "title": "Admin GA4 dashboard upgrade", "source": "Memory/Roadmap", "est": "3-4h", "priority": "P0", "notes": "Sparklines, period comparison, organic, new vs returning, conversions", "status": "done" },
-        { "id": 55, "title": "Workspace Home Dashboard", "source": "Sprint 1 addition", "est": "2-3h", "priority": "P0", "notes": "Per-workspace landing page with parallel-fetched audit/search/GA4/ranks/requests/activity data", "status": "done" },
-        { "id": 56, "title": "Audit pipeline: error sort + flag + Fix→ + auto-fix", "source": "Sprint 1 addition", "est": "3-4h", "priority": "P0", "notes": "Pages sorted by errors, Flag for Client workflow, Fix→ routes to tools with auto-generation context (Schema auto-generates, Editor auto-expands, Briefs pre-fill)", "status": "done" },
-        { "id": 57, "title": "Sidebar restructure + Command Center", "source": "Sprint 1 addition", "est": "1-2h", "priority": "P1", "notes": "Icon-only bottom bar, Command Center button, grouped nav (Analytics, Site Health, SEO, Manage)", "status": "done" }
-      ]
-    },
-    {
-      "id": "sprint-2",
-      "name": "Stripe Payments & Auth Foundation",
-      "hours": "26-37",
-      "rationale": "Monetize content deliverables and establish user identity. Revenue + infrastructure.",
-      "items": [
-        { "id": 78, "title": "Pre-Stripe security hardening", "source": "Security Audit", "est": "1h", "priority": "P0", "notes": "Helmet security headers (CSP whitelists Stripe domains), HTTPS enforcement in production, rate limiting on all public routes (60/min read, 10/min write, 5/min checkout), input sanitization (sanitizeString + validateEnum) on content request endpoints, Stripe webhook raw body placeholder", "status": "done" },
-        { "id": 4, "title": "Stripe integration: content payments", "source": "MONETIZATION.md Phase 1", "est": "5-7h", "priority": "P0", "notes": "Stripe Checkout for briefs, posts, schemas, strategies. Webhook handler, payment tracking per workspace. server/stripe.ts + server/payments.ts", "status": "done" },
-        { "id": 79, "title": "Stripe admin settings in Command Center", "source": "Sprint 2 addition", "est": "2h", "priority": "P0", "notes": "StripeSettings.tsx in Command Center: encrypted key storage (AES-256-GCM), product Price ID mapping, enable/disable products. stripe-config.ts persistence layer. Lazy SDK init. Zero env vars needed.", "status": "done" },
-        { "id": 65, "title": "Workspace tier field + TierGate component", "source": "MONETIZATION.md UX Spec", "est": "1-2h", "priority": "P0", "notes": "Shipped — tier field on Workspace, TierGate/TierBadge components, GET /api/public/tier/:wsId, admin tier selector", "status": "done" },
-        { "id": 66, "title": "Soft-gate dashboard sections", "source": "MONETIZATION.md UX Spec", "est": "1.5-2h", "priority": "P0", "notes": "Shipped — 6 sections wrapped in TierGate: strategy page map, content gaps, brief generation, custom date ranges, schema bulk publish, chat input", "status": "done" },
-        { "id": 67, "title": "AI chatbot rate limiting (free tier)", "source": "MONETIZATION.md UX Spec", "est": "1h", "priority": "P0", "notes": "Shipped — checkChatRateLimit in chat-memory.ts, 3 convos/month free, usage counter badge in chat header, locked prompt when exhausted, 429 handling", "status": "done" },
-        { "id": 5, "title": "Internal user accounts", "source": "AUTH_ROADMAP Phase 1", "est": "6-8h", "priority": "P0", "notes": "Shipped — server/users.ts + server/auth.ts. User model (owner/admin/member), bcrypt, JWT 7d, requireAuth/requireRole/optionalAuth middleware, setup/login/me/CRUD endpoints. Frontend login UI still TODO", "status": "done" },
-        { "id": 6, "title": "Workspace access control", "source": "AUTH_ROADMAP Phase 2", "est": "3-4h", "priority": "P0", "notes": "Shipped — requireWorkspaceAccess middleware, applied to workspace routes, optionalAuth global, JWT accepted in admin gate. Frontend workspace filtering still TODO", "status": "done" },
-        { "id": 7, "title": "Client user accounts", "source": "AUTH_ROADMAP Phase 4", "est": "6-8h", "priority": "P0", "notes": "Shipped — server/client-users.ts. Per-workspace accounts (client_owner/client_member), bcrypt, JWT 24h, client-login/me/logout/auth-mode endpoints, admin CRUD, backward compat with shared password. Frontend: smart login form with auth-mode detection, email+password login, user menu with avatar+logout, admin client user management UI (CRUD + password reset)", "status": "done" }
-      ]
-    },
-    {
-      "id": "sprint-2b",
-      "name": "Monetization UX",
-      "hours": "12-18",
-      "rationale": "Maximize conversion from free → paid. Trial drives upgrades, page types expand product catalog, inline pricing reduces friction.",
-      "items": [
-        { "id": 68, "title": "14-day Growth trial for new workspaces", "source": "MONETIZATION.md Trial Strategy", "est": "1-2h", "priority": "P0", "notes": "Shipped — trialEndsAt field on Workspace. Auto-resolve tier to growth during trial. Countdown banner at day 10+. Post-trial auto-downgrade to free. Trial badges in client dashboard, welcome modal, plans page", "status": "done" },
-        { "id": 69, "title": "Inline price visibility", "source": "MONETIZATION.md Pricing", "est": "2-3h", "priority": "P0", "notes": "Shipped — Prices on all purchase buttons, bundle savings callouts, prices from Stripe config with workspace overrides via /api/public/pricing/:id", "status": "done" },
-        { "id": 70, "title": "Page-type content briefs", "source": "MONETIZATION.md Products", "est": "3-4h", "priority": "P0", "notes": "Shipped — 7 page types with type-specific AI prompts (blog, landing, service, location, product, pillar, resource). Page type selector in pricing modal and topic submission. pageType on ContentBrief + ContentTopicRequest models", "status": "done" },
-        { "id": 71, "title": "Page type → content opportunity mapping", "source": "MONETIZATION.md Products", "est": "2-3h", "priority": "P1", "notes": "Shipped — Strategy AI recommends suggestedPageType per content gap. Violet badges on gap cards. Pre-fills page type in pricing modal from strategy recommendations", "status": "done" },
-        { "id": 72, "title": "Client onboarding welcome flow", "source": "ACTION_PLAN #25", "est": "2-3h", "priority": "P0", "notes": "Shipped — First-visit modal with tier badge, trial countdown, 2×3 feature grid, quick-action CTAs. Per-user localStorage key (user-aware welcome)", "status": "done" },
-        { "id": 73, "title": "In-portal pricing/plans page", "source": "MONETIZATION.md Phase 3", "est": "2-3h", "priority": "P1", "notes": "Shipped — Plans tab with 3-tier comparison cards, content pricing, bundle cards from Stripe config, upgrade CTAs, trial countdown banner", "status": "done" }
-      ]
-    },
-    {
-      "id": "sprint-2c",
-      "name": "Client UX & Polish",
-      "hours": "4-6",
-      "rationale": "Complete the client auth UX, improve per-user experience, and polish exports/reports.",
-      "items": [
-        { "id": 80, "title": "Client user management admin UI", "source": "AUTH_ROADMAP Phase 4", "est": "2h", "priority": "P0", "notes": "Shipped — WorkspaceSettings > Client Dashboard tab: add/edit/delete client users, reset passwords, role badges, last login display", "status": "done" },
-        { "id": 81, "title": "Client login form + user menu", "source": "AUTH_ROADMAP Phase 4", "est": "2h", "priority": "P0", "notes": "Shipped — Smart login gate: auth-mode detection (shared password vs individual accounts vs both with tabs), email+password form, auto-auth via JWT cookie, user menu with avatar initials + name + logout", "status": "done" },
-        { "id": 82, "title": "Welcome modal per-user awareness", "source": "Client UX", "est": "15m", "priority": "P1", "notes": "Shipped — localStorage key includes clientUser.id when logged in; each user sees welcome on their first visit", "status": "done" },
-        { "id": 83, "title": "Auto-populate submittedBy from client user", "source": "Client UX", "est": "15m", "priority": "P1", "notes": "Shipped — submittedBy auto-filled from clientUser.name, 'Your Name' field hidden when logged in", "status": "done" },
-        { "id": 84, "title": "Brief HTML export: page type badge", "source": "Content Pipeline", "est": "15m", "priority": "P1", "notes": "Shipped — Page type badge rendered in brief export header subtitle when pageType is present", "status": "done" },
-        { "id": 85, "title": "Monthly report: trial status banner", "source": "Monetization", "est": "30m", "priority": "P1", "notes": "Shipped — isTrial + trialDaysRemaining threaded through monthly-report.ts → email-templates.ts. Amber banner at top of email with days remaining + upgrade CTA", "status": "done" },
-        { "id": 86, "title": "Admin workspace cards: trial/tier badges", "source": "Admin UX", "est": "30m", "priority": "P1", "notes": "Shipped — /api/workspace-overview returns tier, isTrial, trialDaysRemaining. WorkspaceOverview.tsx renders amber trial badge with countdown and blue/violet tier badge", "status": "done" }
-      ]
-    },
-    {
-      "id": "sprint-3",
-      "name": "Data Quality & Dashboard Polish",
-      "hours": "8-12",
-      "rationale": "Clean up recently shipped work, extend to client side.",
-      "items": [
-        { "id": 8, "title": "Admin Search Console: primitives audit", "source": "Memory/Roadmap", "est": "1-2h", "priority": "P1", "notes": "Shipped — new panels verified against shared UI primitives", "status": "done" },
-        { "id": 9, "title": "Client dashboard: simplified search data", "source": "Memory/Roadmap", "est": "3-4h", "priority": "P1", "notes": "SearchSnapshot component: traffic trend, top pages, device split with comparison badges", "status": "done" },
-        { "id": 10, "title": "Admin GA4 dashboard upgrade", "source": "Memory/Roadmap", "est": "3-4h", "priority": "P1", "notes": "Shipped in Sprint 1", "status": "done" },
-        { "id": 11, "title": "Client dashboard: simplified analytics data", "source": "Memory/Roadmap", "est": "2-3h", "priority": "P1", "notes": "AnalyticsSnapshot + OrganicInsight components: GA4 organic overview, landing pages, new vs returning", "status": "done" },
-        { "id": 64, "title": "Insights Engine: overview redesign + branding", "source": "Sprint 3 addition", "est": "2-3h", "priority": "P0", "notes": "Insights-first overview: InsightsDigest auto-generates plain-English cards from all data sources, PerformancePulse compact metrics, chatbot promoted as Insights Engine in sidebar, OG/title branding, tab renamed Overview→Insights, removed SearchSnapshot+AnalyticsSnapshot from overview (data in dedicated tabs), design system alignment", "status": "done" }
-      ]
-    },
-    {
-      "id": "sprint-4",
-      "name": "Intelligence Upgrades",
-      "hours": "6-9",
-      "rationale": "Cross-pollinate data across tools for smarter recommendations.",
-      "items": [
-        { "id": 12, "title": "SEO Audit Intelligence", "source": "Memory/Roadmap", "est": "3-4h", "priority": "P1", "notes": "/api/audit-traffic endpoint, traffic badges on page cards, sort-by-traffic toggle", "status": "done" },
-        { "id": 13, "title": "Content brief enrichment", "source": "Memory/Roadmap", "est": "1-2h", "priority": "P1", "notes": "Shipped — GSC queries + SEMRush volume/KD/CPC/related keywords injected into AI brief generation", "status": "done" },
-        { "id": 14, "title": "Monthly report enrichment", "source": "Memory/Roadmap", "est": "1h", "priority": "P2", "notes": "GSC/GA4 period comparison fetched in gatherMonthlyData, traffic trends section in email template", "status": "done" },
-        { "id": 15, "title": "AI chatbot: conversation memory", "source": "AI_CHATBOT_ROADMAP Phase 4", "est": "3-4h", "priority": "P2", "notes": "chat-memory.ts: persistent sessions, conversation history in OpenAI calls, cross-session summaries, chat history UI", "status": "done" }
-      ]
-    },
-    {
-      "id": "sprint-4b",
-      "name": "Intelligence Wiring",
+      "id": "sprint-A",
+      "name": "Quick Wins",
       "hours": "3-5",
-      "rationale": "Cross-wire existing features for compounding intelligence. All data exists — just needs connecting.",
+      "rationale": "No-brainer items: one-line changes, inject existing data into existing features, and small guards. Ship in a single session.",
       "items": [
-        { "id": 58, "title": "Admin chat: conversation memory", "source": "Intelligence Wiring", "est": "30m", "priority": "P1", "notes": "Wired sessionId, addMessage, buildConversationContext, history UI (New Chat + Chat History) into admin chat — full parity with client", "status": "done" },
-        { "id": 59, "title": "Client chat: comparison data in context", "source": "Intelligence Wiring", "est": "15m", "priority": "P1", "notes": "Client askAi now sends searchComparison, ga4Comparison, ga4Organic, ga4NewVsReturning; server prompt lists them as data sources", "status": "done" },
-        { "id": 60, "title": "Chat activity logging", "source": "Intelligence Wiring", "est": "30m", "priority": "P1", "notes": "First exchange of each session logged as chat_session activity type in both client + admin endpoints", "status": "done" },
-        { "id": 61, "title": "Audit traffic data in chatbot context", "source": "Intelligence Wiring", "est": "45m", "priority": "P2", "notes": "getAuditTrafficForWorkspace cached helper + HIGH-TRAFFIC PAGES WITH SEO ISSUES injected into both admin + client chat prompts", "status": "done" },
-        { "id": 62, "title": "Monthly reports: chat topic summaries", "source": "Intelligence Wiring", "est": "30m", "priority": "P2", "notes": "gatherMonthlyData fetches recent client chat summaries; email template renders 'Topics You Asked About' section", "status": "done" },
-        { "id": 63, "title": "Strategy Flow Enrichment", "source": "Intelligence Wiring", "est": "30m", "priority": "P1", "notes": "GA4 conversions + events-by-page + audit high-traffic error pages injected into strategy master prompt. Money-page protection rules, conversion-aware rationales, audit quickWin candidates from traffic data", "status": "done" }
+        { "id": 90, "title": "Schema generator → gpt-4o upgrade", "source": "FEATURE_AUDIT", "est": "15m", "priority": "P0", "notes": "One-line model change in schema-suggester.ts. Switch from gpt-4o-mini to gpt-4o for better schema quality", "status": "pending" },
+        { "id": 91, "title": "SEO audit AI → gpt-4o-mini cost savings", "source": "FEATURE_AUDIT", "est": "15m", "priority": "P0", "notes": "One-line model change. Switch audit AI recommendations from gpt-4o to gpt-4o-mini for cost savings with minimal quality loss", "status": "pending" },
+        { "id": 87, "title": "Content brief: GA4 page performance injection", "source": "FEATURE_AUDIT", "est": "1-2h", "priority": "P0", "notes": "GA4 landing page data (sessions, bounce rate, engagement) already fetched — inject into brief generation prompt for existing-page content refreshes", "status": "pending" },
+        { "id": 50, "title": "Concurrent background job limits", "source": "FEATURE_AUDIT", "est": "1-2h", "priority": "P1", "notes": "Add guard to prevent duplicate audits/crawls on same site. Simple in-memory lock per workspace", "status": "pending" }
       ]
     },
     {
-      "id": "sprint-5",
-      "name": "Revenue Intelligence",
-      "hours": "10-14",
-      "rationale": "Features that directly retain clients and increase lifetime value. ROI dashboard justifies retainer; churn signals prevent loss; credits increase prepaid revenue.",
+      "id": "sprint-B",
+      "name": "Revenue Engine",
+      "hours": "13-18",
+      "rationale": "Direct revenue impact: justify retainer with ROI data, prevent churn, enable self-service upgrades, and unlock prepaid revenue via credits.",
       "items": [
-        { "id": 74, "title": "ROI dashboard (Premium)", "source": "MONETIZATION.md ROI Spec", "est": "3-4h", "priority": "P1", "notes": "Organic traffic value in dollars (GSC clicks × SEMRush CPC). Ad spend equivalent. Content ROI. Growth trend. Blurred soft-gate for free/growth. GET /api/public/roi/:wsId", "status": "pending" },
-        { "id": 75, "title": "Churn prevention signals", "source": "MONETIZATION.md Churn Spec", "est": "2-3h", "priority": "P1", "notes": "Daily background job: no-login 14d, chat drop-off, no requests 30d, health score drop, trial ending, payment failed. Positive signals: traffic up 20%, high engagement. Alerts in Command Center", "status": "pending" },
-        { "id": 76, "title": "Credits system", "source": "MONETIZATION.md Credits Spec", "est": "2-3h", "priority": "P2", "notes": "Prepaid credit packs ($500/5cr, $900/10cr, $1600/20cr). Per-product credit costs. Purchase via Stripe. Admin can grant credits. Deduct on fulfillment", "status": "pending" },
-        { "id": 77, "title": "Usage tracking + limits", "source": "MONETIZATION.md Phase 4", "est": "2-3h", "priority": "P2", "notes": "Track AI conversations, briefs, strategies per workspace per month. Usage indicators (3 of 4 briefs remaining). Overage prompts. Admin usage dashboard", "status": "pending" }
+        { "id": 74, "title": "ROI dashboard (Premium)", "source": "MONETIZATION.md ROI Spec", "est": "3-4h", "priority": "P0", "notes": "Organic traffic value in dollars (GSC clicks × SEMRush CPC). Ad spend equivalent. Content ROI. Growth trend. Blurred soft-gate for free/growth. GET /api/public/roi/:wsId", "status": "pending" },
+        { "id": 88, "title": "Self-service tier upgrade via Stripe", "source": "MONETIZATION.md Phase 3", "est": "3-4h", "priority": "P0", "notes": "Replace mailto upgrade CTAs with Stripe Checkout subscription flows for tier changes. Biggest conversion friction point.", "status": "pending" },
+        { "id": 75, "title": "Churn prevention signals", "source": "MONETIZATION.md Churn Spec", "est": "2-3h", "priority": "P0", "notes": "Daily background job: no-login 14d, chat drop-off, no requests 30d, health score drop, trial ending, payment failed. Positive signals: traffic up 20%, high engagement. Alerts in Command Center", "status": "pending" },
+        { "id": 77, "title": "Usage tracking + limits", "source": "MONETIZATION.md Phase 4", "est": "2-3h", "priority": "P1", "notes": "Track AI conversations, briefs, strategies per workspace per month. Usage indicators (3 of 4 briefs remaining). Overage prompts. Admin usage dashboard", "status": "pending" },
+        { "id": 76, "title": "Credits system", "source": "MONETIZATION.md Credits Spec", "est": "2-3h", "priority": "P1", "notes": "Prepaid credit packs ($500/5cr, $900/10cr, $1600/20cr). Per-product credit costs. Purchase via Stripe. Admin can grant credits. Deduct on fulfillment", "status": "pending" }
       ]
     },
     {
-      "id": "sprint-5b",
-      "name": "Team & Permissions",
-      "hours": "7-9",
-      "rationale": "Only needed when actually hiring/contracting.",
+      "id": "sprint-C",
+      "name": "Client Value & Retention",
+      "hours": "13-18",
+      "rationale": "Features that keep clients engaged, prove value, and reduce churn. Each one adds a reason to stay.",
       "items": [
-        { "id": 16, "title": "Internal team management", "source": "AUTH_ROADMAP Phase 3", "est": "4-5h", "priority": "P2", "notes": "Invite, manage, assign workspaces, disable accounts", "status": "pending" },
-        { "id": 17, "title": "Permission-based feature access", "source": "AUTH_ROADMAP Phase 5", "est": "3-4h", "priority": "P2", "notes": "Fine-grained: client_member view-only on approvals", "status": "pending" }
+        { "id": 25, "title": "Client onboarding wizard", "source": "ACTION_PLAN", "est": "2-3h", "priority": "P0", "notes": "Guided first-time experience: connect site, run first audit, explore key features. Reduces early drop-off", "status": "pending" },
+        { "id": 30, "title": "\"What happened this month\" summary", "source": "ACTION_PLAN", "est": "2-3h", "priority": "P0", "notes": "Auto-generated plain-English monthly summary. AI synthesizes GSC/GA4/audit changes into 3-5 bullet insights. Shows on Overview + email", "status": "pending" },
+        { "id": 31, "title": "Content performance tracker", "source": "ACTION_PLAN", "est": "3-4h", "priority": "P1", "notes": "Track GSC/GA4 performance per published post. Proves content ROI to clients — clicks, impressions, rankings over time since publish date", "status": "pending" },
+        { "id": 33, "title": "AI anomaly detection", "source": "ACTION_PLAN", "est": "4-5h", "priority": "P1", "notes": "Background job to flag traffic/conversion anomalies. Alerts admin and client when significant changes detected. Proactive value.", "status": "pending" },
+        { "id": 29, "title": "Automated competitive monitoring", "source": "ACTION_PLAN", "est": "3-4h", "priority": "P2", "notes": "Monthly competitor audit, alert on improvements. Shows clients you're watching the landscape", "status": "pending" }
       ]
     },
     {
-      "id": "sprint-6",
-      "name": "Platform Polish",
-      "hours": "10-15",
-      "rationale": "Quality-of-life improvements. Do in batches.",
+      "id": "sprint-D",
+      "name": "Platform Scale & Integrations",
+      "hours": "12-18",
+      "rationale": "Features that expand the platform's reach: white-label for resale revenue, webhooks for integrations, multi-modal chat for differentiation.",
       "items": [
-        { "id": 18, "title": "AI chatbot: proactive insights", "source": "AI_CHATBOT_ROADMAP Phase 5", "est": "4-5h", "priority": "P2", "notes": "Auto-surface 2-3 contextual insights on dashboard load. Proactive greeting with data-driven bullets, quick question follow-ups", "status": "done" },
-        { "id": 19, "title": "Custom date range picker", "source": "FEATURE_AUDIT", "est": "2-3h", "priority": "P2", "notes": "Preset buttons + Custom calendar popover with start/end date inputs. Backend: all GSC + GA4 routes accept startDate/endDate query params", "status": "done" },
-        { "id": 20, "title": "Notification preferences", "source": "AUTH_ROADMAP Phase 6", "est": "2-3h", "priority": "P3", "notes": "Per-user email settings, digest frequency, in-app bell", "status": "pending" },
-        { "id": 21, "title": "Content calendar", "source": "FEATURE_AUDIT", "est": "3-4h", "priority": "P3", "notes": "Visual calendar of content in production with due dates", "status": "pending" }
+        { "id": 27, "title": "White-label domain support", "source": "MONETIZATION.md White-Label", "est": "4-6h", "priority": "P0", "notes": "CNAME + reverse proxy. Configurable branding (logo, colors, favicon, email sender, chatbot persona). Agency resale tiers ($299-999/mo). New revenue stream.", "status": "pending" },
+        { "id": 26, "title": "Webhook / Zapier triggers", "source": "ACTION_PLAN", "est": "3-4h", "priority": "P1", "notes": "Fire webhooks on key events (audit complete, content delivered, payment received, chat session). Enables automation integrations", "status": "pending" },
+        { "id": 22, "title": "AI chatbot: multi-modal responses", "source": "AI_CHATBOT_ROADMAP Phase 6", "est": "3-4h", "priority": "P1", "notes": "Inline charts, data tables, export in chat responses. Differentiator from basic chatbot competitors", "status": "pending" },
+        { "id": 52, "title": "Responsive mobile layout", "source": "FEATURE_AUDIT", "est": "4-6h", "priority": "P2", "notes": "Sidebar → bottom nav, stacked cards on small screens. Required for white-label clients on mobile", "status": "pending" }
+      ]
+    },
+    {
+      "id": "sprint-E",
+      "name": "Team, Workflow & Polish",
+      "hours": "16-22",
+      "rationale": "Internal team features (only when hiring), content workflow improvements, and quality-of-life polish.",
+      "items": [
+        { "id": 16, "title": "Internal team management", "source": "AUTH_ROADMAP Phase 3", "est": "4-5h", "priority": "P1", "notes": "Invite team members, manage roles, assign workspaces, disable accounts. Needed when hiring/contracting", "status": "pending" },
+        { "id": 17, "title": "Permission-based feature access", "source": "AUTH_ROADMAP Phase 5", "est": "3-4h", "priority": "P1", "notes": "Fine-grained: client_member view-only on approvals, member can't delete workspaces", "status": "pending" },
+        { "id": 23, "title": "Writer assignment", "source": "FEATURE_AUDIT", "est": "2-3h", "priority": "P2", "notes": "Assign content briefs to specific writers. Track who's working on what", "status": "pending" },
+        { "id": 21, "title": "Content calendar", "source": "FEATURE_AUDIT", "est": "3-4h", "priority": "P2", "notes": "Visual calendar of content in production with due dates. Bird's eye view of content pipeline", "status": "pending" },
+        { "id": 20, "title": "Notification preferences", "source": "AUTH_ROADMAP Phase 6", "est": "2-3h", "priority": "P3", "notes": "Per-user email settings, digest frequency, in-app notification bell", "status": "pending" }
       ]
     },
     {
       "id": "backlog",
       "name": "Backlog",
-      "hours": "80+",
-      "rationale": "Revisit quarterly. Do when a specific need justifies it.",
+      "hours": "60+",
+      "rationale": "Revisit quarterly. Prioritize when a specific client need or revenue opportunity justifies it.",
       "items": [
-        { "id": 22, "title": "AI chatbot: multi-modal responses", "source": "AI_CHATBOT_ROADMAP Phase 6", "est": "3-4h", "priority": "P3", "notes": "Inline charts, data tables, export", "status": "pending" },
-        { "id": 23, "title": "Writer assignment", "source": "FEATURE_AUDIT", "est": "2-3h", "priority": "P3", "notes": "Assign content to specific writers", "status": "pending" },
         { "id": 24, "title": "Multi-competitor analysis", "source": "FEATURE_AUDIT", "est": "3-4h", "priority": "P3", "notes": "Compare against 2-3 competitors simultaneously", "status": "pending" },
-        { "id": 25, "title": "Client onboarding wizard", "source": "ACTION_PLAN", "est": "2-3h", "priority": "P0", "notes": "Guided first-time experience for new clients", "status": "pending" },
-        { "id": 26, "title": "Webhook / Zapier triggers", "source": "ACTION_PLAN", "est": "3-4h", "priority": "P0", "notes": "Fire webhooks on key events", "status": "pending" },
-        { "id": 27, "title": "White-label domain support", "source": "MONETIZATION.md White-Label", "est": "4-6h", "priority": "P1", "notes": "CNAME + reverse proxy. Configurable branding (logo, colors, favicon, email sender, chatbot persona). Agency resale tiers ($299-999/mo)", "status": "pending" },
-        { "id": 28, "title": "ROI calculator / value dashboard", "source": "MONETIZATION.md", "est": "3-4h", "priority": "P1", "notes": "Moved to Sprint 5 (Revenue Intelligence) as item #74", "status": "pending" },
-        { "id": 29, "title": "Automated competitive monitoring", "source": "ACTION_PLAN", "est": "3-4h", "priority": "P1", "notes": "Monthly competitor audit, alert on improvements", "status": "pending" },
-        { "id": 30, "title": "\"What happened this month\" summary", "source": "ACTION_PLAN", "est": "2-3h", "priority": "P1", "notes": "Auto-generated plain-English monthly summary", "status": "pending" },
-        { "id": 31, "title": "Content performance tracker", "source": "ACTION_PLAN", "est": "3-4h", "priority": "P2", "notes": "Track GSC/GA4 performance per published post", "status": "pending" },
-        { "id": 32, "title": "Shared notes / wiki per workspace", "source": "ACTION_PLAN", "est": "2-3h", "priority": "P2", "notes": "Team-internal notes about a client", "status": "pending" },
-        { "id": 33, "title": "AI anomaly detection", "source": "ACTION_PLAN", "est": "4-5h", "priority": "P2", "notes": "Background job to flag traffic/conversion anomalies", "status": "pending" },
-        { "id": 34, "title": "Client NPS survey", "source": "ACTION_PLAN", "est": "2h", "priority": "P2", "notes": "Periodic in-dashboard satisfaction survey", "status": "pending" },
-        { "id": 35, "title": "Content delivery attachments", "source": "FEATURE_AUDIT", "est": "2-3h", "priority": "P2", "notes": "Shipped — delivery URL + notes fields on content requests, PATCH endpoint for fulfillment", "status": "done" },
-        { "id": 36, "title": "GSC 404 import for redirect scanner", "source": "FEATURE_AUDIT", "est": "2-3h", "priority": "P2", "notes": "Pull crawl errors from GSC to seed redirect scanner", "status": "pending" },
-        { "id": 37, "title": "Audit historical trend charts", "source": "FEATURE_AUDIT", "est": "3-4h", "priority": "P2", "notes": "Track audit score over time per-page, not just site-wide", "status": "pending" },
+        { "id": 32, "title": "Shared notes / wiki per workspace", "source": "ACTION_PLAN", "est": "2-3h", "priority": "P3", "notes": "Team-internal notes about a client", "status": "pending" },
+        { "id": 34, "title": "Client NPS survey", "source": "ACTION_PLAN", "est": "2h", "priority": "P3", "notes": "Periodic in-dashboard satisfaction survey", "status": "pending" },
+        { "id": 36, "title": "GSC 404 import for redirect scanner", "source": "FEATURE_AUDIT", "est": "2-3h", "priority": "P3", "notes": "Pull crawl errors from GSC to seed redirect scanner", "status": "pending" },
+        { "id": 37, "title": "Audit historical trend charts", "source": "FEATURE_AUDIT", "est": "3-4h", "priority": "P3", "notes": "Track audit score over time per-page, not just site-wide", "status": "pending" },
         { "id": 38, "title": "Schema auto-schedule", "source": "FEATURE_AUDIT", "est": "2-3h", "priority": "P3", "notes": "Re-generate schemas on cadence, flag stale pages", "status": "pending" },
         { "id": 39, "title": "Competitor historical comparisons", "source": "FEATURE_AUDIT", "est": "3-4h", "priority": "P3", "notes": "Track competitor gap over time", "status": "pending" },
         { "id": 40, "title": "Competitor keyword overlap", "source": "FEATURE_AUDIT", "est": "3-4h", "priority": "P3", "notes": "Show shared keywords and where you win/lose", "status": "pending" },
@@ -169,9 +86,120 @@
         { "id": 47, "title": "Webflow Enterprise API: 301 redirects", "source": "FEATURE_AUDIT", "est": "1-2h", "priority": "P4", "notes": "Push rules via API (Enterprise-only)", "status": "pending" },
         { "id": 48, "title": "Sales report: branded PDF export", "source": "FEATURE_AUDIT", "est": "3-4h", "priority": "P4", "notes": "Downloadable prospect reports with agency branding", "status": "pending" },
         { "id": 49, "title": "Sales report: email delivery", "source": "FEATURE_AUDIT", "est": "2h", "priority": "P4", "notes": "Send reports directly to prospects", "status": "pending" },
-        { "id": 50, "title": "Concurrent background job limits", "source": "FEATURE_AUDIT", "est": "1-2h", "priority": "P4", "notes": "Prevent duplicate audits on same site", "status": "pending" },
         { "id": 51, "title": "Heavy dependency audit / tree-shaking", "source": "FEATURE_AUDIT", "est": "2h", "priority": "P4", "notes": "Verify Lucide tree-shaking, audit chart libs", "status": "pending" },
-        { "id": 52, "title": "Responsive mobile layout", "source": "FEATURE_AUDIT", "est": "4-6h", "priority": "P4", "notes": "Sidebar → bottom nav, stacked cards on small screens", "status": "pending" }
+        { "id": 89, "title": "Sales report: CRM integration", "source": "FEATURE_AUDIT", "est": "3-4h", "priority": "P4", "notes": "Push prospect data to HubSpot/Pipedrive when a report is generated", "status": "pending" }
+      ]
+    },
+    {
+      "id": "archive-sprint-1",
+      "name": "✅ SHIPPED — AI Chatbot Revenue Engine",
+      "hours": "10-13",
+      "rationale": "Fastest path to visible client value and upsell potential. No dependencies.",
+      "items": [
+        { "id": 1, "title": "Client AI: Full dashboard context", "source": "AI_CHATBOT_ROADMAP Phase 1", "est": "3-4h", "priority": "P0", "notes": "Feed audit, strategy, ranks, content pipeline, approvals, activity, annotations into chatbot", "status": "done" },
+        { "id": 2, "title": "Client AI: Global knowledge base", "source": "AI_CHATBOT_ROADMAP Phase 2", "est": "4-5h", "priority": "P0", "notes": "Per-workspace knowledgeBase field + knowledge-docs/ folder, injected into both chatbots", "status": "done" },
+        { "id": 3, "title": "Client AI: Sales engine behavior", "source": "AI_CHATBOT_ROADMAP Phase 3", "est": "3-4h", "priority": "P0", "notes": "8 revenue hooks, Insights Engine branding, warm handoff pattern", "status": "done" },
+        { "id": 53, "title": "Admin AI chat panel", "source": "Sprint 1 addition", "est": "2-3h", "priority": "P0", "notes": "Shipped — /api/admin-chat endpoint + AdminChat.tsx with internal analyst persona", "status": "done" },
+        { "id": 54, "title": "Admin GA4 dashboard upgrade", "source": "Memory/Roadmap", "est": "3-4h", "priority": "P0", "notes": "Shipped — Sparklines, period comparison, organic, new vs returning, conversions", "status": "done" },
+        { "id": 55, "title": "Workspace Home Dashboard", "source": "Sprint 1 addition", "est": "2-3h", "priority": "P0", "notes": "Shipped — Per-workspace landing page with parallel-fetched data", "status": "done" },
+        { "id": 56, "title": "Audit pipeline: error sort + flag + Fix→ + auto-fix", "source": "Sprint 1 addition", "est": "3-4h", "priority": "P0", "notes": "Shipped — Pages sorted by errors, Flag for Client workflow, Fix→ routes to tools with auto-generation context", "status": "done" },
+        { "id": 57, "title": "Sidebar restructure + Command Center", "source": "Sprint 1 addition", "est": "1-2h", "priority": "P1", "notes": "Shipped — Icon-only bottom bar, Command Center button, grouped nav", "status": "done" }
+      ]
+    },
+    {
+      "id": "archive-sprint-2",
+      "name": "✅ SHIPPED — Stripe Payments & Auth Foundation",
+      "hours": "26-37",
+      "rationale": "Monetize content deliverables and establish user identity.",
+      "items": [
+        { "id": 78, "title": "Pre-Stripe security hardening", "source": "Security Audit", "est": "1h", "priority": "P0", "notes": "Shipped — Helmet CSP, HTTPS enforcement, rate limiting, input sanitization", "status": "done" },
+        { "id": 4, "title": "Stripe integration: content payments", "source": "MONETIZATION.md Phase 1", "est": "5-7h", "priority": "P0", "notes": "Shipped — Stripe Checkout for briefs, posts, schemas, strategies. Webhook handler, payment tracking", "status": "done" },
+        { "id": 79, "title": "Stripe admin settings in Command Center", "source": "Sprint 2 addition", "est": "2h", "priority": "P0", "notes": "Shipped — Encrypted key storage, product Price ID mapping, enable/disable products", "status": "done" },
+        { "id": 65, "title": "Workspace tier field + TierGate component", "source": "MONETIZATION.md UX Spec", "est": "1-2h", "priority": "P0", "notes": "Shipped — tier field, TierGate/TierBadge, admin tier selector", "status": "done" },
+        { "id": 66, "title": "Soft-gate dashboard sections", "source": "MONETIZATION.md UX Spec", "est": "1.5-2h", "priority": "P0", "notes": "Shipped — 6 sections wrapped in TierGate", "status": "done" },
+        { "id": 67, "title": "AI chatbot rate limiting (free tier)", "source": "MONETIZATION.md UX Spec", "est": "1h", "priority": "P0", "notes": "Shipped — 3 convos/month free, usage counter badge, locked prompt", "status": "done" },
+        { "id": 5, "title": "Internal user accounts", "source": "AUTH_ROADMAP Phase 1", "est": "6-8h", "priority": "P0", "notes": "Shipped — User model, bcrypt, JWT 7d, auth middleware, CRUD endpoints", "status": "done" },
+        { "id": 6, "title": "Workspace access control", "source": "AUTH_ROADMAP Phase 2", "est": "3-4h", "priority": "P0", "notes": "Shipped — requireWorkspaceAccess middleware, JWT in admin gate", "status": "done" },
+        { "id": 7, "title": "Client user accounts", "source": "AUTH_ROADMAP Phase 4", "est": "6-8h", "priority": "P0", "notes": "Shipped — Per-workspace accounts, smart login, user menu, admin management UI", "status": "done" }
+      ]
+    },
+    {
+      "id": "archive-sprint-2b",
+      "name": "✅ SHIPPED — Monetization UX",
+      "hours": "12-18",
+      "rationale": "Maximize conversion from free → paid.",
+      "items": [
+        { "id": 68, "title": "14-day Growth trial for new workspaces", "source": "MONETIZATION.md Trial Strategy", "est": "1-2h", "priority": "P0", "notes": "Shipped — Trial auto-resolve, countdown banner, post-trial downgrade", "status": "done" },
+        { "id": 69, "title": "Inline price visibility", "source": "MONETIZATION.md Pricing", "est": "2-3h", "priority": "P0", "notes": "Shipped — Prices on all purchase buttons, bundle savings callouts", "status": "done" },
+        { "id": 70, "title": "Page-type content briefs", "source": "MONETIZATION.md Products", "est": "3-4h", "priority": "P0", "notes": "Shipped — 7 page types with type-specific AI prompts", "status": "done" },
+        { "id": 71, "title": "Page type → content opportunity mapping", "source": "MONETIZATION.md Products", "est": "2-3h", "priority": "P1", "notes": "Shipped — Strategy AI recommends suggestedPageType per content gap", "status": "done" },
+        { "id": 72, "title": "Client onboarding welcome flow", "source": "ACTION_PLAN #25", "est": "2-3h", "priority": "P0", "notes": "Shipped — First-visit modal with tier badge, trial countdown, feature grid", "status": "done" },
+        { "id": 73, "title": "In-portal pricing/plans page", "source": "MONETIZATION.md Phase 3", "est": "2-3h", "priority": "P1", "notes": "Shipped — Plans tab with 3-tier comparison, content pricing, bundle cards", "status": "done" }
+      ]
+    },
+    {
+      "id": "archive-sprint-2c",
+      "name": "✅ SHIPPED — Client UX & Polish",
+      "hours": "4-6",
+      "rationale": "Complete the client auth UX, improve per-user experience.",
+      "items": [
+        { "id": 80, "title": "Client user management admin UI", "source": "AUTH_ROADMAP Phase 4", "est": "2h", "priority": "P0", "notes": "Shipped — Add/edit/delete client users, reset passwords, role badges", "status": "done" },
+        { "id": 81, "title": "Client login form + user menu", "source": "AUTH_ROADMAP Phase 4", "est": "2h", "priority": "P0", "notes": "Shipped — Smart login gate, email+password, auto-auth via JWT cookie", "status": "done" },
+        { "id": 82, "title": "Welcome modal per-user awareness", "source": "Client UX", "est": "15m", "priority": "P1", "notes": "Shipped — Per-user localStorage key", "status": "done" },
+        { "id": 83, "title": "Auto-populate submittedBy from client user", "source": "Client UX", "est": "15m", "priority": "P1", "notes": "Shipped — submittedBy auto-filled, field hidden when logged in", "status": "done" },
+        { "id": 84, "title": "Brief HTML export: page type badge", "source": "Content Pipeline", "est": "15m", "priority": "P1", "notes": "Shipped — Page type badge in brief export header", "status": "done" },
+        { "id": 85, "title": "Monthly report: trial status banner", "source": "Monetization", "est": "30m", "priority": "P1", "notes": "Shipped — Amber trial banner in email with days remaining + upgrade CTA", "status": "done" },
+        { "id": 86, "title": "Admin workspace cards: trial/tier badges", "source": "Admin UX", "est": "30m", "priority": "P1", "notes": "Shipped — Trial/tier badges on workspace overview cards", "status": "done" }
+      ]
+    },
+    {
+      "id": "archive-sprint-3",
+      "name": "✅ SHIPPED — Data Quality & Dashboard Polish",
+      "hours": "8-12",
+      "rationale": "Clean up recently shipped work, extend to client side.",
+      "items": [
+        { "id": 8, "title": "Admin Search Console: primitives audit", "source": "Memory/Roadmap", "est": "1-2h", "priority": "P1", "notes": "Shipped — Panels verified against shared UI primitives", "status": "done" },
+        { "id": 9, "title": "Client dashboard: simplified search data", "source": "Memory/Roadmap", "est": "3-4h", "priority": "P1", "notes": "Shipped — SearchSnapshot: traffic trend, top pages, device split", "status": "done" },
+        { "id": 10, "title": "Admin GA4 dashboard upgrade", "source": "Memory/Roadmap", "est": "3-4h", "priority": "P1", "notes": "Shipped in Sprint 1 (duplicate)", "status": "done" },
+        { "id": 11, "title": "Client dashboard: simplified analytics data", "source": "Memory/Roadmap", "est": "2-3h", "priority": "P1", "notes": "Shipped — AnalyticsSnapshot + OrganicInsight components", "status": "done" },
+        { "id": 64, "title": "Insights Engine: overview redesign + branding", "source": "Sprint 3 addition", "est": "2-3h", "priority": "P0", "notes": "Shipped — InsightsDigest, PerformancePulse, chatbot as Insights Engine", "status": "done" }
+      ]
+    },
+    {
+      "id": "archive-sprint-4",
+      "name": "✅ SHIPPED — Intelligence Upgrades",
+      "hours": "6-9",
+      "rationale": "Cross-pollinate data across tools for smarter recommendations.",
+      "items": [
+        { "id": 12, "title": "SEO Audit Intelligence", "source": "Memory/Roadmap", "est": "3-4h", "priority": "P1", "notes": "Shipped — /api/audit-traffic, traffic badges, sort-by-traffic", "status": "done" },
+        { "id": 13, "title": "Content brief enrichment", "source": "Memory/Roadmap", "est": "1-2h", "priority": "P1", "notes": "Shipped — GSC + SEMRush data in brief generation", "status": "done" },
+        { "id": 14, "title": "Monthly report enrichment", "source": "Memory/Roadmap", "est": "1h", "priority": "P2", "notes": "Shipped — Period comparison in monthly email", "status": "done" },
+        { "id": 15, "title": "AI chatbot: conversation memory", "source": "AI_CHATBOT_ROADMAP Phase 4", "est": "3-4h", "priority": "P2", "notes": "Shipped — Persistent sessions, cross-session summaries, history UI", "status": "done" }
+      ]
+    },
+    {
+      "id": "archive-sprint-4b",
+      "name": "✅ SHIPPED — Intelligence Wiring",
+      "hours": "3-5",
+      "rationale": "Cross-wire existing features for compounding intelligence.",
+      "items": [
+        { "id": 58, "title": "Admin chat: conversation memory", "source": "Intelligence Wiring", "est": "30m", "priority": "P1", "notes": "Shipped — Full parity with client chat", "status": "done" },
+        { "id": 59, "title": "Client chat: comparison data in context", "source": "Intelligence Wiring", "est": "15m", "priority": "P1", "notes": "Shipped — Period comparison data in chat context", "status": "done" },
+        { "id": 60, "title": "Chat activity logging", "source": "Intelligence Wiring", "est": "30m", "priority": "P1", "notes": "Shipped — First exchange logged as chat_session activity", "status": "done" },
+        { "id": 61, "title": "Audit traffic data in chatbot context", "source": "Intelligence Wiring", "est": "45m", "priority": "P2", "notes": "Shipped — High-traffic pages with SEO issues in chat prompts", "status": "done" },
+        { "id": 62, "title": "Monthly reports: chat topic summaries", "source": "Intelligence Wiring", "est": "30m", "priority": "P2", "notes": "Shipped — Topics You Asked About section in monthly email", "status": "done" },
+        { "id": 63, "title": "Strategy Flow Enrichment", "source": "Intelligence Wiring", "est": "30m", "priority": "P1", "notes": "Shipped — GA4 conversions + audit data in strategy prompt", "status": "done" }
+      ]
+    },
+    {
+      "id": "archive-sprint-6-partial",
+      "name": "✅ SHIPPED — Platform Polish (partial)",
+      "hours": "6-8",
+      "rationale": "Quality-of-life improvements (completed items).",
+      "items": [
+        { "id": 18, "title": "AI chatbot: proactive insights", "source": "AI_CHATBOT_ROADMAP Phase 5", "est": "4-5h", "priority": "P2", "notes": "Shipped — Proactive greeting with data-driven bullets, quick question follow-ups", "status": "done" },
+        { "id": 19, "title": "Custom date range picker", "source": "FEATURE_AUDIT", "est": "2-3h", "priority": "P2", "notes": "Shipped — Preset buttons + calendar popover, all GSC/GA4 routes accept date params", "status": "done" },
+        { "id": 35, "title": "Content delivery attachments", "source": "FEATURE_AUDIT", "est": "2-3h", "priority": "P2", "notes": "Shipped — Delivery URL + notes fields on content requests, PATCH endpoint", "status": "done" }
       ]
     }
   ]

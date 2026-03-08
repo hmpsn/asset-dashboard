@@ -59,8 +59,18 @@ If you need a UI pattern that doesn't match any existing primitive:
 4. Use the new primitive in your component
 5. Mention the new primitive in your commit message
 
-## 5. Reference docs
+## 5. Color rules — always check before choosing a color
 
-- **Design System**: `DESIGN_SYSTEM.md` — typography, colors, spacing, component specs
+Before assigning any color to a new or modified element, consult the **Color Decision Tree** in `BRAND_DESIGN_LANGUAGE.md` § 10:
+
+- **Teal** → CTAs, active states, toggles, tier badges, interactive highlights
+- **Blue** → Data metrics (clicks, sessions, impressions), info badges, progress bars
+- **Purple** → Admin AI chat only (`AdminChat.tsx`, SeoAudit "Flag for Client"). **Never client-facing.**
+- **Never** use `violet` or `indigo` anywhere
+
+## 6. Reference docs
+
+- **Brand & Color Rules**: `BRAND_DESIGN_LANGUAGE.md` — **read first** for color decisions, per-component color map, admin vs client rules, and AI prompting guidelines
+- **Design System**: `DESIGN_SYSTEM.md` — typography, component specs, spacing, Tailwind classes, migration checklist
 - **Barrel export**: `src/components/ui/index.ts` — all available primitives
-- **Constants**: `src/components/ui/constants.ts` — shared helpers
+- **Constants**: `src/components/ui/constants.ts` — shared helpers (`scoreColor`, `scoreColorClass`, date presets)

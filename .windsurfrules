@@ -1,0 +1,339 @@
+# hmpsn.studio — Global Rules
+
+> This file is loaded at the start of every Cascade session. It is the single source of
+> orientation for the entire codebase. Read it, follow it, and reference the linked docs
+> before making changes in any area.
+
+---
+
+## 0. Session Protocol — READ THIS FIRST
+
+### Starting a session
+
+Before writing any code, orient yourself:
+
+1. **Check `data/roadmap.json`** — scan for items with `"status": "pending"` in the current sprint. Understand what's next. If the user hasn't specified a task, suggest the next pending roadmap item.
+2. **Check `FEATURE_AUDIT.md`** — understand what exists, what's shipped, and what's in the Future Additions backlog. Don't build something that already exists.
+3. **If the task involves UI** — read `BRAND_DESIGN_LANGUAGE.md` before writing any JSX (see § 4 below).
+4. **If continuing previous work** — check for any TODO lists or progress notes from the prior session. Pick up where it left off.
+
+### During a session
+
+- **Update docs as you go, not just at the end.** If you ship a feature mid-session, update `FEATURE_AUDIT.md` and `data/roadmap.json` immediately — don't defer to a batch update that may be forgotten.
+- **Always check the roadmap when the user asks "what's next"** — read `data/roadmap.json` and `ACTION_PLAN.md` to recommend the highest-priority pending item.
+- **Cross-reference before building** — before creating any new component, endpoint, or feature, search the codebase to verify it doesn't already exist in some form.
+
+### Completing a task
+
+Every completed task — no matter how small — must include these steps:
+
+1. **`FEATURE_AUDIT.md`** — if a new feature was added or an existing one enhanced, update it. Add new numbered entries; update "What it does" for enhancements; mark Future Additions as shipped.
+2. **`data/roadmap.json`** — change any completed items from `"pending"` → `"done"`. Add `"notes": "Shipped — [description]"`. If the work wasn't on the roadmap, add it as a done item.
+3. **`BRAND_DESIGN_LANGUAGE.md`** — if any UI colors, components, or design patterns changed, update the Per-Component Color Map (§ 4).
+4. **Build verify** — run `npx tsc --noEmit --skipLibCheck && npx vite build`.
+5. **Summarize** — tell the user what was done, what docs were updated, and what's next on the roadmap.
+
+> **These are not optional.** Documentation debt compounds fast. Every session that skips doc updates makes the next session less effective.
+
+### Decision framework — when to ask vs. proceed
+
+| Situation | Action |
+|-----------|--------|
+| User gave a clear, specific task | Proceed. Implement it fully. |
+| Task is ambiguous but low-risk (styling, docs) | Proceed with best judgment, explain what you did. |
+| Task could go multiple directions (architecture, new feature) | Present 2-3 options with tradeoffs, let user choose. |
+| Task conflicts with existing patterns (design system, conventions) | Flag the conflict, recommend the pattern-consistent approach. |
+| You're unsure if something already exists | Search first (`code_search` / `grep`), then proceed. |
+| Pre-existing lint errors appear | Check § 6 (Known Issues). If listed there, ignore. If new, fix only if caused by your changes. |
+
+---
+
+## 1. Project Overview
+
+**hmpsn.studio** is an SEO/web analytics platform built with **React 18 + Vite + TailwindCSS** (frontend) and **Express + TypeScript** (backend). It manages client websites via Webflow, Google Search Console, GA4, and SEMRush integrations.
+
+- **No database** — all data is JSON on disk via `~/.asset-dashboard/` and per-workspace folders
+- **AI** — OpenAI GPT-4o/4o-mini via `server/openai-helpers.ts` (`callOpenAI` with retry, timeout, token tracking)
+- **Payments** — Stripe Checkout (not Payment Intents). Config encrypted on disk (AES-256-GCM). Admin UI for keys + products.
+- **Auth** — Dual system: internal JWT (7-day, admin) + client JWT (24h, per-workspace). Legacy shared-password still supported.
+- **Monetization** — 3 tiers (Free/Growth/Premium), per-item content purchases, 14-day Growth trial, UX soft-gating via `<TierGate>`
+
+---
+
+## 2. File Map
+
+### Server (`server/` — Express backend)
+
+| File | Purpose | Notes |
+|------|---------|-------|
+| `index.ts` | **All Express routes** (~6,500 lines) | Chat endpoints, strategy generation, CRUD. The largest file. |
+| `workspaces.ts` | Workspace CRUD, `Workspace` interface, `KeywordStrategy` types | Core data model |
+| `seo-context.ts` | `buildSeoContext()`, `buildKeywordMapContext()`, `buildKnowledgeBase()` | Shared AI prompt builders — used by chat, briefs, schema |
+| `chat-memory.ts` | Chat session persistence | `addMessage`, `buildConversationContext`, `generateSessionSummary` |
+| `content-brief.ts` | AI content brief generation | 7 page-type-specific prompts, SEMRush/GSC enrichment |
+| `brief-export-html.ts` | Branded HTML/PDF brief export | Page type badge in header |
+| `content-requests.ts` | Content topic request CRUD | `ContentTopicRequest` interface (includes `pageType`, `serviceType`) |
+| `stripe.ts` | Lazy-init Stripe SDK, 14-product map, checkout, webhooks | Re-creates SDK when keys change |
+| `stripe-config.ts` | Encrypted on-disk Stripe config (AES-256-GCM) | Env vars as fallback |
+| `payments.ts` | Payment record CRUD (JSON on disk) | Per-workspace payment history |
+| `auth.ts` | JWT sign/verify (7-day), Express middleware | `requireAuth`, `requireRole`, `requireWorkspaceAccess`, `optionalAuth` |
+| `client-users.ts` | Client user model, per-workspace accounts | bcrypt, JWT (24h), CRUD |
+| `users.ts` | Internal user model (owner/admin/member) | bcrypt (12 rounds), JSON persistence |
+| `openai-helpers.ts` | `callOpenAI` wrapper | Retry/backoff/timeout, `parseAIJson`, token tracking |
+| `google-analytics.ts` | GA4 API | All functions accept optional `dateRange?: CustomDateRange` |
+| `search-console.ts` | GSC API | All functions accept optional `dateRange?: CustomDateRange` |
+| `semrush.ts` | SEMRush API | Keyword overview, domain organic, gaps, related |
+| `seo-audit.ts` | Site health audit engine | Crawl + scoring |
+| `monthly-report.ts` | Auto-report scheduler | `gatherMonthlyData`, trial banner support |
+| `email-templates.ts` | HTML email builders | `renderMonthlyReport`, `renderApprovalReminder` |
+| `activity-log.ts` | Activity logging | `addActivity(workspaceId, type, title, detail, metadata?)` |
+| `schema-suggester.ts` | JSON-LD schema generation per page | |
+| `rank-tracking.ts` | Keyword position tracking over time | |
+| `approvals.ts` | Client approval workflow | SEO changes → client review → Webflow push |
+
+### Frontend (`src/`)
+
+| File | Purpose | Notes |
+|------|---------|-------|
+| `App.tsx` | Router, workspace selector, admin tabs (lazy-loaded) | `Page` type union defines all admin routes |
+| `components/ClientDashboard.tsx` | **Full client portal** (~3,950 lines) | Login gate, chat, analytics, approvals, requests, content hub, plans, welcome modal |
+| `components/AdminChat.tsx` | Admin AI chat (purple accent) | Conversation memory + history |
+| `components/KeywordStrategy.tsx` | SEO strategy + content gaps | Admin keyword strategy viewer/generator |
+| `components/ContentBriefs.tsx` | Admin content brief management | Brief preview, status management |
+| `components/SeoAudit.tsx` | Site health audit viewer | Main admin panel host for many sub-views |
+| `components/StripePaymentForm.tsx` | Stripe payment UI | Teal unified, `PaymentModal` wrapper |
+| `components/StripeSettings.tsx` | Admin Stripe config | Keys, product mapping, connection status |
+| `components/WorkspaceOverview.tsx` | Admin workspace grid | Workspace cards with tier badges |
+| `components/WorkspaceSettings.tsx` | Admin workspace config | Knowledge base, client users, branding |
+| `components/LoginScreen.tsx` | Admin login UI | Setup flow + email/password |
+| `components/Styleguide.tsx` | Design system reference page | Color swatches, component demos |
+| `components/ui/` | **12 shared UI primitives** | See § 4 below |
+| `components/client/` | Client sub-components | `types.ts` (interfaces), `helpers.tsx`, `HealthTab.tsx`, `DataSnapshots.tsx`, `InsightsDigest.tsx` |
+
+### Data & Config
+
+| Path | Purpose |
+|------|---------|
+| `data/roadmap.json` | Sprint-level tracking (86+ items across 11 sprints) |
+| `~/.asset-dashboard/` | Runtime data directory (workspaces, uploads, payments, auth) |
+| `.env` / `.env.example` | Environment variables |
+
+---
+
+## 3. Documentation Hierarchy
+
+**Read in this order based on what you're doing:**
+
+### Always read first (any task)
+| Doc | What it tells you |
+|-----|-------------------|
+| **This file (`.windsurfrules`)** | Architecture, file map, rules, commands |
+
+### UI / frontend work
+| Priority | Doc | What it tells you |
+|----------|-----|-------------------|
+| 1 | `BRAND_DESIGN_LANGUAGE.md` | **Color rules** (Three Laws), per-component color map, admin vs client, AI prompting guidelines, primitive inventory |
+| 2 | `DESIGN_SYSTEM.md` | Component specs, typography, spacing, Tailwind classes, migration checklist |
+| 3 | `.windsurf/workflows/use-primitives.md` | When and how to use `src/components/ui/` primitives |
+| 4 | `.windsurf/workflows/ui-vocabulary.md` | Canonical labels for buttons, badges, status text, toasts |
+
+### Feature work
+| Priority | Doc | What it tells you |
+|----------|-----|-------------------|
+| 1 | `FEATURE_AUDIT.md` | 49-feature inventory with agency/client/mutual value, Future Additions backlog |
+| 2 | `.windsurf/workflows/feature-integration.md` | How to connect features (cross-links, client dashboard, approvals) |
+| 3 | `.windsurf/workflows/wiring-patterns.md` | How to wire data into chat, strategy, briefs, reports |
+| 4 | `data/roadmap.json` | Sprint tracking — check what's done/pending before starting work |
+
+### After shipping
+| Doc | What it tells you |
+|-----|-------------------|
+| `.windsurf/workflows/feature-shipped.md` | 9-step checklist: FEATURE_AUDIT, brand doc, roadmap, ACTION_PLAN, build verify, commit |
+
+### Specialized
+| Doc | When to read |
+|-----|-------------|
+| `MONETIZATION.md` | Tiers, pricing, bundles, credits, Stripe spec, UX soft-gating |
+| `ACTION_PLAN.md` | Execution roadmap (67 items, 10 sprints), decision log |
+| `.windsurf/workflows/stripe-integration.md` | Payment architecture, checkout flow, webhook handling |
+| `.windsurf/workflows/auth-system.md` | Auth architecture, middleware stack, protecting routes, client login |
+| `AI_CHATBOT_ROADMAP.md` | Chat feature phases, data sources |
+| `AUTH_ROADMAP.md` | Auth phases (1, 2, 4 shipped) |
+
+---
+
+## 4. Design System Enforcement
+
+**Before writing or modifying ANY UI code**, you MUST follow these rules:
+
+### The Three Laws of Color
+1. **Teal for actions** — every CTA, toggle, active state, tier badge, interactive highlight
+2. **Blue for data** — clicks, sessions, impressions, info badges, progress bars (read-only, never actionable)
+3. **Purple for admin AI only** — `AdminChat.tsx` and `SeoAudit.tsx` "Flag for Client". **Never in client-facing views.**
+
+### Color Decision Quick Reference
+```
+Button / CTA / toggle?      → Teal (from-teal-600 to-emerald-600)
+Data metric?                 → Blue (text-blue-400, bg-blue-500/10)
+Admin AI feature?            → Purple (purple-400/purple-600)
+Score (health/perf)?         → scoreColor() from constants.ts
+Status badge?                → green (success), amber (warning), red (error), orange (changes requested), blue (info/review), teal (client requested)
+Tier badge (client)?         → Teal (all tiers) or zinc (free)
+```
+
+### Forbidden
+- **Never** use `violet`, `indigo`, or introduce new hue families without explicit user approval
+- **Never** hand-roll card markup — use `<SectionCard>`
+- **Never** hand-roll stat displays — use `<StatCard>` or `<CompactStatBar>`
+- **Never** hard-code score colors — use `scoreColor()` / `scoreColorClass()` from `ui/constants.ts`
+- **Never** use purple in any client-facing component
+
+### UI Primitives (always use before hand-rolling)
+
+| Primitive | Import from | Use for |
+|-----------|------------|---------|
+| `SectionCard` | `./ui` | Any card container |
+| `StatCard` / `CompactStatBar` | `./ui` | Metric displays |
+| `PageHeader` | `./ui` | Page/tab header with title + actions |
+| `MetricRing` / `MetricRingSvg` | `./ui` | Score rings |
+| `Badge` | `./ui` | Status/category pills (9 colors) |
+| `TabBar` | `./ui` | Sub-navigation tabs |
+| `DateRangeSelector` | `./ui` | Segmented date pickers |
+| `DataList` | `./ui` | Ranked list displays |
+| `EmptyState` | `./ui` | Empty data placeholders |
+| `TierGate` / `TierBadge` | `./ui` | Tier lock overlay + badge |
+| `scoreColor()` / `scoreColorClass()` | `./ui` | Score-based color helpers |
+
+### When creating new UI primitives
+1. Create in `src/components/ui/`
+2. Export from `src/components/ui/index.ts`
+3. Add spec to `DESIGN_SYSTEM.md`
+4. Add to Per-Component Color Map in `BRAND_DESIGN_LANGUAGE.md` § 4
+
+---
+
+## 5. Workflow Index
+
+| Slash command | When to use |
+|---------------|-------------|
+| `/codebase-overview` | Need deeper architecture context beyond this file |
+| `/use-primitives` | Building or modifying any UI component |
+| `/ui-vocabulary` | Writing any user-facing labels, badges, toasts, or status text |
+| `/feature-integration` | Connecting features together, adding cross-links, client dashboard work |
+| `/feature-shipped` | After completing any feature — 9-step doc update checklist |
+| `/wiring-patterns` | Adding new data sources to chat, strategy, briefs, or reports |
+| `/stripe-integration` | Payment architecture, checkout flow, webhook handling |
+| `/auth-system` | Auth architecture, protecting routes, client login flows |
+
+---
+
+## 6. Known Issues to Ignore
+
+These pre-existing lint warnings in `ClientDashboard.tsx` are **not caused by current work** and should be ignored to avoid unproductive loops:
+
+- `'requestingTopic' is declared but its value is never read` (line ~57)
+- `'searchDevices' is declared but its value is never read` (line ~96)
+- `'upgradingReqId' is assigned a value but never used` (line ~147)
+- `React Hook useEffect has missing dependencies` (lines ~225, ~241)
+
+These will be addressed in a dedicated cleanup pass. **Do not attempt to fix them during unrelated tasks.**
+
+---
+
+## 7. Commands
+
+| Command | Purpose |
+|---------|---------|
+| `npm run dev` | Vite dev server (frontend only) |
+| `npm run dev:server` | Express server (backend only) |
+| `npm run dev:all` | Both concurrently |
+| `npx tsc --noEmit --skipLibCheck` | Type-check without building |
+| `npx vite build` | Production build |
+| `npm start` | Production server |
+
+**Always verify after UI changes:** `npx tsc --noEmit --skipLibCheck && npx vite build`
+
+---
+
+## 8. Environment Variables
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `OPENAI_API_KEY` | Yes | GPT-4o for AI features |
+| `ANTHROPIC_API_KEY` | Yes | Claude for some AI features |
+| `WEBFLOW_API_TOKEN` | Yes | Webflow CMS integration |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | For GSC/GA4 | OAuth2 for Google APIs |
+| `STRIPE_SECRET_KEY` | For payments | Or configure via admin UI |
+| `APP_PASSWORD` | Optional | Legacy admin password gate |
+| `PORT` | Optional | Default: 3001 |
+| `DATA_DIR` | Optional | Default: `~/.asset-dashboard` |
+
+> **REMINDER**: Switch Stripe to production keys (`sk_live_...`) before launch.
+
+---
+
+## 9. Code Conventions
+
+- **TypeScript strict** — no `any` unless unavoidable
+- **Prefer `const` assertions** and discriminated unions over loose types
+- **API error shape**: `{ error: string }` consistently
+- **User-facing strings**: follow `ui-vocabulary.md` — use canonical labels, never invent synonyms
+- **Comments**: don't add or remove unless explicitly asked
+- **Imports**: always at top of file, never mid-file
+- **Large edits**: break into multiple smaller edits if > 300 lines
+
+---
+
+## 10. Mandatory Documentation Updates
+
+### FEATURE_AUDIT.md — the feature inventory
+
+**Always update when:** a feature is added, enhanced, or significantly modified.
+
+- **New feature**: add a numbered entry (continue from last number) with: What it does / Agency value / Client value / Mutual value
+- **Enhancement**: update the existing entry's description to include the new capability
+- **Future Additions**: mark shipped items with `~~strikethrough~~: ✅ Shipped — [description]`
+- **Summary table**: update category counts and total feature count
+- **Bottom counter**: update `Current feature count: **N**`
+
+### data/roadmap.json — the execution tracker
+
+**Always update when:** any planned work is completed or new work is done.
+
+- **Completed items**: `"status": "pending"` → `"status": "done"`, add `"notes": "Shipped — [description]"`
+- **Unplanned work**: add as a new item in the appropriate sprint with `"status": "done"`
+- **Cross-check**: scan ALL sprints (not just current) for items that may have been completed but never marked done
+- **When user asks "what's next"**: read this file, find the next pending items, and recommend them
+
+### BRAND_DESIGN_LANGUAGE.md — the design authority
+
+**Always update when:** any UI colors, badges, buttons, or design patterns change.
+
+- Update Per-Component Color Map (§ 4) with new/changed elements
+- If new primitives created, add to UI Primitive Inventory (§ 3)
+- Verify Three Laws compliance
+
+### ACTION_PLAN.md — the decision log
+
+**Update when:** significant architectural or product decisions are made during a session.
+
+- Add row to Decision Log table with date, decision, and context
+- Update `*Last updated:*` timestamp
+
+### Full checklist
+
+For comprehensive post-ship documentation, run the `/feature-shipped` workflow (9-step checklist including build verify, commit, and reminder checks).
+
+---
+
+## 11. Quality Gates
+
+Work is not "done" until ALL of these pass:
+
+- [ ] `npx tsc --noEmit --skipLibCheck` — zero errors
+- [ ] `npx vite build` — builds successfully
+- [ ] `FEATURE_AUDIT.md` updated (if feature work)
+- [ ] `data/roadmap.json` updated (if roadmap item completed)
+- [ ] `BRAND_DESIGN_LANGUAGE.md` updated (if UI changed)
+- [ ] No `violet` or `indigo` in `src/components/` (run: `grep -rn "violet\|indigo" src/components/ --include="*.tsx"`)
+- [ ] User informed of what was done + what's next on the roadmap

@@ -120,5 +120,6 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 - `ACTION_PLAN.md` — Prioritized execution plan, 67 items across 10 sprints, decision log
 - `AI_CHATBOT_ROADMAP.md` — Chatbot phases, shipped and planned
 - `AUTH_ROADMAP.md` — Authentication/authorization phases (Phases 1, 2, 4 shipped)
-- `DESIGN_SYSTEM.md` — UI primitives and design tokens
+- `DESIGN_SYSTEM.md` — UI primitives, component specs, typography, spacing, Tailwind classes
+- `BRAND_DESIGN_LANGUAGE.md` — Color rules (Three Laws), per-component color map, admin vs client rules, AI prompting guidelines. **Read before any UI work.**
 - `data/roadmap.json` — Sprint-level tracking with item statuses (86 items across 11 sprints, managed via /api/roadmap)

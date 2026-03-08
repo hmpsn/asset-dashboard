@@ -233,7 +233,7 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
                       )}
                       {ws.tier && ws.tier !== 'free' && !ws.isTrial && (
                         <span className={`flex-shrink-0 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md border ${
-                          ws.tier === 'premium' ? 'bg-violet-500/15 text-violet-400 border-violet-500/20' : 'bg-blue-500/15 text-blue-400 border-blue-500/20'
+                          'bg-teal-500/15 text-teal-400 border-teal-500/20'
                         }`}>{ws.tier}</span>
                       )}
                     </div>

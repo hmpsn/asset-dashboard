@@ -675,8 +675,8 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
           {/* Knowledge Base */}
           <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
             <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
-              <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center">
-                <BookOpen className="w-4 h-4 text-indigo-400" />
+              <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
+                <BookOpen className="w-4 h-4 text-teal-400" />
               </div>
               <div className="flex-1">
                 <h3 className="text-sm font-semibold text-zinc-200">Knowledge Base</h3>
@@ -695,7 +695,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                     toast('Knowledge base saved');
                   }
                 }}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-indigo-500 resize-y font-mono leading-relaxed"
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-teal-500 resize-y font-mono leading-relaxed"
               />
               <p className="text-[11px] text-zinc-500">
                 This context is shared with both the client Insights Engine and Admin Insights chatbots.
@@ -802,8 +802,8 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
             <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
               <div className="px-5 py-4 border-b border-zinc-800">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
-                    <Shield className="w-4 h-4 text-violet-400" />
+                  <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
+                    <Shield className="w-4 h-4 text-teal-400" />
                   </div>
                   <div className="flex-1">
                     <h3 className="text-sm font-semibold text-zinc-200">Client Users</h3>
@@ -878,7 +878,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                       <div key={user.id} className="group rounded-lg border border-zinc-800 hover:border-zinc-700 transition-colors">
                         <div className="flex items-center gap-3 px-4 py-3">
                           {/* Avatar */}
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-600 to-teal-500 flex items-center justify-center text-white text-[11px] font-bold shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center text-white text-[11px] font-bold shrink-0">
                             {user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
                           </div>
 

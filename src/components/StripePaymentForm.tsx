@@ -26,7 +26,7 @@ interface PaymentFormInnerProps {
   accentColor: 'teal' | 'blue';
 }
 
-function PaymentFormInner({ amount, productName, onSuccess, onCancel, accentColor }: PaymentFormInnerProps) {
+function PaymentFormInner({ amount, productName, onSuccess, onCancel }: PaymentFormInnerProps) {
   const stripe = useStripe();
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
@@ -66,8 +66,8 @@ function PaymentFormInner({ amount, productName, onSuccess, onCancel, accentColo
   if (succeeded) {
     return (
       <div className="flex flex-col items-center justify-center py-10 gap-4 animate-[scaleIn_0.3s_ease-out]">
-        <div className={`w-16 h-16 rounded-full flex items-center justify-center ${accentColor === 'blue' ? 'bg-blue-500/15 ring-1 ring-blue-500/30' : 'bg-teal-500/15 ring-1 ring-teal-500/30'}`}>
-          <CheckCircle2 className={`w-8 h-8 ${accentColor === 'blue' ? 'text-blue-400' : 'text-teal-400'}`} />
+        <div className="w-16 h-16 rounded-full flex items-center justify-center bg-teal-500/15 ring-1 ring-teal-500/30">
+          <CheckCircle2 className="w-8 h-8 text-teal-400" />
         </div>
         <div className="text-center">
           <div className="text-sm font-semibold text-zinc-100">Payment Successful</div>
@@ -100,11 +100,7 @@ function PaymentFormInner({ amount, productName, onSuccess, onCancel, accentColo
       <button
         type="submit"
         disabled={!stripe || processing}
-        className={`w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 shadow-lg active:scale-[0.98] ${
-          accentColor === 'blue'
-            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-500 hover:to-indigo-500 shadow-blue-900/40'
-            : 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:from-teal-500 hover:to-emerald-500 shadow-teal-900/40'
-        }`}
+        className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 shadow-lg active:scale-[0.98] bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:from-teal-500 hover:to-emerald-500 shadow-teal-900/40"
       >
         {processing ? (
           <>
@@ -334,25 +330,19 @@ export function StripePaymentModal({
         </button>
 
         {/* Header */}
-        <div className={`relative px-6 pt-6 pb-4 overflow-hidden ${
-          isFull
-            ? 'bg-gradient-to-br from-blue-600/15 via-indigo-600/10 to-transparent'
-            : 'bg-gradient-to-br from-teal-600/15 via-emerald-600/10 to-transparent'
-        }`}>
-          <div className={`absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl opacity-20 ${isFull ? 'bg-blue-500' : 'bg-teal-500'}`} />
+        <div className="relative px-6 pt-6 pb-4 overflow-hidden bg-gradient-to-br from-teal-600/15 via-emerald-600/10 to-transparent">
+          <div className="absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl opacity-20 bg-teal-500" />
           <div className="relative">
             <div className="text-sm font-semibold text-zinc-100 mb-1">{productName}</div>
             <div className="text-[11px] text-zinc-500">{topic}</div>
-            <div className={`text-[11px] mt-0.5 ${isFull ? 'text-blue-400/80' : 'text-teal-400/80'}`}>
+            <div className="text-[11px] mt-0.5 text-teal-400/80">
               Keyword: &ldquo;{targetKeyword}&rdquo;
             </div>
           </div>
 
           {/* Price badge */}
-          <div className={`inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-lg border ${
-            isFull ? 'bg-blue-500/5 border-blue-500/20' : 'bg-teal-500/5 border-teal-500/20'
-          }`}>
-            <span className={`text-lg font-bold tracking-tight ${isFull ? 'text-blue-300' : 'text-teal-300'}`}>
+          <div className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-lg border bg-teal-500/5 border-teal-500/20">
+            <span className="text-lg font-bold tracking-tight text-teal-300">
               {fmt(amount)}
             </span>
             <span className="text-[10px] text-zinc-500">one-time</span>

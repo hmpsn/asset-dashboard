@@ -1136,7 +1136,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
             {/* Client user menu */}
             {clientUser && (
               <div className="flex items-center gap-2 pr-2 border-r border-zinc-800">
-                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-600 to-teal-500 flex items-center justify-center text-white text-[10px] font-bold">
+                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center text-white text-[10px] font-bold">
                   {clientUser.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
                 </div>
                 <span className="text-xs text-zinc-400 hidden sm:block">{clientUser.name}</span>
@@ -1769,40 +1769,32 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                     </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {strategyData.contentGaps.map((gap, i) => {
-                        const prioColor = gap.priority === 'high' ? 'text-red-400 bg-red-500/15 border-red-500/30' : gap.priority === 'medium' ? 'text-amber-400 bg-amber-500/15 border-amber-500/30' : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
                         const alreadyRequested = requestedTopics.has(gap.targetKeyword);
+                        const pageType = gap.suggestedPageType || 'blog';
+                        const pageTypeLabel = ({ blog: 'Blog Post', landing: 'Landing Page', service: 'Service Page', location: 'Location Page', product: 'Product Page', pillar: 'Pillar Page', resource: 'Resource Guide' } as Record<string, string>)[pageType] || 'Blog Post';
+                        const keywordDiffers = gap.targetKeyword.toLowerCase().replace(/[^a-z0-9]/g, '') !== gap.topic.toLowerCase().replace(/[^a-z0-9]/g, '');
                         return (
                           <div key={i} className="px-4 py-3.5 rounded-lg bg-zinc-900/60 border border-zinc-800/80 hover:border-teal-500/30 transition-all group flex flex-col">
-                            <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                              <span className="text-[11px] text-zinc-500 uppercase tracking-wider">{gap.intent}</span>
-                              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${prioColor}`}>{gap.priority}</span>
-                              {gap.suggestedPageType && gap.suggestedPageType !== 'blog' && (
-                                <span className="text-[11px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20 font-medium capitalize">{gap.suggestedPageType}</span>
-                              )}
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs font-semibold text-zinc-100 flex-1 min-w-0 mr-2">{gap.topic}</span>
+                              <span className="text-[11px] text-zinc-500 uppercase tracking-wider flex-shrink-0">{gap.intent}</span>
                             </div>
-                            <div className="text-xs font-semibold text-zinc-100 mb-1">{gap.topic}</div>
-                            <div className="text-[11px] text-teal-400 font-medium mb-1">&ldquo;{gap.targetKeyword}&rdquo;</div>
                             <div className="text-[11px] text-zinc-500 leading-relaxed flex-1 mb-3">{gap.rationale}</div>
-                            <div className="mt-auto">
+                            <div className="flex items-center justify-between mt-auto">
+                              <div className="flex items-center gap-2 min-w-0">
+                                {keywordDiffers && <span className="text-[11px] text-teal-400/70 truncate">&ldquo;{gap.targetKeyword}&rdquo;</span>}
+                                <span className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20 font-medium flex-shrink-0">{pageTypeLabel}</span>
+                              </div>
                               {alreadyRequested ? (
-                                <span className="flex items-center gap-1 text-[11px] text-teal-400 bg-teal-500/10 px-2.5 py-1.5 rounded-lg border border-teal-500/20 w-fit"><CheckCircle2 className="w-3.5 h-3.5" /> Requested</span>
+                                <span className="flex items-center gap-1 text-[11px] text-teal-400 bg-teal-500/10 px-2.5 py-1.5 rounded-lg border border-teal-500/20 flex-shrink-0"><CheckCircle2 className="w-3.5 h-3.5" /> Requested</span>
                               ) : (
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => setPricingModal({ serviceType: 'brief_only', topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, source: 'strategy', pageType: gap.suggestedPageType || 'blog' })}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 font-medium hover:bg-teal-600/40 transition-all"
-                                  >
-                                    <FileText className="w-3 h-3" /> Get a Brief
-                                    {briefPrice != null && <span className="text-[11px] opacity-70 ml-0.5">{fmtPrice(briefPrice)}</span>}
-                                  </button>
-                                  <button
-                                    onClick={() => setPricingModal({ serviceType: 'full_post', topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, source: 'strategy', pageType: gap.suggestedPageType || 'blog' })}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600/30 to-teal-600/30 border border-blue-500/30 text-[11px] text-blue-200 font-medium hover:from-blue-600/50 hover:to-teal-600/50 transition-all"
-                                  >
-                                    <Sparkles className="w-3 h-3" /> Get Full Post
-                                    {fullPostPrice != null && <span className="text-[11px] opacity-70 ml-0.5">{fmtPrice(fullPostPrice)}</span>}
-                                  </button>
-                                </div>
+                                <button
+                                  onClick={() => setPricingModal({ serviceType: 'brief_only', topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, source: 'strategy', pageType })}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 font-medium hover:bg-teal-600/40 transition-all flex-shrink-0"
+                                >
+                                  <FileText className="w-3 h-3" /> Get a Brief
+                                  {briefPrice != null && <span className="opacity-70 ml-0.5">{fmtPrice(briefPrice)}</span>}
+                                </button>
                               )}
                             </div>
                           </div>
@@ -2001,17 +1993,17 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
             const reviewCount = contentRequests.filter(r => r.status === 'client_review').length;
             const newComments = contentRequests.filter(r => r.comments && r.comments.length > 0 && r.comments[r.comments.length - 1].author === 'team' && r.status !== 'declined').length;
             if (reviewCount > 0 || newComments > 0) return (
-              <div className="bg-gradient-to-r from-blue-600/20 to-teal-600/10 border border-blue-500/30 rounded-xl px-5 py-3 flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-                  <FileText className="w-4 h-4 text-blue-400" />
+              <div className="bg-gradient-to-r from-teal-600/15 to-teal-600/5 border border-teal-500/30 rounded-xl px-5 py-3 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-teal-500/20 flex items-center justify-center flex-shrink-0">
+                  <FileText className="w-4 h-4 text-teal-400" />
                 </div>
                 <div className="flex-1">
-                  <div className="text-xs font-semibold text-blue-200">
+                  <div className="text-xs font-semibold text-teal-200">
                     {reviewCount > 0 && <>{reviewCount} brief{reviewCount > 1 ? 's' : ''} ready for your review</>}
                     {reviewCount > 0 && newComments > 0 && ' · '}
                     {newComments > 0 && <>{newComments} item{newComments > 1 ? 's' : ''} with new team responses</>}
                   </div>
-                  <div className="text-[11px] text-blue-400/60 mt-0.5">Your team has updates waiting for you below</div>
+                  <div className="text-[11px] text-teal-400/60 mt-0.5">Your team has updates waiting for you below</div>
                 </div>
               </div>
             );
@@ -2023,14 +2015,14 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
               <h2 className="text-xl font-semibold text-zinc-100">Content Pipeline</h2>
               <p className="text-sm text-zinc-500 mt-1">Track and manage your content requests</p>
             </div>
-            <button onClick={() => setShowTopicForm(!showTopicForm)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600/20 border border-blue-500/30 text-xs text-blue-300 hover:bg-blue-600/30 transition-colors font-medium">
+            <button onClick={() => setShowTopicForm(!showTopicForm)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600/20 border border-teal-500/30 text-xs text-teal-300 hover:bg-teal-600/30 transition-colors font-medium">
               <Plus className="w-3.5 h-3.5" /> Suggest a Topic
             </button>
           </div>
 
           {/* Topic submission form */}
           {showTopicForm && (
-            <div className="bg-zinc-900 rounded-xl border border-blue-500/20 p-5 space-y-3">
+            <div className="bg-zinc-900 rounded-xl border border-teal-500/20 p-5 space-y-3">
               <div className="text-xs font-medium text-zinc-300">Suggest a Content Topic</div>
               <input type="text" value={newTopicName} onChange={e => setNewTopicName(e.target.value)} placeholder="Topic name (e.g. 'Benefits of sedation dentistry')" className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600" />
               <input type="text" value={newTopicKeyword} onChange={e => setNewTopicKeyword(e.target.value)} placeholder="Target keyword (e.g. 'sedation dentistry benefits')" className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600" />
@@ -2041,35 +2033,17 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                   <button onClick={() => setNewTopicServiceType('brief_only')} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border text-xs font-medium transition-all ${newTopicServiceType === 'brief_only' ? 'bg-teal-600/20 border-teal-500/40 text-teal-300' : 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}>
                     <FileText className="w-3.5 h-3.5" /> Content Brief
                   </button>
-                  <button onClick={() => setNewTopicServiceType('full_post')} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border text-xs font-medium transition-all ${newTopicServiceType === 'full_post' ? 'bg-gradient-to-r from-blue-600/20 to-teal-600/20 border-blue-500/40 text-blue-300' : 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}>
+                  <button onClick={() => setNewTopicServiceType('full_post')} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border text-xs font-medium transition-all ${newTopicServiceType === 'full_post' ? 'bg-teal-600/20 border-teal-500/40 text-teal-300' : 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}>
                     <Sparkles className="w-3.5 h-3.5" /> Full Blog Post
                   </button>
                 </div>
                 <div className="text-[11px] text-zinc-500 mt-1">{newTopicServiceType === 'brief_only' ? 'A detailed content strategy document for this topic' : 'Brief + professionally written article delivered ready to publish'}</div>
               </div>
-              <div>
-                <div className="text-[11px] text-zinc-500 mb-1.5">Page type</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {([
-                    { value: 'blog' as const, label: 'Blog Post' },
-                    { value: 'landing' as const, label: 'Landing' },
-                    { value: 'service' as const, label: 'Service' },
-                    { value: 'location' as const, label: 'Location' },
-                    { value: 'product' as const, label: 'Product' },
-                    { value: 'pillar' as const, label: 'Pillar' },
-                    { value: 'resource' as const, label: 'Resource' },
-                  ]).map(pt => (
-                    <button key={pt.value} onClick={() => setNewTopicPageType(pt.value)} className={`px-2 py-1 rounded-lg text-[11px] font-medium transition-all border ${newTopicPageType === pt.value ? 'bg-blue-500/15 border-blue-500/30 text-blue-300' : 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700'}`}>
-                      {pt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
               <div className="flex items-center gap-2">
                 <button onClick={() => {
                   if (!newTopicName.trim() || !newTopicKeyword.trim()) return;
                   setPricingModal({ serviceType: newTopicServiceType, topic: newTopicName.trim(), targetKeyword: newTopicKeyword.trim(), notes: newTopicNotes.trim() || undefined, source: 'client', pageType: newTopicPageType });
-                }} disabled={!newTopicName.trim() || !newTopicKeyword.trim() || pricingConfirming} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 text-xs text-white font-medium hover:bg-blue-500 transition-colors disabled:opacity-50">
+                }} disabled={!newTopicName.trim() || !newTopicKeyword.trim() || pricingConfirming} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 text-xs text-white font-medium hover:from-teal-500 hover:to-emerald-500 transition-colors disabled:opacity-50">
                   <Send className="w-3.5 h-3.5" /> Submit Topic
                 </button>
                 <button onClick={() => setShowTopicForm(false)} className="px-3 py-2 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Cancel</button>
@@ -2120,11 +2094,11 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-semibold text-zinc-200">{req.topic}</span>
-                          <span className={`text-[11px] px-1.5 py-0.5 rounded border font-medium ${(req.serviceType || 'brief_only') === 'full_post' ? 'bg-gradient-to-r from-blue-500/10 to-teal-500/10 text-blue-300 border-blue-500/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
+                          <span className={`text-[11px] px-1.5 py-0.5 rounded border font-medium ${(req.serviceType || 'brief_only') === 'full_post' ? 'bg-teal-500/10 text-teal-300 border-teal-500/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
                             {(req.serviceType || 'brief_only') === 'full_post' ? '✦ Full Post' : 'Brief'}
                           </span>
                           {req.pageType && req.pageType !== 'blog' && (
-                            <span className="text-[11px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20 font-medium capitalize">{req.pageType}</span>
+                            <span className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20 font-medium capitalize">{req.pageType}</span>
                           )}
                           {req.upgradedAt && <span className="text-[11px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 font-medium">Upgraded</span>}
                         </div>
@@ -2172,7 +2146,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                             <div className="bg-zinc-950 rounded-lg px-3 py-2.5 border border-zinc-800">
                               <div className="text-[11px] text-zinc-500 mb-0.5">Word Count</div>
-                              <div className="text-sm font-bold text-blue-400">{brief.wordCountTarget?.toLocaleString()}</div>
+                              <div className="text-sm font-bold text-teal-400">{brief.wordCountTarget?.toLocaleString()}</div>
                             </div>
                             <div className="bg-zinc-950 rounded-lg px-3 py-2.5 border border-zinc-800">
                               <div className="text-[11px] text-zinc-500 mb-0.5">Search Intent</div>
@@ -2413,17 +2387,17 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
 
                       {/* Upgrade CTA for brief_only items after approval */}
                       {canUpgrade && (
-                        <div className="bg-gradient-to-r from-blue-600/10 via-teal-600/10 to-blue-600/10 border border-blue-500/20 rounded-xl p-4 flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-teal-500/20 flex items-center justify-center flex-shrink-0">
-                            <Sparkles className="w-5 h-5 text-blue-400" />
+                        <div className="bg-gradient-to-r from-teal-600/10 via-emerald-600/10 to-teal-600/10 border border-teal-500/20 rounded-xl p-4 flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500/20 to-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                            <Sparkles className="w-5 h-5 text-teal-400" />
                           </div>
                           <div className="flex-1">
-                            <div className="text-xs font-semibold text-blue-200">Want the full article written?</div>
+                            <div className="text-xs font-semibold text-teal-200">Want the full article written?</div>
                             <div className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">Love the brief? Upgrade to a professionally written blog post delivered ready to publish.</div>
                           </div>
                           <button
                             onClick={(e) => { e.stopPropagation(); setPricingModal({ serviceType: 'full_post', topic: req.topic, targetKeyword: req.targetKeyword, source: 'upgrade', upgradeReqId: req.id }); }}
-                            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-teal-600 text-xs text-white font-medium hover:from-blue-500 hover:to-teal-500 transition-all flex-shrink-0 shadow-lg shadow-blue-900/20"
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 text-xs text-white font-medium hover:from-teal-500 hover:to-emerald-500 transition-all flex-shrink-0 shadow-lg shadow-teal-900/20"
                           >
                             <Sparkles className="w-3.5 h-3.5" />
                             Upgrade to Full Post
@@ -3533,7 +3507,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
             },
             {
               id: 'growth', name: 'Growth', tagline: 'Full SEO strategy & content engine',
-              color: 'text-blue-300', borderColor: 'border-blue-500/30', bgColor: 'bg-blue-500/5',
+              color: 'text-teal-300', borderColor: 'border-teal-500/30', bgColor: 'bg-teal-500/5',
               features: [
                 { label: 'Everything in Starter', included: true },
                 { label: 'Custom date ranges', included: true },
@@ -3550,7 +3524,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
             },
             {
               id: 'premium', name: 'Premium', tagline: 'White-glove SEO partnership',
-              color: 'text-violet-300', borderColor: 'border-violet-500/30', bgColor: 'bg-violet-500/5',
+              color: 'text-teal-200', borderColor: 'border-teal-400/30', bgColor: 'bg-teal-500/5',
               features: [
                 { label: 'Everything in Growth', included: true },
                 { label: 'Priority support', included: true },
@@ -3586,9 +3560,9 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                   const isCurrent = plan.id === tier;
                   const isUpgrade = (plan.id === 'growth' && tier === 'free') || (plan.id === 'premium' && tier !== 'premium');
                   return (
-                    <div key={plan.id} className={`relative rounded-xl border p-5 transition-all ${isCurrent ? `${plan.bgColor} ${plan.borderColor} ring-1 ring-offset-0 ${plan.id === 'premium' ? 'ring-violet-500/20' : plan.id === 'growth' ? 'ring-blue-500/20' : 'ring-zinc-700'}` : `bg-zinc-900/50 border-zinc-800 hover:border-zinc-700`}`}>
+                    <div key={plan.id} className={`relative rounded-xl border p-5 transition-all ${isCurrent ? `${plan.bgColor} ${plan.borderColor} ring-1 ring-offset-0 ${plan.id !== 'free' ? 'ring-teal-500/20' : 'ring-zinc-700'}` : `bg-zinc-900/50 border-zinc-800 hover:border-zinc-700`}`}>
                       {isCurrent && (
-                        <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider border ${plan.id === 'premium' ? 'bg-violet-500/20 border-violet-500/30 text-violet-300' : plan.id === 'growth' ? 'bg-blue-500/20 border-blue-500/30 text-blue-300' : 'bg-zinc-800 border-zinc-700 text-zinc-400'}`}>
+                        <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider border ${plan.id !== 'free' ? 'bg-teal-500/20 border-teal-500/30 text-teal-300' : 'bg-zinc-800 border-zinc-700 text-zinc-400'}`}>
                           {isTrial ? 'Current Trial' : 'Current Plan'}
                         </div>
                       )}
@@ -3599,7 +3573,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                           {plan.features.map((f, i) => (
                             <div key={i} className="flex items-center gap-2">
                               {f.included ? (
-                                <CheckCircle2 className={`w-3.5 h-3.5 flex-shrink-0 ${plan.id === 'premium' ? 'text-violet-400' : plan.id === 'growth' ? 'text-blue-400' : 'text-teal-400'}`} />
+                                <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 text-teal-400" />
                               ) : (
                                 <X className="w-3.5 h-3.5 flex-shrink-0 text-zinc-700" />
                               )}
@@ -3609,12 +3583,12 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                         </div>
                         <div className="mt-5">
                           {isCurrent ? (
-                            <div className={`w-full py-2 rounded-lg text-xs font-medium text-center border ${plan.id === 'premium' ? 'bg-violet-500/10 border-violet-500/20 text-violet-300' : plan.id === 'growth' ? 'bg-blue-500/10 border-blue-500/20 text-blue-300' : 'bg-zinc-800 border-zinc-700 text-zinc-400'}`}>
+                            <div className={`w-full py-2 rounded-lg text-xs font-medium text-center border ${plan.id !== 'free' ? 'bg-teal-500/10 border-teal-500/20 text-teal-300' : 'bg-zinc-800 border-zinc-700 text-zinc-400'}`}>
                               {isTrial ? 'Trialing Now' : 'Your Plan'}
                             </div>
                           ) : isUpgrade ? (
                             <a href={`mailto:josh@hmpsn.studio?subject=Upgrade%20to%20${plan.name}&body=I'd%20like%20to%20upgrade%20my%20dashboard%20(${ws.name})%20to%20the%20${plan.name}%20plan.`}
-                              className={`block w-full py-2.5 rounded-lg text-xs font-semibold text-center transition-all ${plan.id === 'premium' ? 'bg-violet-600 hover:bg-violet-500 text-white' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}>
+                              className="block w-full py-2.5 rounded-lg text-xs font-semibold text-center transition-all bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white">
                               Upgrade to {plan.name}
                             </a>
                           ) : (
@@ -3630,7 +3604,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
               </div>
 
               {/* Content pricing section */}
-              {(briefPrice != null || fullPostPrice != null || (pricingData?.bundles && pricingData.bundles.length > 0)) && (
+              {(briefPrice != null || fullPostPrice != null) && (
                 <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
                   <div className="flex items-center gap-2 mb-1">
                     <FileText className="w-5 h-5 text-teal-400" />
@@ -3652,44 +3626,18 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                       </div>
                     )}
                     {fullPostPrice != null && (
-                      <div className="px-5 py-4 rounded-xl bg-blue-500/5 border border-blue-500/20 hover:border-blue-500/30 transition-colors">
+                      <div className="px-5 py-4 rounded-xl bg-teal-500/5 border border-teal-500/20 hover:border-teal-500/30 transition-colors">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
-                            <Sparkles className="w-4 h-4 text-blue-400" />
+                            <Sparkles className="w-4 h-4 text-teal-400" />
                             <span className="text-sm font-semibold text-zinc-200">Full Blog Post</span>
                           </div>
-                          <span className="text-lg font-bold text-blue-300">{fmtPrice(fullPostPrice)}</span>
+                          <span className="text-lg font-bold text-teal-300">{fmtPrice(fullPostPrice)}</span>
                         </div>
                         <p className="text-[11px] text-zinc-500 leading-relaxed">Complete brief + professionally written article, ready to publish with SEO optimization built in.</p>
                       </div>
                     )}
                   </div>
-
-                  {/* Bundle cards */}
-                  {pricingData?.bundles && pricingData.bundles.length > 0 && (
-                    <div>
-                      <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-3">Monthly Bundles</div>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        {pricingData.bundles.map(bundle => (
-                          <div key={bundle.id} className="px-4 py-3.5 rounded-xl bg-gradient-to-br from-blue-500/5 to-teal-500/5 border border-blue-500/15 hover:border-blue-500/30 transition-colors">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-xs font-semibold text-zinc-200">{bundle.name}</span>
-                              <span className="text-sm font-bold text-blue-300">{fmtPrice(bundle.monthlyPrice)}<span className="text-[10px] text-zinc-500 font-normal">/mo</span></span>
-                            </div>
-                            <div className="space-y-1 mb-2">
-                              {bundle.includes.map((item, i) => (
-                                <div key={i} className="flex items-center gap-1.5">
-                                  <Check className="w-3 h-3 text-teal-400 flex-shrink-0" />
-                                  <span className="text-[11px] text-zinc-400">{item}</span>
-                                </div>
-                              ))}
-                            </div>
-                            {bundle.savings && <div className="text-[10px] text-emerald-400 font-medium">{bundle.savings}</div>}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
 
                   {tier !== 'free' && (
                     <div className="mt-5 text-center">
@@ -3754,25 +3702,6 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         const upgradePrice = isUpgrade && briefPrice != null && fullPostPrice != null ? Math.max(0, fullPostPrice - briefPrice) : null;
         const displayPrice = isUpgrade ? upgradePrice : price;
         const fmt = fmtPrice;
-        const accentColor = isFull ? 'blue' : 'teal';
-        // Bundle savings callout
-        const showBundleSavings = !isUpgrade && pricingData?.bundles && pricingData.bundles.length > 0;
-
-        const briefIncludes = [
-          'SEO-optimized content strategy',
-          'Target keyword analysis & SERP research',
-          'Detailed content outline with headings',
-          'E-E-A-T guidance & content checklist',
-          'Schema markup recommendations',
-        ];
-        const fullPostIncludes = [
-          'Everything in the Content Brief',
-          'Professionally written article',
-          'SEO-optimized for target keywords',
-          'Ready to publish on your site',
-          'One round of revisions included',
-        ];
-
         return (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[70] flex items-center justify-center p-4" onClick={() => !pricingConfirming && setPricingModal(null)}>
             <div className="bg-zinc-900 border border-zinc-700/50 rounded-2xl shadow-2xl shadow-black/50 w-full max-w-md overflow-hidden animate-[scaleIn_0.2s_ease-out]" onClick={e => e.stopPropagation()}>
@@ -3785,14 +3714,14 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
               </button>
 
               {/* Header with gradient */}
-              <div className={`relative px-6 pt-6 pb-5 overflow-hidden ${isFull ? 'bg-gradient-to-br from-blue-600/15 via-indigo-600/10 to-transparent' : 'bg-gradient-to-br from-teal-600/15 via-emerald-600/10 to-transparent'}`}>
+              <div className="relative px-6 pt-6 pb-5 overflow-hidden bg-gradient-to-br from-teal-600/15 via-emerald-600/10 to-transparent">
                 {/* Decorative glow */}
-                <div className={`absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl opacity-20 ${isFull ? 'bg-blue-500' : 'bg-teal-500'}`} />
+                <div className="absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl opacity-20 bg-teal-500" />
 
                 <div className="relative flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center ring-1 ${isFull ? 'bg-gradient-to-br from-blue-500/25 to-indigo-500/25 ring-blue-500/20' : 'bg-gradient-to-br from-teal-500/25 to-emerald-500/25 ring-teal-500/20'}`}>
-                      {isFull ? <Sparkles className="w-5 h-5 text-blue-400" /> : <FileText className="w-5 h-5 text-teal-400" />}
+                    <div className="w-11 h-11 rounded-xl flex items-center justify-center ring-1 bg-gradient-to-br from-teal-500/25 to-emerald-500/25 ring-teal-500/20">
+                      {isFull ? <Sparkles className="w-5 h-5 text-teal-400" /> : <FileText className="w-5 h-5 text-teal-400" />}
                     </div>
                     <div>
                       <div className="text-sm font-semibold text-zinc-100">
@@ -3806,55 +3735,25 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                 </div>
 
                 {/* Topic card */}
-                <div className={`rounded-xl px-3.5 py-3 border ${isFull ? 'bg-blue-950/30 border-blue-500/10' : 'bg-teal-950/30 border-teal-500/10'}`}>
+                <div className="rounded-xl px-3.5 py-3 border bg-teal-950/30 border-teal-500/10">
                   <div className="flex items-center gap-2 mb-1">
-                    <Target className={`w-3 h-3 ${isFull ? 'text-blue-400/70' : 'text-teal-400/70'}`} />
+                    <Target className="w-3 h-3 text-teal-400/70" />
                     <span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Topic</span>
                   </div>
                   <div className="text-xs text-zinc-200 font-medium leading-relaxed">{pricingModal.topic}</div>
-                  <div className={`text-[11px] mt-1 ${isFull ? 'text-blue-400/80' : 'text-teal-400/80'}`}>Keyword: &ldquo;{pricingModal.targetKeyword}&rdquo;</div>
+                  <div className="text-[11px] mt-1 text-teal-400/80">Keyword: &ldquo;{pricingModal.targetKeyword}&rdquo;</div>
                 </div>
               </div>
 
-              {/* Page type selector */}
-              {!isUpgrade && (
-                <div className="mx-6 mt-3 mb-0">
-                  <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-1.5">Page Type</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {([
-                      { value: 'blog', label: 'Blog Post' },
-                      { value: 'landing', label: 'Landing Page' },
-                      { value: 'service', label: 'Service Page' },
-                      { value: 'location', label: 'Location Page' },
-                      { value: 'product', label: 'Product Page' },
-                      { value: 'pillar', label: 'Pillar / Hub' },
-                      { value: 'resource', label: 'Resource / Guide' },
-                    ] as const).map(pt => (
-                      <button
-                        key={pt.value}
-                        onClick={() => setPricingModal(prev => prev ? { ...prev, pageType: pt.value } : null)}
-                        className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all border ${
-                          (pricingModal.pageType || 'blog') === pt.value
-                            ? (isFull ? 'bg-blue-500/15 border-blue-500/30 text-blue-300' : 'bg-teal-500/15 border-teal-500/30 text-teal-300')
-                            : 'bg-zinc-900/50 border-zinc-800 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700'
-                        }`}
-                      >
-                        {pt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {/* Price banner */}
               {displayPrice != null && (
-                <div className={`mx-6 -mt-0 mb-0 flex items-center justify-between px-4 py-3 rounded-xl border ${isFull ? 'bg-blue-500/5 border-blue-500/15' : 'bg-teal-500/5 border-teal-500/15'}`}>
+                <div className="mx-6 flex items-center justify-between px-4 py-3 rounded-xl border bg-teal-500/5 border-teal-500/15">
                   <div>
-                    <div className={`text-2xl font-bold tracking-tight ${isFull ? 'text-blue-300' : 'text-teal-300'}`}>{fmt(displayPrice)}</div>
+                    <div className="text-2xl font-bold tracking-tight text-teal-300">{fmt(displayPrice)}</div>
                     <div className="text-[10px] text-zinc-500 mt-0.5">{isUpgrade ? 'Upgrade difference' : 'One-time payment'}</div>
                   </div>
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${isFull ? 'bg-blue-500/10' : 'bg-teal-500/10'}`}>
-                    <Shield className={`w-4 h-4 ${isFull ? 'text-blue-400/60' : 'text-teal-400/60'}`} />
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-teal-500/10">
+                    <Shield className="w-4 h-4 text-teal-400/60" />
                   </div>
                 </div>
               )}
@@ -3865,41 +3764,12 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                 </div>
               )}
 
-              {/* What's included */}
-              <div className="px-6 py-4">
-                <div className="text-[10px] text-zinc-500 font-semibold uppercase tracking-widest mb-3">What&apos;s included</div>
-                <div className="grid grid-cols-1 gap-1.5">
-                  {(isFull ? fullPostIncludes : briefIncludes).map((item, i) => (
-                    <div key={i} className="flex items-center gap-2.5 group">
-                      <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${accentColor === 'blue' ? 'bg-blue-500/10' : 'bg-teal-500/10'}`}>
-                        <Check className={`w-2.5 h-2.5 ${accentColor === 'blue' ? 'text-blue-400' : 'text-teal-400'}`} />
-                      </div>
-                      <span className="text-[11px] text-zinc-400 group-hover:text-zinc-300 transition-colors">{item}</span>
-                    </div>
-                  ))}
-                </div>
-                {pricing && (isFull ? pricing.fullPostDescription : pricing.briefDescription) && (
-                  <div className="text-[11px] text-zinc-500 mt-3 leading-relaxed pl-6">{isFull ? pricing.fullPostDescription : pricing.briefDescription}</div>
-                )}
-              </div>
-
-              {/* Bundle savings callout */}
-              {showBundleSavings && (
-                <div className="mx-6 mb-1 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-violet-500/5 to-blue-500/5 border border-violet-500/15">
-                  <div className="text-[10px] text-violet-300 font-semibold uppercase tracking-wider mb-1">Save with a bundle</div>
-                  <div className="text-[11px] text-zinc-400 leading-relaxed">
-                    {pricingData!.bundles[0].name} — <span className="text-violet-300 font-medium">{fmtPrice(pricingData!.bundles[0].monthlyPrice)}/mo</span>
-                    {' · '}{pricingData!.bundles[0].savings}
-                  </div>
-                </div>
-              )}
-
               {/* Actions */}
               <div className="px-6 pb-5 space-y-3">
                 <button
                   disabled={pricingConfirming}
                   onClick={confirmPricingAndSubmit}
-                  className={`w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 shadow-lg active:scale-[0.98] ${isFull ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-500 hover:to-indigo-500 shadow-blue-900/40' : 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:from-teal-500 hover:to-emerald-500 shadow-teal-900/40'}`}
+                  className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 shadow-lg active:scale-[0.98] bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:from-teal-500 hover:to-emerald-500 shadow-teal-900/40"
                 >
                   {pricingConfirming ? (
                     <>
@@ -3969,8 +3839,8 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
       {showWelcome && ws && (() => {
         const tier = (ws.tier as 'free' | 'growth' | 'premium') || 'free';
         const tierLabel = tier === 'premium' ? 'Premium' : tier === 'growth' ? 'Growth' : 'Starter';
-        const tierColor = tier === 'premium' ? 'from-violet-500 to-indigo-500' : tier === 'growth' ? 'from-blue-500 to-teal-500' : 'from-zinc-500 to-zinc-400';
-        const tierBg = tier === 'premium' ? 'bg-violet-500/15 border-violet-500/30 text-violet-300' : tier === 'growth' ? 'bg-blue-500/15 border-blue-500/30 text-blue-300' : 'bg-zinc-800 border-zinc-700 text-zinc-300';
+        const tierColor = tier === 'premium' ? 'from-teal-400 to-emerald-400' : tier === 'growth' ? 'from-teal-500 to-emerald-500' : 'from-zinc-500 to-zinc-400';
+        const tierBg = tier !== 'free' ? 'bg-teal-500/15 border-teal-500/30 text-teal-300' : 'bg-zinc-800 border-zinc-700 text-zinc-300';
         const isTrial = ws.isTrial && ws.trialDaysRemaining != null && ws.trialDaysRemaining > 0;
         const features = [
           { icon: Sparkles, label: 'AI-Powered Insights', desc: 'Real-time overview of your site performance', available: true },
@@ -3989,11 +3859,11 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={dismissWelcome}>
             <div className="bg-zinc-900 rounded-2xl border border-zinc-800 shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
               {/* Header with gradient */}
-              <div className={`relative px-6 pt-8 pb-6 overflow-hidden bg-gradient-to-br ${tierColor} bg-opacity-10`} style={{ background: `linear-gradient(135deg, ${tier === 'premium' ? 'rgba(139,92,246,0.12)' : tier === 'growth' ? 'rgba(59,130,246,0.12)' : 'rgba(113,113,122,0.08)'}, transparent)` }}>
-                <div className="absolute -top-20 -right-20 w-48 h-48 rounded-full blur-3xl opacity-15 bg-gradient-to-br from-blue-500 to-teal-500" />
+              <div className={`relative px-6 pt-8 pb-6 overflow-hidden bg-gradient-to-br ${tierColor} bg-opacity-10`} style={{ background: `linear-gradient(135deg, ${tier !== 'free' ? 'rgba(45,212,191,0.10)' : 'rgba(113,113,122,0.08)'}, transparent)` }}>
+                <div className="absolute -top-20 -right-20 w-48 h-48 rounded-full blur-3xl opacity-15 bg-gradient-to-br from-teal-500 to-emerald-500" />
                 <div className="relative text-center">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/20 to-teal-500/20 ring-1 ring-blue-500/20 flex items-center justify-center mx-auto mb-4">
-                    <Sparkles className="w-7 h-7 text-blue-400" />
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-500/20 to-emerald-500/20 ring-1 ring-teal-500/20 flex items-center justify-center mx-auto mb-4">
+                    <Sparkles className="w-7 h-7 text-teal-400" />
                   </div>
                   <h2 className="text-xl font-bold text-zinc-100 mb-1">Welcome to your dashboard</h2>
                   <p className="text-sm text-zinc-400">{ws.name}</p>

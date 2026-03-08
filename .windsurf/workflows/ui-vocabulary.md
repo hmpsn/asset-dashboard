@@ -6,11 +6,13 @@ description: Canonical UI vocabulary for action labels, badges, and status text.
 
 Use these exact labels when creating buttons, badges, tooltips, status text, and toast messages. Do NOT invent synonyms.
 
+> **Color assignments below must match `BRAND_DESIGN_LANGUAGE.md` § 2 (Three Laws of Color).** When in doubt, check the Per-Component Color Map.
+
 ## Action Verbs
 
 | Action | Label | Icon | Color | Context |
 |--------|-------|------|-------|---------|
-| Send item to client for review | **"Send to Client"** | `Send` | purple/cyan | Audit issues, schemas, briefs, SEO changes |
+| Send item to client for review | **"Send to Client"** | `Send` | purple (admin-only AI feature) | Audit issues, schemas, briefs, SEO changes |
 | Send batch for client approval | **"Send for Approval"** | `Send` | teal | SEO Editor, CMS Editor (batch approval flow) |
 | Create internal team work item | **"Add to Tasks"** | `ClipboardList` | zinc | Audit → request manager |
 | Batch create internal tasks | **"Add [X] to Tasks"** | `ClipboardList` | varies | e.g. "Add Errors to Tasks (5)" |
@@ -24,7 +26,7 @@ Use these exact labels when creating buttons, badges, tooltips, status text, and
 
 | State | Badge Label | Icon | Color |
 |-------|-------------|------|-------|
-| Sent to client | **"Sent"** | `Send` | purple |
+| Sent to client | **"Sent"** | `Send` | purple (admin-only) |
 | Task created | **"Added"** | `CheckCircle` | green |
 | Fix pushed to Webflow | **"Applied"** | `CheckCircle` | green |
 | Approval sent | **"Sent!"** | `CheckCircle` | teal |
@@ -67,3 +69,4 @@ When actions are behind a `⋮` (MoreVertical) overflow menu:
 4. **Tooltips expand the label** — e.g. button says "Fix", tooltip says "Open SEO Editor".
 5. **Batch labels include the destination** — "Add Errors to Tasks", not just "Add Errors".
 6. **Loading states use "...ing"** — "Pushing...", "Sending...", "Adding...".
+7. **Color rules** — All action colors must follow the Three Laws in `BRAND_DESIGN_LANGUAGE.md`: teal for CTAs, blue for data, purple for admin AI only. Never use violet or indigo.
