@@ -48,6 +48,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
   const [sendingApproval, setSendingApproval] = useState(false);
   const [approvalSent, setApprovalSent] = useState(false);
   const [variations, setVariations] = useState<Record<string, { fieldSlug: string; options: string[] }>>({});
+  const [editTracking, setEditTracking] = useState<Record<string, { status: 'flagged' | 'in-review' | 'live'; updatedAt: string; fields?: string[] }>>({});
 
   const fetchData = async () => {
     setLoading(true);
@@ -79,6 +80,15 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
 
   useEffect(() => { fetchData(); }, [siteId]);
 
+  // Fetch edit tracking data
+  useEffect(() => {
+    if (!workspaceId) return;
+    fetch(`/api/workspaces/${workspaceId}/seo-edit-tracking`)
+      .then(r => r.ok ? r.json() : {})
+      .then(data => setEditTracking(data || {}))
+      .catch(() => {});
+  }, [workspaceId]);
+
   const updateField = (itemId: string, fieldSlug: string, value: string) => {
     setEdits(prev => ({
       ...prev,
@@ -97,7 +107,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
       const res = await fetch(`/api/webflow/collections/${collectionId}/items/${itemId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fieldData: fields }),
+        body: JSON.stringify({ fieldData: fields, workspaceId }),
       });
       const result = await res.json();
       if (!result.success) {
@@ -105,6 +115,8 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
       } else {
         setDirty(prev => { const n = new Set(prev); n.delete(itemId); return n; });
         setSaved(prev => new Set(prev).add(itemId));
+        // Update local tracking to live
+        setEditTracking(prev => ({ ...prev, [itemId]: { status: 'live', updatedAt: new Date().toISOString() } }));
       }
     } catch {
       setErrors(prev => ({ ...prev, [itemId]: 'Network error' }));
@@ -214,6 +226,15 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
         body: JSON.stringify({ siteId, name: `CMS SEO Changes — ${new Date().toLocaleDateString()}`, items }),
       });
       setApprovalSent(true);
+      // Update local tracking to in-review for submitted items
+      const uniqueItemIds = [...new Set(items.map((i: { pageId: string }) => i.pageId))];
+      setEditTracking(prev => {
+        const next = { ...prev };
+        for (const iid of uniqueItemIds) {
+          next[iid] = { status: 'in-review', updatedAt: new Date().toISOString() };
+        }
+        return next;
+      });
       setApprovalSelected(new Set());
       setTimeout(() => setApprovalSent(false), 4000);
     } catch (err) {
@@ -393,6 +414,9 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                           <span className="text-[11px] text-zinc-500 font-mono flex-shrink-0">/{coll.collectionSlug}/{itemSlug}</span>
                         </div>
                         <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {editTracking[item.id]?.status === 'live' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/30 text-teal-400">Live</span>}
+                          {editTracking[item.id]?.status === 'in-review' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/30 text-purple-400">In Review</span>}
+                          {editTracking[item.id]?.status === 'flagged' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">Flagged</span>}
                           {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
                           {isSaved && <Check className="w-3 h-3 text-emerald-400" />}
                           {error && <AlertCircle className="w-3 h-3 text-red-400" />}

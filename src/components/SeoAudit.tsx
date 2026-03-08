@@ -538,6 +538,9 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
   const [trafficMap, setTrafficMap] = useState<Record<string, { clicks: number; impressions: number; sessions: number; pageviews: number }>>({});
   const [sortMode, setSortMode] = useState<'issues' | 'traffic'>('issues');
 
+  // SEO edit tracking (#137)
+  const [editTracking, setEditTracking] = useState<Record<string, { status: 'flagged' | 'in-review' | 'live'; updatedAt: string; fields?: string[] }>>({});
+
   useEffect(() => {
     if (siteId) {
       fetch(`/api/audit-traffic/${siteId}`).then(r => r.ok ? r.json() : {}).then((m: Record<string, { clicks: number; impressions: number; sessions: number; pageviews: number }>) => {
@@ -545,6 +548,15 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
       }).catch(() => {});
     }
   }, [siteId]);
+
+  useEffect(() => {
+    if (workspaceId) {
+      fetch(`/api/workspaces/${workspaceId}/seo-edit-tracking`)
+        .then(r => r.ok ? r.json() : {})
+        .then(data => setEditTracking(data || {}))
+        .catch(() => {});
+    }
+  }, [workspaceId]);
 
   // Audit issue suppressions
   const [suppressions, setSuppressions] = useState<{ check: string; pageSlug: string }[]>([]);
@@ -1521,9 +1533,11 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
           const errorCount = page.issues.filter(i => i.severity === 'error').length;
           const warningCount = page.issues.filter(i => i.severity === 'warning').length;
           const pageTraffic = trafficMap[`/${page.slug}`];
+          const pageTracking = editTracking[page.pageId];
+          const trackBorder = pageTracking?.status === 'live' ? 'border-teal-500/40' : pageTracking?.status === 'in-review' ? 'border-purple-500/40' : '';
 
           return (
-            <div key={page.slug || page.page} className="bg-zinc-900 rounded-xl border border-zinc-800">
+            <div key={page.slug || page.page} className={`bg-zinc-900 rounded-xl border ${trackBorder || 'border-zinc-800'}`}>
               <button
                 onClick={() => toggleExpand(page.page)}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/50 transition-colors text-left"
@@ -1538,6 +1552,8 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
                   <div className="text-xs text-zinc-500 truncate">/{page.slug}</div>
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
+                  {pageTracking?.status === 'live' && <span className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/30 text-teal-400">Live</span>}
+                  {pageTracking?.status === 'in-review' && <span className="text-[11px] px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/30 text-purple-400">In Review</span>}
                   {pageTraffic && (pageTraffic.clicks > 0 || pageTraffic.pageviews > 0) && (
                     <span className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400 tabular-nums" title={`${pageTraffic.clicks} clicks, ${pageTraffic.impressions} impressions, ${pageTraffic.pageviews} pageviews (28d)`}>
                       {pageTraffic.clicks > 0 ? `${pageTraffic.clicks.toLocaleString()} clicks` : ''}{pageTraffic.clicks > 0 && pageTraffic.pageviews > 0 ? ' · ' : ''}{pageTraffic.pageviews > 0 ? `${pageTraffic.pageviews.toLocaleString()} views` : ''}

@@ -831,6 +831,59 @@ app.delete('/api/workspaces/:id/audit-suppressions', requireWorkspaceAccess(), (
   res.json({ ok: true, suppressions });
 });
 
+// --- SEO Edit Tracking ---
+// Helper: update tracking status for a page/item
+function trackSeoEdit(workspaceId: string, pageId: string, status: 'flagged' | 'in-review' | 'live', fields?: string[]) {
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return;
+  const tracking = ws.seoEditTracking || {};
+  const existing = tracking[pageId];
+  // Don't downgrade: live > in-review > flagged
+  const priority = { live: 3, 'in-review': 2, flagged: 1 };
+  if (existing && priority[existing.status] > priority[status]) return;
+  tracking[pageId] = { status, updatedAt: new Date().toISOString(), fields: fields || existing?.fields };
+  updateWorkspace(workspaceId, { seoEditTracking: tracking });
+}
+
+// GET edit tracking for a workspace
+app.get('/api/workspaces/:id/seo-edit-tracking', requireWorkspaceAccess(), (req, res) => {
+  const ws = getWorkspace(req.params.id);
+  if (!ws) return res.status(404).json({ error: 'Not found' });
+  res.json(ws.seoEditTracking || {});
+});
+
+// Public GET for client portal
+app.get('/api/public/seo-edit-tracking/:workspaceId', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Not found' });
+  res.json(ws.seoEditTracking || {});
+});
+
+// PATCH: manually set status for a page
+app.patch('/api/workspaces/:id/seo-edit-tracking', requireWorkspaceAccess(), (req, res) => {
+  const ws = getWorkspace(req.params.id);
+  if (!ws) return res.status(404).json({ error: 'Not found' });
+  const { pageId, status, fields } = req.body;
+  if (!pageId || !status) return res.status(400).json({ error: 'pageId and status required' });
+  if (!['flagged', 'in-review', 'live'].includes(status)) return res.status(400).json({ error: 'status must be flagged, in-review, or live' });
+  const tracking = ws.seoEditTracking || {};
+  tracking[pageId] = { status, updatedAt: new Date().toISOString(), fields };
+  updateWorkspace(req.params.id, { seoEditTracking: tracking });
+  res.json({ ok: true, tracking });
+});
+
+// DELETE: clear tracking for a page
+app.delete('/api/workspaces/:id/seo-edit-tracking', requireWorkspaceAccess(), (req, res) => {
+  const ws = getWorkspace(req.params.id);
+  if (!ws) return res.status(404).json({ error: 'Not found' });
+  const { pageId } = req.body;
+  if (!pageId) return res.status(400).json({ error: 'pageId required' });
+  const tracking = ws.seoEditTracking || {};
+  delete tracking[pageId];
+  updateWorkspace(req.params.id, { seoEditTracking: tracking });
+  res.json({ ok: true, tracking });
+});
+
 // File upload
 app.post('/api/upload/:workspaceId', upload.array('files'), (req, res) => {
   const files = req.files as Express.Multer.File[];
@@ -1187,6 +1240,16 @@ app.get('/api/webflow/seo-audit/:siteId', async (req, res) => {
       return res.status(500).json({ error: 'No Webflow API token configured. Please link a workspace to this site in Settings, or set WEBFLOW_API_TOKEN environment variable.' });
     }
     const result = await runSeoAudit(req.params.siteId, token, req.query.workspaceId as string | undefined);
+    // Auto-flag pages with issues for edit tracking
+    const auditWsId = req.query.workspaceId as string | undefined;
+    const auditWs = auditWsId ? getWorkspace(auditWsId) : listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+    if (auditWs) {
+      for (const page of result.pages) {
+        if (page.issues.length > 0) {
+          trackSeoEdit(auditWs.id, page.pageId, 'flagged');
+        }
+      }
+    }
     res.json(result);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -1822,12 +1885,14 @@ app.put('/api/webflow/pages/:pageId/seo', async (req, res) => {
     const { siteId, seo, openGraph, title } = req.body;
     const token = siteId ? (getTokenForSite(siteId) || undefined) : undefined;
     const result = await updatePageSeo(req.params.pageId, { seo, openGraph, title }, token);
-    // Log activity
+    // Log activity + track edit status
     if (siteId) {
       const seoWs = listWorkspaces().find(w => w.webflowSiteId === siteId);
       if (seoWs) {
-        const fields = [seo?.title && 'title', seo?.description && 'description', openGraph && 'OG'].filter(Boolean).join(', ');
-        addActivity(seoWs.id, 'seo_updated', `Updated SEO ${fields} for a page`, undefined, { pageId: req.params.pageId });
+        const changedFields = [seo?.title && 'title', seo?.description && 'description', openGraph && 'OG'].filter(Boolean) as string[];
+        addActivity(seoWs.id, 'seo_updated', `Updated SEO ${changedFields.join(', ')} for a page`, undefined, { pageId: req.params.pageId });
+        // Mark as live (saved to Webflow draft, ready for publish)
+        trackSeoEdit(seoWs.id, req.params.pageId, 'live', changedFields);
       }
     }
     res.json(result);
@@ -3211,6 +3276,10 @@ app.get('/api/webflow/collections/:collectionId/items', async (req, res) => {
 
 app.patch('/api/webflow/collections/:collectionId/items/:itemId', async (req, res) => {
   const result = await updateCollectionItem(req.params.collectionId, req.params.itemId, req.body.fieldData);
+  // Track CMS item edit as live
+  if (req.body.workspaceId) {
+    trackSeoEdit(req.body.workspaceId, req.params.itemId, 'live');
+  }
   res.json(result);
 });
 
@@ -4545,6 +4614,10 @@ app.post('/api/approvals/:workspaceId', (req, res) => {
   const { siteId, name, items } = req.body;
   if (!siteId || !items?.length) return res.status(400).json({ error: 'siteId and items required' });
   const batch = createBatch(req.params.workspaceId, siteId, name || 'SEO Changes', items);
+  // Track all pages in this batch as in-review
+  for (const item of items) {
+    if (item.pageId) trackSeoEdit(req.params.workspaceId, item.pageId, 'in-review', [item.field]);
+  }
   // Notify client that items are ready for review
   const ws = getWorkspace(req.params.workspaceId);
   if (ws?.clientEmail) {
