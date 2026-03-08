@@ -158,12 +158,13 @@ AI generates fixes, published programmatically via Webflow API. Minimal human to
 | Product | Price | API Method | Agency Cost | Margin | What's Delivered |
 |---------|:-----:|-----------|:-----------:|:------:|------------------|
 | **Metadata Optimization** | $29/page | Page PATCH | ~$0.05 tokens + 5min | ~90% | AI-optimized title, meta description, OG tags — published to Webflow |
+| **Alt Text Optimization** | $19/page | Asset PATCH | ~$0.03 tokens (GPT-4o-mini vision) | ~95% | AI-generated context-aware alt text, written back to Webflow asset |
 | **Redirect Fix** | $19/redirect | CSV export | ~2min labor | ~90% | 301 redirect rule exported in Webflow-compatible CSV format |
 | **Full Metadata Sweep** | $199 flat | Batch Page PATCH | ~$1 tokens + 45min | ~85% | Titles + descriptions optimized for all pages |
 | **Schema — Per Page** | $39/page | Custom Code API | ~$0.10 tokens + 5min | ~95% | JSON-LD schema generated, validated, and published |
 | **Schema — Full Site** | $249 flat | Custom Code API | ~$2–5 tokens + 30min | ~90% | Schema for all pages, generated + published |
 
-> **Why these are API-safe:** Meta titles, descriptions, and OG tags are editable via Webflow’s Page PATCH endpoint. Schema publishes via Custom Code API (already built). Redirects export as CSV for import in Webflow Settings → Hosting → 301 Redirects.
+> **Why these are API-safe:** Meta titles, descriptions, and OG tags are editable via Webflow's Page PATCH endpoint. Alt text writes back via Asset PATCH API (already built — GPT-4o-mini vision + bulk generation + NDJSON streaming). Schema publishes via Custom Code API (already built). Redirects export as CSV for import in Webflow Settings → Hosting → 301 Redirects.
 
 #### Product B: Manual Implementation (Webflow Designer Access — Custom Quote)
 
@@ -171,7 +172,6 @@ Fixes that require editing page body content, visual elements, or site structure
 
 | Fix Type | Why It Needs Designer Access | Typical Scope |
 |----------|----------------------------|---------------|
-| Alt text on images | Images in rich text / body content aren't API-patchable | Per-page, varies by image count |
 | Heading structure (H1/H2/H3) | Page body content structure | Per-page |
 | Internal link additions | Rich text body edits | Per-page, varies by link count |
 | Page speed fixes | Image compression, lazy loading, layout changes | Per-page or site-wide |
@@ -242,7 +242,8 @@ For manual implementation (Product B), there is no self-service bundling — it�
 | Metadata optimization | $29/page (cart) | Included in 3 hrs |
 | Schema generation + publishing | $39/page (cart) | Included in 3 hrs |
 | Redirect fixes | $19/redirect (cart) | Included in 3 hrs |
-| Alt text, heading, link fixes | Contact for quote (Designer access) | Included in 3 hrs* |
+| Alt text optimization | $19/page (cart) | Included in 3 hrs |
+| Heading, link, layout fixes | Contact for quote (Designer access) | Included in 3 hrs* |
 | Content briefs | $75-350 (purchase) | **10% off** — $68-315 |
 | Full content posts | $250-2,500 (purchase) | **10% off** — $225-2,250 |
 
