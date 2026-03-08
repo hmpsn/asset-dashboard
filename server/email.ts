@@ -177,6 +177,19 @@ export function notifyApprovalReady(opts: {
   }));
 }
 
+export function notifyClientWelcome(opts: {
+  clientEmail: string;
+  clientName: string;
+  workspaceName: string;
+  workspaceId: string;
+  dashboardUrl: string;
+}): void {
+  if (!isEmailConfigured()) return;
+  queueEmail(makeEvent('client_welcome', opts.clientEmail, opts.workspaceId, opts.workspaceName, opts.dashboardUrl, {
+    clientName: opts.clientName,
+  }));
+}
+
 export function notifyAuditAlert(opts: {
   workspaceName: string;
   workspaceId?: string;

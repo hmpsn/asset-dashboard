@@ -65,7 +65,7 @@ import { runSalesAudit } from './sales-audit.js';
 import { initJobs, createJob, updateJob, getJob, listJobs, cancelJob, registerAbort, isJobCancelled, hasActiveJob } from './jobs.js';
 import { createBatch, listBatches, getBatch, updateItem, markBatchApplied, deleteBatch } from './approvals.js';
 import { listRequests, createRequest, updateRequest, addNote, deleteRequest, getRequest, getAttachmentsDir, addAttachmentsToRequest, type RequestAttachment } from './requests.js';
-import { notifyTeamNewRequest, notifyClientTeamResponse, notifyClientStatusChange, notifyTeamContentRequest, notifyClientBriefReady, notifyApprovalReady, isEmailConfigured, initEmailQueue } from './email.js';
+import { notifyTeamNewRequest, notifyClientTeamResponse, notifyClientStatusChange, notifyTeamContentRequest, notifyClientBriefReady, notifyApprovalReady, notifyClientWelcome, isEmailConfigured, initEmailQueue } from './email.js';
 import { getQueueStats } from './email-queue.js';
 import { addActivity, listActivity } from './activity-log.js';
 import { getSchedule, listSchedules, upsertSchedule, deleteSchedule, startScheduler } from './scheduled-audits.js';
@@ -4588,6 +4588,13 @@ app.post('/api/workspaces/:id/client-users', requireWorkspaceAccess(), express.j
     if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
     const invitedBy = req.user?.id;
     const user = await createClientUser(email, password, name, req.params.id, role || 'client_member', invitedBy);
+    // Send welcome email to the new client user
+    const ws = getWorkspace(req.params.id);
+    if (ws) {
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const dashboardUrl = `${baseUrl}/client/${req.params.id}`;
+      notifyClientWelcome({ clientEmail: email, clientName: name, workspaceName: ws.name, workspaceId: req.params.id, dashboardUrl });
+    }
     res.json(user);
   } catch (err) {
     res.status(400).json({ error: err instanceof Error ? err.message : String(err) });

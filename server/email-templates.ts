@@ -140,7 +140,8 @@ export type EmailEventType =
   | 'request_response'
   | 'content_request'
   | 'content_brief_ready'
-  | 'audit_alert';
+  | 'audit_alert'
+  | 'client_welcome';
 
 // ── Template renderers ──
 
@@ -164,6 +165,8 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
       return renderContentBriefReady(events, count, ws, dashUrl);
     case 'audit_alert':
       return renderAuditAlert(events, count, ws, dashUrl);
+    case 'client_welcome':
+      return renderClientWelcome(events[0]);
     default:
       return { subject: 'Notification', html: '' };
   }
@@ -343,6 +346,41 @@ function renderAuditAlert(events: EmailEvent[], _count: number, ws: string, dash
       subtitle: ws,
       body: items,
       cta: dashUrl ? { label: 'View Audit Results', url: dashUrl } : undefined,
+    }),
+  };
+}
+
+// ── Client welcome email ──
+
+function renderClientWelcome(event: EmailEvent) {
+  const ws = event.workspaceName;
+  const name = (event.data.clientName as string) || 'there';
+  const dashUrl = event.dashboardUrl || '';
+
+  const gettingStarted = `
+    <div style="margin-top:16px;">
+      <div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">Here's what you can do</div>
+      ${itemRow({ title: '📊 View your site health score', detail: 'See how your website stacks up with our automated SEO audits', isLast: false })}
+      ${itemRow({ title: '📈 Track your traffic & rankings', detail: 'Search Console and Google Analytics data in one place', isLast: false })}
+      ${itemRow({ title: '💬 Ask your AI advisor', detail: 'Get instant insights about your traffic, rankings, and content strategy', isLast: false })}
+      ${itemRow({ title: '📝 Request content', detail: 'Submit topics and track briefs through your content pipeline', isLast: true })}
+    </div>`;
+
+  return {
+    subject: `Welcome to your dashboard — ${ws}`,
+    html: layout({
+      preheader: `Your ${ws} insights dashboard is ready`,
+      headline: `Welcome, ${esc(name)}!`,
+      subtitle: `Your ${ws} dashboard is ready`,
+      body: `
+        <p class="text-primary" style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 16px;">
+          Your web team has set up a personalized insights dashboard for you. It's your central hub for tracking website performance, reviewing SEO improvements, and collaborating on content.
+        </p>` + gettingStarted + `
+        <div style="margin-top:20px;background:#f0fdf9;border:1px solid #ccfbf1;border-radius:8px;padding:14px 16px;text-align:center;">
+          <span style="font-size:12px;color:#0d9488;">Questions? Just reply to this email — we're here to help.</span>
+        </div>`,
+      cta: dashUrl ? { label: 'Open Your Dashboard', url: dashUrl } : undefined,
+      footer: `You're receiving this because an account was created for you on ${esc(ws)}`,
     }),
   };
 }
