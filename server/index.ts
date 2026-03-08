@@ -6584,6 +6584,38 @@ app.post('/api/stripe/create-checkout', checkoutLimiter, async (req, res) => {
   }
 });
 
+// Public: tier upgrade checkout (client-facing)
+app.post('/api/public/upgrade-checkout/:workspaceId', checkoutLimiter, async (req, res) => {
+  if (!isStripeConfigured()) return res.status(503).json({ error: 'Stripe is not configured' });
+  const wsId = req.params.workspaceId;
+  const ws = getWorkspace(wsId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const { planId } = req.body;
+  const productType = planId === 'growth' ? 'plan_growth' : planId === 'premium' ? 'plan_premium' : null;
+  if (!productType) return res.status(400).json({ error: 'Invalid plan' });
+
+  const config = getProductConfig(productType);
+  if (!config) return res.status(400).json({ error: `Product not configured: ${productType}` });
+
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  const successUrl = `${baseUrl}/client/${wsId}?tab=plans&payment=success&session_id={CHECKOUT_SESSION_ID}`;
+  const cancelUrl = `${baseUrl}/client/${wsId}?tab=plans&payment=cancelled`;
+
+  try {
+    const { sessionId, url } = await createCheckoutSession({
+      workspaceId: wsId,
+      productType,
+      successUrl,
+      cancelUrl,
+    });
+    res.json({ sessionId, url });
+  } catch (err) {
+    console.error('[stripe] Tier upgrade checkout error:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to create checkout session' });
+  }
+});
+
 // List payments for a workspace (admin)
 app.get('/api/stripe/payments/:workspaceId', (req, res) => {
   res.json(listPayments(req.params.workspaceId));

@@ -9,7 +9,8 @@ export type ProductType =
   | 'brief_product' | 'brief_pillar' | 'brief_resource'
   | 'post_draft' | 'post_polished' | 'post_premium'
   | 'schema_page' | 'schema_site'
-  | 'strategy' | 'strategy_refresh';
+  | 'strategy' | 'strategy_refresh'
+  | 'plan_growth' | 'plan_premium';
 
 export interface PaymentRecord {
   id: string;

@@ -3721,10 +3721,23 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                               {isTrial ? 'Trialing Now' : 'Your Plan'}
                             </div>
                           ) : isUpgrade ? (
-                            <a href={`mailto:josh@hmpsn.studio?subject=Upgrade%20to%20${plan.name}&body=I'd%20like%20to%20upgrade%20my%20dashboard%20(${ws.name})%20to%20the%20${plan.name}%20plan.`}
-                              className="block w-full py-2.5 rounded-lg text-xs font-semibold text-center transition-all bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white">
+                            <button onClick={async () => {
+                              try {
+                                const res = await fetch(`/api/public/upgrade-checkout/${workspaceId}`, {
+                                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ planId: plan.id }),
+                                });
+                                const data = await res.json();
+                                if (!res.ok) throw new Error(data.error || 'Failed to start checkout');
+                                if (data.url) window.location.href = data.url;
+                              } catch (err) {
+                                setToast({ message: err instanceof Error ? err.message : 'Upgrade failed. Please try again.', type: 'error' });
+                                setTimeout(() => setToast(null), 6000);
+                              }
+                            }}
+                              className="block w-full py-2.5 rounded-lg text-xs font-semibold text-center transition-all bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white cursor-pointer">
                               Upgrade to {plan.name}
-                            </a>
+                            </button>
                           ) : (
                             <div className="w-full py-2 rounded-lg text-xs font-medium text-center bg-zinc-800/50 border border-zinc-800 text-zinc-600">
                               Included
@@ -3786,10 +3799,10 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
               {/* Contact CTA */}
               <div className="text-center py-6 bg-zinc-900/50 rounded-xl border border-zinc-800">
                 <p className="text-sm text-zinc-400 mb-3">Have questions about which plan is right for you?</p>
-                <a href="mailto:josh@hmpsn.studio?subject=Dashboard%20Plans%20Question"
+                <button onClick={() => setTab('overview')}
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-sm text-zinc-200 font-medium transition-colors">
-                  <MessageSquare className="w-4 h-4" /> Talk to Our Team
-                </a>
+                  <MessageSquare className="w-4 h-4" /> Ask Your AI Advisor
+                </button>
               </div>
             </div>
           </>);
@@ -3816,10 +3829,23 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                 </div>
               ))}
             </div>
-            <a href="mailto:josh@hmpsn.studio?subject=SEO%20Insights%20Upgrade&body=I'm%20interested%20in%20enabling%20SEO%20insights%20for%20my%20dashboard."
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium transition-colors">
-              <Sparkles className="w-4 h-4" /> Connect With Our Team
-            </a>
+            <button onClick={async () => {
+              try {
+                const res = await fetch(`/api/public/upgrade-checkout/${workspaceId}`, {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ planId: 'premium' }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to start checkout');
+                if (data.url) window.location.href = data.url;
+              } catch (err) {
+                setToast({ message: err instanceof Error ? err.message : 'Upgrade failed. Please try again.', type: 'error' });
+                setTimeout(() => setToast(null), 6000);
+              }
+            }}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium transition-colors cursor-pointer">
+              <Sparkles className="w-4 h-4" /> Upgrade to Premium
+            </button>
             <button onClick={() => setShowUpgradeModal(false)} className="block mx-auto mt-3 text-xs text-zinc-500 hover:text-zinc-400 transition-colors">
               Maybe later
             </button>

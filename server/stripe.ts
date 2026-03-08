@@ -50,6 +50,8 @@ const PRODUCT_MAP: Record<ProductType, { displayName: string; category: ProductC
   schema_site:      { displayName: 'Schema — Full Site',      category: 'schema',   priceUsd: 350,  envKey: 'STRIPE_PRICE_SCHEMA_SITE' },
   strategy:         { displayName: 'Keyword Strategy',        category: 'strategy', priceUsd: 400,  envKey: 'STRIPE_PRICE_STRATEGY' },
   strategy_refresh: { displayName: 'Strategy Refresh',        category: 'strategy', priceUsd: 200,  envKey: 'STRIPE_PRICE_STRATEGY_REFRESH' },
+  plan_growth:      { displayName: 'Growth Plan',              category: 'strategy', priceUsd: 99,   envKey: 'STRIPE_PRICE_PLAN_GROWTH' },
+  plan_premium:     { displayName: 'Premium Plan',             category: 'strategy', priceUsd: 249,  envKey: 'STRIPE_PRICE_PLAN_PREMIUM' },
 };
 
 export function getProductConfig(type: ProductType): ProductConfig | null {
@@ -254,6 +256,13 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
         updateContentRequest(workspaceId, contentRequestId, { status: 'requested' });
       }
 
+      // Handle tier upgrade
+      if (productType === 'plan_growth' || productType === 'plan_premium') {
+        const newTier = productType === 'plan_growth' ? 'growth' : 'premium';
+        updateWorkspace(workspaceId, { tier: newTier, trialEndsAt: undefined });
+        console.log(`[stripe] Tier upgraded: workspace=${workspaceId} → ${newTier}`);
+      }
+
       // Log activity
       const amount = session.amount_total ? (session.amount_total / 100).toFixed(2) : '?';
       addActivity(
@@ -292,6 +301,13 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       // Update content request status if linked
       if (contentRequestId) {
         updateContentRequest(workspaceId, contentRequestId, { status: 'requested' });
+      }
+
+      // Handle tier upgrade
+      if (productType === 'plan_growth' || productType === 'plan_premium') {
+        const newTier = productType === 'plan_growth' ? 'growth' : 'premium';
+        updateWorkspace(workspaceId, { tier: newTier, trialEndsAt: undefined });
+        console.log(`[stripe] Tier upgraded: workspace=${workspaceId} → ${newTier}`);
       }
 
       // Log activity
