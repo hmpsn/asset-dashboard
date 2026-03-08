@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 import express from 'express';
 import helmet from 'helmet';
 import { createServer } from 'http';
@@ -71,6 +72,7 @@ import { getSchedule, listSchedules, upsertSchedule, deleteSchedule, startSchedu
 import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword, togglePinKeyword, storeRankSnapshot, getRankHistory, getLatestRanks } from './rank-tracking.js';
 import { listAnnotations, addAnnotation, deleteAnnotation } from './annotations.js';
 import { startApprovalReminders } from './approval-reminders.js';
+import { startBackupScheduler } from './backup.js';
 import { startMonthlyReports, triggerMonthlyReport } from './monthly-report.js';
 import { listBriefs, getBrief, updateBrief, deleteBrief, generateBrief } from './content-brief.js';
 import { renderBriefHTML } from './brief-export-html.js';
@@ -676,6 +678,12 @@ app.patch('/api/workspaces/:id', requireWorkspaceAccess(), async (req, res) => {
   if (updates.webflowSiteId === null || updates.webflowSiteId === '') {
     updates.webflowToken = '';
     updates.liveDomain = '';
+  }
+  // Hash clientPassword with bcrypt before saving (empty string = remove password)
+  if (typeof updates.clientPassword === 'string') {
+    updates.clientPassword = updates.clientPassword
+      ? await bcrypt.hash(updates.clientPassword, 12)
+      : '';
   }
   // Auto-resolve live domain when linking a site
   if (updates.webflowSiteId && updates.webflowSiteId !== '') {
@@ -4481,12 +4489,21 @@ app.get('/api/public/pricing/:id', (req, res) => {
 });
 
 const clientLoginLimiter = rateLimit(60 * 1000, 5); // 5 attempts per minute per IP
-app.post('/api/public/auth/:id', clientLoginLimiter, (req, res) => {
+app.post('/api/public/auth/:id', clientLoginLimiter, async (req, res) => {
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Not found' });
   if (!ws.clientPassword) return res.json({ ok: true });
   const { password } = req.body;
-  if (password === ws.clientPassword) {
+  // Support both bcrypt hashes (new) and legacy plaintext (migration)
+  const isHash = ws.clientPassword.startsWith('$2a$') || ws.clientPassword.startsWith('$2b$');
+  const match = isHash
+    ? await bcrypt.compare(password, ws.clientPassword)
+    : password === ws.clientPassword;
+  if (match) {
+    // Migrate legacy plaintext password to bcrypt on successful login
+    if (!isHash) {
+      try { updateWorkspace(ws.id, { clientPassword: await bcrypt.hash(password, 12) }); } catch { /* best-effort migration */ }
+    }
     // Issue signed session cookie for server-side verification
     const sessionToken = signClientSession(ws.id);
     res.cookie(`client_session_${ws.id}`, sessionToken, {
@@ -6571,6 +6588,8 @@ startScheduler();
 startApprovalReminders();
 // Start monthly reports
 startMonthlyReports();
+// Start daily data backups
+startBackupScheduler();
 
 // Start
 const PORT = parseInt(process.env.PORT || '3001', 10);
@@ -6587,6 +6606,11 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`[startup] OPENAI_API_KEY env: ${process.env.OPENAI_API_KEY ? 'SET' : 'NOT SET'}`);
   console.log(`[startup] GOOGLE_PSI_KEY env: ${process.env.GOOGLE_PSI_KEY ? 'SET' : 'NOT SET'}`);
   console.log(`[startup] STRIPE: ${isStripeConfigured() ? 'CONFIGURED' : 'NOT CONFIGURED (set STRIPE_SECRET_KEY to enable payments)'}`);
+  if (!process.env.JWT_SECRET) {
+    console.warn('[startup] ⚠️  JWT_SECRET is NOT SET — using insecure hardcoded fallback. Set JWT_SECRET in environment before production launch.');
+  } else {
+    console.log('[startup] JWT_SECRET: SET');
+  }
   console.log(`[startup] Workspaces loaded: ${workspaces.length}`);
   for (const ws of workspaces) {
     console.log(`[startup]   - ${ws.name}: siteId=${ws.webflowSiteId || 'none'}, hasToken=${!!ws.webflowToken}`);

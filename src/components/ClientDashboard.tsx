@@ -190,6 +190,8 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
   const [feedbackReqId, setFeedbackReqId] = useState<string | null>(null);
   const [feedbackText, setFeedbackText] = useState('');
   const [showWelcome, setShowWelcome] = useState(false);
+  // Track data-loading errors per section for inline error indicators
+  const [sectionErrors, setSectionErrors] = useState<Record<string, string>>({});
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
 
@@ -300,7 +302,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
       const res = await fetch(`/api/public/requests/${wsId}`);
       const data = await res.json();
       if (Array.isArray(data)) setRequests(data);
-    } catch { /* skip */ }
+    } catch { setSectionError('requests', 'Unable to load requests'); }
     finally { setRequestsLoading(false); }
   };
 
@@ -323,7 +325,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         setNewReqTitle(''); setNewReqDesc(''); setNewReqCategory('other'); setNewReqPage(''); setNewReqName(''); setNewReqFiles([]); setShowNewRequest(false);
         loadRequests(workspaceId);
       }
-    } catch { /* skip */ }
+    } catch { setToast({ message: 'Failed to submit request. Please try again.', type: 'error' }); setTimeout(() => setToast(null), 5000); }
     finally { setSubmittingReq(false); }
   };
 
@@ -344,7 +346,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
       }
       setReqNoteInput(''); setNoteFiles([]);
       loadRequests(workspaceId);
-    } catch { /* skip */ }
+    } catch { setToast({ message: 'Failed to send note. Please try again.', type: 'error' }); setTimeout(() => setToast(null), 5000); }
     finally { setSendingNote(false); }
   };
 
@@ -354,24 +356,27 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
       const res = await fetch(`/api/public/approvals/${wsId}`);
       const data = await res.json();
       if (Array.isArray(data)) setApprovalBatches(data);
-    } catch { /* skip */ }
+    } catch { setSectionError('approvals', 'Unable to load approvals'); }
     setApprovalsLoading(false);
   };
 
+  const setSectionError = (key: string, msg: string) => setSectionErrors(prev => ({ ...prev, [key]: msg }));
+  const clearSectionError = (key: string) => setSectionErrors(prev => { const n = { ...prev }; delete n[key]; return n; });
+
   const loadDashboardData = (data: WorkspaceInfo) => {
     if (data.gscPropertyUrl) loadSearchData(data.id, 28);
-    fetch(`/api/public/audit-summary/${data.id}`).then(r => r.json()).then(a => { if (a?.id) setAudit(a); }).catch(() => {});
+    fetch(`/api/public/audit-summary/${data.id}`).then(r => r.json()).then(a => { if (a?.id) { setAudit(a); clearSectionError('audit'); } }).catch(() => setSectionError('audit', 'Unable to load site health data'));
     fetch(`/api/public/audit-detail/${data.id}`).then(r => r.json()).then(d => { if (d?.id) setAuditDetail(d); }).catch(() => {});
     if (data.ga4PropertyId) loadGA4Data(data.id, 28);
     loadApprovals(data.id);
     loadRequests(data.id);
-    fetch(`/api/public/activity/${data.id}?limit=20`).then(r => r.json()).then(a => { if (Array.isArray(a)) setActivityLog(a); }).catch(() => {});
+    fetch(`/api/public/activity/${data.id}?limit=20`).then(r => r.json()).then(a => { if (Array.isArray(a)) setActivityLog(a); }).catch(() => setSectionError('activity', 'Unable to load activity'));
     fetch(`/api/public/rank-tracking/${data.id}/history`).then(r => r.json()).then(h => { if (Array.isArray(h)) setRankHistory(h); }).catch(() => {});
-    fetch(`/api/public/rank-tracking/${data.id}/latest`).then(r => r.json()).then(l => { if (Array.isArray(l)) setLatestRanks(l); }).catch(() => {});
+    fetch(`/api/public/rank-tracking/${data.id}/latest`).then(r => r.json()).then(l => { if (Array.isArray(l)) setLatestRanks(l); }).catch(() => setSectionError('ranks', 'Unable to load ranking data'));
     fetch(`/api/public/annotations/${data.id}`).then(r => r.json()).then(a => { if (Array.isArray(a)) setAnnotations(a); }).catch(() => {});
     // Load strategy if SEO view is enabled
     if (data.seoClientView) {
-      fetch(`/api/public/seo-strategy/${data.id}`).then(r => r.ok ? r.json() : null).then(s => { if (s) setStrategyData(s); }).catch(() => {});
+      fetch(`/api/public/seo-strategy/${data.id}`).then(r => r.ok ? r.json() : null).then(s => { if (s) setStrategyData(s); }).catch(() => setSectionError('strategy', 'Unable to load SEO strategy'));
     }
     // Load product pricing for inline price display
     fetch(`/api/public/pricing/${data.id}`).then(r => r.ok ? r.json() : null).then(p => { if (p) setPricingData(p); }).catch(() => {});
@@ -381,7 +386,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         setContentRequests(reqs);
         setRequestedTopics(new Set(reqs.map(r => r.targetKeyword)));
       }
-    }).catch(() => {});
+    }).catch(() => setSectionError('content', 'Unable to load content requests'));
   };
 
   const loadGA4Data = async (wsId: string, numDays: number, dateRange?: { startDate: string; endDate: string }) => {
@@ -416,6 +421,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
       if (Array.isArray(lp)) setGa4LandingPages(lp);
     } catch (err) {
       console.error('GA4 data load error:', err);
+      setSectionError('analytics', 'Unable to load analytics data');
     }
   };
 
@@ -503,7 +509,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         setContentRequests(prev => prev.map(r => r.id === reqId ? updated : r));
         setDeclineReqId(null); setDeclineReason('');
       }
-    } catch { /* skip */ }
+    } catch { setToast({ message: 'Failed to decline topic. Please try again.', type: 'error' }); setTimeout(() => setToast(null), 5000); }
   };
 
   const approveBrief = async (reqId: string) => {
@@ -515,7 +521,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         setToast({ message: 'Brief approved! Your team will begin content production.', type: 'success' });
         setTimeout(() => setToast(null), 5000);
       }
-    } catch { /* skip */ }
+    } catch { setToast({ message: 'Failed to approve brief. Please try again.', type: 'error' }); setTimeout(() => setToast(null), 5000); }
   };
 
   const upgradeToFullPost = async (reqId: string) => {
@@ -528,7 +534,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         setToast({ message: 'Upgraded to full blog post! Your team will begin writing.', type: 'success' });
         setTimeout(() => setToast(null), 5000);
       }
-    } catch { /* skip */ }
+    } catch { setToast({ message: 'Failed to upgrade to full post. Please try again.', type: 'error' }); setTimeout(() => setToast(null), 5000); }
     setUpgradingReqId(null);
   };
 
@@ -657,7 +663,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         setContentRequests(prev => prev.map(r => r.id === reqId ? updated : r));
         setFeedbackReqId(null); setFeedbackText('');
       }
-    } catch { /* skip */ }
+    } catch { setToast({ message: 'Failed to submit feedback. Please try again.', type: 'error' }); setTimeout(() => setToast(null), 5000); }
   };
 
   const addContentComment = async (reqId: string) => {
@@ -673,7 +679,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         setContentRequests(prev => prev.map(r => r.id === reqId ? updated : r));
         setContentComment('');
       }
-    } catch { /* skip */ }
+    } catch { setToast({ message: 'Failed to send comment. Please try again.', type: 'error' }); setTimeout(() => setToast(null), 5000); }
     setSendingContentComment(false);
   };
 
@@ -685,7 +691,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         const brief = await res.json();
         setBriefPreviews(prev => ({ ...prev, [briefId]: brief }));
       }
-    } catch { /* skip */ }
+    } catch { setToast({ message: 'Failed to load brief preview.', type: 'error' }); setTimeout(() => setToast(null), 5000); }
   };
 
   const handlePasswordSubmit = async (e?: React.FormEvent) => {
@@ -1071,7 +1077,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
       if (updated.id) {
         setApprovalBatches(prev => prev.map(b => b.id === batchId ? updated : b));
       }
-    } catch { /* skip */ }
+    } catch { setToast({ message: 'Failed to update approval. Please try again.', type: 'error' }); setTimeout(() => setToast(null), 5000); }
     setEditingApproval(null);
     setEditDraft('');
   };
@@ -1084,7 +1090,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
       if (data.applied > 0) {
         loadApprovals(workspaceId);
       }
-    } catch { /* skip */ }
+    } catch { setToast({ message: 'Failed to apply changes. Please try again.', type: 'error' }); setTimeout(() => setToast(null), 5000); }
     setApplyingBatch(null);
   };
 
@@ -1266,6 +1272,16 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
               Your Growth trial has ended. Some features are now limited.
               {' '}Upgrade to restore full access.
             </p>
+          </div>
+        )}
+
+        {/* Section loading errors */}
+        {Object.keys(sectionErrors).length > 0 && (
+          <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-red-500/8 border border-red-500/15">
+            <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-red-300 space-y-0.5">
+              {Object.values(sectionErrors).map((msg, i) => <p key={i}>{msg} — try refreshing the page.</p>)}
+            </div>
           </div>
         )}
 

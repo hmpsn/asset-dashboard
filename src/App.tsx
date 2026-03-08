@@ -3,6 +3,7 @@ import { WorkspaceSelector, type Workspace } from './components/WorkspaceSelecto
 import { type QueueItem } from './components/ProcessingQueue';
 import { StatusBar } from './components/StatusBar';
 import { LoginScreen } from './components/LoginScreen';
+import { MobileGuard } from './components/MobileGuard';
 import { useAuth } from './hooks/useAuth';
 import { useWebSocket } from './hooks/useWebSocket';
 import { ToastProvider } from './components/Toast';
@@ -68,7 +69,7 @@ function App() {
   // Client dashboard route: /client/:workspaceId (public, no auth)
   const clientMatch = window.location.pathname.match(/^\/client\/([\w_]+)/);
   if (clientMatch) {
-    return <Suspense fallback={<ChunkFallback />}><ClientDashboard workspaceId={clientMatch[1]} /></Suspense>;
+    return <MobileGuard><Suspense fallback={<ChunkFallback />}><ClientDashboard workspaceId={clientMatch[1]} /></Suspense></MobileGuard>;
   }
   return <ToastProvider><BackgroundTaskProvider><AdminApp /></BackgroundTaskProvider></ToastProvider>;
 }
