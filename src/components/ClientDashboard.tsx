@@ -77,6 +77,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
   const [chatSessionId, setChatSessionId] = useState<string>(() => `cs-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
   const [chatSessions, setChatSessions] = useState<Array<{ id: string; title: string; messageCount: number; updatedAt: string }>>([]);
   const [showChatHistory, setShowChatHistory] = useState(false);
+  const [chatUsage, setChatUsage] = useState<{ allowed: boolean; used: number; limit: number; remaining: number; tier: string } | null>(null);
   const [ga4Overview, setGa4Overview] = useState<GA4Overview | null>(null);
   const [ga4Trend, setGa4Trend] = useState<GA4DailyTrend[]>([]);
   const [ga4Pages, setGa4Pages] = useState<GA4TopPage[]>([]);
@@ -775,7 +776,14 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         body: JSON.stringify({ question: question.trim(), context, sessionId: chatSessionId }),
       });
       const data = await res.json();
-      setChatMessages(prev => [...prev, { role: 'assistant', content: data.error ? `Error: ${data.error}` : data.answer }]);
+      if (res.status === 429) {
+        setChatMessages(prev => [...prev, { role: 'assistant', content: `You've used all your free conversations this month. Upgrade to Growth for unlimited chat access.` }]);
+        setChatUsage(u => u ? { ...u, allowed: false, remaining: 0 } : u);
+      } else {
+        setChatMessages(prev => [...prev, { role: 'assistant', content: data.error ? `Error: ${data.error}` : data.answer }]);
+      }
+      // Refresh usage counter
+      if (ws) fetch(`/api/public/chat-usage/${ws.id}`).then(r => r.json()).then(d => setChatUsage(d)).catch(() => {});
     } catch {
       setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong.' }]);
     } finally { setChatLoading(false); }
@@ -799,9 +807,17 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
     finally { setChatLoading(false); }
   };
 
-  // Auto-fire proactive insight when chat opens for first time
+  // Fetch chat usage when chat opens
   useEffect(() => {
-    if (chatOpen && chatMessages.length === 0 && !proactiveInsightSent.current && (overview || ga4Overview) && ws) {
+    if (chatOpen && ws) {
+      fetch(`/api/public/chat-usage/${ws.id}`).then(r => r.json()).then(d => setChatUsage(d)).catch(() => {});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatOpen]);
+
+  // Auto-fire proactive insight when chat opens for first time (skip on free tier — saves tokens + creates upgrade incentive)
+  useEffect(() => {
+    if (chatOpen && chatMessages.length === 0 && !proactiveInsightSent.current && (overview || ga4Overview) && ws && effectiveTier !== 'free') {
       proactiveInsightSent.current = true;
       fetchProactiveInsight();
     }
@@ -2677,7 +2693,16 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
         {chatOpen && (
           <div className="fixed bottom-6 right-6 w-96 bg-zinc-900 rounded-2xl border border-zinc-800 shadow-2xl shadow-black/40 overflow-hidden z-50 flex flex-col max-h-[500px]">
             <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 flex-shrink-0">
-              <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-teal-400" /><span className="text-sm font-medium text-zinc-200">Insights Engine</span><span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">by hmpsn studio</span></div>
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-teal-400" /><span className="text-sm font-medium text-zinc-200">Insights Engine</span>
+                {chatUsage && chatUsage.tier === 'free' ? (
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${chatUsage.remaining > 0 ? 'text-zinc-400 bg-zinc-800' : 'text-amber-400 bg-amber-500/10 border border-amber-500/20'}`}>
+                    {chatUsage.remaining}/{chatUsage.limit} left
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">by hmpsn studio</span>
+                )}
+              </div>
               <div className="flex items-center gap-1">
                 {chatMessages.length > 0 && (
                   <button onClick={() => { setChatSessionId(`cs-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`); setChatMessages([]); setShowChatHistory(false); }}
@@ -2749,11 +2774,20 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
               )}
               </>)}
             </div>
+            {chatUsage && chatUsage.tier === 'free' && !chatUsage.allowed ? (
+            <div className="px-4 py-3 border-t border-zinc-800 flex-shrink-0">
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                <Lock className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                <p className="text-[11px] text-amber-300/80 flex-1">You've used all {chatUsage.limit} free conversations this month.</p>
+              </div>
+            </div>
+            ) : (
             <div className="px-4 py-3 border-t border-zinc-800 flex gap-2 flex-shrink-0">
               <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && askAi(chatInput)}
                 placeholder="Ask about your site data..." className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500" disabled={chatLoading} />
               <button onClick={() => askAi(chatInput)} disabled={chatLoading || !chatInput.trim()} className="px-3 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-lg transition-colors"><Send className="w-3.5 h-3.5" /></button>
             </div>
+            )}
           </div>
         )}
       </>)}

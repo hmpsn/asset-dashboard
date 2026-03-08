@@ -77,7 +77,7 @@ import { renderBriefHTML } from './brief-export-html.js';
 import { listContentRequests, getContentRequest, createContentRequest, updateContentRequest, deleteContentRequest, addComment } from './content-requests.js';
 import { isSemrushConfigured, getKeywordOverview, getDomainOrganicKeywords, getKeywordGap, getRelatedKeywords, estimateCreditCost, clearSemrushCache } from './semrush.js';
 import { callOpenAI, getTokenUsage } from './openai-helpers.js';
-import { addMessage, buildConversationContext, listSessions, getSession as getChatSession, deleteSession as deleteChatSession, generateSessionSummary } from './chat-memory.js';
+import { addMessage, buildConversationContext, listSessions, getSession as getChatSession, deleteSession as deleteChatSession, generateSessionSummary, checkChatRateLimit } from './chat-memory.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
 import { isStripeConfigured, createCheckoutSession, createPaymentIntentForProduct, constructWebhookEvent, handleWebhookEvent, getProductConfig, listProducts } from './stripe.js';
 import { listPayments, getPayment } from './payments.js';
@@ -4967,11 +4967,32 @@ app.post('/api/public/chat-sessions/:workspaceId/:sessionId/summarize', async (r
   }
 });
 
+// Chat usage / rate limit info
+app.get('/api/public/chat-usage/:workspaceId', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const tier = ws.tier || 'free';
+  const rl = checkChatRateLimit(ws.id, tier);
+  res.json({ ...rl, tier });
+});
+
 app.post('/api/public/search-chat/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(400).json({ error: 'Workspace not configured' });
   const { question, context, sessionId } = req.body;
   if (!question) return res.status(400).json({ error: 'question required' });
+
+  // Rate limit check for free tier
+  const tier = ws.tier || 'free';
+  const rl = checkChatRateLimit(ws.id, tier, sessionId);
+  if (!rl.allowed) {
+    return res.status(429).json({
+      error: 'Chat limit reached',
+      message: `You've used all ${rl.limit} free conversations this month. Upgrade to Growth for unlimited chat.`,
+      used: rl.used,
+      limit: rl.limit,
+    });
+  }
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) return res.status(400).json({ error: 'AI not configured' });
 

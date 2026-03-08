@@ -124,6 +124,51 @@ export function addMessage(
   return session;
 }
 
+// ── Rate limiting ──
+
+export const FREE_CHAT_LIMIT = 3; // conversations per calendar month on free tier
+
+/**
+ * Count the number of unique conversations (sessions with ≥1 user message)
+ * in the current calendar month for a workspace on a given channel.
+ */
+export function getMonthlyConversationCount(workspaceId: string, channel: 'client' | 'admin' | 'search' = 'client'): number {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const sessions = listSessions(workspaceId, channel);
+  return sessions.filter(s => {
+    // Session must have been created this month and have at least 1 message (from user)
+    return s.createdAt >= monthStart && s.messageCount >= 1;
+  }).length;
+}
+
+/**
+ * Check if a workspace on free tier can start/continue a conversation.
+ * Returns { allowed, used, limit, remaining }.
+ */
+export function checkChatRateLimit(workspaceId: string, tier: string, sessionId?: string): {
+  allowed: boolean;
+  used: number;
+  limit: number;
+  remaining: number;
+} {
+  if (tier !== 'free') return { allowed: true, used: 0, limit: Infinity, remaining: Infinity };
+
+  const used = getMonthlyConversationCount(workspaceId, 'client');
+
+  // If continuing an existing session, always allow
+  if (sessionId) {
+    const existing = getSession(workspaceId, sessionId);
+    if (existing && existing.messages.length > 0) {
+      return { allowed: true, used, limit: FREE_CHAT_LIMIT, remaining: Math.max(0, FREE_CHAT_LIMIT - used) };
+    }
+  }
+
+  // New conversation — check limit
+  const remaining = Math.max(0, FREE_CHAT_LIMIT - used);
+  return { allowed: remaining > 0, used, limit: FREE_CHAT_LIMIT, remaining };
+}
+
 // ── Cross-session context ──
 
 /**
