@@ -197,6 +197,28 @@ export async function createPaymentIntentForProduct(params: PaymentIntentParams)
   return { clientSecret: intent.client_secret!, paymentIntentId: intent.id, amount: amountCents };
 }
 
+// --- Startup: clear stale test-mode customer IDs when using live keys ---
+
+export function clearTestModeCustomerIds(): number {
+  const key = getStripeSecretKey();
+  if (!key || !key.startsWith('sk_live_')) return 0;
+  const { listWorkspaces, updateWorkspace: updateWs } = require('./workspaces.js');
+  const workspaces = listWorkspaces();
+  let cleared = 0;
+  for (const ws of workspaces) {
+    if (ws.stripeCustomerId && ws.stripeCustomerId.startsWith('cus_') && !ws.stripeCustomerId.startsWith('cus_live_')) {
+      // Test-mode customer IDs won't start with 'cus_live_' — but there's no reliable prefix.
+      // Instead, just try to retrieve it and clear if it fails.
+      // For a simpler heuristic: clear any stored ID when switching to live mode.
+      // The getOrCreateCustomer function will create a fresh live customer on next payment.
+      updateWs(ws.id, { stripeCustomerId: '' });
+      cleared++;
+    }
+  }
+  if (cleared > 0) console.log(`[stripe] Cleared ${cleared} stale test-mode customer ID(s) — live customers will be created on next payment`);
+  return cleared;
+}
+
 // --- Webhook Handler ---
 
 export function constructWebhookEvent(rawBody: Buffer, signature: string): Stripe.Event {

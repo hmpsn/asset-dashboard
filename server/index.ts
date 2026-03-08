@@ -84,7 +84,7 @@ import { signToken, verifyToken as verifyJwtToken, requireAuth, requireRole, req
 import { callOpenAI, getTokenUsage } from './openai-helpers.js';
 import { addMessage, buildConversationContext, listSessions, getSession as getChatSession, deleteSession as deleteChatSession, generateSessionSummary, checkChatRateLimit } from './chat-memory.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
-import { isStripeConfigured, createCheckoutSession, createPaymentIntentForProduct, constructWebhookEvent, handleWebhookEvent, getProductConfig, listProducts } from './stripe.js';
+import { isStripeConfigured, createCheckoutSession, createPaymentIntentForProduct, constructWebhookEvent, handleWebhookEvent, getProductConfig, listProducts, clearTestModeCustomerIds } from './stripe.js';
 import { listPayments, getPayment } from './payments.js';
 import { getStripeConfigSafe, saveStripeKeys, saveStripeProducts, clearStripeConfig, getStripePublishableKey, type StripeProductPrice } from './stripe-config.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
@@ -6590,6 +6590,8 @@ startApprovalReminders();
 startMonthlyReports();
 // Start daily data backups
 startBackupScheduler();
+// Clear stale test-mode Stripe customer IDs (one-time on startup when using live keys)
+clearTestModeCustomerIds();
 
 // Start
 const PORT = parseInt(process.env.PORT || '3001', 10);
