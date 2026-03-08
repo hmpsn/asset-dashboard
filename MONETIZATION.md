@@ -100,6 +100,21 @@ A comprehensive monetization plan for the asset dashboard platform, covering tie
 
 **Strategy:** Premium is the managed partnership. The 3 included hours (at $150/hr floor rate = $450) plus $549 software margin makes the unit economics work. Clients feel like they have an SEO team. Additional hours available as add-on ($200/hr ad-hoc, $175/hr 5-hr block, $150/hr 10-hr block). Strategy & implementation hours are scoped to SEO execution only — not general development.
 
+**What the 3 hours cover (no additional charge):**
+- AI generation of schemas, metadata suggestions, strategy — always free (pennies in tokens)
+- Publishing schemas to Webflow
+- Updating meta titles, descriptions, OG tags
+- Setting up and implementing redirects
+- Publishing approved content to the site
+- Fixing audit issues (alt text, heading structure, etc.)
+- Any technical SEO execution within the platform
+
+**What still costs extra on Premium:**
+- Full content writing (blog posts, landing pages, etc.) — still purchased as deliverables
+- Add-on implementation hours beyond the included 3
+
+**Why:** Don't nickel-and-dime a $999/mo client with $29 metadata charges. The hour cap is the natural boundary — if they need more work, they buy an hour block. Clean, simple, trust-building.
+
 ---
 
 ## Product Pricing (One-Time Deliverables)
@@ -132,12 +147,101 @@ Transactional revenue items — purchased inside the platform, fulfilled through
 | **Pillar Page** | $1,500–2,500 | ~$3 tokens + 6-8hr | ~55% | 3,000-5,000 word authority piece with cluster linking |
 | **Resource/Guide** | $800–1,500 | ~$2 tokens + 3-5hr | ~65% | Downloadable PDF + web version, lead gen form copy |
 
-### Schema Generation
+### Technical SEO Products (Growth Tier — Self-Service Cart)
+
+Growth clients don't have implementation hours — they purchase technical SEO fixes à la carte. The platform generates recommendations, the client selects what they want done, pays via Stripe, and we fulfill.
+
+#### Per-Page Products
+
+| Product | Price | Agency Cost | Margin | What's Delivered |
+|---------|:-----:|:-----------:|:------:|------------------|
+| **Metadata Optimization** | $29/page | ~$0.05 tokens + 5min | ~90% | AI-optimized title, meta description, OG tags — published to Webflow |
+| **Schema Generation + Publishing** | $39/page | ~$0.10 tokens + 5min | ~90% | JSON-LD schema generated, validated, and published via Webflow API |
+| **Alt Text Optimization** | $19/page | ~$0.05 tokens + 3min | ~90% | AI-generated descriptive alt text for all images on the page |
+| **Redirect Fix** | $19/redirect | ~2min labor | ~90% | Fix redirect chain or 404 with proper 301 rule |
+
+#### Site-Wide Packages
+
+| Product | Price | Agency Cost | Margin | What's Delivered |
+|---------|:-----:|:-----------:|:------:|------------------|
+| **Full-Site Schema Package** | $249 flat | ~$2–5 tokens + 30min | ~90% | Schema for all pages, generated + published |
+| **Full Metadata Sweep** | $199 flat | ~$1 tokens + 45min | ~85% | Titles + descriptions optimized for all pages |
+| **Audit Fix Bundle (5 pages)** | $99 | ~$0.50 tokens + 20min | ~85% | Fix all critical audit issues on 5 highest-priority pages |
+| **Audit Fix Bundle (all pages)** | $299 | ~$2 tokens + 1-2hr | ~75% | Fix all critical audit issues site-wide |
+
+#### How the Cart Works (UX Flow)
+
+```
+Client visits Site Health tab
+    │
+    ├─ Sees issues list: "14 pages missing meta descriptions"
+    │   └─ Each issue row has: [ Fix This → $29/page ] button
+    │   └─ Banner: [ Fix All 14 → $199 (save $207) ] ← smart bundle pricing
+    │
+    ├─ Selects individual fixes OR clicks a bundle
+    │   └─ Items added to a cart sidebar / drawer
+    │
+    ├─ Cart shows:
+    │   ┌─────────────────────────────────────┐
+    │   │  Your SEO Fixes                     │
+    │   │                                     │
+    │   │  ☑ Meta optimization (8 pages) $199 │
+    │   │  ☑ Schema (3 pages)          $117  │
+    │   │  ☑ Redirect fixes (2)         $38  │
+    │   │  ─────────────────────────────────  │
+    │   │  Total                        $354  │
+    │   │                                     │
+    │   │  [ Checkout → Stripe ]              │
+    │   └─────────────────────────────────────┘
+    │
+    ├─ Stripe Checkout (single session, all items)
+    │
+    └─ Fulfillment:
+        ├─ Items appear as tasks in admin queue
+        ├─ AI auto-generates fixes (meta, schema, alt text)
+        ├─ Admin reviews + publishes to Webflow
+        └─ Client notified: "3 fixes applied to your site"
+```
+
+#### Where Recommendations Surface
+
+The cart is fed from multiple recommendation sources across the dashboard:
+
+| Source | Recommendation Type | Cart Action |
+|--------|-------------------|-------------|
+| **Site Health** audit | Missing meta, no schema, alt text, redirects | "Fix this" per issue or "Fix all" bundle |
+| **SEO Strategy** tab | Quick wins (positions 5-20), content gaps | "Get a Brief" or "Optimize this page" |
+| **AI Chat Advisor** | Contextual recommendations mid-conversation | "Want me to add that to your cart?" |
+| **Monthly Report** email | "3 new issues found this month" | CTA → dashboard → cart |
+
+#### Smart Bundle Pricing
+
+When a client selects 5+ items of the same type, auto-offer a bundle discount:
+- 5-9 pages: 15% off per-page rate
+- 10-19 pages: 25% off per-page rate
+- 20+ pages: flat site-wide package price
+
+This incentivizes larger purchases while keeping per-item pricing transparent.
+
+#### Premium vs Growth: Technical SEO Pricing
+
+| Action | Growth | Premium |
+|--------|--------|---------|
+| AI generates recommendations | Free | Free |
+| View recommendations in dashboard | Free | Free |
+| Metadata optimization | $29/page (cart) | Included in 3 hrs |
+| Schema generation + publishing | $39/page (cart) | Included in 3 hrs |
+| Redirect fixes | $19/redirect (cart) | Included in 3 hrs |
+| Alt text optimization | $19/page (cart) | Included in 3 hrs |
+| Content briefs | $75-350 (purchase) | $75-350 (purchase) |
+| Full content posts | $250-2,500 (purchase) | $250-2,500 (purchase) |
+
+### Schema Generation (Legacy — now part of Technical SEO Products)
 
 | Product | Price | Agency Cost | Margin |
 |---------|:-----:|:-----------:|:------:|
-| Per-page schema (generate + publish) | $25–50/page | ~$0.10 tokens | ~95% |
-| Full-site schema package (all pages) | $200–500 flat | ~$2–5 tokens | ~95% |
+| Per-page schema (generate + publish) | $39/page | ~$0.10 tokens | ~95% |
+| Full-site schema package (all pages) | $249 flat | ~$2–5 tokens | ~95% |
 
 ### Keyword Strategy
 
@@ -204,33 +308,39 @@ This mapping feeds into:
 Client lands on dashboard (free)
     │
     ├─ Sees Site Health score → "72/100, 14 errors"
-    │   └─ Can't fix them → needs agency (retainer / hourly)
+    │   ├─ Growth: [ Fix This → $29/page ] buttons on each issue
+    │   │   └─ 💰 Adds to SEO Fix Cart → Stripe Checkout
+    │   │       └─ 💰 Bundle: [ Fix All 14 → $199 ] smart pricing
+    │   └─ Premium: covered by 3 implementation hrs/mo
     │
     ├─ AI chatbot opens with proactive insights
     │   └─ "Your clicks dropped 8% — here are 3 things to fix"
-    │   └─ Revenue hook → "Want me to create a brief for that?"
-    │       └─ 💰 Content brief purchase ($75-150)
-    │           └─ 💰 Upgrade to full post ($250-800)
+    │   └─ Revenue hook → "Want me to add a fix to your cart?"
+    │       └─ 💰 Technical SEO fix ($19-39/page)
+    │       └─ 💰 Content brief purchase ($75-350)
+    │           └─ 💰 Upgrade to full post ($250-2,500)
     │
-    ├─ Strategy tab shows content gaps
-    │   └─ "Request This Topic" button
-    │       └─ 💰 Brief → Post pipeline
+    ├─ Strategy tab shows content gaps + quick wins
+    │   ├─ "Request This Topic" → 💰 Brief → Post pipeline
+    │   └─ "Optimize This Page" → 💰 Meta/schema fix via cart
     │
     ├─ Schema tab shows "No structured data"
-    │   └─ 💰 Schema package ($200-500)
+    │   └─ Growth: 💰 Per-page ($39) or full-site ($249) via cart
+    │   └─ Premium: covered by implementation hours
     │
     └─ Monthly report email
-        └─ "Your organic traffic grew 12%" or "dropped 5%"
-            └─ Client logs in → sees opportunities → spends
+        └─ "3 new issues found" or "traffic dropped 5%"
+            └─ Client logs in → sees fix recommendations → cart → pays
 ```
 
 ### Key Monetization Moments (by frequency)
 
-1. **Every chat open** — proactive insights surface problems/opportunities
-2. **Every dashboard visit** — health score, strategy gaps, comparison data create urgency
-3. **Every "Request This Topic" click** — direct pipeline to paid content
-4. **Monthly report email** — re-engagement trigger
-5. **Competitor comparison** — "they're ahead of you on X" drives action
+1. **Every dashboard visit** — health score issues surface with "Fix this → $X" buttons
+2. **Every chat open** — proactive insights recommend fixes, AI offers to add to cart
+3. **Every Strategy tab visit** — content gaps + quick wins with purchase CTAs
+4. **Every audit completion** — new issues = new fix recommendations = new revenue
+5. **Monthly report email** — "3 new issues found" re-engagement trigger
+6. **Competitor comparison** — "they're ahead of you on X" drives action
 
 ---
 
