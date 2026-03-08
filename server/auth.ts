@@ -92,6 +92,37 @@ export function requireRole(...roles: string[]) {
 }
 
 /**
+ * Requires the authenticated user to have access to the workspace
+ * identified by :id or :workspaceId in the route params.
+ * Owners always have access to all workspaces.
+ * Must be used AFTER requireAuth.
+ */
+export function requireWorkspaceAccess(paramName: string = 'id') {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    // If no JWT user is set, pass through (legacy APP_PASSWORD auth handles access)
+    if (!req.user) {
+      next();
+      return;
+    }
+    // Owners bypass workspace checks
+    if (req.user.role === 'owner') {
+      next();
+      return;
+    }
+    const wsId = req.params[paramName];
+    if (!wsId) {
+      next();
+      return;
+    }
+    if (!req.user.workspaceIds || !req.user.workspaceIds.includes(wsId)) {
+      res.status(403).json({ error: 'You do not have access to this workspace' });
+      return;
+    }
+    next();
+  };
+}
+
+/**
  * Optional auth — populates req.user if a valid token is present,
  * but does not reject the request if missing.
  */

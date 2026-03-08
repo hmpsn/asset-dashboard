@@ -77,7 +77,7 @@ import { renderBriefHTML } from './brief-export-html.js';
 import { listContentRequests, getContentRequest, createContentRequest, updateContentRequest, deleteContentRequest, addComment } from './content-requests.js';
 import { isSemrushConfigured, getKeywordOverview, getDomainOrganicKeywords, getKeywordGap, getRelatedKeywords, estimateCreditCost, clearSemrushCache } from './semrush.js';
 import { createUser, verifyPassword, listUsers, getSafeUser, updateUser, changePassword, deleteUser, recordLogin, userCount } from './users.js';
-import { signToken, requireAuth, requireRole } from './auth.js';
+import { signToken, verifyToken as verifyJwtToken, requireAuth, requireRole, requireWorkspaceAccess, optionalAuth } from './auth.js';
 import { callOpenAI, getTokenUsage } from './openai-helpers.js';
 import { addMessage, buildConversationContext, listSessions, getSession as getChatSession, deleteSession as deleteChatSession, generateSessionSummary, checkChatRateLimit } from './chat-memory.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
@@ -240,6 +240,9 @@ function validateEnum<T extends string>(val: unknown, allowed: T[], fallback: T)
   return allowed.includes(val as T) ? (val as T) : fallback;
 }
 
+// --- Populate req.user from JWT when present (non-blocking) ---
+app.use(optionalAuth);
+
 // --- Auth middleware (password gate) ---
 const APP_PASSWORD = process.env.APP_PASSWORD;
 if (APP_PASSWORD) {
@@ -250,9 +253,16 @@ if (APP_PASSWORD) {
     // Check header or cookie (support both legacy raw password and new HMAC token)
     const token = (req.headers['x-auth-token'] || req.cookies?.auth_token || '') as string;
     if (token === APP_PASSWORD || verifyAdminToken(token)) return next();
+    // Also accept new JWT user tokens (from cookie or Authorization header)
+    const jwtToken = req.cookies?.token || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : '');
+    if (jwtToken) {
+      const payload = verifyJwtToken(jwtToken);
+      if (payload) return next();
+    }
     // Allow auth endpoints through
     if (req.path === '/api/auth/login' && req.method === 'POST') return next();
     if (req.path === '/api/auth/check') return next();
+    if (req.path.startsWith('/api/auth/setup') || req.path === '/api/auth/user-login') return next();
     // Allow Google OAuth callback (Google redirects here without our auth token)
     if (req.path === '/api/google/callback') return next();
     // Allow public report and client routes
@@ -621,7 +631,7 @@ app.get('/api/workspace-overview', (_req, res) => {
   res.json(overview);
 });
 
-app.get('/api/workspaces/:id', (req, res) => {
+app.get('/api/workspaces/:id', requireWorkspaceAccess(), (req, res) => {
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Not found' });
   const safe = { ...ws, webflowToken: undefined, clientPassword: undefined, hasPassword: !!ws.clientPassword };
@@ -636,7 +646,7 @@ app.post('/api/workspaces', (req, res) => {
   res.json(ws);
 });
 
-app.patch('/api/workspaces/:id', async (req, res) => {
+app.patch('/api/workspaces/:id', requireWorkspaceAccess(), async (req, res) => {
   const updates = { ...req.body };
   // When unlinking, clear the token too
   if (updates.webflowSiteId === null || updates.webflowSiteId === '') {
@@ -670,7 +680,7 @@ app.patch('/api/workspaces/:id', async (req, res) => {
   res.json(safe);
 });
 
-app.delete('/api/workspaces/:id', (req, res) => {
+app.delete('/api/workspaces/:id', requireWorkspaceAccess(), (req, res) => {
   const ok = deleteWorkspace(req.params.id);
   if (!ok) return res.status(404).json({ error: 'Not found' });
   broadcast('workspace:deleted', { id: req.params.id });
