@@ -36,6 +36,7 @@ interface WorkspaceSummary {
   requests: { total: number; new: number; active: number; latestDate: string | null };
   approvals: { pending: number; total: number };
   contentRequests?: { pending: number; inProgress: number; delivered: number; total: number };
+  workOrders?: { pending: number; total: number };
   tier?: 'free' | 'growth' | 'premium';
   isTrial?: boolean;
   trialDaysRemaining?: number;
@@ -119,6 +120,7 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
   const totalPendingContent = data.reduce((s, w) => s + (w.contentRequests?.pending || 0), 0);
   const totalInProgressContent = data.reduce((s, w) => s + (w.contentRequests?.inProgress || 0), 0);
   const totalDeliveredContent = data.reduce((s, w) => s + (w.contentRequests?.delivered || 0), 0);
+  const totalPendingWorkOrders = data.reduce((s, w) => s + (w.workOrders?.pending || 0), 0);
   const avgScore = data.filter(w => w.audit).length > 0
     ? Math.round(data.filter(w => w.audit).reduce((s, w) => s + (w.audit?.score || 0), 0) / data.filter(w => w.audit).length)
     : null;
@@ -140,6 +142,7 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
   if (totalNewRequests > 0) attentionItems.push({ label: `${totalNewRequests} new client request${totalNewRequests > 1 ? 's' : ''}`, value: 'Requests', color: 'text-red-400', icon: Bell });
   if (totalPendingApprovals > 0) attentionItems.push({ label: `${totalPendingApprovals} pending approval${totalPendingApprovals > 1 ? 's' : ''}`, value: 'Approvals', color: 'text-teal-400', icon: ClipboardCheck });
   if (totalPendingContent > 0) attentionItems.push({ label: `${totalPendingContent} content brief${totalPendingContent > 1 ? 's' : ''} awaiting review`, value: 'Content', color: 'text-amber-400', icon: FileText });
+  if (totalPendingWorkOrders > 0) attentionItems.push({ label: `${totalPendingWorkOrders} purchased fix${totalPendingWorkOrders > 1 ? 'es' : ''} awaiting fulfillment`, value: 'Work Orders', color: 'text-teal-400', icon: ClipboardCheck });
   const lowScoreWorkspaces = data.filter(w => w.audit && w.audit.score < 60);
   if (lowScoreWorkspaces.length > 0) attentionItems.push({ label: `${lowScoreWorkspaces.length} workspace${lowScoreWorkspaces.length > 1 ? 's' : ''} with health score below 60`, value: 'Health', color: 'text-red-400', icon: AlertTriangle });
   const unlinkWorkspaces = data.filter(w => !w.webflowSiteId);

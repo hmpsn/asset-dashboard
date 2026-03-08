@@ -69,7 +69,7 @@ import { runSalesAudit } from './sales-audit.js';
 import { initJobs, createJob, updateJob, getJob, listJobs, cancelJob, registerAbort, isJobCancelled, hasActiveJob } from './jobs.js';
 import { createBatch, listBatches, getBatch, updateItem, markBatchApplied, deleteBatch } from './approvals.js';
 import { listRequests, createRequest, updateRequest, addNote, deleteRequest, getRequest, getAttachmentsDir, addAttachmentsToRequest, type RequestAttachment } from './requests.js';
-import { notifyTeamNewRequest, notifyClientTeamResponse, notifyClientStatusChange, notifyTeamContentRequest, notifyClientBriefReady, notifyApprovalReady, notifyClientWelcome, isEmailConfigured, initEmailQueue, sendEmail } from './email.js';
+import { notifyTeamNewRequest, notifyClientTeamResponse, notifyClientStatusChange, notifyTeamContentRequest, notifyClientBriefReady, notifyApprovalReady, notifyClientWelcome, notifyClientFixesApplied, isEmailConfigured, initEmailQueue, sendEmail } from './email.js';
 import { getQueueStats } from './email-queue.js';
 import { addActivity, listActivity } from './activity-log.js';
 import { getSchedule, listSchedules, upsertSchedule, deleteSchedule, startScheduler } from './scheduled-audits.js';
@@ -94,6 +94,7 @@ import { listPayments, getPayment } from './payments.js';
 import { computeROI } from './roi.js';
 import { generateRecommendations, loadRecommendations, updateRecommendationStatus, dismissRecommendation } from './recommendations.js';
 import { startChurnSignalScheduler, listChurnSignals, dismissSignal } from './churn-signals.js';
+import { listWorkOrders, updateWorkOrder } from './work-orders.js';
 import { getStripeConfigSafe, saveStripeKeys, saveStripeProducts, clearStripeConfig, getStripePublishableKey, type StripeProductPrice } from './stripe-config.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
 import { listGscSites, getSearchOverview, getPerformanceTrend, getQueryPageData, getAllGscPages, getSearchDeviceBreakdown, getSearchCountryBreakdown, getSearchTypeBreakdown, getSearchPeriodComparison } from './search-console.js';
@@ -643,6 +644,10 @@ app.get('/api/workspace-overview', (_req, res) => {
     const inProgressContentReqs = contentReqs.filter(r => ['brief_generated', 'client_review', 'approved', 'in_progress'].includes(r.status)).length;
     const deliveredContentReqs = contentReqs.filter(r => r.status === 'delivered' || r.status === 'published').length;
 
+    // Work orders
+    const workOrders = listWorkOrders(ws.id);
+    const pendingWorkOrders = workOrders.filter(o => o.status === 'pending' || o.status === 'in_progress').length;
+
     const trialEnd = ws.trialEndsAt ? new Date(ws.trialEndsAt) : null;
     const isTrial = trialEnd ? trialEnd > new Date() : false;
     const trialDaysRemaining = isTrial && trialEnd ? Math.max(0, Math.ceil((trialEnd.getTime() - Date.now()) / 86400000)) : undefined;
@@ -662,6 +667,7 @@ app.get('/api/workspace-overview', (_req, res) => {
       requests: { total: reqTotal, new: reqNew, active: reqActive, latestDate: latestReq?.updatedAt || null },
       approvals: { pending: pendingApprovals, total: totalApprovalItems },
       contentRequests: { pending: pendingContentReqs, inProgress: inProgressContentReqs, delivered: deliveredContentReqs, total: contentReqs.length },
+      workOrders: { pending: pendingWorkOrders, total: workOrders.length },
     };
   });
   res.json(overview);
@@ -6921,9 +6927,10 @@ app.post('/api/stripe/cart-checkout', checkoutLimiter, async (req, res) => {
   try {
     const { sessionId, url } = await createCartCheckoutSession({
       workspaceId,
-      items: items.map((i: { productType: string; quantity: number }) => ({
+      items: items.map((i: { productType: string; quantity: number; pageIds?: string[] }) => ({
         productType: sanitizeString(i.productType, 50) as import('./payments.js').ProductType,
         quantity: Math.max(1, Math.min(100, Number(i.quantity) || 1)),
+        pageIds: Array.isArray(i.pageIds) ? i.pageIds.map((p: string) => sanitizeString(p, 200)) : undefined,
       })),
       successUrl,
       cancelUrl,
@@ -7140,6 +7147,56 @@ app.post('/api/churn-signals/:signalId/dismiss', (req, res) => {
   const ok = dismissSignal(req.params.signalId);
   if (!ok) return res.status(404).json({ error: 'Signal not found' });
   res.json({ dismissed: true });
+});
+
+// --- Work Orders (admin + public) ---
+app.get('/api/work-orders/:workspaceId', (req, res) => {
+  res.json(listWorkOrders(req.params.workspaceId));
+});
+
+app.patch('/api/work-orders/:workspaceId/:orderId', (req, res) => {
+  const { status, assignedTo, notes } = req.body;
+  const wsId = req.params.workspaceId;
+  const updates: Record<string, unknown> = {};
+  if (status) updates.status = status;
+  if (assignedTo !== undefined) updates.assignedTo = assignedTo;
+  if (notes !== undefined) updates.notes = notes;
+  if (status === 'completed') updates.completedAt = new Date().toISOString();
+  const order = updateWorkOrder(wsId, req.params.orderId, updates as Parameters<typeof updateWorkOrder>[2]);
+  if (!order) return res.status(404).json({ error: 'Work order not found' });
+
+  // When work order is completed, update page states + log activity + email client
+  if (status === 'completed') {
+    for (const pageId of order.pageIds) {
+      updatePageState(wsId, pageId, { status: 'live', source: 'cart-fix', workOrderId: order.id, updatedBy: 'admin' });
+    }
+    const ws = getWorkspace(wsId);
+    addActivity(wsId, 'fix_completed',
+      `Fix completed: ${order.productType.replace(/_/g, ' ')}`,
+      `${order.pageIds.length} page${order.pageIds.length !== 1 ? 's' : ''} updated`,
+      { workOrderId: order.id, productType: order.productType });
+    // Email client
+    if (ws) {
+      const clientUsers = listClientUsers(wsId);
+      for (const cu of clientUsers) {
+        if (cu.email) {
+          notifyClientFixesApplied({
+            clientEmail: cu.email,
+            workspaceName: ws.name,
+            workspaceId: wsId,
+            productType: order.productType.replace(/_/g, ' '),
+            pageCount: order.pageIds.length,
+          });
+        }
+      }
+    }
+  }
+
+  res.json(order);
+});
+
+app.get('/api/public/work-orders/:workspaceId', (req, res) => {
+  res.json(listWorkOrders(req.params.workspaceId));
 });
 
 // --- Serve frontend in production (MUST be after all API routes) ---

@@ -4,6 +4,8 @@ import { updateContentRequest } from './content-requests.js';
 import { addActivity } from './activity-log.js';
 import { getStripeSecretKey, getStripeWebhookSecret, getStripePriceId } from './stripe-config.js';
 import { getWorkspace, updateWorkspace, listWorkspaces } from './workspaces.js';
+import { createWorkOrder } from './work-orders.js';
+import { notifyTeamPaymentReceived } from './email.js';
 
 // --- Stripe SDK (lazy init — picks up keys saved via admin UI or env vars) ---
 
@@ -130,7 +132,7 @@ export async function createCheckoutSession(params: CheckoutParams): Promise<{ s
 
 export interface CartCheckoutParams {
   workspaceId: string;
-  items: Array<{ productType: ProductType; quantity: number }>;
+  items: Array<{ productType: ProductType; quantity: number; pageIds?: string[] }>;
   successUrl: string;
   cancelUrl: string;
 }
@@ -335,6 +337,52 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
         contentRequestId ? `Content request: ${contentRequestId}` : '',
         { paymentId: payment?.id, productType, stripeSessionId: session.id }
       );
+
+      // Create work orders for fix/schema products
+      if (productType.startsWith('fix_') || productType.startsWith('schema_')) {
+        const pageIds = session.metadata?.pageIds ? JSON.parse(session.metadata.pageIds) as string[] : [];
+        const issueChecks = session.metadata?.issueChecks ? JSON.parse(session.metadata.issueChecks) as string[] : undefined;
+        const quantity = parseInt(session.metadata?.quantity || '1', 10);
+        createWorkOrder(workspaceId, {
+          paymentId: payment?.id || session.id,
+          productType: productType as ProductType,
+          status: 'pending',
+          pageIds,
+          issueChecks,
+          quantity,
+        });
+        console.log(`[stripe] Work order created: workspace=${workspaceId} product=${productType} pages=${pageIds.length}`);
+      }
+
+      // Handle cart checkouts (multiple line items)
+      if (session.metadata?.cartItems) {
+        try {
+          const cartItems = JSON.parse(session.metadata.cartItems) as Array<{ productType: string; pageIds?: string[]; issueChecks?: string[]; quantity?: number }>;
+          for (const item of cartItems) {
+            if (item.productType.startsWith('fix_') || item.productType.startsWith('schema_')) {
+              createWorkOrder(workspaceId, {
+                paymentId: payment?.id || session.id,
+                productType: item.productType as ProductType,
+                status: 'pending',
+                pageIds: item.pageIds || [],
+                issueChecks: item.issueChecks,
+                quantity: item.quantity || 1,
+              });
+            }
+          }
+        } catch { /* cartItems parse error — skip */ }
+      }
+
+      // Notify team of payment
+      const ws = getWorkspace(workspaceId);
+      if (ws) {
+        notifyTeamPaymentReceived({
+          workspaceName: ws.name,
+          workspaceId,
+          productType,
+          amount: `$${amount}`,
+        });
+      }
 
       console.log(`[stripe] Payment completed: workspace=${workspaceId} product=${productType} amount=$${amount}`);
       break;

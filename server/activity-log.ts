@@ -27,6 +27,7 @@ export type ActivityType =
   | 'chat_session'
   | 'payment_received'
   | 'payment_failed'
+  | 'fix_completed'
   | 'note';
 
 export interface ActivityEntry {

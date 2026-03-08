@@ -207,6 +207,33 @@ export function notifyAuditAlert(opts: {
   }));
 }
 
+export function notifyClientFixesApplied(opts: {
+  clientEmail: string;
+  workspaceName: string;
+  workspaceId: string;
+  productType: string;
+  pageCount: number;
+  dashboardUrl?: string;
+}): void {
+  if (!isEmailConfigured()) return;
+  queueEmail(makeEvent('fixes_applied', opts.clientEmail, opts.workspaceId, opts.workspaceName, opts.dashboardUrl, {
+    productType: opts.productType, pageCount: opts.pageCount,
+  }));
+}
+
+export function notifyTeamPaymentReceived(opts: {
+  workspaceName: string;
+  workspaceId: string;
+  productType: string;
+  amount: string;
+}): void {
+  const to = getNotificationEmail();
+  if (!to || !isEmailConfigured()) return;
+  queueEmail(makeEvent('payment_received', to, opts.workspaceId, opts.workspaceName, undefined, {
+    productType: opts.productType, amount: opts.amount,
+  }));
+}
+
 export function notifyTeamChurnSignal(opts: {
   workspaceName: string;
   workspaceId: string;

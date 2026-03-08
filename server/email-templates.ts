@@ -148,7 +148,9 @@ export type EmailEventType =
   | 'client_welcome'
   | 'trial_expiry_warning'
   | 'password_reset'
-  | 'churn_signal';
+  | 'churn_signal'
+  | 'payment_received'
+  | 'fixes_applied';
 
 // ── Template renderers ──
 
@@ -189,6 +191,10 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
       return renderPasswordReset(events[0], logoUrl);
     case 'churn_signal':
       return renderChurnSignal(events, count, ws, dashUrl, logoUrl);
+    case 'payment_received':
+      return renderPaymentReceived(events, count, ws, dashUrl, logoUrl);
+    case 'fixes_applied':
+      return renderFixesApplied(events, count, ws, dashUrl, logoUrl);
     default:
       return { subject: 'Notification', html: '' };
   }
@@ -617,6 +623,52 @@ export function renderMonthlyReport(data: {
       cta: d.dashboardUrl ? { label: 'Open Dashboard', url: d.dashboardUrl } : undefined,
       footer: 'Automated monthly summary from your web team',
       logoUrl: deriveLogoUrl(d.dashboardUrl),
+    }),
+  };
+}
+
+function renderFixesApplied(events: EmailEvent[], count: number, ws: string, dashUrl?: string, logoUrl?: string) {
+  const items = events.map((e, i) => itemRow({
+    title: ((e.data.productType as string) || 'Fix').replace(/_/g, ' '),
+    detail: `${(e.data.pageCount as number) || 0} page${((e.data.pageCount as number) || 0) !== 1 ? 's' : ''} updated`,
+    badge: { label: 'Completed', color: '#059669', bg: '#ecfdf5' },
+    isLast: i === events.length - 1,
+  })).join('');
+
+  return {
+    subject: count === 1
+      ? `✅ Your fixes are live — ${ws}`
+      : `✅ ${count} fix orders completed — ${ws}`,
+    html: layout({
+      preheader: 'Your purchased fixes have been applied',
+      headline: 'Fixes Applied',
+      subtitle: ws,
+      body: (count > 1 ? countPill(count, 'fix completed') : '') + items,
+      cta: dashUrl ? { label: 'View Your Dashboard', url: dashUrl } : undefined,
+      logoUrl,
+    }),
+  };
+}
+
+function renderPaymentReceived(events: EmailEvent[], count: number, ws: string, dashUrl?: string, logoUrl?: string) {
+  const items = events.map((e, i) => itemRow({
+    title: ((e.data.productType as string) || 'Purchase').replace(/_/g, ' '),
+    detail: `Amount: ${(e.data.amount as string) || '?'}`,
+    badge: { label: 'Paid', color: '#059669', bg: '#ecfdf5' },
+    isLast: i === events.length - 1,
+  })).join('');
+
+  return {
+    subject: count === 1
+      ? `💰 Payment received — ${ws}`
+      : `💰 ${count} payments received`,
+    html: layout({
+      preheader: `Payment received from ${ws}`,
+      headline: 'Payment Received',
+      subtitle: ws,
+      body: (count > 1 ? countPill(count, 'payment received') : '') + items,
+      cta: dashUrl ? { label: 'View Dashboard', url: dashUrl } : undefined,
+      logoUrl,
     }),
   };
 }

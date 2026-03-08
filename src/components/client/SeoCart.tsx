@@ -39,7 +39,7 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
       const res = await fetch('/api/stripe/cart-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workspaceId, items: items.map(i => ({ productType: i.productType, quantity: i.quantity })) }),
+        body: JSON.stringify({ workspaceId, items: items.map(i => ({ productType: i.productType, quantity: i.quantity, pageIds: i.pageIds })) }),
       });
       const data = await res.json();
       if (data.url) {
