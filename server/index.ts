@@ -1600,10 +1600,11 @@ app.post('/api/webflow/schema-publish/:siteId', async (req, res) => {
       }
     }
 
-    // Log to activity feed
+    // Log to activity feed + track edit status
     const pubWs = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
     if (pubWs) {
       addActivity(pubWs.id, 'schema_published', 'Schema published to Webflow', `Page ${pageId.slice(0, 8)}… — ${published ? 'site published' : 'saved as draft'}`, { pageId });
+      trackSeoEdit(pubWs.id, pageId, 'live', ['schema']);
     }
 
     res.json({ success: true, published });
@@ -2201,6 +2202,7 @@ app.post('/api/webflow/seo-bulk-fix/:siteId', async (req, res) => {
           ? { seo: { description: text } }
           : { seo: { title: text } };
         await updatePageSeo(page.pageId, seoFields, token);
+        if (ws) trackSeoEdit(ws.id, page.pageId, 'live', [field]);
         results.push({ pageId: page.pageId, text, applied: true });
       } else {
         results.push({ pageId: page.pageId, text: '', applied: false, error: 'Empty AI response' });
@@ -5256,6 +5258,10 @@ app.post('/api/public/approvals/:workspaceId/:batchId/apply', async (req, res) =
 
   if (appliedIds.length > 0) {
     markBatchApplied(req.params.workspaceId, req.params.batchId, appliedIds);
+    // Mark applied pages as live in edit tracking
+    for (const r of results) {
+      if (r.success) trackSeoEdit(req.params.workspaceId, r.pageId, 'live');
+    }
     // Log activity
     const batchData = getBatch(req.params.workspaceId, req.params.batchId);
     addActivity(req.params.workspaceId, 'approval_applied',
@@ -6251,6 +6257,7 @@ app.post('/api/jobs', async (req, res) => {
                 if (text) {
                   const seoFields = field === 'description' ? { seo: { description: text } } : { seo: { title: text } };
                   await updatePageSeo(page.pageId, seoFields, token);
+                  if (bwsId) trackSeoEdit(bwsId, page.pageId, 'live', [field]);
                   results.push({ pageId: page.pageId, text, applied: true });
                 } else {
                   results.push({ pageId: page.pageId, text: '', applied: false, error: 'Empty AI response' });
