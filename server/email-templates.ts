@@ -147,7 +147,8 @@ export type EmailEventType =
   | 'audit_alert'
   | 'client_welcome'
   | 'trial_expiry_warning'
-  | 'password_reset';
+  | 'password_reset'
+  | 'churn_signal';
 
 // ── Template renderers ──
 
@@ -186,6 +187,8 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
       return renderTrialExpiryWarning(events[0], logoUrl);
     case 'password_reset':
       return renderPasswordReset(events[0], logoUrl);
+    case 'churn_signal':
+      return renderChurnSignal(events, count, ws, dashUrl, logoUrl);
     default:
       return { subject: 'Notification', html: '' };
   }
@@ -614,6 +617,37 @@ export function renderMonthlyReport(data: {
       cta: d.dashboardUrl ? { label: 'Open Dashboard', url: d.dashboardUrl } : undefined,
       footer: 'Automated monthly summary from your web team',
       logoUrl: deriveLogoUrl(d.dashboardUrl),
+    }),
+  };
+}
+
+function renderChurnSignal(events: EmailEvent[], count: number, ws: string, dashUrl?: string, logoUrl?: string) {
+  const items = events.map((e, i) => {
+    const severity = e.data.severity as string;
+    const badge = severity === 'critical'
+      ? { label: 'Critical', color: '#dc2626', bg: '#fef2f2' }
+      : severity === 'warning'
+        ? { label: 'Warning', color: '#d97706', bg: '#fffbeb' }
+        : undefined;
+    return itemRow({
+      title: (e.data.signalTitle as string) || 'Churn signal detected',
+      detail: (e.data.signalDescription as string) || '',
+      badge,
+      isLast: i === events.length - 1,
+    });
+  }).join('');
+
+  return {
+    subject: count === 1
+      ? `⚠ Churn signal: ${(events[0].data.signalTitle as string) || ws}`
+      : `⚠ ${count} churn signals detected`,
+    html: layout({
+      preheader: `${count} churn signal${count !== 1 ? 's' : ''} detected`,
+      headline: 'Client Risk Alert',
+      subtitle: ws,
+      body: (count > 1 ? countPill(count, 'signal detected') : '') + items,
+      cta: dashUrl ? { label: 'View Dashboard', url: dashUrl } : undefined,
+      logoUrl,
     }),
   };
 }

@@ -55,6 +55,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   const [contentRequests, setContentRequests] = useState<Array<{ id: string; title?: string; status: string; category?: string }>>([]);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [annotations, setAnnotations] = useState<Array<{ id: string; date: string; label: string; color?: string }>>([]);
+  const [churnSignals, setChurnSignals] = useState<Array<{ id: string; type: string; severity: string; title: string; description: string; detectedAt: string }>>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,6 +81,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       { key: 'content', url: `/api/content-requests/${workspaceId}` },
       { key: 'activity', url: `/api/activity?workspaceId=${workspaceId}&limit=8` },
       { key: 'annotations', url: `/api/annotations/${workspaceId}` },
+      { key: 'churn', url: `/api/churn-signals/${workspaceId}` },
     ];
     if (gscPropertyUrl) urls.push({ key: 'search', url: `/api/public/search-overview/${workspaceId}${qs}` });
     if (ga4PropertyId) {
@@ -100,6 +102,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
         if (key === 'content' && Array.isArray(d)) setContentRequests(d);
         if (key === 'activity' && Array.isArray(d)) setActivity(d);
         if (key === 'annotations' && Array.isArray(d)) setAnnotations(d.slice(0, 5));
+        if (key === 'churn' && Array.isArray(d)) setChurnSignals(d.filter((s: { severity: string }) => s.severity === 'critical' || s.severity === 'warning'));
       }
       setLoading(false);
     }).catch(() => { if (!cancelled) setLoading(false); });
@@ -136,6 +139,15 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   if (!webflowSiteId) actions.push({ label: 'No Webflow site linked', sub: 'Link a site to enable SEO tools', color: 'amber', icon: Globe, tab: 'workspace-settings' });
   if (!gscPropertyUrl) actions.push({ label: 'Google Search Console not connected', sub: 'Connect GSC for search data', color: 'amber', icon: Search, tab: 'workspace-settings' });
   if (!ga4PropertyId) actions.push({ label: 'Google Analytics not connected', sub: 'Connect GA4 for traffic data', color: 'amber', icon: BarChart3, tab: 'workspace-settings' });
+  for (const signal of churnSignals) {
+    actions.push({
+      label: signal.title,
+      sub: signal.description,
+      color: signal.severity === 'critical' ? 'red' : 'amber',
+      icon: Flag,
+      tab: 'workspace-settings',
+    });
+  }
 
   const activityIconMap: Record<string, typeof Activity> = {
     audit_completed: Globe,

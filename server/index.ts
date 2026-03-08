@@ -6109,6 +6109,15 @@ app.post('/api/jobs', async (req, res) => {
                 { score: result.siteScore, previousScore: snapshot.previousScore });
             }
             updateJob(job.id, { status: 'done', result: { ...result, snapshotId: snapshot.id }, message: `Audit complete — score ${result.siteScore}` });
+            // Auto-regenerate recommendations after audit
+            if (ws) {
+              try {
+                await generateRecommendations(ws.id);
+                console.log(`[audit] Auto-regenerated recommendations for ${ws.id}`);
+              } catch (recErr) {
+                console.error('[audit] Failed to regenerate recommendations:', recErr);
+              }
+            }
           } catch (err) {
             updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Audit failed' });
           }
@@ -7068,6 +7077,16 @@ app.patch('/api/public/recommendations/:workspaceId/:recId', (req, res) => {
   }
   const rec = updateRecommendationStatus(req.params.workspaceId, req.params.recId, status);
   if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
+  // When recommendation is completed, mark affected pages as live
+  if (status === 'completed' && rec.affectedPages && rec.affectedPages.length > 0) {
+    for (const pageSlug of rec.affectedPages) {
+      updatePageState(req.params.workspaceId, pageSlug, {
+        status: 'live',
+        source: 'recommendation',
+        recommendationId: rec.id,
+      });
+    }
+  }
   res.json(rec);
 });
 

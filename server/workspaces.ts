@@ -84,10 +84,11 @@ export interface PageEditState {
   status: PageEditStatus;
   auditIssues?: string[];
   fields?: string[];
-  source?: 'audit' | 'editor' | 'cms' | 'schema' | 'bulk-fix' | 'cart-fix' | 'content-delivery';
+  source?: 'audit' | 'editor' | 'cms' | 'schema' | 'bulk-fix' | 'cart-fix' | 'content-delivery' | 'recommendation';
   approvalBatchId?: string;
   contentRequestId?: string;
   workOrderId?: string;
+  recommendationId?: string;
   rejectionNote?: string;
   updatedAt: string;
   updatedBy?: 'admin' | 'client' | 'system';

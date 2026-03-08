@@ -206,3 +206,17 @@ export function notifyAuditAlert(opts: {
     siteName: opts.siteName, score: opts.score, previousScore: opts.previousScore,
   }));
 }
+
+export function notifyTeamChurnSignal(opts: {
+  workspaceName: string;
+  workspaceId: string;
+  signalTitle: string;
+  signalDescription: string;
+  severity: string;
+}): void {
+  const to = getNotificationEmail();
+  if (!to || !isEmailConfigured()) return;
+  queueEmail(makeEvent('churn_signal', to, opts.workspaceId, opts.workspaceName, undefined, {
+    signalTitle: opts.signalTitle, signalDescription: opts.signalDescription, severity: opts.severity,
+  }));
+}

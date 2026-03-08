@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Sparkles, ShoppingCart, Image, FileText, Code2, ArrowRightLeft, Wrench, Crown, MessageSquare, TrendingUp, Eye, MousePointerClick, ChevronDown, Lightbulb } from 'lucide-react';
+import { Sparkles, ShoppingCart, Image, FileText, Code2, ArrowRightLeft, Wrench, Crown, MessageSquare, TrendingUp, Eye, MousePointerClick, ChevronDown, Lightbulb, CheckCircle2, Zap, Shield } from 'lucide-react';
 import { useCart } from './useCart';
 import type { AuditDetail } from './types';
 import type { ProductType } from '../../../server/payments';
@@ -11,6 +11,28 @@ const num = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleS
 
 interface TrafficMap {
   [path: string]: { clicks: number; impressions: number; sessions: number; pageviews: number };
+}
+
+interface ServerRecommendation {
+  id: string;
+  priority: 'fix_now' | 'fix_soon' | 'fix_later' | 'ongoing';
+  type: 'technical' | 'content' | 'schema' | 'metadata' | 'performance' | 'accessibility' | 'strategy';
+  title: string;
+  description: string;
+  insight: string;
+  impact: 'high' | 'medium' | 'low';
+  effort: 'low' | 'medium' | 'high';
+  impactScore: number;
+  source: string;
+  affectedPages: string[];
+  trafficAtRisk: number;
+  impressionsAtRisk: number;
+  estimatedGain: string;
+  actionType: 'automated' | 'manual' | 'content_creation' | 'purchase';
+  productType?: string;
+  productPrice?: number;
+  status: 'pending' | 'in_progress' | 'completed' | 'dismissed';
+  assignedTo?: 'team' | 'client';
 }
 
 interface FixRecommendationsProps {
@@ -219,12 +241,138 @@ function buildFixCategories(audit: AuditDetail, traffic: TrafficMap): FixCategor
   return categories;
 }
 
+/** Map server rec type to icon + label */
+const typeConfig: Record<string, { icon: typeof FileText; label: string }> = {
+  metadata: { icon: FileText, label: 'Metadata Optimization' },
+  schema: { icon: Code2, label: 'Schema Markup' },
+  technical: { icon: Wrench, label: 'Technical Fixes' },
+  content: { icon: FileText, label: 'Content Improvements' },
+  performance: { icon: Zap, label: 'Performance' },
+  accessibility: { icon: Shield, label: 'Accessibility' },
+  strategy: { icon: Sparkles, label: 'Strategy Opportunities' },
+};
+
+/** Build FixCategories from server recommendation data */
+function buildCategoriesFromServer(recs: ServerRecommendation[]): FixCategory[] {
+  // Group by type
+  const groups = new Map<string, ServerRecommendation[]>();
+  for (const rec of recs) {
+    const list = groups.get(rec.type) || [];
+    list.push(rec);
+    groups.set(rec.type, list);
+  }
+
+  const categories: FixCategory[] = [];
+  for (const [type, typeRecs] of groups) {
+    // Sort by impactScore descending within group
+    typeRecs.sort((a, b) => b.impactScore - a.impactScore);
+    const topRec = typeRecs[0];
+    const config = typeConfig[type] || typeConfig.technical;
+
+    // Aggregate affected pages (deduplicated)
+    const pageSet = new Set<string>();
+    let totalTraffic = 0;
+    let totalImpressions = 0;
+    for (const r of typeRecs) {
+      for (const p of r.affectedPages) pageSet.add(p);
+      totalTraffic += r.trafficAtRisk;
+      totalImpressions += r.impressionsAtRisk;
+    }
+
+    const pages: AffectedPage[] = [...pageSet].map(slug => ({
+      name: slug.replace(/^\//, '') || 'Home',
+      slug: slug.startsWith('/') ? slug : `/${slug}`,
+      clicks: 0, impressions: 0, pageviews: 0, issueCount: 1, topIssue: '',
+    }));
+
+    // Build purchase options from recs that have productType
+    const purchasableRecs = typeRecs.filter(r => r.productType && r.productPrice);
+    const options: FixCategory['options'] = [];
+    const isManual = typeRecs.every(r => r.actionType === 'manual');
+
+    if (purchasableRecs.length > 0) {
+      // Deduplicate by productType
+      const seen = new Set<string>();
+      for (const r of purchasableRecs) {
+        if (seen.has(r.productType!)) continue;
+        seen.add(r.productType!);
+        const count = pageSet.size;
+        options.push({
+          productType: r.productType!,
+          displayName: r.title,
+          priceUsd: r.productPrice!,
+          buttonLabel: count > 1 ? `Fix ${count} pages — ${fmt(count * r.productPrice!)}` : `Fix — ${fmt(r.productPrice!)}`,
+          quantity: count > 1 ? count : 1,
+          isSuggested: true,
+          tier: 'full',
+        });
+      }
+    }
+
+    // Build insight from top rec + aggregated traffic
+    const insight = topRec.insight + (totalTraffic > 0 ? ` ${num(totalTraffic)} clicks and ${num(totalImpressions)} impressions at risk across ${pageSet.size} pages.` : '');
+
+    // Determine how many recs are already addressed
+    const pendingCount = typeRecs.filter(r => r.status === 'pending' || r.status === 'in_progress').length;
+    const completedCount = typeRecs.filter(r => r.status === 'completed' || r.status === 'dismissed').length;
+
+    categories.push({
+      id: type,
+      icon: config.icon,
+      label: config.label,
+      pages,
+      totalPages: pageSet.size,
+      highTrafficPages: totalTraffic > 0 ? pages.length : 0,
+      totalClicks: totalTraffic,
+      totalImpressions: totalImpressions,
+      insight,
+      whyItMatters: topRec.description,
+      options,
+      isManual,
+      // Attach server metadata for status display
+      _pendingCount: pendingCount,
+      _completedCount: completedCount,
+      _serverRecs: typeRecs,
+    } as FixCategory & { _pendingCount: number; _completedCount: number; _serverRecs: ServerRecommendation[] });
+  }
+
+  // Sort: fix_now types first, then by total traffic
+  const priorityOrder: Record<string, number> = { fix_now: 0, fix_soon: 1, fix_later: 2, ongoing: 3 };
+  categories.sort((a, b) => {
+    const aRecs = (a as FixCategory & { _serverRecs: ServerRecommendation[] })._serverRecs;
+    const bRecs = (b as FixCategory & { _serverRecs: ServerRecommendation[] })._serverRecs;
+    const aPri = Math.min(...aRecs.map(r => priorityOrder[r.priority] ?? 3));
+    const bPri = Math.min(...bRecs.map(r => priorityOrder[r.priority] ?? 3));
+    if (aPri !== bPri) return aPri - bPri;
+    return b.totalClicks - a.totalClicks;
+  });
+
+  return categories;
+}
+
 export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecommendationsProps) {
   const cart = useCart();
   const [traffic, setTraffic] = useState<TrafficMap>({});
   const [trafficLoaded, setTrafficLoaded] = useState(!workspaceId);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [serverRecs, setServerRecs] = useState<ServerRecommendation[] | null>(null);
 
+  // Fetch server recommendations
+  useEffect(() => {
+    if (!workspaceId) return;
+    let cancelled = false;
+    fetch(`/api/public/recommendations/${workspaceId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!cancelled && data?.recommendations && Array.isArray(data.recommendations)) {
+          setServerRecs(data.recommendations);
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [workspaceId]);
+
+  // Fetch traffic data (fallback for local audit-based categories)
   useEffect(() => {
     if (!workspaceId) return;
     fetch(`/api/public/audit-traffic/${workspaceId}`)
@@ -233,7 +381,11 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
       .catch(() => setTrafficLoaded(true));
   }, [workspaceId]);
 
-  const categories = useMemo(() => buildFixCategories(auditDetail, traffic), [auditDetail, traffic]);
+  // Prefer server recommendations when available, fall back to local audit-based categories
+  const categories = useMemo(() => {
+    if (serverRecs && serverRecs.length > 0) return buildCategoriesFromServer(serverRecs);
+    return buildFixCategories(auditDetail, traffic);
+  }, [serverRecs, auditDetail, traffic]);
 
   const toggleCategory = (id: string) =>
     setExpandedCategories(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -276,13 +428,16 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
       <div className="divide-y divide-zinc-800/50">
         {categories.map(cat => {
           const Icon = cat.icon;
-          const inCart = cart.items.some(i => cat.options.some(o => o.productType === i.productType));
+          const inCart = cart?.items.some(i => cat.options.some(o => o.productType === i.productType));
           const isExpanded = expandedCategories.has(cat.id);
           const topPages = cat.pages.slice(0, 5);
           const hasPages = topPages.length > 0 && (topPages[0].clicks > 0 || topPages[0].pageviews > 0);
+          const completedCount = (cat as FixCategory & { _completedCount?: number })._completedCount || 0;
+          const pendingCount = (cat as FixCategory & { _pendingCount?: number })._pendingCount || 0;
+          const allDone = completedCount > 0 && pendingCount === 0;
 
           return (
-            <div key={cat.id} className="px-5 py-4">
+            <div key={cat.id} className={`px-5 py-4 ${allDone ? 'opacity-50' : ''}`}>
               {/* Category header */}
               <div className="flex items-start gap-3">
                 <div className="w-9 h-9 rounded-lg bg-zinc-800 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -296,6 +451,16 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
                       <span className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400 flex items-center gap-1">
                         <TrendingUp className="w-3 h-3" />
                         {cat.highTrafficPages} with traffic
+                      </span>
+                    )}
+                    {allDone && (
+                      <span className="text-[11px] px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-green-400 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> Addressed
+                      </span>
+                    )}
+                    {completedCount > 0 && pendingCount > 0 && (
+                      <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400">
+                        {completedCount} done · {pendingCount} remaining
                       </span>
                     )}
                   </div>
@@ -368,7 +533,7 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
                         {cat.options.map((opt, idx) => (
                           <button
                             key={idx}
-                            onClick={() => cart.addItem({
+                            onClick={() => cart?.addItem({
                               productType: opt.productType as ProductType,
                               displayName: opt.displayName,
                               priceUsd: opt.priceUsd,
@@ -414,7 +579,7 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
                 autoCategories.forEach(cat => {
                   const suggested = cat.options.find(o => o.isSuggested);
                   if (suggested) {
-                    cart.addItem({
+                    cart?.addItem({
                       productType: suggested.productType as ProductType,
                       displayName: suggested.displayName,
                       priceUsd: suggested.priceUsd,

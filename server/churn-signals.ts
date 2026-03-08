@@ -20,6 +20,7 @@ import { getUploadRoot } from './data-dir.js';
 import { listWorkspaces } from './workspaces.js';
 import { listActivity } from './activity-log.js';
 import { listClientUsers } from './client-users.js';
+import { notifyTeamChurnSignal } from './email.js';
 
 const UPLOAD_ROOT = getUploadRoot();
 const SIGNALS_FILE = path.join(UPLOAD_ROOT, '.churn-signals.json');
@@ -224,6 +225,18 @@ async function runChurnCheck() {
         description: `${ws.name} had ${weekChats} chat sessions and ${weekLogins} active users this week.`,
       });
     }
+  }
+
+  // Send email notifications for critical signals
+  const criticalSignals = readSignals().filter(s => !s.dismissedAt && (s.severity === 'critical' || s.severity === 'warning'));
+  for (const signal of criticalSignals) {
+    notifyTeamChurnSignal({
+      workspaceName: signal.workspaceName,
+      workspaceId: signal.workspaceId,
+      signalTitle: signal.title,
+      signalDescription: signal.description,
+      severity: signal.severity,
+    });
   }
 
   console.log('[churn-signals] Check completed at', new Date().toISOString());
