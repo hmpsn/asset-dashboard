@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import { TierGate, type Tier } from '../ui';
 import type { ClientKeywordStrategy, ClientContentRequest } from './types';
+import { useBetaMode } from './BetaContext';
 
 export interface PricingModalState {
   serviceType: 'brief_only' | 'full_post';
@@ -30,6 +31,7 @@ interface StrategyTabProps {
 }
 
 export function StrategyTab({ strategyData, requestedTopics, contentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal }: StrategyTabProps) {
+  const betaMode = useBetaMode();
   const [mapSearch, setMapSearch] = useState('');
   const [mapSort, setMapSort] = useState<'default' | 'position' | 'impressions' | 'clicks'>('default');
   const [mapIntent, setMapIntent] = useState<string>('all');
@@ -67,11 +69,11 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               <div className="text-xl font-bold text-zinc-100">{keywordsTracked}</div>
               <div className="text-[11px] text-zinc-500">{strategyData.pageMap.length} pages mapped</div>
             </div>
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
+            {!betaMode && <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
               <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><FileText className="w-3 h-3" /> Content Gaps</div>
               <div className={`text-xl font-bold ${contentGapsFound > 0 ? 'text-teal-400' : 'text-zinc-500'}`}>{contentGapsFound}</div>
               <div className="text-[11px] text-zinc-500">{contentGapsFound > 0 ? 'topics identified' : 'none found yet'}</div>
-            </div>
+            </div>}
             <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
               <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Zap className="w-3 h-3" /> Quick Wins</div>
               <div className={`text-xl font-bold ${quickWinsAvailable > 0 ? 'text-amber-400' : 'text-zinc-500'}`}>{quickWinsAvailable}</div>
@@ -120,7 +122,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       )}
 
       {/* ── CONTENT OPPORTUNITIES (conversion moment) ── */}
-      {strategyData.contentGaps && strategyData.contentGaps.length > 0 && (
+      {!betaMode && strategyData.contentGaps && strategyData.contentGaps.length > 0 && (
         <TierGate tier={effectiveTier} required="growth" feature="Content Opportunities" teaser={`${strategyData.contentGaps.length} content topics identified — upgrade to unlock recommendations`}>
         <div className="bg-gradient-to-br from-teal-950/40 to-zinc-900 rounded-xl border border-teal-500/30 p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-40 h-40 bg-teal-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />

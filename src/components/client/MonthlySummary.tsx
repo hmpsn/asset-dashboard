@@ -4,6 +4,7 @@ import {
 import type {
   ClientContentRequest, ClientRequest, ApprovalBatch,
 } from './types';
+import { useBetaMode } from './BetaContext';
 
 interface MonthlySummaryProps {
   contentRequests: ClientContentRequest[];
@@ -15,6 +16,7 @@ interface MonthlySummaryProps {
 export function MonthlySummary({
   contentRequests, requests, approvalBatches, activityCount,
 }: MonthlySummaryProps) {
+  const betaMode = useBetaMode();
   const now = new Date();
   const monthName = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
@@ -27,8 +29,8 @@ export function MonthlySummary({
 
   // Build activity summary items
   const activities: { icon: typeof FileText; label: string; value: string; color: string }[] = [];
-  if (contentThisMonth.length > 0) activities.push({ icon: FileText, label: 'Content requests', value: `${contentThisMonth.length} submitted`, color: 'text-teal-400' });
-  if (briefsDelivered > 0) activities.push({ icon: CheckCircle2, label: 'Briefs delivered', value: `${briefsDelivered}`, color: 'text-emerald-400' });
+  if (!betaMode && contentThisMonth.length > 0) activities.push({ icon: FileText, label: 'Content requests', value: `${contentThisMonth.length} submitted`, color: 'text-teal-400' });
+  if (!betaMode && briefsDelivered > 0) activities.push({ icon: CheckCircle2, label: 'Briefs delivered', value: `${briefsDelivered}`, color: 'text-emerald-400' });
   if (requestsCompleted > 0) activities.push({ icon: MessageSquare, label: 'Requests completed', value: `${requestsCompleted}`, color: 'text-blue-400' });
   if (approvalsApplied > 0) activities.push({ icon: CheckCircle2, label: 'SEO batches applied', value: `${approvalsApplied}`, color: 'text-purple-400' });
   if (activityCount > 0) activities.push({ icon: Activity, label: 'Total activities', value: `${activityCount}`, color: 'text-zinc-400' });

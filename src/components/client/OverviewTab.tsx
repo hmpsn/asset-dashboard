@@ -3,6 +3,7 @@ import {
   Sparkles, Activity, Loader2, MessageCircle,
 } from 'lucide-react';
 import { StatCard } from '../ui';
+import { useBetaMode } from './BetaContext';
 import { MonthlySummary } from './MonthlySummary';
 import { InsightsDigest } from './InsightsDigest';
 import { ErrorBoundary } from '../ErrorBoundary';
@@ -74,6 +75,7 @@ export function OverviewTab({
   clientUser,
   proactiveInsight, proactiveInsightLoading,
 }: OverviewTabProps) {
+  const betaMode = useBetaMode();
   // Derive a dynamic subtitle from the most significant data signal
   const dynamicSubtitle = (() => {
     if (ga4Comparison) {
@@ -137,7 +139,7 @@ export function OverviewTab({
       const actions: { label: string; count: number; tab: ClientTab; color: string }[] = [];
       if (pendingApprovals > 0) actions.push({ label: `${pendingApprovals} SEO change${pendingApprovals > 1 ? 's' : ''} to review`, count: pendingApprovals, tab: 'inbox', color: 'text-amber-400' });
       const contentReviews = contentRequests.filter(r => r.status === 'client_review').length;
-      if (contentReviews > 0) actions.push({ label: `${contentReviews} content brief${contentReviews > 1 ? 's' : ''} ready for review`, count: contentReviews, tab: 'inbox', color: 'text-blue-400' });
+      if (!betaMode && contentReviews > 0) actions.push({ label: `${contentReviews} content brief${contentReviews > 1 ? 's' : ''} ready for review`, count: contentReviews, tab: 'inbox', color: 'text-blue-400' });
       if (unreadTeamNotes > 0) actions.push({ label: `${unreadTeamNotes} request${unreadTeamNotes > 1 ? 's' : ''} with new team replies`, count: unreadTeamNotes, tab: 'inbox', color: 'text-teal-400' });
       if (actions.length === 0) return null;
       const total = actions.reduce((s, a) => s + a.count, 0);

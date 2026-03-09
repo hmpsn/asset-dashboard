@@ -5,6 +5,7 @@ import { RequestsTab } from './RequestsTab';
 import { ContentTab } from './ContentTab';
 import type { Tier } from '../ui';
 import type { ClientContentRequest, ClientRequest, ApprovalBatch, ClientTab } from './types';
+import { useBetaMode } from './BetaContext';
 
 type InboxFilter = 'all' | 'approvals' | 'requests' | 'content';
 
@@ -56,6 +57,7 @@ export function InboxTab({
   setToast,
   initialFilter,
 }: InboxTabProps) {
+  const betaMode = useBetaMode();
   const [filter, setFilter] = useState<InboxFilter>(initialFilter || 'all');
 
   const pendingRequests = requests.filter(r => r.status !== 'completed' && r.status !== 'closed').length;
@@ -65,12 +67,12 @@ export function InboxTab({
     { id: 'all', label: 'All', icon: Inbox },
     { id: 'approvals', label: 'SEO Changes', icon: ClipboardCheck, count: pendingApprovals || undefined },
     { id: 'requests', label: 'Requests', icon: MessageSquare, count: pendingRequests || undefined },
-    { id: 'content', label: 'Content', icon: FileText, count: contentReviews || undefined },
+    ...(!betaMode ? [{ id: 'content' as InboxFilter, label: 'Content', icon: FileText, count: contentReviews || undefined }] : []),
   ];
 
   const showApprovals = filter === 'all' || filter === 'approvals';
   const showRequests = filter === 'all' || filter === 'requests';
-  const showContent = filter === 'all' || filter === 'content';
+  const showContent = !betaMode && (filter === 'all' || filter === 'content');
 
   const hasApprovals = approvalBatches.length > 0;
   const hasRequests = requests.length > 0;
@@ -84,7 +86,7 @@ export function InboxTab({
           <Inbox className="w-5 h-5 text-teal-400" />
           <div>
             <h2 className="text-xl font-semibold text-zinc-100">Inbox</h2>
-            <p className="text-sm text-zinc-500 mt-0.5">SEO changes, requests, and content — all in one place.</p>
+            <p className="text-sm text-zinc-500 mt-0.5">{betaMode ? 'SEO changes and requests — all in one place.' : 'SEO changes, requests, and content — all in one place.'}</p>
           </div>
         </div>
         <div className="flex items-center gap-1.5">
@@ -200,7 +202,7 @@ export function InboxTab({
           <p className="text-[11px] text-zinc-500 mt-1">Submit a request and your team will respond here.</p>
         </div>
       )}
-      {filter === 'content' && contentRequests.length === 0 && (
+      {!betaMode && filter === 'content' && contentRequests.length === 0 && (
         <div className="text-center py-12">
           <FileText className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
           <p className="text-sm text-zinc-400">No content requests yet.</p>
@@ -211,7 +213,7 @@ export function InboxTab({
         <div className="text-center py-12">
           <Inbox className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
           <p className="text-sm text-zinc-400">Your inbox is empty.</p>
-          <p className="text-[11px] text-zinc-500 mt-1">SEO changes, requests, and content items will appear here as your team works on your site.</p>
+          <p className="text-[11px] text-zinc-500 mt-1">{betaMode ? 'SEO changes and requests will appear here as your team works on your site.' : 'SEO changes, requests, and content items will appear here as your team works on your site.'}</p>
         </div>
       )}
     </div>

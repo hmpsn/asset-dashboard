@@ -72,6 +72,11 @@ function App() {
   if (window.location.pathname === '/styleguide') {
     return <Suspense fallback={<ChunkFallback />}><Styleguide /></Suspense>;
   }
+  // Beta client dashboard: /client/beta/:workspaceId (no monetization / briefs / blog)
+  const betaMatch = window.location.pathname.match(/^\/client\/beta\/([\w_]+)/);
+  if (betaMatch) {
+    return <MobileGuard><Suspense fallback={<ChunkFallback />}><ClientDashboard workspaceId={betaMatch[1]} betaMode /></Suspense></MobileGuard>;
+  }
   // Client dashboard route: /client/:workspaceId (public, no auth)
   const clientMatch = window.location.pathname.match(/^\/client\/([\w_]+)/);
   if (clientMatch) {

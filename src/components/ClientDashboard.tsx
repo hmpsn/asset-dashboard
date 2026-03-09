@@ -21,6 +21,7 @@ import { PerformanceTab } from './client/PerformanceTab';
 import { InboxTab } from './client/InboxTab';
 import { OverviewTab } from './client/OverviewTab';
 import { ErrorBoundary } from './ErrorBoundary';
+import { BetaProvider } from './client/BetaContext';
 import {
   QUICK_QUESTIONS,
   type SearchOverview, type PerformanceTrend, type WorkspaceInfo, type AuditSummary,
@@ -33,7 +34,7 @@ import {
   type ClientTab,
 } from './client/types';
 
-export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
+export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId: string; betaMode?: boolean }) {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     try { return (localStorage.getItem('dashboard-theme') as 'dark' | 'light') || 'dark'; } catch { return 'dark'; }
   });
@@ -971,7 +972,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
   const pendingApprovals = approvalBatches.reduce((sum, b) => sum + b.items.filter(i => i.status === 'pending').length, 0);
   const unreadTeamNotes = requests.filter(r => r.notes.length > 0 && r.notes[r.notes.length - 1].author === 'team' && r.status !== 'completed' && r.status !== 'closed').length;
 
-  const effectiveTier: Tier = (ws?.tier as Tier) || 'free';
+  const effectiveTier: Tier = betaMode ? 'premium' : ((ws?.tier as Tier) || 'free');
   // Inline price helpers — prefer pricingData (from Stripe config), fall back to ws.contentPricing
   const pCurrency = pricingData?.currency || ws?.contentPricing?.currency || 'USD';
   const fmtPrice = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: pCurrency, minimumFractionDigits: 0 }).format(n);
@@ -987,14 +988,15 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
       { id: 'performance' as ClientTab, label: 'Performance', icon: LineChart, locked: false },
     ] : []),
     ...(isPaid ? [{ id: 'inbox' as ClientTab, label: 'Inbox', icon: Zap, locked: false }] : []),
-    { id: 'plans' as ClientTab, label: 'Plans', icon: CreditCard, locked: false },
+    ...(!betaMode ? [{ id: 'plans' as ClientTab, label: 'Plans', icon: CreditCard, locked: false }] : []),
     ...(isPaid ? [{ id: 'roi' as ClientTab, label: 'ROI', icon: Trophy, locked: false }] : []),
   ];
 
   return (
+    <BetaProvider value={betaMode}>
     <CartProvider>
     <div className={`min-h-screen bg-[#0f1219] text-zinc-200 ${theme === 'light' ? 'dashboard-light' : ''}`}>
-      <SeoCartDrawer workspaceId={workspaceId} tier={effectiveTier} />
+      {!betaMode && <SeoCartDrawer workspaceId={workspaceId} tier={effectiveTier} />}
       {/* Header */}
       <header className="border-b border-zinc-800">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
@@ -1004,7 +1006,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-lg font-semibold">{ws.name}</h1>
-                {ws.isTrial && (
+                {!betaMode && ws.isTrial && (
                   <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20">
                     Growth Trial{ws.trialDaysRemaining ? ` · ${ws.trialDaysRemaining}d` : ''}
                   </span>
@@ -1027,7 +1029,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                 </button>
               </div>
             )}
-            <SeoCartButton />
+            {!betaMode && <SeoCartButton />}
             <button onClick={toggleTheme} title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
               className="p-2 rounded-lg border border-zinc-800 hover:border-zinc-700 transition-colors">
               {theme === 'dark' ? <Sun className="w-4 h-4 text-zinc-400" /> : <Moon className="w-4 h-4 text-zinc-400" />}
@@ -1128,7 +1130,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
       <main className="max-w-6xl mx-auto px-6 py-6 space-y-5">
 
         {/* Trial countdown banner — shows at day 10 and under */}
-        {ws.isTrial && (ws.trialDaysRemaining ?? 0) <= 10 && (ws.trialDaysRemaining ?? 0) > 0 && (
+        {!betaMode && ws.isTrial && (ws.trialDaysRemaining ?? 0) <= 10 && (ws.trialDaysRemaining ?? 0) > 0 && (
           <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
             <Clock className="w-4 h-4 text-amber-400 flex-shrink-0" />
             <p className="text-sm text-amber-300">
@@ -1137,7 +1139,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
             </p>
           </div>
         )}
-        {ws.isTrial && (ws.trialDaysRemaining ?? 0) === 0 && (
+        {!betaMode && ws.isTrial && (ws.trialDaysRemaining ?? 0) === 0 && (
           <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20">
             <Clock className="w-4 h-4 text-red-400 flex-shrink-0" />
             <p className="text-sm text-red-300">
@@ -1206,7 +1208,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
             <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 flex-shrink-0">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-teal-400" /><span className="text-sm font-medium text-zinc-200">Insights Engine</span>
-                {chatUsage && chatUsage.tier === 'free' ? (
+                {!betaMode && chatUsage && chatUsage.tier === 'free' ? (
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${chatUsage.remaining > 0 ? 'text-zinc-400 bg-zinc-800' : 'text-amber-400 bg-amber-500/10 border border-amber-500/20'}`}>
                     {chatUsage.remaining}/{chatUsage.limit} left
                   </span>
@@ -1288,7 +1290,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
               )}
               </>)}
             </div>
-            {chatUsage && chatUsage.tier === 'free' && !chatUsage.allowed ? (
+            {!betaMode && chatUsage && chatUsage.tier === 'free' && !chatUsage.allowed ? (
             <div className="px-4 py-3 border-t border-zinc-800 flex-shrink-0">
               <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-amber-500/5 border border-amber-500/20">
                 <Lock className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
@@ -1315,7 +1317,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
       </main>
 
       {/* ── SEO Upgrade Modal ── */}
-      {showUpgradeModal && (
+      {!betaMode && showUpgradeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowUpgradeModal(false)}>
           <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-8 max-w-md w-full mx-4 text-center shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="w-14 h-14 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center mx-auto mb-4">
@@ -1358,7 +1360,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
       )}
 
       {/* Pricing confirmation modal */}
-      {pricingModal && (() => {
+      {!betaMode && pricingModal && (() => {
         const pricing = ws?.contentPricing;
         const isUpgrade = pricingModal.source === 'upgrade';
         const isFull = pricingModal.serviceType === 'full_post';
@@ -1486,7 +1488,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
       )}
 
       {/* Stripe Elements inline payment modal */}
-      {stripePayment && (
+      {!betaMode && stripePayment && (
         <StripePaymentModal
           clientSecret={stripePayment.clientSecret}
           publishableKey={stripePayment.publishableKey}
@@ -1544,5 +1546,6 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
       </footer>
     </div>
     </CartProvider>
+    </BetaProvider>
   );
 }

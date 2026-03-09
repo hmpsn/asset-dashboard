@@ -4,6 +4,7 @@ import {
   Zap, ChevronRight, ChevronLeft, Check, BarChart3, Trophy,
   MousePointerClick, ArrowRight,
 } from 'lucide-react';
+import { useBetaMode } from './BetaContext';
 
 interface OnboardingWizardProps {
   workspaceName: string;
@@ -26,6 +27,7 @@ export function OnboardingWizard({
   hasGSC, hasStrategy, hasAudit,
   onDismiss, onNavigate,
 }: OnboardingWizardProps) {
+  const betaMode = useBetaMode();
   const [step, setStep] = useState<Step>('welcome');
   const stepIdx = STEPS.indexOf(step);
   const tierLabel = tier === 'premium' ? 'Premium' : tier === 'growth' ? 'Growth' : 'Starter';
@@ -36,7 +38,7 @@ export function OnboardingWizard({
     { icon: LineChart, label: 'Performance', desc: 'GA4 + Search Console data in one place', available: true, tab: 'performance' },
     { icon: Sparkles, label: 'AI Advisor', desc: 'Ask questions about your traffic and strategy', available: true, tab: 'overview' },
     { icon: Target, label: 'SEO Strategy', desc: 'Keyword mapping, content gaps, and quick wins', available: tier !== 'free', tab: 'strategy' },
-    { icon: FileText, label: 'Content Engine', desc: 'AI-generated briefs and content purchasing', available: tier !== 'free', tab: 'content' },
+    ...(!betaMode ? [{ icon: FileText, label: 'Content Engine', desc: 'AI-generated briefs and content purchasing', available: tier !== 'free', tab: 'content' }] : []),
     { icon: Trophy, label: 'ROI Dashboard', desc: 'Track the value of your organic traffic', available: tier !== 'free', tab: 'roi' },
   ];
 
@@ -75,14 +77,14 @@ export function OnboardingWizard({
                 </div>
                 <h2 className="text-xl font-bold text-zinc-100 mb-1">Welcome to your dashboard</h2>
                 <p className="text-sm text-zinc-400">{workspaceName}</p>
-                <div className="flex items-center justify-center gap-2 mt-3">
+                {!betaMode && <div className="flex items-center justify-center gap-2 mt-3">
                   <span className={`text-[11px] px-2.5 py-1 rounded-full border font-semibold ${tierBg}`}>{tierLabel} Plan</span>
                   {isTrial && trialDaysRemaining != null && (
                     <span className="text-[11px] px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 font-medium">
                       {trialDaysRemaining} day{trialDaysRemaining !== 1 ? 's' : ''} left in trial
                     </span>
                   )}
-                </div>
+                </div>}
               </div>
             </div>
 
@@ -93,7 +95,7 @@ export function OnboardingWizard({
               </p>
             </div>
 
-            {isTrial && (
+            {!betaMode && isTrial && (
               <div className="mx-6 mb-4 px-3.5 py-3 rounded-xl bg-gradient-to-r from-blue-500/5 to-teal-500/5 border border-blue-500/15">
                 <div className="flex items-start gap-2">
                   <Zap className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
@@ -127,7 +129,7 @@ export function OnboardingWizard({
                       <span className={`text-[11px] font-semibold ${f.available ? 'text-zinc-200' : 'text-zinc-500'}`}>{f.label}</span>
                     </div>
                     <div className="text-[10px] text-zinc-500 leading-relaxed">{f.desc}</div>
-                    {!f.available && <div className="text-[10px] text-zinc-600 mt-1 italic">Upgrade to unlock</div>}
+                    {!betaMode && !f.available && <div className="text-[10px] text-zinc-600 mt-1 italic">Upgrade to unlock</div>}
                   </div>
                 ))}
               </div>
