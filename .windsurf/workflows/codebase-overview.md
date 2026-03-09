@@ -38,7 +38,7 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 | `server/seo-audit.ts` | Site health audit engine. `applySuppressionsToAudit()` in index.ts filters suppressed issues and recalculates scores |
 | `server/reports.ts` | Audit snapshot persistence, `getLatestSnapshot` |
 | `server/google-analytics.ts` | GA4 API: overview, landing pages, organic, conversions, events, period comparison, new vs returning. Exports `CustomDateRange` type; all functions accept optional `dateRange` param |
-| `server/search-console.ts` | GSC API: queries, pages, devices, countries, period comparison. All functions accept optional `dateRange?: CustomDateRange` param |
+| `server/search-console.ts` | GSC API: queries, pages, devices, countries, period comparison, `getPageTrend` (per-page daily data with URL filter). All functions accept optional `dateRange?: CustomDateRange` param |
 | `server/semrush.ts` | SEMRush API: keyword overview, domain organic, keyword gaps, related keywords |
 | `server/openai-helpers.ts` | `callOpenAI` with retry/backoff/timeout, `parseAIJson`, token usage tracking |
 | `server/schema-suggester.ts` | JSON-LD schema generation per page |
@@ -63,6 +63,7 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 | `src/components/SeoEditor.tsx` | Page-level SEO field editor with AI rewrite, approval workflow, edit tracking (teal=live, purple=in-review, yellow=flagged) |
 | `src/components/CmsEditor.tsx` | CMS collection item SEO editor with sitemap filtering, parent slug display, edit tracking |
 | `src/components/ChatPanel.tsx` | Shared chat UI: message bubbles, loading dots, input bar, quick questions, teal/purple accent theming. Used by SearchConsole; AdminChat and ClientDashboard can adopt incrementally (#133) |
+| `src/components/ContentPerformance.tsx` | Per-published-post GSC+GA4 performance tracker (#31). Summary cards, sortable expandable table, per-post trend charts. Lazy-loaded under SEO > Content Perf in sidebar. |
 
 ## AI-Powered Features & Their Data Sources
 
@@ -115,7 +116,8 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 2. **Shared context builders**: `buildSeoContext`, `buildKeywordMapContext`, `buildKnowledgeBase` in `seo-context.ts` — used by chat, briefs, schema
 3. **Activity logging**: `addActivity(workspaceId, type, title, detail)` — all major actions logged
 4. **Chat memory**: `addMessage` → `buildConversationContext` → `generateSessionSummary` (auto after 6+ msgs)
-8. **Shared data-fetching hooks** (#132): Module-level cached hooks in `src/hooks/` — `useAuditSummary(wsId)`, `useSearchData(wsId, days)`, `useGA4Overview(wsId, days)`. 60s stale window, same pattern as `usePageEditStates`. Wired into WorkspaceHome; ClientDashboard can adopt incrementally.
+8. **Content performance** (#31): `handleContentPerformance(wsId)` batch-fetches GSC pages + GA4 landing pages (2 API calls), cross-references with delivered/published content requests. Per-post trend via `getPageTrend()`. Endpoints: `/api/content-performance/:wsId` (admin+public), `/api/content-performance/:wsId/:requestId/trend`
+9. **Shared data-fetching hooks** (#132): Module-level cached hooks in `src/hooks/` — `useAuditSummary(wsId)`, `useSearchData(wsId, days)`, `useGA4Overview(wsId, days)`. 60s stale window, same pattern as `usePageEditStates`. Wired into WorkspaceHome; ClientDashboard can adopt incrementally.
 5. **Audit suppressions**: `applySuppressionsToAudit()` filters suppressed issues + recalculates scores. Applied to all 6 data exit points (audit-summary, audit-detail, reports/latest, admin/client/strategy chat)
 6. **SEO edit tracking**: `trackSeoEdit(wsId, pageId, status)` with priority guard (won't downgrade live→flagged). Auto-wired into save, approval, audit flows. CRUD endpoints at `/api/workspaces/:id/seo-edit-tracking`
 7. **CMS sitemap filtering**: `/api/webflow/cms-seo/:siteId` fetches sitemap.xml to filter collection items. Falls back to all items if sitemap unavailable

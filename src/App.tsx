@@ -44,6 +44,7 @@ const RedirectManager = lazy(() => import('./components/RedirectManager').then(m
 const InternalLinks = lazy(() => import('./components/InternalLinks').then(m => ({ default: m.InternalLinks })));
 const SchemaSuggester = lazy(() => import('./components/SchemaSuggester').then(m => ({ default: m.SchemaSuggester })));
 const ContentBriefs = lazy(() => import('./components/ContentBriefs').then(m => ({ default: m.ContentBriefs })));
+const ContentPerformance = lazy(() => import('./components/ContentPerformance').then(m => ({ default: m.ContentPerformance })));
 const CompetitorAnalysis = lazy(() => import('./components/CompetitorAnalysis').then(m => ({ default: m.CompetitorAnalysis })));
 const RankTracker = lazy(() => import('./components/RankTracker').then(m => ({ default: m.RankTracker })));
 
@@ -59,6 +60,7 @@ type Page =
   | 'seo-strategy' | 'seo-schema' | 'seo-briefs' | 'seo-competitors' | 'seo-ranks'
   | 'search' | 'analytics' | 'annotations'
   | 'performance'
+  | 'content-perf'
   | 'workspace-settings'
   | 'prospect'
   | 'roadmap'
@@ -306,6 +308,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
       { id: 'seo-schema', label: 'Schema', icon: Code2, needsSite: true },
       { id: 'seo-briefs', label: 'Content Briefs', icon: Clipboard, needsSite: true },
       { id: 'seo-competitors', label: 'Competitors', icon: Swords, needsSite: true },
+      { id: 'content-perf', label: 'Content Perf', icon: BarChart3, needsSite: true },
     ]},
     { label: 'MANAGE', items: [
       { id: 'requests', label: 'Requests', icon: Clipboard },
@@ -315,7 +318,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   ];
 
   // ── Content renderer ──
-  const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'seo-redirects', 'seo-internal', 'seo-strategy', 'seo-schema', 'seo-briefs', 'seo-competitors', 'seo-ranks']);
+  const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'seo-redirects', 'seo-internal', 'seo-strategy', 'seo-schema', 'seo-briefs', 'seo-competitors', 'seo-ranks', 'content-perf']);
   const needsSite = !!(SEO_TABS.has(tab) || tab === 'search' || tab === 'analytics' || tab === 'annotations' || tab === 'performance');
   const seoNavigate = (t: string, ctx?: FixContext) => { setFixContext(ctx || null); setTab(t as Page); };
 
@@ -363,6 +366,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (tab === 'performance') return <Performance key={`perf-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
     if (tab === 'analytics') return <GoogleAnalytics key={`ga4-${selected.id}`} workspaceId={selected.id} ga4PropertyId={selected.ga4PropertyId} />;
     if (tab === 'annotations') return <Annotations key={`ann-${selected.id}`} workspaceId={selected.id} />;
+    if (tab === 'content-perf') return <ContentPerformance key={`content-perf-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'requests') return <RequestManager key={`requests-${selected.id}`} workspaceId={selected.id} />;
 
     return null;

@@ -311,6 +311,50 @@ export async function getPerformanceTrend(
   }));
 }
 
+/**
+ * Get daily performance trend for a specific page URL.
+ * Uses dimensionFilterGroups to filter GSC data to a single page.
+ */
+export async function getPageTrend(
+  siteId: string,
+  gscSiteUrl: string,
+  pageUrl: string,
+  days: number = 90,
+  dateRange?: CustomDateRange,
+): Promise<PerformanceTrend[]> {
+  const token = await getValidToken(siteId);
+  if (!token) throw new Error('Not connected to Google');
+
+  const { startDate, endDate } = gscDateRange(days, dateRange);
+  const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
+
+  const data = await gscFetch(
+    `${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`,
+    token,
+    {
+      startDate,
+      endDate,
+      dimensions: ['date'],
+      dimensionFilterGroups: [{
+        filters: [{
+          dimension: 'page',
+          operator: 'equals',
+          expression: pageUrl,
+        }],
+      }],
+      type: 'web',
+    }
+  ) as { rows?: SearchAnalyticsRow[] };
+
+  return (data.rows || []).map(r => ({
+    date: r.keys[0],
+    clicks: r.clicks,
+    impressions: r.impressions,
+    ctr: +(r.ctr * 100).toFixed(1),
+    position: +r.position.toFixed(1),
+  }));
+}
+
 // ─── Phase 2: Device, Country, Search Type, Period Comparison ───
 
 export interface DeviceBreakdown {

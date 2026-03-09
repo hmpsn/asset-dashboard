@@ -98,7 +98,7 @@ import { listWorkOrders, updateWorkOrder } from './work-orders.js';
 import { checkUsageLimit, incrementUsage, getUsageSummary } from './usage-tracking.js';
 import { getStripeConfigSafe, saveStripeKeys, saveStripeProducts, clearStripeConfig, getStripePublishableKey, type StripeProductPrice } from './stripe-config.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
-import { listGscSites, getSearchOverview, getPerformanceTrend, getQueryPageData, getAllGscPages, getSearchDeviceBreakdown, getSearchCountryBreakdown, getSearchTypeBreakdown, getSearchPeriodComparison } from './search-console.js';
+import { listGscSites, getSearchOverview, getPerformanceTrend, getQueryPageData, getAllGscPages, getPageTrend, getSearchDeviceBreakdown, getSearchCountryBreakdown, getSearchTypeBreakdown, getSearchPeriodComparison } from './search-console.js';
 import { listGA4Properties, getGA4Overview, getGA4DailyTrend, getGA4TopPages, getGA4TopSources, getGA4DeviceBreakdown, getGA4Countries, getGA4KeyEvents, getGA4EventTrend, getGA4Conversions, getGA4EventsByPage, getGA4LandingPages, getGA4OrganicOverview, getGA4PeriodComparison, getGA4NewVsReturning, type CustomDateRange } from './google-analytics.js';
 
 /** Parse optional startDate/endDate query params into a CustomDateRange (or undefined). */
@@ -5264,6 +5264,172 @@ app.post('/api/content-requests/:workspaceId/:id/generate-brief', async (req, re
 
     addActivity(req.params.workspaceId, 'brief_generated', `Content brief generated for "${request.targetKeyword}"`, `Title: ${brief.suggestedTitle}`, { requestId: request.id, briefId: brief.id });
     res.json(brief);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    res.status(500).json({ error: msg });
+  }
+});
+
+// --- Content Performance Tracker (#31) ---
+// Shared handler for both admin and public routes
+async function handleContentPerformance(workspaceId: string): Promise<{
+  items: Array<{
+    requestId: string;
+    topic: string;
+    targetKeyword: string;
+    targetPageSlug?: string;
+    pageType?: string;
+    status: string;
+    publishedAt?: string;
+    daysSincePublish: number;
+    gsc: { clicks: number; impressions: number; ctr: number; position: number } | null;
+    ga4: { sessions: number; users: number; bounceRate: number; avgEngagementTime: number; conversions: number } | null;
+  }>;
+}> {
+  const ws = getWorkspace(workspaceId);
+  if (!ws) throw new Error('Workspace not found');
+
+  const requests = listContentRequests(workspaceId);
+  const published = requests.filter(r => r.status === 'delivered' || r.status === 'published');
+  if (published.length === 0) return { items: [] };
+
+  // Batch-fetch GSC page data (one API call)
+  const gscPages: Map<string, { clicks: number; impressions: number; ctr: number; position: number }> = new Map();
+  if (ws.gscPropertyUrl && ws.webflowSiteId) {
+    try {
+      const pages = await getAllGscPages(ws.webflowSiteId, ws.gscPropertyUrl, 90);
+      for (const p of pages) {
+        // Store by path (strip domain)
+        try {
+          const url = new URL(p.page);
+          gscPages.set(url.pathname, { clicks: p.clicks, impressions: p.impressions, ctr: p.ctr, position: p.position });
+        } catch {
+          gscPages.set(p.page, { clicks: p.clicks, impressions: p.impressions, ctr: p.ctr, position: p.position });
+        }
+      }
+    } catch { /* GSC unavailable */ }
+  }
+
+  // Batch-fetch GA4 landing pages (one API call)
+  const ga4Pages: Map<string, { sessions: number; users: number; bounceRate: number; avgEngagementTime: number; conversions: number }> = new Map();
+  if (ws.ga4PropertyId) {
+    try {
+      const pages = await getGA4LandingPages(ws.ga4PropertyId, 90, 100);
+      for (const p of pages) {
+        ga4Pages.set(p.landingPage, { sessions: p.sessions, users: p.users, bounceRate: p.bounceRate, avgEngagementTime: p.avgEngagementTime, conversions: p.conversions });
+      }
+    } catch { /* GA4 unavailable */ }
+  }
+
+  const now = Date.now();
+  const items = published.map(r => {
+    const slug = r.targetPageSlug;
+    const path = slug ? (slug.startsWith('/') ? slug : `/${slug}`) : undefined;
+
+    // Match GSC data by slug path
+    const gsc = path ? (gscPages.get(path) || null) : null;
+    // Match GA4 data by slug path
+    const ga4 = path ? (ga4Pages.get(path) || null) : null;
+
+    // Calculate days since publish (use updatedAt as proxy for publish date)
+    const publishDate = r.updatedAt || r.requestedAt;
+    const daysSincePublish = Math.floor((now - new Date(publishDate).getTime()) / (1000 * 60 * 60 * 24));
+
+    return {
+      requestId: r.id,
+      topic: r.topic,
+      targetKeyword: r.targetKeyword,
+      targetPageSlug: r.targetPageSlug,
+      pageType: r.pageType,
+      status: r.status,
+      publishedAt: publishDate,
+      daysSincePublish,
+      gsc,
+      ga4,
+    };
+  });
+
+  // Sort by GSC clicks descending, then by days since publish
+  items.sort((a, b) => (b.gsc?.clicks || 0) - (a.gsc?.clicks || 0) || a.daysSincePublish - b.daysSincePublish);
+
+  return { items };
+}
+
+app.get('/api/content-performance/:workspaceId', async (req, res) => {
+  try {
+    const data = await handleContentPerformance(req.params.workspaceId);
+    res.json(data);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    res.status(err instanceof Error && msg === 'Workspace not found' ? 404 : 500).json({ error: msg });
+  }
+});
+
+app.get('/api/public/content-performance/:workspaceId', async (req, res) => {
+  try {
+    const data = await handleContentPerformance(req.params.workspaceId);
+    res.json(data);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    res.status(err instanceof Error && msg === 'Workspace not found' ? 404 : 500).json({ error: msg });
+  }
+});
+
+// Per-post GSC trend (daily clicks/impressions since publish)
+app.get('/api/content-performance/:workspaceId/:requestId/trend', async (req, res) => {
+  try {
+    const ws = getWorkspace(req.params.workspaceId);
+    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+    const request = getContentRequest(req.params.workspaceId, req.params.requestId);
+    if (!request) return res.status(404).json({ error: 'Request not found' });
+    if (!request.targetPageSlug || !ws.gscPropertyUrl || !ws.webflowSiteId) {
+      return res.json({ trend: [] });
+    }
+
+    // Build full URL for the page
+    let siteBase = ws.gscPropertyUrl.replace(/\/$/, '');
+    if (siteBase.startsWith('sc-domain:')) {
+      siteBase = `https://${siteBase.replace('sc-domain:', '')}`;
+    }
+    const slug = request.targetPageSlug.startsWith('/') ? request.targetPageSlug : `/${request.targetPageSlug}`;
+    const pageUrl = `${siteBase}${slug}`;
+
+    // Use publish date as start, or default to 90 days
+    const publishDate = request.updatedAt || request.requestedAt;
+    const startDate = publishDate.split('T')[0];
+    const endDate = new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0]; // 3-day GSC delay
+
+    const trend = await getPageTrend(ws.webflowSiteId, ws.gscPropertyUrl, pageUrl, 90, { startDate, endDate });
+    res.json({ trend });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    res.status(500).json({ error: msg });
+  }
+});
+
+app.get('/api/public/content-performance/:workspaceId/:requestId/trend', async (req, res) => {
+  try {
+    const ws = getWorkspace(req.params.workspaceId);
+    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+    const request = getContentRequest(req.params.workspaceId, req.params.requestId);
+    if (!request) return res.status(404).json({ error: 'Request not found' });
+    if (!request.targetPageSlug || !ws.gscPropertyUrl || !ws.webflowSiteId) {
+      return res.json({ trend: [] });
+    }
+
+    let siteBase = ws.gscPropertyUrl.replace(/\/$/, '');
+    if (siteBase.startsWith('sc-domain:')) {
+      siteBase = `https://${siteBase.replace('sc-domain:', '')}`;
+    }
+    const slug = request.targetPageSlug.startsWith('/') ? request.targetPageSlug : `/${request.targetPageSlug}`;
+    const pageUrl = `${siteBase}${slug}`;
+
+    const publishDate = request.updatedAt || request.requestedAt;
+    const startDate = publishDate.split('T')[0];
+    const endDate = new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0];
+
+    const trend = await getPageTrend(ws.webflowSiteId, ws.gscPropertyUrl, pageUrl, 90, { startDate, endDate });
+    res.json({ trend });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     res.status(500).json({ error: msg });
