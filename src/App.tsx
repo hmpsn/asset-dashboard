@@ -12,6 +12,7 @@ import { TaskPanel } from './components/TaskPanel';
 import { AdminChat } from './components/AdminChat';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { NotificationBell } from './components/NotificationBell';
+import { CommandPalette } from './components/CommandPalette';
 import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, Search,
   Pencil, CornerDownRight, Share2, Target, Code2, LogOut, Swords, TrendingUp, Flag,
@@ -554,6 +555,12 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
           workspaceCount={workspaces.length}
         />
       </div>
+      <CommandPalette
+        workspaces={workspaces}
+        selectedWorkspace={selected}
+        onSelectWorkspace={(ws) => { setSelected(ws); setTab('home'); }}
+        onNavigate={(t) => setTab(t)}
+      />
       {selected && health.hasOpenAIKey && (
         <ErrorBoundary label="Admin Chat">
           <AdminChat
