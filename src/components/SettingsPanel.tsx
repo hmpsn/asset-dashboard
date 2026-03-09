@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { useToast } from './Toast';
 import {
   Check, Search, Loader2, LogIn, LogOut, Globe, ExternalLink, Unplug,
+  Shield, Key, Mail, CreditCard, Wifi, WifiOff,
 } from 'lucide-react';
+import { StripeSettings } from './StripeSettings';
 
 interface Workspace {
   id: string;
@@ -16,12 +18,21 @@ interface GscSite {
   permissionLevel: string;
 }
 
+interface HealthStatus {
+  hasOpenAIKey: boolean;
+  hasWebflowToken: boolean;
+  hasGoogleAuth: boolean;
+  hasEmailConfig: boolean;
+  hasStripe: boolean;
+}
+
 export function SettingsPanel() {
   const { toast } = useToast();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [googleStatus, setGoogleStatus] = useState<{ connected: boolean; configured: boolean } | null>(null);
   const [gscSites, setGscSites] = useState<GscSite[]>([]);
   const [loadingGsc, setLoadingGsc] = useState(false);
+  const [health, setHealth] = useState<HealthStatus | null>(null);
 
   useEffect(() => {
     fetch('/api/workspaces').then(r => r.json()).then(setWorkspaces).catch(() => {});
@@ -29,6 +40,7 @@ export function SettingsPanel() {
       setGoogleStatus(s);
       if (s.connected) loadGscSites();
     }).catch(() => {});
+    fetch('/api/health').then(r => r.json()).then((h: HealthStatus) => setHealth(h)).catch(() => {});
   }, []);
 
   const loadGscSites = async () => {
@@ -159,6 +171,59 @@ export function SettingsPanel() {
           </div>
         </div>
       </section>
+
+      {/* Platform Health */}
+      <section className="bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800">
+        <div className="px-5 py-4 border-b border-zinc-800">
+          <div className="flex items-center gap-2">
+            <Shield className="w-4 h-4 text-teal-400" />
+            <h3 className="text-sm font-semibold text-zinc-200">Platform Health</h3>
+          </div>
+          <p className="text-xs mt-0.5 text-zinc-500">Connection status and workspace overview</p>
+        </div>
+        <div className="px-5 py-4 space-y-4">
+          {/* Connection status */}
+          <div>
+            <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-2">Connections</div>
+            <div className="space-y-1.5">
+              {[
+                { label: 'OpenAI', ok: health?.hasOpenAIKey, icon: Key },
+                { label: 'Webflow', ok: health?.hasWebflowToken, icon: Globe },
+                { label: 'Google Auth', ok: health?.hasGoogleAuth, icon: Search },
+                { label: 'Email', ok: health?.hasEmailConfig, icon: Mail },
+                { label: 'Stripe', ok: health?.hasStripe, icon: CreditCard },
+              ].map(c => {
+                const Icon = c.icon;
+                return (
+                  <div key={c.label} className="flex items-center gap-2">
+                    <Icon className="w-3 h-3 text-zinc-500" />
+                    <span className="text-xs text-zinc-300 flex-1">{c.label}</span>
+                    {c.ok ? <Wifi className="w-3 h-3 text-green-400" /> : <WifiOff className="w-3 h-3 text-zinc-600" />}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Workspace stats */}
+          <div>
+            <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-2">Workspaces</div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-zinc-400">Total</span>
+                <span className="text-xs font-medium text-zinc-200">{workspaces.length}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-zinc-400">With Webflow site</span>
+                <span className="text-xs font-medium text-zinc-200">{workspaces.filter(w => w.webflowSiteId).length}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Stripe / Payments */}
+      <StripeSettings />
 
       {/* Hint */}
       <p className="text-xs text-center py-4 text-zinc-500">

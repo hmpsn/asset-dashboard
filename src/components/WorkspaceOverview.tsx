@@ -3,11 +3,10 @@ import {
   Globe, Shield, MessageSquare, ClipboardCheck, AlertTriangle,
   CheckCircle2, ArrowUpRight, ArrowDownRight, Minus, Loader2,
   Search, BarChart3, Lock, ExternalLink, Bell, Activity, FileText, Zap,
-  Map, Clock, Circle, Rocket, Wifi, WifiOff, Key, Mail, FileSearch, CreditCard,
+  Map, Rocket, FileSearch,
   TrendingDown,
 } from 'lucide-react';
 import { MetricRingSvg, PageHeader, SectionCard, Badge, StatCard } from './ui';
-import { StripeSettings } from './StripeSettings';
 
 interface ActivityEntry {
   id: string;
@@ -44,13 +43,6 @@ interface WorkspaceSummary {
   trialDaysRemaining?: number;
 }
 
-interface HealthStatus {
-  hasOpenAIKey: boolean;
-  hasWebflowToken: boolean;
-  hasGoogleAuth: boolean;
-  hasEmailConfig: boolean;
-  hasStripe: boolean;
-}
 
 interface AnomalySummary {
   id: string;
@@ -65,13 +57,6 @@ interface AnomalySummary {
 // ScoreRing replaced by unified <MetricRingSvg /> from ./ui
 const ScoreRing = MetricRingSvg;
 
-/* ── Roadmap sprint shape from API ── */
-interface RoadmapSprint {
-  id: string;
-  name: string;
-  hours: string;
-  items: Array<{ id: number; status: string }>;
-}
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -88,22 +73,16 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
   const [data, setData] = useState<WorkspaceSummary[]>([]);
   const [recentActivity, setRecentActivity] = useState<ActivityEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [roadmapSprints, setRoadmapSprints] = useState<RoadmapSprint[]>([]);
-  const [health, setHealth] = useState<HealthStatus | null>(null);
   const [anomalies, setAnomalies] = useState<AnomalySummary[]>([]);
 
   useEffect(() => {
     Promise.all([
       fetch('/api/workspace-overview').then(r => r.json()),
       fetch('/api/activity?limit=15').then(r => r.json()).catch(() => []),
-      fetch('/api/roadmap').then(r => r.ok ? r.json() : null).catch(() => null),
-      fetch('/api/health').then(r => r.json()).catch(() => null),
       fetch('/api/anomalies').then(r => r.ok ? r.json() : []).catch(() => []),
-    ]).then(([d, act, rm, h, anom]) => {
+    ]).then(([d, act, anom]) => {
       if (Array.isArray(d)) setData(d);
       if (Array.isArray(act)) setRecentActivity(act);
-      if (rm?.sprints && Array.isArray(rm.sprints)) setRoadmapSprints(rm.sprints);
-      if (h) setHealth(h as HealthStatus);
       if (Array.isArray(anom)) setAnomalies(anom.filter((a: AnomalySummary) => !a.dismissedAt));
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
@@ -140,18 +119,6 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
     ? Math.round(data.filter(w => w.audit).reduce((s, w) => s + (w.audit?.score || 0), 0) / data.filter(w => w.audit).length)
     : null;
 
-  // Roadmap stats (derived from API data)
-  const allRoadmapItems = roadmapSprints.flatMap(s => s.items);
-  const totalRoadmapItems = allRoadmapItems.length;
-  const roadmapDone = allRoadmapItems.filter(i => i.status === 'done').length;
-  const roadmapInProgress = allRoadmapItems.filter(i => i.status === 'in_progress').length;
-  const roadmapPct = totalRoadmapItems > 0 ? Math.round((roadmapDone / totalRoadmapItems) * 100) : 0;
-
-  // Current sprint (first sprint with incomplete items)
-  const currentSprint = roadmapSprints.find(s =>
-    s.items.some(i => i.status !== 'done')
-  );
-
   // Anomaly aggregation across workspaces
   const criticalAnomalies = anomalies.filter(a => a.severity === 'critical');
   const warningAnomalies = anomalies.filter(a => a.severity === 'warning');
@@ -177,15 +144,6 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
   const unlinkWorkspaces = data.filter(w => !w.webflowSiteId);
   if (unlinkWorkspaces.length > 0) attentionItems.push({ label: `${unlinkWorkspaces.length} workspace${unlinkWorkspaces.length > 1 ? 's' : ''} with no site linked`, value: 'Setup', color: 'text-amber-400', icon: Globe, priority: 8 });
   attentionItems.sort((a, b) => a.priority - b.priority);
-
-  // Platform connections
-  const connections = [
-    { label: 'OpenAI', ok: health?.hasOpenAIKey, icon: Key },
-    { label: 'Webflow', ok: health?.hasWebflowToken, icon: Globe },
-    { label: 'Google Auth', ok: health?.hasGoogleAuth, icon: Search },
-    { label: 'Email', ok: health?.hasEmailConfig, icon: Mail },
-    { label: 'Stripe', ok: health?.hasStripe, icon: CreditCard },
-  ];
 
   return (
     <div className="space-y-6">
@@ -396,129 +354,6 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
           })}
         </div>
       </div>
-
-      {/* ── Two-column: Roadmap + Platform Health ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Roadmap Progress */}
-        <SectionCard
-          title="Roadmap Progress"
-          titleIcon={<Map className="w-4 h-4 text-teal-400" />}
-          action={onNavigate && (
-            <button onClick={() => onNavigate('roadmap')} className="text-[11px] text-teal-400 hover:text-teal-300 transition-colors">
-              View Full →
-            </button>
-          )}
-          className="lg:col-span-2"
-        >
-          {/* Overall progress */}
-          <div className="mb-4">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs text-zinc-400">{roadmapDone}/{totalRoadmapItems} items complete</span>
-              <span className="text-xs font-medium text-teal-400">{roadmapPct}%</span>
-            </div>
-            <div className="h-2.5 bg-zinc-800 rounded-full overflow-hidden flex">
-              {roadmapDone > 0 && <div className="h-full bg-green-500 transition-all" style={{ width: `${totalRoadmapItems > 0 ? (roadmapDone / totalRoadmapItems) * 100 : 0}%` }} />}
-              {roadmapInProgress > 0 && <div className="h-full bg-teal-400 transition-all" style={{ width: `${totalRoadmapItems > 0 ? (roadmapInProgress / totalRoadmapItems) * 100 : 0}%` }} />}
-            </div>
-          </div>
-
-          {/* Sprint list */}
-          <div className="space-y-2">
-            {roadmapSprints.map(sprint => {
-              const sprintDone = sprint.items.filter(i => i.status === 'done').length;
-              const sprintActive = sprint.items.filter(i => i.status === 'in_progress').length;
-              const sprintTotal = sprint.items.length;
-              const isCurrent = sprint.id === currentSprint?.id;
-              const isComplete = sprintDone === sprintTotal;
-
-              return (
-                <div key={sprint.id} className={`flex items-center gap-3 px-3 py-2 rounded-lg ${isCurrent ? 'bg-teal-500/5 border border-teal-500/20' : 'bg-zinc-800/30'}`}>
-                  <div className="flex-shrink-0">
-                    {isComplete ? <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
-                      : sprintActive > 0 ? <Clock className="w-3.5 h-3.5 text-teal-400 animate-pulse" />
-                      : <Circle className="w-3.5 h-3.5 text-zinc-600" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs font-medium truncate ${isComplete ? 'text-zinc-500 line-through' : isCurrent ? 'text-teal-300' : 'text-zinc-300'}`}>
-                        {sprint.name}
-                      </span>
-                      {isCurrent && <Badge label="Current" color="teal" />}
-                    </div>
-                  </div>
-                  <span className="text-[11px] text-zinc-500 flex-shrink-0">{sprint.hours}h</span>
-                  <span className="text-[11px] text-zinc-400 flex-shrink-0 tabular-nums w-8 text-right">{sprintDone}/{sprintTotal}</span>
-                </div>
-              );
-            })}
-          </div>
-        </SectionCard>
-
-        {/* Platform Health */}
-        <SectionCard title="Platform" titleIcon={<Shield className="w-4 h-4 text-teal-400" />}>
-          <div className="space-y-4">
-            {/* Connection status */}
-            <div>
-              <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-2">Connections</div>
-              <div className="space-y-1.5">
-                {connections.map(c => {
-                  const Icon = c.icon;
-                  return (
-                    <div key={c.label} className="flex items-center gap-2">
-                      <Icon className="w-3 h-3 text-zinc-500" />
-                      <span className="text-xs text-zinc-300 flex-1">{c.label}</span>
-                      {c.ok ? <Wifi className="w-3 h-3 text-green-400" /> : <WifiOff className="w-3 h-3 text-zinc-600" />}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Workspace stats */}
-            <div>
-              <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-2">Workspaces</div>
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-zinc-400">Total</span>
-                  <span className="text-xs font-medium text-zinc-200">{data.length}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-zinc-400">With GSC</span>
-                  <span className="text-xs font-medium text-zinc-200">{data.filter(w => w.hasGsc).length}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-zinc-400">With GA4</span>
-                  <span className="text-xs font-medium text-zinc-200">{data.filter(w => w.hasGa4).length}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-zinc-400">Client portals</span>
-                  <span className="text-xs font-medium text-zinc-200">{data.filter(w => w.hasPassword).length}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-zinc-400">Audited</span>
-                  <span className="text-xs font-medium text-zinc-200">{data.filter(w => w.audit).length}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Feature count */}
-            <div>
-              <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-2">Platform</div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-zinc-400">Features shipped</span>
-                <span className="text-xs font-bold text-teal-400">{roadmapDone}</span>
-              </div>
-              <div className="flex items-center justify-between mt-1">
-                <span className="text-xs text-zinc-400">Roadmap items</span>
-                <span className="text-xs font-medium text-zinc-200">{totalRoadmapItems}</span>
-              </div>
-            </div>
-          </div>
-        </SectionCard>
-      </div>
-
-      {/* ── Stripe Payments ── */}
-      <StripeSettings />
 
       {/* ── Recent Activity ── */}
       {recentActivity.length > 0 && (
