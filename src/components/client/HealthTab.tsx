@@ -19,8 +19,10 @@ export interface HealthTabProps {
   workspaceId?: string;
 }
 
-export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity = 'all', tier, workspaceId }: HealthTabProps) {
-  const [severityFilter, setSeverityFilter] = useState<'all' | 'error' | 'warning' | 'info'>(initialSeverity);
+export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, tier, workspaceId }: HealthTabProps) {
+  // Default to 'error' filter when there are errors — most actionable view first
+  const defaultSeverity = initialSeverity || (auditDetail && auditDetail.audit.errors > 0 ? 'error' : 'all');
+  const [severityFilter, setSeverityFilter] = useState<'all' | 'error' | 'warning' | 'info'>(defaultSeverity);
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
   const [auditSearch, setAuditSearch] = useState('');
 
@@ -136,6 +138,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity = 'a
       <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
         <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-3">
           <span className="text-xs font-medium text-zinc-300">Page Breakdown</span>
+          <span className="text-[11px] text-zinc-500">{filteredPages.length} of {auditDetail?.audit.totalPages || 0} pages</span>
           <div className="flex-1" />
           <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-0.5">
             {(['all', 'error', 'warning', 'info'] as const).map(s => (

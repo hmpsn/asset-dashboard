@@ -76,6 +76,9 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const proactiveInsightSent = useRef(false);
+  const [proactiveInsight, setProactiveInsight] = useState<string | null>(null);
+  const [proactiveInsightLoading, setProactiveInsightLoading] = useState(false);
+  const inlineInsightFetched = useRef(false);
   const [chatSessionId, setChatSessionId] = useState<string>(() => `cs-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
   const [chatSessions, setChatSessions] = useState<Array<{ id: string; title: string; messageCount: number; updatedAt: string }>>([]);
   const [showChatHistory, setShowChatHistory] = useState(false);
@@ -677,6 +680,32 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
     finally { setChatLoading(false); }
   };
 
+  // Fetch inline AI insight for the Overview tab hero card (separate from chat greeting)
+  const fetchInlineInsight = async () => {
+    if (!ws || (!overview && !ga4Overview) || inlineInsightFetched.current) return;
+    inlineInsightFetched.current = true;
+    setProactiveInsightLoading(true);
+    try {
+      const context = buildChatContext();
+      const prompt = 'Give me a 2-3 sentence executive summary of my site\'s current performance. Lead with the single most important trend (positive or negative), then one actionable next step. Be specific with numbers. Do not use bullet points or headers — write it as a short paragraph. Do not ask me questions.';
+      const res = await fetch(`/api/public/search-chat/${ws.id}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: prompt, context, sessionId: `inline-${ws.id}` }),
+      });
+      const data = await res.json();
+      if (!data.error && data.answer) setProactiveInsight(data.answer);
+    } catch { /* silent fail */ }
+    finally { setProactiveInsightLoading(false); }
+  };
+
+  // Fire inline insight after dashboard data loads (paid tiers only)
+  useEffect(() => {
+    if (ws && (overview || ga4Overview) && effectiveTier !== 'free' && !inlineInsightFetched.current) {
+      fetchInlineInsight();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [overview, ga4Overview, ws]);
+
   // Fetch chat usage when chat opens
   useEffect(() => {
     if (chatOpen && ws) {
@@ -1131,7 +1160,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
 
         {/* ════════════ OVERVIEW TAB ════════════ */}
         {tab === 'overview' && (
-          <OverviewTab ws={ws!} overview={overview} searchComparison={searchComparison} trend={trend} ga4Overview={ga4Overview} ga4Trend={ga4Trend} ga4Comparison={ga4Comparison} ga4Organic={ga4Organic} ga4Conversions={ga4Conversions} ga4NewVsReturning={ga4NewVsReturning} audit={audit} auditDetail={auditDetail} strategyData={strategyData} insights={insights} contentRequests={contentRequests} requests={requests} approvalBatches={approvalBatches} activityLog={activityLog} pendingApprovals={pendingApprovals} unreadTeamNotes={unreadTeamNotes} eventDisplayName={eventDisplayName} isEventPinned={isEventPinned} setTab={setTab} onAskAi={askAi} onOpenChat={() => setChatOpen(true)} clientUser={clientUser} />
+          <OverviewTab ws={ws!} overview={overview} searchComparison={searchComparison} trend={trend} ga4Overview={ga4Overview} ga4Trend={ga4Trend} ga4Comparison={ga4Comparison} ga4Organic={ga4Organic} ga4Conversions={ga4Conversions} ga4NewVsReturning={ga4NewVsReturning} audit={audit} auditDetail={auditDetail} strategyData={strategyData} insights={insights} contentRequests={contentRequests} requests={requests} approvalBatches={approvalBatches} activityLog={activityLog} pendingApprovals={pendingApprovals} unreadTeamNotes={unreadTeamNotes} eventDisplayName={eventDisplayName} isEventPinned={isEventPinned} setTab={setTab} onAskAi={askAi} onOpenChat={() => setChatOpen(true)} clientUser={clientUser} proactiveInsight={proactiveInsight} proactiveInsightLoading={proactiveInsightLoading} />
         )}
 
         {/* ════════════ SEARCH TAB ════════════ */}

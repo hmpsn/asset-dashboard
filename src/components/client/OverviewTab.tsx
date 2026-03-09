@@ -1,6 +1,6 @@
 import {
   AlertTriangle, Users, MousePointerClick, Eye, BarChart3, Shield, Target,
-  Sparkles, Activity,
+  Sparkles, Activity, Loader2, MessageCircle,
 } from 'lucide-react';
 import { StatCard } from '../ui';
 import { MonthlySummary } from './MonthlySummary';
@@ -57,6 +57,9 @@ interface OverviewTabProps {
   onOpenChat: () => void;
   // Auth
   clientUser: { id: string; name: string; email: string; role: string } | null;
+  // AI Insight
+  proactiveInsight: string | null;
+  proactiveInsightLoading: boolean;
 }
 
 export function OverviewTab({
@@ -69,6 +72,7 @@ export function OverviewTab({
   eventDisplayName, isEventPinned,
   setTab, onAskAi, onOpenChat,
   clientUser,
+  proactiveInsight, proactiveInsightLoading,
 }: OverviewTabProps) {
   // Derive a dynamic subtitle from the most significant data signal
   const dynamicSubtitle = (() => {
@@ -94,6 +98,39 @@ export function OverviewTab({
       <h2 className="text-xl font-semibold text-zinc-100">Welcome back{clientUser ? `, ${clientUser.name.split(' ')[0]}` : ''}</h2>
       <p className="text-sm text-zinc-500 mt-1">{dynamicSubtitle}</p>
     </div>
+
+    {/* Inline AI Hero Insight */}
+    {(proactiveInsight || proactiveInsightLoading) && (
+      <div className="bg-gradient-to-r from-teal-500/8 via-zinc-900 to-emerald-500/8 rounded-xl border border-teal-500/20 px-5 py-4">
+        <div className="flex items-start gap-3">
+          <div className="w-8 h-8 rounded-lg bg-teal-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <Sparkles className="w-4 h-4 text-teal-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-xs font-semibold text-teal-300">Insights Engine</span>
+              <span className="text-[10px] text-zinc-600">AI-powered summary</span>
+            </div>
+            {proactiveInsightLoading ? (
+              <div className="flex items-center gap-2 py-1">
+                <Loader2 className="w-3.5 h-3.5 text-teal-400 animate-spin" />
+                <span className="text-xs text-zinc-500">Analyzing your data...</span>
+              </div>
+            ) : (
+              <p className="text-sm text-zinc-300 leading-relaxed">{proactiveInsight}</p>
+            )}
+            {proactiveInsight && !proactiveInsightLoading && (
+              <button
+                onClick={() => { onOpenChat(); setTimeout(() => onAskAi('What should I focus on this week?'), 100); }}
+                className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/20 transition-colors text-xs text-teal-300 font-medium"
+              >
+                <MessageCircle className="w-3 h-3" /> Continue in chat
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
 
     {/* Action-needed banner */}
     {(() => {

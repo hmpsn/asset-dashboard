@@ -79,10 +79,26 @@ export function SearchTab({
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
           <div className="text-sm font-semibold text-zinc-200 mb-3">Search Health Summary</div>
           <div className="grid grid-cols-4 gap-3">
-            <div className="text-center"><div className={`text-lg font-bold ${insights.page1 > 5 ? 'text-green-400' : 'text-amber-400'}`}>{insights.page1}</div><div className="text-[11px] text-zinc-500">Page 1 Rankings</div></div>
-            <div className="text-center"><div className={`text-lg font-bold ${insights.top3 > 2 ? 'text-green-400' : 'text-amber-400'}`}>{insights.top3}</div><div className="text-[11px] text-zinc-500">Top 3 Rankings</div></div>
-            <div className="text-center"><div className={`text-lg font-bold ${overview.avgCtr > 3 ? 'text-green-400' : overview.avgCtr > 1.5 ? 'text-amber-400' : 'text-red-400'}`}>{overview.avgCtr}%</div><div className="text-[11px] text-zinc-500">Avg CTR</div></div>
-            <div className="text-center"><div className={`text-lg font-bold ${insights.lowHanging.length > 0 ? 'text-amber-400' : 'text-green-400'}`}>{insights.lowHanging.length}</div><div className="text-[11px] text-zinc-500">Opportunities</div></div>
+            <div className="text-center">
+              <div className={`text-lg font-bold ${insights.page1 > 5 ? 'text-green-400' : 'text-amber-400'}`}>{insights.page1}</div>
+              <div className="text-[11px] text-zinc-500">Page 1 Rankings</div>
+              <div className={`text-[10px] mt-0.5 ${insights.page1 >= 10 ? 'text-green-400/70' : insights.page1 >= 3 ? 'text-amber-400/70' : 'text-zinc-600'}`}>{insights.page1 >= 10 ? 'Strong visibility' : insights.page1 >= 3 ? 'Room to grow' : 'Building up'}</div>
+            </div>
+            <div className="text-center">
+              <div className={`text-lg font-bold ${insights.top3 > 2 ? 'text-green-400' : 'text-amber-400'}`}>{insights.top3}</div>
+              <div className="text-[11px] text-zinc-500">Top 3 Rankings</div>
+              <div className={`text-[10px] mt-0.5 ${insights.top3 >= 5 ? 'text-green-400/70' : insights.top3 >= 1 ? 'text-amber-400/70' : 'text-zinc-600'}`}>{insights.top3 >= 5 ? 'Dominant positions' : insights.top3 >= 1 ? 'Competitive' : 'Opportunity ahead'}</div>
+            </div>
+            <div className="text-center">
+              <div className={`text-lg font-bold ${overview.avgCtr > 3 ? 'text-green-400' : overview.avgCtr > 1.5 ? 'text-amber-400' : 'text-red-400'}`}>{overview.avgCtr}%</div>
+              <div className="text-[11px] text-zinc-500">Avg CTR</div>
+              <div className={`text-[10px] mt-0.5 ${overview.avgCtr > 3 ? 'text-green-400/70' : overview.avgCtr > 1.5 ? 'text-amber-400/70' : 'text-red-400/70'}`}>{overview.avgCtr > 3 ? 'Above average' : overview.avgCtr > 1.5 ? 'Typical range' : 'Needs attention'}</div>
+            </div>
+            <div className="text-center">
+              <div className={`text-lg font-bold ${insights.lowHanging.length > 0 ? 'text-amber-400' : 'text-green-400'}`}>{insights.lowHanging.length}</div>
+              <div className="text-[11px] text-zinc-500">Opportunities</div>
+              <div className={`text-[10px] mt-0.5 ${insights.lowHanging.length > 5 ? 'text-amber-400/70' : insights.lowHanging.length > 0 ? 'text-teal-400/70' : 'text-green-400/70'}`}>{insights.lowHanging.length > 5 ? 'Quick wins available' : insights.lowHanging.length > 0 ? 'A few to capture' : 'Fully optimized'}</div>
+            </div>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">

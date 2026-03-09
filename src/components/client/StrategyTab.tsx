@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Eye, MousePointerClick, Trophy, Zap, FileText, Sparkles, Target, Search, CheckCircle2,
+  Zap, FileText, Sparkles, Target, Search, CheckCircle2,
 } from 'lucide-react';
 import { TierGate, type Tier } from '../ui';
 import type { ClientKeywordStrategy, ClientContentRequest } from './types';
@@ -54,33 +54,33 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         </div>
       </div>
 
-      {/* Summary Cards */}
+      {/* Summary Cards — strategy-specific metrics */}
       {(() => {
-        const ranked = strategyData.pageMap.filter(p => p.currentPosition);
-        const avgPos = ranked.length > 0 ? ranked.reduce((s, p) => s + (p.currentPosition || 0), 0) / ranked.length : 0;
-        const totalImp = strategyData.pageMap.reduce((s, p) => s + (p.impressions || 0), 0);
-        const totalClk = strategyData.pageMap.reduce((s, p) => s + (p.clicks || 0), 0);
+        const keywordsTracked = strategyData.siteKeywords.length;
+        const contentGapsFound = strategyData.contentGaps?.length || 0;
+        const quickWinsAvailable = strategyData.quickWins?.length || 0;
+        const pagesWithoutRankings = strategyData.pageMap.filter(p => !p.currentPosition).length;
         return (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-              <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Pages Mapped</div>
-              <div className="text-xl font-bold text-zinc-100">{strategyData.pageMap.length}</div>
-              <div className="text-[11px] text-zinc-500">{strategyData.siteKeywords.length} target keywords</div>
+              <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Target className="w-3 h-3" /> Keywords Tracked</div>
+              <div className="text-xl font-bold text-zinc-100">{keywordsTracked}</div>
+              <div className="text-[11px] text-zinc-500">{strategyData.pageMap.length} pages mapped</div>
             </div>
             <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-              <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Eye className="w-3 h-3" /> Impressions</div>
-              <div className="text-xl font-bold text-zinc-100">{totalImp > 0 ? totalImp.toLocaleString() : '—'}</div>
-              <div className="text-[11px] text-zinc-500">{totalImp > 0 ? 'last 90 days' : 'no search data yet'}</div>
+              <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><FileText className="w-3 h-3" /> Content Gaps</div>
+              <div className={`text-xl font-bold ${contentGapsFound > 0 ? 'text-teal-400' : 'text-zinc-500'}`}>{contentGapsFound}</div>
+              <div className="text-[11px] text-zinc-500">{contentGapsFound > 0 ? 'topics identified' : 'none found yet'}</div>
             </div>
             <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-              <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><MousePointerClick className="w-3 h-3" /> Clicks</div>
-              <div className="text-xl font-bold text-zinc-100">{totalClk > 0 ? totalClk.toLocaleString() : '—'}</div>
-              <div className="text-[11px] text-zinc-500">{totalImp > 0 ? `${((totalClk / totalImp) * 100).toFixed(1)}% CTR` : 'no search data yet'}</div>
+              <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Zap className="w-3 h-3" /> Quick Wins</div>
+              <div className={`text-xl font-bold ${quickWinsAvailable > 0 ? 'text-amber-400' : 'text-zinc-500'}`}>{quickWinsAvailable}</div>
+              <div className="text-[11px] text-zinc-500">{quickWinsAvailable > 0 ? 'low-effort improvements' : 'none right now'}</div>
             </div>
             <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-              <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Trophy className="w-3 h-3" /> Avg Position</div>
-              <div className={`text-xl font-bold ${ranked.length > 0 ? (avgPos <= 3 ? 'text-emerald-400' : avgPos <= 10 ? 'text-green-400' : avgPos <= 20 ? 'text-amber-400' : 'text-red-400') : 'text-zinc-500'}`}>{ranked.length > 0 ? `#${avgPos.toFixed(1)}` : '—'}</div>
-              <div className="text-[11px] text-zinc-500">{ranked.length} pages ranking</div>
+              <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Search className="w-3 h-3" /> Not Yet Ranking</div>
+              <div className={`text-xl font-bold ${pagesWithoutRankings > 0 ? 'text-red-400' : 'text-emerald-400'}`}>{pagesWithoutRankings}</div>
+              <div className="text-[11px] text-zinc-500">{pagesWithoutRankings > 0 ? 'pages need attention' : 'all pages ranking'}</div>
             </div>
           </div>
         );
