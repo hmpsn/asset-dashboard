@@ -9,6 +9,7 @@ import {
 import { StripePaymentModal } from './StripePaymentForm';
 import { type Tier } from './ui';
 import { RenderMarkdown } from './client/helpers';
+import { STUDIO_NAME } from '../constants';
 import { HealthTab } from './client/HealthTab';
 import { InsightsEngine } from './client/InsightsEngine';
 import { CartProvider } from './client/useCart';
@@ -206,7 +207,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
     setLoading(true);
     fetch(`/api/public/workspace/${workspaceId}`)
       .then(r => {
-        if (r.status === 403) { setError('This dashboard is currently unavailable. Please contact your web team for access.'); setLoading(false); throw new Error('portal_disabled'); }
+        if (r.status === 403) { setError('This dashboard is currently unavailable. Please contact hmpsn studio for access.'); setLoading(false); throw new Error('portal_disabled'); }
         return r.json();
       })
       .then(async (data: WorkspaceInfo) => {
@@ -467,7 +468,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
         if (upRes.ok) {
           const updated = await upRes.json();
           setContentRequests(prev => prev.map(r => r.id === pricingModal.upgradeReqId ? updated : r));
-          setToast({ message: 'Upgraded to full blog post! Your team will begin writing.', type: 'success' });
+          setToast({ message: `Upgraded to full blog post! ${STUDIO_NAME} will begin writing.`, type: 'success' });
           setTimeout(() => setToast(null), 5000);
         }
       } else if (pricingModal.source === 'strategy') {
@@ -494,7 +495,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
           const created = await res.json();
           setContentRequests(prev => [created, ...prev]);
           setRequestedTopics(prev => new Set(prev).add(created.targetKeyword));
-          setToast({ message: 'Topic submitted! Your team will review it.', type: 'success' });
+          setToast({ message: `Topic submitted! ${STUDIO_NAME} will review it.`, type: 'success' });
           setTimeout(() => setToast(null), 5000);
         }
       }
@@ -1366,7 +1367,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
               Unlock your full keyword strategy with page-level keyword targets, competitor gap analysis, and growth opportunities tailored to your business.
             </p>
             <div className="space-y-2 text-left mb-6">
-              {['Target keywords mapped to every page', 'Competitor keyword gap analysis', 'Content opportunity recommendations', 'Ongoing strategy refinement by your web team'].map(f => (
+              {['Target keywords mapped to every page', 'Competitor keyword gap analysis', 'Content opportunity recommendations', `Ongoing strategy refinement by ${STUDIO_NAME}`].map(f => (
                 <div key={f} className="flex items-center gap-2 text-xs text-zinc-300">
                   <CheckCircle2 className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" />
                   {f}
@@ -1464,7 +1465,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
               {displayPrice == null && (
                 <div className="mx-6 mt-0 mb-0 text-[11px] text-zinc-500 bg-zinc-800/40 rounded-xl px-4 py-3 border border-zinc-700/30">
                   <Lock className="w-3 h-3 inline mr-1.5 -mt-0.5" />
-                  Pricing will be confirmed by your team after submission.
+                  Pricing will be confirmed by {STUDIO_NAME} after submission.
                 </div>
               )}
 

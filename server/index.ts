@@ -5661,7 +5661,7 @@ app.post('/api/requests/batch', (req, res) => {
   const { workspaceId, items } = req.body as { workspaceId: string; items: Array<{ title: string; description: string; category?: string; priority?: string; pageUrl?: string }> };
   if (!workspaceId || !Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'workspaceId and items[] required' });
   const created = items.map(item =>
-    createRequest(workspaceId, { title: item.title, description: item.description, category: (item.category as 'seo') || 'seo', priority: (item.priority as 'high') || 'medium', pageUrl: item.pageUrl, submittedBy: 'Web Team' })
+    createRequest(workspaceId, { title: item.title, description: item.description, category: (item.category as 'seo') || 'seo', priority: (item.priority as 'high') || 'medium', pageUrl: item.pageUrl, submittedBy: STUDIO_NAME })
   );
   broadcast('request:batch_created', { count: created.length });
   broadcastToWorkspace(workspaceId, 'request:created', { ids: created.map(r => r.id), batch: true });

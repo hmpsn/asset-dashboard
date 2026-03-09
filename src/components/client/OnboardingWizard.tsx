@@ -5,6 +5,7 @@ import {
   MousePointerClick, ArrowRight,
 } from 'lucide-react';
 import { useBetaMode } from './BetaContext';
+import { STUDIO_NAME } from '../../constants';
 
 interface OnboardingWizardProps {
   workspaceName: string;
@@ -90,7 +91,7 @@ export function OnboardingWizard({
 
             <div className="px-6 pb-2">
               <p className="text-[13px] text-zinc-400 text-center leading-relaxed">
-                Your web team has set up a personalized insights dashboard for you.
+                {STUDIO_NAME} has set up a personalized insights dashboard for you.
                 Let&apos;s take a quick tour of what&apos;s available.
               </p>
             </div>
