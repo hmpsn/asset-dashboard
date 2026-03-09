@@ -541,6 +541,63 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     }
   }
 
+  // ── Merge with existing recommendations ──
+  // Preserve statuses from previous run and auto-resolve issues no longer detected
+  const existing = loadRecommendations(workspaceId);
+  let autoResolved = 0;
+
+  if (existing) {
+    // Build lookup: source → existing rec (for audit-based and site-wide recs)
+    // For strategy recs, use source + first affected page as key
+    const existingByKey = new Map<string, Recommendation>();
+    for (const oldRec of existing.recommendations) {
+      const key = oldRec.source.startsWith('strategy:')
+        ? `${oldRec.source}::${oldRec.affectedPages[0] || oldRec.title}`
+        : oldRec.source;
+      existingByKey.set(key, oldRec);
+    }
+
+    const newSources = new Set<string>();
+    for (const newRec of recs) {
+      const key = newRec.source.startsWith('strategy:')
+        ? `${newRec.source}::${newRec.affectedPages[0] || newRec.title}`
+        : newRec.source;
+      newSources.add(key);
+
+      // Preserve status from existing rec if it was in_progress or completed
+      const oldRec = existingByKey.get(key);
+      if (oldRec) {
+        if (oldRec.status === 'in_progress' || oldRec.status === 'completed') {
+          newRec.status = oldRec.status;
+          newRec.id = oldRec.id; // keep same ID for frontend continuity
+          newRec.createdAt = oldRec.createdAt;
+        } else if (oldRec.status === 'dismissed') {
+          newRec.status = 'dismissed';
+          newRec.id = oldRec.id;
+          newRec.createdAt = oldRec.createdAt;
+        }
+      }
+    }
+
+    // Auto-resolve: old pending/in_progress recs whose source is gone (issue fixed!)
+    for (const oldRec of existing.recommendations) {
+      if (oldRec.status === 'completed' || oldRec.status === 'dismissed') continue;
+      const key = oldRec.source.startsWith('strategy:')
+        ? `${oldRec.source}::${oldRec.affectedPages[0] || oldRec.title}`
+        : oldRec.source;
+      if (!newSources.has(key)) {
+        // Issue no longer detected — auto-resolve
+        recs.push({
+          ...oldRec,
+          status: 'completed',
+          updatedAt: now,
+          insight: `✓ Auto-resolved — this issue is no longer detected in the latest audit. ${oldRec.insight}`,
+        });
+        autoResolved++;
+      }
+    }
+  }
+
   // ── Sort by impact score (highest first within each priority) ──
   recs.sort((a, b) => {
     const priorityOrder: Record<RecPriority, number> = { fix_now: 0, fix_soon: 1, fix_later: 2, ongoing: 3 };
@@ -549,14 +606,15 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     return b.impactScore - a.impactScore;
   });
 
-  // ── Build summary ──
+  // ── Build summary (exclude auto-resolved from active counts) ──
+  const activeRecs = recs.filter(r => r.status !== 'completed' && r.status !== 'dismissed');
   const summary = {
-    fixNow: recs.filter(r => r.priority === 'fix_now').length,
-    fixSoon: recs.filter(r => r.priority === 'fix_soon').length,
-    fixLater: recs.filter(r => r.priority === 'fix_later').length,
-    ongoing: recs.filter(r => r.priority === 'ongoing').length,
-    totalImpactScore: recs.reduce((s, r) => s + r.impactScore, 0),
-    trafficAtRisk: recs.reduce((s, r) => s + r.trafficAtRisk, 0),
+    fixNow: activeRecs.filter(r => r.priority === 'fix_now').length,
+    fixSoon: activeRecs.filter(r => r.priority === 'fix_soon').length,
+    fixLater: activeRecs.filter(r => r.priority === 'fix_later').length,
+    ongoing: activeRecs.filter(r => r.priority === 'ongoing').length,
+    totalImpactScore: activeRecs.reduce((s, r) => s + r.impactScore, 0),
+    trafficAtRisk: activeRecs.reduce((s, r) => s + r.trafficAtRisk, 0),
   };
 
   const set: RecommendationSet = {
@@ -567,7 +625,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   };
 
   saveRecommendations(set);
-  console.log(`[recommendations] Generated ${recs.length} recommendations for ${workspaceId}: ${summary.fixNow} fix-now, ${summary.fixSoon} fix-soon, ${summary.fixLater} fix-later, ${summary.ongoing} ongoing`);
+  console.log(`[recommendations] Generated ${recs.length} recommendations for ${workspaceId}: ${summary.fixNow} fix-now, ${summary.fixSoon} fix-soon, ${summary.fixLater} fix-later, ${summary.ongoing} ongoing${autoResolved > 0 ? `, ${autoResolved} auto-resolved` : ''}`);
 
   return set;
 }
