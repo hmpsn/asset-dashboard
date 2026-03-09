@@ -4,6 +4,7 @@ import {
   CheckCircle2, ArrowUpRight, ArrowDownRight, Minus, Loader2,
   Search, BarChart3, Lock, ExternalLink, Bell, Activity, FileText, Zap,
   Map, Clock, Circle, Rocket, Wifi, WifiOff, Key, Mail, FileSearch, CreditCard,
+  TrendingDown,
 } from 'lucide-react';
 import { MetricRingSvg, PageHeader, SectionCard, Badge, StatCard } from './ui';
 import { StripeSettings } from './StripeSettings';
@@ -51,6 +52,16 @@ interface HealthStatus {
   hasStripe: boolean;
 }
 
+interface AnomalySummary {
+  id: string;
+  workspaceId: string;
+  workspaceName: string;
+  severity: 'critical' | 'warning' | 'positive';
+  title: string;
+  acknowledgedAt?: string;
+  dismissedAt?: string;
+}
+
 // ScoreRing replaced by unified <MetricRingSvg /> from ./ui
 const ScoreRing = MetricRingSvg;
 
@@ -79,6 +90,7 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
   const [loading, setLoading] = useState(true);
   const [roadmapSprints, setRoadmapSprints] = useState<RoadmapSprint[]>([]);
   const [health, setHealth] = useState<HealthStatus | null>(null);
+  const [anomalies, setAnomalies] = useState<AnomalySummary[]>([]);
 
   useEffect(() => {
     Promise.all([
@@ -86,11 +98,13 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
       fetch('/api/activity?limit=15').then(r => r.json()).catch(() => []),
       fetch('/api/roadmap').then(r => r.ok ? r.json() : null).catch(() => null),
       fetch('/api/health').then(r => r.json()).catch(() => null),
-    ]).then(([d, act, rm, h]) => {
+      fetch('/api/anomalies').then(r => r.ok ? r.json() : []).catch(() => []),
+    ]).then(([d, act, rm, h, anom]) => {
       if (Array.isArray(d)) setData(d);
       if (Array.isArray(act)) setRecentActivity(act);
       if (rm?.sprints && Array.isArray(rm.sprints)) setRoadmapSprints(rm.sprints);
       if (h) setHealth(h as HealthStatus);
+      if (Array.isArray(anom)) setAnomalies(anom.filter((a: AnomalySummary) => !a.dismissedAt));
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
@@ -138,19 +152,31 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
     s.items.some(i => i.status !== 'done')
   );
 
-  // Needs attention items
-  const attentionItems: Array<{ label: string; value: string; color: string; icon: typeof Bell }> = [];
-  if (totalNewRequests > 0) attentionItems.push({ label: `${totalNewRequests} new client request${totalNewRequests > 1 ? 's' : ''}`, value: 'Requests', color: 'text-red-400', icon: Bell });
-  if (totalPendingApprovals > 0) attentionItems.push({ label: `${totalPendingApprovals} pending approval${totalPendingApprovals > 1 ? 's' : ''}`, value: 'Approvals', color: 'text-teal-400', icon: ClipboardCheck });
-  if (totalPendingContent > 0) attentionItems.push({ label: `${totalPendingContent} content brief${totalPendingContent > 1 ? 's' : ''} awaiting review`, value: 'Content', color: 'text-amber-400', icon: FileText });
-  if (totalPendingWorkOrders > 0) attentionItems.push({ label: `${totalPendingWorkOrders} purchased fix${totalPendingWorkOrders > 1 ? 'es' : ''} awaiting fulfillment`, value: 'Work Orders', color: 'text-teal-400', icon: ClipboardCheck });
+  // Anomaly aggregation across workspaces
+  const criticalAnomalies = anomalies.filter(a => a.severity === 'critical');
+  const warningAnomalies = anomalies.filter(a => a.severity === 'warning');
+  const anomalyByWorkspace: Record<string, { critical: number; warning: number; positive: number }> = {};
+  anomalies.forEach(a => {
+    if (!anomalyByWorkspace[a.workspaceId]) anomalyByWorkspace[a.workspaceId] = { critical: 0, warning: 0, positive: 0 };
+    anomalyByWorkspace[a.workspaceId][a.severity]++;
+  });
+
+  // Needs attention items — priority sorted (critical first)
+  const attentionItems: Array<{ label: string; value: string; color: string; icon: typeof Bell; priority: number }> = [];
+  if (criticalAnomalies.length > 0) attentionItems.push({ label: `${criticalAnomalies.length} critical anomal${criticalAnomalies.length > 1 ? 'ies' : 'y'} across ${new Set(criticalAnomalies.map(a => a.workspaceId)).size} workspace${new Set(criticalAnomalies.map(a => a.workspaceId)).size > 1 ? 's' : ''}`, value: 'Anomalies', color: 'text-red-400', icon: TrendingDown, priority: 0 });
+  if (warningAnomalies.length > 0) attentionItems.push({ label: `${warningAnomalies.length} warning anomal${warningAnomalies.length > 1 ? 'ies' : 'y'} detected`, value: 'Anomalies', color: 'text-amber-400', icon: TrendingDown, priority: 1 });
+  if (totalNewRequests > 0) attentionItems.push({ label: `${totalNewRequests} new client request${totalNewRequests > 1 ? 's' : ''}`, value: 'Requests', color: 'text-red-400', icon: Bell, priority: 2 });
+  if (totalPendingApprovals > 0) attentionItems.push({ label: `${totalPendingApprovals} pending approval${totalPendingApprovals > 1 ? 's' : ''}`, value: 'Approvals', color: 'text-teal-400', icon: ClipboardCheck, priority: 3 });
+  if (totalPendingContent > 0) attentionItems.push({ label: `${totalPendingContent} content brief${totalPendingContent > 1 ? 's' : ''} awaiting review`, value: 'Content', color: 'text-amber-400', icon: FileText, priority: 4 });
+  if (totalPendingWorkOrders > 0) attentionItems.push({ label: `${totalPendingWorkOrders} purchased fix${totalPendingWorkOrders > 1 ? 'es' : ''} awaiting fulfillment`, value: 'Work Orders', color: 'text-teal-400', icon: ClipboardCheck, priority: 5 });
   const rejectedWorkspaces = data.filter(w => (w.pageStates?.rejected || 0) > 0);
   const totalRejected = rejectedWorkspaces.reduce((s, w) => s + (w.pageStates?.rejected || 0), 0);
-  if (totalRejected > 0) attentionItems.push({ label: `${totalRejected} rejected change${totalRejected > 1 ? 's' : ''} need revision`, value: 'Rejected', color: 'text-red-400', icon: AlertTriangle });
+  if (totalRejected > 0) attentionItems.push({ label: `${totalRejected} rejected change${totalRejected > 1 ? 's' : ''} need revision`, value: 'Rejected', color: 'text-red-400', icon: AlertTriangle, priority: 6 });
   const lowScoreWorkspaces = data.filter(w => w.audit && w.audit.score < 60);
-  if (lowScoreWorkspaces.length > 0) attentionItems.push({ label: `${lowScoreWorkspaces.length} workspace${lowScoreWorkspaces.length > 1 ? 's' : ''} with health score below 60`, value: 'Health', color: 'text-red-400', icon: AlertTriangle });
+  if (lowScoreWorkspaces.length > 0) attentionItems.push({ label: `${lowScoreWorkspaces.length} workspace${lowScoreWorkspaces.length > 1 ? 's' : ''} with health score below 60`, value: 'Health', color: 'text-red-400', icon: AlertTriangle, priority: 7 });
   const unlinkWorkspaces = data.filter(w => !w.webflowSiteId);
-  if (unlinkWorkspaces.length > 0) attentionItems.push({ label: `${unlinkWorkspaces.length} workspace${unlinkWorkspaces.length > 1 ? 's' : ''} with no site linked`, value: 'Setup', color: 'text-amber-400', icon: Globe });
+  if (unlinkWorkspaces.length > 0) attentionItems.push({ label: `${unlinkWorkspaces.length} workspace${unlinkWorkspaces.length > 1 ? 's' : ''} with no site linked`, value: 'Setup', color: 'text-amber-400', icon: Globe, priority: 8 });
+  attentionItems.sort((a, b) => a.priority - b.priority);
 
   // Platform connections
   const connections = [
@@ -216,12 +242,14 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
           {data.map(ws => {
             const hasAlerts = ws.requests.new > 0 || ws.approvals.pending > 0 || (ws.contentRequests?.pending || 0) > 0;
             const scoreDelta = ws.audit && ws.audit.previousScore != null ? ws.audit.score - ws.audit.previousScore : null;
+            const wsAnomalies = anomalyByWorkspace[ws.id];
+            const hasAnomalies = wsAnomalies && (wsAnomalies.critical > 0 || wsAnomalies.warning > 0);
 
             return (
               <button
                 key={ws.id}
                 onClick={() => onSelectWorkspace(ws.id)}
-                className={`text-left rounded-xl p-5 transition-all hover:scale-[1.01] hover:shadow-lg group relative bg-zinc-900 border ${hasAlerts ? 'border-amber-500/30' : 'border-zinc-800'}`}
+                className={`text-left rounded-xl p-5 transition-all hover:scale-[1.01] hover:shadow-lg group relative bg-zinc-900 border ${hasAnomalies && wsAnomalies?.critical ? 'border-red-500/30' : hasAlerts ? 'border-amber-500/30' : 'border-zinc-800'}`}
               >
                 {/* New request badge */}
                 {ws.requests.new > 0 && (
@@ -235,6 +263,16 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <h3 className="text-sm font-semibold truncate group-hover:text-teal-400 transition-colors text-zinc-200">{ws.name}</h3>
+                      {hasAnomalies && (
+                        <span className={`flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md border ${
+                          wsAnomalies.critical > 0
+                            ? 'bg-red-500/15 text-red-400 border-red-500/20'
+                            : 'bg-amber-500/15 text-amber-400 border-amber-500/20'
+                        }`}>
+                          <TrendingDown className="w-2.5 h-2.5" />
+                          {wsAnomalies.critical > 0 ? `${wsAnomalies.critical} critical` : `${wsAnomalies.warning} warning`}
+                        </span>
+                      )}
                       {ws.isTrial && (
                         <span className="flex-shrink-0 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md bg-amber-500/15 text-amber-400 border border-amber-500/20">
                           Trial{ws.trialDaysRemaining != null ? ` · ${ws.trialDaysRemaining}d` : ''}
@@ -468,7 +506,7 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
               <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-2">Platform</div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-zinc-400">Features shipped</span>
-                <span className="text-xs font-bold text-teal-400">37</span>
+                <span className="text-xs font-bold text-teal-400">{roadmapDone}</span>
               </div>
               <div className="flex items-center justify-between mt-1">
                 <span className="text-xs text-zinc-400">Roadmap items</span>
