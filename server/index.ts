@@ -70,7 +70,7 @@ import { runSalesAudit } from './sales-audit.js';
 import { initJobs, createJob, updateJob, getJob, listJobs, cancelJob, registerAbort, isJobCancelled, hasActiveJob } from './jobs.js';
 import { createBatch, listBatches, getBatch, updateItem, markBatchApplied, deleteBatch } from './approvals.js';
 import { listRequests, createRequest, updateRequest, addNote, deleteRequest, getRequest, getAttachmentsDir, addAttachmentsToRequest, type RequestAttachment } from './requests.js';
-import { notifyTeamNewRequest, notifyClientTeamResponse, notifyClientStatusChange, notifyTeamContentRequest, notifyClientBriefReady, notifyApprovalReady, notifyClientWelcome, notifyClientFixesApplied, notifyClientRecommendationsReady, notifyClientAuditImproved, isEmailConfigured, initEmailQueue, sendEmail } from './email.js';
+import { notifyTeamNewRequest, notifyClientTeamResponse, notifyClientStatusChange, notifyTeamContentRequest, notifyClientBriefReady, notifyApprovalReady, notifyClientWelcome, notifyClientFixesApplied, notifyClientRecommendationsReady, notifyClientAuditImproved, notifyClientContentPublished, isEmailConfigured, initEmailQueue, sendEmail } from './email.js';
 import { getQueueStats } from './email-queue.js';
 import { addActivity, listActivity, listClientActivity, initActivityBroadcast } from './activity-log.js';
 import { getSchedule, listSchedules, upsertSchedule, deleteSchedule, startScheduler } from './scheduled-audits.js';
@@ -5240,6 +5240,15 @@ app.patch('/api/content-requests/:workspaceId/:id', (req, res) => {
       contentRequestId: updated.id,
     });
   }
+  // Notify client when content is published
+  if (status === 'published') {
+    const wsInfo = getWorkspace(req.params.workspaceId);
+    if (wsInfo?.clientEmail) {
+      const origin = req.get('origin') || req.get('referer')?.replace(/\/[^/]*$/, '') || '';
+      const dashUrl = origin ? `${origin}/dashboard/${req.params.workspaceId}?tab=content` : undefined;
+      notifyClientContentPublished({ clientEmail: wsInfo.clientEmail, workspaceName: wsInfo.name, workspaceId: req.params.workspaceId, topic: updated.topic, targetKeyword: updated.targetKeyword, dashboardUrl: dashUrl });
+    }
+  }
   broadcastToWorkspace(req.params.workspaceId, 'content-request:update', { id: updated.id, status: updated.status });
   res.json(updated);
 });
@@ -7578,6 +7587,7 @@ app.patch('/api/work-orders/:workspaceId/:orderId', (req, res) => {
     }
   }
 
+  broadcastToWorkspace(wsId, 'work-order:update', { id: order.id, status: order.status });
   res.json(order);
 });
 

@@ -290,6 +290,20 @@ export function notifyAnomalyAlert(opts: {
   }
 }
 
+export function notifyClientContentPublished(opts: {
+  clientEmail: string;
+  workspaceName: string;
+  workspaceId: string;
+  topic: string;
+  targetKeyword?: string;
+  dashboardUrl?: string;
+}): void {
+  if (!isEmailConfigured()) return;
+  queueEmail(makeEvent('content_published', opts.clientEmail, opts.workspaceId, opts.workspaceName, opts.dashboardUrl, {
+    topic: opts.topic, targetKeyword: opts.targetKeyword,
+  }));
+}
+
 export function notifyTeamChurnSignal(opts: {
   workspaceName: string;
   workspaceId: string;

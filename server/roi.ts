@@ -3,8 +3,59 @@
  * Uses GSC clicks × CPC from keyword strategy pageMap.
  */
 
+import fs from 'fs';
+import path from 'path';
 import { getWorkspace } from './workspaces.js';
 import { listContentRequests } from './content-requests.js';
+import { getDataDir } from './data-dir.js';
+
+const ROI_HISTORY_DIR = getDataDir('roi-history');
+fs.mkdirSync(ROI_HISTORY_DIR, { recursive: true });
+
+interface ROISnapshot {
+  organicTrafficValue: number;
+  computedAt: string;
+}
+
+function getHistoryFile(workspaceId: string): string {
+  return path.join(ROI_HISTORY_DIR, `${workspaceId}.json`);
+}
+
+function loadHistory(workspaceId: string): ROISnapshot[] {
+  try {
+    const f = getHistoryFile(workspaceId);
+    if (fs.existsSync(f)) return JSON.parse(fs.readFileSync(f, 'utf-8'));
+  } catch { /* fresh */ }
+  return [];
+}
+
+function saveSnapshot(workspaceId: string, value: number): void {
+  const history = loadHistory(workspaceId);
+  history.push({ organicTrafficValue: value, computedAt: new Date().toISOString() });
+  // Keep last 90 days of daily snapshots (max ~90 entries)
+  const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
+  const trimmed = history.filter(s => new Date(s.computedAt).getTime() > cutoff);
+  fs.writeFileSync(getHistoryFile(workspaceId), JSON.stringify(trimmed, null, 2));
+}
+
+function computeGrowthPercent(workspaceId: string, currentValue: number): number | null {
+  const history = loadHistory(workspaceId);
+  if (history.length === 0) return null;
+  // Find snapshot closest to 30 days ago
+  const target = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  let closest: ROISnapshot | null = null;
+  let closestDiff = Infinity;
+  for (const s of history) {
+    const diff = Math.abs(new Date(s.computedAt).getTime() - target);
+    if (diff < closestDiff) { closest = s; closestDiff = diff; }
+  }
+  // Only use if the snapshot is within 15-45 day range
+  if (!closest) return null;
+  const daysAgo = (Date.now() - new Date(closest.computedAt).getTime()) / (24 * 60 * 60 * 1000);
+  if (daysAgo < 15 || daysAgo > 45) return null;
+  if (closest.organicTrafficValue === 0) return currentValue > 0 ? 100 : 0;
+  return Math.round(((currentValue - closest.organicTrafficValue) / closest.organicTrafficValue) * 10000) / 100;
+}
 
 export interface ROIData {
   /** Total estimated dollar value of organic traffic this period */
@@ -178,10 +229,10 @@ export function computeROI(workspaceId: string): ROIData | null {
     };
   }
 
-  return {
+  const result: ROIData = {
     organicTrafficValue: Math.round(totalValue * 100) / 100,
     adSpendEquivalent: Math.round(adSpendEquivalent * 100) / 100,
-    growthPercent: null, // Would need historical data to compute
+    growthPercent: computeGrowthPercent(workspaceId, Math.round(totalValue * 100) / 100),
     pageBreakdown,
     totalClicks,
     totalImpressions,
@@ -191,4 +242,9 @@ export function computeROI(workspaceId: string): ROIData | null {
     contentItems,
     computedAt: new Date().toISOString(),
   };
+
+  // Save snapshot for future MoM comparison
+  saveSnapshot(workspaceId, result.organicTrafficValue);
+
+  return result;
 }

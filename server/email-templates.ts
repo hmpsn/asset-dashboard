@@ -153,7 +153,8 @@ export type EmailEventType =
   | 'fixes_applied'
   | 'recommendations_ready'
   | 'audit_improved'
-  | 'anomaly_alert';
+  | 'anomaly_alert'
+  | 'content_published';
 
 // ── Template renderers ──
 
@@ -204,6 +205,8 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
       return renderAuditImproved(events, count, ws, dashUrl, logoUrl);
     case 'anomaly_alert':
       return renderAnomalyAlert(events, count, ws, dashUrl, logoUrl);
+    case 'content_published':
+      return renderContentPublished(events, count, ws, dashUrl, logoUrl);
     default:
       return { subject: 'Notification', html: '' };
   }
@@ -780,6 +783,31 @@ function renderAnomalyAlert(events: EmailEvent[], count: number, ws: string, das
         (events[0].data.aiSummary ? `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#475569;line-height:1.5;">${esc(events[0].data.aiSummary as string)}</div>` : '') +
         items,
       cta: dashUrl ? { label: 'View Dashboard', url: dashUrl } : undefined,
+      logoUrl,
+    }),
+  };
+}
+
+function renderContentPublished(events: EmailEvent[], count: number, ws: string, dashUrl?: string, logoUrl?: string) {
+  const items = events.map((e, i) => itemRow({
+    title: (e.data.topic as string) || 'Content Published',
+    detail: (e.data.targetKeyword as string) ? `Target keyword: ${e.data.targetKeyword as string}` : undefined,
+    badge: { label: 'Published', color: '#0d9488', bg: '#f0fdfa' },
+    isLast: i === events.length - 1,
+  })).join('');
+
+  return {
+    subject: `${count === 1 ? 'New content published' : `${count} pieces of content published`} — ${ws}`,
+    html: layout({
+      preheader: `Your new content is live!`,
+      headline: 'Content Published',
+      subtitle: ws,
+      body: `
+        <div style="background:#f0fdf9;border:1px solid #ccfbf1;border-radius:8px;padding:14px 20px;text-align:center;margin-bottom:16px;">
+          <div style="font-size:14px;color:#0d9488;font-weight:600;">Your new content is live on your website</div>
+        </div>
+        ${items}`,
+      cta: dashUrl ? { label: 'View in Dashboard', url: dashUrl } : undefined,
       logoUrl,
     }),
   };

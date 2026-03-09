@@ -33,6 +33,9 @@ export const WS_EVENTS = {
   // Audit
   AUDIT_COMPLETE: 'audit:complete',
 
+  // Work orders
+  WORK_ORDER_UPDATE: 'work-order:update',
+
   // Anomalies (auto-broadcast via initAnomalyBroadcast)
   ANOMALIES_UPDATE: 'anomalies:update',
 } as const;

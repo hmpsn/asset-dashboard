@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  DollarSign, BarChart3, Target,
+  DollarSign, BarChart3, Target, TrendingUp,
   Loader2, Lock, Shield, MousePointerClick, Eye,
 } from 'lucide-react';
 
@@ -144,18 +144,35 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
           </div>
         </div>
 
-        {/* Savings / ROI */}
-        <div className="bg-gradient-to-br from-teal-500/10 via-zinc-900 to-zinc-900 rounded-xl border border-teal-500/20 p-5">
+        {/* MoM Growth or Pages Tracked */}
+        <div className={`bg-gradient-to-br ${data.growthPercent != null ? (data.growthPercent >= 0 ? 'from-teal-500/10' : 'from-amber-500/10') : 'from-teal-500/10'} via-zinc-900 to-zinc-900 rounded-xl border ${data.growthPercent != null ? (data.growthPercent >= 0 ? 'border-teal-500/20' : 'border-amber-500/20') : 'border-teal-500/20'} p-5`}>
           <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 rounded-lg bg-teal-500/15 flex items-center justify-center">
-              <Shield className="w-4 h-4 text-teal-400" />
+            <div className={`w-8 h-8 rounded-lg ${data.growthPercent != null ? (data.growthPercent >= 0 ? 'bg-teal-500/15' : 'bg-amber-500/15') : 'bg-teal-500/15'} flex items-center justify-center`}>
+              {data.growthPercent != null
+                ? <TrendingUp className={`w-4 h-4 ${data.growthPercent >= 0 ? 'text-teal-400' : 'text-amber-400'}`} />
+                : <Shield className="w-4 h-4 text-teal-400" />}
             </div>
-            <span className="text-xs text-zinc-400 font-medium">Pages Tracked</span>
+            <span className="text-xs text-zinc-400 font-medium">
+              {data.growthPercent != null ? 'Month-over-Month' : 'Pages Tracked'}
+            </span>
           </div>
-          <div className="text-2xl font-bold text-teal-300 tracking-tight">{data.trackedPages}</div>
-          <div className="text-[11px] text-zinc-500 mt-1">
-            Pages generating organic value with keyword data
-          </div>
+          {data.growthPercent != null ? (
+            <>
+              <div className={`text-2xl font-bold tracking-tight ${data.growthPercent >= 0 ? 'text-teal-300' : 'text-amber-300'}`}>
+                {data.growthPercent >= 0 ? '+' : ''}{data.growthPercent.toFixed(1)}%
+              </div>
+              <div className="text-[11px] text-zinc-500 mt-1">
+                Traffic value growth vs. 30 days ago · {data.trackedPages} pages tracked
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-2xl font-bold text-teal-300 tracking-tight">{data.trackedPages}</div>
+              <div className="text-[11px] text-zinc-500 mt-1">
+                Pages generating organic value · growth tracking starts next month
+              </div>
+            </>
+          )}
         </div>
       </div>
 
