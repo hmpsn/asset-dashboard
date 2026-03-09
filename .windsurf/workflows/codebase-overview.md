@@ -46,6 +46,7 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 | `server/rank-tracking.ts` | Keyword position tracking over time |
 | `server/stripe.ts` | Stripe SDK setup (lazy init from config), product config (14 types), checkout session creation, webhook handler (checkout.session.completed, payment_intent.payment_failed) |
 | `server/stripe-config.ts` | Encrypted on-disk persistence for Stripe keys + product Price IDs. AES-256-GCM encryption. Falls back to env vars for CI/Docker. |
+| `server/constants.ts` | `STUDIO_NAME` constant — single source of truth for studio/agency name in all server-side copy (emails, request notes, submittedBy). Future: per-workspace override for agency resale |
 | `server/payments.ts` | Payment record CRUD (JSON on disk), per-workspace payment history, lookup by session ID |
 | `server/users.ts` | Internal user model (owner/admin/member), bcrypt hashing (12 rounds), CRUD, `verifyPassword`, JSON-on-disk persistence in `auth/users.json` |
 | `server/auth.ts` | JWT sign/verify (7-day expiry), Express middleware: `requireAuth`, `requireRole`, `requireWorkspaceAccess`, `optionalAuth`. Augments `Express.Request` with `user` and `jwtPayload` |
@@ -67,6 +68,7 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 | `src/components/ContentPerformance.tsx` | Per-published-post GSC+GA4 performance tracker (#31). Summary cards, sortable expandable table, per-post trend charts. Lazy-loaded under SEO > Content Perf in sidebar. |
 | `src/components/AnomalyAlerts.tsx` | Anomaly detection UI (#33). Severity-colored cards (critical/warning/positive), expand/collapse, AI summary banner, dismiss/acknowledge. Wired into WorkspaceHome (admin, isAdmin=true) and ClientDashboard overview. |
 | `src/components/ChatBlocks.tsx` | Rich chat block renderers (#22): `MetricBlock`, `ChartBlock`, `DataTableBlock`, `SparklineBlock`. Rendered by `RenderMarkdown` when fenced code blocks use `metric`, `chart`, `datatable`, `sparkline` language tags. |
+| `src/constants.ts` | `STUDIO_NAME` constant — single source of truth for studio/agency name in all client-facing copy. Imported by all client components that display team/studio references. Future: per-workspace override for agency resale |
 
 ## AI-Powered Features & Their Data Sources
 
@@ -136,7 +138,8 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
     - **Command palette** (#164): `CommandPalette.tsx` — ⌘K/Ctrl+K toggle. Fuzzy search across 20 nav items + workspaces + quick actions. Recent items (localStorage, last 5). Full keyboard nav (arrows, Enter, Escape). Grouped display when browsing, flat when searching.
     - **Breadcrumb bar** (#165): `App.tsx` — persistent `Command Center / [Workspace] / [Tool]` breadcrumb above content. Hover workspace name for quick-switch dropdown. `TAB_LABELS` map for display names.
 15. **Client overview declutter** (#172): Removed AnomalyAlerts banner, AI Hero Insight full-width banner, and MonthlySummary from `OverviewTab.tsx`. InsightsDigest is now the single source of analytical insight. Recent Work timeline in sidebar filtered to `WORK_TYPES` set (audit_completed, request_resolved, approval_applied, seo_updated, images_optimized, links_fixed, content_updated) — excludes anomaly_detected, anomaly_positive, note, and chat entries. AnomalyAlerts component still used on admin side (WorkspaceHome). Final overview layout: Welcome → Action banner → Key metrics → InsightsDigest (left) + Ask AI + Recent Work (right).
-16. **Recommendation auto-resolve**: `generateRecommendations()` in `recommendations.ts` — on regeneration (triggered after each audit), cross-references new recs with existing by `source` key. Preserves `in_progress`/`completed`/`dismissed` statuses. Auto-marks `completed` any old pending/in_progress recs whose source issue is no longer detected. Insight text prepended with "✓ Auto-resolved". Summary counts exclude completed/dismissed from active totals.
+16. **Studio name constant** (`STUDIO_NAME`): All client-facing and server-side copy referencing the studio/agency name MUST use `STUDIO_NAME` from `src/constants.ts` (client) or `server/constants.ts` (server). Never hardcode "your team", "Web Team", "SEO team", "our team", or "hmpsn studio" as string literals. In JSX, use `{STUDIO_NAME}`; in template literals, use `` `text ${STUDIO_NAME} text` ``; in object properties, use the constant directly. **Common bug**: `${STUDIO_NAME}` inside JSX text or single-quoted strings won't interpolate — must use backtick template literals or JSX expressions.
+17. **Recommendation auto-resolve**: `generateRecommendations()` in `recommendations.ts` — on regeneration (triggered after each audit), cross-references new recs with existing by `source` key. Preserves `in_progress`/`completed`/`dismissed` statuses. Auto-marks `completed` any old pending/in_progress recs whose source issue is no longer detected. Insight text prepended with "✓ Auto-resolved". Summary counts exclude completed/dismissed from active totals.
 
 ## Development Enforcement
 

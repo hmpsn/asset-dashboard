@@ -90,3 +90,28 @@ Public endpoints (`/api/public/*`) must only return fields safe for client consu
 Every significant write action should call `addActivity()` to log the event. This automatically broadcasts to workspace clients via `initActivityBroadcast`. Activity types are defined in `server/activity-log.ts`.
 
 Client-visible types are filtered by `CLIENT_VISIBLE_TYPES` in `listClientActivity()`. If adding a new activity type that clients should see, add it to that set.
+
+## Rule 8: Client-facing copy MUST use STUDIO_NAME constant
+
+Any user-facing text that references the studio, team, or agency name MUST use the `STUDIO_NAME` constant. Never hardcode "your team", "Web Team", "SEO team", "our team", "your web team", or "hmpsn studio".
+
+**Why**: Centralizes branding for easy rebrand and future per-workspace agency resale (white-label).
+
+**Constants**:
+- Client: `import { STUDIO_NAME } from '../constants'` (or `'../../constants'` depending on depth)
+- Server: `import { STUDIO_NAME } from './constants.js'`
+
+**Interpolation rules**:
+```tsx
+// ✅ JSX text
+<p>{STUDIO_NAME} will handle this.</p>
+
+// ✅ Template literal (JS/TS)
+setToast({ message: `Brief approved! ${STUDIO_NAME} will begin.` });
+
+// ❌ Single-quoted string — won't interpolate
+setToast({ message: 'Brief approved! ${STUDIO_NAME} will begin.' });
+
+// ❌ JSX text with dollar sign — renders literal ${STUDIO_NAME}
+<p>Brief approved! ${STUDIO_NAME} will begin.</p>
+```

@@ -29,6 +29,7 @@ Follow this checklist for EVERY feature, bug fix, or modification that touches d
 - [ ] **Admin dashboard handler**: Relevant admin component (e.g., `WorkspaceHome.tsx`) handles the event if applicable
 - [ ] **State updates**: Components receive fresh data from state (not stale closures or one-time fetches)
 - [ ] **Feature toggles**: If feature is tier-gated, `effectiveTier` check is in place and updates when `workspace:updated` fires
+- [ ] **Studio name in copy**: Any user-facing text referencing the team/studio uses `STUDIO_NAME` from `src/constants.ts` (client) or `server/constants.ts` (server) — never hardcoded strings. See `ui-vocabulary.md` § Studio / Agency Name for interpolation rules.
 
 ## After Implementation
 

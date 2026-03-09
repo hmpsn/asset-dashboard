@@ -61,6 +61,22 @@ When actions are behind a `⋮` (MoreVertical) overflow menu:
 | Fix applied | `"Applied to Webflow"` |
 | Report saved | `"Report saved! Share this link with clients:"` |
 
+## Studio / Agency Name
+
+All user-facing copy that references the studio or agency MUST use the `STUDIO_NAME` constant:
+
+| Context | Import from | Usage |
+|---------|-------------|-------|
+| Client components (JSX text) | `src/constants.ts` | `{STUDIO_NAME}` |
+| Client components (template literal) | `src/constants.ts` | `` `text ${STUDIO_NAME} text` `` |
+| Server emails / logic | `server/constants.ts` | `` `text ${STUDIO_NAME} text` `` |
+
+**DO NOT** hardcode: "your team", "Web Team", "SEO team", "our team", "your web team", or "hmpsn studio".
+
+**Common interpolation bugs:**
+- `'text ${STUDIO_NAME} text'` (single quotes) — **won't interpolate**, renders literal `${STUDIO_NAME}`
+- `<p>text ${STUDIO_NAME} text</p>` (JSX text) — **won't interpolate**, use `<p>text {STUDIO_NAME} text</p>`
+
 ## Rules
 
 1. **Never mix "flag" and "send"** — always use "send" for client-facing actions.
