@@ -1,13 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Loader2, Search, TrendingUp, TrendingDown, Eye, MousePointer,
   BarChart3, ExternalLink, ArrowUpDown,
-  Sparkles, Send, AlertTriangle, Target, Zap, Shield, MessageSquare, X,
+  Sparkles, AlertTriangle, Target, Zap, Shield, X,
 } from 'lucide-react';
 import { ChartPointDetail } from './ChartPointDetail';
 import { PageHeader, StatCard, SectionCard, TabBar, DateRangeSelector, EmptyState } from './ui';
-import { RenderMarkdown } from './client/helpers';
 import { DATE_PRESETS_SEARCH } from './ui/constants';
+import { ChatPanel, type ChatMessage } from './ChatPanel';
 
 interface SearchQuery {
   query: string;
@@ -72,11 +72,6 @@ interface PeriodComparison {
   previous: { clicks: number; impressions: number; ctr: number; position: number };
   change: { clicks: number; impressions: number; ctr: number; position: number };
   changePercent: { clicks: number; impressions: number; ctr: number; position: number };
-}
-
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
 }
 
 interface Props {
@@ -171,11 +166,6 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatMessages]);
 
   // Load data when gscPropertyUrl is available
   useEffect(() => {
@@ -356,83 +346,16 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
             </div>
             <button onClick={() => setChatOpen(false)} className="text-zinc-500 hover:text-zinc-300" aria-label="Close chat"><X className="w-4 h-4" /></button>
           </div>
-
-          {/* Quick questions */}
-          {chatMessages.length === 0 && (
-            <div className="p-4 space-y-3">
-              <p className="text-xs text-zinc-500">Ask anything about your search performance. Try one of these:</p>
-              <div className="grid grid-cols-2 gap-2">
-                {QUICK_QUESTIONS.map((q, i) => (
-                  <button
-                    key={i}
-                    onClick={() => askAi(q)}
-                    className="text-left px-3 py-2.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-800 text-[11px] text-zinc-300 transition-colors"
-                  >
-                    <MessageSquare className="w-3 h-3 text-teal-400 mb-1" />
-                    {q}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Chat messages */}
-          {chatMessages.length > 0 && (
-            <div className="max-h-80 overflow-y-auto p-4 space-y-4">
-              {chatMessages.map((msg, i) => (
-                <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
-                  {msg.role === 'assistant' && (
-                    <div className="w-6 h-6 rounded-lg bg-teal-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Sparkles className="w-3 h-3 text-teal-400" />
-                    </div>
-                  )}
-                  <div className={`max-w-[85%] rounded-xl px-3.5 py-2.5 ${
-                    msg.role === 'user'
-                      ? 'bg-teal-600/20 border border-teal-500/20 text-xs text-zinc-200'
-                      : 'bg-zinc-800/50 border border-zinc-800'
-                  }`}>
-                    {msg.role === 'assistant' ? <RenderMarkdown text={msg.content} /> : msg.content}
-                  </div>
-                </div>
-              ))}
-              {chatLoading && (
-                <div className="flex gap-3">
-                  <div className="w-6 h-6 rounded-lg bg-teal-500/10 flex items-center justify-center flex-shrink-0">
-                    <Loader2 className="w-3 h-3 text-teal-400 animate-spin" />
-                  </div>
-                  <div className="bg-zinc-800/50 border border-zinc-800 rounded-xl px-3.5 py-2.5">
-                    <div className="flex gap-1">
-                      <div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '300ms' }} />
-                    </div>
-                  </div>
-                </div>
-              )}
-              <div ref={chatEndRef} />
-            </div>
-          )}
-
-          {/* Chat input */}
-          <div className="px-4 py-3 border-t border-zinc-800">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={chatInput}
-                onChange={e => setChatInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && askAi(chatInput)}
-                placeholder="Ask about your search data..."
-                className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500"
-                disabled={chatLoading}
-              />
-              <button
-                onClick={() => askAi(chatInput)}
-                disabled={chatLoading || !chatInput.trim()}
-                className="px-3 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-lg transition-colors"
-              >
-                <Send className="w-3.5 h-3.5" />
-              </button>
-            </div>
+          <div className="max-h-80 overflow-y-auto">
+            <ChatPanel
+              messages={chatMessages}
+              loading={chatLoading}
+              input={chatInput}
+              onInputChange={setChatInput}
+              onSend={askAi}
+              quickQuestions={QUICK_QUESTIONS}
+              placeholder="Ask about your search data..."
+            />
           </div>
         </div>
       )}

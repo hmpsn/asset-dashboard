@@ -37,6 +37,16 @@ const SalesReport = lazy(() => import('./components/SalesReport').then(m => ({ d
 const Roadmap = lazy(() => import('./components/Roadmap').then(m => ({ default: m.Roadmap })));
 const WorkspaceHome = lazy(() => import('./components/WorkspaceHome').then(m => ({ default: m.WorkspaceHome })));
 
+// ── Lazy-loaded SEO sub-tool chunks (split from SeoAudit #131) ──
+const SeoEditorWrapper = lazy(() => import('./components/SeoEditorWrapper').then(m => ({ default: m.SeoEditorWrapper })));
+const KeywordStrategyPanel = lazy(() => import('./components/KeywordStrategy').then(m => ({ default: m.KeywordStrategyPanel })));
+const RedirectManager = lazy(() => import('./components/RedirectManager').then(m => ({ default: m.RedirectManager })));
+const InternalLinks = lazy(() => import('./components/InternalLinks').then(m => ({ default: m.InternalLinks })));
+const SchemaSuggester = lazy(() => import('./components/SchemaSuggester').then(m => ({ default: m.SchemaSuggester })));
+const ContentBriefs = lazy(() => import('./components/ContentBriefs').then(m => ({ default: m.ContentBriefs })));
+const CompetitorAnalysis = lazy(() => import('./components/CompetitorAnalysis').then(m => ({ default: m.CompetitorAnalysis })));
+const RankTracker = lazy(() => import('./components/RankTracker').then(m => ({ default: m.RankTracker })));
+
 function ChunkFallback() {
   return <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>;
 }
@@ -305,8 +315,9 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   ];
 
   // ── Content renderer ──
-  const seoView = tab.startsWith('seo-') ? tab.replace('seo-', '') : null;
-  const needsSite = !!(seoView || tab === 'search' || tab === 'analytics' || tab === 'annotations' || tab === 'performance');
+  const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'seo-redirects', 'seo-internal', 'seo-strategy', 'seo-schema', 'seo-briefs', 'seo-competitors', 'seo-ranks']);
+  const needsSite = !!(SEO_TABS.has(tab) || tab === 'search' || tab === 'analytics' || tab === 'annotations' || tab === 'performance');
+  const seoNavigate = (t: string, ctx?: FixContext) => { setFixContext(ctx || null); setTab(t as Page); };
 
   const renderContent = () => {
     if (tab === 'settings') return <SettingsPanel />;
@@ -339,7 +350,15 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
 
     if (tab === 'home') return <WorkspaceHome key={`home-${selected.id}`} workspaceId={selected.id} workspaceName={selected.webflowSiteName || selected.name} webflowSiteId={selected.webflowSiteId} webflowSiteName={selected.webflowSiteName} gscPropertyUrl={selected.gscPropertyUrl} ga4PropertyId={selected.ga4PropertyId} onNavigate={(t) => setTab(t as Page)} />;
     if (tab === 'media') return <MediaTab key={selected.folder} siteId={selected.webflowSiteId} workspaceFolder={selected.folder} queue={workspaceQueue} />;
-    if (seoView) return <SeoAudit key={`seo-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} siteName={selected.webflowSiteName || selected.name} view={seoView} onRequestCountChange={setPendingContentRequests} onNavigate={(t: string, ctx?: FixContext) => { setFixContext(ctx || null); setTab(t as Page); }} fixContext={fixContext} />;
+    if (tab === 'seo-audit') return <SeoAudit key={`seo-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} siteName={selected.webflowSiteName || selected.name} onNavigate={seoNavigate} />;
+    if (tab === 'seo-editor') return <SeoEditorWrapper key={`editor-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} />;
+    if (tab === 'seo-strategy') return <KeywordStrategyPanel key={`strategy-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId!} />;
+    if (tab === 'seo-redirects') return <RedirectManager key={`redirects-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
+    if (tab === 'seo-internal') return <InternalLinks key={`internal-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} />;
+    if (tab === 'seo-schema') return <SchemaSuggester key={`schema-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} />;
+    if (tab === 'seo-briefs') return <ContentBriefs key={`briefs-${selected.id}`} workspaceId={selected.id} onRequestCountChange={setPendingContentRequests} fixContext={fixContext} />;
+    if (tab === 'seo-competitors') return <CompetitorAnalysis key={`competitors-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
+    if (tab === 'seo-ranks') return <RankTracker key={`ranks-${selected.id}`} workspaceId={selected.id} hasGsc={!!selected.gscPropertyUrl} />;
     if (tab === 'search') return <SearchConsole key={`search-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} gscPropertyUrl={selected.gscPropertyUrl} />;
     if (tab === 'performance') return <Performance key={`perf-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
     if (tab === 'analytics') return <GoogleAnalytics key={`ga4-${selected.id}`} workspaceId={selected.id} ga4PropertyId={selected.ga4PropertyId} />;

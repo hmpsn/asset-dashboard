@@ -13,20 +13,8 @@ import { statusBorderClass } from './ui/statusConfig';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import type { FixContext } from '../App';
 
-// ── Lazy-loaded sub-tool chunks ──
-const SeoEditorWrapper = lazy(() => import('./SeoEditorWrapper').then(m => ({ default: m.SeoEditorWrapper })));
+// ── Lazy-loaded sub-tool (only LinkChecker used internally for Dead Links sub-tab) ──
 const LinkChecker = lazy(() => import('./LinkChecker').then(m => ({ default: m.LinkChecker })));
-const SchemaSuggester = lazy(() => import('./SchemaSuggester').then(m => ({ default: m.SchemaSuggester })));
-const KeywordStrategyPanel = lazy(() => import('./KeywordStrategy').then(m => ({ default: m.KeywordStrategyPanel })));
-const RedirectManager = lazy(() => import('./RedirectManager').then(m => ({ default: m.RedirectManager })));
-const InternalLinks = lazy(() => import('./InternalLinks').then(m => ({ default: m.InternalLinks })));
-const ContentBriefs = lazy(() => import('./ContentBriefs').then(m => ({ default: m.ContentBriefs })));
-const CompetitorAnalysis = lazy(() => import('./CompetitorAnalysis').then(m => ({ default: m.CompetitorAnalysis })));
-const RankTracker = lazy(() => import('./RankTracker').then(m => ({ default: m.RankTracker })));
-
-function SubToolFallback() {
-  return <div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>;
-}
 
 type Severity = 'error' | 'warning' | 'info';
 
@@ -107,10 +95,7 @@ interface Props {
   siteId: string;
   workspaceId?: string;
   siteName?: string;
-  view?: string;
-  onRequestCountChange?: (pending: number) => void;
   onNavigate?: (tab: string, context?: FixContext) => void;
-  fixContext?: FixContext | null;
 }
 
 const SEVERITY_CONFIG: Record<Severity, { label: string; color: string; bg: string; icon: typeof AlertTriangle }> = {
@@ -512,7 +497,7 @@ function AuditHistory({ siteId, history, onRefresh }: { siteId: string; history:
 
 type AuditSubTab = 'audit' | 'links' | 'history';
 
-function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCountChange, onNavigate, fixContext }: Props) {
+function SeoAudit({ siteId, workspaceId, siteName, onNavigate }: Props) {
   const { startJob, jobs } = useBackgroundTasks();
   const auditJobId = useRef<string | null>(null);
   const [data, setData] = useState<SeoAuditResult | null>(null);
@@ -1122,17 +1107,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
     return { ...data, pages, errors, warnings, infos, siteScore };
   }, [data, suppressions]);
 
-  // ── View-based routing (controlled by parent) ──
-  if (view === 'editor') return <Suspense fallback={<SubToolFallback />}><SeoEditorWrapper siteId={siteId} workspaceId={workspaceId} fixContext={fixContext} /></Suspense>;
-  if (view === 'strategy') return <Suspense fallback={<SubToolFallback />}><KeywordStrategyPanel workspaceId={workspaceId || ''} siteId={siteId} /></Suspense>;
-  if (view === 'redirects') return <Suspense fallback={<SubToolFallback />}><RedirectManager siteId={siteId} /></Suspense>;
-  if (view === 'internal') return <Suspense fallback={<SubToolFallback />}><InternalLinks siteId={siteId} workspaceId={workspaceId} /></Suspense>;
-  if (view === 'schema') return <Suspense fallback={<SubToolFallback />}><SchemaSuggester siteId={siteId} workspaceId={workspaceId} fixContext={fixContext} /></Suspense>;
-  if (view === 'briefs') return <Suspense fallback={<SubToolFallback />}><ContentBriefs workspaceId={workspaceId || ''} onRequestCountChange={onRequestCountChange} fixContext={fixContext} /></Suspense>;
-  if (view === 'competitors') return <Suspense fallback={<SubToolFallback />}><CompetitorAnalysis siteId={siteId} /></Suspense>;
-  if (view === 'ranks') return <Suspense fallback={<SubToolFallback />}><RankTracker workspaceId={workspaceId || ''} hasGsc={!!workspaceId} /></Suspense>;
-
-  // ── Audit view (default) — with sub-tabs ──
+  // ── Audit view — with sub-tabs ──
   const auditTabBar = (
     <div className="flex items-center gap-1 border-b border-zinc-800 pb-0 mb-4">
       {([
@@ -1157,7 +1132,7 @@ function SeoAudit({ siteId, workspaceId, siteName, view = 'audit', onRequestCoun
   );
 
   if (auditSubTab === 'links') {
-    return <div>{auditTabBar}<Suspense fallback={<SubToolFallback />}><LinkChecker siteId={siteId} /></Suspense></div>;
+    return <div>{auditTabBar}<Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>}><LinkChecker siteId={siteId} /></Suspense></div>;
   }
   if (auditSubTab === 'history') {
     return <div>{auditTabBar}<AuditHistory siteId={siteId} history={history} onRefresh={loadHistory} /></div>;

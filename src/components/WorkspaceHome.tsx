@@ -9,6 +9,7 @@ import { StatCard, SectionCard, PageHeader, Badge } from './ui';
 import { InsightsEngine } from './client/InsightsEngine';
 import { ErrorBoundary } from './ErrorBoundary';
 import { usePageEditStates } from '../hooks/usePageEditStates';
+import { useAuditSummary } from '../hooks/useAuditSummary';
 
 interface WorkspaceHomeProps {
   workspaceId: string;
@@ -47,8 +48,8 @@ function fmt(n: number): string {
 
 export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webflowSiteName, gscPropertyUrl, ga4PropertyId, onNavigate }: WorkspaceHomeProps) {
   const { summary: seoStatus } = usePageEditStates(workspaceId);
+  const { audit } = useAuditSummary(workspaceId);
   const [loading, setLoading] = useState(true);
-  const [audit, setAudit] = useState<{ siteScore: number; totalPages: number; errors: number; warnings: number; previousScore?: number } | null>(null);
   const [searchData, setSearchData] = useState<{ totalClicks: number; totalImpressions: number; avgCtr: number; avgPosition: number } | null>(null);
   const [ga4Data, setGa4Data] = useState<{ totalUsers: number; totalSessions: number; totalPageviews: number; newUserPercentage: number } | null>(null);
   const [comparison, setComparison] = useState<{ users?: { current: number; previous: number }; sessions?: { current: number; previous: number } } | null>(null);
@@ -78,7 +79,6 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
     };
 
     const urls: Array<{ key: string; url: string }> = [
-      { key: 'audit', url: `/api/public/audit-summary/${workspaceId}` },
       { key: 'ranks', url: `/api/rank-tracking/${workspaceId}/latest` },
       { key: 'requests', url: `/api/requests?workspaceId=${workspaceId}` },
       { key: 'content', url: `/api/content-requests/${workspaceId}` },
@@ -97,7 +97,6 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       if (cancelled) return;
       for (const { key, d } of results) {
         if (!d) continue;
-        if (key === 'audit' && d.siteScore !== undefined) setAudit(d);
         if (key === 'search' && d.totalClicks !== undefined) setSearchData({ totalClicks: d.totalClicks, totalImpressions: d.totalImpressions, avgCtr: d.avgCtr, avgPosition: d.avgPosition });
         if (key === 'ga4' && d.totalUsers !== undefined) setGa4Data(d);
         if (key === 'comparison' && !d.error) setComparison(d);
