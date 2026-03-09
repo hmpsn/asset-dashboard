@@ -145,6 +145,30 @@ To add a new block type:
 2. Add case in `RenderMarkdown` fenced block parser
 3. Add examples in `RICH_BLOCKS_PROMPT`
 
+## 11. WebSocket Real-Time Broadcasts
+
+When adding real-time updates for a new feature:
+
+1. **Server broadcast**: Call `broadcastToWorkspace(wsId, 'event:name', data)` at the point where data changes (e.g., after a DB write, after detection completes)
+2. **Broadcast callback pattern** (for modules that can't import `broadcastToWorkspace` directly):
+   - Add `let _broadcast: ((wsId: string, event: string, data: unknown) => void) | null = null;`
+   - Export `initMyBroadcast(fn)` function
+   - Call `initMyBroadcast(broadcastToWorkspace)` in `server/index.ts` alongside other broadcast inits
+   - Example: `initActivityBroadcast`, `initAnomalyBroadcast`
+3. **Frontend**: Use `useWorkspaceEvents(wsId, { 'event:name': (data) => refetchRelevantData() })` in the component
+4. **Existing events**: `activity:new`, `approval:update`, `approval:applied`, `request:created`, `request:update`, `content-request:created`, `content-request:update`, `audit:complete`, `anomalies:update`
+
+## 12. Email Notifications
+
+When adding email notifications for a new event type:
+
+1. **Add event type**: Add to `EmailEventType` union in `server/email-templates.ts`
+2. **Add template**: Create `renderMyEvent()` function following existing patterns (use `layout()`, `itemRow()`, `countPill()`, badges)
+3. **Add case**: Add to `renderDigest()` switch statement
+4. **Add helper**: Create `notifyMyEvent()` in `server/email.ts` using `queueEmail(makeEvent(...))`
+5. **Wire it**: Call the notify helper at the relevant point in server logic
+6. **Recipient logic**: Use `getNotificationEmail()` for admin team, `ws.clientEmail` for client. Consider severity-based filtering (e.g., anomalies: admin gets all, client gets critical-only)
+
 ## Caching Pattern
 
 For expensive cross-API data (e.g., audit + traffic):

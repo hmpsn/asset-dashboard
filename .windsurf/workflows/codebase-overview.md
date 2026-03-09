@@ -33,7 +33,7 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 | `server/activity-log.ts` | Activity logging, `addActivity`, `ActivityType` union (includes `anomaly_detected`, `anomaly_positive`) |
 | `server/anomaly-detection.ts` | AI anomaly detection: compares current vs previous 28-day period for GSC, GA4, audit. Configurable thresholds. AI summaries via gpt-4o-mini. Scheduler (12h) + manual trigger. File storage in `.anomalies.json` |
 | `server/monthly-report.ts` | `gatherMonthlyData`, auto-report scheduler, `generateReportHTML`. Trial banner: `isTrial`/`trialDaysRemaining` threaded to email template |
-| `server/email-templates.ts` | HTML email builders: `renderMonthlyReport` (with trial banner), `renderApprovalReminder`, etc. |
+| `server/email-templates.ts` | HTML email builders: `renderMonthlyReport` (with trial banner), `renderApprovalReminder`, `renderAnomalyAlert`, etc. 16 event types including `anomaly_alert` |
 | `server/content-brief.ts` | AI content brief generation with SEMRush/GSC enrichment, 7 page-type-specific prompts. `brief-export-html.ts` renders branded HTML/PDF with page type badge |
 | `server/content-requests.ts` | Content topic request CRUD, `ContentTopicRequest` interface (includes `pageType`, `serviceType`) |
 | `server/seo-audit.ts` | Site health audit engine. `applySuppressionsToAudit()` in index.ts filters suppressed issues and recalculates scores |
@@ -125,7 +125,9 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 6. **SEO edit tracking**: `trackSeoEdit(wsId, pageId, status)` with priority guard (won't downgrade live→flagged). Auto-wired into save, approval, audit flows. CRUD endpoints at `/api/workspaces/:id/seo-edit-tracking`
 7. **CMS sitemap filtering**: `/api/webflow/cms-seo/:siteId` fetches sitemap.xml to filter collection items. Falls back to all items if sitemap unavailable
 10. **Anomaly detection** (#33): `anomaly-detection.ts` compares current vs previous 28-day GSC (clicks, impressions, CTR, position) + GA4 (users, sessions, bounce, conversions) + audit score snapshots. Configurable thresholds, dedup, AI summaries. Scheduled every 12h. API: `/api/anomalies[/:workspaceId]` (list), `/api/anomalies/:id/dismiss`, `/api/anomalies/:id/acknowledge`, `/api/anomalies/scan` (trigger). Public: `/api/public/anomalies/:workspaceId`
-11. **Multi-modal chat** (#22): `RICH_BLOCKS_PROMPT` in `seo-context.ts` teaches AI to emit fenced code blocks (`metric`, `chart`, `datatable`, `sparkline`) with JSON payloads. `RenderMarkdown` in `helpers.tsx` parses these and renders `ChatBlocks.tsx` components. Injected into all 3 chat system prompts.
+11. **WebSocket real-time updates** (#139): `broadcastToWorkspace(wsId, event, data)` sends scoped events to subscribed clients. Broadcast callbacks: `initActivityBroadcast` (auto on every `addActivity`), `initAnomalyBroadcast` (on new anomalies). Frontend: `useWorkspaceEvents(wsId, handlers)` hook. Events: `activity:new`, `approval:update`, `approval:applied`, `request:created/update`, `content-request:created/update`, `audit:complete`, `anomalies:update`
+12. **Email notifications for anomalies**: `notifyAnomalyAlert()` in `email.ts` — admin gets all critical+warning anomalies, client gets critical-only. Uses queue-based email system with branded `anomaly_alert` template (severity badges, AI summary banner)
+13. **Multi-modal chat** (#22): `RICH_BLOCKS_PROMPT` in `seo-context.ts` teaches AI to emit fenced code blocks (`metric`, `chart`, `datatable`, `sparkline`) with JSON payloads. `RenderMarkdown` in `helpers.tsx` parses these and renders `ChatBlocks.tsx` components. Injected into all 3 chat system prompts.
 
 ## Documentation
 
@@ -136,4 +138,5 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 - `AUTH_ROADMAP.md` — Authentication/authorization phases (Phases 1, 2, 4 shipped)
 - `DESIGN_SYSTEM.md` — UI primitives, component specs, typography, spacing, Tailwind classes
 - `BRAND_DESIGN_LANGUAGE.md` — Color rules (Three Laws), per-component color map, admin vs client rules, AI prompting guidelines. **Read before any UI work.**
-- `data/roadmap.json` — Sprint-level tracking with item statuses (89 items across 11 sprints, managed via /api/roadmap). 69+ features shipped total.
+- `ADMIN_UX_AUDIT.md` — Comprehensive admin dashboard UX audit: 12 proposed changes across 3 priority tiers (P0: sidebar collapse, command center, extraction; P1: notification bell, ⌘K, breadcrumb; P2: onboarding, tooltips, freshness, nav, chat, theme)
+- `data/roadmap.json` — Sprint-level tracking with item statuses across 19 sprints (5 active + backlog + 13 archived), managed via /api/roadmap. 80+ features shipped total.
