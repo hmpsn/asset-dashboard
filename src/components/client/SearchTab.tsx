@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import {
-  Search, Target, Shield, TrendingDown, AlertTriangle, TrendingUp,
+  Search, Target, Shield, TrendingDown, AlertTriangle,
   ArrowUpDown, Activity,
 } from 'lucide-react';
+import { RankTrackingSection } from '../shared/RankTable';
 import { CompactStatBar, EmptyState } from '../ui';
 import { DualTrendChart, InsightCard } from './helpers';
 import type {
@@ -111,86 +112,7 @@ export function SearchTab({
     )}
 
     {/* Rank Tracking */}
-    {(rankHistory.length > 1 || latestRanks.length > 0) && (
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <TrendingUp className="w-4 h-4 text-teal-400" />
-          <span className="text-sm font-semibold text-zinc-200">Keyword Rank Tracking</span>
-          <span className="text-[11px] text-zinc-500 ml-auto">{rankHistory.length} snapshots</span>
-        </div>
-        {/* Rank history chart */}
-        {rankHistory.length > 1 && (() => {
-          const allKws = Object.keys(rankHistory[rankHistory.length - 1]?.positions || {}).slice(0, 5);
-          if (allKws.length === 0) return null;
-          const colors = ['#2dd4bf', '#60a5fa', '#f472b6', '#fbbf24', '#a78bfa'];
-          const maxPos = Math.max(...rankHistory.flatMap(s => allKws.map(k => s.positions[k] || 0)), 20);
-          const W = 400, H = 120, PAD = 8;
-          return (
-            <div className="mb-3">
-              <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-28" preserveAspectRatio="none">
-                {allKws.map((kw, ki) => {
-                  const pts = rankHistory.map((s, i) => {
-                    const x = PAD + (i / Math.max(rankHistory.length - 1, 1)) * (W - PAD * 2);
-                    const pos = s.positions[kw];
-                    if (pos === undefined) return null;
-                    const y = PAD + ((pos - 1) / Math.max(maxPos - 1, 1)) * (H - PAD * 2);
-                    return `${x},${y}`;
-                  }).filter(Boolean);
-                  if (pts.length < 2) return null;
-                  return <path key={kw} d={`M${pts.join(' L')}`} fill="none" stroke={colors[ki % colors.length]} strokeWidth="2" opacity="0.8" />;
-                })}
-              </svg>
-              <div className="flex flex-wrap gap-3 mt-1">
-                {allKws.map((kw, ki) => (
-                  <span key={kw} className="flex items-center gap-1.5 text-[11px] text-zinc-500">
-                    <span className="w-3 h-0.5 rounded inline-block" style={{ backgroundColor: colors[ki % colors.length] }} />
-                    <span className="truncate max-w-[120px]">{kw}</span>
-                  </span>
-                ))}
-              </div>
-              <div className="flex items-center justify-between text-[11px] text-zinc-500 mt-1">
-                <span>Position 1 (top)</span>
-                <span>Position {maxPos} (bottom)</span>
-              </div>
-            </div>
-          );
-        })()}
-        {/* Latest ranks table */}
-        {latestRanks.length > 0 && (
-          <div className="overflow-hidden rounded-lg border border-zinc-800">
-            <table className="w-full text-xs">
-              <thead><tr className="bg-zinc-950/50">
-                <th className="text-left py-2 px-3 text-zinc-500 font-medium">Keyword</th>
-                <th className="text-right py-2 px-3 text-zinc-500 font-medium">Position</th>
-                <th className="text-right py-2 px-3 text-zinc-500 font-medium">Change</th>
-                <th className="text-right py-2 px-3 text-zinc-500 font-medium">Clicks</th>
-              </tr></thead>
-              <tbody>
-                {latestRanks.slice(0, 10).map((r, i) => (
-                  <tr key={i} className="border-t border-zinc-800/50">
-                    <td className="py-1.5 px-3 text-zinc-300 truncate max-w-[200px]">{r.query}</td>
-                    <td className="py-1.5 px-3 text-right">
-                      <span className={r.position <= 3 ? 'text-green-400 font-semibold' : r.position <= 10 ? 'text-green-400' : r.position <= 20 ? 'text-amber-400' : 'text-red-400'}>
-                        #{r.position}
-                      </span>
-                    </td>
-                    <td className="py-1.5 px-3 text-right">
-                      {r.change !== undefined && r.change !== 0 && (
-                        <span className={r.change > 0 ? 'text-green-400' : 'text-red-400'}>
-                          {r.change > 0 ? '↑' : '↓'}{Math.abs(r.change)}
-                        </span>
-                      )}
-                      {r.change === 0 && <span className="text-zinc-500">—</span>}
-                    </td>
-                    <td className="py-1.5 px-3 text-right text-blue-400">{r.clicks}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    )}
+    <RankTrackingSection rankHistory={rankHistory} latestRanks={latestRanks} />
 
     <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
       <div className="flex items-center gap-1 px-4 pt-3 pb-1">

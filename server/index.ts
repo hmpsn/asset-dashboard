@@ -95,6 +95,7 @@ import { computeROI } from './roi.js';
 import { generateRecommendations, loadRecommendations, updateRecommendationStatus, dismissRecommendation } from './recommendations.js';
 import { startChurnSignalScheduler, listChurnSignals, dismissSignal } from './churn-signals.js';
 import { listWorkOrders, updateWorkOrder } from './work-orders.js';
+import { checkUsageLimit, incrementUsage, getUsageSummary } from './usage-tracking.js';
 import { getStripeConfigSafe, saveStripeKeys, saveStripeProducts, clearStripeConfig, getStripePublishableKey, type StripeProductPrice } from './stripe-config.js';
 import { getAuthUrl, exchangeCode, isConnected, disconnect, getGoogleCredentials, getGlobalAuthUrl, isGlobalConnected, disconnectGlobal, getGlobalToken, GLOBAL_KEY } from './google-auth.js';
 import { listGscSites, getSearchOverview, getPerformanceTrend, getQueryPageData, getAllGscPages, getSearchDeviceBreakdown, getSearchCountryBreakdown, getSearchTypeBreakdown, getSearchPeriodComparison } from './search-console.js';
@@ -3807,6 +3808,17 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
 
+  // Usage limit check
+  const tier = ws.tier || 'free';
+  const strategyUsage = checkUsageLimit(ws.id, tier, 'strategy_generations');
+  if (!strategyUsage.allowed) {
+    return res.status(429).json({
+      error: 'Strategy generation limit reached',
+      message: `You've used all ${strategyUsage.limit} strategy generations this month. Upgrade for more.`,
+      used: strategyUsage.used, limit: strategyUsage.limit,
+    });
+  }
+
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
@@ -4601,6 +4613,7 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
       generatedAt: new Date().toISOString(),
     };
     updateWorkspace(ws.id, { keywordStrategy });
+    incrementUsage(ws.id, 'strategy_generations');
 
     if (wantsStream) {
       res.write(`data: ${JSON.stringify({ done: true, strategy: keywordStrategy })}\n\n`);
@@ -5241,6 +5254,8 @@ app.post('/api/content-requests/:workspaceId/:id/generate-brief', async (req, re
       ga4PagePerformance,
     });
 
+    incrementUsage(req.params.workspaceId, 'content_briefs');
+
     // Link brief to request and update status
     updateContentRequest(req.params.workspaceId, req.params.id, {
       status: 'brief_generated',
@@ -5722,6 +5737,14 @@ app.get('/api/public/chat-usage/:workspaceId', (req, res) => {
   res.json({ ...rl, tier });
 });
 
+// Unified usage summary — all features for a workspace
+app.get('/api/public/usage/:workspaceId', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const tier = ws.tier || 'free';
+  res.json({ tier, usage: getUsageSummary(ws.id, tier) });
+});
+
 app.post('/api/public/search-chat/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(400).json({ error: 'Workspace not configured' });
@@ -5879,6 +5902,7 @@ ${JSON.stringify(context, null, 2)}`;
       // Log first exchange to activity log so agency sees what clients ask
       if (session && session.messages.length === 2) {
         addActivity(ws.id, 'chat_session', 'Client chat: ' + question.trim().slice(0, 80), `Client started a new Insights Engine conversation`);
+        incrementUsage(ws.id, 'ai_chats');
       }
       // Auto-summarize after 6+ messages
       if (session && session.messages.length >= 6 && !session.summary) {
@@ -6805,6 +6829,18 @@ app.post('/api/content-briefs/:workspaceId/generate', async (req, res) => {
     if (!targetKeyword) return res.status(400).json({ error: 'targetKeyword required' });
 
     const ws = getWorkspace(req.params.workspaceId);
+
+    // Usage limit check
+    if (ws) {
+      const briefUsage = checkUsageLimit(ws.id, ws.tier || 'free', 'content_briefs');
+      if (!briefUsage.allowed) {
+        return res.status(429).json({
+          error: 'Brief generation limit reached',
+          message: `You've used all ${briefUsage.limit} content briefs this month. Upgrade for more.`,
+          used: briefUsage.used, limit: briefUsage.limit,
+        });
+      }
+    }
     let relatedQueries: { query: string; position: number; clicks: number; impressions: number }[] = [];
     let existingPages: string[] = [];
 
@@ -6846,6 +6882,7 @@ app.post('/api/content-briefs/:workspaceId/generate', async (req, res) => {
       semrushRelated,
       pageType: resolvedPageType,
     });
+    incrementUsage(req.params.workspaceId, 'content_briefs');
     res.json(brief);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate brief' });

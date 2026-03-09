@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  Loader2, Search,
+  Loader2,
   Sparkles, Send, AlertTriangle,
-  Target, Zap, Shield, MessageSquare, X, ChevronDown, ChevronUp,
+  Target, Zap, Shield, MessageSquare, X,
   CheckCircle2, LineChart, Lock, Trophy, Check,
-  Sun, Moon, Plus, FileText, Download, ExternalLink, Calendar, Clock, CreditCard,
+  Sun, Moon, Plus, FileText, Calendar, Clock, CreditCard,
 } from 'lucide-react';
 import { StripePaymentModal } from './StripePaymentForm';
-import { TierGate, type Tier } from './ui';
+import { type Tier } from './ui';
 import { RenderMarkdown } from './client/helpers';
 import { HealthTab } from './client/HealthTab';
 import { InsightsEngine } from './client/InsightsEngine';
@@ -17,8 +17,7 @@ import { OnboardingWizard } from './client/OnboardingWizard';
 import { ROIDashboard } from './client/ROIDashboard';
 import { PlansTab } from './client/PlansTab';
 import { StrategyTab } from './client/StrategyTab';
-import { AnalyticsTab } from './client/AnalyticsTab';
-import { SearchTab } from './client/SearchTab';
+import { PerformanceTab } from './client/PerformanceTab';
 import { InboxTab } from './client/InboxTab';
 import { OverviewTab } from './client/OverviewTab';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -53,7 +52,8 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
   const [tab, setTabRaw] = useState<ClientTab>(() => {
     const params = new URLSearchParams(window.location.search);
     const t = params.get('tab');
-    if (t && ['overview','search','health','strategy','analytics','inbox','approvals','requests','content','plans','roi'].includes(t)) return t as ClientTab;
+    if (t === 'search' || t === 'analytics') return 'performance' as ClientTab;
+    if (t && ['overview','performance','health','strategy','inbox','approvals','requests','content','plans','roi'].includes(t)) return t as ClientTab;
     return 'overview';
   });
   const setTab = (t: ClientTab) => {
@@ -984,8 +984,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
     ...(isPaid ? [{ id: 'strategy' as ClientTab, label: 'SEO Strategy', icon: Target, locked: strategyLocked }] : []),
     { id: 'health' as ClientTab, label: 'Site Health', icon: Shield, locked: false },
     ...(ws?.analyticsClientView !== false ? [
-      { id: 'analytics' as ClientTab, label: 'Analytics', icon: LineChart, locked: false },
-      { id: 'search' as ClientTab, label: 'Search', icon: Search, locked: false },
+      { id: 'performance' as ClientTab, label: 'Performance', icon: LineChart, locked: false },
     ] : []),
     ...(isPaid ? [{ id: 'inbox' as ClientTab, label: 'Inbox', icon: Zap, locked: false }] : []),
     { id: 'plans' as ClientTab, label: 'Plans', icon: CreditCard, locked: false },
@@ -1104,9 +1103,8 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
               const Icon = t.icon;
               const active = tab === t.id;
               const hasData = (t.id === 'overview') ||
-                (t.id === 'search' && !!overview) ||
+                (t.id === 'performance' && !!(overview || ga4Overview)) ||
                 (t.id === 'health' && !!audit) ||
-                (t.id === 'analytics' && !!ga4Overview) ||
                 (t.id === 'inbox');
               const pendingReviews = contentRequests.filter(r => r.status === 'client_review').length;
               return (
@@ -1164,9 +1162,9 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
           <OverviewTab ws={ws!} overview={overview} searchComparison={searchComparison} trend={trend} ga4Overview={ga4Overview} ga4Trend={ga4Trend} ga4Comparison={ga4Comparison} ga4Organic={ga4Organic} ga4Conversions={ga4Conversions} ga4NewVsReturning={ga4NewVsReturning} audit={audit} auditDetail={auditDetail} strategyData={strategyData} insights={insights} contentRequests={contentRequests} requests={requests} approvalBatches={approvalBatches} activityLog={activityLog} pendingApprovals={pendingApprovals} unreadTeamNotes={unreadTeamNotes} eventDisplayName={eventDisplayName} isEventPinned={isEventPinned} setTab={setTab} onAskAi={askAi} onOpenChat={() => setChatOpen(true)} clientUser={clientUser} proactiveInsight={proactiveInsight} proactiveInsightLoading={proactiveInsightLoading} />
         )}
 
-        {/* ════════════ SEARCH TAB ════════════ */}
-        {tab === 'search' && (
-          <SearchTab overview={overview} searchComparison={searchComparison} trend={trend} annotations={annotations} rankHistory={rankHistory} latestRanks={latestRanks} insights={insights} />
+        {/* ════════════ PERFORMANCE TAB (Search + Analytics) ════════════ */}
+        {tab === 'performance' && (
+          <PerformanceTab overview={overview} searchComparison={searchComparison} trend={trend} annotations={annotations} rankHistory={rankHistory} latestRanks={latestRanks} insights={insights} ga4Overview={ga4Overview} ga4Comparison={ga4Comparison} ga4Trend={ga4Trend} ga4Devices={ga4Devices} ga4Pages={ga4Pages} ga4Sources={ga4Sources} ga4Organic={ga4Organic} ga4LandingPages={ga4LandingPages} ga4NewVsReturning={ga4NewVsReturning} ga4Conversions={ga4Conversions} ga4Events={ga4Events} ws={ws!} days={days} />
         )}
 
         {/* ════════════ SITE HEALTH TAB ════════════ */}
@@ -1194,10 +1192,6 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
           <InboxTab workspaceId={workspaceId} effectiveTier={effectiveTier} approvalBatches={approvalBatches} approvalsLoading={approvalsLoading} pendingApprovals={pendingApprovals} setApprovalBatches={setApprovalBatches} loadApprovals={loadApprovals} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} contentRequests={contentRequests} setContentRequests={setContentRequests} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} pricingConfirming={pricingConfirming} setTab={setTab} setToast={setToast} />
         )}
 
-        {/* ════════════ ANALYTICS TAB ════════════ */}
-        {tab === 'analytics' && (
-          <AnalyticsTab ga4Overview={ga4Overview} ga4Comparison={ga4Comparison} ga4Trend={ga4Trend} ga4Devices={ga4Devices} ga4Pages={ga4Pages} ga4Sources={ga4Sources} ga4Organic={ga4Organic} ga4LandingPages={ga4LandingPages} ga4NewVsReturning={ga4NewVsReturning} ga4Conversions={ga4Conversions} ga4Events={ga4Events} ws={ws!} days={days} />
-        )}
 
       {/* Floating AI Chat */}
       {(overview || audit || ga4Overview) && (<>

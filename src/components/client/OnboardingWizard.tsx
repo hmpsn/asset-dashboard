@@ -33,7 +33,7 @@ export function OnboardingWizard({
 
   const features = [
     { icon: Shield, label: 'Site Health', desc: 'Automated SEO audits with actionable fixes', available: true, tab: 'health' },
-    { icon: LineChart, label: 'Analytics', desc: 'GA4 + Search Console data in one place', available: true, tab: 'analytics' },
+    { icon: LineChart, label: 'Performance', desc: 'GA4 + Search Console data in one place', available: true, tab: 'performance' },
     { icon: Sparkles, label: 'AI Advisor', desc: 'Ask questions about your traffic and strategy', available: true, tab: 'overview' },
     { icon: Target, label: 'SEO Strategy', desc: 'Keyword mapping, content gaps, and quick wins', available: tier !== 'free', tab: 'strategy' },
     { icon: FileText, label: 'Content Engine', desc: 'AI-generated briefs and content purchasing', available: tier !== 'free', tab: 'content' },
@@ -42,7 +42,7 @@ export function OnboardingWizard({
 
   const suggestedActions = [
     hasAudit && { icon: Shield, label: 'Check your site health score', desc: 'See how your website stacks up technically', tab: 'health', color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' },
-    hasGSC && { icon: MousePointerClick, label: 'Explore search performance', desc: 'See which keywords are driving traffic', tab: 'search', color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' },
+    hasGSC && { icon: MousePointerClick, label: 'Explore search performance', desc: 'See which keywords are driving traffic', tab: 'performance', color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' },
     hasStrategy && tier !== 'free' && { icon: Target, label: 'Review your SEO strategy', desc: 'Keyword assignments, content gaps, and opportunities', tab: 'strategy', color: 'text-purple-400', bg: 'bg-purple-500/10 border-purple-500/20' },
     { icon: Sparkles, label: 'Ask your AI advisor a question', desc: 'Try: "What should I focus on this month?"', tab: 'overview', color: 'text-teal-400', bg: 'bg-teal-500/10 border-teal-500/20', action: 'chat' },
   ].filter(Boolean) as { icon: typeof Shield; label: string; desc: string; tab: string; color: string; bg: string; action?: string }[];

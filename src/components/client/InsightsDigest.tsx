@@ -76,7 +76,7 @@ function generateInsights(props: InsightsDigestProps): DigestInsight[] {
       body: `You had ${fmtNum(ga4Comparison.current.totalUsers)} visitors this period vs ${fmtNum(ga4Comparison.previous.totalUsers)} last period.${
         ga4Organic ? ` Organic search drives ${ga4Organic.shareOfTotalUsers}% of your total traffic.` : ''
       }`,
-      action: { label: 'View analytics', tab: 'analytics' },
+      action: { label: 'View analytics', tab: 'performance' },
       priority: 1,
       sentiment: up ? 'positive' : 'negative',
     });
@@ -89,7 +89,7 @@ function generateInsights(props: InsightsDigestProps): DigestInsight[] {
       body: `${fmtNum(ga4Overview.totalSessions)} sessions with ${fmtNum(ga4Overview.totalPageviews)} page views. Avg session: ${Math.round(ga4Overview.avgSessionDuration)}s.${
         ga4Organic ? ` Organic search drives ${ga4Organic.shareOfTotalUsers}% of total traffic.` : ''
       }`,
-      action: { label: 'View analytics', tab: 'analytics' },
+      action: { label: 'View analytics', tab: 'performance' },
       priority: 2,
       sentiment: 'neutral',
     });
@@ -110,7 +110,7 @@ function generateInsights(props: InsightsDigestProps): DigestInsight[] {
       color: clicksUp ? 'blue' : 'red',
       headline: `Search clicks ${clicksUp ? 'up' : 'down'} ${Math.abs(changePercent.clicks)}% vs last period`,
       body,
-      action: { label: 'View search data', tab: 'search' },
+      action: { label: 'View search data', tab: 'performance' },
       priority: 1,
       sentiment: clicksUp ? 'positive' : 'negative',
     });
@@ -121,7 +121,7 @@ function generateInsights(props: InsightsDigestProps): DigestInsight[] {
       color: 'blue',
       headline: `${fmtNum(overview.totalClicks)} search clicks this period`,
       body: `Appearing in ${fmtNum(overview.totalImpressions)} Google searches with ${overview.avgCtr}% click-through rate. Average position: #${overview.avgPosition}.`,
-      action: { label: 'View search data', tab: 'search' },
+      action: { label: 'View search data', tab: 'performance' },
       priority: 3,
       sentiment: 'neutral',
     });
@@ -138,7 +138,7 @@ function generateInsights(props: InsightsDigestProps): DigestInsight[] {
       headline: `${top.length} keyword${top.length !== 1 ? 's' : ''} ranking in the top 3`,
       body: `Your strongest positions: ${topNames}. These are driving real clicks — keep building on them.`,
       detail: top.slice(0, 5).map(q => `${q.query} → #${q.position} (${q.clicks} clicks)`),
-      action: { label: 'View rankings', tab: 'search' },
+      action: { label: 'View rankings', tab: 'performance' },
       priority: 3,
       sentiment: 'positive',
     });
@@ -155,7 +155,7 @@ function generateInsights(props: InsightsDigestProps): DigestInsight[] {
       headline: `${lh.length} keyword${lh.length !== 1 ? 's' : ''} almost on page 1`,
       body: `Small ranking improvements here could mean significant traffic gains. Closest: "${closest[0].query}" at #${closest[0].position}.`,
       detail: closest.map(q => `${q.query} → #${q.position} (${fmtNum(q.impressions)} impressions)`),
-      action: { label: 'View opportunities', tab: 'search' },
+      action: { label: 'View opportunities', tab: 'performance' },
       priority: 2,
       sentiment: 'opportunity',
     });
@@ -196,7 +196,7 @@ function generateInsights(props: InsightsDigestProps): DigestInsight[] {
         pinnedConversions.length > 1 ? ` ${pinnedConversions.length} tracked event types total.` : ''
       }`,
       detail: pinnedConversions.slice(0, 4).map(c => `${eventDisplayName(c.eventName)}: ${fmtNum(c.conversions)} (${c.rate}%)`),
-      action: { label: 'View events', tab: 'analytics' },
+      action: { label: 'View events', tab: 'performance' },
       priority: 2,
       sentiment: 'positive',
     });
@@ -252,7 +252,7 @@ function generateInsights(props: InsightsDigestProps): DigestInsight[] {
           : highRet
           ? `Strong returning visitor base (${Math.round(retSeg.percentage)}%) shows good engagement. Your content keeps people coming back.`
           : `Healthy mix of new (${Math.round(newSeg.percentage)}%) and returning (${Math.round(retSeg.percentage)}%) visitors.`,
-        action: { label: 'View visitor breakdown', tab: 'analytics' },
+        action: { label: 'View visitor breakdown', tab: 'performance' },
         priority: 5,
         sentiment: 'neutral',
       });
@@ -269,7 +269,7 @@ function generateInsights(props: InsightsDigestProps): DigestInsight[] {
         color: 'green',
         headline: `Organic search drives ${ga4Organic.shareOfTotalUsers}% of your traffic`,
         body: `${fmtNum(ga4Organic.organicUsers)} organic visitors with ${ga4Organic.engagementRate}% engagement rate. SEO is working — keep investing in content.`,
-        action: { label: 'View organic data', tab: 'analytics' },
+        action: { label: 'View organic data', tab: 'performance' },
         priority: 4,
         sentiment: 'positive',
       });
@@ -285,7 +285,7 @@ function generateInsights(props: InsightsDigestProps): DigestInsight[] {
       color: 'green',
       headline: `Average position improved by ${Math.abs(searchComparison.change.position).toFixed(1)} spots`,
       body: `Your rankings are climbing. This should translate to more clicks and traffic over the coming weeks.`,
-      action: { label: 'View search trends', tab: 'search' },
+      action: { label: 'View search trends', tab: 'performance' },
       priority: 1,
       sentiment: 'positive',
     });
