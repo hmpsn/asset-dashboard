@@ -14,7 +14,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, Search,
   Pencil, CornerDownRight, Share2, Target, Code2, LogOut, Swords, TrendingUp, Flag,
-  Sun, Moon, LayoutDashboard,
+  Sun, Moon, LayoutDashboard, ChevronRight,
 } from 'lucide-react';
 
 // ── Lazy-loaded route-level chunks ──
@@ -128,6 +128,22 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   const [fixContext, setFixContext] = useState<FixContext | null>(null);
   const [clipboardStatus, setClipboardStatus] = useState<string | null>(null);
   const [pendingContentRequests, setPendingContentRequests] = useState(0);
+
+  // ── Collapsible sidebar groups (#160) ──
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem('admin-sidebar-collapsed');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); }
+  });
+  const toggleGroup = useCallback((label: string) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label); else next.add(label);
+      try { localStorage.setItem('admin-sidebar-collapsed', JSON.stringify([...next])); } catch { /* skip */ }
+      return next;
+    });
+  }, []);
 
   const refreshHealth = useCallback(() => {
     fetch('/api/health').then(r => r.json()).then(h => {
@@ -286,6 +302,20 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     ? queue.filter(q => q.workspace === selected.folder)
     : queue;
 
+  // Auto-expand sidebar group containing active tab (#160)
+  useEffect(() => {
+    const activeGroup = navGroups.find(g => g.label && g.items.some(i => i.id === tab));
+    if (activeGroup && collapsedGroups.has(activeGroup.label)) {
+      setCollapsedGroups(prev => {
+        const next = new Set(prev);
+        next.delete(activeGroup.label);
+        try { localStorage.setItem('admin-sidebar-collapsed', JSON.stringify([...next])); } catch { /* skip */ }
+        return next;
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
   // ── Sidebar navigation groups ──
   const navGroups: Array<{ label: string; items: Array<{ id: Page; label: string; icon: typeof Globe; needsSite?: boolean }> }> = [
     { label: '', items: [
@@ -399,38 +429,57 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
-          {navGroups.map((group, gi) => (
-            <div key={group.label || `group-${gi}`}>
-              {group.label && <div className="text-[11px] text-zinc-500 font-semibold tracking-widest px-2.5 mb-1">{group.label}</div>}
-              {group.items.map(item => {
-                const Icon = item.icon;
-                const active = tab === item.id;
-                const disabled = !selected || (item.needsSite && !selected.webflowSiteId);
-                return (
+        <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-1">
+          {navGroups.map((group, gi) => {
+            const isCollapsed = !!group.label && collapsedGroups.has(group.label);
+            const groupBadgeCount = group.items.reduce((sum, item) =>
+              item.id === 'seo-briefs' ? sum + pendingContentRequests : sum, 0);
+
+            return (
+              <div key={group.label || `group-${gi}`} className={group.label ? 'mt-3' : ''}>
+                {group.label ? (
                   <button
-                    key={item.id}
-                    onClick={() => !disabled && setTab(item.id)}
-                    className={`w-full flex items-center gap-2.5 px-2.5 py-[5px] rounded-lg text-[12px] font-medium transition-all ${
-                      active
-                        ? 'bg-teal-500/10 text-teal-300'
-                        : disabled
-                          ? 'text-zinc-700 cursor-not-allowed'
-                          : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
-                    }`}
+                    onClick={() => toggleGroup(group.label)}
+                    className="w-full flex items-center gap-1 px-2 py-1 mb-0.5 rounded-md hover:bg-zinc-800/30 transition-colors"
                   >
-                    <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${active ? 'text-teal-400' : ''}`} />
-                    <span className="truncate">{item.label}</span>
-                    {item.id === 'seo-briefs' && pendingContentRequests > 0 && (
-                      <span className="ml-auto text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 tabular-nums flex-shrink-0 min-w-[20px] text-center leading-tight">
-                        {pendingContentRequests}
+                    <ChevronRight className={`w-3 h-3 text-zinc-600 transition-transform duration-150 ${!isCollapsed ? 'rotate-90' : ''}`} />
+                    <span className="text-[11px] text-zinc-500 font-semibold tracking-widest flex-1 text-left">{group.label}</span>
+                    {isCollapsed && groupBadgeCount > 0 && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 tabular-nums min-w-[18px] text-center leading-tight">
+                        {groupBadgeCount}
                       </span>
                     )}
                   </button>
-                );
-              })}
-            </div>
-          ))}
+                ) : null}
+                {!isCollapsed && group.items.map(item => {
+                  const Icon = item.icon;
+                  const active = tab === item.id;
+                  const disabled = !selected || (item.needsSite && !selected.webflowSiteId);
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => !disabled && setTab(item.id)}
+                      className={`w-full flex items-center gap-2.5 px-2.5 py-[5px] rounded-lg text-[12px] font-medium transition-all ${
+                        active
+                          ? 'bg-teal-500/10 text-teal-300'
+                          : disabled
+                            ? 'text-zinc-700 cursor-not-allowed'
+                            : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
+                      }`}
+                    >
+                      <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${active ? 'text-teal-400' : ''}`} />
+                      <span className="truncate">{item.label}</span>
+                      {item.id === 'seo-briefs' && pendingContentRequests > 0 && (
+                        <span className="ml-auto text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 tabular-nums flex-shrink-0 min-w-[20px] text-center leading-tight">
+                          {pendingContentRequests}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
         </nav>
 
         {/* Bottom: icon-only utility bar */}
