@@ -148,16 +148,18 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 const pageTypeLabel = ({ blog: 'Blog Post', landing: 'Landing Page', service: 'Service Page', location: 'Location Page', product: 'Product Page', pillar: 'Pillar Page', resource: 'Resource Guide' } as Record<string, string>)[pageType] || 'Blog Post';
                 const keywordDiffers = gap.targetKeyword.toLowerCase().replace(/[^a-z0-9]/g, '') !== gap.topic.toLowerCase().replace(/[^a-z0-9]/g, '');
                 return (
-                  <div key={i} className="px-4 py-3.5 rounded-lg bg-zinc-900/60 border border-zinc-800/80 hover:border-teal-500/30 transition-all group flex flex-col">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-semibold text-zinc-100 flex-1 min-w-0 mr-2">{gap.topic}</span>
-                      <span className="text-[11px] text-zinc-500 uppercase tracking-wider flex-shrink-0">{gap.intent}</span>
+                  <div key={i} className="px-3.5 py-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800/80 hover:border-teal-500/30 transition-all group flex flex-col">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-zinc-100 flex-1 min-w-0 mr-2 truncate">{gap.topic}</span>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20 font-medium">{pageTypeLabel}</span>
+                        <span className="text-[10px] text-zinc-600 uppercase tracking-wider">{gap.intent}</span>
+                      </div>
                     </div>
-                    <div className="text-[11px] text-zinc-500 leading-relaxed flex-1 mb-3">{gap.rationale}</div>
+                    <div className="text-[11px] text-zinc-500 leading-snug mb-2 line-clamp-2">{gap.rationale}</div>
                     <div className="flex items-center justify-between mt-auto">
-                      <div className="flex items-center gap-2 min-w-0">
-                        {keywordDiffers && <span className="text-[11px] text-teal-400/70 truncate">&ldquo;{gap.targetKeyword}&rdquo;</span>}
-                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20 font-medium flex-shrink-0">{pageTypeLabel}</span>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        {keywordDiffers && <span className="text-[10px] text-teal-400/70 truncate max-w-[140px]">&ldquo;{gap.targetKeyword}&rdquo;</span>}
                       </div>
                       {alreadyRequested ? (
                         (() => {

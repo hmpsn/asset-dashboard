@@ -1,4 +1,4 @@
-import { CheckCircle2, FileText, MessageSquare, Sparkles, X, Zap } from 'lucide-react';
+import { CheckCircle2, FileText, MessageSquare, Sparkles, X, Zap, DollarSign, TrendingUp } from 'lucide-react';
 import type { Tier } from '../ui';
 import type { WorkspaceInfo, ClientTab } from './types';
 
@@ -11,61 +11,81 @@ interface PlansTabProps {
   fmtPrice: (n: number) => string;
   setTab: (tab: ClientTab) => void;
   setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
+  onOpenChat: () => void;
 }
 
-export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setTab, setToast }: PlansTabProps) {
+export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setTab, setToast, onOpenChat }: PlansTabProps) {
   const tier = effectiveTier;
   const isTrial = ws.isTrial && ws.trialDaysRemaining != null && ws.trialDaysRemaining > 0;
-  const plans: { id: Tier; name: string; price: string; tagline: string; color: string; borderColor: string; bgColor: string; features: { label: string; included: boolean }[] }[] = [
+  type FeatureGroup = { category: string; features: { label: string; included: boolean }[] };
+  const plans: { id: Tier; name: string; price: string; tagline: string; color: string; borderColor: string; bgColor: string; featureGroups: FeatureGroup[] }[] = [
     {
       id: 'free', name: 'Starter', price: 'Free', tagline: 'Your site at a glance',
       color: 'text-zinc-300', borderColor: 'border-zinc-700', bgColor: 'bg-zinc-900',
-      features: [
-        { label: 'AI-powered site insights', included: true },
-        { label: 'Site health audits', included: true },
-        { label: 'Google Analytics overview', included: true },
-        { label: 'Search Console data', included: true },
-        { label: 'AI chat advisor (3/mo)', included: true },
-        { label: 'Monthly summary digest', included: true },
-        { label: 'SEO keyword strategy', included: false },
-        { label: 'Content briefs & posts', included: false },
-        { label: 'ROI tracking', included: false },
-        { label: 'Custom date ranges', included: false },
-        { label: 'Competitor analysis', included: false },
+      featureGroups: [
+        { category: 'Insights & Data', features: [
+          { label: 'AI-powered site insights', included: true },
+          { label: 'Site health audits', included: true },
+          { label: 'Google Analytics overview', included: true },
+          { label: 'Search Console data', included: true },
+        ]},
+        { category: 'AI & Tools', features: [
+          { label: 'AI chat advisor (3/mo)', included: true },
+          { label: 'Monthly summary digest', included: true },
+          { label: 'Custom date ranges', included: false },
+        ]},
+        { category: 'Strategy & Content', features: [
+          { label: 'SEO keyword strategy', included: false },
+          { label: 'Content briefs & posts', included: false },
+          { label: 'ROI tracking', included: false },
+          { label: 'Competitor analysis', included: false },
+        ]},
       ],
     },
     {
       id: 'growth', name: 'Growth', price: '$249', tagline: 'AI-powered SEO engine',
       color: 'text-teal-300', borderColor: 'border-teal-500/30', bgColor: 'bg-teal-500/5',
-      features: [
-        { label: 'Everything in Starter', included: true },
-        { label: 'Custom date ranges', included: true },
-        { label: 'SEO keyword strategy', included: true },
-        { label: 'Content gaps & quick wins', included: true },
-        { label: 'Page keyword mapping', included: true },
-        { label: 'Content briefs & posts', included: true },
-        { label: 'ROI dashboard', included: true },
-        { label: 'Unlimited AI chat', included: true },
-        { label: 'Competitor analysis', included: false },
-        { label: '3 strategy & implementation hrs', included: false },
-        { label: 'Dedicated strategist', included: false },
+      featureGroups: [
+        { category: 'Everything in Starter, plus:', features: [] },
+        { category: 'Strategy & SEO', features: [
+          { label: 'SEO keyword strategy', included: true },
+          { label: 'Content gaps & quick wins', included: true },
+          { label: 'Page keyword mapping', included: true },
+        ]},
+        { category: 'Content & ROI', features: [
+          { label: 'Content briefs & posts', included: true },
+          { label: 'ROI dashboard', included: true },
+          { label: 'Custom date ranges', included: true },
+          { label: 'Unlimited AI chat', included: true },
+        ]},
+        { category: 'Premium Only', features: [
+          { label: 'Competitor analysis', included: false },
+          { label: '3 strategy & implementation hrs', included: false },
+          { label: 'Dedicated strategist', included: false },
+        ]},
       ],
     },
     {
       id: 'premium', name: 'Premium', price: '$999', tagline: 'Managed SEO partnership',
       color: 'text-teal-200', borderColor: 'border-teal-400/30', bgColor: 'bg-teal-500/5',
-      features: [
-        { label: 'Everything in Growth', included: true },
-        { label: 'Competitor keyword analysis', included: true },
-        { label: 'Advanced competitor intel', included: true },
-        { label: 'Dedicated strategist', included: true },
-        { label: '3 strategy & implementation hrs/mo', included: true },
-        { label: 'Monthly strategy reviews', included: true },
-        { label: 'SEO change approvals', included: true },
-        { label: 'Content calendar planning', included: true },
-        { label: 'Technical SEO implementation', included: true },
-        { label: 'Schema markup', included: true },
-        { label: 'Priority support', included: true },
+      featureGroups: [
+        { category: 'Everything in Growth, plus:', features: [] },
+        { category: 'Competitor Intelligence', features: [
+          { label: 'Competitor keyword analysis', included: true },
+          { label: 'Advanced competitor intel', included: true },
+        ]},
+        { category: 'Managed SEO', features: [
+          { label: 'Dedicated strategist', included: true },
+          { label: '3 strategy & implementation hrs/mo', included: true },
+          { label: 'Monthly strategy reviews', included: true },
+          { label: 'SEO change approvals', included: true },
+        ]},
+        { category: 'Technical & Content', features: [
+          { label: 'Content calendar planning', included: true },
+          { label: 'Technical SEO implementation', included: true },
+          { label: 'Schema markup', included: true },
+          { label: 'Priority support', included: true },
+        ]},
       ],
     },
   ];
@@ -102,15 +122,20 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                   {plan.price !== 'Free' && <span className="text-xs text-zinc-500">/month</span>}
                 </div>
                 <p className="text-[11px] text-zinc-500 mt-1.5 mb-4">{plan.tagline}</p>
-                <div className="space-y-2">
-                  {plan.features.map((f, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      {f.included ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 text-teal-400" />
-                      ) : (
-                        <X className="w-3.5 h-3.5 flex-shrink-0 text-zinc-700" />
-                      )}
-                      <span className={`text-xs ${f.included ? 'text-zinc-300' : 'text-zinc-600'}`}>{f.label}</span>
+                <div className="space-y-3">
+                  {plan.featureGroups.map((group, gi) => (
+                    <div key={gi}>
+                      <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium mb-1.5">{group.category}</div>
+                      {group.features.map((f, fi) => (
+                        <div key={fi} className="flex items-center gap-2 py-0.5">
+                          {f.included ? (
+                            <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 text-teal-400" />
+                          ) : (
+                            <X className="w-3.5 h-3.5 flex-shrink-0 text-zinc-700" />
+                          )}
+                          <span className={`text-xs ${f.included ? 'text-zinc-300' : 'text-zinc-600'}`}>{f.label}</span>
+                        </div>
+                      ))}
                     </div>
                   ))}
                 </div>
@@ -195,10 +220,41 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
         </div>
       )}
 
+      {/* ROI teaser for free-tier users */}
+      {tier === 'free' && (
+        <div className="bg-gradient-to-r from-emerald-500/8 via-zinc-900 to-blue-500/8 rounded-xl border border-emerald-500/20 p-6">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center flex-shrink-0">
+              <DollarSign className="w-5 h-5 text-emerald-400" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-zinc-100 mb-1">See the dollar value of your organic traffic</h3>
+              <p className="text-xs text-zinc-500 leading-relaxed mb-3">
+                The ROI Dashboard shows what your organic search traffic would cost if you bought it through Google Ads. Growth plan clients see their traffic value, page-by-page breakdown, and content investment returns.
+              </p>
+              <div className="grid grid-cols-3 gap-3 mb-3">
+                <div className="bg-zinc-900/60 rounded-lg border border-zinc-800 p-2.5 text-center">
+                  <TrendingUp className="w-3.5 h-3.5 text-emerald-400 mx-auto mb-1" />
+                  <div className="text-[10px] text-zinc-500">Traffic Value</div>
+                </div>
+                <div className="bg-zinc-900/60 rounded-lg border border-zinc-800 p-2.5 text-center">
+                  <DollarSign className="w-3.5 h-3.5 text-blue-400 mx-auto mb-1" />
+                  <div className="text-[10px] text-zinc-500">Ad Spend Saved</div>
+                </div>
+                <div className="bg-zinc-900/60 rounded-lg border border-zinc-800 p-2.5 text-center">
+                  <Sparkles className="w-3.5 h-3.5 text-teal-400 mx-auto mb-1" />
+                  <div className="text-[10px] text-zinc-500">Content ROI</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Contact CTA */}
       <div className="text-center py-6 bg-zinc-900/50 rounded-xl border border-zinc-800">
         <p className="text-sm text-zinc-400 mb-3">Have questions about which plan is right for you?</p>
-        <button onClick={() => setTab('overview')}
+        <button onClick={onOpenChat}
           className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-sm text-zinc-200 font-medium transition-colors">
           <MessageSquare className="w-4 h-4" /> Ask Your AI Advisor
         </button>

@@ -71,6 +71,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
   const [customDateRange, setCustomDateRange] = useState<{ startDate: string; endDate: string } | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [chatExpanded, setChatExpanded] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
@@ -1207,7 +1208,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
           </button>
         )}
         {chatOpen && (
-          <div className="fixed bottom-6 right-6 w-96 bg-zinc-900 rounded-2xl border border-zinc-800 shadow-2xl shadow-black/40 overflow-hidden z-50 flex flex-col max-h-[500px]">
+          <div className={`fixed bottom-6 right-6 bg-zinc-900 rounded-2xl border border-zinc-800 shadow-2xl shadow-black/40 overflow-hidden z-50 flex flex-col transition-all duration-200 ${chatExpanded ? 'w-[600px] max-h-[700px]' : 'w-96 max-h-[500px]'}`}>
             <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 flex-shrink-0">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-teal-400" /><span className="text-sm font-medium text-zinc-200">Insights Engine</span>
@@ -1226,7 +1227,10 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
                 )}
                 <button onClick={() => { setShowChatHistory(!showChatHistory); if (!showChatHistory && ws) { fetch(`/api/public/chat-sessions/${ws.id}?channel=client`).then(r => r.json()).then(d => { if (Array.isArray(d)) setChatSessions(d); }).catch(() => {}); } }}
                   title="Chat history" className={`p-1 ${showChatHistory ? 'text-teal-400' : 'text-zinc-500 hover:text-zinc-300'}`}><MessageSquare className="w-3.5 h-3.5" /></button>
-                <button onClick={() => setChatOpen(false)} className="text-zinc-500 hover:text-zinc-300 p-1"><X className="w-4 h-4" /></button>
+                <button onClick={() => setChatExpanded(!chatExpanded)} title={chatExpanded ? 'Minimize' : 'Maximize'} className="text-zinc-500 hover:text-zinc-300 p-1">
+                  {chatExpanded ? <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg> : <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>}
+                </button>
+                <button onClick={() => { setChatOpen(false); setChatExpanded(false); }} className="text-zinc-500 hover:text-zinc-300 p-1"><X className="w-4 h-4" /></button>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto">
@@ -1311,7 +1315,7 @@ export function ClientDashboard({ workspaceId }: { workspaceId: string }) {
 
         {/* ════════════ PLANS TAB ════════════ */}
         {tab === 'plans' && (
-          <PlansTab workspaceId={workspaceId} ws={ws} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setTab={setTab} setToast={setToast} />
+          <PlansTab workspaceId={workspaceId} ws={ws} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setTab={setTab} setToast={setToast} onOpenChat={() => setChatOpen(true)} />
         )}
 
       </main>

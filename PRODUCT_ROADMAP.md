@@ -53,16 +53,12 @@ The goal this month is to make the platform fully self-service — any business 
 - **Inbox status chips** — Section headers show "Waiting on you", "Team replied", "In progress", or "All reviewed"
 - **Free-tier tab hiding** — Strategy, Inbox, ROI tabs already hidden for Starter plan (confirmed)
 
-### Dashboard UX — Phase 2: Information Architecture (2-3 days)
-Findings from the client dashboard UX audit (see `CLIENT_DASHBOARD_UX_AUDIT.md`):
-
-| Feature | What It Means For You | Priority |
-|---------|----------------------|----------|
-| **Inline AI proactive insight** | The AI advisor's personalized greeting surfaces directly on the Overview tab instead of hiding behind the chat button. Your most relevant insight is front and center every time you log in. | 🔴 Critical |
-| **Overview hierarchy restructure** | Overview now follows a clear flow: hero insight → key metrics → actions needed → monthly activity → deep insights. Less scrolling, faster answers to "how am I doing?" | 🟡 High |
-| **Strategy-specific summary cards** | Strategy tab shows Keywords Tracked, Content Gaps Found, Quick Wins Available, Pages Without Rankings — instead of repeating traffic data from other tabs. | 🟡 High |
-| **Health tab errors-only default** | Page breakdown defaults to showing only pages with errors (most actionable). "Show all pages" toggle available for the full view. | 🟢 Medium |
-| **Contextual search benchmarks** | Search Health Summary adds qualitative labels like "strong for your industry" so non-technical clients understand whether their numbers are good or bad. | 🟢 Medium |
+### Dashboard UX — Phase 2: Information Architecture (shipped March 8)
+- **Inline AI proactive insight** — AI hero insight card on Overview with loading state and "Continue in chat" CTA
+- **Overview hierarchy restructure** — Welcome → AI insight → action banners → key metrics → monthly activity → insights digest + sidebar
+- **Strategy-specific summary cards** — Keywords Tracked, Content Gaps, Quick Wins, Not Yet Ranking (replaced duplicate Search metrics)
+- **Health tab errors-only default** — Page breakdown defaults to errors filter; added page count indicator
+- **Contextual search benchmarks** — Qualitative labels on Search Health Summary: "Strong visibility", "Above average", "Needs attention"
 
 ### Recently shipped (March 8):
 - **SEO edit tracking** — Every page card in the SEO editor, CMS editor, and audit view now shows its edit status (Live / In Review / Flagged) with colored borders and badges
@@ -93,15 +89,12 @@ Once clients are in the door, we need to prove ROI fast. This month focuses on c
 | **Usage tracking & limits** | Clear visibility into your plan usage: "You've used 3 of 4 briefs this month." No surprise bills. Transparent limits with upgrade prompts when you're getting close. | 🟡 High |
 | **AI chat: inline charts & tables** | When you ask your AI advisor about traffic trends or keyword performance, it responds with visual charts and data tables — not just text. Makes conversations more actionable. | 🟢 Medium |
 
-### Dashboard UX — Phase 3: Conversion Optimization (2-3 days)
-
-| Feature | What It Means For You | Priority |
-|---------|----------------------|----------|
-| **ROI teaser on Plans tab** | Trial users see a data-driven value estimate ("Based on your traffic, Growth could unlock $X in organic value") to strengthen upgrade decisions. | 🟡 High |
-| **Compact Content Opportunities** | Content gap cards default to a scannable list view. Click to expand details. Makes the "Get a Brief" CTA more prominent. | 🟡 High |
-| **Fix Plans "Ask AI" CTA** | The contact CTA on Plans opens the AI chat with a pricing question pre-loaded instead of navigating away. | 🟡 High |
-| **AI chat maximize button** | Expand the chat panel to a larger overlay for reading lengthy strategy responses. | 🟢 Medium |
-| **Grouped Plans features** | Plan feature lists grouped by category (Data, Strategy, Content, Support) for easier scanning. | 🟢 Medium |
+### Dashboard UX — Phase 3: Conversion Optimization (shipped March 8)
+- **ROI teaser on Plans tab** — Free-tier users see ROI teaser card with Traffic Value / Ad Spend Saved / Content ROI preview
+- **Compact Content Opportunities** — Tighter cards with inline badges, 2-line clamped rationale, more prominent CTAs
+- **Fix Plans "Ask AI" CTA** — Button now opens the AI chat directly instead of navigating to Overview
+- **AI chat maximize button** — Toggle expands chat from compact to 600×700px with smooth transition
+- **Grouped Plans features** — Features organized into category groups (Insights & Data, Strategy & SEO, etc.)
 
 ### Value unlocked:
 - Every piece of content you purchase has a performance trail proving its ROI
