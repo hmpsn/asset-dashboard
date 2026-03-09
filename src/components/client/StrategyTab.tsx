@@ -89,40 +89,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         );
       })()}
 
-      {/* ── QUICK WINS (urgency builder) ── */}
-      {strategyData.quickWins && strategyData.quickWins.length > 0 && (
-        <div className="bg-gradient-to-br from-amber-950/30 to-zinc-900 rounded-xl border border-amber-500/30 p-5 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
-          <div className="relative">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-7 h-7 rounded-lg bg-amber-500/20 flex items-center justify-center">
-                <Zap className="w-4 h-4 text-amber-400" />
-              </div>
-              <div>
-                <div className="text-sm font-semibold text-amber-200">Quick Wins</div>
-                <div className="text-[11px] text-amber-400/60">Low-effort changes that can improve rankings fast</div>
-              </div>
-            </div>
-            <div className="space-y-2 mt-3">
-              {strategyData.quickWins.map((qw, i) => {
-                const impactColor = qw.estimatedImpact === 'high' ? 'text-green-400 bg-green-500/15 border-green-500/30' : qw.estimatedImpact === 'medium' ? 'text-amber-400 bg-amber-500/15 border-amber-500/30' : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
-                return (
-                  <div key={i} className="px-3.5 py-3 rounded-lg bg-zinc-900/60 border border-zinc-800/80 hover:border-amber-500/20 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-mono text-zinc-500">{qw.pagePath}</span>
-                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${impactColor}`}>{qw.estimatedImpact} impact</span>
-                    </div>
-                    <div className="text-[11px] text-zinc-200 mt-1.5 font-medium">{qw.action}</div>
-                    <div className="text-[11px] text-zinc-500 mt-1">{qw.rationale}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── CONTENT OPPORTUNITIES (conversion moment) ── */}
+      {/* ── CONTENT OPPORTUNITIES (revenue moment — show gaps first) ── */}
       {strategyData.contentGaps && strategyData.contentGaps.length > 0 && (
         <TierGate tier={effectiveTier} required="growth" feature="Content Opportunities" teaser={`${strategyData.contentGaps.length} content topics identified — upgrade to unlock recommendations`}>
         <div className="bg-gradient-to-br from-teal-950/40 to-zinc-900 rounded-xl border border-teal-500/30 p-5 relative overflow-hidden">
@@ -171,7 +138,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                           const s = matchingReq?.status;
                           if (s === 'delivered' || s === 'published') return <span className="flex items-center gap-1 text-[11px] text-teal-400 bg-teal-500/10 px-2.5 py-1.5 rounded-lg border border-teal-500/20 flex-shrink-0"><CheckCircle2 className="w-3.5 h-3.5" /> {s === 'published' ? 'Published' : 'Delivered'} ✓</span>;
                           if (s === 'approved' || s === 'in_progress') return <span className="flex items-center gap-1 text-[11px] text-blue-400 bg-blue-500/10 px-2.5 py-1.5 rounded-lg border border-blue-500/20 flex-shrink-0"><Sparkles className="w-3.5 h-3.5" /> In Progress</span>;
-                          if (s === 'brief_generated' || s === 'client_review') return <span className="flex items-center gap-1 text-[11px] text-purple-400 bg-purple-500/10 px-2.5 py-1.5 rounded-lg border border-purple-500/20 flex-shrink-0"><FileText className="w-3.5 h-3.5" /> In Review</span>;
+                          if (s === 'brief_generated' || s === 'client_review') return <span className="flex items-center gap-1 text-[11px] text-amber-400 bg-amber-500/10 px-2.5 py-1.5 rounded-lg border border-amber-500/20 flex-shrink-0"><FileText className="w-3.5 h-3.5" /> In Review</span>;
                           return <span className="flex items-center gap-1 text-[11px] text-blue-400 bg-blue-500/10 px-2.5 py-1.5 rounded-lg border border-blue-500/20 flex-shrink-0"><CheckCircle2 className="w-3.5 h-3.5" /> Brief Ordered</span>;
                         })()
                       ) : (
@@ -202,6 +169,39 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           </div>
         </div>
         </TierGate>
+      )}
+
+      {/* ── QUICK WINS (value proof — we're already working on it) ── */}
+      {strategyData.quickWins && strategyData.quickWins.length > 0 && (
+        <div className="bg-gradient-to-br from-amber-950/30 to-zinc-900 rounded-xl border border-amber-500/30 p-5 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+          <div className="relative">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-7 h-7 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                <Zap className="w-4 h-4 text-amber-400" />
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-amber-200">Quick Wins</div>
+                <div className="text-[11px] text-amber-400/60">Low-effort changes that can improve rankings fast</div>
+              </div>
+            </div>
+            <div className="space-y-2 mt-3">
+              {strategyData.quickWins.map((qw, i) => {
+                const impactColor = qw.estimatedImpact === 'high' ? 'text-green-400 bg-green-500/15 border-green-500/30' : qw.estimatedImpact === 'medium' ? 'text-amber-400 bg-amber-500/15 border-amber-500/30' : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
+                return (
+                  <div key={i} className="px-3.5 py-3 rounded-lg bg-zinc-900/60 border border-zinc-800/80 hover:border-amber-500/20 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-mono text-zinc-500">{qw.pagePath}</span>
+                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${impactColor}`}>{qw.estimatedImpact} impact</span>
+                    </div>
+                    <div className="text-[11px] text-zinc-200 mt-1.5 font-medium">{qw.action}</div>
+                    <div className="text-[11px] text-zinc-500 mt-1">{qw.rationale}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── KEYWORD OPPORTUNITIES + TARGET KEYWORDS (side by side) ── */}

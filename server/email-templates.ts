@@ -484,8 +484,8 @@ function renderClientWelcome(event: EmailEvent, logoUrl?: string) {
   const gettingStarted = `
     <div style="margin-top:16px;">
       <div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">Here's what you can do</div>
-      ${itemRow({ title: '📊 View your site health score', detail: 'See how your website stacks up with our automated SEO audits', isLast: false })}
-      ${itemRow({ title: '📈 Track your traffic & rankings', detail: 'Search Console and Google Analytics data in one place', isLast: false })}
+      ${itemRow({ title: '� Track your traffic & rankings', detail: 'Search Console and Google Analytics data in one place', isLast: false })}
+      ${itemRow({ title: '� View your site health score', detail: 'See how your website stacks up with our automated SEO audits', isLast: false })}
       ${itemRow({ title: '💬 Ask your AI advisor', detail: 'Get instant insights about your traffic, rankings, and content strategy', isLast: false })}
       ${itemRow({ title: '📝 Request content', detail: 'Submit topics and track briefs through your content pipeline', isLast: true })}
     </div>`;
