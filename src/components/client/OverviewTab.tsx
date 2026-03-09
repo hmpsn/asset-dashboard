@@ -1,10 +1,9 @@
 import {
   AlertTriangle, Users, MousePointerClick, Eye, BarChart3, Shield, Target,
-  Sparkles, Activity, Loader2, MessageCircle,
+  Sparkles, Activity,
 } from 'lucide-react';
 import { StatCard } from '../ui';
 import { useBetaMode } from './BetaContext';
-import { MonthlySummary } from './MonthlySummary';
 import { InsightsDigest } from './InsightsDigest';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { QUICK_QUESTIONS } from './types';
@@ -68,12 +67,11 @@ export function OverviewTab({
   overview, searchComparison, trend,
   ga4Overview, ga4Trend, ga4Comparison, ga4Organic, ga4Conversions, ga4NewVsReturning,
   audit, auditDetail, strategyData, insights,
-  contentRequests, requests, approvalBatches, activityLog,
+  contentRequests, activityLog,
   pendingApprovals, unreadTeamNotes,
   eventDisplayName, isEventPinned,
   setTab, onAskAi, onOpenChat,
   clientUser,
-  proactiveInsight, proactiveInsightLoading,
 }: OverviewTabProps) {
   const betaMode = useBetaMode();
   // Derive a dynamic subtitle from the most significant data signal
@@ -100,39 +98,6 @@ export function OverviewTab({
       <h2 className="text-xl font-semibold text-zinc-100">Welcome back{clientUser ? `, ${clientUser.name.split(' ')[0]}` : ''}</h2>
       <p className="text-sm text-zinc-500 mt-1">{dynamicSubtitle}</p>
     </div>
-
-    {/* Inline AI Hero Insight */}
-    {(proactiveInsight || proactiveInsightLoading) && (
-      <div className="bg-gradient-to-r from-teal-500/8 via-zinc-900 to-emerald-500/8 rounded-xl border border-teal-500/20 px-5 py-4">
-        <div className="flex items-start gap-3">
-          <div className="w-8 h-8 rounded-lg bg-teal-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <Sparkles className="w-4 h-4 text-teal-400" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-xs font-semibold text-teal-300">Insights Engine</span>
-              <span className="text-[10px] text-zinc-600">AI-powered summary</span>
-            </div>
-            {proactiveInsightLoading ? (
-              <div className="flex items-center gap-2 py-1">
-                <Loader2 className="w-3.5 h-3.5 text-teal-400 animate-spin" />
-                <span className="text-xs text-zinc-500">Analyzing your data...</span>
-              </div>
-            ) : (
-              <p className="text-sm text-zinc-300 leading-relaxed">{proactiveInsight}</p>
-            )}
-            {proactiveInsight && !proactiveInsightLoading && (
-              <button
-                onClick={() => { onOpenChat(); setTimeout(() => onAskAi('What should I focus on this week?'), 100); }}
-                className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/20 transition-colors text-xs text-teal-300 font-medium"
-              >
-                <MessageCircle className="w-3 h-3" /> Continue in chat
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    )}
 
     {/* Action-needed banner */}
     {(() => {
@@ -205,16 +170,6 @@ export function OverviewTab({
       );
     })()}
 
-    {/* What happened this month */}
-    <ErrorBoundary label="Monthly Summary">
-      <MonthlySummary
-        contentRequests={contentRequests}
-        requests={requests}
-        approvalBatches={approvalBatches}
-        activityCount={activityLog.length}
-      />
-    </ErrorBoundary>
-
     {/* Main content: insights + sidebar */}
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
       {/* Left column (3/5) — Insights feed */}
@@ -274,45 +229,49 @@ export function OverviewTab({
         </div>
 
 
-        {/* Activity timeline */}
-        {activityLog.length > 0 && (
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Activity className="w-4 h-4 text-teal-400" />
-              <span className="text-xs font-medium text-zinc-300">Recent Work</span>
-            </div>
-            <div className="relative">
-              <div className="absolute left-[5px] top-1 bottom-1 w-px bg-zinc-800" />
-              <div className="space-y-2.5">
-                {activityLog.slice(0, 5).map(entry => {
-                  const icons: Record<string, { color: string; label: string }> = {
-                    audit_completed: { color: '#60a5fa', label: 'Audit' },
-                    request_resolved: { color: '#34d399', label: 'Done' },
-                    approval_applied: { color: '#a78bfa', label: 'Applied' },
-                    seo_updated: { color: '#fbbf24', label: 'SEO' },
-                    images_optimized: { color: '#f472b6', label: 'Media' },
-                    links_fixed: { color: '#fb923c', label: 'Links' },
-                    content_updated: { color: '#2dd4bf', label: 'Content' },
-                    note: { color: '#94a3b8', label: 'Note' },
-                  };
-                  const cfg = icons[entry.type] || icons.note;
-                  return (
-                    <div key={entry.id} className="flex items-start gap-2.5 pl-0">
-                      <div className="w-[11px] h-[11px] rounded-full border-2 flex-shrink-0 mt-1 z-10" style={{ borderColor: cfg.color, backgroundColor: '#0f1219' }} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[11px] font-medium px-1 py-0.5 rounded" style={{ backgroundColor: `${cfg.color}15`, color: cfg.color }}>{cfg.label}</span>
-                          <span className="text-[11px] text-zinc-500">{new Date(entry.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+        {/* Activity timeline — only real team work, no system/anomaly entries */}
+        {(() => {
+          const WORK_TYPES = new Set(['audit_completed', 'request_resolved', 'approval_applied', 'seo_updated', 'images_optimized', 'links_fixed', 'content_updated']);
+          const workEntries = activityLog.filter(e => WORK_TYPES.has(e.type)).slice(0, 5);
+          if (workEntries.length === 0) return null;
+          const icons: Record<string, { color: string; label: string }> = {
+            audit_completed: { color: '#60a5fa', label: 'Audit' },
+            request_resolved: { color: '#34d399', label: 'Done' },
+            approval_applied: { color: '#a78bfa', label: 'Applied' },
+            seo_updated: { color: '#fbbf24', label: 'SEO' },
+            images_optimized: { color: '#f472b6', label: 'Media' },
+            links_fixed: { color: '#fb923c', label: 'Links' },
+            content_updated: { color: '#2dd4bf', label: 'Content' },
+          };
+          return (
+            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Activity className="w-4 h-4 text-teal-400" />
+                <span className="text-xs font-medium text-zinc-300">Recent Work</span>
+              </div>
+              <div className="relative">
+                <div className="absolute left-[5px] top-1 bottom-1 w-px bg-zinc-800" />
+                <div className="space-y-2.5">
+                  {workEntries.map(entry => {
+                    const cfg = icons[entry.type] || { color: '#94a3b8', label: 'Note' };
+                    return (
+                      <div key={entry.id} className="flex items-start gap-2.5 pl-0">
+                        <div className="w-[11px] h-[11px] rounded-full border-2 flex-shrink-0 mt-1 z-10" style={{ borderColor: cfg.color, backgroundColor: '#0f1219' }} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] font-medium px-1 py-0.5 rounded" style={{ backgroundColor: `${cfg.color}15`, color: cfg.color }}>{cfg.label}</span>
+                            <span className="text-[11px] text-zinc-500">{new Date(entry.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                          </div>
+                          <div className="text-[11px] text-zinc-400 mt-0.5 line-clamp-1">{entry.title}</div>
                         </div>
-                        <div className="text-[11px] text-zinc-400 mt-0.5 line-clamp-1">{entry.title}</div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   </>);
