@@ -170,13 +170,18 @@ Every write endpoint has two versions — admin (`/api/...`) and client (`/api/p
 
 **Common mistake**: Only adding the broadcast to the admin endpoint. The client `/api/public/*` endpoints also need it or admin won't see client actions in real-time (and vice versa).
 
-**Endpoints that currently broadcast correctly from both sides:**
-- Approvals: `approval:update`, `approval:applied`
-- Requests: `request:created`, `request:update`
-- Content requests: `content-request:created`, `content-request:update`
+**All endpoints now broadcast correctly (verified March 2026 platform audit):**
+- Approvals: `approval:update` (create, update item, delete batch), `approval:applied` (batch apply)
+- Requests: `request:created` (client create, admin create, batch create), `request:update` (status change, notes, notes-with-files, attachments, bulk update, delete)
+- Content requests: `content-request:created` (client create, admin submit), `content-request:update` (status change, decline, approve, request-changes, upgrade, comment, admin update, delete)
 - Activity: `activity:new` (auto via `addActivity` → `initActivityBroadcast`)
 - Anomalies: `anomalies:update` (auto via `initAnomalyBroadcast`)
-- Workspace settings/tier: `workspace:updated` (admin PUT + `initStripeBroadcast` for tier upgrades)
+- Workspace settings/tier: `workspace:updated` (admin PUT + `initStripeBroadcast` for Stripe tier upgrades)
+- Audit: `audit:complete` (after audit finishes)
+
+**Event constants**: All event names are defined in `server/ws-events.ts`. New events MUST be registered there.
+
+**Enforcement**: See `.windsurf/rules/data-flow.md` for mandatory rules and `.windsurf/workflows/new-feature-checklist.md` for the pre/during/post implementation checklist.
 
 ## 12. Email Notifications
 

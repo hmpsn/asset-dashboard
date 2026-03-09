@@ -138,6 +138,12 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 15. **Client overview declutter** (#172): Removed AnomalyAlerts banner, AI Hero Insight full-width banner, and MonthlySummary from `OverviewTab.tsx`. InsightsDigest is now the single source of analytical insight. Recent Work timeline in sidebar filtered to `WORK_TYPES` set (audit_completed, request_resolved, approval_applied, seo_updated, images_optimized, links_fixed, content_updated) — excludes anomaly_detected, anomaly_positive, note, and chat entries. AnomalyAlerts component still used on admin side (WorkspaceHome). Final overview layout: Welcome → Action banner → Key metrics → InsightsDigest (left) + Ask AI + Recent Work (right).
 16. **Recommendation auto-resolve**: `generateRecommendations()` in `recommendations.ts` — on regeneration (triggered after each audit), cross-references new recs with existing by `source` key. Preserves `in_progress`/`completed`/`dismissed` statuses. Auto-marks `completed` any old pending/in_progress recs whose source issue is no longer detected. Insight text prepended with "✓ Auto-resolved". Summary counts exclude completed/dismissed from active totals.
 
+## Development Enforcement
+
+- `.windsurf/rules/data-flow.md` — **MANDATORY rules** for data flow consistency: broadcast patterns, delete pre-read, external module callbacks, public API safety, activity logging. Read before any write endpoint work.
+- `.windsurf/workflows/new-feature-checklist.md` — Pre/during/post implementation checklist for every feature or modification. Covers server broadcasts, frontend handlers, docs, and common pitfalls.
+- `server/ws-events.ts` — Single source of truth for all WebSocket event names. New events MUST be registered here.
+
 ## Documentation
 
 - `FEATURE_AUDIT.md` — Comprehensive feature inventory (52 features) with agency/client/mutual value

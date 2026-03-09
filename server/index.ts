@@ -4726,6 +4726,7 @@ app.post('/api/approvals/:workspaceId', (req, res) => {
     const dashUrl = getClientPortalUrl(ws);
     notifyApprovalReady({ clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: req.params.workspaceId, batchName: batch.name, itemCount: items.length, dashboardUrl: dashUrl });
   }
+  broadcastToWorkspace(req.params.workspaceId, 'approval:update', { batchId: batch.id, action: 'created' });
   res.json(batch);
 });
 
@@ -4741,6 +4742,7 @@ app.get('/api/approvals/:workspaceId/:batchId', (req, res) => {
 
 app.delete('/api/approvals/:workspaceId/:batchId', (req, res) => {
   deleteBatch(req.params.workspaceId, req.params.batchId);
+  broadcastToWorkspace(req.params.workspaceId, 'approval:update', { batchId: req.params.batchId, action: 'deleted' });
   res.json({ ok: true });
 });
 
@@ -5246,6 +5248,7 @@ app.patch('/api/content-requests/:workspaceId/:id', (req, res) => {
 app.delete('/api/content-requests/:workspaceId/:id', (req, res) => {
   const deleted = deleteContentRequest(req.params.workspaceId, req.params.id);
   if (!deleted) return res.status(404).json({ error: 'Request not found' });
+  broadcastToWorkspace(req.params.workspaceId, 'content-request:update', { id: req.params.id, deleted: true });
   res.json({ ok: true });
 });
 
@@ -5638,6 +5641,7 @@ app.post('/api/requests', (req, res) => {
   if (!workspaceId || !title || !description) return res.status(400).json({ error: 'workspaceId, title, and description required' });
   const request = createRequest(workspaceId, { title, description, category: category || 'seo', priority, pageUrl, pageId, submittedBy: 'Web Team' });
   broadcast('request:created', request);
+  broadcastToWorkspace(workspaceId, 'request:created', { id: request.id });
   res.json(request);
 });
 
@@ -5649,6 +5653,7 @@ app.post('/api/requests/batch', (req, res) => {
     createRequest(workspaceId, { title: item.title, description: item.description, category: (item.category as 'seo') || 'seo', priority: (item.priority as 'high') || 'medium', pageUrl: item.pageUrl, submittedBy: 'Web Team' })
   );
   broadcast('request:batch_created', { count: created.length });
+  broadcastToWorkspace(workspaceId, 'request:created', { ids: created.map(r => r.id), batch: true });
   res.json({ created: created.length, ids: created.map(r => r.id) });
 });
 
@@ -5662,6 +5667,9 @@ app.patch('/api/requests/bulk', (req, res) => {
   const results = ids.map(id => updateRequest(id, updates));
   const succeeded = results.filter(Boolean).length;
   broadcast('request:bulk_updated', { count: succeeded, status });
+  // Broadcast to each affected workspace
+  const wsIds = new Set(results.filter(Boolean).map(r => r!.workspaceId));
+  for (const wsId of wsIds) broadcastToWorkspace(wsId, 'request:update', { bulk: true, status });
   res.json({ updated: succeeded, total: ids.length });
 });
 
@@ -5713,6 +5721,7 @@ app.post('/api/requests/:id/notes', (req, res) => {
   const updated = addNote(req.params.id, 'team', content);
   if (!updated) return res.status(404).json({ error: 'Not found' });
   broadcast('request:updated', updated);
+  broadcastToWorkspace(updated.workspaceId, 'request:update', { id: updated.id });
   // Email client
   const ws = getWorkspace(updated.workspaceId);
   if (ws?.clientEmail) {
@@ -5724,9 +5733,11 @@ app.post('/api/requests/:id/notes', (req, res) => {
 
 // Internal: delete request
 app.delete('/api/requests/:id', (req, res) => {
+  const existing = getRequest(req.params.id);
   const ok = deleteRequest(req.params.id);
   if (!ok) return res.status(404).json({ error: 'Not found' });
   broadcast('request:deleted', { id: req.params.id });
+  if (existing) broadcastToWorkspace(existing.workspaceId, 'request:update', { id: req.params.id, deleted: true });
   res.json({ ok: true });
 });
 
@@ -5779,7 +5790,9 @@ app.post('/api/public/requests/:workspaceId/:requestId/attachments', upload.arra
   if (!r || r.workspaceId !== req.params.workspaceId) return res.status(404).json({ error: 'Not found' });
   const atts = processUploadedAttachments(files);
   const updated = addAttachmentsToRequest(req.params.requestId, atts);
+  if (!updated) return res.status(404).json({ error: 'Not found' });
   broadcast('request:updated', updated);
+  broadcastToWorkspace(req.params.workspaceId, 'request:update', { id: updated.id });
   res.json(updated);
 });
 
@@ -5792,7 +5805,9 @@ app.post('/api/public/requests/:workspaceId/:requestId/notes-with-files', upload
   if (!r || r.workspaceId !== req.params.workspaceId) return res.status(404).json({ error: 'Not found' });
   const atts = files?.length ? processUploadedAttachments(files) : undefined;
   const updated = addNote(req.params.requestId, 'client', content, atts);
+  if (!updated) return res.status(404).json({ error: 'Not found' });
   broadcast('request:updated', updated);
+  broadcastToWorkspace(req.params.workspaceId, 'request:update', { id: updated.id });
   res.json(updated);
 });
 
@@ -5805,6 +5820,7 @@ app.post('/api/requests/:id/notes-with-files', upload.array('files', 5), (req, r
   const updated = addNote(req.params.id, 'team', content, atts);
   if (!updated) return res.status(404).json({ error: 'Not found' });
   broadcast('request:updated', updated);
+  broadcastToWorkspace(updated.workspaceId, 'request:update', { id: updated.id });
   // Email client
   const ws = getWorkspace(updated.workspaceId);
   if (ws?.clientEmail && content) {
