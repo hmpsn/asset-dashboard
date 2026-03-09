@@ -54,14 +54,15 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 
 | Component | Purpose |
 |-----------|---------|
-| `src/App.tsx` | Router, workspace selector, admin tabs (lazy-loaded) |
+| `src/App.tsx` | Router, workspace selector, admin tabs (lazy-loaded). Each SEO sub-tool routes directly (no SeoAudit pass-through). |
 | `src/components/ClientDashboard.tsx` | Full client portal with smart login gate (auth-mode detection, email+password or shared password with tab toggle), user menu (avatar+logout), chat, date picker, analytics, approvals, requests (auto-populated submittedBy), content hub, per-user welcome modal, plans/pricing page |
 | `src/components/AdminChat.tsx` | Floating admin chat panel with conversation memory + history UI |
 | `src/components/StripeSettings.tsx` | Stripe admin settings in Command Center: API keys (masked), product Price ID mapping, connection status |
 | `src/components/SeoStrategy.tsx` | Keyword strategy viewer/generator |
-| `src/components/SeoAudit.tsx` | Site health audit viewer, edit tracking badges |
+| `src/components/SeoAudit.tsx` | Site health audit viewer (core audit only — sub-tools route directly from App.tsx since #131), edit tracking badges |
 | `src/components/SeoEditor.tsx` | Page-level SEO field editor with AI rewrite, approval workflow, edit tracking (teal=live, purple=in-review, yellow=flagged) |
 | `src/components/CmsEditor.tsx` | CMS collection item SEO editor with sitemap filtering, parent slug display, edit tracking |
+| `src/components/ChatPanel.tsx` | Shared chat UI: message bubbles, loading dots, input bar, quick questions, teal/purple accent theming. Used by SearchConsole; AdminChat and ClientDashboard can adopt incrementally (#133) |
 
 ## AI-Powered Features & Their Data Sources
 
@@ -114,6 +115,7 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 2. **Shared context builders**: `buildSeoContext`, `buildKeywordMapContext`, `buildKnowledgeBase` in `seo-context.ts` — used by chat, briefs, schema
 3. **Activity logging**: `addActivity(workspaceId, type, title, detail)` — all major actions logged
 4. **Chat memory**: `addMessage` → `buildConversationContext` → `generateSessionSummary` (auto after 6+ msgs)
+8. **Shared data-fetching hooks** (#132): Module-level cached hooks in `src/hooks/` — `useAuditSummary(wsId)`, `useSearchData(wsId, days)`, `useGA4Overview(wsId, days)`. 60s stale window, same pattern as `usePageEditStates`. Wired into WorkspaceHome; ClientDashboard can adopt incrementally.
 5. **Audit suppressions**: `applySuppressionsToAudit()` filters suppressed issues + recalculates scores. Applied to all 6 data exit points (audit-summary, audit-detail, reports/latest, admin/client/strategy chat)
 6. **SEO edit tracking**: `trackSeoEdit(wsId, pageId, status)` with priority guard (won't downgrade live→flagged). Auto-wired into save, approval, audit flows. CRUD endpoints at `/api/workspaces/:id/seo-edit-tracking`
 7. **CMS sitemap filtering**: `/api/webflow/cms-seo/:siteId` fetches sitemap.xml to filter collection items. Falls back to all items if sitemap unavailable

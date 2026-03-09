@@ -55,9 +55,11 @@ Every tool should include "Next steps" or "Tip" hints that guide users to relate
 
 When adding a new tool/tab to the admin panel:
 
-1. Add the tab to `SeoAudit.tsx`'s tab system (it's the main admin panel host)
-2. Use the shared `view` state pattern for tab switching
-3. Ensure the sidebar nav item exists and highlights correctly
+1. Add the `Page` union member in `App.tsx` (line ~54)
+2. Add a lazy import for the component in `App.tsx`
+3. Add an `if (tab === '...')` route in `renderContent()` with appropriate props
+4. Add a sidebar nav item to the `navGroups` array in `App.tsx`
+5. Each tool is a standalone lazy-loaded route — **do not** nest tools inside `SeoAudit.tsx` (split in #131)
 
 ## 3. Client Dashboard Integration
 
