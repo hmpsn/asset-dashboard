@@ -312,6 +312,18 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                 <div className="flex-1 min-w-0">
                   <div className="text-[12px] font-medium text-zinc-300 truncate">{rec.title}</div>
                   <div className="text-[11px] text-zinc-500 mt-0.5 line-clamp-1">{rec.insight}</div>
+                  {rec.affectedPages.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                      {rec.affectedPages.slice(0, 3).map((slug, i) => (
+                        <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700/50 truncate max-w-[180px]">
+                          /{slug}
+                        </span>
+                      ))}
+                      {rec.affectedPages.length > 3 && (
+                        <span className="text-[10px] text-zinc-600">+{rec.affectedPages.length - 3} more</span>
+                      )}
+                    </div>
+                  )}
                 </div>
                 {rec.trafficAtRisk > 0 && (
                   <span className="text-[10px] text-teal-400 flex-shrink-0 flex items-center gap-0.5">

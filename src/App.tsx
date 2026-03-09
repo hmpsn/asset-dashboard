@@ -132,11 +132,12 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   const [pendingContentRequests, setPendingContentRequests] = useState(0);
 
   // ── Collapsible sidebar groups (#160) ──
+  const ALL_GROUP_LABELS = ['ANALYTICS', 'SITE HEALTH', 'SEO', 'MANAGE'];
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
     try {
       const stored = localStorage.getItem('admin-sidebar-collapsed');
-      return stored ? new Set(JSON.parse(stored)) : new Set();
-    } catch { return new Set(); }
+      return stored ? new Set(JSON.parse(stored)) : new Set(ALL_GROUP_LABELS);
+    } catch { return new Set(ALL_GROUP_LABELS); }
   });
   const toggleGroup = useCallback((label: string) => {
     setCollapsedGroups(prev => {
