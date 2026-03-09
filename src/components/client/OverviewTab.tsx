@@ -55,6 +55,8 @@ interface OverviewTabProps {
   setTab: (t: ClientTab) => void;
   onAskAi: (q: string) => void;
   onOpenChat: () => void;
+  // Auth
+  clientUser: { id: string; name: string; email: string; role: string } | null;
 }
 
 export function OverviewTab({
@@ -66,12 +68,31 @@ export function OverviewTab({
   pendingApprovals, unreadTeamNotes,
   eventDisplayName, isEventPinned,
   setTab, onAskAi, onOpenChat,
+  clientUser,
 }: OverviewTabProps) {
+  // Derive a dynamic subtitle from the most significant data signal
+  const dynamicSubtitle = (() => {
+    if (ga4Comparison) {
+      const pct = ga4Comparison.changePercent.users;
+      const dir = pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat';
+      if (dir !== 'flat') return `Traffic is ${dir} ${Math.abs(pct)}% — here's what's driving it`;
+    }
+    if (searchComparison) {
+      const pct = searchComparison.changePercent.clicks;
+      const dir = pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat';
+      if (dir !== 'flat') return `Search clicks ${dir} ${Math.abs(pct)}% vs last period`;
+    }
+    if (audit) {
+      if (audit.siteScore >= 80) return `Site health is strong at ${audit.siteScore}/100`;
+      return `${audit.errors || 0} site issues need attention`;
+    }
+    return 'Here are your latest insights';
+  })();
   return (<>
     {/* Welcome header */}
     <div className="mb-2">
-      <h2 className="text-xl font-semibold text-zinc-100">Welcome back</h2>
-      <p className="text-sm text-zinc-500 mt-1">Here are your latest insights</p>
+      <h2 className="text-xl font-semibold text-zinc-100">Welcome back{clientUser ? `, ${clientUser.name.split(' ')[0]}` : ''}</h2>
+      <p className="text-sm text-zinc-500 mt-1">{dynamicSubtitle}</p>
     </div>
 
     {/* Action-needed banner */}
@@ -148,11 +169,6 @@ export function OverviewTab({
     {/* What happened this month */}
     <ErrorBoundary label="Monthly Summary">
       <MonthlySummary
-        overview={overview}
-        searchComparison={searchComparison}
-        ga4Overview={ga4Overview}
-        ga4Comparison={ga4Comparison}
-        audit={audit}
         contentRequests={contentRequests}
         requests={requests}
         approvalBatches={approvalBatches}

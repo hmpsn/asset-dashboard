@@ -46,6 +46,24 @@ The goal this month is to make the platform fully self-service — any business 
 - GSC/GA4 self-service OAuth connection (so you can connect Google data without sharing credentials)
 - Beta feedback collection from first 3-5 clients
 
+### Dashboard UX — Phase 1: Quick Wins (shipped March 8)
+- **De-duplicated MonthlySummary** — Removed metric highlights that repeated StatCards; now shows only activity/work done
+- **Personalized Welcome header** — Client's first name + dynamic subtitle from top data signal ("Traffic is up 12%...")
+- **Inbox empty states** — All filter views (Requests, Content, All) now have helpful empty states
+- **Inbox status chips** — Section headers show "Waiting on you", "Team replied", "In progress", or "All reviewed"
+- **Free-tier tab hiding** — Strategy, Inbox, ROI tabs already hidden for Starter plan (confirmed)
+
+### Dashboard UX — Phase 2: Information Architecture (2-3 days)
+Findings from the client dashboard UX audit (see `CLIENT_DASHBOARD_UX_AUDIT.md`):
+
+| Feature | What It Means For You | Priority |
+|---------|----------------------|----------|
+| **Inline AI proactive insight** | The AI advisor's personalized greeting surfaces directly on the Overview tab instead of hiding behind the chat button. Your most relevant insight is front and center every time you log in. | 🔴 Critical |
+| **Overview hierarchy restructure** | Overview now follows a clear flow: hero insight → key metrics → actions needed → monthly activity → deep insights. Less scrolling, faster answers to "how am I doing?" | 🟡 High |
+| **Strategy-specific summary cards** | Strategy tab shows Keywords Tracked, Content Gaps Found, Quick Wins Available, Pages Without Rankings — instead of repeating traffic data from other tabs. | 🟡 High |
+| **Health tab errors-only default** | Page breakdown defaults to showing only pages with errors (most actionable). "Show all pages" toggle available for the full view. | 🟢 Medium |
+| **Contextual search benchmarks** | Search Health Summary adds qualitative labels like "strong for your industry" so non-technical clients understand whether their numbers are good or bad. | 🟢 Medium |
+
 ### Recently shipped (March 8):
 - **SEO edit tracking** — Every page card in the SEO editor, CMS editor, and audit view now shows its edit status (Live / In Review / Flagged) with colored borders and badges
 - **Suppression-aware health scores** — Suppressed issues are excluded from all scores, issue lists, and AI recommendations across 6 data endpoints
@@ -75,10 +93,21 @@ Once clients are in the door, we need to prove ROI fast. This month focuses on c
 | **Usage tracking & limits** | Clear visibility into your plan usage: "You've used 3 of 4 briefs this month." No surprise bills. Transparent limits with upgrade prompts when you're getting close. | 🟡 High |
 | **AI chat: inline charts & tables** | When you ask your AI advisor about traffic trends or keyword performance, it responds with visual charts and data tables — not just text. Makes conversations more actionable. | 🟢 Medium |
 
+### Dashboard UX — Phase 3: Conversion Optimization (2-3 days)
+
+| Feature | What It Means For You | Priority |
+|---------|----------------------|----------|
+| **ROI teaser on Plans tab** | Trial users see a data-driven value estimate ("Based on your traffic, Growth could unlock $X in organic value") to strengthen upgrade decisions. | 🟡 High |
+| **Compact Content Opportunities** | Content gap cards default to a scannable list view. Click to expand details. Makes the "Get a Brief" CTA more prominent. | 🟡 High |
+| **Fix Plans "Ask AI" CTA** | The contact CTA on Plans opens the AI chat with a pricing question pre-loaded instead of navigating away. | 🟡 High |
+| **AI chat maximize button** | Expand the chat panel to a larger overlay for reading lengthy strategy responses. | 🟢 Medium |
+| **Grouped Plans features** | Plan feature lists grouped by category (Data, Strategy, Content, Support) for easier scanning. | 🟢 Medium |
+
 ### Value unlocked:
 - Every piece of content you purchase has a performance trail proving its ROI
 - Proactive alerts mean you never miss a traffic problem or opportunity
 - The AI advisor becomes more visual and actionable
+- Conversion funnel from insight → purchase is tighter at every step
 
 ---
 

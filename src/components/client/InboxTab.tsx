@@ -115,7 +115,8 @@ export function InboxTab({
             <div className="flex items-center gap-2 mb-3">
               <ClipboardCheck className="w-4 h-4 text-teal-400" />
               <span className="text-sm font-medium text-zinc-300">SEO Changes</span>
-              {pendingApprovals > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400">{pendingApprovals} pending</span>}
+              {pendingApprovals > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20">Waiting on you · {pendingApprovals}</span>}
+              {pendingApprovals === 0 && approvalBatches.length > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">All reviewed</span>}
             </div>
           )}
           <ApprovalsTab
@@ -138,7 +139,12 @@ export function InboxTab({
             <div className="flex items-center gap-2 mb-3 mt-2">
               <MessageSquare className="w-4 h-4 text-blue-400" />
               <span className="text-sm font-medium text-zinc-300">Requests</span>
-              {pendingRequests > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-400">{pendingRequests} active</span>}
+              {(() => {
+                const awaitingReply = requests.filter(r => r.notes.length > 0 && r.notes[r.notes.length - 1].author === 'team' && r.status !== 'completed' && r.status !== 'closed').length;
+                if (awaitingReply > 0) return <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20">Team replied · {awaitingReply}</span>;
+                if (pendingRequests > 0) return <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">In progress · {pendingRequests}</span>;
+                return null;
+              })()}
             </div>
           )}
           <RequestsTab
@@ -159,7 +165,8 @@ export function InboxTab({
             <div className="flex items-center gap-2 mb-3 mt-2">
               <FileText className="w-4 h-4 text-violet-400" />
               <span className="text-sm font-medium text-zinc-300">Content</span>
-              {contentReviews > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-violet-500/15 text-violet-400">{contentReviews} to review</span>}
+              {contentReviews > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20">Waiting on you · {contentReviews}</span>}
+              {contentReviews === 0 && contentRequests.filter(r => r.status === 'in_progress' || r.status === 'approved').length > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">In progress</span>}
             </div>
           )}
           <ContentTab
@@ -184,6 +191,27 @@ export function InboxTab({
           <ClipboardCheck className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
           <p className="text-sm text-zinc-400">No SEO changes to review yet.</p>
           <p className="text-[11px] text-zinc-500 mt-1">Your team will send proposed changes here for your approval.</p>
+        </div>
+      )}
+      {filter === 'requests' && !hasRequests && !requestsLoading && (
+        <div className="text-center py-12">
+          <MessageSquare className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
+          <p className="text-sm text-zinc-400">No requests yet.</p>
+          <p className="text-[11px] text-zinc-500 mt-1">Submit a request and your team will respond here.</p>
+        </div>
+      )}
+      {filter === 'content' && contentRequests.length === 0 && (
+        <div className="text-center py-12">
+          <FileText className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
+          <p className="text-sm text-zinc-400">No content requests yet.</p>
+          <p className="text-[11px] text-zinc-500 mt-1">{effectiveTier === 'free' ? 'Upgrade to Growth to request content briefs and blog posts.' : 'Request content from the Strategy tab or ask your team.'}</p>
+        </div>
+      )}
+      {filter === 'all' && !hasApprovals && !hasRequests && contentRequests.length === 0 && !approvalsLoading && !requestsLoading && (
+        <div className="text-center py-12">
+          <Inbox className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
+          <p className="text-sm text-zinc-400">Your inbox is empty.</p>
+          <p className="text-[11px] text-zinc-500 mt-1">SEO changes, requests, and content items will appear here as your team works on your site.</p>
         </div>
       )}
     </div>
