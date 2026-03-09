@@ -69,11 +69,11 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               <div className="text-xl font-bold text-zinc-100">{keywordsTracked}</div>
               <div className="text-[11px] text-zinc-500">{strategyData.pageMap.length} pages mapped</div>
             </div>
-            {!betaMode && <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
+            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
               <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><FileText className="w-3 h-3" /> Content Gaps</div>
               <div className={`text-xl font-bold ${contentGapsFound > 0 ? 'text-teal-400' : 'text-zinc-500'}`}>{contentGapsFound}</div>
               <div className="text-[11px] text-zinc-500">{contentGapsFound > 0 ? 'topics identified' : 'none found yet'}</div>
-            </div>}
+            </div>
             <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
               <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Zap className="w-3 h-3" /> Quick Wins</div>
               <div className={`text-xl font-bold ${quickWinsAvailable > 0 ? 'text-amber-400' : 'text-zinc-500'}`}>{quickWinsAvailable}</div>
@@ -122,7 +122,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       )}
 
       {/* ── CONTENT OPPORTUNITIES (conversion moment) ── */}
-      {!betaMode && strategyData.contentGaps && strategyData.contentGaps.length > 0 && (
+      {strategyData.contentGaps && strategyData.contentGaps.length > 0 && (
         <TierGate tier={effectiveTier} required="growth" feature="Content Opportunities" teaser={`${strategyData.contentGaps.length} content topics identified — upgrade to unlock recommendations`}>
         <div className="bg-gradient-to-br from-teal-950/40 to-zinc-900 rounded-xl border border-teal-500/30 p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-40 h-40 bg-teal-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
@@ -140,7 +140,9 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               <span className="text-[11px] text-zinc-500">{strategyData.contentGaps.length} topics identified</span>
             </div>
             <p className="text-[11px] text-zinc-400 mt-2 mb-4 leading-relaxed">
-              Based on your keyword strategy and competitor analysis, these topics represent untapped search traffic. Click <strong className="text-teal-300">Request This Topic</strong> to have our team create a full content brief.
+              {betaMode
+                ? 'Based on your keyword strategy and competitor analysis, these topics represent untapped search traffic your site could capture.'
+                : <>Based on your keyword strategy and competitor analysis, these topics represent untapped search traffic. Click <strong className="text-teal-300">Request This Topic</strong> to have our team create a full content brief.</>}
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {strategyData.contentGaps.map((gap, i) => {
@@ -163,7 +165,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                       <div className="flex items-center gap-1.5 min-w-0">
                         {keywordDiffers && <span className="text-[10px] text-teal-400/70 truncate max-w-[140px]">&ldquo;{gap.targetKeyword}&rdquo;</span>}
                       </div>
-                      {alreadyRequested ? (
+                      {!betaMode && (alreadyRequested ? (
                         (() => {
                           const s = matchingReq?.status;
                           if (s === 'delivered' || s === 'published') return <span className="flex items-center gap-1 text-[11px] text-teal-400 bg-teal-500/10 px-2.5 py-1.5 rounded-lg border border-teal-500/20 flex-shrink-0"><CheckCircle2 className="w-3.5 h-3.5" /> {s === 'published' ? 'Published' : 'Delivered'} ✓</span>;
@@ -190,7 +192,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                             </button>
                           )}
                         </div>
-                      )}
+                      ))}
                     </div>
                   </div>
                 );

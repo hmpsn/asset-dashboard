@@ -989,7 +989,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
     ] : []),
     ...(isPaid ? [{ id: 'inbox' as ClientTab, label: 'Inbox', icon: Zap, locked: false }] : []),
     ...(!betaMode ? [{ id: 'plans' as ClientTab, label: 'Plans', icon: CreditCard, locked: false }] : []),
-    ...(isPaid ? [{ id: 'roi' as ClientTab, label: 'ROI', icon: Trophy, locked: false }] : []),
+    ...(isPaid && !betaMode ? [{ id: 'roi' as ClientTab, label: 'ROI', icon: Trophy, locked: false }] : []),
   ];
 
   return (

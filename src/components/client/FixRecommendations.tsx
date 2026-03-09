@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Sparkles, ShoppingCart, Image, FileText, Code2, ArrowRightLeft, Wrench, Crown, MessageSquare, TrendingUp, Eye, MousePointerClick, ChevronDown, Lightbulb, CheckCircle2, Zap, Shield } from 'lucide-react';
 import { useCart } from './useCart';
 import type { AuditDetail } from './types';
+import { useBetaMode } from './BetaContext';
 import type { ProductType } from '../../../server/payments';
 
 const fmt = (usd: number) =>
@@ -351,6 +352,7 @@ function buildCategoriesFromServer(recs: ServerRecommendation[]): FixCategory[] 
 }
 
 export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecommendationsProps) {
+  const betaMode = useBetaMode();
   const cart = useCart();
   const [traffic, setTraffic] = useState<TrafficMap>({});
   const [trafficLoaded, setTrafficLoaded] = useState(!workspaceId);
@@ -512,7 +514,7 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
                   )}
 
                   {/* Purchase options */}
-                  <div className="mt-3">
+                  {!betaMode && <div className="mt-3">
                     {isPremium ? (
                       <div className="flex items-center gap-1.5">
                         <Crown className="w-3 h-3 text-amber-400" />
@@ -552,7 +554,7 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
                         ))}
                       </div>
                     )}
-                  </div>
+                  </div>}
                 </div>
               </div>
             </div>
@@ -561,7 +563,7 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
       </div>
 
       {/* Fix everything CTA */}
-      {!isPremium && autoCategories.length > 1 && (
+      {!betaMode && !isPremium && autoCategories.length > 1 && (
         <div className="px-5 py-3.5 border-t border-zinc-800 bg-zinc-800/30">
           <div className="flex items-center justify-between">
             <div>

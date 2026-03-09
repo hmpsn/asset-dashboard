@@ -9,7 +9,6 @@ import type {
   GA4Overview, GA4ConversionSummary, GA4NewVsReturning, GA4OrganicOverview,
   SearchComparison, GA4Comparison, ClientKeywordStrategy, ClientTab,
 } from './types';
-import { useBetaMode } from './BetaContext';
 
 // ─── Types ───
 
@@ -319,9 +318,7 @@ const SENTIMENT_LABELS: Record<string, string> = {
 // ─── Component ───
 
 export function InsightsDigest(props: InsightsDigestProps) {
-  const betaMode = useBetaMode();
-  const allInsights = generateInsights(props);
-  const insights = betaMode ? allInsights.filter(i => i.id !== 'content-gaps') : allInsights;
+  const insights = generateInsights(props);
   const [expanded, setExpanded] = useState(false);
 
   if (insights.length === 0) return null;
