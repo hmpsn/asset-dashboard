@@ -18,6 +18,7 @@ import {
   deleteWorkspace,
   getWorkspace,
   getTokenForSite,
+  getClientPortalUrl,
   updatePageState,
   getPageState,
   getAllPageStates,
@@ -4720,7 +4721,7 @@ app.post('/api/approvals/:workspaceId', (req, res) => {
   // Notify client that items are ready for review
   const ws = getWorkspace(req.params.workspaceId);
   if (ws?.clientEmail) {
-    const dashUrl = ws.liveDomain ? `${ws.liveDomain.startsWith('http') ? '' : 'https://'}${ws.liveDomain}/client/${ws.id}` : undefined;
+    const dashUrl = getClientPortalUrl(ws);
     notifyApprovalReady({ clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: req.params.workspaceId, batchName: batch.name, itemCount: items.length, dashboardUrl: dashUrl });
   }
   res.json(batch);
@@ -5687,7 +5688,7 @@ app.patch('/api/requests/:id', (req, res) => {
   if (status && prev && status !== prev.status) {
     const ws = getWorkspace(updated.workspaceId);
     if (ws?.clientEmail) {
-      const dashUrl = ws.liveDomain ? `${ws.liveDomain.startsWith('http') ? '' : 'https://'}${ws.liveDomain}/client/${ws.id}` : undefined;
+      const dashUrl = getClientPortalUrl(ws);
       notifyClientStatusChange({ clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: updated.workspaceId, requestTitle: updated.title, newStatus: status, dashboardUrl: dashUrl });
     }
     // Log activity for completed/closed
@@ -5713,7 +5714,7 @@ app.post('/api/requests/:id/notes', (req, res) => {
   // Email client
   const ws = getWorkspace(updated.workspaceId);
   if (ws?.clientEmail) {
-    const dashUrl = ws.liveDomain ? `${ws.liveDomain.startsWith('http') ? '' : 'https://'}${ws.liveDomain}/client/${ws.id}` : undefined;
+    const dashUrl = getClientPortalUrl(ws);
     notifyClientTeamResponse({ clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: updated.workspaceId, requestTitle: updated.title, noteContent: content, dashboardUrl: dashUrl });
   }
   res.json(updated);
@@ -5805,7 +5806,7 @@ app.post('/api/requests/:id/notes-with-files', upload.array('files', 5), (req, r
   // Email client
   const ws = getWorkspace(updated.workspaceId);
   if (ws?.clientEmail && content) {
-    const dashUrl = ws.liveDomain ? `${ws.liveDomain.startsWith('http') ? '' : 'https://'}${ws.liveDomain}/client/${ws.id}` : undefined;
+    const dashUrl = getClientPortalUrl(ws);
     notifyClientTeamResponse({ clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: updated.workspaceId, requestTitle: updated.title, noteContent: content, dashboardUrl: dashUrl });
   }
   res.json(updated);
@@ -6427,7 +6428,7 @@ app.post('/api/jobs', async (req, res) => {
                 console.log(`[audit] Auto-regenerated recommendations for ${ws.id}`);
                 // Notify client that recommendations are ready
                 if (ws.clientEmail) {
-                  const dashUrl = ws.liveDomain ? `${ws.liveDomain.startsWith('http') ? '' : 'https://'}${ws.liveDomain}/client/${ws.id}` : undefined;
+                  const dashUrl = getClientPortalUrl(ws);
                   const recSet = loadRecommendations(ws.id);
                   const recs = recSet?.recommendations || [];
                   if (recs.length > 0) {
@@ -6439,7 +6440,7 @@ app.post('/api/jobs', async (req, res) => {
               }
               // Notify client if audit score improved
               if (snapshot.previousScore != null && result.siteScore > snapshot.previousScore && ws.clientEmail) {
-                const dashUrl = ws.liveDomain ? `${ws.liveDomain.startsWith('http') ? '' : 'https://'}${ws.liveDomain}/client/${ws.id}` : undefined;
+                const dashUrl = getClientPortalUrl(ws);
                 notifyClientAuditImproved({ clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: ws.id, score: result.siteScore, previousScore: snapshot.previousScore, dashboardUrl: dashUrl });
               }
             }

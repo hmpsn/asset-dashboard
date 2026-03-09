@@ -6,7 +6,7 @@
  * Uses direct sendEmail (not queue) to ensure timely delivery.
  */
 
-import { listWorkspaces } from './workspaces.js';
+import { listWorkspaces, getClientPortalUrl } from './workspaces.js';
 import { isEmailConfigured, sendEmail } from './email.js';
 import { renderDigest, type EmailEvent } from './email-templates.js';
 
@@ -17,13 +17,6 @@ let interval: ReturnType<typeof setInterval> | null = null;
 // Track which reminders we've sent: `${workspaceId}:${daysRemaining}`
 const sentReminders = new Set<string>();
 
-function getDashboardUrl(ws: { id: string; liveDomain?: string }): string {
-  if (ws.liveDomain) {
-    const domain = ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;
-    return `${domain}/client/${ws.id}`;
-  }
-  return '';
-}
 
 async function checkTrialExpiry() {
   if (!isEmailConfigured()) return;
@@ -52,7 +45,7 @@ async function checkTrialExpiry() {
         recipient: ws.clientEmail,
         workspaceId: ws.id,
         workspaceName: ws.name,
-        dashboardUrl: getDashboardUrl(ws),
+        dashboardUrl: getClientPortalUrl(ws) || '',
         data: { daysRemaining },
         createdAt: new Date().toISOString(),
       };

@@ -1,4 +1,4 @@
-import { listWorkspaces } from './workspaces.js';
+import { listWorkspaces, getClientPortalUrl } from './workspaces.js';
 import { listBatches } from './approvals.js';
 import { isEmailConfigured, sendEmail } from './email.js';
 import { renderApprovalReminder } from './email-templates.js';
@@ -44,9 +44,7 @@ async function checkStaleApprovals() {
       const lastSent = sentReminders.get(batch.id) || 0;
       if (now - lastSent < 3 * 24 * 60 * 60 * 1000) continue;
 
-      const dashUrl = ws.liveDomain
-        ? `${ws.liveDomain.startsWith('http') ? '' : 'https://'}${ws.liveDomain}/client/${ws.id}`
-        : undefined;
+      const dashUrl = getClientPortalUrl(ws);
 
       console.log(`[Approval Reminder] Sending reminder for batch "${batch.name}" to ${ws.clientEmail} (${staleDays} days stale)`);
       try {

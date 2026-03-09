@@ -144,6 +144,18 @@ export interface Workspace {
   createdAt: string;
 }
 
+/**
+ * Build the client portal URL for a workspace.
+ * Uses APP_URL env var (the platform's own domain) — NOT liveDomain (which is the client's website).
+ * Returns undefined if APP_URL is not configured.
+ */
+export function getClientPortalUrl(ws: { id: string }): string | undefined {
+  const appUrl = process.env.APP_URL;
+  if (!appUrl) return undefined;
+  const base = appUrl.replace(/\/+$/, '');
+  return `${base}/client/${ws.id}`;
+}
+
 // Look up the token for a given siteId across all workspaces, fall back to env
 export function getTokenForSite(siteId: string): string | null {
   const workspaces = readConfig();
