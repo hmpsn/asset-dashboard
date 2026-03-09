@@ -1021,11 +1021,11 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
   const isPaid = effectiveTier !== 'free';
   const NAV = [
     { id: 'overview' as ClientTab, label: 'Insights', icon: Sparkles, locked: false },
-    ...(isPaid ? [{ id: 'strategy' as ClientTab, label: 'SEO Strategy', icon: Target, locked: strategyLocked }] : []),
-    { id: 'health' as ClientTab, label: 'Site Health', icon: Shield, locked: false },
     ...(ws?.analyticsClientView !== false ? [
       { id: 'performance' as ClientTab, label: 'Performance', icon: LineChart, locked: false },
     ] : []),
+    { id: 'health' as ClientTab, label: 'Site Health', icon: Shield, locked: false },
+    ...(isPaid ? [{ id: 'strategy' as ClientTab, label: 'SEO Strategy', icon: Target, locked: strategyLocked }] : []),
     ...(isPaid ? [{ id: 'inbox' as ClientTab, label: 'Inbox', icon: Zap, locked: false }] : []),
     ...(!betaMode ? [{ id: 'plans' as ClientTab, label: 'Plans', icon: CreditCard, locked: false }] : []),
     ...(isPaid && !betaMode ? [{ id: 'roi' as ClientTab, label: 'ROI', icon: Trophy, locked: false }] : []),
