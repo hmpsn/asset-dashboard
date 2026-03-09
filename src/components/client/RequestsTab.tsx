@@ -4,6 +4,7 @@ import {
   CheckCircle2, X, Paperclip, FileText,
 } from 'lucide-react';
 import type { ClientRequest, RequestCategory } from './types';
+import { STUDIO_NAME } from '../../constants';
 import { RenderMarkdown } from './helpers';
 
 interface RequestsTabProps {
@@ -82,7 +83,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
           <MessageSquare className="w-5 h-5 text-teal-400" />
           <div>
             <h2 className="text-xl font-semibold text-zinc-100">Requests</h2>
-            <p className="text-sm text-zinc-500 mt-1">Submit requests for your web team to action on.</p>
+            <p className="text-sm text-zinc-500 mt-1">Submit requests for {STUDIO_NAME} to action on.</p>
           </div>
         </div>
         <button onClick={() => setShowNewRequest(!showNewRequest)}
@@ -195,7 +196,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
             <MessageSquare className="w-8 h-8 text-zinc-700" />
           </div>
           <h3 className="text-sm font-medium text-zinc-400 mb-1">Need something? We're here to help</h3>
-          <p className="text-[11px] text-zinc-500 mb-4">Report a bug, request a design change, or suggest an improvement — your team will get right on it.</p>
+          <p className="text-[11px] text-zinc-500 mb-4">Report a bug, request a design change, or suggest an improvement — {STUDIO_NAME} will get right on it.</p>
           <button onClick={() => setShowNewRequest(true)}
             className="px-4 py-2 bg-teal-600 hover:bg-teal-500 rounded-lg text-xs font-medium transition-colors">
             <Plus className="w-3.5 h-3.5 inline mr-1" /> Create Your First Request
@@ -271,7 +272,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
                               }`}>
                                 <div className="flex items-center gap-1.5 mb-0.5">
                                   <span className={`text-[11px] font-medium ${note.author === 'team' ? 'text-teal-400' : 'text-zinc-400'}`}>
-                                    {note.author === 'team' ? 'Web Team' : 'You'}
+                                    {note.author === 'team' ? STUDIO_NAME : 'You'}
                                   </span>
                                   <span className="text-[11px] text-zinc-500">
                                     {new Date(note.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}

@@ -779,7 +779,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                 {/* Client notification email */}
                 <div className="pt-2 border-t border-zinc-800">
                   <div className="text-[11px] font-medium mb-1.5 text-zinc-500">Client Notification Email</div>
-                  <p className="text-[11px] mb-2 text-zinc-500">We'll email this address when your team responds to requests or changes status.</p>
+                  <p className="text-[11px] mb-2 text-zinc-500">We'll email this address when you respond to requests or change status.</p>
                   <div className="flex items-center gap-2">
                     <input type="email" value={clientEmail} onChange={e => setClientEmail(e.target.value)}
                       placeholder="client@company.com"

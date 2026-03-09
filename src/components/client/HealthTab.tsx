@@ -7,6 +7,7 @@ import { SEV, CAT_LABELS } from './types';
 import type { AuditSummary, AuditDetail } from './types';
 import { FixRecommendations } from './FixRecommendations';
 import { OrderStatus } from './OrderStatus';
+import { STUDIO_NAME } from '../../constants';
 
 const ScoreRing = MetricRing;
 
@@ -218,7 +219,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, tie
         <Shield className="w-8 h-8 text-zinc-700" />
       </div>
       <p className="text-sm font-medium text-zinc-400">Site Health Check Coming Soon</p>
-      <p className="text-xs text-zinc-500 mt-1 max-w-sm mx-auto">Once your team runs a site audit, you'll see a detailed health score, page-by-page issues, and recommendations to improve your site.</p>
+      <p className="text-xs text-zinc-500 mt-1 max-w-sm mx-auto">Once {STUDIO_NAME} runs a site audit, you'll see a detailed health score, page-by-page issues, and recommendations to improve your site.</p>
     </div>
   );
 }

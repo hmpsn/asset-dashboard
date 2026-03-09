@@ -6,6 +6,7 @@ import {
 import { TierGate, type Tier } from '../ui';
 import type { ClientContentRequest, ClientBriefPreview, ClientTab } from './types';
 import type { PricingModalState } from './StrategyTab';
+import { STUDIO_NAME } from '../../constants';
 
 interface ContentTabProps {
   contentRequests: ClientContentRequest[];
@@ -66,7 +67,7 @@ export function ContentTab({
       if (res.ok) {
         const updated = await res.json();
         setContentRequests(prev => prev.map(r => r.id === reqId ? updated : r));
-        setToast({ message: 'Brief approved! Your team will begin content production.', type: 'success' });
+        setToast({ message: `Brief approved! ${STUDIO_NAME} will begin content production.`, type: 'success' });
         setTimeout(() => setToast(null), 5000);
       }
     } catch { setToast({ message: 'Failed to approve brief. Please try again.', type: 'error' }); setTimeout(() => setToast(null), 5000); }
@@ -130,7 +131,7 @@ export function ContentTab({
               {reviewCount > 0 && newComments > 0 && ' · '}
               {newComments > 0 && <>{newComments} item{newComments > 1 ? 's' : ''} with new team responses</>}
             </div>
-            <div className="text-[11px] text-teal-400/60 mt-0.5">Your team has updates waiting for you below</div>
+            <div className="text-[11px] text-teal-400/60 mt-0.5">{STUDIO_NAME} has updates waiting for you below</div>
           </div>
         </div>
       );

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useCart } from './useCart';
 import type { ProductType } from '../../../server/payments';
+import { STUDIO_NAME } from '../../constants';
 
 // ─── Types (mirrors server/recommendations.ts) ───────────────────
 
@@ -379,7 +380,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
         {isPremium ? (
           <p className="text-[12px] text-zinc-400 mt-1.5 leading-relaxed">
             <Crown className="w-3 h-3 text-amber-400 inline mr-1" />
-            Your team is actively working through these recommendations. Items are prioritized by traffic impact.
+            {STUDIO_NAME} is actively working through these recommendations. Items are prioritized by traffic impact.
           </p>
         ) : (
           <p className="text-[12px] text-zinc-400 mt-1.5 leading-relaxed">
@@ -652,7 +653,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
             <Crown className="w-5 h-5 text-amber-400 flex-shrink-0" />
             <div className="flex-1">
               <div className="text-[12px] font-medium text-zinc-300">
-                Want your team to handle all {data.summary.fixNow + data.summary.fixSoon} urgent items?
+                Want {STUDIO_NAME} to handle all {data.summary.fixNow + data.summary.fixSoon} urgent items?
               </div>
               <div className="text-[11px] text-zinc-500 mt-0.5">
                 Premium clients get hands-free SEO — we implement every recommendation for you.

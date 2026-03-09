@@ -6,6 +6,7 @@ import { ContentTab } from './ContentTab';
 import type { Tier } from '../ui';
 import type { ClientContentRequest, ClientRequest, ApprovalBatch, ClientTab } from './types';
 import { useBetaMode } from './BetaContext';
+import { STUDIO_NAME } from '../../constants';
 
 type InboxFilter = 'all' | 'approvals' | 'requests' | 'content';
 
@@ -192,28 +193,28 @@ export function InboxTab({
         <div className="text-center py-12">
           <ClipboardCheck className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
           <p className="text-sm text-zinc-400">No SEO changes to review yet.</p>
-          <p className="text-[11px] text-zinc-500 mt-1">Your team will send proposed changes here for your approval.</p>
+          <p className="text-[11px] text-zinc-500 mt-1">{STUDIO_NAME} will send proposed changes here for your approval.</p>
         </div>
       )}
       {filter === 'requests' && !hasRequests && !requestsLoading && (
         <div className="text-center py-12">
           <MessageSquare className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
           <p className="text-sm text-zinc-400">No requests yet.</p>
-          <p className="text-[11px] text-zinc-500 mt-1">Submit a request and your team will respond here.</p>
+          <p className="text-[11px] text-zinc-500 mt-1">Submit a request and {STUDIO_NAME} will respond here.</p>
         </div>
       )}
       {!betaMode && filter === 'content' && contentRequests.length === 0 && (
         <div className="text-center py-12">
           <FileText className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
           <p className="text-sm text-zinc-400">No content requests yet.</p>
-          <p className="text-[11px] text-zinc-500 mt-1">{effectiveTier === 'free' ? 'Upgrade to Growth to request content briefs and blog posts.' : 'Request content from the Strategy tab or ask your team.'}</p>
+          <p className="text-[11px] text-zinc-500 mt-1">{effectiveTier === 'free' ? 'Upgrade to Growth to request content briefs and blog posts.' : `Request content from the Strategy tab or ask ${STUDIO_NAME}.`}</p>
         </div>
       )}
       {filter === 'all' && !hasApprovals && !hasRequests && contentRequests.length === 0 && !approvalsLoading && !requestsLoading && (
         <div className="text-center py-12">
           <Inbox className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
           <p className="text-sm text-zinc-400">Your inbox is empty.</p>
-          <p className="text-[11px] text-zinc-500 mt-1">{betaMode ? 'SEO changes and requests will appear here as your team works on your site.' : 'SEO changes, requests, and content items will appear here as your team works on your site.'}</p>
+          <p className="text-[11px] text-zinc-500 mt-1">{betaMode ? `SEO changes and requests will appear here as ${STUDIO_NAME} works on your site.` : `SEO changes, requests, and content items will appear here as ${STUDIO_NAME} works on your site.`}</p>
         </div>
       )}
     </div>

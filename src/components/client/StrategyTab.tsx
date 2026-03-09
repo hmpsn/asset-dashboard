@@ -5,6 +5,7 @@ import {
 import { TierGate, type Tier } from '../ui';
 import type { ClientKeywordStrategy, ClientContentRequest } from './types';
 import { useBetaMode } from './BetaContext';
+import { STUDIO_NAME } from '../../constants';
 
 export interface PricingModalState {
   serviceType: 'brief_only' | 'full_post';
@@ -41,7 +42,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       <div className="text-center py-16">
         <Target className="w-8 h-8 text-zinc-500 mx-auto mb-2" />
         <p className="text-sm text-zinc-500">SEO strategy is being prepared</p>
-        <p className="text-xs text-zinc-500 mt-1">Your web team is building a keyword strategy for your site. Check back soon!</p>
+        <p className="text-xs text-zinc-500 mt-1">{STUDIO_NAME} is building a keyword strategy for your site. Check back soon!</p>
       </div>
     );
   }
@@ -142,7 +143,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
             <p className="text-[11px] text-zinc-400 mt-2 mb-4 leading-relaxed">
               {betaMode
                 ? 'Based on your keyword strategy and competitor analysis, these topics represent untapped search traffic your site could capture.'
-                : <>Based on your keyword strategy and competitor analysis, these topics represent untapped search traffic. Click <strong className="text-teal-300">Request This Topic</strong> to have our team create a full content brief.</>}
+                : <>Based on your keyword strategy and competitor analysis, these topics represent untapped search traffic. Click <strong className="text-teal-300">Request This Topic</strong> to have {STUDIO_NAME} create a full content brief.</>}
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {strategyData.contentGaps.map((gap, i) => {

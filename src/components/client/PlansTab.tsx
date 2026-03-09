@@ -1,4 +1,6 @@
 import { CheckCircle2, FileText, MessageSquare, Sparkles, X, Zap, DollarSign, TrendingUp } from 'lucide-react';
+import { useState } from 'react';
+import { STUDIO_NAME } from '../../constants';
 import type { Tier } from '../ui';
 import type { WorkspaceInfo, ClientTab } from './types';
 
@@ -181,7 +183,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
             <FileText className="w-5 h-5 text-teal-400" />
             <h3 className="text-lg font-semibold text-zinc-100">Content Services</h3>
           </div>
-          <p className="text-xs text-zinc-500 mb-5">Professional content created by our team, tailored to your SEO strategy.</p>
+          <p className="text-xs text-zinc-500 mb-5">Professional content created by {STUDIO_NAME}, tailored to your SEO strategy.</p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             {briefPrice != null && (

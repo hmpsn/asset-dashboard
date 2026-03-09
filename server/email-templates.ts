@@ -4,6 +4,8 @@
  * Templates support both single events and batched digests.
  */
 
+import { STUDIO_NAME } from './constants.js';
+
 // ── Shared helpers ──
 
 function esc(str: string): string {
@@ -78,7 +80,7 @@ function layout(opts: {
 
       <!-- Footer -->
       <div style="text-align:center;margin-top:20px;">
-        <span class="text-muted" style="font-size:11px;color:#9ca3af;">${opts.footer || 'Automated notification from your web team'}</span>
+        <span class="text-muted" style="font-size:11px;color:#9ca3af;">${opts.footer || `Automated notification from ${STUDIO_NAME}`}</span>
       </div>
 
     </div>
@@ -300,7 +302,7 @@ function renderRequestStatus(events: EmailEvent[], count: number, ws: string, da
 function renderRequestResponse(events: EmailEvent[], count: number, ws: string, dashUrl?: string, logoUrl?: string) {
   const items = events.map((e, i) => itemRow({
     title: (e.data.requestTitle as string) || 'Request',
-    detail: (e.data.noteContent as string)?.slice(0, 150) || 'New response from your web team',
+    detail: (e.data.noteContent as string)?.slice(0, 150) || `New response from ${STUDIO_NAME}`,
     isLast: i === events.length - 1,
   })).join('');
 
@@ -309,7 +311,7 @@ function renderRequestResponse(events: EmailEvent[], count: number, ws: string, 
       ? `Update on "${(events[0].data.requestTitle as string) || 'your request'}" — ${ws}`
       : `${count} new responses on your requests — ${ws}`,
     html: layout({
-      preheader: `Your web team responded to ${count} request${count !== 1 ? 's' : ''}`,
+      preheader: `${STUDIO_NAME} responded to ${count} request${count !== 1 ? 's' : ''}`,
       headline: count === 1 ? 'New Response on Your Request' : `${count} New Responses`,
       subtitle: ws,
       body: items,
@@ -463,7 +465,7 @@ function renderTrialExpiryWarning(event: EmailEvent, logoUrl?: string) {
           ${itemRow({ title: 'Content pipeline', detail: 'Brief generation, content requests, approval workflows', isLast: true })}
         </div>
         <div style="margin-top:16px;background:#f0fdf9;border:1px solid #ccfbf1;border-radius:8px;padding:14px 16px;text-align:center;">
-          <span style="font-size:12px;color:#0d9488;">Want to keep Growth features? Contact your web team to discuss plans.</span>
+          <span style="font-size:12px;color:#0d9488;">Want to keep Growth features? Contact ${STUDIO_NAME} to discuss plans.</span>
         </div>`,
       cta: dashUrl ? { label: 'Open Your Dashboard', url: dashUrl } : undefined,
       footer: `You're receiving this because your Growth trial on ${esc(ws)} is ending soon`,
@@ -496,7 +498,7 @@ function renderClientWelcome(event: EmailEvent, logoUrl?: string) {
       subtitle: `Your ${ws} dashboard is ready`,
       body: `
         <p class="text-primary" style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 16px;">
-          Your web team has set up a personalized insights dashboard for you. It's your central hub for tracking website performance, reviewing SEO improvements, and collaborating on content.
+          ${STUDIO_NAME} has set up a personalized insights dashboard for you. It's your central hub for tracking website performance, reviewing SEO improvements, and collaborating on content.
         </p>` + gettingStarted + `
         <div style="margin-top:20px;background:#f0fdf9;border:1px solid #ccfbf1;border-radius:8px;padding:14px 16px;text-align:center;">
           <span style="font-size:12px;color:#0d9488;">Questions? Just reply to this email — we're here to help.</span>
@@ -622,7 +624,7 @@ export function renderMonthlyReport(data: {
   const trialBanner = d.isTrial ? `
     <div style="margin-bottom:16px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:14px 16px;text-align:center;">
       <div style="font-size:13px;font-weight:600;color:#92400e;">Growth Trial${d.trialDaysRemaining != null ? ` · ${d.trialDaysRemaining} day${d.trialDaysRemaining !== 1 ? 's' : ''} remaining` : ''}</div>
-      <div style="font-size:11px;color:#a16207;margin-top:4px;">You're currently on a 14-day Growth trial. Contact your web team to discuss plans and pricing.</div>
+      <div style="font-size:11px;color:#a16207;margin-top:4px;">You're currently on a 14-day Growth trial. Contact ${STUDIO_NAME} to discuss plans and pricing.</div>
     </div>` : '';
 
   return {
@@ -633,7 +635,7 @@ export function renderMonthlyReport(data: {
       subtitle: `${d.workspaceName} · ${d.monthName}`,
       body: trialBanner + scoreSection + trafficSection + metricsGrid + activitySection + chatSection + pendingAlert,
       cta: d.dashboardUrl ? { label: 'Open Dashboard', url: d.dashboardUrl } : undefined,
-      footer: 'Automated monthly summary from your web team',
+      footer: `Automated monthly summary from ${STUDIO_NAME}`,
       logoUrl: deriveLogoUrl(d.dashboardUrl),
     }),
   };
@@ -835,7 +837,7 @@ export function renderApprovalReminder(data: {
         </div>
         ${itemRow({
           title: data.batchName,
-          detail: `Submitted ${data.staleDays} days ago · Approving lets your web team push updates live`,
+          detail: `Submitted ${data.staleDays} days ago · Approving lets ${STUDIO_NAME} push updates live`,
           isLast: true,
         })}`,
       cta: data.dashboardUrl ? { label: 'Review Changes', url: data.dashboardUrl } : undefined,

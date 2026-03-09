@@ -77,6 +77,7 @@ import { getSchedule, listSchedules, upsertSchedule, deleteSchedule, startSchedu
 import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword, togglePinKeyword, storeRankSnapshot, getRankHistory, getLatestRanks } from './rank-tracking.js';
 import { listAnnotations, addAnnotation, deleteAnnotation } from './annotations.js';
 import { startApprovalReminders } from './approval-reminders.js';
+import { STUDIO_NAME } from './constants.js';
 import { startTrialReminders } from './trial-reminders.js';
 import { startBackupScheduler } from './backup.js';
 import { startMonthlyReports, triggerMonthlyReport } from './monthly-report.js';
@@ -5649,7 +5650,7 @@ app.post('/api/public/requests/:workspaceId/:requestId/notes', (req, res) => {
 app.post('/api/requests', (req, res) => {
   const { workspaceId, title, description, category, priority, pageUrl, pageId } = req.body;
   if (!workspaceId || !title || !description) return res.status(400).json({ error: 'workspaceId, title, and description required' });
-  const request = createRequest(workspaceId, { title, description, category: category || 'seo', priority, pageUrl, pageId, submittedBy: 'Web Team' });
+  const request = createRequest(workspaceId, { title, description, category: category || 'seo', priority, pageUrl, pageId, submittedBy: STUDIO_NAME });
   broadcast('request:created', request);
   broadcastToWorkspace(workspaceId, 'request:created', { id: request.id });
   res.json(request);

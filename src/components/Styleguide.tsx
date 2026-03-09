@@ -332,7 +332,7 @@ export function Styleguide() {
               <EmptyState
                 icon={Lock}
                 title="Feature not configured"
-                description="This module needs to be enabled by your web team."
+                description="This module needs to be enabled by hmpsn studio."
                 action={<button className="px-4 py-2 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-xs font-medium hover:from-teal-500 hover:to-emerald-500 transition-all">Request Access</button>}
               />
             </div>
@@ -650,7 +650,7 @@ export function Styleguide() {
               <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Inline Toast (Client Dashboard)</div>
               <div className="px-5 py-3 rounded-xl border shadow-lg bg-emerald-500/15 border-emerald-500/30 text-emerald-300 flex items-center gap-2.5">
                 <CheckCircle className="w-4 h-4 flex-shrink-0" />
-                <span className="text-xs font-medium">Brief approved! Your team will begin content production.</span>
+                <span className="text-xs font-medium">Brief approved! hmpsn studio will begin content production.</span>
                 <button className="ml-auto text-zinc-400 hover:text-zinc-200"><X className="w-3.5 h-3.5" /></button>
               </div>
             </div>
