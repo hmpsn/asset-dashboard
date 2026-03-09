@@ -5129,6 +5129,7 @@ app.post('/api/public/content-request/:workspaceId/submit', (req, res) => {
   });
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'content_requested', `${actor?.name || 'Client'} submitted topic: "${topic}"`, `Keyword: "${targetKeyword}"`, { requestId: request.id }, actor);
+  broadcastToWorkspace(req.params.workspaceId, 'content-request:created', { id: request.id, topic });
   notifyTeamContentRequest({ workspaceName: ws.name, workspaceId: req.params.workspaceId, topic, targetKeyword, priority: 'medium', rationale: notes || '' });
   res.json(request);
 });
@@ -5142,6 +5143,7 @@ app.post('/api/public/content-request/:workspaceId/:id/decline', (req, res) => {
   if (!updated) return res.status(404).json({ error: 'Request not found' });
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'content_declined', `${actor?.name || 'Client'} declined topic: "${updated.topic}"`, reason || 'No reason given', { requestId: updated.id }, actor);
+  broadcastToWorkspace(req.params.workspaceId, 'content-request:update', { id: updated.id, status: updated.status });
   res.json(updated);
 });
 
@@ -5151,6 +5153,7 @@ app.post('/api/public/content-request/:workspaceId/:id/approve', (req, res) => {
   if (!updated) return res.status(404).json({ error: 'Request not found' });
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'brief_approved', `${actor?.name || 'Client'} approved brief for "${updated.topic}"`, '', { requestId: updated.id, briefId: updated.briefId }, actor);
+  broadcastToWorkspace(req.params.workspaceId, 'content-request:update', { id: updated.id, status: updated.status });
   res.json(updated);
 });
 
@@ -5163,6 +5166,7 @@ app.post('/api/public/content-request/:workspaceId/:id/request-changes', (req, r
   if (!updated) return res.status(404).json({ error: 'Request not found' });
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'changes_requested', `${actor?.name || 'Client'} requested changes on "${updated.topic}"`, feedback || '', { requestId: updated.id }, actor);
+  broadcastToWorkspace(req.params.workspaceId, 'content-request:update', { id: updated.id, status: updated.status });
   res.json(updated);
 });
 
@@ -5175,6 +5179,7 @@ app.post('/api/public/content-request/:workspaceId/:id/upgrade', (req, res) => {
   if (!updated) return res.status(404).json({ error: 'Request not found' });
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'content_upgraded', `${actor?.name || 'Client'} upgraded "${updated.topic}" to full blog post`, '', { requestId: updated.id }, actor);
+  broadcastToWorkspace(req.params.workspaceId, 'content-request:update', { id: updated.id, status: updated.status });
   res.json(updated);
 });
 
@@ -5185,6 +5190,7 @@ app.post('/api/public/content-request/:workspaceId/:id/comment', (req, res) => {
   if (!content) return res.status(400).json({ error: 'content is required' });
   const updated = addComment(req.params.workspaceId, req.params.id, author, content);
   if (!updated) return res.status(404).json({ error: 'Request not found' });
+  broadcastToWorkspace(req.params.workspaceId, 'content-request:update', { id: updated.id, status: updated.status });
   res.json(updated);
 });
 
@@ -5616,7 +5622,9 @@ app.post('/api/public/requests/:workspaceId/:requestId/notes', (req, res) => {
   const r = getRequest(req.params.requestId);
   if (!r || r.workspaceId !== req.params.workspaceId) return res.status(404).json({ error: 'Not found' });
   const updated = addNote(req.params.requestId, 'client', content);
+  if (!updated) return res.status(404).json({ error: 'Request not found' });
   broadcast('request:updated', updated);
+  broadcastToWorkspace(req.params.workspaceId, 'request:update', { id: updated.id });
   res.json(updated);
 });
 
