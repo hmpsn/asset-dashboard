@@ -98,9 +98,10 @@ For long-running operations (audits, crawls, reports):
 When a feature produces data changes that should update the UI immediately:
 
 1. **Server**: Broadcast the event via `broadcastToWorkspace(wsId, 'feature:event', data)` — see `wiring-patterns.md` §11
-2. **Admin**: Add handler in `WorkspaceHome.tsx` `useWorkspaceEvents()` to refetch relevant data
-3. **Client**: Add handler in `ClientDashboard.tsx` `useWorkspaceEvents()` or in the relevant tab component
-4. **Existing pattern**: Activity logging auto-broadcasts via `initActivityBroadcast`; anomaly detection via `initAnomalyBroadcast`
+2. **⚠️ Both sides**: If the feature has admin (`/api/...`) AND client (`/api/public/...`) write endpoints, **both must broadcast the same event**. Missing this causes one side not to see the other's changes in real-time.
+3. **Admin**: Add handler in `WorkspaceHome.tsx` `useWorkspaceEvents()` to refetch relevant data
+4. **Client**: Add handler in `ClientDashboard.tsx` `useWorkspaceEvents()` or in the relevant tab component
+5. **Existing pattern**: Activity logging auto-broadcasts via `initActivityBroadcast`; anomaly detection via `initAnomalyBroadcast`
 
 ## 7. Feature Documentation & Memory Updates
 

@@ -158,6 +158,25 @@ When adding real-time updates for a new feature:
 3. **Frontend**: Use `useWorkspaceEvents(wsId, { 'event:name': (data) => refetchRelevantData() })` in the component
 4. **Existing events**: `activity:new`, `approval:update`, `approval:applied`, `request:created`, `request:update`, `content-request:created`, `content-request:update`, `audit:complete`, `anomalies:update`
 
+### ⚠️ Critical: Broadcast from BOTH admin and client endpoints
+
+Every write endpoint has two versions — admin (`/api/...`) and client (`/api/public/...`). **Both must call `broadcastToWorkspace()`** for the same event. Without this, actions on one side won't appear in real-time on the other.
+
+**Checklist when adding a new write endpoint pair:**
+- [ ] Admin endpoint calls `broadcastToWorkspace(wsId, 'feature:event', data)`
+- [ ] Client/public endpoint calls `broadcastToWorkspace(wsId, 'feature:event', data)` with the same event name
+- [ ] `WorkspaceHome.tsx` `useWorkspaceEvents()` handles the event (admin side)
+- [ ] `ClientDashboard.tsx` `useWorkspaceEvents()` handles the event (client side)
+
+**Common mistake**: Only adding the broadcast to the admin endpoint. The client `/api/public/*` endpoints also need it or admin won't see client actions in real-time (and vice versa).
+
+**Endpoints that currently broadcast correctly from both sides:**
+- Approvals: `approval:update`, `approval:applied`
+- Requests: `request:created`, `request:update`
+- Content requests: `content-request:created`, `content-request:update`
+- Activity: `activity:new` (auto via `addActivity` → `initActivityBroadcast`)
+- Anomalies: `anomalies:update` (auto via `initAnomalyBroadcast`)
+
 ## 12. Email Notifications
 
 When adding email notifications for a new event type:
