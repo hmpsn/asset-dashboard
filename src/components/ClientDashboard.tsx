@@ -648,7 +648,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
       const context = buildChatContext();
       const res = await fetch(`/api/public/search-chat/${ws.id}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: question.trim(), context, sessionId: chatSessionId }),
+        body: JSON.stringify({ question: question.trim(), context, sessionId: chatSessionId, betaMode }),
       });
       const data = await res.json();
       if (res.status === 429) {
@@ -672,7 +672,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
       const proactivePrompt = 'You are proactively greeting me as I open the Insights Engine. In 2-3 concise bullet points, tell me the most important things happening with my site data right now. Be specific with numbers. Highlight anything that needs attention first, then wins, then opportunities. Keep it brief and actionable. Do not ask me questions.';
       const res = await fetch(`/api/public/search-chat/${ws.id}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: proactivePrompt, context, sessionId: chatSessionId }),
+        body: JSON.stringify({ question: proactivePrompt, context, sessionId: chatSessionId, betaMode }),
       });
       const data = await res.json();
       if (!data.error) {
@@ -692,7 +692,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
       const prompt = 'Give me a 2-3 sentence executive summary of my site\'s current performance. Lead with the single most important trend (positive or negative), then one actionable next step. Be specific with numbers. Do not use bullet points or headers — write it as a short paragraph. Do not ask me questions.';
       const res = await fetch(`/api/public/search-chat/${ws.id}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: prompt, context, sessionId: `inline-${ws.id}` }),
+        body: JSON.stringify({ question: prompt, context, sessionId: `inline-${ws.id}`, betaMode }),
       });
       const data = await res.json();
       if (!data.error && data.answer) setProactiveInsight(data.answer);
