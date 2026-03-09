@@ -1,17 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Shield, Search, BarChart3, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
-  Loader2, Bell, ClipboardCheck, FileText, AlertTriangle, Activity, Clipboard,
-  Globe, Target, Pencil, Code2, CornerDownRight, Flag,
-  Minus, MessageSquare,
+  Shield, Search, BarChart3, TrendingUp, TrendingDown, ArrowUpRight,
+  Loader2, Bell, FileText, AlertTriangle,
+  Globe, Clipboard, Flag,
 } from 'lucide-react';
-import { StatCard, SectionCard, PageHeader, Badge } from './ui';
+import { StatCard, SectionCard, PageHeader } from './ui';
 import { InsightsEngine } from './client/InsightsEngine';
 import { ErrorBoundary } from './ErrorBoundary';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useAuditSummary } from '../hooks/useAuditSummary';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { AnomalyAlerts } from './AnomalyAlerts';
+import { SeoWorkStatus, ActivityFeed, RankingsSnapshot, ActiveRequestsAnnotations } from './workspace-home';
 
 interface WorkspaceHomeProps {
   workspaceId: string;
@@ -29,17 +29,6 @@ interface ActivityEntry {
   title: string;
   description?: string;
   createdAt: string;
-}
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 function fmt(n: number): string {
@@ -188,20 +177,6 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
     });
   }
 
-  const activityIconMap: Record<string, typeof Activity> = {
-    audit_completed: Globe,
-    content_requested: FileText,
-    brief_generated: ClipboardCheck,
-    request_resolved: MessageSquare,
-    approval_applied: ClipboardCheck,
-    seo_updated: Pencil,
-    schema_generated: Code2,
-    schema_published: Code2,
-    redirects_scanned: CornerDownRight,
-    strategy_generated: Target,
-    rank_snapshot: TrendingUp,
-  };
-
   return (
     <div className="space-y-6">
       <PageHeader
@@ -277,48 +252,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       <AnomalyAlerts workspaceId={workspaceId} isAdmin={true} />
 
       {/* ── SEO Work Status ── */}
-      {seoStatus.total > 0 && (
-        <SectionCard title="SEO Work Status" titleIcon={<Pencil className="w-4 h-4 text-teal-400" />} noPadding>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-zinc-800/50">
-            {seoStatus.issueDetected > 0 && (
-              <button onClick={() => onNavigate('seo-audit')} className="flex flex-col items-center py-3 hover:bg-zinc-800/30 transition-colors bg-zinc-900">
-                <span className="text-lg font-bold text-amber-400">{seoStatus.issueDetected}</span>
-                <span className="text-[10px] text-zinc-500">issues found</span>
-              </button>
-            )}
-            {seoStatus.inReview > 0 && (
-              <button onClick={() => onNavigate('seo-editor')} className="flex flex-col items-center py-3 hover:bg-zinc-800/30 transition-colors bg-zinc-900">
-                <span className="text-lg font-bold text-purple-400">{seoStatus.inReview}</span>
-                <span className="text-[10px] text-zinc-500">in review</span>
-              </button>
-            )}
-            {seoStatus.approved > 0 && (
-              <button onClick={() => onNavigate('seo-editor')} className="flex flex-col items-center py-3 hover:bg-zinc-800/30 transition-colors bg-zinc-900">
-                <span className="text-lg font-bold text-green-400">{seoStatus.approved}</span>
-                <span className="text-[10px] text-zinc-500">approved</span>
-              </button>
-            )}
-            {seoStatus.rejected > 0 && (
-              <button onClick={() => onNavigate('seo-editor')} className="flex flex-col items-center py-3 hover:bg-zinc-800/30 transition-colors bg-zinc-900">
-                <span className="text-lg font-bold text-red-400">{seoStatus.rejected}</span>
-                <span className="text-[10px] text-zinc-500">rejected</span>
-              </button>
-            )}
-            {seoStatus.live > 0 && (
-              <div className="flex flex-col items-center py-3 bg-zinc-900">
-                <span className="text-lg font-bold text-teal-400">{seoStatus.live}</span>
-                <span className="text-[10px] text-zinc-500">live</span>
-              </div>
-            )}
-            {seoStatus.clean > 0 && (
-              <div className="flex flex-col items-center py-3 bg-zinc-900">
-                <span className="text-lg font-bold text-zinc-400">{seoStatus.clean}</span>
-                <span className="text-[10px] text-zinc-500">clean</span>
-              </div>
-            )}
-          </div>
-        </SectionCard>
-      )}
+      <SeoWorkStatus seoStatus={seoStatus} onNavigate={onNavigate} />
 
       {/* ── Action Items ── */}
       {actions.length > 0 && (
@@ -355,115 +289,12 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
 
       {/* ── Two-column: Activity + Rankings ── */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-        {/* Recent Activity */}
-        <SectionCard
-          title="Recent Activity"
-          titleIcon={<Activity className="w-4 h-4 text-zinc-500" />}
-          className="lg:col-span-3"
-          noPadding
-        >
-          {activity.length > 0 ? (
-            <div className="divide-y divide-zinc-800/50">
-              {activity.map(entry => {
-                const Icon = activityIconMap[entry.type] || Activity;
-                return (
-                  <div key={entry.id} className="flex items-start gap-3 px-4 py-2.5">
-                    <Icon className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-teal-400" />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs text-zinc-200">{entry.title}</div>
-                      {entry.description && <div className="text-[11px] text-zinc-500 mt-0.5">{entry.description}</div>}
-                    </div>
-                    <span className="text-[11px] text-zinc-500 flex-shrink-0">{timeAgo(entry.createdAt)}</span>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="px-4 py-8 text-center text-xs text-zinc-500">No activity recorded yet</div>
-          )}
-        </SectionCard>
-
-        {/* Rankings snapshot */}
-        <SectionCard
-          title="Top Rankings"
-          titleIcon={<TrendingUp className="w-4 h-4 text-teal-400" />}
-          action={ranks.length > 0 ? <button onClick={() => onNavigate('seo-ranks')} className="text-[11px] text-teal-400 hover:text-teal-300 transition-colors">View All →</button> : undefined}
-          className="lg:col-span-2"
-          noPadding
-        >
-          {ranks.length > 0 ? (
-            <div className="divide-y divide-zinc-800/50">
-              {ranks.slice(0, 6).map((r, i) => (
-                <div key={i} className="flex items-center gap-2.5 px-4 py-2">
-                  <span className="text-[11px] text-zinc-400 truncate flex-1">{r.query}</span>
-                  <span className="text-[11px] font-medium text-zinc-200 tabular-nums w-6 text-right">{Math.round(r.position)}</span>
-                  {r.change != null && r.change !== 0 && (
-                    <span className={`flex items-center text-[11px] font-medium w-8 justify-end ${r.change > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {r.change > 0 ? <ArrowUpRight className="w-2.5 h-2.5" /> : <ArrowDownRight className="w-2.5 h-2.5" />}
-                      {Math.abs(Math.round(r.change))}
-                    </span>
-                  )}
-                  {(r.change == null || r.change === 0) && <span className="w-8 flex justify-end"><Minus className="w-2.5 h-2.5 text-zinc-600" /></span>}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="px-4 py-8 text-center text-xs text-zinc-500">
-              {gscPropertyUrl ? 'No keywords tracked yet' : 'Connect GSC to track rankings'}
-            </div>
-          )}
-        </SectionCard>
+        <ActivityFeed activity={activity} className="lg:col-span-3" />
+        <RankingsSnapshot ranks={ranks} gscPropertyUrl={gscPropertyUrl} onNavigate={onNavigate} className="lg:col-span-2" />
       </div>
 
       {/* ── Active Requests + Annotations ── */}
-      {(activeRequests.length > 0 || annotations.length > 0) && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {activeRequests.length > 0 && (
-            <SectionCard
-              title="Active Requests"
-              titleIcon={<Clipboard className="w-4 h-4 text-amber-400" />}
-              action={<button onClick={() => onNavigate('requests')} className="text-[11px] text-teal-400 hover:text-teal-300 transition-colors">View All →</button>}
-              noPadding
-            >
-              <div className="divide-y divide-zinc-800/50">
-                {activeRequests.slice(0, 5).map(req => {
-                  const statusColor = req.status === 'new' || req.status === 'open' ? 'red' : req.status === 'in_progress' ? 'teal' : 'zinc';
-                  return (
-                    <div key={req.id} className="flex items-center gap-3 px-4 py-2.5">
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs text-zinc-200 truncate">{req.title}</div>
-                        <div className="text-[11px] text-zinc-500 mt-0.5">{req.category} · {timeAgo(req.createdAt)}</div>
-                      </div>
-                      <Badge label={req.status} color={statusColor} />
-                    </div>
-                  );
-                })}
-              </div>
-            </SectionCard>
-          )}
-
-          {annotations.length > 0 && (
-            <SectionCard
-              title="Recent Annotations"
-              titleIcon={<Flag className="w-4 h-4 text-zinc-500" />}
-              action={<button onClick={() => onNavigate('annotations')} className="text-[11px] text-teal-400 hover:text-teal-300 transition-colors">View All →</button>}
-              noPadding
-            >
-              <div className="divide-y divide-zinc-800/50">
-                {annotations.map(ann => (
-                  <div key={ann.id} className="flex items-center gap-3 px-4 py-2.5">
-                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: ann.color || '#2dd4bf' }} />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs text-zinc-200 truncate">{ann.label}</div>
-                    </div>
-                    <span className="text-[11px] text-zinc-500 flex-shrink-0">{ann.date}</span>
-                  </div>
-                ))}
-              </div>
-            </SectionCard>
-          )}
-        </div>
-      )}
+      <ActiveRequestsAnnotations requests={activeRequests} annotations={annotations} onNavigate={onNavigate} />
 
     </div>
   );
