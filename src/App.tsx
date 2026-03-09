@@ -11,6 +11,7 @@ import { BackgroundTaskProvider } from './hooks/useBackgroundTasks';
 import { TaskPanel } from './components/TaskPanel';
 import { AdminChat } from './components/AdminChat';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { NotificationBell } from './components/NotificationBell';
 import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, Search,
   Pencil, CornerDownRight, Share2, Target, Code2, LogOut, Swords, TrendingUp, Flag,
@@ -484,6 +485,10 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
 
         {/* Bottom: icon-only utility bar */}
         <div className="px-3 py-2.5 border-t border-zinc-800 flex items-center justify-center gap-1">
+          <NotificationBell onSelectWorkspace={(wsId, wsTab) => {
+            const ws = workspaces.find(w => w.id === wsId);
+            if (ws) { setSelected(ws); setTab(wsTab as Page); }
+          }} />
           <button
             onClick={() => setTab('settings')}
             title="Settings"
