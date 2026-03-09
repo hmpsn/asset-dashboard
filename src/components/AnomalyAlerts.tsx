@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AlertTriangle, TrendingUp, TrendingDown, Activity, X, Check, RefreshCw, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 
 interface Anomaly {
   id: string;
@@ -91,6 +92,10 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
   }, [workspaceId, isAdmin]);
 
   useEffect(() => { fetchAnomalies(); }, [fetchAnomalies]);
+
+  useWorkspaceEvents(workspaceId, {
+    'anomalies:update': () => fetchAnomalies(),
+  });
 
   const handleDismiss = async (id: string) => {
     try {
