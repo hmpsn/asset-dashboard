@@ -1,6 +1,6 @@
 import {
   Activity, Globe, FileText, ClipboardCheck, MessageSquare,
-  Pencil, Code2, CornerDownRight, Target, TrendingUp,
+  Pencil, Code2, CornerDownRight, Target, TrendingUp, TrendingDown, AlertTriangle,
 } from 'lucide-react';
 import { SectionCard } from '../ui';
 
@@ -24,6 +24,8 @@ const ICON_MAP: Record<string, typeof Activity> = {
   redirects_scanned: CornerDownRight,
   strategy_generated: Target,
   rank_snapshot: TrendingUp,
+  anomaly_detected: AlertTriangle,
+  anomaly_positive: TrendingDown,
 };
 
 function timeAgo(dateStr: string): string {

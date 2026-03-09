@@ -94,6 +94,19 @@ export function listActivity(workspaceId?: string, limit = 50): ActivityEntry[] 
   return filtered.slice(-limit).reverse();
 }
 
+/** Activity types visible to clients — real team work only, no system/anomaly/internal entries */
+const CLIENT_VISIBLE_TYPES: Set<ActivityType> = new Set([
+  'audit_completed', 'request_resolved', 'approval_applied', 'seo_updated',
+  'images_optimized', 'links_fixed', 'content_updated', 'content_requested',
+  'brief_generated', 'brief_approved', 'content_upgraded', 'fix_completed',
+]);
+
+export function listClientActivity(workspaceId: string, limit = 50): ActivityEntry[] {
+  const all = readLog();
+  const filtered = all.filter(e => e.workspaceId === workspaceId && CLIENT_VISIBLE_TYPES.has(e.type));
+  return filtered.slice(-limit).reverse();
+}
+
 export function deleteActivity(id: string): boolean {
   const entries = readLog();
   const idx = entries.findIndex(e => e.id === id);

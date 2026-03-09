@@ -72,7 +72,7 @@ import { createBatch, listBatches, getBatch, updateItem, markBatchApplied, delet
 import { listRequests, createRequest, updateRequest, addNote, deleteRequest, getRequest, getAttachmentsDir, addAttachmentsToRequest, type RequestAttachment } from './requests.js';
 import { notifyTeamNewRequest, notifyClientTeamResponse, notifyClientStatusChange, notifyTeamContentRequest, notifyClientBriefReady, notifyApprovalReady, notifyClientWelcome, notifyClientFixesApplied, notifyClientRecommendationsReady, notifyClientAuditImproved, isEmailConfigured, initEmailQueue, sendEmail } from './email.js';
 import { getQueueStats } from './email-queue.js';
-import { addActivity, listActivity, initActivityBroadcast } from './activity-log.js';
+import { addActivity, listActivity, listClientActivity, initActivityBroadcast } from './activity-log.js';
 import { getSchedule, listSchedules, upsertSchedule, deleteSchedule, startScheduler } from './scheduled-audits.js';
 import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword, togglePinKeyword, storeRankSnapshot, getRankHistory, getLatestRanks } from './rank-tracking.js';
 import { listAnnotations, addAnnotation, deleteAnnotation } from './annotations.js';
@@ -5732,7 +5732,7 @@ app.delete('/api/requests/:id', (req, res) => {
 // Public: client views activity for their workspace
 app.get('/api/public/activity/:workspaceId', (req, res) => {
   const limit = parseInt(req.query.limit as string) || 50;
-  res.json(listActivity(req.params.workspaceId, limit));
+  res.json(listClientActivity(req.params.workspaceId, limit));
 });
 
 // Internal: list activity (optionally filtered by workspace)
