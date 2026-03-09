@@ -6,6 +6,22 @@ import {
   Play, CheckCheck, ArrowRight,
 } from 'lucide-react';
 
+function SimpleMarkdown({ text }: { text: string }) {
+  const inlineMd = (s: string) =>
+    s.replace(/\*\*(.+?)\*\*/g, '<b class="text-zinc-100">$1</b>')
+     .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em class="text-zinc-300">$1</em>')
+     .replace(/`([^`]+)`/g, '<code class="bg-zinc-800 px-1 py-0.5 rounded text-zinc-300 text-[11px]">$1</code>');
+  return (
+    <div className="space-y-1">
+      {text.split('\n').map((line, i) => {
+        const trimmed = line.trim();
+        if (trimmed === '') return <div key={i} className="h-1" />;
+        return <p key={i} className="text-[11px] text-zinc-200 leading-relaxed" dangerouslySetInnerHTML={{ __html: inlineMd(trimmed) }} />;
+      })}
+    </div>
+  );
+}
+
 type RequestPriority = 'low' | 'medium' | 'high' | 'urgent';
 type RequestStatus = 'new' | 'in_review' | 'in_progress' | 'on_hold' | 'completed' | 'closed';
 type RequestCategory = 'bug' | 'content' | 'design' | 'seo' | 'feature' | 'other';
@@ -463,7 +479,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                     {/* Description */}
                     <div className="px-5 py-4">
                       <div className="text-[11px] mb-1 text-zinc-500">Description</div>
-                      <p className="text-[11px] leading-relaxed whitespace-pre-wrap text-zinc-200">{req.description}</p>
+                      <SimpleMarkdown text={req.description} />
                       {req.pageUrl && (
                         <div className="mt-2 flex items-center gap-1 text-[11px] text-zinc-500">
                           <ExternalLink className="w-3 h-3" />
@@ -497,7 +513,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                                     {new Date(note.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                                   </span>
                                 </div>
-                                {note.content && <p className="text-[11px] whitespace-pre-wrap text-zinc-200">{note.content}</p>}
+                                {note.content && <SimpleMarkdown text={note.content} />}
                                 {note.attachments && note.attachments.length > 0 && (
                                   <div className="mt-1.5 space-y-1">
                                     {note.attachments.map(att => (

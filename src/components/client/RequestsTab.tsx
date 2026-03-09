@@ -4,6 +4,7 @@ import {
   CheckCircle2, X, Paperclip, FileText,
 } from 'lucide-react';
 import type { ClientRequest, RequestCategory } from './types';
+import { RenderMarkdown } from './helpers';
 
 interface RequestsTabProps {
   workspaceId: string;
@@ -253,7 +254,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
                     {/* Description */}
                     <div className="px-5 py-4">
                       <div className="text-[11px] text-zinc-500 mb-1">Description</div>
-                      <p className="text-[11px] text-zinc-300 leading-relaxed whitespace-pre-wrap">{req.description}</p>
+                      <div className="text-[11px] text-zinc-300 leading-relaxed"><RenderMarkdown text={req.description} /></div>
                     </div>
 
                     {/* Notes / conversation */}
@@ -276,7 +277,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
                                     {new Date(note.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                                   </span>
                                 </div>
-                                {note.content && <p className="text-[11px] text-zinc-300 whitespace-pre-wrap">{note.content}</p>}
+                                {note.content && <div className="text-[11px] text-zinc-300"><RenderMarkdown text={note.content} /></div>}
                                 {note.attachments && note.attachments.length > 0 && (
                                   <div className="mt-1.5 space-y-1">
                                     {note.attachments.map(att => (
