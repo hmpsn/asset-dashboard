@@ -654,11 +654,12 @@ app.get('/api/workspace-overview', (_req, res) => {
     if (ws.webflowSiteId) {
       const snap = getLatestSnapshot(ws.webflowSiteId);
       if (snap) {
+        const filtered = applySuppressionsToAudit(snap.audit, ws.auditSuppressions || []);
         audit = {
-          score: snap.audit.siteScore,
-          totalPages: snap.audit.totalPages,
-          errors: snap.audit.errors,
-          warnings: snap.audit.warnings,
+          score: filtered.siteScore,
+          totalPages: filtered.totalPages,
+          errors: filtered.errors,
+          warnings: filtered.warnings,
           previousScore: snap.previousScore,
           lastAuditDate: snap.createdAt,
         };
