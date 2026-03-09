@@ -65,15 +65,34 @@ When adding a new tool/tab to the admin panel:
 
 ## 3. Client Dashboard Integration
 
-When a new admin tool produces data the client should see:
+The client dashboard follows a **"why, then how"** narrative arc (see `codebase-overview.md` § Client UX Narrative). When adding client-facing features, always ask: **where does this fit in the story?**
+
+### Tab order & placement guide
+
+| Tab | Narrative role | Put new features here if they... |
+|-----|---------------|----------------------------------|
+| **Insights** | Big picture | Summarize or highlight something actionable |
+| **Performance** | Traffic context | Show data trends or comparisons |
+| **Health** | Diagnosis | Surface problems or issues |
+| **Strategy** | The plan | Present recommendations or growth opportunities |
+| **Inbox** | Collaboration | Require client review, approval, or input |
+| **Plans** | Pricing | Relate to upgrade paths or service tiers |
+| **ROI** | Value proof | Quantify the impact of work done |
+
+**Principle**: Never present the plan before the diagnosis. Never ask for action before explaining why. Data first, then recommendations, then collaboration.
+
+### Implementation checklist
 
 1. **Read `BRAND_DESIGN_LANGUAGE.md` first** — check the Per-Component Color Map (§ 4) and Color Decision Tree (§ 10) before choosing any colors
-2. Add a summary card to `ClientDashboard.tsx` in the appropriate tab
-3. Use shared primitives (`StatCard`, `MetricRing`, `SectionCard`) — see `use-primitives.md` workflow
-4. Link to the relevant client tab from the overview cards
-5. Ensure light mode CSS overrides exist for any new accent colors
-6. **No purple in client views** — teal for actions, blue for data only
-7. Update the Per-Component Color Map in `BRAND_DESIGN_LANGUAGE.md` with any new elements
+2. **Choose the right tab** using the placement guide above — don't default to Overview
+3. Add a summary card to the appropriate tab component
+4. Use shared primitives (`StatCard`, `MetricRing`, `SectionCard`) — see `use-primitives.md` workflow
+5. Link to the relevant client tab from the overview action banners
+6. Ensure light mode CSS overrides exist for any new accent colors
+7. **No purple in client views** — teal for actions, blue for data only
+8. Use `STUDIO_NAME` for any copy referencing the team — see `data-flow.md` Rule 8
+9. Write copy in **plain English** — lead with what matters to the client, not what the tool does
+10. Update the Per-Component Color Map in `BRAND_DESIGN_LANGUAGE.md` with any new elements
 
 ## 4. Approval Workflow Integration
 

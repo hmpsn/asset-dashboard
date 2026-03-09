@@ -57,7 +57,7 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 | Component | Purpose |
 |-----------|---------|
 | `src/App.tsx` | Router, workspace selector, admin tabs (lazy-loaded). Each SEO sub-tool routes directly (no SeoAudit pass-through). |
-| `src/components/ClientDashboard.tsx` | Full client portal with smart login gate (auth-mode detection, email+password or shared password with tab toggle), user menu (avatar+logout), chat, date picker, analytics, approvals, requests (auto-populated submittedBy), content hub, per-user welcome modal, plans/pricing page |
+| `src/components/ClientDashboard.tsx` | Full client portal with smart login gate (auth-mode detection, email+password or shared password with tab toggle), user menu (avatar+logout), chat, date picker. **Tab order follows narrative arc** (see §Client UX Narrative below): Insights → Performance → Health → Strategy → Inbox → Plans → ROI. Per-user welcome modal, auto-populated submittedBy via STUDIO_NAME |
 | `src/components/AdminChat.tsx` | Floating admin chat panel with conversation memory + history UI |
 | `src/components/StripeSettings.tsx` | Stripe admin settings in Command Center: API keys (masked), product Price ID mapping, connection status |
 | `src/components/SeoStrategy.tsx` | Keyword strategy viewer/generator |
@@ -140,6 +140,41 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 15. **Client overview declutter** (#172): Removed AnomalyAlerts banner, AI Hero Insight full-width banner, and MonthlySummary from `OverviewTab.tsx`. InsightsDigest is now the single source of analytical insight. Recent Work timeline in sidebar filtered to `WORK_TYPES` set (audit_completed, request_resolved, approval_applied, seo_updated, images_optimized, links_fixed, content_updated) — excludes anomaly_detected, anomaly_positive, note, and chat entries. AnomalyAlerts component still used on admin side (WorkspaceHome). Final overview layout: Welcome → Action banner → Key metrics → InsightsDigest (left) + Ask AI + Recent Work (right).
 16. **Studio name constant** (`STUDIO_NAME`): All client-facing and server-side copy referencing the studio/agency name MUST use `STUDIO_NAME` from `src/constants.ts` (client) or `server/constants.ts` (server). Never hardcode "your team", "Web Team", "SEO team", "our team", or "hmpsn studio" as string literals. In JSX, use `{STUDIO_NAME}`; in template literals, use `` `text ${STUDIO_NAME} text` ``; in object properties, use the constant directly. **Common bug**: `${STUDIO_NAME}` inside JSX text or single-quoted strings won't interpolate — must use backtick template literals or JSX expressions.
 17. **Recommendation auto-resolve**: `generateRecommendations()` in `recommendations.ts` — on regeneration (triggered after each audit), cross-references new recs with existing by `source` key. Preserves `in_progress`/`completed`/`dismissed` statuses. Auto-marks `completed` any old pending/in_progress recs whose source issue is no longer detected. Insight text prepended with "✓ Auto-resolved". Summary counts exclude completed/dismissed from active totals.
+
+## Client UX Narrative
+
+The client dashboard follows a **"why, then how"** narrative arc. Every tab, feature, and piece of copy should guide the client through a logical story — not dump data on them.
+
+### Tab Order (enforced in `ClientDashboard.tsx` NAV array)
+
+| Order | Tab | Narrative Role |
+|-------|-----|---------------|
+| 1 | **Insights** (overview) | "Here's the big picture" — headline metrics, AI digest, action banners |
+| 2 | **Performance** | "Here's how traffic is trending" — establishes context with real data |
+| 3 | **Site Health** | "Here's what's broken" — diagnosis, page-by-page issues |
+| 4 | **SEO Strategy** | "Here's the plan" — keyword targets, content gaps, growth opportunities |
+| 5 | **Inbox** | "Let's act on it together" — approvals, requests, content collaboration |
+| 6 | **Plans** | Pricing & upgrade options (hidden in beta) |
+| 7 | **ROI** | Value proof — traffic value, ad spend equivalent (hidden in beta) |
+
+### Principle: Diagnosis → Plan → Action
+
+When adding new client-facing features, ask: **where does this fit in the narrative?**
+
+- **Data / metrics** → early tabs (Performance, Health) — establish the "why"
+- **Recommendations / strategy** → middle (Strategy) — present the plan
+- **Collaboration / actions** → later (Inbox) — enable the "how"
+- **Value proof** → end (ROI) — reinforce why the engagement matters
+
+Never present the plan before the diagnosis. Never ask for action before explaining why.
+
+### Copy Tone
+
+All client-facing copy should:
+- Lead with **what matters to the client**, not what the tool does
+- Use `STUDIO_NAME` (never hardcode team names) — see `data-flow.md` Rule 8
+- Be **plain English** — no jargon unless the client's tier implies SEO literacy
+- Frame hmpsn studio as a **collaborative partner**, not a vendor
 
 ## Development Enforcement
 
