@@ -24,7 +24,7 @@ import {
   clearPageState,
 } from './workspaces.js';
 import { getUploadRoot, getOptRoot, getDataDir, DATA_BASE } from './data-dir.js';
-import { buildSeoContext, buildKeywordMapContext, buildKnowledgeBase } from './seo-context.js';
+import { buildSeoContext, buildKeywordMapContext, buildKnowledgeBase, RICH_BLOCKS_PROMPT } from './seo-context.js';
 import { startWatcher, getQueue, triggerOptimize, getMetadata } from './processor.js';
 import {
   listSites,
@@ -71,7 +71,7 @@ import { createBatch, listBatches, getBatch, updateItem, markBatchApplied, delet
 import { listRequests, createRequest, updateRequest, addNote, deleteRequest, getRequest, getAttachmentsDir, addAttachmentsToRequest, type RequestAttachment } from './requests.js';
 import { notifyTeamNewRequest, notifyClientTeamResponse, notifyClientStatusChange, notifyTeamContentRequest, notifyClientBriefReady, notifyApprovalReady, notifyClientWelcome, notifyClientFixesApplied, notifyClientRecommendationsReady, notifyClientAuditImproved, isEmailConfigured, initEmailQueue, sendEmail } from './email.js';
 import { getQueueStats } from './email-queue.js';
-import { addActivity, listActivity } from './activity-log.js';
+import { addActivity, listActivity, initActivityBroadcast } from './activity-log.js';
 import { getSchedule, listSchedules, upsertSchedule, deleteSchedule, startScheduler } from './scheduled-audits.js';
 import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword, togglePinKeyword, storeRankSnapshot, getRankHistory, getLatestRanks } from './rank-tracking.js';
 import { listAnnotations, addAnnotation, deleteAnnotation } from './annotations.js';
@@ -94,6 +94,7 @@ import { listPayments, getPayment } from './payments.js';
 import { computeROI } from './roi.js';
 import { generateRecommendations, loadRecommendations, updateRecommendationStatus, dismissRecommendation } from './recommendations.js';
 import { startChurnSignalScheduler, listChurnSignals, dismissSignal } from './churn-signals.js';
+import { startAnomalyDetection, listAnomalies, dismissAnomaly, acknowledgeAnomaly, runAnomalyDetection, initAnomalyBroadcast } from './anomaly-detection.js';
 import { listWorkOrders, updateWorkOrder } from './work-orders.js';
 import { checkUsageLimit, incrementUsage, getUsageSummary } from './usage-tracking.js';
 import { getStripeConfigSafe, saveStripeKeys, saveStripeProducts, clearStripeConfig, getStripePublishableKey, type StripeProductPrice } from './stripe-config.js';
@@ -553,12 +554,31 @@ app.use('/files', express.static(getOptRoot()));
 
 // --- WebSocket ---
 const clients = new Set<WebSocket>();
+// Track which workspaces each client has subscribed to
+const clientWorkspaces = new Map<WebSocket, Set<string>>();
 
 wss.on('connection', (ws) => {
   clients.add(ws);
-  ws.on('close', () => clients.delete(ws));
+  clientWorkspaces.set(ws, new Set());
+
+  ws.on('message', (raw) => {
+    try {
+      const msg = JSON.parse(String(raw));
+      if (msg.action === 'subscribe' && typeof msg.workspaceId === 'string') {
+        clientWorkspaces.get(ws)?.add(msg.workspaceId);
+      } else if (msg.action === 'unsubscribe' && typeof msg.workspaceId === 'string') {
+        clientWorkspaces.get(ws)?.delete(msg.workspaceId);
+      }
+    } catch { /* ignore malformed messages */ }
+  });
+
+  ws.on('close', () => {
+    clients.delete(ws);
+    clientWorkspaces.delete(ws);
+  });
 });
 
+/** Broadcast to ALL connected clients (global events like jobs, queue). */
 function broadcast(event: string, data: unknown) {
   const msg = JSON.stringify({ event, data });
   for (const ws of clients) {
@@ -568,8 +588,23 @@ function broadcast(event: string, data: unknown) {
   }
 }
 
+/** Broadcast to clients subscribed to a specific workspace. */
+function broadcastToWorkspace(workspaceId: string, event: string, data: unknown) {
+  const msg = JSON.stringify({ event, data, workspaceId });
+  for (const [ws, subs] of clientWorkspaces) {
+    if (ws.readyState === WebSocket.OPEN && subs.has(workspaceId)) {
+      ws.send(msg);
+    }
+  }
+}
+
 // --- Background Jobs ---
 initJobs(broadcast);
+
+// --- Activity broadcast (every addActivity auto-notifies subscribed WS clients) ---
+initActivityBroadcast(broadcastToWorkspace);
+// --- Anomaly broadcast (notify workspace clients when new anomalies detected) ---
+initAnomalyBroadcast(broadcastToWorkspace);
 
 // --- File Upload ---
 const tmpDir = path.join(getUploadRoot(), '.tmp');
@@ -1807,6 +1842,7 @@ app.post('/api/reports/:siteId/save', async (req, res) => {
       addActivity(auditWs.id, 'audit_completed', `Site audit completed — score ${audit.siteScore}`,
         `${audit.totalPages} pages scanned, ${audit.errors} errors, ${audit.warnings} warnings`,
         { score: audit.siteScore, previousScore: snapshot.previousScore });
+      broadcastToWorkspace(auditWs.id, 'audit:complete', { score: audit.siteScore, previousScore: snapshot.previousScore });
     }
     res.json({ id: snapshot.id, createdAt: snapshot.createdAt, siteScore: audit.siteScore, previousScore: snapshot.previousScore });
   } catch (err) {
@@ -3576,7 +3612,7 @@ When giving recommendations:
 - If keyword strategy data is available, reference their target keywords and suggest alignment improvements
 - Identify gaps between what they're ranking for and what they should be targeting
 ${strategySection}
-
+${RICH_BLOCKS_PROMPT}
 Current search data context:
 ${JSON.stringify(context, null, 2)}`;
 
@@ -3637,6 +3673,7 @@ app.post('/api/admin-chat', async (req, res) => {
     if (context?.conversions) dataSources.push('Key Events/Conversions (event counts, user counts, rates)');
     if (context?.siteHealth) dataSources.push('Site Health Audit (score, errors, warnings, page issues)');
     if (context?.rankings) dataSources.push('Rank Tracking (keyword positions, changes over time)');
+    if (context?.detectedAnomalies && Array.isArray(context.detectedAnomalies) && context.detectedAnomalies.length > 0) dataSources.push('Detected Anomalies (AI-flagged significant changes in traffic, conversions, or site health)');
 
     // Audit traffic intelligence: cross-reference audit errors with real traffic
     let auditTrafficSection = '';
@@ -3687,7 +3724,7 @@ TONE:
 - Use markdown: tables for comparisons, bold for emphasis, code blocks for URLs/paths
 - Numbers first, narrative second
 - 200-400 words unless the question demands more
-
+${RICH_BLOCKS_PROMPT}
 Site: ${ws.webflowSiteName || ws.name}
 Date range: last ${context?.days || 28} days
 ${buildKnowledgeBase(workspaceId)}
@@ -5051,6 +5088,7 @@ app.post('/api/public/content-request/:workspaceId', (req, res) => {
   const request = createContentRequest(req.params.workspaceId, { topic, targetKeyword, intent, priority, rationale, clientNote, serviceType, pageType, initialStatus, targetPageId: targetPageId || undefined, targetPageSlug: targetPageSlug || undefined });
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'content_requested', `${actor?.name || 'Client'} requested topic: "${topic}"`, `Keyword: "${targetKeyword}" · Priority: ${priority}`, { requestId: request.id }, actor);
+  broadcastToWorkspace(req.params.workspaceId, 'content-request:created', { id: request.id, topic });
   notifyTeamContentRequest({ workspaceName: ws.name, workspaceId: req.params.workspaceId, topic, targetKeyword, priority, rationale: rationale || '' });
   res.json(request);
 });
@@ -5190,6 +5228,7 @@ app.patch('/api/content-requests/:workspaceId/:id', (req, res) => {
       contentRequestId: updated.id,
     });
   }
+  broadcastToWorkspace(req.params.workspaceId, 'content-request:update', { id: updated.id, status: updated.status });
   res.json(updated);
 });
 
@@ -5478,6 +5517,7 @@ app.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', (req, res) => {
       }
     }
   }
+  broadcastToWorkspace(req.params.workspaceId, 'approval:update', { batchId: req.params.batchId, itemId: req.params.itemId, status });
   res.json(batch);
 });
 
@@ -5537,6 +5577,7 @@ app.post('/api/public/approvals/:workspaceId/:batchId/apply', async (req, res) =
       { batchId: req.params.batchId, appliedCount: appliedIds.length });
   }
 
+  broadcastToWorkspace(req.params.workspaceId, 'approval:applied', { batchId: req.params.batchId, applied: appliedIds.length });
   res.json({ results, applied: appliedIds.length, failed: results.length - appliedIds.length });
 });
 
@@ -5547,6 +5588,7 @@ app.post('/api/public/requests/:workspaceId', (req, res) => {
   if (!title || !description || !category) return res.status(400).json({ error: 'title, description, and category required' });
   const request = createRequest(req.params.workspaceId, { title, description, category, priority, pageUrl, submittedBy });
   broadcast('request:created', request);
+  broadcastToWorkspace(req.params.workspaceId, 'request:created', { id: request.id });
   // Email team
   const ws = getWorkspace(req.params.workspaceId);
   if (ws) {
@@ -5631,6 +5673,7 @@ app.patch('/api/requests/:id', (req, res) => {
   const updated = updateRequest(req.params.id, { status, priority, category });
   if (!updated) return res.status(404).json({ error: 'Not found' });
   broadcast('request:updated', updated);
+  broadcastToWorkspace(updated.workspaceId, 'request:update', { id: updated.id, status: updated.status });
   // Email client on status change
   if (status && prev && status !== prev.status) {
     const ws = getWorkspace(updated.workspaceId);
@@ -5999,6 +6042,7 @@ ${hasRankings ? '✅ **Rank Tracking** — tracked keyword positions, clicks, im
 ${hasActivity ? '✅ **Activity Log** — recent actions taken on the site' : ''}
 ${hasApprovals ? `✅ **Pending Approvals** — ${context.pendingApprovals} SEO changes awaiting client review` : ''}
 ${hasRequests ? '✅ **Active Requests** — open client requests with categories and statuses' : ''}
+${context?.detectedAnomalies && Array.isArray(context.detectedAnomalies) && context.detectedAnomalies.length > 0 ? '✅ **Detected Anomalies** — AI-flagged significant changes in traffic, conversions, or site health. Reference these when the user asks about recent changes or drops.' : ''}
 ${clientAuditTrafficSection}
 ${priorContext}`;
 
@@ -6054,7 +6098,7 @@ TONE & STYLE:
 - Use markdown formatting (bold for emphasis, numbered lists for action items, bullet points for data)
 - Keep responses focused and scannable — aim for 150-300 words unless the question demands more
 - When you see a genuine opportunity, show enthusiasm — "This is really promising" or "There's a great opportunity here"
-
+${RICH_BLOCKS_PROMPT}
 CRITICAL RULES:
 - NEVER fabricate data or statistics that aren't in the provided context. Only reference numbers you can see.
 - NEVER give step-by-step technical implementation instructions (code, meta tags, schema markup, etc.)
@@ -7428,6 +7472,41 @@ app.post('/api/churn-signals/:signalId/dismiss', (req, res) => {
   res.json({ dismissed: true });
 });
 
+// --- Anomaly Detection ---
+app.get('/api/anomalies', (_req, res) => {
+  res.json(listAnomalies());
+});
+
+app.get('/api/anomalies/:workspaceId', (req, res) => {
+  const includeDismissed = req.query.includeDismissed === 'true';
+  res.json(listAnomalies(req.params.workspaceId, includeDismissed));
+});
+
+app.get('/api/public/anomalies/:workspaceId', (req, res) => {
+  res.json(listAnomalies(req.params.workspaceId));
+});
+
+app.post('/api/anomalies/:anomalyId/dismiss', (req, res) => {
+  const ok = dismissAnomaly(req.params.anomalyId);
+  if (!ok) return res.status(404).json({ error: 'Anomaly not found' });
+  res.json({ dismissed: true });
+});
+
+app.post('/api/anomalies/:anomalyId/acknowledge', (req, res) => {
+  const ok = acknowledgeAnomaly(req.params.anomalyId);
+  if (!ok) return res.status(404).json({ error: 'Anomaly not found' });
+  res.json({ acknowledged: true });
+});
+
+app.post('/api/anomalies/scan', async (_req, res) => {
+  try {
+    const result = await runAnomalyDetection();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Scan failed' });
+  }
+});
+
 // --- Work Orders (admin + public) ---
 app.get('/api/work-orders/:workspaceId', (req, res) => {
   res.json(listWorkOrders(req.params.workspaceId));
@@ -7503,6 +7582,8 @@ clearTestModeCustomerIds();
 startTrialReminders();
 // Start churn prevention signal checks (every 6h)
 startChurnSignalScheduler();
+// Start anomaly detection (every 12h)
+startAnomalyDetection();
 
 // Start
 const PORT = parseInt(process.env.PORT || '3001', 10);

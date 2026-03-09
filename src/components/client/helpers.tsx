@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ChartPointDetail } from '../ChartPointDetail';
+import { MetricBlock, ChartBlock, DataTableBlock, SparklineBlock } from '../ChatBlocks';
 import type { PerformanceTrend } from './types';
 
 export function TrendChart({ data, metric, color }: { data: PerformanceTrend[]; metric: keyof PerformanceTrend; color: string }) {
@@ -166,6 +167,47 @@ export function RenderMarkdown({ text }: { text: string }) {
     const line = lines[idx];
     const trimmed = line.trimStart();
     const indent = line.length - trimmed.length;
+
+    // Fenced code blocks: ```lang ... ```
+    if (trimmed.startsWith('```')) {
+      const lang = trimmed.slice(3).trim().toLowerCase();
+      idx++;
+      const blockLines: string[] = [];
+      while (idx < lines.length && !lines[idx].trimStart().startsWith('```')) {
+        blockLines.push(lines[idx]);
+        idx++;
+      }
+      if (idx < lines.length) idx++; // skip closing ```
+      const blockContent = blockLines.join('\n').trim();
+
+      // Rich blocks: metric, chart, datatable, sparkline
+      if (lang === 'metric' || lang === 'chart' || lang === 'datatable' || lang === 'sparkline') {
+        let parsed: unknown = null;
+        try { parsed = JSON.parse(blockContent); } catch { /* invalid JSON */ }
+
+        if (parsed !== null) {
+          if (lang === 'metric') elements.push(<MetricBlock key={elements.length} data={parsed as Parameters<typeof MetricBlock>[0]['data']} />);
+          else if (lang === 'chart') elements.push(<ChartBlock key={elements.length} data={parsed as Parameters<typeof ChartBlock>[0]['data']} />);
+          else if (lang === 'datatable') elements.push(<DataTableBlock key={elements.length} data={parsed as Parameters<typeof DataTableBlock>[0]['data']} />);
+          else if (lang === 'sparkline') elements.push(<SparklineBlock key={elements.length} data={parsed as Parameters<typeof SparklineBlock>[0]['data']} />);
+        } else {
+          elements.push(
+            <pre key={elements.length} className="text-[11px] bg-zinc-800/60 border border-zinc-700/50 rounded-lg p-2 overflow-x-auto text-zinc-300 my-1">
+              <code>{blockContent}</code>
+            </pre>
+          );
+        }
+        continue;
+      }
+
+      // Regular code block
+      elements.push(
+        <pre key={elements.length} className="text-[11px] bg-zinc-800/60 border border-zinc-700/50 rounded-lg p-2 overflow-x-auto text-zinc-300 my-1">
+          <code>{blockContent}</code>
+        </pre>
+      );
+      continue;
+    }
 
     // Table: consecutive lines starting and ending with |
     if (trimmed.startsWith('|') && trimmed.includes('|', 1)) {

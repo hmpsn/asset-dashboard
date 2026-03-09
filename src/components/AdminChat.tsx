@@ -78,6 +78,9 @@ export function AdminChat({ workspaceId, workspaceName, ga4PropertyId, gscProper
       // Site audit
       fetches.push(f('siteHealth', `/api/public/audit/${workspaceId}`));
 
+      // Anomalies
+      fetches.push(f('detectedAnomalies', `/api/anomalies/${workspaceId}`));
+
       const results = await Promise.all(fetches);
       const ctx: Record<string, unknown> = { days };
 

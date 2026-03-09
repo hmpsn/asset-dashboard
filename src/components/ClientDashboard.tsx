@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Loader2,
   Sparkles, Send, AlertTriangle,
@@ -21,6 +21,8 @@ import { PerformanceTab } from './client/PerformanceTab';
 import { InboxTab } from './client/InboxTab';
 import { OverviewTab } from './client/OverviewTab';
 import { ErrorBoundary } from './ErrorBoundary';
+import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
+import { AnomalyAlerts } from './AnomalyAlerts';
 import { BetaProvider } from './client/BetaContext';
 import {
   QUICK_QUESTIONS,
@@ -98,6 +100,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
   const [ga4NewVsReturning, setGa4NewVsReturning] = useState<GA4NewVsReturning[]>([]);
   const [ga4Organic, setGa4Organic] = useState<GA4OrganicOverview | null>(null);
   const [ga4LandingPages, setGa4LandingPages] = useState<GA4LandingPage[]>([]);
+  const [anomalies, setAnomalies] = useState<Array<{ type: string; severity: string; title: string; description: string; source: string; changePct: number }>>([]);
   const [authenticated, setAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [authError, setAuthError] = useState('');
@@ -167,6 +170,33 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
   const [sectionErrors, setSectionErrors] = useState<Record<string, string>>({});
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
+
+  // Real-time workspace events — auto-refresh relevant sections
+  const refetchClient = useCallback(async (key: string, url: string) => {
+    try {
+      const r = await fetch(url);
+      if (!r.ok) return;
+      const d = await r.json();
+      if (key === 'activity' && Array.isArray(d)) setActivityLog(d);
+      if (key === 'approvals' && Array.isArray(d)) setApprovalBatches(d);
+      if (key === 'requests' && Array.isArray(d)) setRequests(d);
+      if (key === 'content' && Array.isArray(d)) { setContentRequests(d); setRequestedTopics(new Set(d.map((r: ClientContentRequest) => r.targetKeyword))); }
+    } catch { /* ignore */ }
+  }, []);
+
+  useWorkspaceEvents(authenticated ? workspaceId : undefined, {
+    'activity:new': () => refetchClient('activity', `/api/public/activity/${workspaceId}?limit=20`),
+    'approval:update': () => refetchClient('approvals', `/api/public/approvals/${workspaceId}`),
+    'approval:applied': () => refetchClient('approvals', `/api/public/approvals/${workspaceId}`),
+    'request:created': () => refetchClient('requests', `/api/public/requests/${workspaceId}`),
+    'request:update': () => refetchClient('requests', `/api/public/requests/${workspaceId}`),
+    'content-request:created': () => refetchClient('content', `/api/public/content-requests/${workspaceId}`),
+    'content-request:update': () => refetchClient('content', `/api/public/content-requests/${workspaceId}`),
+    'audit:complete': () => {
+      fetch(`/api/public/audit-summary/${workspaceId}`).then(r => r.json()).then(a => { if (a?.id) setAudit(a); }).catch(() => {});
+      refetchClient('activity', `/api/public/activity/${workspaceId}?limit=20`);
+    },
+  });
 
   // Load workspace info first (includes requiresPassword flag)
   useEffect(() => {
@@ -306,6 +336,8 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
     }
     // Load product pricing for inline price display
     fetch(`/api/public/pricing/${data.id}`).then(r => r.ok ? r.json() : null).then(p => { if (p) setPricingData(p); }).catch(() => {});
+    // Load anomalies for chat context
+    fetch(`/api/public/anomalies/${data.id}`).then(r => r.ok ? r.json() : []).then(a => { if (Array.isArray(a)) setAnomalies(a); }).catch(() => {});
     // Always load content requests (powers the Content tab independently)
     fetch(`/api/public/content-requests/${data.id}`).then(r => r.ok ? r.json() : []).then((reqs: ClientContentRequest[]) => {
       if (Array.isArray(reqs) && reqs.length > 0) {
@@ -634,6 +666,9 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
     if (requests.length > 0) {
       const active = requests.filter(r => r.status !== 'closed');
       if (active.length > 0) context.activeRequests = active.slice(0, 5).map(r => ({ title: r.title, category: r.category, status: r.status }));
+    }
+    if (anomalies.length > 0) {
+      context.detectedAnomalies = anomalies.map(a => ({ type: a.type, severity: a.severity, title: a.title, description: a.description, source: a.source, changePct: a.changePct }));
     }
     return context;
   };
@@ -1161,7 +1196,10 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
 
         {/* ════════════ OVERVIEW TAB ════════════ */}
         {tab === 'overview' && (
-          <OverviewTab ws={ws!} overview={overview} searchComparison={searchComparison} trend={trend} ga4Overview={ga4Overview} ga4Trend={ga4Trend} ga4Comparison={ga4Comparison} ga4Organic={ga4Organic} ga4Conversions={ga4Conversions} ga4NewVsReturning={ga4NewVsReturning} audit={audit} auditDetail={auditDetail} strategyData={strategyData} insights={insights} contentRequests={contentRequests} requests={requests} approvalBatches={approvalBatches} activityLog={activityLog} pendingApprovals={pendingApprovals} unreadTeamNotes={unreadTeamNotes} eventDisplayName={eventDisplayName} isEventPinned={isEventPinned} setTab={setTab} onAskAi={askAi} onOpenChat={() => setChatOpen(true)} clientUser={clientUser} proactiveInsight={proactiveInsight} proactiveInsightLoading={proactiveInsightLoading} />
+          <>
+            <AnomalyAlerts workspaceId={ws!.id} />
+            <OverviewTab ws={ws!} overview={overview} searchComparison={searchComparison} trend={trend} ga4Overview={ga4Overview} ga4Trend={ga4Trend} ga4Comparison={ga4Comparison} ga4Organic={ga4Organic} ga4Conversions={ga4Conversions} ga4NewVsReturning={ga4NewVsReturning} audit={audit} auditDetail={auditDetail} strategyData={strategyData} insights={insights} contentRequests={contentRequests} requests={requests} approvalBatches={approvalBatches} activityLog={activityLog} pendingApprovals={pendingApprovals} unreadTeamNotes={unreadTeamNotes} eventDisplayName={eventDisplayName} isEventPinned={isEventPinned} setTab={setTab} onAskAi={askAi} onOpenChat={() => setChatOpen(true)} clientUser={clientUser} proactiveInsight={proactiveInsight} proactiveInsightLoading={proactiveInsightLoading} />
+          </>
         )}
 
         {/* ════════════ PERFORMANCE TAB (Search + Analytics) ════════════ */}

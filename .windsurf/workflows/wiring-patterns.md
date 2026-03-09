@@ -112,6 +112,39 @@ app.get('/api/workspaces/:id/data', requireWorkspaceAccess(), handler);
 ### Reference
 See `.windsurf/workflows/auth-system.md` for full auth system documentation including all endpoints, middleware stack, and common tasks.
 
+## 9. Anomaly Detection
+
+The anomaly detection system (`server/anomaly-detection.ts`) runs on a 12h scheduler + manual trigger:
+
+1. **Thresholds**: Configurable in `THRESHOLDS` constant — % change that triggers an anomaly (traffic, impressions, CTR, position, bounce, conversions, audit score)
+2. **Detection**: `detectForWorkspace(ws)` compares current vs previous 28-day period using `getSearchPeriodComparison` (GSC) and `getGA4PeriodComparison` (GA4), plus audit `listSnapshots` for score deltas
+3. **Deduplication**: `alreadyDetected()` prevents duplicate anomalies within 48h window
+4. **AI Summary**: `generateAiSummary()` calls gpt-4o-mini for a 2-3 sentence executive summary per workspace
+5. **Activity logging**: Critical/warning anomalies log `anomaly_detected`; positive trends log `anomaly_positive`
+6. **Storage**: JSON file at `.anomalies.json` with 60-day auto-pruning
+7. **API endpoints**: `GET /api/anomalies[/:workspaceId]`, `POST /api/anomalies/:id/dismiss`, `POST /api/anomalies/:id/acknowledge`, `POST /api/anomalies/scan`, `GET /api/public/anomalies/:workspaceId`
+8. **Frontend**: `AnomalyAlerts` component with `workspaceId`, `isAdmin`, `compact` props. Wired into WorkspaceHome (admin) and ClientDashboard overview.
+
+To add a new anomaly type:
+1. Add type to `AnomalyType` union and threshold to `THRESHOLDS`
+2. Add detection logic in `detectForWorkspace()`
+3. Map severity in `severityFor()`
+
+## 10. Multi-Modal Chat Rendering
+
+Chat responses can include rich structured blocks via fenced code blocks:
+
+1. **Prompt**: `RICH_BLOCKS_PROMPT` in `seo-context.ts` — injected into all 3 chat system prompts
+2. **Block types**: `metric` (stat cards), `chart` (horizontal bars), `datatable` (tables with CSV), `sparkline` (mini charts)
+3. **Parsing**: `RenderMarkdown` in `helpers.tsx` detects fenced blocks with these language tags, parses JSON payload, renders corresponding `ChatBlocks.tsx` component
+4. **Fallback**: Invalid JSON falls back to standard code block rendering
+5. **Coverage**: Works in AdminChat, ChatPanel, and ClientDashboard (all use `RenderMarkdown`)
+
+To add a new block type:
+1. Add component in `ChatBlocks.tsx`
+2. Add case in `RenderMarkdown` fenced block parser
+3. Add examples in `RICH_BLOCKS_PROMPT`
+
 ## Caching Pattern
 
 For expensive cross-API data (e.g., audit + traffic):

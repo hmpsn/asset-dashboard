@@ -261,6 +261,35 @@ export function notifyClientAuditImproved(opts: {
   }));
 }
 
+export function notifyAnomalyAlert(opts: {
+  workspaceName: string;
+  workspaceId: string;
+  anomalies: Array<{ title: string; description: string; severity: string; source: string; changePct: number }>;
+  aiSummary?: string;
+  clientEmail?: string;
+  dashboardUrl?: string;
+}): void {
+  if (!isEmailConfigured()) return;
+  // Notify admin team
+  const to = getNotificationEmail();
+  if (to) {
+    for (const a of opts.anomalies) {
+      queueEmail(makeEvent('anomaly_alert', to, opts.workspaceId, opts.workspaceName, undefined, {
+        title: a.title, description: a.description, severity: a.severity, source: a.source, changePct: a.changePct, aiSummary: opts.aiSummary,
+      }));
+    }
+  }
+  // Notify client if email configured and any critical anomalies
+  const hasCritical = opts.anomalies.some(a => a.severity === 'critical');
+  if (opts.clientEmail && hasCritical) {
+    for (const a of opts.anomalies.filter(x => x.severity === 'critical')) {
+      queueEmail(makeEvent('anomaly_alert', opts.clientEmail, opts.workspaceId, opts.workspaceName, opts.dashboardUrl, {
+        title: a.title, description: a.description, severity: a.severity, source: a.source, changePct: a.changePct, aiSummary: opts.aiSummary,
+      }));
+    }
+  }
+}
+
 export function notifyTeamChurnSignal(opts: {
   workspaceName: string;
   workspaceId: string;

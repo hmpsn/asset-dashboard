@@ -5,6 +5,14 @@ import { getUploadRoot } from './data-dir.js';
 const UPLOAD_ROOT = getUploadRoot();
 const LOG_FILE = path.join(UPLOAD_ROOT, '.activity-log.json');
 
+type WorkspaceBroadcastFn = (workspaceId: string, event: string, data: unknown) => void;
+let _broadcastFn: WorkspaceBroadcastFn | null = null;
+
+/** Register a workspace-scoped broadcast function (called from index.ts). */
+export function initActivityBroadcast(fn: WorkspaceBroadcastFn) {
+  _broadcastFn = fn;
+}
+
 export type ActivityType =
   | 'audit_completed'
   | 'request_resolved'
@@ -28,6 +36,8 @@ export type ActivityType =
   | 'payment_received'
   | 'payment_failed'
   | 'fix_completed'
+  | 'anomaly_detected'
+  | 'anomaly_positive'
   | 'note';
 
 export interface ActivityEntry {
@@ -73,6 +83,8 @@ export function addActivity(workspaceId: string, type: ActivityType, title: stri
   // Keep last 500 entries max
   if (entries.length > 500) entries.splice(0, entries.length - 500);
   writeLog(entries);
+  // Broadcast to subscribed workspace clients
+  _broadcastFn?.(workspaceId, 'activity:new', entry);
   return entry;
 }
 

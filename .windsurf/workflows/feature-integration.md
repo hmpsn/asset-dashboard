@@ -44,6 +44,8 @@ Every tool should include "Next steps" or "Tip" hints that guide users to relate
 | Rank Tracker empty | → Strategy | No keywords tracked yet | Static cross-link hint |
 | Internal Links | → SEO Editor, Site Audit | After analysis | Static cross-link hint |
 | Redirect Manager | → Site Audit, Dead Links | After adding redirects | Static cross-link hint |
+| Anomaly Alerts | → Search Console, Analytics, Site Audit | Anomaly source matches tool | Click-through to relevant tool |
+| AI Chat | → Rich blocks (metric/chart/datatable/sparkline) | AI includes structured data | Auto-rendered inline by RenderMarkdown |
 
 ### When to add a cross-link
 
@@ -99,7 +101,9 @@ When adding or significantly modifying a feature:
 2. Update `DESIGN_SYSTEM.md` if new UI patterns or primitives are introduced
 3. Update `BRAND_DESIGN_LANGUAGE.md` Per-Component Color Map (§ 4) if any colors or UI elements changed
 4. Note any new cross-links in this workflow file
-4. **Update global knowledge memories** — check the File → Memory Update Map (in memory rules) and update any affected memories. Key ones:
+4. **Update anomaly detection** — if new data source added, consider adding anomaly threshold in `anomaly-detection.ts`
+5. **Update chat context** — if new data source added, wire into `buildChatContext()` (client) and admin chat context in `index.ts`
+6. **Update global knowledge memories** — check the File → Memory Update Map (in memory rules) and update any affected memories. Key ones:
    - New/moved endpoints in `server/index.ts` → update **Server index.ts Section Map**
    - New server files → update **Server File Map**
    - New frontend components/tabs → update **Frontend Component Map**

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Shield, Search, BarChart3, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
   Loader2, Bell, ClipboardCheck, FileText, AlertTriangle, Activity, Clipboard,
@@ -10,6 +10,8 @@ import { InsightsEngine } from './client/InsightsEngine';
 import { ErrorBoundary } from './ErrorBoundary';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useAuditSummary } from '../hooks/useAuditSummary';
+import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
+import { AnomalyAlerts } from './AnomalyAlerts';
 
 interface WorkspaceHomeProps {
   workspaceId: string;
@@ -60,6 +62,37 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   const [annotations, setAnnotations] = useState<Array<{ id: string; date: string; label: string; color?: string }>>([]);
   const [churnSignals, setChurnSignals] = useState<Array<{ id: string; type: string; severity: string; title: string; description: string; detectedAt: string }>>([]);
   const [workOrders, setWorkOrders] = useState<Array<{ id: string; status: string; productType: string }>>([]);
+
+  // Refetch a single key when a real-time event arrives
+  const refetch = useCallback(async (key: string, url: string) => {
+    try {
+      const r = await fetch(url);
+      if (!r.ok) return;
+      const d = await r.json();
+      if (key === 'activity' && Array.isArray(d)) setActivity(d);
+      if (key === 'requests' && Array.isArray(d)) setRequests(d);
+      if (key === 'content' && Array.isArray(d)) setContentRequests(d);
+      if (key === 'workOrders' && Array.isArray(d)) setWorkOrders(d);
+    } catch { /* ignore */ }
+  }, []);
+
+  // Real-time workspace events
+  useWorkspaceEvents(workspaceId, {
+    'activity:new': () => refetch('activity', `/api/activity?workspaceId=${workspaceId}&limit=8`),
+    'approval:update': () => refetch('activity', `/api/activity?workspaceId=${workspaceId}&limit=8`),
+    'approval:applied': () => refetch('activity', `/api/activity?workspaceId=${workspaceId}&limit=8`),
+    'request:created': () => refetch('requests', `/api/requests?workspaceId=${workspaceId}`),
+    'request:update': () => refetch('requests', `/api/requests?workspaceId=${workspaceId}`),
+    'content-request:created': () => refetch('content', `/api/content-requests/${workspaceId}`),
+    'content-request:update': () => refetch('content', `/api/content-requests/${workspaceId}`),
+    'audit:complete': (data) => {
+      const d = data as { score?: number; previousScore?: number };
+      if (d?.score != null) {
+        // Audit hook will refresh on next render, just trigger activity refresh
+        refetch('activity', `/api/activity?workspaceId=${workspaceId}&limit=8`);
+      }
+    },
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -239,6 +272,9 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
           onClick={ranks.length > 0 ? () => onNavigate('seo-ranks') : undefined}
         />
       </div>
+
+      {/* ── Anomaly Alerts ── */}
+      <AnomalyAlerts workspaceId={workspaceId} isAdmin={true} />
 
       {/* ── SEO Work Status ── */}
       {seoStatus.total > 0 && (

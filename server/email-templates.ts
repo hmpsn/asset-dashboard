@@ -152,7 +152,8 @@ export type EmailEventType =
   | 'payment_received'
   | 'fixes_applied'
   | 'recommendations_ready'
-  | 'audit_improved';
+  | 'audit_improved'
+  | 'anomaly_alert';
 
 // ── Template renderers ──
 
@@ -201,6 +202,8 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
       return renderRecommendationsReady(events, count, ws, dashUrl, logoUrl);
     case 'audit_improved':
       return renderAuditImproved(events, count, ws, dashUrl, logoUrl);
+    case 'anomaly_alert':
+      return renderAnomalyAlert(events, count, ws, dashUrl, logoUrl);
     default:
       return { subject: 'Notification', html: '' };
   }
@@ -740,6 +743,42 @@ function renderChurnSignal(events: EmailEvent[], count: number, ws: string, dash
       headline: 'Client Risk Alert',
       subtitle: ws,
       body: (count > 1 ? countPill(count, 'signal detected') : '') + items,
+      cta: dashUrl ? { label: 'View Dashboard', url: dashUrl } : undefined,
+      logoUrl,
+    }),
+  };
+}
+
+function renderAnomalyAlert(events: EmailEvent[], count: number, ws: string, dashUrl?: string, logoUrl?: string) {
+  const items = events.map((e, i) => {
+    const severity = e.data.severity as string;
+    const badge = severity === 'critical'
+      ? { label: 'Critical', color: '#dc2626', bg: '#fef2f2' }
+      : severity === 'warning'
+        ? { label: 'Warning', color: '#d97706', bg: '#fffbeb' }
+        : { label: 'Positive', color: '#16a34a', bg: '#f0fdf4' };
+    return itemRow({
+      title: (e.data.title as string) || 'Anomaly detected',
+      detail: (e.data.description as string) || '',
+      badge,
+      isLast: i === events.length - 1,
+    });
+  }).join('');
+
+  const criticalCount = events.filter(e => e.data.severity === 'critical').length;
+  const emoji = criticalCount > 0 ? '🚨' : '⚠';
+
+  return {
+    subject: count === 1
+      ? `${emoji} Anomaly detected: ${(events[0].data.title as string) || ws}`
+      : `${emoji} ${count} anomalies detected — ${ws}`,
+    html: layout({
+      preheader: `${count} anomal${count !== 1 ? 'ies' : 'y'} detected for ${ws}`,
+      headline: 'Anomaly Alert',
+      subtitle: ws,
+      body: (count > 1 ? countPill(count, 'anomaly detected') : '') +
+        (events[0].data.aiSummary ? `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#475569;line-height:1.5;">${esc(events[0].data.aiSummary as string)}</div>` : '') +
+        items,
       cta: dashUrl ? { label: 'View Dashboard', url: dashUrl } : undefined,
       logoUrl,
     }),
