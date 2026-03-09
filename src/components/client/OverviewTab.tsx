@@ -99,33 +99,6 @@ export function OverviewTab({
       <p className="text-sm text-zinc-500 mt-1">{dynamicSubtitle}</p>
     </div>
 
-    {/* Action-needed banner */}
-    {(() => {
-      const actions: { label: string; count: number; tab: ClientTab; color: string }[] = [];
-      if (pendingApprovals > 0) actions.push({ label: `${pendingApprovals} SEO change${pendingApprovals > 1 ? 's' : ''} to review`, count: pendingApprovals, tab: 'inbox', color: 'text-amber-400' });
-      const contentReviews = contentRequests.filter(r => r.status === 'client_review').length;
-      if (!betaMode && contentReviews > 0) actions.push({ label: `${contentReviews} content brief${contentReviews > 1 ? 's' : ''} ready for review`, count: contentReviews, tab: 'inbox', color: 'text-blue-400' });
-      if (unreadTeamNotes > 0) actions.push({ label: `${unreadTeamNotes} request${unreadTeamNotes > 1 ? 's' : ''} with new team replies`, count: unreadTeamNotes, tab: 'inbox', color: 'text-teal-400' });
-      if (actions.length === 0) return null;
-      const total = actions.reduce((s, a) => s + a.count, 0);
-      return (
-        <div className="bg-gradient-to-r from-amber-600/10 via-zinc-900 to-teal-600/10 border border-amber-500/20 rounded-xl px-5 py-3.5">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-5 h-5 rounded-md bg-amber-500/15 flex items-center justify-center"><AlertTriangle className="w-3 h-3 text-amber-400" /></div>
-            <span className="text-xs font-medium text-zinc-200">{total} item{total > 1 ? 's' : ''} need{total === 1 ? 's' : ''} your attention</span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {actions.map((a, i) => (
-              <button key={i} onClick={() => setTab(a.tab)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/50 transition-colors text-left">
-                <span className={`text-[11px] font-semibold ${a.color}`}>{a.count}</span>
-                <span className="text-[11px] text-zinc-400">{a.label.replace(/^\d+\s*/, '')}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      );
-    })()}
-
     {/* Key metrics — full-span StatCards */}
     {(() => {
       const cards: { label: string; value: string; icon?: typeof Users; color: string; sub?: string; sparkline?: number[]; delta?: number }[] = [];
@@ -206,6 +179,33 @@ export function OverviewTab({
 
       {/* Right sidebar (2/5) */}
       <div className="lg:col-span-2 space-y-4">
+        {/* Action-needed banner */}
+        {(() => {
+          const actions: { label: string; count: number; tab: ClientTab; color: string }[] = [];
+          if (pendingApprovals > 0) actions.push({ label: `${pendingApprovals} SEO change${pendingApprovals > 1 ? 's' : ''} to review`, count: pendingApprovals, tab: 'inbox', color: 'text-amber-400' });
+          const contentReviews = contentRequests.filter(r => r.status === 'client_review').length;
+          if (!betaMode && contentReviews > 0) actions.push({ label: `${contentReviews} content brief${contentReviews > 1 ? 's' : ''} ready for review`, count: contentReviews, tab: 'inbox', color: 'text-blue-400' });
+          if (unreadTeamNotes > 0) actions.push({ label: `${unreadTeamNotes} request${unreadTeamNotes > 1 ? 's' : ''} with new team replies`, count: unreadTeamNotes, tab: 'inbox', color: 'text-teal-400' });
+          if (actions.length === 0) return null;
+          const total = actions.reduce((s, a) => s + a.count, 0);
+          return (
+            <div className="bg-gradient-to-r from-amber-600/10 via-zinc-900 to-teal-600/10 border border-amber-500/20 rounded-xl px-4 py-3">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-5 h-5 rounded-md bg-amber-500/15 flex items-center justify-center"><AlertTriangle className="w-3 h-3 text-amber-400" /></div>
+                <span className="text-xs font-medium text-zinc-200">{total} item{total > 1 ? 's' : ''} need{total === 1 ? 's' : ''} your attention</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {actions.map((a, i) => (
+                  <button key={i} onClick={() => setTab(a.tab)} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/50 transition-colors text-left">
+                    <span className={`text-[11px] font-semibold ${a.color}`}>{a.count}</span>
+                    <span className="text-[11px] text-zinc-400">{a.label.replace(/^\d+\s*/, '')}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Ask the Insights Engine */}
         <div className="bg-gradient-to-br from-teal-500/5 via-zinc-900 to-zinc-900 rounded-xl border border-teal-500/15 p-4">
           <div className="flex items-center gap-2 mb-3">
@@ -262,7 +262,7 @@ export function OverviewTab({
                             <span className="text-[11px] font-medium px-1 py-0.5 rounded" style={{ backgroundColor: `${cfg.color}15`, color: cfg.color }}>{cfg.label}</span>
                             <span className="text-[11px] text-zinc-500">{new Date(entry.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                           </div>
-                          <div className="text-[11px] text-zinc-400 mt-0.5 line-clamp-1">{entry.title}</div>
+                          <div className="text-[11px] text-zinc-400 mt-0.5 line-clamp-1">{entry.type === 'audit_completed' && audit ? entry.title.replace(/score \d+/, `score ${audit.siteScore}`) : entry.title}</div>
                         </div>
                       </div>
                     );

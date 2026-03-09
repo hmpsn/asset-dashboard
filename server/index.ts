@@ -1840,13 +1840,14 @@ app.post('/api/reports/:siteId/save', async (req, res) => {
     }
 
     const snapshot = saveSnapshot(siteId, siteName || siteId, audit, logoUrl);
-    // Log activity
+    // Log activity — use suppression-adjusted score so it matches client dashboard stat card
     const auditWs = listWorkspaces().find(w => w.webflowSiteId === siteId);
     if (auditWs) {
-      addActivity(auditWs.id, 'audit_completed', `Site audit completed — score ${audit.siteScore}`,
-        `${audit.totalPages} pages scanned, ${audit.errors} errors, ${audit.warnings} warnings`,
-        { score: audit.siteScore, previousScore: snapshot.previousScore });
-      broadcastToWorkspace(auditWs.id, 'audit:complete', { score: audit.siteScore, previousScore: snapshot.previousScore });
+      const effectiveAudit = auditWs.auditSuppressions?.length ? applySuppressionsToAudit(audit, auditWs.auditSuppressions) : audit;
+      addActivity(auditWs.id, 'audit_completed', `Site audit completed — score ${effectiveAudit.siteScore}`,
+        `${effectiveAudit.totalPages} pages scanned, ${effectiveAudit.errors} errors, ${effectiveAudit.warnings} warnings`,
+        { score: effectiveAudit.siteScore, previousScore: snapshot.previousScore });
+      broadcastToWorkspace(auditWs.id, 'audit:complete', { score: effectiveAudit.siteScore, previousScore: snapshot.previousScore });
     }
     res.json({ id: snapshot.id, createdAt: snapshot.createdAt, siteScore: audit.siteScore, previousScore: snapshot.previousScore });
   } catch (err) {
@@ -6443,9 +6444,10 @@ app.post('/api/jobs', async (req, res) => {
             const siteName = ws?.webflowSiteName || ws?.name || siteId;
             const snapshot = saveSnapshot(siteId, siteName, result);
             if (ws) {
-              addActivity(ws.id, 'audit_completed', `Site audit completed — score ${result.siteScore}`,
-                `${result.totalPages} pages scanned, ${result.errors} errors, ${result.warnings} warnings`,
-                { score: result.siteScore, previousScore: snapshot.previousScore });
+              const effectiveResult = ws.auditSuppressions?.length ? applySuppressionsToAudit(result, ws.auditSuppressions) : result;
+              addActivity(ws.id, 'audit_completed', `Site audit completed — score ${effectiveResult.siteScore}`,
+                `${effectiveResult.totalPages} pages scanned, ${effectiveResult.errors} errors, ${effectiveResult.warnings} warnings`,
+                { score: effectiveResult.siteScore, previousScore: snapshot.previousScore });
             }
             updateJob(job.id, { status: 'done', result: { ...result, snapshotId: snapshot.id }, message: `Audit complete — score ${result.siteScore}` });
             // Auto-regenerate recommendations after audit
