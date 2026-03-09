@@ -7,6 +7,14 @@ import { getWorkspace, updateWorkspace, listWorkspaces } from './workspaces.js';
 import { createWorkOrder } from './work-orders.js';
 import { notifyTeamPaymentReceived } from './email.js';
 
+type WorkspaceBroadcastFn = (workspaceId: string, event: string, data: unknown) => void;
+let _broadcastFn: WorkspaceBroadcastFn | null = null;
+
+/** Register a workspace-scoped broadcast function (called from index.ts). */
+export function initStripeBroadcast(fn: WorkspaceBroadcastFn) {
+  _broadcastFn = fn;
+}
+
 // --- Stripe SDK (lazy init — picks up keys saved via admin UI or env vars) ---
 
 let _stripe: Stripe | null = null;
@@ -325,6 +333,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       if (productType === 'plan_growth' || productType === 'plan_premium') {
         const newTier = productType === 'plan_growth' ? 'growth' : 'premium';
         updateWorkspace(workspaceId, { tier: newTier, trialEndsAt: undefined });
+        _broadcastFn?.(workspaceId, 'workspace:updated', { tier: newTier });
         console.log(`[stripe] Tier upgraded: workspace=${workspaceId} → ${newTier}`);
       }
 
@@ -418,6 +427,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       if (productType === 'plan_growth' || productType === 'plan_premium') {
         const newTier = productType === 'plan_growth' ? 'growth' : 'premium';
         updateWorkspace(workspaceId, { tier: newTier, trialEndsAt: undefined });
+        _broadcastFn?.(workspaceId, 'workspace:updated', { tier: newTier });
         console.log(`[stripe] Tier upgraded: workspace=${workspaceId} → ${newTier}`);
       }
 

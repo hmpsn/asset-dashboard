@@ -123,7 +123,7 @@ The anomaly detection system (`server/anomaly-detection.ts`) runs on a 12h sched
 5. **Activity logging**: Critical/warning anomalies log `anomaly_detected`; positive trends log `anomaly_positive`
 6. **Storage**: JSON file at `.anomalies.json` with 60-day auto-pruning
 7. **API endpoints**: `GET /api/anomalies[/:workspaceId]`, `POST /api/anomalies/:id/dismiss`, `POST /api/anomalies/:id/acknowledge`, `POST /api/anomalies/scan`, `GET /api/public/anomalies/:workspaceId`
-8. **Frontend**: `AnomalyAlerts` component with `workspaceId`, `isAdmin`, `compact` props. Wired into WorkspaceHome (admin) and ClientDashboard overview.
+8. **Frontend**: `AnomalyAlerts` component with `workspaceId`, `isAdmin`, `compact` props. Wired into WorkspaceHome (admin only). Removed from client overview — InsightsDigest covers trend signals client-side.
 
 To add a new anomaly type:
 1. Add type to `AnomalyType` union and threshold to `THRESHOLDS`
@@ -154,9 +154,9 @@ When adding real-time updates for a new feature:
    - Add `let _broadcast: ((wsId: string, event: string, data: unknown) => void) | null = null;`
    - Export `initMyBroadcast(fn)` function
    - Call `initMyBroadcast(broadcastToWorkspace)` in `server/index.ts` alongside other broadcast inits
-   - Example: `initActivityBroadcast`, `initAnomalyBroadcast`
+   - Example: `initActivityBroadcast`, `initAnomalyBroadcast`, `initStripeBroadcast`
 3. **Frontend**: Use `useWorkspaceEvents(wsId, { 'event:name': (data) => refetchRelevantData() })` in the component
-4. **Existing events**: `activity:new`, `approval:update`, `approval:applied`, `request:created`, `request:update`, `content-request:created`, `content-request:update`, `audit:complete`, `anomalies:update`
+4. **Existing events**: `activity:new`, `approval:update`, `approval:applied`, `request:created`, `request:update`, `content-request:created`, `content-request:update`, `audit:complete`, `anomalies:update`, `workspace:updated`
 
 ### ⚠️ Critical: Broadcast from BOTH admin and client endpoints
 
@@ -176,6 +176,7 @@ Every write endpoint has two versions — admin (`/api/...`) and client (`/api/p
 - Content requests: `content-request:created`, `content-request:update`
 - Activity: `activity:new` (auto via `addActivity` → `initActivityBroadcast`)
 - Anomalies: `anomalies:update` (auto via `initAnomalyBroadcast`)
+- Workspace settings/tier: `workspace:updated` (admin PUT + `initStripeBroadcast` for tier upgrades)
 
 ## 12. Email Notifications
 

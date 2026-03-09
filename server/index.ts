@@ -90,7 +90,7 @@ import { signToken, verifyToken as verifyJwtToken, requireAuth, requireRole, req
 import { callOpenAI, getTokenUsage } from './openai-helpers.js';
 import { addMessage, buildConversationContext, listSessions, getSession as getChatSession, deleteSession as deleteChatSession, generateSessionSummary, checkChatRateLimit } from './chat-memory.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
-import { isStripeConfigured, createCheckoutSession, createCartCheckoutSession, createPaymentIntentForProduct, constructWebhookEvent, handleWebhookEvent, getProductConfig, listProducts, clearTestModeCustomerIds } from './stripe.js';
+import { isStripeConfigured, createCheckoutSession, createCartCheckoutSession, createPaymentIntentForProduct, constructWebhookEvent, handleWebhookEvent, getProductConfig, listProducts, clearTestModeCustomerIds, initStripeBroadcast } from './stripe.js';
 import { listPayments, getPayment } from './payments.js';
 import { computeROI } from './roi.js';
 import { generateRecommendations, loadRecommendations, updateRecommendationStatus, dismissRecommendation } from './recommendations.js';
@@ -606,6 +606,7 @@ initJobs(broadcast);
 initActivityBroadcast(broadcastToWorkspace);
 // --- Anomaly broadcast (notify workspace clients when new anomalies detected) ---
 initAnomalyBroadcast(broadcastToWorkspace);
+initStripeBroadcast(broadcastToWorkspace);
 
 // --- File Upload ---
 const tmpDir = path.join(getUploadRoot(), '.tmp');
@@ -776,6 +777,7 @@ app.patch('/api/workspaces/:id', requireWorkspaceAccess(), async (req, res) => {
   // Strip token from response to avoid leaking to frontend
   const safe = { ...ws, webflowToken: undefined, clientPassword: undefined, hasPassword: !!ws.clientPassword };
   broadcast('workspace:updated', safe);
+  broadcastToWorkspace(req.params.id, 'workspace:updated', safe);
   res.json(safe);
 });
 

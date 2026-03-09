@@ -196,6 +196,9 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
       fetch(`/api/public/audit-summary/${workspaceId}`).then(r => r.json()).then(a => { if (a?.id) setAudit(a); }).catch(() => {});
       refetchClient('activity', `/api/public/activity/${workspaceId}?limit=20`);
     },
+    'workspace:updated': () => {
+      fetch(`/api/public/workspace/${workspaceId}`).then(r => r.ok ? r.json() : null).then(data => { if (data?.id) setWs(data); }).catch(() => {});
+    },
   });
 
   // Load workspace info first (includes requiresPassword flag)
