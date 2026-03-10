@@ -41,24 +41,28 @@ async function fetchPageContent(url: string): Promise<{ content: string; interna
     if (!res.ok) return null;
     const html = await res.text();
 
-    // Extract body text
+    // Extract body text — strip nav/header/footer so we only see page content
     const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
     const body = bodyMatch ? bodyMatch[1] : html;
-    const content = body
+    const contentHtml = body
       .replace(/<script[\s\S]*?<\/script>/gi, '')
       .replace(/<style[\s\S]*?<\/style>/gi, '')
       .replace(/<nav[\s\S]*?<\/nav>/gi, '')
-      .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+      .replace(/<header[\s\S]*?<\/header>/gi, '')
+      .replace(/<footer[\s\S]*?<\/footer>/gi, '');
+    const content = contentHtml
       .replace(/<[^>]+>/g, ' ')
       .replace(/&[a-z]+;/gi, ' ')
       .replace(/\s+/g, ' ')
       .trim();
 
-    // Extract internal links
+    // Extract internal links from CONTENT ONLY (not nav/header/footer)
+    // Nav links make every page appear to link to every other page,
+    // hiding the real in-content linking gaps the AI should find.
     const linkRegex = /<a\s[^>]*href=["']([^"'#][^"']*)["'][^>]*>/gi;
     const internalLinks: string[] = [];
     let match;
-    while ((match = linkRegex.exec(html)) !== null) {
+    while ((match = linkRegex.exec(contentHtml)) !== null) {
       const href = match[1].trim();
       if (href.startsWith('/') || href.startsWith(url.split('/').slice(0, 3).join('/'))) {
         try {

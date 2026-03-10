@@ -187,7 +187,10 @@ export function ApprovalsTab({
                             const isEditing = editingApproval === item.id;
                             const displayValue = item.clientValue || item.proposedValue;
                             const isSchema = item.field === 'schema';
-                            const fieldLabel = isSchema ? 'Structured Data (JSON-LD)' : item.field === 'seoTitle' ? 'SEO Title' : 'Meta Description';
+                            const fieldLabel = isSchema ? 'Structured Data (JSON-LD)'
+                              : item.field === 'seoTitle' ? 'SEO Title'
+                              : item.field === 'seoDescription' ? 'Meta Description'
+                              : item.field.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
                             const statusColors = {
                               pending: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
                               approved: 'bg-green-500/10 border-green-500/30 text-green-400',
@@ -321,7 +324,7 @@ export function ApprovalsTab({
                                 )}
                                 {item.status === 'applied' && (
                                   <div className="flex items-center gap-2 mt-3 text-[11px] text-blue-400">
-                                    <CheckCircle2 className="w-3 h-3" /> Applied to live site
+                                    <CheckCircle2 className="w-3 h-3" /> Applied to live site on {new Date(item.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                   </div>
                                 )}
                               </div>
@@ -339,8 +342,12 @@ export function ApprovalsTab({
             {/* Batch footer actions */}
             <div className="px-5 py-4 border-t border-zinc-800 bg-zinc-900/50 flex items-center justify-between gap-3">
               <span className="text-[11px] text-zinc-400">
+                {batchApplied > 0 && <>{batchApplied} applied · </>}
                 {batchApproved > 0 && <>{batchApproved} approved · </>}
                 {batchPending > 0 && <>{batchPending} pending</>}
+                {batchApplied === batch.items.length && batchApplied > 0 && (
+                  <span className="text-blue-400"> All changes live as of {new Date(batch.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                )}
               </span>
               <div className="flex items-center gap-2">
                 {batchPending > 0 && effectiveTier !== 'free' && (

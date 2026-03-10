@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Loader2,
   Sparkles, Send, AlertTriangle,
@@ -185,6 +185,13 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
     } catch { /* ignore */ }
   }, []);
 
+  const wsIdentity = useMemo(() => clientUser ? {
+    userId: clientUser.id,
+    email: clientUser.email,
+    name: clientUser.name,
+    role: 'client' as const,
+  } : undefined, [clientUser]);
+
   useWorkspaceEvents(authenticated ? workspaceId : undefined, {
     'activity:new': () => refetchClient('activity', `/api/public/activity/${workspaceId}?limit=20`),
     'approval:update': () => refetchClient('approvals', `/api/public/approvals/${workspaceId}`),
@@ -200,7 +207,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
     'workspace:updated': () => {
       fetch(`/api/public/workspace/${workspaceId}`).then(r => r.ok ? r.json() : null).then(data => { if (data?.id) setWs(data); }).catch(() => {});
     },
-  });
+  }, wsIdentity);
 
   // Load workspace info first (includes requiresPassword flag)
   useEffect(() => {

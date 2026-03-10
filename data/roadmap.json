@@ -326,6 +326,22 @@
         {"id":124,"title":"Audit context in SEO rewrite prompts","source":"Session work","est":"30m","priority":"P1","notes":"Shipped — /api/webflow/seo-rewrite looks up latest audit snapshot, injects page-specific issues (title, description, H1, duplicates) into AI prompt","status":"done"},
         {"id":125,"title":"Schema gen workspaceId cost tracking","source":"Session work","est":"15m","priority":"P1","notes":"Shipped — workspaceId added to SchemaContext, passed through callOpenAI for per-workspace token cost attribution","status":"done"}
       ]
+    },
+    {
+      "id": "archive-sprint-11",
+      "name": "✅ SHIPPED — UX Narrative Audit & CMS Approval Visibility",
+      "hours": "4-6",
+      "rationale": "Client-facing UX narrative audit (diagnosis→plan→action arc), CMS approval change visibility, internal links accuracy, command center layout.",
+      "items": [
+        {"id":180,"title":"Onboarding wizard: reorder features + actions, fix purple","source":"UX Narrative Audit Mar 2026","est":"30m","priority":"P0","notes":"Shipped — Reordered features and suggestedActions arrays in OnboardingWizard.tsx to match diagnosis→plan→action narrative arc. Fixed purple color in suggestedActions to teal (client-facing, no purple).","status":"done"},
+        {"id":181,"title":"Welcome email: reorder feature list","source":"UX Narrative Audit Mar 2026","est":"15m","priority":"P0","notes":"Shipped — Reordered welcome email feature list in email-templates.ts to match narrative arc: traffic context before site health diagnosis.","status":"done"},
+        {"id":182,"title":"Strategy tab: Content Opportunities above Quick Wins + fix purple badge","source":"UX Narrative Audit Mar 2026","est":"30m","priority":"P0","notes":"Shipped — Swapped Content Opportunities above Quick Wins in StrategyTab.tsx (revenue moment first, then value proof). Fixed purple 'In Review' badge to amber.","status":"done"},
+        {"id":183,"title":"Internal links: body-only link extraction","source":"Bug fix","est":"30m","priority":"P0","notes":"Shipped — internal-links.ts: extract links from content body only (strip nav/header/footer before link scan). Nav links were making every page appear fully linked, so AI found no gaps.","status":"done"},
+        {"id":184,"title":"CMS approval publish safeguard","source":"Preventive improvement","est":"15m","priority":"P0","notes":"Shipped — server/index.ts: added publishCollectionItems call after updateCollectionItem in approval apply endpoint. Ensures CMS draft changes go live when client applies approved SEO changes.","status":"done"},
+        {"id":185,"title":"CMS Editor: inline approval context + change history","source":"CMS visibility fix","est":"1-2h","priority":"P0","notes":"Shipped — CmsEditor.tsx: fetches approval batches, builds per-item lookup, shows latest approved/proposed value inline under each CMS item with status badge and date. Collapsible change history for items with multiple past approvals. Admin can see what was changed without leaving the editor.","status":"done"},
+        {"id":186,"title":"Client Inbox: applied batch visibility + CMS field labels","source":"CMS visibility fix","est":"30m","priority":"P0","notes":"Shipped — ApprovalsTab.tsx: applied items now show date applied, batch footer shows applied count + 'All changes live as of [date]'. Field labels handle CMS slugs (slug→title-cased). Types updated: ApprovalItem gains createdAt/updatedAt/collectionId, ApprovalBatch gains updatedAt, field type widened for CMS slugs.","status":"done"},
+        {"id":187,"title":"Command center: single-column workspace rows","source":"UI fix","est":"30m","priority":"P0","notes":"Shipped — WorkspaceOverview.tsx: replaced 2-column grid with single-column full-width rows. Metrics flow horizontally: Health | Requests | Approvals | Content | SEO Status separated by dividers. Cleaner layout that doesn't cramp data.","status":"done"}
+      ]
     }
   ]
 }

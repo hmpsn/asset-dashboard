@@ -133,13 +133,13 @@ export interface ClientRequest {
 
 export interface ApprovalItem {
   id: string; pageId: string; pageTitle: string; pageSlug: string;
-  field: 'seoTitle' | 'seoDescription' | 'schema'; currentValue: string; proposedValue: string;
+  field: string; collectionId?: string; currentValue: string; proposedValue: string;
   clientValue?: string; status: 'pending' | 'approved' | 'rejected' | 'applied'; clientNote?: string;
-  reason?: string;
+  reason?: string; createdAt: string; updatedAt: string;
 }
 export interface ApprovalBatch {
   id: string; workspaceId: string; siteId: string; name: string;
-  items: ApprovalItem[]; status: string; createdAt: string;
+  items: ApprovalItem[]; status: string; createdAt: string; updatedAt: string;
 }
 
 export const SEV = {

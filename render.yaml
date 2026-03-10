@@ -1,0 +1,122 @@
+# Render Blueprint — production + staging environments
+# https://render.com/docs/blueprint-spec
+#
+# Usage:
+#   1. Push this file to your repo
+#   2. Go to Render Dashboard → Blueprints → New Blueprint Instance
+#   3. Select this repo — Render will create both services
+#   4. Fill in the env var values in the Render dashboard
+#
+# Data sharing:
+#   - External APIs (Webflow, GSC, GA4, OpenAI) share the same tokens,
+#     so both environments see the same live data.
+#   - File-based state (workspaces, audits, approvals) lives on each
+#     service's persistent disk. To seed staging with production data,
+#     use: render ssh into prod → tar the data dir → scp to staging.
+#   - Stripe uses TEST keys on staging so payments are sandboxed.
+
+services:
+  # ── Production ──
+  - type: web
+    name: asset-dashboard
+    runtime: node
+    region: oregon
+    plan: starter
+    branch: main
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/workspace-overview
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /var/data/asset-dashboard
+      - key: PORT
+        value: "3001"
+      - key: APP_URL
+        sync: false  # set in dashboard
+      - key: APP_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: WEBFLOW_API_TOKEN
+        fromGroup: shared-api-keys
+      - key: OPENAI_API_KEY
+        fromGroup: shared-api-keys
+      - key: ANTHROPIC_API_KEY
+        fromGroup: shared-api-keys
+      - key: GOOGLE_CLIENT_ID
+        fromGroup: shared-google
+      - key: GOOGLE_CLIENT_SECRET
+        fromGroup: shared-google
+      - key: GOOGLE_REDIRECT_URI
+        sync: false  # differs per environment
+      - key: STRIPE_SECRET_KEY
+        sync: false  # live keys for prod
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+    disk:
+      name: asset-dashboard-data
+      mountPath: /var/data/asset-dashboard
+      sizeGB: 1
+
+  # ── Staging ──
+  - type: web
+    name: asset-dashboard-staging
+    runtime: node
+    region: oregon
+    plan: starter
+    branch: staging
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/workspace-overview
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /var/data/asset-dashboard
+      - key: PORT
+        value: "3001"
+      - key: APP_URL
+        sync: false  # e.g. https://asset-dashboard-staging.onrender.com
+      - key: APP_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: WEBFLOW_API_TOKEN
+        fromGroup: shared-api-keys
+      - key: OPENAI_API_KEY
+        fromGroup: shared-api-keys
+      - key: ANTHROPIC_API_KEY
+        fromGroup: shared-api-keys
+      - key: GOOGLE_CLIENT_ID
+        fromGroup: shared-google
+      - key: GOOGLE_CLIENT_SECRET
+        fromGroup: shared-google
+      - key: GOOGLE_REDIRECT_URI
+        sync: false  # staging callback URL
+      - key: STRIPE_SECRET_KEY
+        sync: false  # test keys for staging
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+    disk:
+      name: asset-dashboard-staging-data
+      mountPath: /var/data/asset-dashboard
+      sizeGB: 1
+
+# Shared env var groups — set once, used by both services
+envVarGroups:
+  - name: shared-api-keys
+    envVars:
+      - key: WEBFLOW_API_TOKEN
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+  - name: shared-google
+    envVars:
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false

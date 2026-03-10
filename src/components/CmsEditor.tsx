@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Loader2, Save, ChevronDown, ChevronRight, Check, AlertCircle,
-  Search, Sparkles, Wand2, Upload, Send,
+  Search, Sparkles, Wand2, Upload, Send, Clock, ArrowRight,
 } from 'lucide-react';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { StatusBadge } from './ui/StatusBadge';
@@ -11,6 +11,33 @@ interface SeoField {
   slug: string;
   displayName: string;
   type: string;
+}
+
+interface ApprovalItem {
+  id: string;
+  pageId: string;
+  pageTitle: string;
+  pageSlug: string;
+  field: string;
+  collectionId?: string;
+  currentValue: string;
+  proposedValue: string;
+  clientValue?: string;
+  status: 'pending' | 'approved' | 'rejected' | 'applied';
+  reason?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface ApprovalBatch {
+  id: string;
+  workspaceId: string;
+  siteId: string;
+  name: string;
+  items: ApprovalItem[];
+  status: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface CmsItem {
@@ -50,6 +77,8 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
   const [sendingApproval, setSendingApproval] = useState(false);
   const [approvalSent, setApprovalSent] = useState(false);
   const [variations, setVariations] = useState<Record<string, { fieldSlug: string; options: string[] }>>({});
+  const [approvalBatches, setApprovalBatches] = useState<ApprovalBatch[]>([]);
+  const [historyExpanded, setHistoryExpanded] = useState<Set<string>>(new Set());
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
 
   const fetchData = async () => {
@@ -81,6 +110,37 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
   };
 
   useEffect(() => { fetchData(); }, [siteId]);
+
+  // Fetch approval batches for this workspace
+  useEffect(() => {
+    if (!workspaceId) return;
+    fetch(`/api/approvals/${workspaceId}`)
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setApprovalBatches(data); })
+      .catch(() => {});
+  }, [workspaceId]);
+
+  // Build per-item approval lookup: itemId → approval items across all batches
+  const itemApprovalMap = useMemo(() => {
+    const map = new Map<string, Array<ApprovalItem & { batchName: string; batchId: string }>>();
+    for (const batch of approvalBatches) {
+      for (const item of batch.items) {
+        if (!item.collectionId) continue; // only CMS items
+        const list = map.get(item.pageId) || [];
+        list.push({ ...item, batchName: batch.name, batchId: batch.id });
+        map.set(item.pageId, list);
+      }
+    }
+    return map;
+  }, [approvalBatches]);
+
+  const toggleHistory = (itemId: string) => {
+    setHistoryExpanded(prev => {
+      const n = new Set(prev);
+      if (n.has(itemId)) n.delete(itemId); else n.add(itemId);
+      return n;
+    });
+  };
 
 
 
@@ -557,6 +617,70 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                               Save
                             </button>
                           </div>
+
+                          {/* Approval context + change history */}
+                          {(() => {
+                            const itemApprovals = itemApprovalMap.get(item.id);
+                            if (!itemApprovals || itemApprovals.length === 0) return null;
+                            const latest = itemApprovals[0]; // most recent first
+                            const statusColors: Record<string, string> = {
+                              pending: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
+                              approved: 'text-green-400 bg-green-500/10 border-green-500/20',
+                              rejected: 'text-red-400 bg-red-500/10 border-red-500/20',
+                              applied: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
+                            };
+                            return (
+                              <div className="mt-3 space-y-2">
+                                {/* Inline: latest approval context */}
+                                <div className="px-3 py-2 rounded-lg bg-zinc-800/40 border border-zinc-700/50">
+                                  <div className="flex items-center gap-2 mb-1.5">
+                                    <Clock className="w-3 h-3 text-zinc-500" />
+                                    <span className="text-[11px] font-medium text-zinc-400">Latest: {latest.batchName}</span>
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded border ${statusColors[latest.status] || ''}`}>{latest.status}</span>
+                                    <span className="text-[10px] text-zinc-600 ml-auto">{new Date(latest.updatedAt).toLocaleDateString()}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-[11px]">
+                                    <span className="text-zinc-500 font-medium">{latest.field}</span>
+                                    <span className="text-zinc-500 truncate max-w-[160px]">{latest.currentValue || '(empty)'}</span>
+                                    <ArrowRight className="w-3 h-3 text-zinc-600 flex-shrink-0" />
+                                    <span className="text-teal-300 truncate max-w-[200px]">{latest.clientValue || latest.proposedValue}</span>
+                                  </div>
+                                </div>
+
+                                {/* Collapsible: full change history */}
+                                {itemApprovals.length > 1 && (
+                                  <>
+                                    <button
+                                      onClick={() => toggleHistory(item.id)}
+                                      className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
+                                    >
+                                      {historyExpanded.has(item.id) ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                                      {itemApprovals.length} changes in history
+                                    </button>
+                                    {historyExpanded.has(item.id) && (
+                                      <div className="space-y-1.5 pl-3 border-l-2 border-zinc-800">
+                                        {itemApprovals.slice(1).map(a => (
+                                          <div key={a.id} className="px-2.5 py-1.5 rounded bg-zinc-800/30 text-[11px]">
+                                            <div className="flex items-center gap-2 mb-0.5">
+                                              <span className="text-zinc-500">{a.batchName}</span>
+                                              <span className={`text-[10px] px-1 py-0.5 rounded border ${statusColors[a.status] || ''}`}>{a.status}</span>
+                                              <span className="text-[10px] text-zinc-600 ml-auto">{new Date(a.updatedAt).toLocaleDateString()}</span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                              <span className="text-zinc-500 font-medium">{a.field}:</span>
+                                              <span className="text-zinc-500 truncate max-w-[140px]">{a.currentValue || '(empty)'}</span>
+                                              <ArrowRight className="w-2.5 h-2.5 text-zinc-600 flex-shrink-0" />
+                                              <span className="text-zinc-300 truncate max-w-[180px]">{a.clientValue || a.proposedValue}</span>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                       )}
                     </div>

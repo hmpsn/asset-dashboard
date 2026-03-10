@@ -2,14 +2,23 @@ import { useEffect, useRef, useCallback } from 'react';
 
 type EventHandler = (data: unknown) => void;
 
+export interface WsIdentity {
+  userId: string;
+  email: string;
+  name?: string;
+  role?: 'client' | 'admin';
+}
+
 /**
  * Subscribe to workspace-scoped WebSocket events.
  * Sends subscribe/unsubscribe messages so the server only pushes relevant events.
  * Handlers are keyed by event name (e.g. 'activity:new', 'approval:update').
+ * Pass `identity` to register presence tracking for the connected user.
  */
 export function useWorkspaceEvents(
   workspaceId: string | undefined,
   handlers: Record<string, EventHandler>,
+  identity?: WsIdentity,
 ) {
   const wsRef = useRef<WebSocket | null>(null);
   const handlersRef = useRef<Record<string, EventHandler>>(handlers);
@@ -28,9 +37,13 @@ export function useWorkspaceEvents(
     }
   }, []);
 
+  const identityRef = useRef(identity);
+  useEffect(() => { identityRef.current = identity; }, [identity]);
+
   useEffect(() => {
     if (!workspaceId) return;
     let disposed = false;
+    let heartbeatInterval: ReturnType<typeof setInterval> | undefined;
 
     function connect() {
       if (disposed) return;
@@ -41,6 +54,18 @@ export function useWorkspaceEvents(
         // Subscribe to the workspace
         ws.send(JSON.stringify({ action: 'subscribe', workspaceId }));
         currentSubRef.current = workspaceId;
+        // Send identity for presence tracking if provided
+        const id = identityRef.current;
+        if (id) {
+          ws.send(JSON.stringify({ action: 'identify', workspaceId, ...id }));
+        }
+        // Heartbeat every 30s to keep presence alive
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ action: 'heartbeat' }));
+          }
+        }, 30_000);
       };
 
       ws.onmessage = (event) => {
@@ -55,6 +80,7 @@ export function useWorkspaceEvents(
 
       ws.onclose = () => {
         currentSubRef.current = undefined;
+        clearInterval(heartbeatInterval);
         if (!disposed) {
           reconnectTimer.current = setTimeout(connect, 2000);
         }
@@ -67,6 +93,7 @@ export function useWorkspaceEvents(
 
     return () => {
       disposed = true;
+      clearInterval(heartbeatInterval);
       clearTimeout(reconnectTimer.current);
       if (wsRef.current) {
         // Unsubscribe before closing

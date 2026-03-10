@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useWebSocket } from '../hooks/useWebSocket';
 import {
   Globe, Shield, MessageSquare, ClipboardCheck, AlertTriangle,
   CheckCircle2, ArrowUpRight, ArrowDownRight, Minus, Loader2,
@@ -74,16 +75,26 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
   const [recentActivity, setRecentActivity] = useState<ActivityEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [anomalies, setAnomalies] = useState<AnomalySummary[]>([]);
+  const [presence, setPresence] = useState<Record<string, Array<{ userId: string; email: string; name?: string; role: string; connectedAt: string; lastSeen: string }>>>({});
+
+  type PresenceMap = typeof presence;
+  // Real-time presence updates via WebSocket
+  const handlePresenceUpdate = useCallback((d: unknown) => {
+    if (d && typeof d === 'object') setPresence(d as PresenceMap);
+  }, []);
+  useWebSocket({ 'presence:update': handlePresenceUpdate });
 
   useEffect(() => {
     Promise.all([
       fetch('/api/workspace-overview').then(r => r.json()),
       fetch('/api/activity?limit=15').then(r => r.json()).catch(() => []),
       fetch('/api/anomalies').then(r => r.ok ? r.json() : []).catch(() => []),
-    ]).then(([d, act, anom]) => {
+      fetch('/api/presence').then(r => r.ok ? r.json() : {}).catch(() => ({})),
+    ]).then(([d, act, anom, pres]) => {
       if (Array.isArray(d)) setData(d);
       if (Array.isArray(act)) setRecentActivity(act);
       if (Array.isArray(anom)) setAnomalies(anom.filter((a: AnomalySummary) => !a.dismissedAt));
+      if (pres && typeof pres === 'object') setPresence(pres as PresenceMap);
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
@@ -196,18 +207,19 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
           <Globe className="w-4 h-4 text-zinc-500" />
           <h2 className="text-sm font-semibold text-zinc-200">Workspaces</h2>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="space-y-3">
           {data.map(ws => {
             const hasAlerts = ws.requests.new > 0 || ws.approvals.pending > 0 || (ws.contentRequests?.pending || 0) > 0;
             const scoreDelta = ws.audit && ws.audit.previousScore != null ? ws.audit.score - ws.audit.previousScore : null;
             const wsAnomalies = anomalyByWorkspace[ws.id];
             const hasAnomalies = wsAnomalies && (wsAnomalies.critical > 0 || wsAnomalies.warning > 0);
+            const onlineUsers = presence[ws.id] || [];
 
             return (
               <button
                 key={ws.id}
                 onClick={() => onSelectWorkspace(ws.id)}
-                className={`text-left rounded-xl p-5 transition-all hover:scale-[1.01] hover:shadow-lg group relative bg-zinc-900 border ${hasAnomalies && wsAnomalies?.critical ? 'border-red-500/30' : hasAlerts ? 'border-amber-500/30' : 'border-zinc-800'}`}
+                className={`w-full text-left rounded-xl p-5 transition-all hover:scale-[1.005] hover:shadow-lg group relative bg-zinc-900 border ${hasAnomalies && wsAnomalies?.critical ? 'border-red-500/30' : hasAlerts ? 'border-amber-500/30' : 'border-zinc-800'}`}
               >
                 {/* New request badge */}
                 {ws.requests.new > 0 && (
@@ -216,62 +228,70 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
                   </div>
                 )}
 
-                {/* Top row: name + site */}
-                <div className="flex items-start justify-between gap-3 mb-4">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-semibold truncate group-hover:text-teal-400 transition-colors text-zinc-200">{ws.name}</h3>
-                      {hasAnomalies && (
-                        <span className={`flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md border ${
-                          wsAnomalies.critical > 0
-                            ? 'bg-red-500/15 text-red-400 border-red-500/20'
-                            : 'bg-amber-500/15 text-amber-400 border-amber-500/20'
-                        }`}>
-                          <TrendingDown className="w-2.5 h-2.5" />
-                          {wsAnomalies.critical > 0 ? `${wsAnomalies.critical} critical` : `${wsAnomalies.warning} warning`}
-                        </span>
-                      )}
-                      {ws.isTrial && (
-                        <span className="flex-shrink-0 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md bg-amber-500/15 text-amber-400 border border-amber-500/20">
-                          Trial{ws.trialDaysRemaining != null ? ` · ${ws.trialDaysRemaining}d` : ''}
-                        </span>
-                      )}
-                      {ws.tier && ws.tier !== 'free' && !ws.isTrial && (
-                        <span className={`flex-shrink-0 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md border ${
-                          'bg-teal-500/15 text-teal-400 border-teal-500/20'
-                        }`}>{ws.tier}</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 mt-1 text-[11px] text-zinc-500">
-                      {ws.webflowSiteName && <span className="flex items-center gap-1"><Globe className="w-2.5 h-2.5" />{ws.webflowSiteName}</span>}
-                      {!ws.webflowSiteId && <span className="flex items-center gap-1 text-amber-400"><AlertTriangle className="w-2.5 h-2.5" />No site linked</span>}
-                      {ws.hasGsc && <span className="flex items-center gap-1"><Search className="w-2.5 h-2.5" />GSC</span>}
-                      {ws.hasGa4 && <span className="flex items-center gap-1"><BarChart3 className="w-2.5 h-2.5" />GA4</span>}
-                      {ws.hasPassword && <span className="flex items-center gap-1"><Lock className="w-2.5 h-2.5" />Client</span>}
-                    </div>
+                {/* Top row: name + badges + site info */}
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <h3 className="text-sm font-semibold truncate group-hover:text-teal-400 transition-colors text-zinc-200">{ws.name}</h3>
+                    {hasAnomalies && (
+                      <span className={`flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md border ${
+                        wsAnomalies.critical > 0
+                          ? 'bg-red-500/15 text-red-400 border-red-500/20'
+                          : 'bg-amber-500/15 text-amber-400 border-amber-500/20'
+                      }`}>
+                        <TrendingDown className="w-2.5 h-2.5" />
+                        {wsAnomalies.critical > 0 ? `${wsAnomalies.critical} critical` : `${wsAnomalies.warning} warning`}
+                      </span>
+                    )}
+                    {ws.isTrial && (
+                      <span className="flex-shrink-0 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                        Trial{ws.trialDaysRemaining != null ? ` · ${ws.trialDaysRemaining}d` : ''}
+                      </span>
+                    )}
+                    {ws.tier && ws.tier !== 'free' && !ws.isTrial && (
+                      <span className="flex-shrink-0 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md border bg-teal-500/15 text-teal-400 border-teal-500/20">{ws.tier}</span>
+                    )}
                   </div>
-                  <ExternalLink className="w-4 h-4 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity text-zinc-500" />
+                  <div className="flex items-center gap-2 text-[11px] text-zinc-500 flex-shrink-0">
+                    {onlineUsers.length > 0 && (
+                      <span className="flex items-center gap-1.5 text-green-400" title={onlineUsers.map(u => u.name || u.email).join(', ')}>
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                        </span>
+                        {onlineUsers.length === 1
+                          ? (onlineUsers[0].name || onlineUsers[0].email.split('@')[0])
+                          : `${onlineUsers.length} online`}
+                      </span>
+                    )}
+                    {onlineUsers.length > 0 && <span className="text-zinc-700">·</span>}
+                    {ws.webflowSiteName && <span className="flex items-center gap-1"><Globe className="w-2.5 h-2.5" />{ws.webflowSiteName}</span>}
+                    {!ws.webflowSiteId && <span className="flex items-center gap-1 text-amber-400"><AlertTriangle className="w-2.5 h-2.5" />No site linked</span>}
+                    {ws.hasGsc && <span className="flex items-center gap-1"><Search className="w-2.5 h-2.5" />GSC</span>}
+                    {ws.hasGa4 && <span className="flex items-center gap-1"><BarChart3 className="w-2.5 h-2.5" />GA4</span>}
+                    {ws.hasPassword && <span className="flex items-center gap-1"><Lock className="w-2.5 h-2.5" />Client</span>}
+                    <ExternalLink className="w-3.5 h-3.5 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" />
+                  </div>
                 </div>
 
-                {/* Metrics row */}
-                <div className="grid grid-cols-4 gap-3">
+                {/* Metrics row — single horizontal strip */}
+                <div className="flex items-center gap-6 flex-wrap">
                   {/* Audit score */}
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2.5">
                     {ws.audit ? (
                       <>
-                        <ScoreRing score={ws.audit.score} size={44} strokeWidth={3.5} />
+                        <ScoreRing score={ws.audit.score} size={40} strokeWidth={3.5} />
                         <div>
-                          <div className="text-[11px] font-medium text-zinc-500">Health</div>
-                          <div className="flex items-center gap-1 mt-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] font-medium text-zinc-400">Health</span>
                             {scoreDelta !== null && scoreDelta !== 0 && (
                               <span className={`flex items-center text-[11px] font-medium ${scoreDelta > 0 ? 'text-green-400' : 'text-red-400'}`}>
                                 {scoreDelta > 0 ? <ArrowUpRight className="w-2.5 h-2.5" /> : <ArrowDownRight className="w-2.5 h-2.5" />}
                                 {Math.abs(scoreDelta)}
                               </span>
                             )}
-                            {scoreDelta === 0 && <span className="flex items-center text-[11px] text-zinc-500"><Minus className="w-2.5 h-2.5" /></span>}
+                            {scoreDelta === 0 && <Minus className="w-2.5 h-2.5 text-zinc-500" />}
                           </div>
-                          <div className="text-[11px] mt-0.5 text-zinc-500">
+                          <div className="text-[11px] text-zinc-500">
                             {ws.audit.errors > 0 && <span className="text-red-400">{ws.audit.errors} err</span>}
                             {ws.audit.errors > 0 && ws.audit.warnings > 0 && ' · '}
                             {ws.audit.warnings > 0 && <span className="text-amber-400">{ws.audit.warnings} warn</span>}
@@ -279,75 +299,76 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
                         </div>
                       </>
                     ) : (
-                      <div className="text-[11px] text-zinc-500">No audit yet</div>
+                      <span className="text-[11px] text-zinc-500">No audit</span>
                     )}
                   </div>
+
+                  <div className="w-px h-8 bg-zinc-800" />
 
                   {/* Requests */}
                   <div>
-                    <div className="text-[11px] font-medium mb-1 text-zinc-500">Requests</div>
+                    <div className="text-[11px] font-medium text-zinc-500 mb-0.5">Requests</div>
                     {ws.requests.total > 0 ? (
-                      <div className="space-y-0.5">
-                        {ws.requests.new > 0 && <div className="text-[11px] text-red-400 font-medium">{ws.requests.new} new</div>}
-                        {ws.requests.active > 0 && <div className="text-[11px] text-teal-400">{ws.requests.active} active</div>}
-                        {ws.requests.total - ws.requests.new - ws.requests.active > 0 && (
-                          <div className="text-[11px] text-zinc-500">{ws.requests.total} total</div>
-                        )}
-                        {ws.requests.latestDate && (
-                          <div className="text-[11px] text-zinc-500">{timeAgo(ws.requests.latestDate)}</div>
-                        )}
+                      <div className="flex items-center gap-2 text-[11px]">
+                        {ws.requests.new > 0 && <span className="text-red-400 font-medium">{ws.requests.new} new</span>}
+                        {ws.requests.active > 0 && <span className="text-teal-400">{ws.requests.active} active</span>}
+                        {ws.requests.latestDate && <span className="text-zinc-500">{timeAgo(ws.requests.latestDate)}</span>}
                       </div>
                     ) : (
                       <div className="text-[11px] text-zinc-500">None</div>
                     )}
                   </div>
+
+                  <div className="w-px h-8 bg-zinc-800" />
 
                   {/* Approvals */}
                   <div>
-                    <div className="text-[11px] font-medium mb-1 text-zinc-500">Approvals</div>
+                    <div className="text-[11px] font-medium text-zinc-500 mb-0.5">Approvals</div>
                     {ws.approvals.total > 0 ? (
-                      <div className="space-y-0.5">
-                        {ws.approvals.pending > 0 && (
-                          <div className="text-[11px] text-teal-400 font-medium">{ws.approvals.pending} pending</div>
-                        )}
-                        {ws.approvals.pending === 0 && (
-                          <div className="flex items-center gap-1 text-[11px] text-green-400">
-                            <CheckCircle2 className="w-2.5 h-2.5" /> All clear
-                          </div>
-                        )}
-                      </div>
+                      ws.approvals.pending > 0 ? (
+                        <div className="text-[11px] text-teal-400 font-medium">{ws.approvals.pending} pending</div>
+                      ) : (
+                        <div className="flex items-center gap-1 text-[11px] text-green-400">
+                          <CheckCircle2 className="w-2.5 h-2.5" /> All clear
+                        </div>
+                      )
                     ) : (
                       <div className="text-[11px] text-zinc-500">None</div>
                     )}
                   </div>
 
-                  {/* SEO Work Status */}
-                  {(ws.pageStates?.total || 0) > 0 && (
-                    <div className="col-span-full">
-                      <div className="text-[11px] font-medium mb-1 text-zinc-500">SEO Status</div>
-                      <div className="flex flex-wrap gap-1">
-                        {(ws.pageStates?.issueDetected || 0) > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400">{ws.pageStates!.issueDetected} issues</span>}
-                        {(ws.pageStates?.inReview || 0) > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-purple-400">{ws.pageStates!.inReview} in review</span>}
-                        {(ws.pageStates?.approved || 0) > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-green-400">{ws.pageStates!.approved} approved</span>}
-                        {(ws.pageStates?.rejected || 0) > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-red-400">{ws.pageStates!.rejected} rejected</span>}
-                        {(ws.pageStates?.live || 0) > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400">{ws.pageStates!.live} live</span>}
-                      </div>
-                    </div>
-                  )}
+                  <div className="w-px h-8 bg-zinc-800" />
 
                   {/* Content Pipeline */}
                   <div>
-                    <div className="text-[11px] font-medium mb-1 text-zinc-500">Content</div>
+                    <div className="text-[11px] font-medium text-zinc-500 mb-0.5">Content</div>
                     {(ws.contentRequests?.total || 0) > 0 ? (
-                      <div className="space-y-0.5">
-                        {(ws.contentRequests?.pending || 0) > 0 && <div className="text-[11px] text-amber-400 font-medium">{ws.contentRequests!.pending} pending</div>}
-                        {(ws.contentRequests?.inProgress || 0) > 0 && <div className="text-[11px] text-blue-400">{ws.contentRequests!.inProgress} in progress</div>}
-                        {(ws.contentRequests?.delivered || 0) > 0 && <div className="text-[11px] text-teal-400">{ws.contentRequests!.delivered} delivered</div>}
+                      <div className="flex items-center gap-2 text-[11px]">
+                        {(ws.contentRequests?.pending || 0) > 0 && <span className="text-amber-400 font-medium">{ws.contentRequests!.pending} pending</span>}
+                        {(ws.contentRequests?.inProgress || 0) > 0 && <span className="text-blue-400">{ws.contentRequests!.inProgress} in progress</span>}
+                        {(ws.contentRequests?.delivered || 0) > 0 && <span className="text-teal-400">{ws.contentRequests!.delivered} delivered</span>}
                       </div>
                     ) : (
                       <div className="text-[11px] text-zinc-500">None</div>
                     )}
                   </div>
+
+                  {/* SEO Status (inline badges) */}
+                  {(ws.pageStates?.total || 0) > 0 && (
+                    <>
+                      <div className="w-px h-8 bg-zinc-800" />
+                      <div>
+                        <div className="text-[11px] font-medium text-zinc-500 mb-0.5">SEO Status</div>
+                        <div className="flex flex-wrap gap-1">
+                          {(ws.pageStates?.issueDetected || 0) > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400">{ws.pageStates!.issueDetected} issues</span>}
+                          {(ws.pageStates?.inReview || 0) > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400">{ws.pageStates!.inReview} in review</span>}
+                          {(ws.pageStates?.approved || 0) > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-green-400">{ws.pageStates!.approved} approved</span>}
+                          {(ws.pageStates?.rejected || 0) > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-red-400">{ws.pageStates!.rejected} rejected</span>}
+                          {(ws.pageStates?.live || 0) > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400">{ws.pageStates!.live} live</span>}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </button>
             );

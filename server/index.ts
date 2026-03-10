@@ -559,6 +559,45 @@ const clients = new Set<WebSocket>();
 // Track which workspaces each client has subscribed to
 const clientWorkspaces = new Map<WebSocket, Set<string>>();
 
+// --- User Presence Tracking ---
+interface PresenceInfo {
+  userId: string;
+  email: string;
+  name?: string;
+  workspaceId: string;
+  role: 'client' | 'admin';
+  connectedAt: string;
+  lastSeen: string;
+}
+const clientPresence = new Map<WebSocket, PresenceInfo>();
+
+/** Get all currently online users, grouped by workspace. */
+function getPresence(): Record<string, Array<{ userId: string; email: string; name?: string; role: string; connectedAt: string; lastSeen: string }>> {
+  const result: Record<string, Array<{ userId: string; email: string; name?: string; role: string; connectedAt: string; lastSeen: string }>> = {};
+  for (const [ws, info] of clientPresence) {
+    if (ws.readyState !== WebSocket.OPEN) continue;
+    if (!result[info.workspaceId]) result[info.workspaceId] = [];
+    // Deduplicate by userId (user might have multiple tabs)
+    if (!result[info.workspaceId].some(u => u.userId === info.userId)) {
+      result[info.workspaceId].push({
+        userId: info.userId,
+        email: info.email,
+        name: info.name,
+        role: info.role,
+        connectedAt: info.connectedAt,
+        lastSeen: info.lastSeen,
+      });
+    }
+  }
+  return result;
+}
+
+/** Broadcast presence update to all admin clients. */
+function broadcastPresenceUpdate() {
+  const presence = getPresence();
+  broadcast('presence:update', presence);
+}
+
 wss.on('connection', (ws) => {
   clients.add(ws);
   clientWorkspaces.set(ws, new Set());
@@ -570,13 +609,31 @@ wss.on('connection', (ws) => {
         clientWorkspaces.get(ws)?.add(msg.workspaceId);
       } else if (msg.action === 'unsubscribe' && typeof msg.workspaceId === 'string') {
         clientWorkspaces.get(ws)?.delete(msg.workspaceId);
+      } else if (msg.action === 'identify' && typeof msg.userId === 'string' && typeof msg.workspaceId === 'string') {
+        const now = new Date().toISOString();
+        clientPresence.set(ws, {
+          userId: msg.userId,
+          email: msg.email || '',
+          name: msg.name,
+          workspaceId: msg.workspaceId,
+          role: msg.role || 'client',
+          connectedAt: now,
+          lastSeen: now,
+        });
+        broadcastPresenceUpdate();
+      } else if (msg.action === 'heartbeat') {
+        const info = clientPresence.get(ws);
+        if (info) info.lastSeen = new Date().toISOString();
       }
     } catch { /* ignore malformed messages */ }
   });
 
   ws.on('close', () => {
+    const hadPresence = clientPresence.has(ws);
     clients.delete(ws);
     clientWorkspaces.delete(ws);
+    clientPresence.delete(ws);
+    if (hadPresence) broadcastPresenceUpdate();
   });
 });
 
@@ -599,6 +656,11 @@ function broadcastToWorkspace(workspaceId: string, event: string, data: unknown)
     }
   }
 }
+
+// --- User Presence API (admin) ---
+app.get('/api/presence', (_req, res) => {
+  res.json(getPresence());
+});
 
 // --- Background Jobs ---
 initJobs(broadcast);
@@ -5570,9 +5632,12 @@ app.post('/api/public/approvals/:workspaceId/:batchId/apply', async (req, res) =
         const result = await publishSchemaToPage(ws.webflowSiteId, item.pageId, schema, token);
         if (!result.success) throw new Error(result.error || 'Schema publish failed');
       } else if (item.collectionId) {
-        // CMS item — update via collection API
+        // CMS item — update via collection API (updates draft)
         const result = await updateCollectionItem(item.collectionId, item.pageId, { [item.field]: value }, token);
         if (!result.success) throw new Error(result.error || 'CMS update failed');
+        // Publish the CMS item so draft changes go live
+        const pubResult = await publishCollectionItems(item.collectionId, [item.pageId], token);
+        if (!pubResult.success) console.warn(`CMS publish warning for ${item.pageId}: ${pubResult.error}`);
       } else {
         // Static page — update via page SEO API
         const fields = item.field === 'seoTitle'
