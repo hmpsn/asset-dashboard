@@ -121,7 +121,8 @@ export async function exchangeCode(code: string, siteId: string): Promise<{ succ
 
 export async function getValidToken(siteId: string): Promise<string | null> {
   const store = loadTokens();
-  const tokens = store[siteId];
+  // Try per-site token first, fall back to global token
+  const tokens = store[siteId] || (siteId !== GLOBAL_KEY ? store[GLOBAL_KEY] : undefined);
   if (!tokens) return null;
 
   // If token is still valid (with 5 min buffer)

@@ -108,6 +108,13 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
 
       if (!res.ok) {
         const errText = await res.text().catch(() => '');
+
+        // Quota exceeded — never retryable, fail fast
+        if (res.status === 429 && errText.includes('insufficient_quota')) {
+          console.error(`[${feature}] OpenAI quota exceeded — add credits at platform.openai.com/account/billing`);
+          throw new Error(`OpenAI quota exceeded. Add credits at https://platform.openai.com/account/billing`);
+        }
+
         const isRetryable = res.status === 429 || res.status >= 500;
         if (isRetryable && attempt < maxRetries) {
           // Parse retry-after header if available

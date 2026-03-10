@@ -913,6 +913,8 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
 
     const aiBatch = 5;
     for (let i = 0; i < pagesNeedingFixes.length; i += aiBatch) {
+      // Stagger batches to avoid hammering rate limits
+      if (i > 0) await new Promise(r => setTimeout(r, 1500));
       const batch = pagesNeedingFixes.slice(i, i + aiBatch);
       await Promise.all(batch.map(async (pageResult) => {
         try {
