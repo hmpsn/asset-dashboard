@@ -1,8 +1,11 @@
 /**
  * Unified usage tracking & rate limiting per workspace per calendar month.
  *
- * Tracks: ai_chats, content_briefs, strategy_generations
+ * Tracks: ai_chats, strategy_generations
  * Limits vary by tier (free / growth / premium).
+ *
+ * NOTE: content_briefs and content_posts are NOT tracked here — they are
+ * paid add-ons purchased via Stripe. Activity logging tracks generation events.
  */
 
 import fs from 'fs';
@@ -12,13 +15,13 @@ const DATA_DIR = path.join(process.cwd(), 'data', 'usage');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 // ── Feature keys ──
-export type UsageFeature = 'ai_chats' | 'content_briefs' | 'strategy_generations';
+export type UsageFeature = 'ai_chats' | 'strategy_generations';
 
 // ── Per-tier monthly limits (Infinity = unlimited) ──
 const LIMITS: Record<string, Record<UsageFeature, number>> = {
-  free:    { ai_chats: 3,        content_briefs: 1,        strategy_generations: 0 },
-  growth:  { ai_chats: 50,       content_briefs: 10,       strategy_generations: 3 },
-  premium: { ai_chats: Infinity, content_briefs: Infinity,  strategy_generations: Infinity },
+  free:    { ai_chats: 3,        strategy_generations: 0 },
+  growth:  { ai_chats: 50,       strategy_generations: 3 },
+  premium: { ai_chats: Infinity, strategy_generations: Infinity },
 };
 
 export function getLimit(tier: string, feature: UsageFeature): number {
@@ -90,7 +93,7 @@ export function getUsageSummary(
   workspaceId: string,
   tier: string,
 ): Record<UsageFeature, { used: number; limit: number; remaining: number }> {
-  const features: UsageFeature[] = ['ai_chats', 'content_briefs', 'strategy_generations'];
+  const features: UsageFeature[] = ['ai_chats', 'strategy_generations'];
   const result = {} as Record<UsageFeature, { used: number; limit: number; remaining: number }>;
   for (const f of features) {
     const { used, limit, remaining } = checkUsageLimit(workspaceId, tier, f);

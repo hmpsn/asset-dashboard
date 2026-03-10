@@ -4,8 +4,10 @@ import {
   Inbox, CheckCircle2, XCircle, Clock, Zap, Download, Copy, Search,
   Target, MessageSquare, BarChart3, BookOpen, Users, TrendingUp,
   AlertTriangle, ArrowUpDown, X, Pencil, Check, ExternalLink, Link2,
+  PenLine,
 } from 'lucide-react';
 import type { FixContext } from '../App';
+import { PostEditor } from './PostEditor';
 
 interface ContentBrief {
   id: string;
@@ -88,6 +90,10 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
   const [briefSort, setBriefSort] = useState<'date' | 'keyword' | 'difficulty'>('date');
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'brief' | 'request'; id: string; label: string } | null>(null);
   const [editingBrief, setEditingBrief] = useState<string | null>(null);
+  const [activePostId, setActivePostId] = useState<string | null>(null);
+  const [generatingPostFor, setGeneratingPostFor] = useState<string | null>(null);
+  interface PostSummary { id: string; briefId: string; targetKeyword: string; title: string; totalWordCount: number; status: string; createdAt: string; updatedAt: string }
+  const [posts, setPosts] = useState<PostSummary[]>([]);
   const [deliveringReqId, setDeliveringReqId] = useState<string | null>(null);
   const [deliveryUrl, setDeliveryUrl] = useState('');
   const [deliveryNotes, setDeliveryNotes] = useState('');
@@ -216,6 +222,13 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
     window.open(`/api/content-briefs/${workspaceId}/${b.id}/export`, '_blank');
   };
 
+  const fetchPosts = () => {
+    fetch(`/api/content-posts/${workspaceId}`)
+      .then(r => r.json())
+      .then(r => { if (Array.isArray(r)) setPosts(r); })
+      .catch(() => {});
+  };
+
   useEffect(() => {
     let done = 0;
     const checkDone = () => { if (++done >= 2) setLoading(false); };
@@ -240,6 +253,8 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
       })
       .catch(err => console.error('[ContentBriefs] requests fetch error:', err))
       .finally(checkDone);
+
+    fetchPosts();
   }, [workspaceId]);
 
   const handleGenerateBriefForRequest = async (req: ContentTopicRequest) => {
@@ -257,6 +272,26 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
       setExpandedRequest(req.id);
     } catch { /* skip */ }
     setGeneratingBriefFor(null);
+  };
+
+  const handleGeneratePost = async (briefId: string) => {
+    setGeneratingPostFor(briefId);
+    try {
+      const res = await fetch(`/api/content-posts/${workspaceId}/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ briefId }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.message || err.error || 'Failed to generate post');
+        return;
+      }
+      const skeleton = await res.json();
+      setPosts(prev => [skeleton, ...prev]);
+      setActivePostId(skeleton.id);
+    } catch { /* skip */ }
+    setGeneratingPostFor(null);
   };
 
   const handleUpdateRequestStatus = async (reqId: string, status: ContentTopicRequest['status'], extra?: { deliveryUrl?: string; deliveryNotes?: string }) => {
@@ -359,6 +394,59 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
                 <Trash2 className="w-3.5 h-3.5" /> Delete
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Active Post Editor */}
+      {activePostId && (
+        <div className="bg-zinc-900 rounded-xl border border-blue-500/20 p-4">
+          <PostEditor
+            workspaceId={workspaceId}
+            postId={activePostId}
+            onClose={() => setActivePostId(null)}
+            onDelete={() => { fetchPosts(); setActivePostId(null); }}
+          />
+        </div>
+      )}
+
+      {/* Generated Posts list */}
+      {posts.length > 0 && !activePostId && (
+        <div className="bg-zinc-900 rounded-xl border border-blue-500/20 p-4 space-y-3">
+          <div className="flex items-center gap-2 mb-1">
+            <PenLine className="w-4 h-4 text-blue-400" />
+            <span className="text-xs font-medium text-zinc-300">Generated Posts</span>
+            <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">{posts.length}</span>
+          </div>
+          <div className="space-y-2">
+            {posts.map(post => {
+              const statusColors: Record<string, string> = {
+                generating: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
+                draft: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
+                review: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
+                approved: 'text-green-400 bg-green-500/10 border-green-500/20',
+              };
+              return (
+                <button
+                  key={post.id}
+                  onClick={() => setActivePostId(post.id)}
+                  className="w-full text-left rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2.5 hover:border-blue-500/30 transition-colors"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-medium text-zinc-200 truncate">{post.title}</div>
+                      <div className="text-[11px] text-zinc-500 mt-0.5">"{post.targetKeyword}" · {post.totalWordCount.toLocaleString()} words</div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className={`text-[11px] px-1.5 py-0.5 rounded border font-medium ${statusColors[post.status] || statusColors.draft}`}>
+                        {post.status === 'generating' ? 'Generating...' : post.status.charAt(0).toUpperCase() + post.status.slice(1)}
+                      </span>
+                      <span className="text-[11px] text-zinc-600">{new Date(post.createdAt).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -912,7 +1000,11 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
               {expanded === brief.id && (
                 <div className="px-4 pb-4 space-y-4 border-t border-zinc-800">
                   {/* Export buttons */}
-                  <div className="pt-3 flex items-center gap-2">
+                  <div className="pt-3 flex items-center gap-2 flex-wrap">
+                    <button onClick={() => handleGeneratePost(brief.id)} disabled={generatingPostFor === brief.id} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 transition-colors disabled:opacity-50">
+                      {generatingPostFor === brief.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <PenLine className="w-3 h-3" />}
+                      {generatingPostFor === brief.id ? 'Starting...' : 'Generate Full Post'}
+                    </button>
                     <button onClick={() => setEditingBrief(editingBrief === brief.id ? null : brief.id)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${editingBrief === brief.id ? 'bg-amber-600/20 border border-amber-500/30 text-amber-300 hover:bg-amber-600/30' : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-700'}`}>
                       {editingBrief === brief.id ? <><Check className="w-3 h-3" /> Done Editing</> : <><Pencil className="w-3 h-3" /> Edit Brief</>}
                     </button>

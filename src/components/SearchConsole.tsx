@@ -364,10 +364,10 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
         <>
           {/* Summary cards */}
           <div className="grid grid-cols-4 gap-3">
-            <StatCard label="Total Clicks" value={overview.totalClicks.toLocaleString()} icon={MousePointer} iconColor="#60a5fa" sparklineData={trend.map(t => t.clicks)} sparklineColor="#60a5fa" />
-            <StatCard label="Total Impressions" value={overview.totalImpressions.toLocaleString()} icon={Eye} iconColor="#22d3ee" sparklineData={trend.map(t => t.impressions)} sparklineColor="#22d3ee" />
-            <StatCard label="Avg CTR" value={`${overview.avgCtr}%`} icon={TrendingUp} iconColor="#34d399" sparklineData={trend.map(t => t.ctr)} sparklineColor="#34d399" />
-            <StatCard label="Avg Position" value={overview.avgPosition} icon={BarChart3} iconColor="#fbbf24" sparklineData={trend.map(t => t.position)} sparklineColor="#fbbf24" />
+            <StatCard label="Total Clicks" value={overview.totalClicks.toLocaleString()} icon={MousePointer} iconColor="#60a5fa" />
+            <StatCard label="Total Impressions" value={overview.totalImpressions.toLocaleString()} icon={Eye} iconColor="#22d3ee" />
+            <StatCard label="Avg CTR" value={`${overview.avgCtr}%`} icon={TrendingUp} iconColor="#34d399" />
+            <StatCard label="Avg Position" value={overview.avgPosition} icon={BarChart3} iconColor="#fbbf24" />
           </div>
 
           {/* Period comparison banner */}

@@ -284,9 +284,9 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
   if (!overview) return null;
 
   const metrics = [
-    { label: 'Users', value: formatNumber(overview.totalUsers), icon: Users, iconColor: '#14b8a6', sparkline: trend.map(t => t.users), delta: comparison?.change.users },
-    { label: 'Sessions', value: formatNumber(overview.totalSessions), icon: ArrowUpDown, iconColor: '#3b82f6', sparkline: trend.map(t => t.sessions), delta: comparison?.change.sessions },
-    { label: 'Pageviews', value: formatNumber(overview.totalPageviews), icon: Eye, iconColor: '#10b981', sparkline: trend.map(t => t.pageviews), delta: comparison?.change.pageviews },
+    { label: 'Users', value: formatNumber(overview.totalUsers), icon: Users, iconColor: '#14b8a6', delta: comparison?.change.users },
+    { label: 'Sessions', value: formatNumber(overview.totalSessions), icon: ArrowUpDown, iconColor: '#3b82f6', delta: comparison?.change.sessions },
+    { label: 'Pageviews', value: formatNumber(overview.totalPageviews), icon: Eye, iconColor: '#10b981', delta: comparison?.change.pageviews },
     { label: 'Avg. Duration', value: formatDuration(overview.avgSessionDuration), icon: Clock, iconColor: '#fbbf24' },
     { label: 'Bounce Rate', value: `${overview.bounceRate}%`, icon: overview.bounceRate > 60 ? TrendingDown : TrendingUp, iconColor: overview.bounceRate > 60 ? '#f87171' : '#10b981' },
     { label: 'New Users', value: `${overview.newUserPercentage}%`, icon: UserPlus, iconColor: '#06b6d4' },
@@ -315,8 +315,6 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
             value={m.value}
             icon={m.icon}
             iconColor={m.iconColor}
-            sparklineData={m.sparkline}
-            sparklineColor={m.iconColor}
             delta={m.delta}
           />
         ))}

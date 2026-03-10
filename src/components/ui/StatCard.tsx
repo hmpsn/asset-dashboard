@@ -1,20 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
 
-/* ── MiniSparkline (inline SVG sparkline for stat cards) ── */
-function MiniSparkline({ data, color = '#2dd4bf' }: { data: number[]; color?: string }) {
-  if (data.length < 3) return null;
-  const max = Math.max(...data, 1);
-  const min = Math.min(...data, 0);
-  const range = max - min || 1;
-  const w = 48, h = 20;
-  const pts = data.map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - min) / range) * h}`);
-  return (
-    <svg width={w} height={h} className="flex-shrink-0 opacity-60">
-      <polyline points={pts.join(' ')} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 /* ── Stat Card: Default ── */
 interface StatCardProps {
   label: React.ReactNode;
@@ -23,8 +8,6 @@ interface StatCardProps {
   iconColor?: string;
   valueColor?: string;
   sub?: string;
-  sparklineData?: number[];
-  sparklineColor?: string;
   delta?: number;
   deltaLabel?: string;
   onClick?: () => void;
@@ -33,7 +16,7 @@ interface StatCardProps {
 
 export function StatCard({
   label, value, icon: Icon, iconColor, valueColor, sub,
-  sparklineData, sparklineColor, delta, deltaLabel, onClick, className,
+  delta, deltaLabel, onClick, className,
 }: StatCardProps) {
   const Tag = onClick ? 'button' : 'div';
   return (
@@ -41,29 +24,24 @@ export function StatCard({
       onClick={onClick}
       className={`bg-zinc-900 rounded-xl p-4 border border-zinc-800 text-left ${onClick ? 'hover:border-zinc-700 transition-colors cursor-pointer group' : ''} ${className ?? ''}`}
     >
-      <div className="flex items-center justify-between mb-1.5">
-        <div className="flex items-center gap-1.5">
-          {Icon && <Icon className="w-4 h-4" style={iconColor ? { color: iconColor } : undefined} />}
-          <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">{label}</span>
-        </div>
-        {sparklineData && sparklineData.length > 2 && (
-          <MiniSparkline data={sparklineData} color={sparklineColor ?? iconColor} />
-        )}
+      <div className="flex items-center gap-1.5 mb-2">
+        {Icon && <Icon className="w-3.5 h-3.5 flex-shrink-0" style={iconColor ? { color: iconColor } : undefined} />}
+        <span className="inline-flex items-center gap-0.5 text-[11px] text-zinc-500 uppercase tracking-wider font-medium leading-none">{label}</span>
       </div>
-      <div className="flex items-end gap-2">
+      <div className="flex items-baseline gap-1.5">
         <div
-          className={`text-2xl font-bold ${valueColor ?? 'text-zinc-100'}`}
+          className={`text-2xl font-bold leading-none ${valueColor ?? 'text-zinc-100'}`}
           style={valueColor?.startsWith('#') ? { color: valueColor } : undefined}
         >
           {value}
         </div>
         {delta !== undefined && delta !== 0 && (
-          <span className={`text-xs font-medium pb-0.5 ${delta > 0 ? 'text-green-400' : 'text-red-400'}`}>
+          <span className={`text-[11px] font-medium ${delta > 0 ? 'text-green-400' : 'text-red-400'}`}>
             {delta > 0 ? '+' : ''}{delta}{deltaLabel ?? ''}
           </span>
         )}
       </div>
-      {sub && <div className="text-[11px] text-zinc-500 mt-0.5">{sub}</div>}
+      {sub && <div className="text-[11px] text-zinc-500 mt-1">{sub}</div>}
     </Tag>
   );
 }

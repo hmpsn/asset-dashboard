@@ -162,6 +162,24 @@
           "status": "pending"
         },
         {
+          "id": 194,
+          "title": "AI blog post generator (brief → full post)",
+          "source": "Product idea Mar 2026",
+          "est": "3-5h",
+          "priority": "P0",
+          "notes": "Extend content brief system to generate full SEO-optimized blog posts. Section-by-section generation using the brief's outline (heading, notes, wordCount, keywords per section) as the writing spec. Each section generated independently with full context (brand voice, keyword strategy, GSC/GA4 data, E-E-A-T guidance). New endpoint: POST /api/content-posts/:workspaceId/generate (takes briefId). New UI: post editor with section cards, inline editing, regenerate-per-section, word count tracking. Export as markdown, HTML, or copy-paste-ready. Cost: ~$0.15-0.30 per post in API tokens. Tier limits: free: 0, growth: 3/mo, premium: 10/mo. Quality control: generate as draft, section-by-section review, approve/export workflow. Differentiator: no competitor generates blog posts personalized to client's actual GSC/GA4 data + brand voice.",
+          "status": "pending"
+        },
+        {
+          "id": 195,
+          "title": "Storage optimization & monitoring",
+          "source": "Infrastructure review Mar 2026",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Currently at 0.4GB on Render persistent disk (50GB limit). Growth drivers: chat history (no pruning), daily backups (7-day retention = 7x multiplier), rank tracking snapshots, activity logs. Phase 1: Add /api/admin/storage-stats endpoint with per-directory breakdown visible in Command Center. Phase 2: Chat history pruning — archive messages older than 90 days, keep conversation summaries. Activity log rotation — compress logs older than 6 months. Reduce backup retention from 7→3 days or switch to incremental backups. Phase 3 (when approaching 5-10GB): migrate structured data to PostgreSQL (Render managed DB or Supabase), move files to S3/Cloudflare R2, add Redis for caching. Estimated timeline: Phase 1-2 keeps us under 2GB for 12+ months. Phase 3 needed at ~20+ active workspaces.",
+          "status": "pending"
+        },
+        {
           "id": 179,
           "title": "Not Yet Ranking action plan in Strategy tab",
           "source": "UX Narrative Audit Mar 2026",

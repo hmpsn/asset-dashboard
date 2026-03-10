@@ -38,6 +38,7 @@ export type ActivityType =
   | 'fix_completed'
   | 'anomaly_detected'
   | 'anomaly_positive'
+  | 'post_generated'
   | 'note';
 
 export interface ActivityEntry {

@@ -83,6 +83,7 @@ import { startBackupScheduler } from './backup.js';
 import { startMonthlyReports, triggerMonthlyReport } from './monthly-report.js';
 import { listBriefs, getBrief, updateBrief, deleteBrief, generateBrief } from './content-brief.js';
 import { renderBriefHTML } from './brief-export-html.js';
+import { listPosts, getPost, savePost, updatePostField, deletePost, generatePost, regenerateSection, exportPostMarkdown, exportPostHTML } from './content-posts.js';
 import { listContentRequests, getContentRequest, createContentRequest, updateContentRequest, deleteContentRequest, addComment } from './content-requests.js';
 import { isSemrushConfigured, getKeywordOverview, getDomainOrganicKeywords, getKeywordGap, getRelatedKeywords, estimateCreditCost, clearSemrushCache } from './semrush.js';
 import { createUser, verifyPassword, listUsers, getSafeUser, updateUser, changePassword, deleteUser, recordLogin, userCount } from './users.js';
@@ -5379,8 +5380,6 @@ app.post('/api/content-requests/:workspaceId/:id/generate-brief', async (req, re
       ga4PagePerformance,
     });
 
-    incrementUsage(req.params.workspaceId, 'content_briefs');
-
     // Link brief to request and update status
     updateContentRequest(req.params.workspaceId, req.params.id, {
       status: 'brief_generated',
@@ -7182,17 +7181,7 @@ app.post('/api/content-briefs/:workspaceId/generate', async (req, res) => {
 
     const ws = getWorkspace(req.params.workspaceId);
 
-    // Usage limit check
-    if (ws) {
-      const briefUsage = checkUsageLimit(ws.id, ws.tier || 'free', 'content_briefs');
-      if (!briefUsage.allowed) {
-        return res.status(429).json({
-          error: 'Brief generation limit reached',
-          message: `You've used all ${briefUsage.limit} content briefs this month. Upgrade for more.`,
-          used: briefUsage.used, limit: briefUsage.limit,
-        });
-      }
-    }
+    // No usage limit — briefs are paid add-ons purchased via Stripe
     let relatedQueries: { query: string; position: number; clicks: number; impressions: number }[] = [];
     let existingPages: string[] = [];
 
@@ -7234,7 +7223,6 @@ app.post('/api/content-briefs/:workspaceId/generate', async (req, res) => {
       semrushRelated,
       pageType: resolvedPageType,
     });
-    incrementUsage(req.params.workspaceId, 'content_briefs');
     res.json(brief);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate brief' });
@@ -7253,6 +7241,123 @@ app.get('/api/content-briefs/:workspaceId/:briefId/export', (req, res) => {
 // Delete a brief
 app.delete('/api/content-briefs/:workspaceId/:briefId', (req, res) => {
   deleteBrief(req.params.workspaceId, req.params.briefId);
+  res.json({ ok: true });
+});
+
+// --- Content Post Generator (#194) ---
+
+// List all generated posts for a workspace
+app.get('/api/content-posts/:workspaceId', (req, res) => {
+  res.json(listPosts(req.params.workspaceId));
+});
+
+// Get a single post
+app.get('/api/content-posts/:workspaceId/:postId', (req, res) => {
+  const post = getPost(req.params.workspaceId, req.params.postId);
+  if (!post) return res.status(404).json({ error: 'Post not found' });
+  res.json(post);
+});
+
+// Generate a full post from a brief (async — returns immediately with skeleton, generates in background)
+app.post('/api/content-posts/:workspaceId/generate', async (req, res) => {
+  const { briefId } = req.body;
+  if (!briefId) return res.status(400).json({ error: 'briefId required' });
+
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  // No usage limit — posts are paid add-ons purchased via Stripe
+
+  const brief = getBrief(req.params.workspaceId, briefId);
+  if (!brief) return res.status(404).json({ error: 'Brief not found' });
+
+  // Start generation in background — return skeleton immediately
+  try {
+    const postId = `post_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const skeleton = {
+      id: postId,
+      workspaceId: req.params.workspaceId,
+      briefId: brief.id,
+      targetKeyword: brief.targetKeyword,
+      title: brief.suggestedTitle,
+      metaDescription: brief.suggestedMetaDesc,
+      introduction: '',
+      sections: brief.outline.map((s, i) => ({
+        index: i, heading: s.heading, content: '', wordCount: 0,
+        targetWordCount: s.wordCount || 250, keywords: s.keywords || [],
+        status: 'pending' as const,
+      })),
+      conclusion: '',
+      totalWordCount: 0,
+      status: 'generating' as const,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    savePost(req.params.workspaceId, skeleton);
+
+    // Return skeleton to client immediately
+    res.json(skeleton);
+
+    // Generate in background
+    generatePost(req.params.workspaceId, brief).then(() => {
+      addActivity(req.params.workspaceId, 'post_generated', `Content generated for "${brief.targetKeyword}"`, `Title: ${brief.suggestedTitle}`);
+    }).catch(err => {
+      console.error(`[content-posts] Generation failed for ${req.params.workspaceId}:`, err);
+    });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to start generation' });
+  }
+});
+
+// Regenerate a single section
+app.post('/api/content-posts/:workspaceId/:postId/regenerate-section', async (req, res) => {
+  const { sectionIndex } = req.body;
+  if (sectionIndex === undefined) return res.status(400).json({ error: 'sectionIndex required' });
+
+  const post = getPost(req.params.workspaceId, req.params.postId);
+  if (!post) return res.status(404).json({ error: 'Post not found' });
+
+  const brief = getBrief(req.params.workspaceId, post.briefId);
+  if (!brief) return res.status(404).json({ error: 'Source brief not found' });
+
+  try {
+    const updated = await regenerateSection(req.params.workspaceId, req.params.postId, sectionIndex, brief);
+    if (!updated) return res.status(404).json({ error: 'Section not found' });
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Regeneration failed' });
+  }
+});
+
+// Update post fields (inline editing of title, sections, status, etc.)
+app.patch('/api/content-posts/:workspaceId/:postId', (req, res) => {
+  const updated = updatePostField(req.params.workspaceId, req.params.postId, req.body);
+  if (!updated) return res.status(404).json({ error: 'Post not found' });
+  res.json(updated);
+});
+
+// Export post as markdown
+app.get('/api/content-posts/:workspaceId/:postId/export/markdown', (req, res) => {
+  const post = getPost(req.params.workspaceId, req.params.postId);
+  if (!post) return res.status(404).json({ error: 'Post not found' });
+  const md = exportPostMarkdown(post);
+  res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${post.targetKeyword.replace(/[^a-z0-9]+/gi, '-')}.md"`);
+  res.send(md);
+});
+
+// Export post as HTML
+app.get('/api/content-posts/:workspaceId/:postId/export/html', (req, res) => {
+  const post = getPost(req.params.workspaceId, req.params.postId);
+  if (!post) return res.status(404).json({ error: 'Post not found' });
+  const html = exportPostHTML(post);
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(html);
+});
+
+// Delete a post
+app.delete('/api/content-posts/:workspaceId/:postId', (req, res) => {
+  deletePost(req.params.workspaceId, req.params.postId);
   res.json({ ok: true });
 });
 

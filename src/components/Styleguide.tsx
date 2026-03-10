@@ -190,7 +190,7 @@ export function Styleguide() {
           <h3 className="text-sm font-medium text-zinc-300">Default Variant</h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <StatCard label="Sessions" value="12,345" icon={Globe} iconColor="#60a5fa" sub="last 30 days" />
-            <StatCard label="Clicks" value="3,456" icon={MousePointer} iconColor="#2dd4bf" sparklineData={[10, 15, 12, 18, 22, 20, 25, 30, 28, 35]} sparklineColor="#2dd4bf" />
+            <StatCard label="Clicks" value="3,456" icon={MousePointer} iconColor="#2dd4bf" />
             <StatCard label="Site Health" value="87" icon={Shield} iconColor="#34d399" valueColor="text-emerald-400" />
             <StatCard label="Avg Position" value="#4.2" icon={Target} iconColor="#fbbf24" sub="12 pages ranking" />
           </div>

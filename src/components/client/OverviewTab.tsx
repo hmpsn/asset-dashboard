@@ -65,8 +65,8 @@ interface OverviewTabProps {
 
 export function OverviewTab({
   ws,
-  overview, searchComparison, trend,
-  ga4Overview, ga4Trend, ga4Comparison, ga4Organic, ga4Conversions, ga4NewVsReturning,
+  overview, searchComparison,
+  ga4Overview, ga4Comparison, ga4Organic, ga4Conversions, ga4NewVsReturning,
   audit, auditDetail, strategyData, insights,
   contentRequests, activityLog,
   pendingApprovals, unreadTeamNotes,
@@ -102,15 +102,15 @@ export function OverviewTab({
 
     {/* Key metrics — full-span StatCards */}
     {(() => {
-      const cards: { label: React.ReactNode; value: string; icon?: typeof Users; color: string; sub?: string; sparkline?: number[]; delta?: number }[] = [];
+      const cards: { label: React.ReactNode; value: string; icon?: typeof Users; color: string; sub?: string; delta?: number }[] = [];
       if (ga4Overview) {
-        cards.push({ label: 'Visitors', value: ga4Overview.totalUsers.toLocaleString(), icon: Users, color: '#2dd4bf', sub: ga4Overview.dateRange ? `${ga4Overview.dateRange.start} — ${ga4Overview.dateRange.end}` : undefined, sparkline: ga4Trend.map(d => d.users), delta: ga4Comparison?.changePercent.users });
+        cards.push({ label: 'Visitors', value: ga4Overview.totalUsers.toLocaleString(), icon: Users, color: '#2dd4bf', sub: ga4Overview.dateRange ? `${ga4Overview.dateRange.start} — ${ga4Overview.dateRange.end}` : undefined, delta: ga4Comparison?.changePercent.users });
       }
       if (overview) {
-        cards.push({ label: <><span>Search Clicks</span><Explainer term="clicks" /></>, value: overview.totalClicks.toLocaleString(), icon: MousePointerClick, color: '#60a5fa', sub: overview.totalImpressions > 0 ? `${((overview.totalClicks / overview.totalImpressions) * 100).toFixed(1)}% CTR` : undefined, sparkline: trend.map(t => t.clicks), delta: searchComparison?.changePercent.clicks });
-        cards.push({ label: <><span>Impressions</span><Explainer term="impressions" /></>, value: overview.totalImpressions.toLocaleString(), icon: Eye, color: '#a78bfa', sub: 'Google searches', sparkline: trend.map(t => t.impressions), delta: searchComparison?.changePercent.impressions });
+        cards.push({ label: <><span>Search Clicks</span><Explainer term="clicks" /></>, value: overview.totalClicks.toLocaleString(), icon: MousePointerClick, color: '#60a5fa', sub: overview.totalImpressions > 0 ? `${((overview.totalClicks / overview.totalImpressions) * 100).toFixed(1)}% CTR` : undefined, delta: searchComparison?.changePercent.clicks });
+        cards.push({ label: <><span>Impressions</span><Explainer term="impressions" /></>, value: overview.totalImpressions.toLocaleString(), icon: Eye, color: '#a78bfa', sub: 'Google searches', delta: searchComparison?.changePercent.impressions });
       } else if (ga4Overview) {
-        cards.push({ label: 'Sessions', value: ga4Overview.totalSessions.toLocaleString(), icon: BarChart3, color: '#60a5fa', sub: 'last period', sparkline: ga4Trend.map(d => d.sessions), delta: ga4Comparison?.changePercent.sessions });
+        cards.push({ label: 'Sessions', value: ga4Overview.totalSessions.toLocaleString(), icon: BarChart3, color: '#60a5fa', sub: 'last period', delta: ga4Comparison?.changePercent.sessions });
       }
       if (audit) {
         cards.push({ label: <><span>Site Health</span><Explainer term="site-health" /></>, value: `${audit.siteScore}/100`, icon: Shield, color: audit.siteScore >= 80 ? '#34d399' : audit.siteScore >= 60 ? '#fbbf24' : '#f87171', sub: `${audit.totalPages} pages`, delta: audit.previousScore != null ? audit.siteScore - audit.previousScore : undefined });
@@ -134,8 +134,6 @@ export function OverviewTab({
               iconColor={card.color}
               valueColor={card.color}
               sub={card.sub}
-              sparklineData={card.sparkline && card.sparkline.length > 2 ? card.sparkline : undefined}
-              sparklineColor={card.color}
               delta={card.delta}
               deltaLabel="%"
             />
