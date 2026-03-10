@@ -211,7 +211,7 @@ Return ONLY valid JSON array, no markdown fences, no explanation.`;
 
   try {
     const aiResult = await callOpenAI({
-      model: 'gpt-4o',
+      model: 'gpt-4.1',
       messages: [
         { role: 'system', content: 'You are an SEO expert. Return only valid JSON arrays, no markdown, no explanation.' },
         { role: 'user', content: prompt },

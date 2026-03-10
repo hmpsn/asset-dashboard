@@ -351,7 +351,7 @@ async function generateAiSummary(anomalies: Anomaly[], workspaceName: string): P
     ).join('\n');
 
     const result = await callOpenAI({
-      model: 'gpt-4o-mini',
+      model: 'gpt-4.1-mini',
       messages: [
         {
           role: 'system',

@@ -911,7 +911,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
       return headingStr + text.slice(0, 2000);
     };
 
-    const aiBatch = 5;
+    const aiBatch = 15;
     for (let i = 0; i < pagesNeedingFixes.length; i += aiBatch) {
       // Stagger batches to avoid hammering rate limits
       if (i > 0) await new Promise(r => setTimeout(r, 1500));
@@ -962,7 +962,7 @@ Respond in this exact JSON format (only include fields that need fixing):
 {"title":"...","metaDescription":"...","ogTitle":"..."}`;
 
           const aiResult = await callOpenAI({
-            model: 'gpt-4o-mini',
+            model: 'gpt-4.1-mini',
             messages: [{ role: 'user', content: prompt }],
             temperature: 0.6,
             maxTokens: 400,

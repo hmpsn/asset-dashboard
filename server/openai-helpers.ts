@@ -29,12 +29,12 @@ export function getTokenUsage(workspaceId?: string, since?: string): { entries: 
   if (workspaceId) entries = entries.filter(e => e.workspaceId === workspaceId);
   if (since) entries = entries.filter(e => e.timestamp >= since);
   const totalTokens = entries.reduce((s, e) => s + e.totalTokens, 0);
-  // Rough cost estimate: gpt-4o-mini ~$0.15/1M input + $0.60/1M output, gpt-4o ~$2.50/1M input + $10/1M output
+  // Rough cost estimate: gpt-4.1-mini ~$0.40/1M input + $1.60/1M output, gpt-4.1 ~$2.00/1M input + $8.00/1M output
   const estimatedCost = entries.reduce((s, e) => {
-    if (e.model.includes('4o-mini')) {
-      return s + (e.promptTokens * 0.00000015) + (e.completionTokens * 0.0000006);
+    if (e.model.includes('mini')) {
+      return s + (e.promptTokens * 0.0000004) + (e.completionTokens * 0.0000016);
     }
-    return s + (e.promptTokens * 0.0000025) + (e.completionTokens * 0.00001);
+    return s + (e.promptTokens * 0.000002) + (e.completionTokens * 0.000008);
   }, 0);
   return { entries, totalTokens, estimatedCost };
 }
@@ -47,7 +47,7 @@ interface ChatMessage {
 }
 
 interface OpenAIChatOptions {
-  model?: 'gpt-4o-mini' | 'gpt-4o';
+  model?: 'gpt-4.1-nano' | 'gpt-4.1-mini' | 'gpt-4.1' | 'gpt-4o-mini' | 'gpt-4o';
   messages: ChatMessage[];
   maxTokens?: number;
   temperature?: number;
@@ -77,7 +77,7 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
   if (!apiKey) throw new Error('OPENAI_API_KEY not configured');
 
   const {
-    model = 'gpt-4o-mini',
+    model = 'gpt-4.1-mini',
     messages,
     maxTokens = 1000,
     temperature = 0.7,

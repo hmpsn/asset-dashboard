@@ -96,10 +96,10 @@ export function deletePost(workspaceId: string, postId: string): boolean {
 
 // --- Generation ---
 
-// AI model for content writing — gpt-4o is the best balance of quality, speed, and cost
+// AI model for content writing — gpt-4.1 is the best balance of quality, speed, and cost
 // for paid content ($250-2,500 products). Temperature 0.7 produces more engaging prose
 // while maintaining coherence and factual accuracy.
-const CONTENT_MODEL = 'gpt-4o';
+const CONTENT_MODEL = 'gpt-4.1';
 const CONTENT_TEMP = 0.7;
 
 function buildVoiceContext(workspaceId: string): string {

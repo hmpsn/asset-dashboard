@@ -222,7 +222,7 @@ export async function generateSessionSummary(
       .join('\n');
 
     const result = await callOpenAI({
-      model: 'gpt-4o-mini',
+      model: 'gpt-4.1-nano',
       messages: [
         { role: 'system', content: 'Summarize this conversation in 1-2 sentences. Focus on the key topics discussed, questions asked, and any preferences or concerns the user expressed. Be concise.' },
         { role: 'user', content: transcript },

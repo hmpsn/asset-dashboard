@@ -297,7 +297,7 @@ Requirements:
 Return ONLY valid JSON, no markdown fences, no explanation.`;
 
   const aiResult = await callOpenAI({
-    model: 'gpt-4o',
+    model: 'gpt-4.1',
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 7000,
     temperature: 0.5,

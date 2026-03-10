@@ -2251,7 +2251,7 @@ Return ONLY a JSON array of 3 strings, e.g. ["title1","title2","title3"]. No exp
     }
 
     const aiResult = await callOpenAI({
-      model: 'gpt-4o-mini',
+      model: 'gpt-4.1-mini',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 500,
       temperature: 0.8,
@@ -2333,7 +2333,7 @@ app.post('/api/webflow/seo-bulk-fix/:siteId', async (req, res) => {
         : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}".${contentSection}${keywordBlock}${bvBlock}\n\nRules:\n- 50-60 characters, hard limit 60\n- Front-load the primary keyword\n- Match the brand voice if provided\nReturn ONLY the text.`;
 
       const aiResult = await callOpenAI({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4.1-mini',
         messages: [{ role: 'user', content: prompt }],
         maxTokens: 200,
         temperature: 0.7,
@@ -2484,7 +2484,7 @@ Return ONLY valid JSON, no markdown fences.`;
 
   try {
     const aiResult = await callOpenAI({
-      model: 'gpt-4o-mini',
+      model: 'gpt-4.1-mini',
       messages: [
         { role: 'system', content: 'You are an expert SEO copywriter who preserves brand voice while optimizing for search. Return valid JSON only.' },
         { role: 'user', content: prompt },
@@ -2600,7 +2600,7 @@ IMPORTANT:
 Return ONLY valid JSON, no markdown, no explanation.`;
 
     const aiResult = await callOpenAI({
-      model: 'gpt-4o-mini',
+      model: 'gpt-4.1-mini',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 1000,
       temperature: 0.4,
@@ -3299,7 +3299,7 @@ Just output the filename slug, nothing else.`;
           const base64 = smallBuf.toString('base64');
 
           const visionRes = await client.chat.completions.create({
-            model: 'gpt-4o-mini',
+            model: 'gpt-4.1-nano',
             max_tokens: 60,
             messages: [{
               role: 'user',
@@ -3319,7 +3319,7 @@ Just output the filename slug, nothing else.`;
     // Fallback to text-only if vision didn't work
     if (!suggestion) {
       const response = await client.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4.1-nano',
         max_tokens: 60,
         messages: [{ role: 'user', content: promptText }],
       });
@@ -3686,7 +3686,7 @@ Current search data context:
 ${JSON.stringify(context, null, 2)}`;
 
     const aiResult = await callOpenAI({
-      model: 'gpt-4o',
+      model: 'gpt-4.1',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: question },
@@ -3807,7 +3807,7 @@ ${JSON.stringify(context, null, 2)}`;
     ];
 
     const aiResult = await callOpenAI({
-      model: 'gpt-4o',
+      model: 'gpt-4.1',
       messages,
       temperature: 0.6,
       maxTokens: 2000,
@@ -4251,7 +4251,7 @@ app.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const callStrategyAI = async (messages: Array<{ role: string; content: string }>, maxTokens: number, _label?: string): Promise<string> => {
       const result = await callOpenAI({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4.1-mini',
         messages: messages as Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
         maxTokens,
         temperature: 0.3,
@@ -6235,7 +6235,7 @@ ${JSON.stringify(context, null, 2)}`;
     ];
 
     const aiResult = await callOpenAI({
-      model: 'gpt-4o',
+      model: 'gpt-4.1',
       messages,
       temperature: 0.7,
       maxTokens: 1500,
@@ -6731,7 +6731,7 @@ app.post('/api/jobs', async (req, res) => {
                   ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}".${kwb}${bvb}\nReturn ONLY the text.`
                   : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}".${kwb}${bvb}\nReturn ONLY the text.`;
                 const aiResult = await callOpenAI({
-                  model: 'gpt-4o-mini',
+                  model: 'gpt-4.1-mini',
                   messages: [{ role: 'user', content: prompt }],
                   maxTokens: 200,
                   temperature: 0.7,

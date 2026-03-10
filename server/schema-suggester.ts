@@ -303,7 +303,7 @@ Return ONLY the JSON-LD object. No markdown, no explanation, no wrapping.`;
 
   try {
     const aiResult = await callOpenAI({
-      model: 'gpt-4o-mini',
+      model: 'gpt-4.1-mini',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 3000,
       temperature: 0.2,
@@ -501,8 +501,8 @@ export async function generateSchemaSuggestions(
 
   const results: SchemaPageSuggestion[] = [];
   const hasAI = !!process.env.OPENAI_API_KEY;
-  // gpt-4o-mini has ~200K TPM — batch 3 AI calls at a time safely
-  const batch = hasAI ? 3 : 5;
+  // gpt-4.1-mini has 4M TPM at Tier 3 — batch 8 AI calls at a time safely
+  const batch = hasAI ? 8 : 5;
 
   // Helper: find keyword context for a page path (supports nested paths like /about/team)
   const getPageKeywords = (pathOrSlug: string): SchemaContext['pageKeywords'] => {
@@ -792,7 +792,7 @@ Return ONLY the raw JSON-LD. No markdown, no explanation.`;
 
   try {
     const aiResult = await callOpenAI({
-      model: 'gpt-4o-mini',
+      model: 'gpt-4.1-mini',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 3000,
       temperature: 0.2,
