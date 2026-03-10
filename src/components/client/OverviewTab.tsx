@@ -3,10 +3,11 @@ import {
   Sparkles, Activity,
 } from 'lucide-react';
 import { StatCard } from '../ui';
+import { Explainer } from './SeoGlossary';
 import { useBetaMode } from './BetaContext';
 import { InsightsDigest } from './InsightsDigest';
 import { ErrorBoundary } from '../ErrorBoundary';
-import { QUICK_QUESTIONS } from './types';
+import { QUICK_QUESTIONS, LEARN_SEO_QUESTIONS } from './types';
 import type {
   SearchOverview, PerformanceTrend, WorkspaceInfo, AuditSummary, AuditDetail,
   GA4Overview, GA4DailyTrend, GA4ConversionSummary, GA4NewVsReturning,
@@ -101,24 +102,24 @@ export function OverviewTab({
 
     {/* Key metrics — full-span StatCards */}
     {(() => {
-      const cards: { label: string; value: string; icon?: typeof Users; color: string; sub?: string; sparkline?: number[]; delta?: number }[] = [];
+      const cards: { label: React.ReactNode; value: string; icon?: typeof Users; color: string; sub?: string; sparkline?: number[]; delta?: number }[] = [];
       if (ga4Overview) {
         cards.push({ label: 'Visitors', value: ga4Overview.totalUsers.toLocaleString(), icon: Users, color: '#2dd4bf', sub: ga4Overview.dateRange ? `${ga4Overview.dateRange.start} — ${ga4Overview.dateRange.end}` : undefined, sparkline: ga4Trend.map(d => d.users), delta: ga4Comparison?.changePercent.users });
       }
       if (overview) {
-        cards.push({ label: 'Search Clicks', value: overview.totalClicks.toLocaleString(), icon: MousePointerClick, color: '#60a5fa', sub: overview.totalImpressions > 0 ? `${((overview.totalClicks / overview.totalImpressions) * 100).toFixed(1)}% CTR` : undefined, sparkline: trend.map(t => t.clicks), delta: searchComparison?.changePercent.clicks });
-        cards.push({ label: 'Impressions', value: overview.totalImpressions.toLocaleString(), icon: Eye, color: '#a78bfa', sub: 'Google searches', sparkline: trend.map(t => t.impressions), delta: searchComparison?.changePercent.impressions });
+        cards.push({ label: <><span>Search Clicks</span><Explainer term="clicks" /></>, value: overview.totalClicks.toLocaleString(), icon: MousePointerClick, color: '#60a5fa', sub: overview.totalImpressions > 0 ? `${((overview.totalClicks / overview.totalImpressions) * 100).toFixed(1)}% CTR` : undefined, sparkline: trend.map(t => t.clicks), delta: searchComparison?.changePercent.clicks });
+        cards.push({ label: <><span>Impressions</span><Explainer term="impressions" /></>, value: overview.totalImpressions.toLocaleString(), icon: Eye, color: '#a78bfa', sub: 'Google searches', sparkline: trend.map(t => t.impressions), delta: searchComparison?.changePercent.impressions });
       } else if (ga4Overview) {
         cards.push({ label: 'Sessions', value: ga4Overview.totalSessions.toLocaleString(), icon: BarChart3, color: '#60a5fa', sub: 'last period', sparkline: ga4Trend.map(d => d.sessions), delta: ga4Comparison?.changePercent.sessions });
       }
       if (audit) {
-        cards.push({ label: 'Site Health', value: `${audit.siteScore}/100`, icon: Shield, color: audit.siteScore >= 80 ? '#34d399' : audit.siteScore >= 60 ? '#fbbf24' : '#f87171', sub: `${audit.totalPages} pages`, delta: audit.previousScore != null ? audit.siteScore - audit.previousScore : undefined });
+        cards.push({ label: <><span>Site Health</span><Explainer term="site-health" /></>, value: `${audit.siteScore}/100`, icon: Shield, color: audit.siteScore >= 80 ? '#34d399' : audit.siteScore >= 60 ? '#fbbf24' : '#f87171', sub: `${audit.totalPages} pages`, delta: audit.previousScore != null ? audit.siteScore - audit.previousScore : undefined });
       }
       if (strategyData) {
         const ranked = strategyData.pageMap.filter(p => p.currentPosition);
         if (ranked.length > 0) {
           const avgP = ranked.reduce((s, p) => s + (p.currentPosition || 0), 0) / ranked.length;
-          cards.push({ label: 'Avg Position', value: `#${avgP.toFixed(1)}`, icon: Target, color: avgP <= 10 ? '#34d399' : avgP <= 20 ? '#fbbf24' : '#60a5fa', sub: `${ranked.length} pages ranking` });
+          cards.push({ label: <><span>Avg Position</span><Explainer term="position" /></>, value: `#${avgP.toFixed(1)}`, icon: Target, color: avgP <= 10 ? '#34d399' : avgP <= 20 ? '#fbbf24' : '#60a5fa', sub: `${ranked.length} pages ranking` });
         }
       }
       if (cards.length === 0) return null;
@@ -225,6 +226,20 @@ export function OverviewTab({
                 {q}
               </button>
             ))}
+          </div>
+          <div className="mt-3 pt-3 border-t border-zinc-800/50">
+            <p className="text-[10px] text-zinc-600 uppercase tracking-wider font-medium mb-2">New to SEO? Ask the AI</p>
+            <div className="space-y-1">
+              {LEARN_SEO_QUESTIONS.slice(0, 3).map((q, i) => (
+                <button
+                  key={i}
+                  onClick={() => { onOpenChat(); setTimeout(() => onAskAi(q), 100); }}
+                  className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-emerald-500/5 border border-transparent hover:border-emerald-500/15 transition-colors text-[11px] text-emerald-400/70 hover:text-emerald-400"
+                >
+                  💡 {q}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

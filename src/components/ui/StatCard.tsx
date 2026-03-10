@@ -17,7 +17,7 @@ function MiniSparkline({ data, color = '#2dd4bf' }: { data: number[]; color?: st
 
 /* ── Stat Card: Default ── */
 interface StatCardProps {
-  label: string;
+  label: React.ReactNode;
   value: string | number;
   icon?: LucideIcon;
   iconColor?: string;

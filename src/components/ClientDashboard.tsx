@@ -26,7 +26,7 @@ import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 // AnomalyAlerts removed from overview — insights digest covers trend signals
 import { BetaProvider } from './client/BetaContext';
 import {
-  QUICK_QUESTIONS,
+  QUICK_QUESTIONS, LEARN_SEO_QUESTIONS,
   type SearchOverview, type PerformanceTrend, type WorkspaceInfo, type AuditSummary,
   type AuditDetail, type ChatMessage, type GA4Overview, type GA4DailyTrend, type GA4TopPage,
   type GA4TopSource, type GA4DeviceBreakdown, type GA4CountryBreakdown, type GA4Event,
@@ -1303,6 +1303,14 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
                       </button>
                     ))}
                   </div>
+                  <div className="pt-3 border-t border-zinc-800/50">
+                    <p className="text-[10px] text-zinc-600 uppercase tracking-wider font-medium mb-2">New to SEO? Ask the AI</p>
+                    {LEARN_SEO_QUESTIONS.slice(0, 3).map((q, i) => (
+                      <button key={`learn-${i}`} onClick={() => askAi(q)} className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-emerald-500/5 border border-transparent hover:border-emerald-500/15 transition-colors text-[11px] text-emerald-400/70 hover:text-emerald-400">
+                        💡 {q}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
               {chatMessages.length > 0 && (
@@ -1327,6 +1335,12 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
                       {QUICK_QUESTIONS.slice(0, 3).map((q, i) => (
                         <button key={i} onClick={() => askAi(q)} className="w-full text-left px-3 py-2 rounded-lg bg-zinc-800/30 hover:bg-zinc-800/60 border border-zinc-800/50 text-[11px] text-zinc-400 hover:text-zinc-300 transition-colors">
                           {q}
+                        </button>
+                      ))}
+                      <p className="text-[10px] text-zinc-600 uppercase tracking-wider font-medium mt-3">New to SEO?</p>
+                      {LEARN_SEO_QUESTIONS.slice(0, 2).map((q, i) => (
+                        <button key={`learn-${i}`} onClick={() => askAi(q)} className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-emerald-500/5 border border-transparent hover:border-emerald-500/15 transition-colors text-[11px] text-emerald-400/70 hover:text-emerald-400">
+                          💡 {q}
                         </button>
                       ))}
                     </div>

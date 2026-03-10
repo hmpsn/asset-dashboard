@@ -201,6 +201,44 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
         <StatCard label="Avg Health" value={avgScore !== null ? avgScore : '—'} icon={Shield} iconColor={avgScore !== null ? (avgScore >= 80 ? '#4ade80' : avgScore >= 60 ? '#fbbf24' : '#f87171') : '#71717a'} />
       </div>
 
+      {/* ── Online Now ── */}
+      {(() => {
+        const totalOnline = Object.values(presence).flat().length;
+        const wsNames: Record<string, string> = {};
+        data.forEach(w => { wsNames[w.id] = w.name; });
+        if (totalOnline === 0) return null;
+        return (
+          <SectionCard
+            title={`Online Now · ${totalOnline}`}
+            titleIcon={
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
+              </span>
+            }
+            noPadding
+          >
+            <div className="divide-y divide-zinc-800/50">
+              {Object.entries(presence).map(([wsId, users]) =>
+                users.map(u => (
+                  <div key={`${wsId}-${u.userId}`} className="flex items-center gap-3 px-4 py-2.5">
+                    <div className="flex items-center justify-center w-7 h-7 rounded-full bg-green-500/15 text-green-400 text-xs font-bold flex-shrink-0">
+                      {(u.name || u.email)[0].toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-xs font-medium text-zinc-200">{u.name || u.email.split('@')[0]}</span>
+                      <span className="text-[10px] text-zinc-500 ml-2">{u.email}</span>
+                    </div>
+                    <span className="text-[10px] text-zinc-500 flex-shrink-0">{wsNames[wsId] || wsId}</span>
+                    <Badge label={u.role === 'admin' ? 'Admin' : 'Client'} color={u.role === 'admin' ? 'blue' : 'green'} />
+                  </div>
+                ))
+              )}
+            </div>
+          </SectionCard>
+        );
+      })()}
+
       {/* ── Workspace Cards ── */}
       <div>
         <div className="flex items-center gap-2 mb-3">
@@ -219,12 +257,25 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
               <button
                 key={ws.id}
                 onClick={() => onSelectWorkspace(ws.id)}
-                className={`w-full text-left rounded-xl p-5 transition-all hover:scale-[1.005] hover:shadow-lg group relative bg-zinc-900 border ${hasAnomalies && wsAnomalies?.critical ? 'border-red-500/30' : hasAlerts ? 'border-amber-500/30' : 'border-zinc-800'}`}
+                className={`w-full text-left rounded-xl p-5 transition-all hover:scale-[1.005] hover:shadow-lg group relative bg-zinc-900 border ${onlineUsers.length > 0 ? 'border-green-500/40' : hasAnomalies && wsAnomalies?.critical ? 'border-red-500/30' : hasAlerts ? 'border-amber-500/30' : 'border-zinc-800'}`}
               >
                 {/* New request badge */}
                 {ws.requests.new > 0 && (
                   <div className="absolute -top-2 -right-2 flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-500 text-white shadow-lg">
                     <Bell className="w-2.5 h-2.5" /> {ws.requests.new} new
+                  </div>
+                )}
+
+                {/* Online users banner */}
+                {onlineUsers.length > 0 && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 -mx-5 -mt-5 mb-3 rounded-t-xl bg-green-500/10 border-b border-green-500/20">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />
+                    </span>
+                    <span className="text-[11px] font-semibold text-green-400">
+                      {onlineUsers.map(u => u.name || u.email.split('@')[0]).join(', ')} online now
+                    </span>
                   </div>
                 )}
 
@@ -252,18 +303,6 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
                     )}
                   </div>
                   <div className="flex items-center gap-2 text-[11px] text-zinc-500 flex-shrink-0">
-                    {onlineUsers.length > 0 && (
-                      <span className="flex items-center gap-1.5 text-green-400" title={onlineUsers.map(u => u.name || u.email).join(', ')}>
-                        <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-                        </span>
-                        {onlineUsers.length === 1
-                          ? (onlineUsers[0].name || onlineUsers[0].email.split('@')[0])
-                          : `${onlineUsers.length} online`}
-                      </span>
-                    )}
-                    {onlineUsers.length > 0 && <span className="text-zinc-700">·</span>}
                     {ws.webflowSiteName && <span className="flex items-center gap-1"><Globe className="w-2.5 h-2.5" />{ws.webflowSiteName}</span>}
                     {!ws.webflowSiteId && <span className="flex items-center gap-1 text-amber-400"><AlertTriangle className="w-2.5 h-2.5" />No site linked</span>}
                     {ws.hasGsc && <span className="flex items-center gap-1"><Search className="w-2.5 h-2.5" />GSC</span>}

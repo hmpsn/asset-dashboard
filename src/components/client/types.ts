@@ -161,3 +161,11 @@ export const QUICK_QUESTIONS = [
   'What content should I create next to grow traffic?',
   'Is there anything waiting for my attention or approval?',
 ];
+
+export const LEARN_SEO_QUESTIONS = [
+  'Explain my site health score — what does it mean?',
+  'What is CTR and why does it matter for my site?',
+  'What are impressions vs clicks in simple terms?',
+  'How does SEO actually help my business grow?',
+  'What is a keyword strategy and do I need one?',
+];

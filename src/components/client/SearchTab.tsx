@@ -6,6 +6,7 @@ import {
 import { RankTrackingSection } from '../shared/RankTable';
 import { CompactStatBar, EmptyState } from '../ui';
 import { DualTrendChart, InsightCard } from './helpers';
+import { Explainer } from './SeoGlossary';
 import type {
   SearchOverview, PerformanceTrend, SearchComparison, SortKey,
 } from './types';
@@ -92,7 +93,7 @@ export function SearchTab({
             </div>
             <div className="text-center">
               <div className={`text-lg font-bold ${overview.avgCtr > 3 ? 'text-green-400' : overview.avgCtr > 1.5 ? 'text-amber-400' : 'text-red-400'}`}>{overview.avgCtr}%</div>
-              <div className="text-[11px] text-zinc-500">Avg CTR</div>
+              <div className="text-[11px] text-zinc-500 flex items-center justify-center gap-0.5">Avg CTR<Explainer term="ctr" /></div>
               <div className={`text-[10px] mt-0.5 ${overview.avgCtr > 3 ? 'text-green-400/70' : overview.avgCtr > 1.5 ? 'text-amber-400/70' : 'text-red-400/70'}`}>{overview.avgCtr > 3 ? 'Above average' : overview.avgCtr > 1.5 ? 'Typical range' : 'Needs attention'}</div>
             </div>
             <div className="text-center">
@@ -129,6 +130,7 @@ export function SearchTab({
             <th key={key} className="text-right py-3 px-3 text-zinc-500 font-medium">
               <button onClick={() => handleSort(key)} className="flex items-center gap-1 ml-auto hover:text-zinc-300">
                 {key === 'ctr' ? 'CTR' : key.charAt(0).toUpperCase() + key.slice(1)}
+                <Explainer term={key === 'ctr' ? 'ctr' : key} />
                 {sortKey === key && <ArrowUpDown className="w-3 h-3" />}
               </button>
             </th>
