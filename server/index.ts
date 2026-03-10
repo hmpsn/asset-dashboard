@@ -2191,6 +2191,40 @@ app.post('/api/webflow/seo-rewrite', async (req, res) => {
     } catch { /* non-critical */ }
   }
 
+  // Fetch page content server-side if not provided
+  let resolvedPageContent = pageContent || '';
+  if (!resolvedPageContent && pagePath && workspaceId) {
+    try {
+      const ws = getWorkspace(workspaceId);
+      let baseUrl = '';
+      if (ws?.liveDomain) {
+        baseUrl = ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;
+      } else if (ws?.webflowSiteId) {
+        const sub = await getSiteSubdomain(ws.webflowSiteId, getTokenForSite(ws.webflowSiteId) || undefined);
+        if (sub) baseUrl = `https://${sub}.webflow.io`;
+      }
+      if (baseUrl) {
+        const slug = pagePath.replace(/^\//, '');
+        console.log(`[seo-rewrite] Fetching page content from ${baseUrl}/${slug}`);
+        const htmlRes = await fetch(`${baseUrl}/${slug}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
+        if (htmlRes.ok) {
+          const html = await htmlRes.text();
+          const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+          const body = bodyMatch ? bodyMatch[1] : html;
+          resolvedPageContent = body
+            .replace(/<script[\s\S]*?<\/script>/gi, '')
+            .replace(/<style[\s\S]*?<\/style>/gi, '')
+            .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+            .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 1500);
+        }
+      }
+    } catch { /* best-effort — continue without content */ }
+  }
+
   // Enforce character limits helper
   const enforceLimit = (text: string, maxLen: number): string => {
     let t = text.replace(/^["']|["']$/g, '').trim();
@@ -2211,7 +2245,7 @@ app.post('/api/webflow/seo-rewrite', async (req, res) => {
 Page title: ${pageTitle}
 Current meta description: ${currentDescription || '(none)'}
 Site context: ${siteContext || 'N/A'}
-Page content excerpt: ${pageContent ? pageContent.slice(0, 1500) : 'N/A'}${keywordContext}${brandVoiceBlock}${auditBlock}
+Page content excerpt: ${resolvedPageContent || 'N/A'}${keywordContext}${brandVoiceBlock}${auditBlock}
 
 Requirements for EACH variation:
 - Between 150-160 characters (hard limit: 160)
@@ -2233,7 +2267,7 @@ Page title: ${pageTitle}
 Current SEO title: ${currentSeoTitle || '(none)'}
 Current meta description: ${currentDescription || '(none)'}
 Site context: ${siteContext || 'N/A'}
-Page content excerpt: ${pageContent ? pageContent.slice(0, 1500) : 'N/A'}${keywordContext}${brandVoiceBlock}${auditBlock}
+Page content excerpt: ${resolvedPageContent || 'N/A'}${keywordContext}${brandVoiceBlock}${auditBlock}
 
 Requirements for EACH variation:
 - Between 50-60 characters (hard limit: 60)
@@ -2412,15 +2446,24 @@ app.post('/api/webflow/seo-copy', async (req, res) => {
   const { keywordBlock, brandVoiceBlock, strategy } = buildSeoContext(workspaceId, pagePath);
   const kwMapContext = buildKeywordMapContext(workspaceId);
 
-  // If no page content was passed, try to fetch it from the live domain
+  // If no page content was passed, try to fetch it from the live site
   let content = pageContent || '';
   if (!content) {
     const ws = getWorkspace(workspaceId);
-    const domain = ws?.liveDomain;
-    if (domain) {
+    let baseUrl = '';
+    if (ws?.liveDomain) {
+      baseUrl = ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;
+    } else if (ws?.webflowSiteId) {
       try {
-        const url = `https://${domain}${pagePath === '/' ? '' : pagePath}`;
-        const r = await fetch(url, { headers: { 'User-Agent': 'AssetDashboard-SEOCopy/1.0' }, signal: AbortSignal.timeout(10000) });
+        const sub = await getSiteSubdomain(ws.webflowSiteId, getTokenForSite(ws.webflowSiteId) || undefined);
+        if (sub) baseUrl = `https://${sub}.webflow.io`;
+      } catch { /* best-effort */ }
+    }
+    if (baseUrl) {
+      try {
+        const url = `${baseUrl}${pagePath === '/' ? '' : pagePath}`;
+        console.log(`[seo-copy] Fetching page content from ${url}`);
+        const r = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(10000) });
         if (r.ok) {
           const html = await r.text();
           const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);

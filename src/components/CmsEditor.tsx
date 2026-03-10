@@ -200,13 +200,24 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
     }
   };
 
-  const aiRewrite = async (_collectionId: string, itemId: string, fieldSlug: string) => {
+  const aiRewrite = async (collectionId: string, itemId: string, fieldSlug: string) => {
     const key = `${itemId}-${fieldSlug}`;
     setAiLoading(prev => ({ ...prev, [key]: true }));
     try {
       const currentValue = edits[itemId]?.[fieldSlug] || '';
       const itemName = edits[itemId]?.['name'] || '';
       const isTitle = fieldSlug.includes('title') || fieldSlug === 'name';
+
+      // Build context from the item's other field values so the AI can differentiate items
+      const collection = collections.find(c => c.collectionId === collectionId);
+      const itemFields = edits[itemId] || {};
+      const fieldContext = Object.entries(itemFields)
+        .filter(([slug, val]) => val && slug !== fieldSlug && slug !== 'name')
+        .map(([slug, val]) => `${slug}: ${String(val).slice(0, 300)}`)
+        .join('\n');
+      const itemSlug = collection?.items.find(i => i.id === itemId)?.fieldData?.slug;
+      const pagePath = itemSlug ? `/${collection?.collectionSlug}/${itemSlug}` : undefined;
+
       const res = await fetch('/api/webflow/seo-rewrite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -214,6 +225,9 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
           pageTitle: itemName,
           currentSeoTitle: isTitle ? currentValue : undefined,
           currentDescription: !isTitle ? currentValue : undefined,
+          pageContent: fieldContext || undefined,
+          siteContext: collection ? `CMS collection: ${collection.collectionName}` : undefined,
+          pagePath,
           field: isTitle ? 'title' : 'description',
           workspaceId,
         }),
