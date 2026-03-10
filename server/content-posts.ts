@@ -436,6 +436,96 @@ function countWords(text: string): number {
 }
 
 /**
+ * Unification pass — reviews the fully assembled post and returns
+ * refined versions of each part with smoother transitions, consistent
+ * voice, and no subtle repetition across sections.
+ */
+async function unifyPost(
+  post: GeneratedPost,
+  brief: ContentBrief,
+  voiceCtx: string,
+  workspaceId: string,
+): Promise<{ introduction?: string; sections?: string[]; conclusion?: string } | null> {
+  const pageType = brief.pageType || 'blog';
+  const role = PAGE_TYPE_WRITER_ROLE[pageType] || PAGE_TYPE_WRITER_ROLE.blog;
+
+  // Assemble the full draft for review
+  const fullDraft = [
+    `# ${post.title}\n\n${post.introduction}`,
+    ...post.sections.map(s => `## ${s.heading}\n\n${s.content}`),
+    post.conclusion,
+  ].join('\n\n---\n\n');
+
+  // If the post is very short, skip unification (not worth the cost)
+  if (post.totalWordCount < 400) return null;
+
+  const prompt = `${role}
+
+You are performing a UNIFICATION PASS on a fully written piece of content. Each section was generated independently and may have:
+- Awkward or missing transitions between sections
+- Subtle repetition of the same points, phrases, or examples across sections
+- Inconsistent tone or voice shifts between sections
+- Disconnected narrative — the intro promises one thing but sections deliver another
+
+YOUR TASK: Refine each section to create a cohesive, unified piece that reads as if written in a single sitting by one expert author.
+
+TITLE: ${post.title}
+TARGET KEYWORD: "${brief.targetKeyword}"
+AUDIENCE: ${brief.audience}
+${brief.toneAndStyle ? `TONE & STYLE: ${brief.toneAndStyle}` : ''}
+${voiceCtx}
+
+FULL DRAFT:
+${fullDraft}
+
+RULES:
+- Preserve the meaning, depth, and word count of each section — this is a POLISH, not a rewrite
+- Smooth transitions: each section should flow naturally from the previous one
+- Remove repeated phrases, examples, or talking points that appear in multiple sections
+- Ensure the introduction's promises are fulfilled by the body sections
+- Ensure the conclusion ties back to the introduction's hook
+- Keep all markdown formatting (headings, bold, lists, etc.)
+- Do NOT add new content or significantly change word counts
+- Do NOT include the title heading — just return the body parts
+
+Return valid JSON with this exact structure:
+{
+  "introduction": "refined intro text (markdown, no heading)",
+  "sections": ["refined section 1 text (markdown, no heading)", "refined section 2 text", ...],
+  "conclusion": "refined conclusion text (markdown, with its own ## heading)"
+}
+
+Return ONLY valid JSON, no markdown fences.`;
+
+  const result = await callOpenAI({
+    model: CONTENT_MODEL,
+    messages: [
+      { role: 'system', content: 'You are a senior editor performing a cohesion review. Return valid JSON only.' },
+      { role: 'user', content: prompt },
+    ],
+    maxTokens: 8000,
+    temperature: 0.4,
+    feature: 'content-post-unify',
+    workspaceId,
+  });
+
+  try {
+    const jsonMatch = result.text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+    const parsed = JSON.parse(jsonMatch[0]) as { introduction?: string; sections?: string[]; conclusion?: string };
+    // Validate sections count matches
+    if (parsed.sections && parsed.sections.length !== post.sections.length) {
+      console.warn(`[content-posts] Unification returned ${parsed.sections.length} sections but expected ${post.sections.length} — skipping section updates`);
+      parsed.sections = undefined;
+    }
+    return parsed;
+  } catch (err) {
+    console.warn('[content-posts] Failed to parse unification JSON:', err);
+    return null;
+  }
+}
+
+/**
  * Generate a full blog post from a content brief.
  * Generates intro, each section, and conclusion sequentially.
  * Saves progress after each section so partial results are available.
@@ -514,6 +604,29 @@ export async function generatePost(
     post.conclusion = await generateConclusion(brief, voiceCtx, workspaceId);
   } catch (err) {
     post.conclusion = `*[Conclusion generation failed: ${err instanceof Error ? err.message : 'Unknown error'}]*`;
+  }
+
+  post.updatedAt = new Date().toISOString();
+  savePost(workspaceId, post);
+
+  // 4. Unification pass — review the full post for cohesion, smooth transitions, and consistent voice
+  try {
+    const unified = await unifyPost(post, brief, voiceCtx, workspaceId);
+    if (unified) {
+      if (unified.introduction) post.introduction = unified.introduction;
+      for (let i = 0; i < post.sections.length; i++) {
+        if (unified.sections?.[i]) {
+          post.sections[i].content = unified.sections[i];
+          post.sections[i].wordCount = countWords(unified.sections[i]);
+        }
+      }
+      if (unified.conclusion) post.conclusion = unified.conclusion;
+      post.updatedAt = new Date().toISOString();
+      savePost(workspaceId, post);
+    }
+  } catch (err) {
+    console.error(`[content-posts] Unification pass failed (non-critical):`, err);
+    // Non-critical — the post is still usable without unification
   }
 
   // Finalize
