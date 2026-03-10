@@ -33,6 +33,14 @@ async function callWithRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T
       return await fn();
     } catch (err: unknown) {
       const status = err instanceof Error && 'status' in err ? (err as { status: number }).status : 0;
+      const errMsg = err instanceof Error ? err.message : String(err);
+
+      // Quota exceeded — never retryable
+      if (status === 429 && errMsg.includes('insufficient_quota')) {
+        console.error('[alt-text] OpenAI quota exceeded — add credits at platform.openai.com/account/billing');
+        throw err;
+      }
+
       if (status !== 429 || attempt === maxRetries) throw err;
 
       const backoffMs = Math.min(60000, 5000 * Math.pow(2, attempt));

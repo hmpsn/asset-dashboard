@@ -888,6 +888,10 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
     );
     console.log(`[seo-audit] Generating AI recommendations for ${pagesNeedingFixes.length} pages (workspace: ${wsId || 'unknown'})...`);
 
+    // Resolve brand name so AI uses correct name in suggestions
+    const auditWs = wsId ? listWorkspaces().find(w => w.id === wsId) : undefined;
+    const auditBrandName = auditWs?.webflowSiteName || auditWs?.name || '';
+
     // Helper: extract readable body text from HTML for context
     const extractBodyText = (html: string): string => {
       // Remove script/style/nav/footer/header blocks
@@ -957,7 +961,7 @@ RULES:
 - OG Title: Can match the SEO title or be slightly more conversational for social sharing
 - Use natural language that sounds like it belongs on this specific website
 - Pull specific terminology, services, or value props directly from the page content
-
+${auditBrandName ? `- The brand name is "${auditBrandName}" — use this exact name if referencing the brand (never use a shortened/abbreviated version)` : ''}
 Respond in this exact JSON format (only include fields that need fixing):
 {"title":"...","metaDescription":"...","ogTitle":"..."}`;
 

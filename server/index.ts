@@ -2166,6 +2166,13 @@ app.post('/api/webflow/seo-rewrite', async (req, res) => {
   // Build shared keyword strategy + brand voice context
   const { keywordBlock: keywordContext, brandVoiceBlock } = buildSeoContext(workspaceId, pagePath);
 
+  // Resolve explicit brand name so the AI doesn't guess from the domain
+  let brandName = '';
+  if (workspaceId) {
+    const wsForBrand = getWorkspace(workspaceId);
+    brandName = wsForBrand?.webflowSiteName || wsForBrand?.name || '';
+  }
+
   // Build audit context for this page (if available)
   let auditBlock = '';
   if (workspaceId) {
@@ -2253,6 +2260,8 @@ Requirements for EACH variation:
 - Natural, not keyword-stuffed
 - Compelling enough to increase click-through rate from search results
 - If keyword strategy is provided, naturally incorporate the primary keyword
+${brandName ? `- The brand name is "${brandName}" — use this exact name if referencing the brand (never use a shortened/abbreviated version)` : ''}
+- Each variation must be meaningfully different, not just a word swap
 
 Variation approaches:
 1. Benefit-focused: Lead with the key value proposition
@@ -2272,14 +2281,15 @@ Page content excerpt: ${resolvedPageContent || 'N/A'}${keywordContext}${brandVoi
 Requirements for EACH variation:
 - Between 50-60 characters (hard limit: 60)
 - Front-load the most important keywords
-- Include brand name at end if appropriate (use pipe separator: |)
+${brandName ? `- Brand name is "${brandName}" — use this exact name (NOT a shortened/abbreviated version) at the end with a pipe separator when appropriate` : '- Include brand name at end if appropriate (use pipe separator: |)'}
 - Compelling and descriptive
 - If keyword strategy is provided, front-load the primary keyword
+- Each variation must be meaningfully different, not just a word swap
 
 Variation approaches:
 1. Keyword-forward: Primary keyword first, then context
 2. Benefit-forward: Lead with the value/benefit, keyword second
-3. Specific/numeric: Include a number, year, or specific detail
+3. Page-specific: Emphasize what makes THIS specific page unique based on the content
 
 Return ONLY a JSON array of 3 strings, e.g. ["title1","title2","title3"]. No explanation.`;
     }
@@ -2288,7 +2298,7 @@ Return ONLY a JSON array of 3 strings, e.g. ["title1","title2","title3"]. No exp
       model: 'gpt-4.1-mini',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 500,
-      temperature: 0.8,
+      temperature: 0.6,
       feature: 'seo-rewrite',
       workspaceId,
     });
@@ -2334,6 +2344,8 @@ app.post('/api/webflow/seo-bulk-fix/:siteId', async (req, res) => {
     } catch { /* best-effort */ }
   }
 
+  const inlineBrandName = ws?.webflowSiteName || ws?.name || '';
+
   const results = [];
   for (const page of pages) {
     try {
@@ -2362,9 +2374,10 @@ app.post('/api/webflow/seo-bulk-fix/:siteId', async (req, res) => {
       }
 
       const contentSection = contentExcerpt ? `\nPage content excerpt: ${contentExcerpt}` : '';
+      const brandNote = inlineBrandName ? `\nBrand name is "${inlineBrandName}" — use this exact name, never an abbreviated version.` : '';
       const prompt = field === 'description'
-        ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}".${contentSection}${keywordBlock}${bvBlock}\n\nRules:\n- 150-160 characters, hard limit 160\n- Include primary keyword naturally\n- Include a call-to-action or value proposition\n- Match the brand voice if provided\nReturn ONLY the text.`
-        : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}".${contentSection}${keywordBlock}${bvBlock}\n\nRules:\n- 50-60 characters, hard limit 60\n- Front-load the primary keyword\n- Match the brand voice if provided\nReturn ONLY the text.`;
+        ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}".${contentSection}${keywordBlock}${bvBlock}${brandNote}\n\nRules:\n- 150-160 characters, hard limit 160\n- Include primary keyword naturally\n- Include a call-to-action or value proposition\n- Match the brand voice if provided\nReturn ONLY the text.`
+        : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}".${contentSection}${keywordBlock}${bvBlock}${brandNote}\n\nRules:\n- 50-60 characters, hard limit 60\n- Front-load the primary keyword\n- Match the brand voice if provided\nReturn ONLY the text.`;
 
       const aiResult = await callOpenAI({
         model: 'gpt-4.1-mini',
@@ -2487,6 +2500,10 @@ app.post('/api/webflow/seo-copy', async (req, res) => {
     p => p.pagePath === pagePath || pagePath.includes(p.pagePath) || p.pagePath.includes(pagePath)
   );
 
+  // Resolve brand name
+  const copyWs = getWorkspace(workspaceId);
+  const copyBrandName = copyWs?.webflowSiteName || copyWs?.name || '';
+
   const prompt = `You are an expert SEO copywriter. Generate optimized SEO copy for this specific web page.
 
 PAGE: ${pagePath}
@@ -2522,7 +2539,7 @@ CRITICAL RULES:
 - The intro paragraph should feel like a natural improvement, not a complete rewrite from scratch
 - Internal link suggestions should reference real pages from the keyword map
 - Changes array should explain your reasoning so the team can learn
-
+${copyBrandName ? `- The brand name is "${copyBrandName}" — use this exact name if referencing the brand (never use a shortened/abbreviated version)` : ''}
 Return ONLY valid JSON, no markdown fences.`;
 
   try {
@@ -6765,14 +6782,53 @@ app.post('/api/jobs', async (req, res) => {
             const openaiKey = process.env.OPENAI_API_KEY;
             const token = getTokenForSite(seoSiteId) || undefined;
             if (!openaiKey) { updateJob(job.id, { status: 'error', error: 'OPENAI_API_KEY not configured', message: 'Missing API key' }); return; }
+
+            // Resolve base URL for page content fetching
+            const bulkWs = bwsId ? getWorkspace(bwsId) : listWorkspaces().find(w => w.webflowSiteId === seoSiteId);
+            let bulkBaseUrl = '';
+            if (bulkWs?.liveDomain) {
+              bulkBaseUrl = bulkWs.liveDomain.startsWith('http') ? bulkWs.liveDomain : `https://${bulkWs.liveDomain}`;
+            } else {
+              try {
+                const sub = await getSiteSubdomain(seoSiteId, token);
+                if (sub) bulkBaseUrl = `https://${sub}.webflow.io`;
+              } catch { /* best-effort */ }
+            }
+            const bulkBrandName = bulkWs?.webflowSiteName || bulkWs?.name || '';
+
             const results: Array<{ pageId: string; text: string; applied: boolean; error?: string }> = [];
             for (let i = 0; i < pages.length; i++) {
               const page = pages[i];
               try {
                 const { keywordBlock: kwb, brandVoiceBlock: bvb } = buildSeoContext(bwsId, page.slug ? `/${page.slug}` : undefined);
+
+                // Fetch page content for context (best-effort)
+                let contentExcerpt = '';
+                if (bulkBaseUrl && page.slug) {
+                  try {
+                    const htmlRes = await fetch(`${bulkBaseUrl}/${page.slug}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
+                    if (htmlRes.ok) {
+                      const html = await htmlRes.text();
+                      const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+                      const body = bodyMatch ? bodyMatch[1] : html;
+                      contentExcerpt = body
+                        .replace(/<script[\s\S]*?<\/script>/gi, '')
+                        .replace(/<style[\s\S]*?<\/style>/gi, '')
+                        .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+                        .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+                        .replace(/<[^>]+>/g, ' ')
+                        .replace(/\s+/g, ' ')
+                        .trim()
+                        .slice(0, 800);
+                    }
+                  } catch { /* best-effort */ }
+                }
+                const contentSection = contentExcerpt ? `\nPage content excerpt: ${contentExcerpt}` : '';
+                const brandNote = bulkBrandName ? `\nBrand name is "${bulkBrandName}" — use this exact name, never an abbreviated version.` : '';
+
                 const prompt = field === 'description'
-                  ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}".${kwb}${bvb}\nReturn ONLY the text.`
-                  : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}".${kwb}${bvb}\nReturn ONLY the text.`;
+                  ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}".${contentSection}${kwb}${bvb}${brandNote}\n\nRules:\n- 150-160 characters, hard limit 160\n- Include primary keyword naturally\n- Include a call-to-action or value proposition\n- Match the brand voice if provided\nReturn ONLY the text.`
+                  : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}".${contentSection}${kwb}${bvb}${brandNote}\n\nRules:\n- 50-60 characters, hard limit 60\n- Front-load the primary keyword\n- Match the brand voice if provided\nReturn ONLY the text.`;
                 const aiResult = await callOpenAI({
                   model: 'gpt-4.1-mini',
                   messages: [{ role: 'user', content: prompt }],
