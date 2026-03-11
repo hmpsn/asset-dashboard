@@ -46,7 +46,8 @@ import {
   updatePageState,
 } from '../workspaces.js';
 
-// Health check
+const PORT = parseInt(process.env.PORT || '3001', 10);
+
 // --- Background Job Endpoints ---
 router.get('/api/jobs', (_req, res) => {
   const wsId = _req.query.workspaceId as string | undefined;
