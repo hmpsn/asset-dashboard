@@ -187,6 +187,6 @@ export function readEnvFile(): Record<string, string> {
 }
 
 export function writeEnvFile(vars: Record<string, string>) {
-  const content = Object.entries(vars).map(([k, v]) => `${k}=${v}`).join('\n') + '\n';
+  const content = Object.entries(vars).map(([k, v]) => `${k}=${v.replace(/[\r\n]/g, '')}`).join('\n') + '\n';
   fs.writeFileSync(ENV_PATH, content);
 }
