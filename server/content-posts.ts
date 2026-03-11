@@ -18,7 +18,7 @@ fs.mkdirSync(POSTS_DIR, { recursive: true });
 export interface PostSection {
   index: number;
   heading: string;
-  content: string;         // markdown
+  content: string;         // HTML
   wordCount: number;
   targetWordCount: number;
   keywords: string[];
@@ -33,9 +33,11 @@ export interface GeneratedPost {
   targetKeyword: string;
   title: string;
   metaDescription: string;
-  introduction: string;    // markdown
+  introduction: string;    // HTML
   sections: PostSection[];
-  conclusion: string;      // markdown
+  conclusion: string;      // HTML
+  seoTitle?: string;       // SEO-optimized title tag (50-60 chars)
+  seoMetaDescription?: string; // SEO meta description (150-160 chars)
   totalWordCount: number;
   targetWordCount: number;
   status: 'generating' | 'draft' | 'review' | 'approved';
@@ -297,12 +299,13 @@ ${typeInstructions}
 UNIVERSAL REQUIREMENTS:
 - Naturally include the target keyword within the first 100 words
 - Match the specified tone and brand voice exactly
-- Use markdown formatting (bold for emphasis where appropriate)
+- Output clean HTML: use <p> for paragraphs, <strong> for emphasis, <a href="..."> for links
 - Do NOT include the title or any heading — just the opening paragraph(s)
+- Do NOT use markdown syntax (no ##, no **, no - lists). Output HTML tags only.
 - Write for humans first, search engines second
 - Stay within 150-200 words — do not exceed 250 under any circumstances
 
-Return ONLY the opening text in markdown. No headings, no labels, no meta-commentary.`;
+Return ONLY the opening HTML. No headings, no labels, no meta-commentary, no markdown.`;
 
   const result = await callOpenAI({
     model: CONTENT_MODEL,
@@ -371,19 +374,20 @@ PAGE-TYPE-SPECIFIC REQUIREMENTS:
 ${typeInstructions}
 
 UNIVERSAL REQUIREMENTS:
-- Start with the H2 heading as a markdown ## heading
+- Start with the section heading as an <h2> tag
 - Write approximately ${sectionTarget} words of content under the heading — this is a STRICT budget, not a minimum
 - Follow the section guidance closely — cover every point mentioned
 - Weave in keywords naturally — never force or stuff them
-- Use subheadings (### H3) if the section is 300+ words
-- Use bullet points, numbered lists, or bold text where it aids readability
+- Use <h3> subheadings if the section is 300+ words
+- Use <ul>/<li> for bullet lists, <ol>/<li> for numbered lists, <strong> for bold emphasis
+- Use <p> tags for paragraphs — do NOT use markdown syntax (no ##, no **, no - lists)
 - Maintain continuity with previous sections (don't repeat points already covered)
 - Match the specified tone and brand voice exactly
 - Include specific, actionable, expert-level advice — never generic filler
 - Write for humans first, search engines second
 - IMPORTANT: Competitor word counts in the SERP data are for reference only — YOUR word count target is ${sectionTarget} words for this section. Do not write more because competitors wrote more.
 
-Return ONLY the section content in markdown (starting with ## heading). No labels, no meta-commentary.`;
+Return ONLY the section content in clean HTML (starting with <h2>). No labels, no meta-commentary, no markdown.`;
 
   const result = await callOpenAI({
     model: CONTENT_MODEL,
@@ -425,12 +429,14 @@ PAGE-TYPE-SPECIFIC REQUIREMENTS:
 ${typeInstructions}
 
 UNIVERSAL REQUIREMENTS:
-- Start with an appropriate ## heading (e.g., "## Next Steps", "## Ready to Get Started?", "## Key Takeaways")
+- Start with an appropriate <h2> heading (e.g., "Next Steps", "Ready to Get Started?", "Key Takeaways")
+- Use <p> for paragraphs, <strong> for emphasis, <ul>/<li> or <ol>/<li> for lists
+- Do NOT use markdown syntax (no ##, no **, no - lists). Output HTML tags only.
 - Naturally include the target keyword one final time
 - Match the specified tone and brand voice exactly
 - Write for humans first, search engines second
 
-Return ONLY the closing section in markdown. No labels, no meta-commentary.`;
+Return ONLY the closing section in clean HTML (starting with <h2>). No labels, no meta-commentary, no markdown.`;
 
   const result = await callOpenAI({
     model: CONTENT_MODEL,
@@ -445,6 +451,74 @@ Return ONLY the closing section in markdown. No labels, no meta-commentary.`;
 
 function countWords(text: string): number {
   return text.split(/\s+/).filter(w => w.length > 0).length;
+}
+
+/** Strip HTML tags for plain-text extraction */
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Generate SEO-optimized title tag and meta description based on the final post content.
+ * Runs after unification so it can reference the actual written content.
+ */
+async function generateSeoMeta(
+  post: GeneratedPost,
+  brief: ContentBrief,
+  workspaceId: string,
+): Promise<{ seoTitle: string; seoMetaDescription: string } | null> {
+  const introPlain = stripHtml(post.introduction).slice(0, 500);
+  const sectionHeadings = post.sections.map(s => s.heading).join(', ');
+
+  const prompt = `You are an expert SEO copywriter. Generate an optimized title tag and meta description for a blog post.
+
+BLOG POST TITLE: ${post.title}
+TARGET KEYWORD: "${brief.targetKeyword}"
+SECONDARY KEYWORDS: ${brief.secondaryKeywords.slice(0, 4).join(', ')}
+AUDIENCE: ${brief.audience}
+INTENT: ${brief.intent}
+SECTIONS COVERED: ${sectionHeadings}
+OPENING: ${introPlain}
+
+REQUIREMENTS:
+1. SEO Title (title tag):
+   - 50-60 characters (STRICT — Google truncates at ~60)
+   - Include the target keyword naturally, ideally near the front
+   - Compelling and click-worthy — not just keyword-stuffed
+   - Different from the blog H1 title if it improves CTR
+   - Do NOT use pipes (|) or site name suffixes
+
+2. Meta Description:
+   - 150-160 characters (STRICT — Google truncates at ~160)
+   - Include the target keyword naturally within the first 120 characters
+   - Summarize the post's unique value proposition
+   - Include a subtle call-to-action or benefit statement
+   - Written as a complete, compelling sentence
+
+Return valid JSON only:
+{
+  "seoTitle": "Your SEO title tag here",
+  "seoMetaDescription": "Your meta description here"
+}`;
+
+  try {
+    const result = await callOpenAI({
+      model: CONTENT_MODEL,
+      messages: [{ role: 'user', content: prompt }],
+      maxTokens: 200,
+      temperature: 0.5,
+      feature: 'content-post-seo-meta',
+      workspaceId,
+    });
+    const jsonMatch = result.text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+    const parsed = JSON.parse(jsonMatch[0]) as { seoTitle: string; seoMetaDescription: string };
+    if (parsed.seoTitle && parsed.seoMetaDescription) return parsed;
+    return null;
+  } catch (err) {
+    console.warn('[content-posts] SEO meta generation failed:', err);
+    return null;
+  }
 }
 
 /**
@@ -504,15 +578,18 @@ RULES:
 - Remove repeated phrases, examples, or talking points that appear in multiple sections
 - Ensure the introduction's promises are fulfilled by the body sections
 - Ensure the conclusion ties back to the introduction's hook
-- Keep all markdown formatting (headings, bold, lists, etc.)
-- Do NOT include section labels or the title heading — return clean markdown for each part
-- Sections array: return the body text ONLY (no ## heading prefix) — headings are stored separately
+- Keep all HTML formatting (<h2>, <h3>, <p>, <strong>, <ul>/<li>, <ol>/<li>, <a>)
+- Do NOT use markdown syntax (no ##, no **, no - lists) — output clean HTML only
+- Do NOT include section labels or the title heading — return clean HTML for each part
+- Sections array: return the FULL section HTML including its <h2> heading
+- Introduction: return HTML paragraphs only (no heading)
+- Conclusion: return full HTML including its <h2> heading
 
 Return valid JSON with this exact structure (${post.sections.length} items in the sections array):
 {
-  "introduction": "refined intro text (markdown, no heading)",
-  "sections": ["section 1 body text only", "section 2 body text only", ...],
-  "conclusion": "refined conclusion text (markdown, with its own ## heading)"
+  "introduction": "refined intro HTML (<p> tags, no heading)",
+  "sections": ["full section 1 HTML with <h2>", "full section 2 HTML with <h2>", ...],
+  "conclusion": "refined conclusion HTML (with <h2> heading)"
 }
 
 Return ONLY valid JSON, no markdown fences, no comments.`;
@@ -675,10 +752,26 @@ export async function generatePost(
     // Non-critical — the post is still usable without unification
   }
 
+  // 5. Generate SEO title tag and meta description
+  try {
+    const seoMeta = await generateSeoMeta(post, brief, workspaceId);
+    if (seoMeta) {
+      post.seoTitle = seoMeta.seoTitle;
+      post.seoMetaDescription = seoMeta.seoMetaDescription;
+      console.log(`[content-posts] SEO meta generated: "${seoMeta.seoTitle}" (${seoMeta.seoTitle.length} chars)`);
+    }
+  } catch (err) {
+    console.warn('[content-posts] SEO meta generation failed (non-critical):', err);
+  }
+
   // Finalize
-  post.totalWordCount = countWords(post.introduction)
-    + post.sections.reduce((s, sec) => s + sec.wordCount, 0)
-    + countWords(post.conclusion);
+  post.totalWordCount = countWords(stripHtml(post.introduction))
+    + post.sections.reduce((s, sec) => s + countWords(stripHtml(sec.content)), 0)
+    + countWords(stripHtml(post.conclusion));
+  // Update per-section word counts to use stripped HTML
+  for (const sec of post.sections) {
+    sec.wordCount = countWords(stripHtml(sec.content));
+  }
   post.status = 'draft';
   post.updatedAt = new Date().toISOString();
   savePost(workspaceId, post);
@@ -743,48 +836,38 @@ export function exportPostMarkdown(post: GeneratedPost): string {
 }
 
 /**
- * Export a post as HTML.
+ * Export a post as HTML — content is already HTML so no conversion needed.
  */
 export function exportPostHTML(post: GeneratedPost): string {
-  // Simple markdown-to-HTML conversion for common patterns
-  function md2html(md: string): string {
-    return md
-      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      .replace(/^- (.+)$/gm, '<li>$1</li>')
-      .replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>')
-      .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
-      .replace(/\n{2,}/g, '</p><p>')
-      .replace(/^(?!<[hulo])/gm, '')
-      .trim();
-  }
+  const metaDesc = post.seoMetaDescription || post.metaDescription;
+  const titleTag = post.seoTitle || post.title;
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="description" content="${post.metaDescription}">
-  <title>${post.title}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="${metaDesc.replace(/"/g, '&quot;')}">
+  <title>${titleTag.replace(/</g, '&lt;')}</title>
   <style>
     body { font-family: Georgia, 'Times New Roman', serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; line-height: 1.7; color: #1a1a1a; }
     h1 { font-size: 2.2rem; margin-bottom: 0.5rem; }
     h2 { font-size: 1.5rem; margin-top: 2rem; color: #2d3748; }
     h3 { font-size: 1.2rem; margin-top: 1.5rem; color: #4a5568; }
-    ul, ol { padding-left: 1.5rem; }
+    p { margin-bottom: 1rem; }
+    ul, ol { padding-left: 1.5rem; margin-bottom: 1rem; }
     li { margin-bottom: 0.3rem; }
     strong { color: #1a202c; }
+    a { color: #2b6cb0; text-decoration: underline; }
     .meta { color: #718096; font-size: 0.9rem; margin-bottom: 2rem; }
   </style>
 </head>
 <body>
   <h1>${post.title}</h1>
   <div class="meta">${post.totalWordCount} words · ${post.targetKeyword}</div>
-  ${md2html(post.introduction)}
-  ${post.sections.map(s => md2html(s.content)).join('\n')}
-  ${md2html(post.conclusion)}
+  ${post.introduction}
+  ${post.sections.map(s => s.content).join('\n')}
+  ${post.conclusion}
 </body>
 </html>`;
 }

@@ -71,7 +71,7 @@ Every completed task — no matter how small — must include these steps:
 | `seo-context.ts` | `buildSeoContext()`, `buildKeywordMapContext()`, `buildKnowledgeBase()` | Shared AI prompt builders — used by chat, briefs, schema |
 | `chat-memory.ts` | Chat session persistence | `addMessage`, `buildConversationContext`, `generateSessionSummary` |
 | `content-brief.ts` | AI content brief generation | 7 page-type-specific prompts, SEMRush/GSC enrichment |
-| `content-posts.ts` | AI full post generation from briefs | Section-by-section generation with strict word count budgets (±10% per section). Unification pass for cohesion + word count trimming to brief target. `unificationStatus` tracking. Page-type-specific writer roles. |
+| `content-posts.ts` | AI full post generation from briefs | Outputs clean HTML (h2/h3/p/strong/ul/ol). Strict word count budgets (±10% per section). Unification pass for cohesion + word count trimming. SEO title tag + meta description generation. `unificationStatus` tracking. Page-type-specific writer roles. |
 | `brief-export-html.ts` | Branded HTML/PDF brief export | Page type badge in header |
 | `content-requests.ts` | Content topic request CRUD | `ContentTopicRequest` interface (includes `pageType`, `serviceType`) |
 | `stripe.ts` | Lazy-init Stripe SDK, 14-product map, checkout, webhooks | Re-creates SDK when keys change |

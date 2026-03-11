@@ -37,17 +37,45 @@ async function fetchPublishedHtml(url: string): Promise<string | null> {
   } catch { return null; }
 }
 
+function isCheckableUrl(href: string): boolean {
+  return !!href && !href.startsWith('mailto:') && !href.startsWith('tel:') && !href.startsWith('javascript:') && !href.startsWith('#');
+}
+
 function extractLinks(html: string): Array<{ href: string; text: string }> {
-  const regex = /<a\s[^>]*href=["']([^"'#][^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
   const links: Array<{ href: string; text: string }> = [];
-  let match;
-  while ((match = regex.exec(html)) !== null) {
-    const href = match[1].trim();
-    const text = match[2].replace(/<[^>]*>/g, '').trim().slice(0, 100);
-    if (href && !href.startsWith('mailto:') && !href.startsWith('tel:') && !href.startsWith('javascript:')) {
-      links.push({ href, text });
+  const seen = new Set<string>();
+
+  const addLink = (href: string, text: string) => {
+    const trimmed = href.trim();
+    if (isCheckableUrl(trimmed) && !seen.has(trimmed)) {
+      seen.add(trimmed);
+      links.push({ href: trimmed, text: text.slice(0, 100) });
     }
+  };
+
+  // 1. Standard <a href="..."> links
+  const aRegex = /<a\s[^>]*href=["']([^"'#][^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  let match;
+  while ((match = aRegex.exec(html)) !== null) {
+    addLink(match[1], match[2].replace(/<[^>]*>/g, '').trim());
   }
+
+  // 2. onclick navigation: window.location, window.location.href, location.href, window.open
+  const onclickRegex = /onclick=["'][^"']*(?:window\.(?:location(?:\.href)?|open)\s*[=(]\s*['"])([^'"]+)['"]/gi;
+  while ((match = onclickRegex.exec(html)) !== null) {
+    // Extract surrounding element text for context
+    const pos = match.index;
+    const surrounding = html.slice(Math.max(0, pos - 200), pos + match[0].length + 200);
+    const textMatch = surrounding.match(/>([^<]{1,100})</);
+    addLink(match[1], textMatch ? textMatch[1].trim() : '[button/onclick]');
+  }
+
+  // 3. <form action="..."> URLs
+  const formRegex = /<form\s[^>]*action=["']([^"'#][^"']*)["']/gi;
+  while ((match = formRegex.exec(html)) !== null) {
+    addLink(match[1], '[form action]');
+  }
+
   return links;
 }
 

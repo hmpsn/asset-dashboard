@@ -27,6 +27,8 @@ interface GeneratedPost {
   conclusion: string;
   totalWordCount: number;
   targetWordCount?: number;
+  seoTitle?: string;
+  seoMetaDescription?: string;
   status: 'generating' | 'draft' | 'review' | 'approved';
   unificationStatus?: 'pending' | 'success' | 'failed' | 'skipped';
   unificationNote?: string;
@@ -168,10 +170,10 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     setEditingTitle(false);
   };
 
-  const copyAllMarkdown = () => {
+  const copyAllHTML = () => {
     if (!post) return;
-    const parts = [`# ${post.title}\n`, post.introduction, ...post.sections.map(s => s.content), post.conclusion];
-    navigator.clipboard.writeText(parts.join('\n\n'));
+    const parts = [`<h1>${post.title}</h1>`, post.introduction, ...post.sections.map(s => s.content), post.conclusion];
+    navigator.clipboard.writeText(parts.join('\n'));
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -276,7 +278,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
               <button onClick={() => setShowPreview(!showPreview)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-colors ${showPreview ? 'bg-teal-600/20 border-teal-500/30 text-teal-300' : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-200'}`}>
                 <Eye className="w-3 h-3" /> Preview
               </button>
-              <button onClick={copyAllMarkdown} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors">
+              <button onClick={copyAllHTML} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors">
                 {copied ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />} {copied ? 'Copied' : 'Copy'}
               </button>
               <button onClick={exportMarkdown} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors">
@@ -333,15 +335,13 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
 
       {/* Full Preview Mode */}
       {showPreview ? (
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6 prose prose-invert prose-sm max-w-none">
+        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6 prose prose-invert prose-sm max-w-none [&_h2]:text-base [&_h2]:font-semibold [&_h2]:text-zinc-100 [&_h2]:mt-6 [&_h2]:mb-2 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:text-zinc-200 [&_h3]:mt-4 [&_h3]:mb-1 [&_p]:text-xs [&_p]:text-zinc-300 [&_p]:leading-relaxed [&_p]:mb-3 [&_ul]:text-xs [&_ul]:text-zinc-300 [&_ul]:pl-4 [&_ul]:mb-3 [&_ol]:text-xs [&_ol]:text-zinc-300 [&_ol]:pl-4 [&_ol]:mb-3 [&_li]:mb-1 [&_strong]:text-zinc-100 [&_a]:text-teal-400 [&_a]:underline">
           <h1 className="text-xl font-bold text-zinc-100 mb-4">{post.title}</h1>
-          <div className="text-xs text-zinc-300 whitespace-pre-wrap leading-relaxed mb-6">{post.introduction}</div>
+          <div dangerouslySetInnerHTML={{ __html: post.introduction }} />
           {post.sections.map(s => (
-            <div key={s.index} className="mb-6">
-              <div className="text-xs text-zinc-300 whitespace-pre-wrap leading-relaxed">{s.content}</div>
-            </div>
+            <div key={s.index} className="mb-4" dangerouslySetInnerHTML={{ __html: s.content }} />
           ))}
-          <div className="text-xs text-zinc-300 whitespace-pre-wrap leading-relaxed">{post.conclusion}</div>
+          <div dangerouslySetInnerHTML={{ __html: post.conclusion }} />
         </div>
       ) : (
         <>
@@ -371,7 +371,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                   </div>
                 </div>
               ) : (
-                <div className="text-xs text-zinc-300 whitespace-pre-wrap leading-relaxed">{post.introduction}</div>
+                <div className="text-xs text-zinc-300 leading-relaxed [&_p]:mb-2 [&_strong]:text-zinc-100 [&_a]:text-teal-400" dangerouslySetInnerHTML={{ __html: post.introduction }} />
               )}
             </div>
           </div>
@@ -423,7 +423,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                     </div>
                   ) : (
                     <div>
-                      <div className="text-xs text-zinc-300 whitespace-pre-wrap leading-relaxed">{section.content}</div>
+                      <div className="text-xs text-zinc-300 leading-relaxed [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:text-zinc-100 [&_h2]:mb-2 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:text-zinc-200 [&_h3]:mt-3 [&_h3]:mb-1 [&_p]:mb-2 [&_ul]:pl-4 [&_ul]:mb-2 [&_ol]:pl-4 [&_ol]:mb-2 [&_li]:mb-1 [&_strong]:text-zinc-100 [&_a]:text-teal-400" dangerouslySetInnerHTML={{ __html: section.content }} />
                       <div className="flex items-center gap-2 mt-3 pt-2 border-t border-zinc-800/50">
                         <button onClick={() => { setEditingSection(section.index); setEditBuffer(section.content); }} className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"><Pencil className="w-3 h-3" /> Edit</button>
                         <button onClick={() => handleRegenerate(section.index)} disabled={regenerating === section.index} className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-teal-300 transition-colors disabled:opacity-50">
@@ -463,18 +463,26 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                   </div>
                 </div>
               ) : (
-                <div className="text-xs text-zinc-300 whitespace-pre-wrap leading-relaxed">{post.conclusion}</div>
+                <div className="text-xs text-zinc-300 leading-relaxed [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:text-zinc-100 [&_h2]:mb-2 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:text-zinc-200 [&_p]:mb-2 [&_ul]:pl-4 [&_ul]:mb-2 [&_ol]:pl-4 [&_ol]:mb-2 [&_li]:mb-1 [&_strong]:text-zinc-100 [&_a]:text-teal-400" dangerouslySetInnerHTML={{ __html: post.conclusion }} />
               )}
             </div>
           </div>
         </>
       )}
 
-      {/* Meta Description */}
+      {/* SEO Metadata */}
       {!showPreview && (
-        <div className="bg-zinc-900/50 rounded-xl border border-zinc-800/50 px-4 py-3">
-          <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-1">Meta Description</div>
-          <div className="text-xs text-zinc-400">{post.metaDescription}</div>
+        <div className="bg-zinc-900/50 rounded-xl border border-zinc-800/50 px-4 py-3 space-y-3">
+          {post.seoTitle && (
+            <div>
+              <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-1">SEO Title Tag <span className="normal-case text-zinc-600">({post.seoTitle.length} chars)</span></div>
+              <div className="text-xs text-zinc-300 font-medium">{post.seoTitle}</div>
+            </div>
+          )}
+          <div>
+            <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-1">Meta Description {post.seoMetaDescription && <span className="normal-case text-zinc-600">({post.seoMetaDescription.length} chars)</span>}</div>
+            <div className="text-xs text-zinc-400">{post.seoMetaDescription || post.metaDescription}</div>
+          </div>
         </div>
       )}
     </div>
