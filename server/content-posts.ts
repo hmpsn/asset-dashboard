@@ -227,7 +227,8 @@ WRITING QUALITY RULES (apply to ALL content — violations will be rejected):
 
 FORBIDDEN PHRASES — never use these AI clichés:
 - Opening clichés: "Did you know...", "In today's [digital/fast-paced/competitive] world...", "Have you ever wondered...", "If you're like most...", "When it comes to...", "Picture this..."
-- Filler transitions: "Let's dive in", "Let's dive into", "Without further ado", "Let's explore", "Let's take a closer look", "Now let's talk about...", "With that said...", "That being said...", "Moving on...", "Let's get started", "Let's start with...". NEVER use "Let's" followed by a verb anywhere in the content. NEVER use "Ready to [verb]...?" as a rhetorical question (e.g., "Ready to move beyond guesswork?", "Ready to see what...", "Ready to build...").
+- Filler transitions: "Let's dive in", "Let's dive into", "Without further ado", "Let's explore", "Let's take a closer look", "Now let's talk about...", "With that said...", "That being said...", "Moving on...", "Let's get started", "Let's start with...". NEVER use "Let's" followed by a verb anywhere in the content.
+- "Ready to" rhetorical questions: NEVER write "Ready to [verb]...?" or "Ready for [noun]?" anywhere in the content. Examples of BANNED phrases: "Ready to build...", "Ready to move beyond...", "Ready for the full toolkit?", "Ready to get started?", "Ready to take your...". Use direct statements instead (e.g., "Download the guide" not "Ready to download the guide?").
 - Hollow intensifiers: "incredibly", "absolutely", "truly", "extremely", "revolutionize", "game-changing", "cutting-edge", "world-class", "best-in-class", "next-level", "top-notch"
 - Corporate buzzwords: "leverage", "utilize", "optimize", "streamline", "empower", "harness", "navigate the landscape", "unlock the power of", "take your X to the next level", "in the realm of"
 - Emotional hedging: "It's important to note that...", "It's worth mentioning that...", "It goes without saying...", "Needless to say...", "At the end of the day...", "The reality is that...", "X is key to Y", "The key is...", "X is crucial for Y", "X is essential for Y", "X is the foundation for Y"
@@ -265,6 +266,7 @@ WHAT TO DO INSTEAD:
 - Each section should teach ONE thing well rather than listing 5 things superficially
 - If a section is titled "FAQ" or "Frequently Asked Questions", format it as individual Q&A pairs: each question as an <h3> followed by a short answer paragraph. NEVER combine multiple questions into a single paragraph
 - Vary examples across industries. If the knowledge base only has one case study, reference it once (max twice), then use hypothetical examples from other industries for remaining sections
+- ANCHOR TEXT ACCURACY: When linking to internal pages, the anchor text must accurately describe the linked page. Do NOT use an external brand name (e.g., "Webflow University", "Google") as anchor text for an internal link. If linking to /services/strategy, use text like "our strategy services" or "brand and web strategy" — not an unrelated third-party name
 `;
 
 /** Build a rich context block from all available brief fields */

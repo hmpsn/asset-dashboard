@@ -398,6 +398,12 @@ Requirements:
 - Content checklist: 8-10 concrete, verifiable items tailored to this brief (not generic SEO advice)
 - Schema recommendations: 1-3 relevant schema types with specific implementation guidance
 
+LANGUAGE RULES for the brief itself:
+- Do NOT use corporate buzzwords in any field: "empower", "leverage", "streamline", "optimize", "harness", "revolutionize", "game-changing", "cutting-edge", "powerful", "world-class"
+- The executiveSummary should be plain, specific, and jargon-free — describe what the reader will learn and why it matters to them
+- Do NOT use "Ready to [verb]?" rhetorical questions anywhere in the brief
+- Internal link paths must start with a single forward slash (e.g., "/services/strategy"), not double slashes
+
 Return ONLY valid JSON, no markdown fences, no explanation.`;
 
   const aiResult = await callOpenAI({
