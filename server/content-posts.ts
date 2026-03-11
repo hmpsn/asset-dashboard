@@ -128,7 +128,7 @@ const PAGE_TYPE_WRITER_ROLE: Record<string, string> = {
 };
 
 const PAGE_TYPE_INTRO_INSTRUCTIONS: Record<string, string> = {
-  blog: `- Hook the reader in the first sentence with a compelling stat, question, or pain point
+  blog: `- Open with a specific, concrete scenario, bold claim, or unexpected angle — NOT a generic stat question
 - Preview what the reader will learn (without giving everything away)
 - End with a smooth transition into the first section`,
   landing: `- Lead with the primary value proposition — what transformation does the reader get?
@@ -219,6 +219,36 @@ const PAGE_TYPE_CONCLUSION_INSTRUCTIONS: Record<string, string> = {
 - Invite feedback or questions to build engagement`,
 };
 
+// --- Shared anti-cliché and writing quality rules (injected into every prompt) ---
+
+const WRITING_QUALITY_RULES = `
+WRITING QUALITY RULES (apply to ALL content — violations will be rejected):
+
+FORBIDDEN PHRASES — never use these AI clichés:
+- Opening clichés: "Did you know...", "In today's [digital/fast-paced/competitive] world...", "Have you ever wondered...", "If you're like most...", "When it comes to...", "Picture this..."
+- Filler transitions: "Let's dive in", "Without further ado", "Let's explore", "Let's take a closer look", "Now let's talk about...", "With that said...", "That being said...", "Moving on..."
+- Hollow intensifiers: "incredibly", "absolutely", "truly", "extremely", "revolutionize", "game-changing", "cutting-edge", "world-class", "best-in-class", "next-level", "top-notch"
+- Corporate buzzwords: "leverage", "utilize", "optimize", "streamline", "empower", "harness", "navigate the landscape", "unlock the power of", "take your X to the next level", "in the realm of"
+- Emotional hedging: "It's important to note that...", "It's worth mentioning that...", "It goes without saying...", "Needless to say...", "At the end of the day...", "The reality is that..."
+- Vague attribution: "Studies show...", "Research suggests...", "Experts agree...", "According to industry data...", "Many businesses have found..." — if you cite something, name the specific source or don't cite at all
+- Conclusion starters: "In conclusion...", "To sum up...", "In summary...", "All in all...", "At the end of the day..."
+
+STRUCTURAL ANTI-PATTERNS — avoid these:
+- Do NOT end every section with a one-sentence summary of what the section just said
+- Do NOT start every bullet point with the same verb form (e.g., "Improve X", "Improve Y", "Improve Z")
+- Do NOT use exactly 3 or 5 items in every list — vary list lengths naturally (2, 4, 6, 7 are all fine)
+- Do NOT repeat the same point from the intro in the conclusion using synonyms — add NEW value in the conclusion
+- Do NOT use "Conclusion" as the final heading — use a specific, action-oriented heading instead
+
+WHAT TO DO INSTEAD:
+- Use concrete specifics: real numbers, named tools, actual processes, specific examples
+- Vary sentence length: mix short punchy sentences with longer explanatory ones
+- Use active voice and direct language: "do X" not "it is recommended that one should consider doing X"
+- Let evidence speak: instead of "incredibly effective", say "reduced bounce rate by 34%"
+- Write like a knowledgeable colleague explaining over coffee, not a brochure or a textbook
+- Vary paragraph structure: some short (1-2 sentences), some medium (3-4), occasional longer ones for complex points
+`;
+
 /** Build a rich context block from all available brief fields */
 function buildBriefContextBlock(brief: ContentBrief): string {
   const parts: string[] = [];
@@ -308,6 +338,8 @@ UNIVERSAL REQUIREMENTS:
 - Write for humans first, search engines second
 - Stay within 150-200 words — do not exceed 250 under any circumstances
 
+${WRITING_QUALITY_RULES}
+
 Return ONLY the opening HTML. No headings, no labels, no meta-commentary, no markdown.`;
 
   const result = await callOpenAI({
@@ -390,6 +422,8 @@ UNIVERSAL REQUIREMENTS:
 - Write for humans first, search engines second
 - IMPORTANT: Competitor word counts in the SERP data are for reference only — YOUR word count target is ${sectionTarget} words for this section. Do not write more because competitors wrote more.
 
+${WRITING_QUALITY_RULES}
+
 Return ONLY the section content in clean HTML (starting with <h2>). No labels, no meta-commentary, no markdown.`;
 
   const result = await callOpenAI({
@@ -432,12 +466,15 @@ PAGE-TYPE-SPECIFIC REQUIREMENTS:
 ${typeInstructions}
 
 UNIVERSAL REQUIREMENTS:
-- Start with an appropriate <h2> heading (e.g., "Next Steps", "Ready to Get Started?", "Key Takeaways")
+- Start with an appropriate <h2> heading (e.g., "Next Steps", "Ready to Get Started?", "Key Takeaways") — do NOT use "Conclusion" as the heading
 - Use <p> for paragraphs, <strong> for emphasis, <ul>/<li> or <ol>/<li> for lists
 - Do NOT use markdown syntax (no ##, no **, no - lists). Output HTML tags only.
 - Naturally include the target keyword one final time
 - Match the specified tone and brand voice exactly
 - Write for humans first, search engines second
+- Do NOT simply restate the introduction in different words — add NEW value: a fresh insight, a specific next step, or a forward-looking perspective
+
+${WRITING_QUALITY_RULES}
 
 Return ONLY the closing section in clean HTML (starting with <h2>). No labels, no meta-commentary, no markdown.`;
 
