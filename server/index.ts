@@ -85,7 +85,7 @@ import { listBriefs, getBrief, updateBrief, deleteBrief, generateBrief } from '.
 import { renderBriefHTML } from './brief-export-html.js';
 import { listPosts, getPost, savePost, updatePostField, deletePost, generatePost, regenerateSection, exportPostMarkdown, exportPostHTML } from './content-posts.js';
 import { listContentRequests, getContentRequest, createContentRequest, updateContentRequest, deleteContentRequest, addComment } from './content-requests.js';
-import { isSemrushConfigured, getKeywordOverview, getDomainOrganicKeywords, getKeywordGap, getRelatedKeywords, estimateCreditCost, clearSemrushCache } from './semrush.js';
+import { isSemrushConfigured, getKeywordOverview, getDomainOrganicKeywords, getKeywordGap, getRelatedKeywords, estimateCreditCost, clearSemrushCache, getSemrushUsage, getSemrushByDay } from './semrush.js';
 import { createUser, verifyPassword, listUsers, getSafeUser, updateUser, changePassword, deleteUser, recordLogin, userCount } from './users.js';
 import { listClientUsers, createClientUser, updateClientUser, changeClientPassword, deleteClientUser, verifyClientPassword as verifyClientUserPassword, signClientToken, verifyClientToken, recordClientLogin, hasClientUsers, getSafeClientUser, createResetToken, resetPasswordWithToken } from './client-users.js';
 import { signToken, verifyToken as verifyJwtToken, requireAuth, requireRole, requireWorkspaceAccess, optionalAuth } from './auth.js';
@@ -4963,7 +4963,9 @@ app.get('/api/ai/usage', (req, res) => {
   const summary = getTokenUsage(workspaceId, since);
   const daily = getUsageByDay(workspaceId, days);
   const byFeature = getUsageByFeature(workspaceId, since);
-  res.json({ ...summary, daily, byFeature });
+  const semrush = getSemrushUsage(workspaceId, since);
+  const semrushDaily = getSemrushByDay(workspaceId, days);
+  res.json({ ...summary, daily, byFeature, semrush, semrushDaily });
 });
 
 // --- SEMRush Utilities ---

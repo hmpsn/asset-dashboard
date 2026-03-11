@@ -483,11 +483,26 @@ interface FeatureUsage {
   provider: string;
 }
 
+interface SemrushUsage {
+  totalCredits: number;
+  totalCalls: number;
+  cachedCalls: number;
+}
+
+interface SemrushDailyUsage {
+  date: string;
+  credits: number;
+  calls: number;
+  cachedCalls: number;
+}
+
 interface AIUsageData {
   totalTokens: number;
   estimatedCost: number;
   daily: DailyUsage[];
   byFeature: FeatureUsage[];
+  semrush: SemrushUsage;
+  semrushDaily: SemrushDailyUsage[];
 }
 
 function AIUsageSection() {
@@ -502,7 +517,8 @@ function AIUsageSection() {
       .catch(() => {});
   }, [days]);
 
-  if (!data || (data.totalTokens === 0 && data.daily.every(d => d.calls === 0))) return null;
+  const hasSemrush = data?.semrush && data.semrush.totalCredits > 0;
+  if (!data || (data.totalTokens === 0 && data.daily.every(d => d.calls === 0) && !hasSemrush)) return null;
 
   const totalCost = data.estimatedCost;
   const totalCalls = data.daily.reduce((s, d) => s + d.calls, 0);
@@ -554,13 +570,13 @@ function AIUsageSection() {
       }
     >
       {/* Stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+      <div className={`grid grid-cols-2 ${hasSemrush ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3 mb-4`}>
         <div className="rounded-lg bg-zinc-800/50 border border-zinc-800 px-3 py-2.5">
-          <div className="text-[11px] text-zinc-500 mb-0.5">Total Cost</div>
+          <div className="text-[11px] text-zinc-500 mb-0.5">AI Cost</div>
           <div className="text-sm font-semibold text-zinc-200">{fmtCost(totalCost)}</div>
         </div>
         <div className="rounded-lg bg-zinc-800/50 border border-zinc-800 px-3 py-2.5">
-          <div className="text-[11px] text-zinc-500 mb-0.5">API Calls</div>
+          <div className="text-[11px] text-zinc-500 mb-0.5">AI Calls</div>
           <div className="text-sm font-semibold text-zinc-200">{totalCalls.toLocaleString()}</div>
         </div>
         <div className="rounded-lg bg-zinc-800/50 border border-zinc-800 px-3 py-2.5">
@@ -571,6 +587,13 @@ function AIUsageSection() {
           <div className="text-[11px] text-zinc-500 mb-0.5">Anthropic</div>
           <div className="text-sm font-semibold text-orange-400">{fmtCost(anthropicCost)}</div>
         </div>
+        {hasSemrush && (
+          <div className="rounded-lg bg-zinc-800/50 border border-zinc-800 px-3 py-2.5">
+            <div className="text-[11px] text-zinc-500 mb-0.5">SEMRush Credits</div>
+            <div className="text-sm font-semibold text-violet-400">{data.semrush.totalCredits.toLocaleString()}</div>
+            <div className="text-[9px] text-zinc-600 mt-0.5">{data.semrush.totalCalls - data.semrush.cachedCalls} API / {data.semrush.cachedCalls} cached</div>
+          </div>
+        )}
       </div>
 
       {/* Stacked bar chart — daily cost by provider */}

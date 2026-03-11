@@ -1,10 +1,115 @@
 import fs from 'fs';
 import path from 'path';
 
-import { getUploadRoot } from './data-dir.js';
+import { getUploadRoot, getDataDir } from './data-dir.js';
 
 const SEMRUSH_API_BASE = 'https://api.semrush.com/';
 const UPLOAD_ROOT = getUploadRoot();
+
+// ── SEMRush Credit Usage Tracking (persisted to disk) ──
+
+interface SemrushCreditEntry {
+  credits: number;
+  endpoint: string;       // e.g. 'keyword_overview', 'domain_organic', 'related_keywords'
+  query: string;          // keyword or domain queried
+  rowsReturned: number;
+  workspaceId: string;
+  cached: boolean;
+  timestamp: string;
+}
+
+const CREDIT_DIR = getDataDir('semrush-usage');
+const MAX_CREDIT_LOG = 1000;
+let creditLog: SemrushCreditEntry[] = [];
+
+// Load recent credit files on startup
+(function loadRecentCredits() {
+  try {
+    const files = fs.readdirSync(CREDIT_DIR).filter(f => f.endsWith('.json')).sort().slice(-30);
+    for (const f of files) {
+      const data = JSON.parse(fs.readFileSync(path.join(CREDIT_DIR, f), 'utf-8'));
+      if (Array.isArray(data)) creditLog.push(...data);
+    }
+    if (creditLog.length > MAX_CREDIT_LOG) creditLog = creditLog.slice(-MAX_CREDIT_LOG);
+  } catch { /* first run */ }
+})();
+
+let pendingCreditWrites: SemrushCreditEntry[] = [];
+let creditFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+function flushCreditsToDisk(): void {
+  if (pendingCreditWrites.length === 0) return;
+  const today = new Date().toISOString().slice(0, 10);
+  const filePath = path.join(CREDIT_DIR, `${today}.json`);
+  let existing: SemrushCreditEntry[] = [];
+  try { existing = JSON.parse(fs.readFileSync(filePath, 'utf-8')); } catch { /* new file */ }
+  existing.push(...pendingCreditWrites);
+  fs.writeFileSync(filePath, JSON.stringify(existing, null, 2));
+  pendingCreditWrites = [];
+}
+
+function logCreditUsage(entry: Omit<SemrushCreditEntry, 'timestamp'>): void {
+  const full = { ...entry, timestamp: new Date().toISOString() };
+  creditLog.push(full);
+  if (creditLog.length > MAX_CREDIT_LOG) creditLog.splice(0, creditLog.length - MAX_CREDIT_LOG);
+  pendingCreditWrites.push(full);
+  if (pendingCreditWrites.length >= 10) { flushCreditsToDisk(); return; }
+  if (!creditFlushTimer) creditFlushTimer = setTimeout(() => { creditFlushTimer = null; flushCreditsToDisk(); }, 5000);
+}
+
+process.on('beforeExit', flushCreditsToDisk);
+process.on('SIGINT', () => { flushCreditsToDisk(); process.exit(0); });
+process.on('SIGTERM', () => { flushCreditsToDisk(); process.exit(0); });
+
+/** Get SEMRush credit usage summary */
+export function getSemrushUsage(workspaceId?: string, since?: string): {
+  totalCredits: number;
+  totalCalls: number;
+  cachedCalls: number;
+  entries: SemrushCreditEntry[];
+} {
+  let entries = creditLog;
+  if (workspaceId) entries = entries.filter(e => e.workspaceId === workspaceId);
+  if (since) entries = entries.filter(e => e.timestamp >= since);
+  return {
+    totalCredits: entries.reduce((s, e) => s + e.credits, 0),
+    totalCalls: entries.length,
+    cachedCalls: entries.filter(e => e.cached).length,
+    entries,
+  };
+}
+
+/** Aggregate SEMRush usage by day for charting */
+export function getSemrushByDay(workspaceId?: string, days = 30): Array<{
+  date: string; credits: number; calls: number; cachedCalls: number;
+}> {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  const since = cutoff.toISOString();
+
+  let entries = creditLog.filter(e => e.timestamp >= since);
+  if (workspaceId) entries = entries.filter(e => e.workspaceId === workspaceId);
+
+  const byDay = new Map<string, { credits: number; calls: number; cachedCalls: number }>();
+  for (const e of entries) {
+    const day = e.timestamp.slice(0, 10);
+    const existing = byDay.get(day) || { credits: 0, calls: 0, cachedCalls: 0 };
+    existing.credits += e.credits;
+    existing.calls += 1;
+    if (e.cached) existing.cachedCalls += 1;
+    byDay.set(day, existing);
+  }
+
+  const result: Array<{ date: string; credits: number; calls: number; cachedCalls: number }> = [];
+  const d = new Date(cutoff);
+  const today = new Date();
+  while (d <= today) {
+    const dayStr = d.toISOString().slice(0, 10);
+    result.push({ date: dayStr, ...(byDay.get(dayStr) || { credits: 0, calls: 0, cachedCalls: 0 }) });
+    d.setDate(d.getDate() + 1);
+  }
+  return result;
+}
 
 function getCacheDir(workspaceId: string): string {
   const dir = path.join(UPLOAD_ROOT, workspaceId, '.semrush-cache');
@@ -80,6 +185,7 @@ export async function getKeywordOverview(
     const cached = readCache<KeywordMetrics>(workspaceId, cacheKey);
     if (cached) {
       results.push(cached);
+      logCreditUsage({ credits: 0, endpoint: 'keyword_overview', query: kw, rowsReturned: 1, workspaceId, cached: true });
     } else {
       uncached.push(kw);
     }
@@ -128,6 +234,7 @@ export async function getKeywordOverview(
         results.push(metrics);
         const cacheKey = `kw_${database}_${kw.toLowerCase().replace(/\s+/g, '_')}`;
         writeCache(workspaceId, cacheKey, metrics);
+        logCreditUsage({ credits: 10, endpoint: 'keyword_overview', query: kw, rowsReturned: rows.length, workspaceId, cached: false });
       }
     } catch (err) {
       console.error(`SEMRush fetch error for "${kw}":`, err);
@@ -161,7 +268,10 @@ export async function getDomainOrganicKeywords(
   const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
   const cacheKey = `domain_organic_${database}_${cleanDomain.replace(/\./g, '_')}_${limit}`;
   const cached = readCache<DomainKeyword[]>(workspaceId, cacheKey);
-  if (cached) return cached;
+  if (cached) {
+    logCreditUsage({ credits: 0, endpoint: 'domain_organic', query: cleanDomain, rowsReturned: cached.length, workspaceId, cached: true });
+    return cached;
+  }
 
   const params = new URLSearchParams({
     type: 'domain_organic',
@@ -201,6 +311,7 @@ export async function getDomainOrganicKeywords(
     trafficPercent: parseFloat(row['Tc'] || '0'),
   }));
 
+  logCreditUsage({ credits: results.length * 10, endpoint: 'domain_organic', query: cleanDomain, rowsReturned: results.length, workspaceId, cached: false });
   writeCache(workspaceId, cacheKey, results);
   return results;
 }
@@ -293,7 +404,10 @@ export async function getRelatedKeywords(
 
   const cacheKey = `related_${database}_${keyword.toLowerCase().replace(/\s+/g, '_')}_${limit}`;
   const cached = readCache<RelatedKeyword[]>(workspaceId, cacheKey);
-  if (cached) return cached;
+  if (cached) {
+    logCreditUsage({ credits: 0, endpoint: 'related_keywords', query: keyword, rowsReturned: cached.length, workspaceId, cached: true });
+    return cached;
+  }
 
   const params = new URLSearchParams({
     type: 'phrase_related',
@@ -330,6 +444,7 @@ export async function getRelatedKeywords(
     cpc: parseFloat(row['Cp'] || '0'),
   }));
 
+  logCreditUsage({ credits: results.length * 10, endpoint: 'related_keywords', query: keyword, rowsReturned: results.length, workspaceId, cached: false });
   writeCache(workspaceId, cacheKey, results);
   return results;
 }
