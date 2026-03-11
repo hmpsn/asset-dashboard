@@ -227,10 +227,10 @@ WRITING QUALITY RULES (apply to ALL content — violations will be rejected):
 
 FORBIDDEN PHRASES — never use these AI clichés:
 - Opening clichés: "Did you know...", "In today's [digital/fast-paced/competitive] world...", "Have you ever wondered...", "If you're like most...", "When it comes to...", "Picture this..."
-- Filler transitions: "Let's dive in", "Let's dive into", "Without further ado", "Let's explore", "Let's explore why", "Let's explore how", "Let's take a closer look", "Now let's talk about...", "With that said...", "That being said...", "Moving on...", "Let's get started", "Ready to see...", "Ready to learn...". NEVER start or end a sentence with "Let's" followed by a verb.
+- Filler transitions: "Let's dive in", "Let's dive into", "Without further ado", "Let's explore", "Let's take a closer look", "Now let's talk about...", "With that said...", "That being said...", "Moving on...", "Let's get started", "Let's start with...". NEVER use "Let's" followed by a verb anywhere in the content. NEVER use "Ready to [verb]...?" as a rhetorical question (e.g., "Ready to move beyond guesswork?", "Ready to see what...", "Ready to build...").
 - Hollow intensifiers: "incredibly", "absolutely", "truly", "extremely", "revolutionize", "game-changing", "cutting-edge", "world-class", "best-in-class", "next-level", "top-notch"
 - Corporate buzzwords: "leverage", "utilize", "optimize", "streamline", "empower", "harness", "navigate the landscape", "unlock the power of", "take your X to the next level", "in the realm of"
-- Emotional hedging: "It's important to note that...", "It's worth mentioning that...", "It goes without saying...", "Needless to say...", "At the end of the day...", "The reality is that...", "X is key to Y", "X is crucial for Y", "X is essential for Y"
+- Emotional hedging: "It's important to note that...", "It's worth mentioning that...", "It goes without saying...", "Needless to say...", "At the end of the day...", "The reality is that...", "X is key to Y", "The key is...", "X is crucial for Y", "X is essential for Y", "X is the foundation for Y"
 - Vague attribution: "Studies show...", "Research suggests...", "Experts agree...", "According to industry data...", "Many businesses have found..." — if you cite something, name the specific source or don't cite at all
 - Conclusion starters: "In conclusion...", "To sum up...", "In summary...", "All in all...", "At the end of the day..."
 - Metaphor clichés: "growth engine", "game changer", "secret sauce", "silver bullet", "deep dive", "move the needle", "from X to Y" (e.g., "from brochure to growth engine"), "powerful [noun]", "trusted [noun] hub", "one-stop shop"
@@ -243,8 +243,10 @@ STRUCTURAL ANTI-PATTERNS — avoid these:
 - Do NOT use "Conclusion" as the final heading — use a specific, action-oriented heading instead
 - Do NOT give every section the same structure (intro paragraph → bullet list → summary). Vary it: some sections should be all prose, some should lead with a list, some should use a numbered process, some should use a comparison or example-first approach
 - Do NOT reference the same case study, example, or data point more than twice in the entire article. Spread different examples across sections. If you only have one example, use it once or twice max and fill other sections with actionable advice instead
+- Do NOT use examples from the same industry in every section. If a dental case study is mentioned in section 2, use a different industry (tech, finance, retail, etc.) for examples in sections 3, 4, and 5 — even if the knowledge base only has one case study. Invent plausible hypothetical examples from other industries rather than repeating the same one
 - Do NOT repeat any phrase, metaphor, or sentence structure across sections. If you used "transforms your X into a Y" in one section, never use that pattern again
 - Do NOT mention the business/brand name in every section — limit to 2-3 mentions in the entire article (intro and conclusion). The middle sections should focus on teaching, not selling
+- Do NOT put the brand name in the first paragraph of the introduction. The intro should hook the reader with their problem/opportunity, not lead with "At [Brand], we..."
 
 FABRICATION RULES:
 - NEVER invent statistics, case study results, percentages, or data points. Only reference specific numbers if they were provided in the brief context or knowledge base
@@ -261,6 +263,8 @@ WHAT TO DO INSTEAD:
 - Vary paragraph structure: some short (1-2 sentences), some medium (3-4), occasional longer ones for complex points
 - Go deeper than surface-level advice. Instead of "optimize your site speed", explain HOW: specific tools, settings, thresholds, and tradeoffs. The reader should learn something they didn't know before
 - Each section should teach ONE thing well rather than listing 5 things superficially
+- If a section is titled "FAQ" or "Frequently Asked Questions", format it as individual Q&A pairs: each question as an <h3> followed by a short answer paragraph. NEVER combine multiple questions into a single paragraph
+- Vary examples across industries. If the knowledge base only has one case study, reference it once (max twice), then use hypothetical examples from other industries for remaining sections
 `;
 
 /** Build a rich context block from all available brief fields */

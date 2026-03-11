@@ -336,7 +336,7 @@ ${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${pe
 
 Generate a content brief in the following JSON format:
 {
-  "executiveSummary": "2-3 sentence plain-English summary of why this content matters, its strategic value, and expected impact",
+  "executiveSummary": "2-3 sentence plain-English summary of why this content matters and its strategic value. Write from the reader's perspective (what THEY gain), not the brand's perspective (do NOT say 'position [brand] as an expert' or 'reinforce authority')",
   "suggestedTitle": "SEO-optimized title tag (50-60 chars)",
   "suggestedMetaDesc": "Compelling meta description (150-160 chars)",
   "secondaryKeywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5", "keyword6", "keyword7", "keyword8"],
@@ -360,7 +360,7 @@ Generate a content brief in the following JSON format:
   "trafficPotential": "Estimated monthly search volume range and traffic potential (e.g., '500-1,000 monthly searches, moderate competition')",
   "competitorInsights": "Detailed analysis of what top-ranking content covers, their strengths, weaknesses, and how to differentiate",
   "ctaRecommendations": ["Primary CTA the content should drive", "Secondary CTA or micro-conversion"],
-  "internalLinkSuggestions": ["page-slug-1", "page-slug-2", "page-slug-3"],
+  "internalLinkSuggestions": ["/services/strategy", "/our-work/case-study", "/insights/blog-post"],
   "eeatGuidance": {
     "experience": "Specific first-hand experience signals to include (e.g., original photos, case studies, personal anecdotes, hands-on testing notes)",
     "expertise": "How to demonstrate subject-matter expertise (e.g., cite specific data, reference industry standards, include technical depth)",
@@ -388,6 +388,10 @@ Requirements:
 - SERP analysis should reflect realistic analysis of what ranks for this keyword
 - difficultyScore: 1-100 based on estimated keyword competition
 - Make every section actionable and specific — a copywriter or AI tool should be able to write directly from this brief
+- CASE STUDY RULE: If including a case study section, write the outline notes as generic guidance (e.g., "Share a client case study showing content strategy results"). Do NOT name specific clients or projects in the outline notes — the writer will pull the right case study from the knowledge base. Do NOT put industry-specific keywords (e.g., "dental practice branding") in the case study section's keyword list unless the target keyword is specifically about that industry
+- FAQ RULE: If including an FAQ section, allocate at least 150 words (not 100). The writer needs room to format individual Q&A pairs with proper headings. Each question should get its own answer paragraph
+- EXAMPLE DIVERSITY: Outline notes should suggest examples from varied industries, not repeat the same industry across every section. If the business context mentions one industry (e.g., dental), reference it in at most 2 sections and suggest different industry examples for the rest
+- SECTION COUNT: For blog posts targeting 1,500-2,500 words, prefer 5-7 substantive sections over 8+ thin ones. Each section should have enough word budget (200-400 words) to go deep on one topic
 - LOCATION RULE: If the target keyword references a specific city/region, ALL content in this brief (title, meta description, outline, headings) must target THAT location. Do NOT substitute the business headquarters or a different city from the general business context. The target keyword is the authoritative location signal.
 - Internal link suggestions: pick 3-5 pages from the "Existing pages on the site" list that are topically related to this content. Use the EXACT paths from that list. Prefer service pages, case studies, and related blog posts over generic pages like /about or /contact
 - E-E-A-T guidance must be specific and actionable for this particular topic, not generic advice
