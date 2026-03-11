@@ -4,7 +4,7 @@ import {
   TrendingUp, TrendingDown, BarChart3, Zap, Target, Leaf, ArrowRight,
   AlertTriangle, UserPlus, UserCheck,
 } from 'lucide-react';
-import { ChartPointDetail } from './ChartPointDetail';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import { PageHeader, StatCard, SectionCard, TabBar, DateRangeSelector, DataList, EmptyState } from './ui';
 import { DATE_PRESETS_FULL } from './ui/constants';
 
@@ -103,66 +103,39 @@ interface Props {
   ga4PropertyId?: string;
 }
 
-// ── Mini trend chart (SVG) ──
+// ── Mini trend chart (Recharts) ──
 function TrendChart({ data, dataKey, color }: { data: GA4DailyTrend[]; dataKey: 'users' | 'sessions' | 'pageviews'; color: string }) {
-  const [selected, setSelected] = useState<number | null>(null);
   if (data.length < 2) return null;
-  const values = data.map(d => d[dataKey]);
-  const max = Math.max(...values, 1);
-  const min = Math.min(...values);
-  const W = 600;
-  const H = 120;
-  const pad = { top: 10, bottom: 20, left: 0, right: 0 };
-  const plotW = W - pad.left - pad.right;
-  const plotH = H - pad.top - pad.bottom;
-
-  const points = values.map((v, i) => ({
-    x: pad.left + (i / (values.length - 1)) * plotW,
-    y: pad.top + plotH - ((v - min) / (max - min || 1)) * plotH,
-  }));
-
-  const line = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
-  const area = `${line} L${points[points.length - 1].x},${H - pad.bottom} L${points[0].x},${H - pad.bottom} Z`;
-  const bandW = W / data.length;
-
   return (
-    <div className="relative">
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[120px]">
-        <defs>
-          <linearGradient id={`grad-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity="0.2" />
-            <stop offset="100%" stopColor={color} stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <path d={area} fill={`url(#grad-${dataKey})`} />
-        <path d={line} fill="none" stroke={color} strokeWidth="2" />
-        {/* Clickable hit areas */}
-        {points.map((p, i) => (
-          <rect key={i} x={p.x - bandW / 2} y={0} width={bandW} height={H - pad.bottom} fill="transparent" className="cursor-pointer" onClick={() => setSelected(selected === i ? null : i)} />
-        ))}
-        {/* Selected point indicator */}
-        {selected !== null && points[selected] && (
-          <>
-            <line x1={points[selected].x} y1={pad.top} x2={points[selected].x} y2={H - pad.bottom} stroke={color} strokeWidth="1" strokeDasharray="4,3" opacity="0.5" />
-            <circle cx={points[selected].x} cy={points[selected].y} r="4" fill={color} stroke="#18181b" strokeWidth="2" />
-          </>
-        )}
-        {/* First and last date labels */}
-        <text x={pad.left} y={H - 4} fill="#52525b" fontSize="10" textAnchor="start">{data[0].date}</text>
-        <text x={W - pad.right} y={H - 4} fill="#52525b" fontSize="10" textAnchor="end">{data[data.length - 1].date}</text>
-      </svg>
-      {selected !== null && data[selected] && (
-        <ChartPointDetail
-          date={data[selected].date}
-          xPct={(selected / (data.length - 1)) * 100}
-          onClose={() => setSelected(null)}
-          metrics={[
-            { label: 'Users', value: data[selected].users, color: '#60a5fa' },
-            { label: 'Sessions', value: data[selected].sessions, color: '#a78bfa' },
-            { label: 'Pageviews', value: data[selected].pageviews, color: '#34d399' },
-          ]}
-        />
-      )}
+    <div>
+      <ResponsiveContainer width="100%" height={120}>
+        <AreaChart data={data} margin={{ top: 4, right: 0, bottom: 16, left: 0 }}>
+          <defs>
+            <linearGradient id={`grad-ga4-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity={0.2} />
+              <stop offset="100%" stopColor={color} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <XAxis dataKey="date" tick={{ fill: '#52525b', fontSize: 10 }} tickLine={false} axisLine={false} interval={data.length - 2} />
+          <YAxis hide domain={['dataMin', 'dataMax']} />
+          <Tooltip content={({ active, payload }) => {
+            if (!active || !payload?.length) return null;
+            const row = payload[0]?.payload as GA4DailyTrend | undefined;
+            if (!row) return null;
+            return (
+              <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl shadow-black/40 min-w-[140px] overflow-hidden">
+                <div className="px-3 py-1.5 border-b border-zinc-800 text-[11px] font-semibold text-zinc-200">{row.date}</div>
+                <div className="px-3 py-1.5 space-y-1">
+                  {[{ label: 'Users', key: 'users' as const, c: '#60a5fa' }, { label: 'Sessions', key: 'sessions' as const, c: '#a78bfa' }, { label: 'Pageviews', key: 'pageviews' as const, c: '#34d399' }].map(m => (
+                    <div key={m.key} className="flex justify-between text-[11px]"><span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: m.c }} />{m.label}</span><span className="text-zinc-200 font-medium">{row[m.key].toLocaleString()}</span></div>
+                  ))}
+                </div>
+              </div>
+            );
+          }} />
+          <Area type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2} fill={`url(#grad-ga4-${dataKey})`} dot={false} activeDot={{ r: 4, fill: color, stroke: '#18181b', strokeWidth: 2 }} />
+        </AreaChart>
+      </ResponsiveContainer>
     </div>
   );
 }

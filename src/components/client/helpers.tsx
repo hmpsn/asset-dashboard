@@ -1,153 +1,137 @@
-import { useState } from 'react';
-import { ChartPointDetail } from '../ChartPointDetail';
 import { MetricBlock, ChartBlock, DataTableBlock, SparklineBlock } from '../ChatBlocks';
 import type { PerformanceTrend } from './types';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts';
 
-export function TrendChart({ data, metric, color }: { data: PerformanceTrend[]; metric: keyof PerformanceTrend; color: string }) {
-  const [selected, setSelected] = useState<number | null>(null);
-  if (data.length < 2) return null;
-  const values = data.map(d => d[metric] as number);
-  const max = Math.max(...values), min = Math.min(...values), range = max - min || 1, w = 100;
-  const pointCoords = values.map((v, i) => ({ x: (i / (values.length - 1)) * w, y: 100 - ((v - min) / range) * 90 - 5 }));
-  const points = pointCoords.map(p => `${p.x},${p.y}`).join(' ');
-  const bandW = w / data.length;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function DarkTooltip({ active, payload, label, metrics }: { active?: boolean; payload?: Array<{ value: number; payload: Record<string, any> }>; label?: string; metrics?: { label: string; key: string; color: string; fmt?: (v: number) => string }[] }) {
+  if (!active || !payload?.length || !metrics) return null;
+  const row = payload[0]?.payload;
+  if (!row) return null;
   return (
-    <div className="relative" onMouseLeave={() => setSelected(null)}>
-      <svg viewBox={`0 0 ${w} 100`} className="w-full" style={{ height: 80 }} preserveAspectRatio="none">
-        <defs><linearGradient id={`cg-${metric}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={color} stopOpacity="0.2" /><stop offset="100%" stopColor={color} stopOpacity="0" /></linearGradient></defs>
-        <polygon fill={`url(#cg-${metric})`} points={`0,100 ${points} ${w},100`} />
-        <polyline fill="none" stroke={color} strokeWidth="1.5" points={points} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
-        {pointCoords.map((p, i) => (
-          <rect key={i} x={p.x - bandW / 2} y={0} width={bandW} height={100} fill="transparent" className="cursor-pointer" onMouseEnter={() => setSelected(i)} />
+    <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl shadow-black/40 min-w-[140px] overflow-hidden">
+      <div className="px-3 py-1.5 border-b border-zinc-800 text-[11px] font-semibold text-zinc-200">{label || row.date}</div>
+      <div className="px-3 py-1.5 space-y-1">
+        {metrics.map(m => (
+          <div key={m.key} className="flex justify-between text-[11px]">
+            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: m.color }} />{m.label}</span>
+            <span className="text-zinc-200 font-medium">{m.fmt ? m.fmt(row[m.key]) : (typeof row[m.key] === 'number' ? row[m.key].toLocaleString() : row[m.key])}</span>
+          </div>
         ))}
-        {selected !== null && pointCoords[selected] && (
-          <>
-            <line x1={pointCoords[selected].x} y1={0} x2={pointCoords[selected].x} y2={100} stroke={color} strokeWidth="0.5" strokeDasharray="2,1.5" opacity="0.6" vectorEffect="non-scaling-stroke" />
-            <circle cx={pointCoords[selected].x} cy={pointCoords[selected].y} r="3" fill={color} stroke="#18181b" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-          </>
-        )}
-      </svg>
-      {selected !== null && data[selected] && (
-        <ChartPointDetail
-          date={data[selected].date}
-          xPct={(selected / (data.length - 1)) * 100}
-          onClose={() => setSelected(null)}
-          metrics={[
-            { label: 'Clicks', value: data[selected].clicks, color: '#60a5fa' },
-            { label: 'Impressions', value: data[selected].impressions, color: '#a78bfa' },
-            { label: 'CTR', value: `${data[selected].ctr}%`, color: '#34d399' },
-            { label: 'Position', value: data[selected].position, color: '#fbbf24' },
-          ]}
-        />
-      )}
+      </div>
     </div>
   );
 }
 
-export function DualTrendChart({ data, annotations: anns }: { data: PerformanceTrend[]; annotations?: { id: string; date: string; label: string; color?: string }[] }) {
-  const [selected, setSelected] = useState<number | null>(null);
+export function TrendChart({ data, metric, color }: { data: PerformanceTrend[]; metric: keyof PerformanceTrend; color: string }) {
   if (data.length < 2) return null;
-  const clicks = data.map(d => d.clicks);
-  const imps = data.map(d => d.impressions);
-  const cMax = Math.max(...clicks), cMin = Math.min(...clicks), cRange = cMax - cMin || 1;
-  const iMax = Math.max(...imps), iMin = Math.min(...imps), iRange = iMax - iMin || 1;
-  const w = 100;
-  const cCoords = clicks.map((v, i) => ({ x: (i / (clicks.length - 1)) * w, y: 100 - ((v - cMin) / cRange) * 85 - 7 }));
-  const iCoords = imps.map((v, i) => ({ x: (i / (imps.length - 1)) * w, y: 100 - ((v - iMin) / iRange) * 85 - 7 }));
-  const cPoints = cCoords.map(p => `${p.x},${p.y}`).join(' ');
-  const iPoints = iCoords.map(p => `${p.x},${p.y}`).join(' ');
-  const bandW = w / data.length;
   return (
-    <div className="relative" onMouseLeave={() => setSelected(null)}>
+    <ResponsiveContainer width="100%" height={80}>
+      <AreaChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+        <defs>
+          <linearGradient id={`cg-${metric}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity={0.2} />
+            <stop offset="100%" stopColor={color} stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <XAxis dataKey="date" hide />
+        <YAxis hide domain={['dataMin', 'dataMax']} />
+        <Tooltip content={<DarkTooltip metrics={[
+          { label: 'Clicks', key: 'clicks', color: '#60a5fa' },
+          { label: 'Impressions', key: 'impressions', color: '#a78bfa' },
+          { label: 'CTR', key: 'ctr', color: '#34d399', fmt: v => `${v}%` },
+          { label: 'Position', key: 'position', color: '#fbbf24' },
+        ]} />} />
+        <Area type="monotone" dataKey={metric as string} stroke={color} strokeWidth={1.5} fill={`url(#cg-${metric})`} dot={false} activeDot={{ r: 3, fill: color, stroke: '#18181b', strokeWidth: 1.5 }} />
+      </AreaChart>
+    </ResponsiveContainer>
+  );
+}
+
+export function DualTrendChart({ data, annotations: anns }: { data: PerformanceTrend[]; annotations?: { id: string; date: string; label: string; color?: string }[] }) {
+  if (data.length < 2) return null;
+  return (
+    <div>
       <div className="flex items-center gap-4 mb-2">
         <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded bg-blue-400" /><span className="text-[11px] text-blue-400">Clicks</span></div>
         <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded bg-teal-400" /><span className="text-[11px] text-teal-400">Impressions</span></div>
       </div>
-      <svg viewBox={`0 0 ${w} 100`} className="w-full" style={{ height: 120 }} preserveAspectRatio="none">
-        <defs>
-          <linearGradient id="cg-clicks-dual" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#60a5fa" stopOpacity="0.15" /><stop offset="100%" stopColor="#60a5fa" stopOpacity="0" /></linearGradient>
-          <linearGradient id="cg-imps-dual" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2dd4bf" stopOpacity="0.1" /><stop offset="100%" stopColor="#2dd4bf" stopOpacity="0" /></linearGradient>
-        </defs>
-        <polygon fill="url(#cg-imps-dual)" points={`0,100 ${iPoints} ${w},100`} />
-        <polyline fill="none" stroke="#2dd4bf" strokeWidth="1.2" points={iPoints} vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeOpacity="0.6" />
-        <polygon fill="url(#cg-clicks-dual)" points={`0,100 ${cPoints} ${w},100`} />
-        <polyline fill="none" stroke="#60a5fa" strokeWidth="1.5" points={cPoints} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
-        {anns?.map(ann => {
-          const idx = data.findIndex(d => d.date === ann.date);
-          if (idx < 0) return null;
-          const x = (idx / (data.length - 1)) * w;
-          return <g key={ann.id}><line x1={x} y1={2} x2={x} y2={98} stroke={ann.color || '#2dd4bf'} strokeWidth="0.8" strokeDasharray="2,1.5" opacity="0.7" vectorEffect="non-scaling-stroke" /><circle cx={x} cy={3} r="1.5" fill={ann.color || '#2dd4bf'} vectorEffect="non-scaling-stroke" /><title>{ann.label}</title></g>;
-        })}
-        {/* Hover hit areas */}
-        {cCoords.map((p, i) => (
-          <rect key={i} x={p.x - bandW / 2} y={0} width={bandW} height={100} fill="transparent" className="cursor-pointer" onMouseEnter={() => setSelected(i)} />
-        ))}
-        {/* Selected point indicators */}
-        {selected !== null && cCoords[selected] && (
-          <>
-            <line x1={cCoords[selected].x} y1={2} x2={cCoords[selected].x} y2={98} stroke="#a1a1aa" strokeWidth="0.5" strokeDasharray="2,1.5" opacity="0.5" vectorEffect="non-scaling-stroke" />
-            <circle cx={cCoords[selected].x} cy={cCoords[selected].y} r="3" fill="#60a5fa" stroke="#18181b" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-            <circle cx={iCoords[selected].x} cy={iCoords[selected].y} r="3" fill="#2dd4bf" stroke="#18181b" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-          </>
-        )}
-      </svg>
-      {selected !== null && data[selected] && (
-        <ChartPointDetail
-          date={data[selected].date}
-          xPct={(selected / (data.length - 1)) * 100}
-          onClose={() => setSelected(null)}
-          metrics={[
-            { label: 'Clicks', value: data[selected].clicks, color: '#60a5fa' },
-            { label: 'Impressions', value: data[selected].impressions, color: '#2dd4bf' },
-            { label: 'CTR', value: `${data[selected].ctr}%`, color: '#34d399' },
-            { label: 'Position', value: data[selected].position, color: '#fbbf24' },
-          ]}
-        />
-      )}
+      <ResponsiveContainer width="100%" height={120}>
+        <AreaChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+          <defs>
+            <linearGradient id="cg-clicks-dual" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#60a5fa" stopOpacity={0.15} />
+              <stop offset="100%" stopColor="#60a5fa" stopOpacity={0} />
+            </linearGradient>
+            <linearGradient id="cg-imps-dual" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#2dd4bf" stopOpacity={0.1} />
+              <stop offset="100%" stopColor="#2dd4bf" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <XAxis dataKey="date" hide />
+          <YAxis yAxisId="clicks" hide domain={['dataMin', 'dataMax']} />
+          <YAxis yAxisId="imps" hide domain={['dataMin', 'dataMax']} orientation="right" />
+          <Tooltip content={<DarkTooltip metrics={[
+            { label: 'Clicks', key: 'clicks', color: '#60a5fa' },
+            { label: 'Impressions', key: 'impressions', color: '#2dd4bf' },
+            { label: 'CTR', key: 'ctr', color: '#34d399', fmt: v => `${v}%` },
+            { label: 'Position', key: 'position', color: '#fbbf24' },
+          ]} />} />
+          <Area yAxisId="imps" type="monotone" dataKey="impressions" stroke="#2dd4bf" strokeWidth={1.2} strokeOpacity={0.6} fill="url(#cg-imps-dual)" dot={false} activeDot={{ r: 3, fill: '#2dd4bf', stroke: '#18181b', strokeWidth: 1.5 }} />
+          <Area yAxisId="clicks" type="monotone" dataKey="clicks" stroke="#60a5fa" strokeWidth={1.5} fill="url(#cg-clicks-dual)" dot={false} activeDot={{ r: 3, fill: '#60a5fa', stroke: '#18181b', strokeWidth: 1.5 }} />
+          {anns?.map(ann => {
+            const idx = data.findIndex(d => d.date === ann.date);
+            if (idx < 0) return null;
+            return <ReferenceLine key={ann.id} x={data[idx].date} stroke={ann.color || '#2dd4bf'} strokeWidth={0.8} strokeDasharray="4 3" opacity={0.7} label={{ value: '', position: 'top' }} />;
+          })}
+        </AreaChart>
+      </ResponsiveContainer>
     </div>
   );
 }
 
 export function ScoreHistoryChart({ history }: { history: Array<{ id: string; createdAt: string; siteScore: number }> }) {
-  const [selected, setSelected] = useState<number | null>(null);
   if (history.length < 2) return null;
-  const reversed = history.slice().reverse();
-  const scores = reversed.map(h => h.siteScore);
-  const max = Math.max(...scores, 100), min = Math.min(...scores, 0), range = max - min || 1, w = 100;
-  const pointCoords = scores.map((v, i) => ({ x: (i / (scores.length - 1)) * w, y: 100 - ((v - min) / range) * 85 - 5 }));
-  const points = pointCoords.map(p => `${p.x},${p.y}`).join(' ');
-  const bandW = w / scores.length;
+  const chartData = history.slice().reverse().map(h => ({
+    date: new Date(h.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+    dateFull: new Date(h.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }),
+    siteScore: h.siteScore,
+  }));
   return (
-    <div className="relative" onMouseLeave={() => setSelected(null)}>
-      <svg viewBox={`0 0 ${w} 100`} className="w-full" style={{ height: 60 }} preserveAspectRatio="none">
-        <defs><linearGradient id="sh-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#34d399" stopOpacity="0.15" /><stop offset="100%" stopColor="#34d399" stopOpacity="0" /></linearGradient></defs>
-        <polygon fill="url(#sh-g)" points={`0,100 ${points} ${w},100`} />
-        <polyline fill="none" stroke="#34d399" strokeWidth="2" points={points} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
-        {pointCoords.map((p, i) => (
-          <rect key={i} x={p.x - bandW / 2} y={0} width={bandW} height={100} fill="transparent" className="cursor-pointer" onMouseEnter={() => setSelected(i)} />
-        ))}
-        {selected !== null && pointCoords[selected] && (
-          <>
-            <line x1={pointCoords[selected].x} y1={0} x2={pointCoords[selected].x} y2={100} stroke="#34d399" strokeWidth="0.5" strokeDasharray="2,1.5" opacity="0.6" vectorEffect="non-scaling-stroke" />
-            <circle cx={pointCoords[selected].x} cy={pointCoords[selected].y} r="3" fill="#34d399" stroke="#18181b" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-          </>
-        )}
-      </svg>
-      {selected !== null && reversed[selected] && (
-        <ChartPointDetail
-          date={new Date(reversed[selected].createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-          xPct={(selected / (scores.length - 1)) * 100}
-          onClose={() => setSelected(null)}
-          metrics={[
-            { label: 'Audit Score', value: `${reversed[selected].siteScore}/100`, color: reversed[selected].siteScore >= 80 ? '#34d399' : reversed[selected].siteScore >= 60 ? '#fbbf24' : '#f87171' },
-          ]}
-        />
-      )}
+    <div>
+      <ResponsiveContainer width="100%" height={60}>
+        <AreaChart data={chartData} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+          <defs>
+            <linearGradient id="sh-g" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#34d399" stopOpacity={0.15} />
+              <stop offset="100%" stopColor="#34d399" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <XAxis dataKey="date" hide />
+          <YAxis hide domain={[0, 100]} />
+          <Tooltip content={({ active, payload }) => {
+            if (!active || !payload?.length) return null;
+            const row = payload[0]?.payload;
+            if (!row) return null;
+            const score = row.siteScore as number;
+            const scoreColor = score >= 80 ? '#34d399' : score >= 60 ? '#fbbf24' : '#f87171';
+            return (
+              <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl shadow-black/40 min-w-[120px] overflow-hidden">
+                <div className="px-3 py-1.5 border-b border-zinc-800 text-[11px] font-semibold text-zinc-200">{row.dateFull}</div>
+                <div className="px-3 py-1.5">
+                  <div className="flex justify-between text-[11px]">
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: scoreColor }} />Score</span>
+                    <span className="text-zinc-200 font-medium">{score}/100</span>
+                  </div>
+                </div>
+              </div>
+            );
+          }} />
+          <Area type="monotone" dataKey="siteScore" stroke="#34d399" strokeWidth={2} fill="url(#sh-g)" dot={false} activeDot={{ r: 3, fill: '#34d399', stroke: '#18181b', strokeWidth: 1.5 }} />
+        </AreaChart>
+      </ResponsiveContainer>
       <div className="flex justify-between text-[11px] text-zinc-500 mt-1">
-        {reversed.map((h, i) => (i === 0 || i === history.length - 1)
-          ? <span key={h.id}>{new Date(h.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
-          : <span key={h.id} />
-        )}
+        <span>{chartData[0]?.date}</span>
+        <span>{chartData[chartData.length - 1]?.date}</span>
       </div>
     </div>
   );

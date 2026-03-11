@@ -4,7 +4,7 @@ import {
   BarChart3, ExternalLink, ArrowUpDown,
   Sparkles, AlertTriangle, Target, Zap, Shield, X,
 } from 'lucide-react';
-import { ChartPointDetail } from './ChartPointDetail';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import { PageHeader, StatCard, SectionCard, TabBar, DateRangeSelector, EmptyState } from './ui';
 import { DATE_PRESETS_SEARCH } from './ui/constants';
 import { ChatPanel, type ChatMessage } from './ChatPanel';
@@ -79,60 +79,49 @@ interface Props {
   gscPropertyUrl?: string;
 }
 
-function TrendChart({ data, metric, color, height = 80 }: { data: PerformanceTrend[]; metric: keyof PerformanceTrend; color: string; height?: number }) {
-  const [selected, setSelected] = useState<number | null>(null);
-  if (data.length < 2) return null;
-  const values = data.map(d => d[metric] as number);
-  const max = Math.max(...values);
-  const min = Math.min(...values);
-  const range = max - min || 1;
-  const w = 100;
-
-  const pointCoords = values.map((v, i) => ({
-    x: (i / (values.length - 1)) * w,
-    y: 100 - ((v - min) / range) * 90 - 5,
-  }));
-  const points = pointCoords.map(p => `${p.x},${p.y}`).join(' ');
-  const areaPoints = `0,100 ${points} ${w},100`;
-  const bandW = w / data.length;
-
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function GscTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: Record<string, any> }> }) {
+  if (!active || !payload?.length) return null;
+  const row = payload[0]?.payload;
+  if (!row) return null;
+  const metrics = [
+    { label: 'Clicks', key: 'clicks', color: '#60a5fa' },
+    { label: 'Impressions', key: 'impressions', color: '#22d3ee' },
+    { label: 'CTR', key: 'ctr', color: '#34d399', fmt: (v: number) => `${v}%` },
+    { label: 'Position', key: 'position', color: '#fbbf24' },
+  ];
   return (
-    <div className="relative">
-      <svg viewBox={`0 0 ${w} 100`} className="w-full" style={{ height }} preserveAspectRatio="none">
+    <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl shadow-black/40 min-w-[140px] overflow-hidden">
+      <div className="px-3 py-1.5 border-b border-zinc-800 text-[11px] font-semibold text-zinc-200">{row.date}</div>
+      <div className="px-3 py-1.5 space-y-1">
+        {metrics.map(m => (
+          <div key={m.key} className="flex justify-between text-[11px]">
+            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: m.color }} />{m.label}</span>
+            <span className="text-zinc-200 font-medium">{m.fmt ? m.fmt(row[m.key]) : row[m.key]?.toLocaleString()}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TrendChart({ data, metric, color, height = 80 }: { data: PerformanceTrend[]; metric: keyof PerformanceTrend; color: string; height?: number }) {
+  if (data.length < 2) return null;
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <AreaChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
         <defs>
           <linearGradient id={`grad-${metric}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity="0.2" />
-            <stop offset="100%" stopColor={color} stopOpacity="0" />
+            <stop offset="0%" stopColor={color} stopOpacity={0.2} />
+            <stop offset="100%" stopColor={color} stopOpacity={0} />
           </linearGradient>
         </defs>
-        <polygon fill={`url(#grad-${metric})`} points={areaPoints} />
-        <polyline fill="none" stroke={color} strokeWidth="1.5" points={points} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
-        {/* Clickable hit areas */}
-        {pointCoords.map((p, i) => (
-          <rect key={i} x={p.x - bandW / 2} y={0} width={bandW} height={100} fill="transparent" className="cursor-pointer" onClick={() => setSelected(selected === i ? null : i)} />
-        ))}
-        {/* Selected point indicator */}
-        {selected !== null && pointCoords[selected] && (
-          <>
-            <line x1={pointCoords[selected].x} y1={0} x2={pointCoords[selected].x} y2={100} stroke={color} strokeWidth="0.5" strokeDasharray="2,1.5" opacity="0.6" vectorEffect="non-scaling-stroke" />
-            <circle cx={pointCoords[selected].x} cy={pointCoords[selected].y} r="3" fill={color} stroke="#18181b" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-          </>
-        )}
-      </svg>
-      {selected !== null && data[selected] && (
-        <ChartPointDetail
-          date={data[selected].date}
-          xPct={(selected / (data.length - 1)) * 100}
-          onClose={() => setSelected(null)}
-          metrics={[
-            { label: 'Clicks', value: data[selected].clicks, color: '#60a5fa' },
-            { label: 'Impressions', value: data[selected].impressions, color: '#22d3ee' },
-            { label: 'CTR', value: `${data[selected].ctr}%`, color: '#34d399' },
-            { label: 'Position', value: data[selected].position, color: '#fbbf24' },
-          ]}
-        />
-      )}
-    </div>
+        <XAxis dataKey="date" hide />
+        <YAxis hide domain={['dataMin', 'dataMax']} />
+        <Tooltip content={<GscTooltip />} />
+        <Area type="monotone" dataKey={metric as string} stroke={color} strokeWidth={1.5} fill={`url(#grad-${metric})`} dot={false} activeDot={{ r: 3, fill: color, stroke: '#18181b', strokeWidth: 1.5 }} />
+      </AreaChart>
+    </ResponsiveContainer>
   );
 }
 

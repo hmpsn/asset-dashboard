@@ -3,6 +3,7 @@ import {
   BarChart3, MousePointer, Eye, Target,
   Clock, FileText, Loader2, ChevronDown, ChevronRight, Users,
 } from 'lucide-react';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from 'recharts';
 import { PageHeader, SectionCard, EmptyState, Badge } from './ui';
 
 interface GscMetrics {
@@ -47,52 +48,49 @@ interface Props {
 
 function MiniSparkline({ data, color, height = 32, width = 100 }: { data: number[]; color: string; height?: number; width?: number }) {
   if (data.length < 2) return null;
-  const max = Math.max(...data, 1);
-  const min = Math.min(...data, 0);
-  const range = max - min || 1;
-  const points = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * width;
-    const y = height - ((v - min) / range) * (height - 4) - 2;
-    return `${x},${y}`;
-  }).join(' ');
+  const chartData = data.map((v, i) => ({ i, v }));
   return (
-    <svg width={width} height={height} className="flex-shrink-0">
-      <polyline fill="none" stroke={color} strokeWidth="1.5" points={points} />
-    </svg>
+    <div className="flex-shrink-0" style={{ width, height }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={chartData} margin={{ top: 2, right: 0, bottom: 2, left: 0 }}>
+          <Line type="monotone" dataKey="v" stroke={color} strokeWidth={1.5} dot={false} isAnimationActive={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
   );
 }
 
 function TrendChart({ trend }: { trend: TrendPoint[] }) {
   if (trend.length < 2) return <p className="text-xs text-zinc-500 py-4">Not enough data for trend chart.</p>;
-
-  const maxClicks = Math.max(...trend.map(t => t.clicks), 1);
-  const maxImpressions = Math.max(...trend.map(t => t.impressions), 1);
-  const w = 600;
-  const h = 120;
-  const pad = 2;
-
-  const clicksPoints = trend.map((t, i) => {
-    const x = pad + (i / (trend.length - 1)) * (w - 2 * pad);
-    const y = h - pad - (t.clicks / maxClicks) * (h - 2 * pad);
-    return `${x},${y}`;
-  }).join(' ');
-
-  const impressionsPoints = trend.map((t, i) => {
-    const x = pad + (i / (trend.length - 1)) * (w - 2 * pad);
-    const y = h - pad - (t.impressions / maxImpressions) * (h - 2 * pad);
-    return `${x},${y}`;
-  }).join(' ');
-
   return (
     <div className="mt-3">
       <div className="flex items-center gap-4 mb-2">
         <span className="flex items-center gap-1 text-[10px] text-zinc-400"><span className="w-3 h-0.5 bg-blue-400 inline-block" /> Clicks</span>
         <span className="flex items-center gap-1 text-[10px] text-zinc-400"><span className="w-3 h-0.5 bg-cyan-400 inline-block" /> Impressions</span>
       </div>
-      <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ maxHeight: 120 }}>
-        <polyline fill="none" stroke="#22d3ee" strokeWidth="1.5" opacity="0.5" points={impressionsPoints} />
-        <polyline fill="none" stroke="#60a5fa" strokeWidth="2" points={clicksPoints} />
-      </svg>
+      <ResponsiveContainer width="100%" height={120}>
+        <LineChart data={trend} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+          <XAxis dataKey="date" hide />
+          <YAxis yAxisId="clicks" hide domain={[0, 'dataMax']} />
+          <YAxis yAxisId="imps" hide domain={[0, 'dataMax']} orientation="right" />
+          <Tooltip content={({ active, payload }) => {
+            if (!active || !payload?.length) return null;
+            const row = payload[0]?.payload as TrendPoint | undefined;
+            if (!row) return null;
+            return (
+              <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl shadow-black/40 min-w-[120px] overflow-hidden">
+                <div className="px-3 py-1.5 border-b border-zinc-800 text-[11px] font-semibold text-zinc-200">{row.date}</div>
+                <div className="px-3 py-1.5 space-y-1">
+                  <div className="flex justify-between text-[11px]"><span className="text-blue-400">Clicks</span><span className="text-zinc-200 font-medium">{row.clicks.toLocaleString()}</span></div>
+                  <div className="flex justify-between text-[11px]"><span className="text-cyan-400">Impressions</span><span className="text-zinc-200 font-medium">{row.impressions.toLocaleString()}</span></div>
+                </div>
+              </div>
+            );
+          }} />
+          <Line yAxisId="imps" type="monotone" dataKey="impressions" stroke="#22d3ee" strokeWidth={1.5} strokeOpacity={0.5} dot={false} />
+          <Line yAxisId="clicks" type="monotone" dataKey="clicks" stroke="#60a5fa" strokeWidth={2} dot={false} />
+        </LineChart>
+      </ResponsiveContainer>
       <div className="flex justify-between text-[10px] text-zinc-600 mt-1">
         <span>{trend[0].date}</span>
         <span>{trend[trend.length - 1].date}</span>

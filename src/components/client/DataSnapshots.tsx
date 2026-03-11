@@ -7,6 +7,7 @@ import type {
   GA4Overview, GA4DailyTrend, GA4TopPage, GA4Comparison, GA4NewVsReturning,
   GA4OrganicOverview, GA4LandingPage,
 } from './types';
+import { ResponsiveContainer, AreaChart, Area } from 'recharts';
 
 // ─── Helpers ───
 
@@ -23,16 +24,19 @@ function ChangeBadge({ value, suffix = '%', invert = false }: { value: number; s
 
 function MiniSparkline({ data, color }: { data: number[]; color: string }) {
   if (data.length < 3) return null;
-  const max = Math.max(...data, 1);
-  const min = Math.min(...data, 0);
-  const range = max - min || 1;
-  const w = 120, h = 32;
-  const points = data.map((v, i) => `${(i / (data.length - 1)) * w},${h - 2 - ((v - min) / range) * (h - 4)}`).join(' ');
+  const chartData = data.map((v, i) => ({ i, v }));
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ height: h }} preserveAspectRatio="none">
-      <polyline fill="none" stroke={color} strokeWidth="1.5" points={points} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
-      <polygon fill={color} fillOpacity="0.08" points={`0,${h} ${points} ${w},${h}`} />
-    </svg>
+    <ResponsiveContainer width="100%" height={32}>
+      <AreaChart data={chartData} margin={{ top: 2, right: 0, bottom: 2, left: 0 }}>
+        <defs>
+          <linearGradient id={`spark-${color.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity={0.08} />
+            <stop offset="100%" stopColor={color} stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <Area type="monotone" dataKey="v" stroke={color} strokeWidth={1.5} fill={`url(#spark-${color.replace('#', '')})`} dot={false} isAnimationActive={false} />
+      </AreaChart>
+    </ResponsiveContainer>
   );
 }
 

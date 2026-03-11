@@ -7,6 +7,7 @@ import {
   Map, Rocket, FileSearch,
   TrendingDown,
 } from 'lucide-react';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import { MetricRingSvg, PageHeader, SectionCard, Badge, StatCard } from './ui';
 
 interface ActivityEntry {
@@ -508,7 +509,6 @@ interface AIUsageData {
 function AIUsageSection() {
   const [data, setData] = useState<AIUsageData | null>(null);
   const [days, setDays] = useState(14);
-  const [hovered, setHovered] = useState<number | null>(null);
 
   useEffect(() => {
     fetch(`/api/ai/usage?days=${days}`)
@@ -525,10 +525,7 @@ function AIUsageSection() {
   const openaiCost = data.daily.reduce((s, d) => s + d.openaiCost, 0);
   const anthropicCost = data.daily.reduce((s, d) => s + d.anthropicCost, 0);
 
-  // Chart dimensions
   const chartDays = data.daily.slice(-days);
-  const maxCost = Math.max(...chartDays.map(d => d.cost), 0.001);
-  const barW = 100 / chartDays.length;
 
   const fmtCost = (v: number) => v < 0.01 ? '<$0.01' : `$${v.toFixed(2)}`;
   const fmtTokens = (v: number) => v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(1)}K` : String(v);
@@ -605,56 +602,31 @@ function AIUsageSection() {
             <span className="flex items-center gap-1 text-[11px] text-zinc-500"><span className="w-2 h-2 rounded-sm bg-orange-500 inline-block" /> Anthropic</span>
           </div>
         </div>
-        <div className="relative" onMouseLeave={() => setHovered(null)}>
-          <svg viewBox="0 0 100 50" className="w-full" style={{ height: 120 }} preserveAspectRatio="none">
-            {chartDays.map((d, i) => {
-              const x = i * barW + barW * 0.15;
-              const w = barW * 0.7;
-              const oaiH = (d.openaiCost / maxCost) * 44;
-              const antH = (d.anthropicCost / maxCost) * 44;
-              const isHov = hovered === i;
+        <ResponsiveContainer width="100%" height={120}>
+          <BarChart data={chartDays} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+            <XAxis dataKey="date" tick={{ fill: '#52525b', fontSize: 9 }} tickLine={false} axisLine={false} interval={'preserveStartEnd'} tickFormatter={(v: string) => v.slice(5)} />
+            <YAxis hide />
+            <Tooltip content={({ active, payload }) => {
+              if (!active || !payload?.length) return null;
+              const row = payload[0]?.payload as DailyUsage | undefined;
+              if (!row) return null;
               return (
-                <g key={d.date}>
-                  {/* OpenAI (bottom) */}
-                  <rect x={x} y={48 - oaiH - antH} width={w} height={oaiH} fill={isHov ? '#34d399' : '#059669'} rx="0.3" opacity={isHov ? 1 : 0.8} />
-                  {/* Anthropic (top) */}
-                  <rect x={x} y={48 - antH} width={w} height={antH} fill={isHov ? '#fb923c' : '#ea580c'} rx="0.3" opacity={isHov ? 1 : 0.8} />
-                  {/* Hover target */}
-                  <rect x={i * barW} y={0} width={barW} height={50} fill="transparent" className="cursor-pointer" onMouseEnter={() => setHovered(i)} />
-                </g>
-              );
-            })}
-            {/* Baseline */}
-            <line x1={0} y1={48} x2={100} y2={48} stroke="#3f3f46" strokeWidth="0.3" vectorEffect="non-scaling-stroke" />
-          </svg>
-          {/* X-axis labels */}
-          <div className="flex justify-between px-0.5 -mt-0.5">
-            {chartDays.length > 0 && <span className="text-[9px] text-zinc-600">{chartDays[0].date.slice(5)}</span>}
-            {chartDays.length > 7 && <span className="text-[9px] text-zinc-600">{chartDays[Math.floor(chartDays.length / 2)].date.slice(5)}</span>}
-            {chartDays.length > 0 && <span className="text-[9px] text-zinc-600">{chartDays[chartDays.length - 1].date.slice(5)}</span>}
-          </div>
-          {/* Hover tooltip */}
-          {hovered !== null && chartDays[hovered] && (
-            <div
-              className="absolute z-20 top-0 mt-1 pointer-events-none"
-              style={{
-                left: hovered / chartDays.length < 0.65 ? `${(hovered / chartDays.length) * 100}%` : undefined,
-                right: hovered / chartDays.length >= 0.65 ? `${100 - (hovered / chartDays.length) * 100}%` : undefined,
-              }}
-            >
-              <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl shadow-black/40 min-w-[140px] overflow-hidden">
-                <div className="px-3 py-1.5 border-b border-zinc-800 text-[11px] font-semibold text-zinc-200">{chartDays[hovered].date}</div>
-                <div className="px-3 py-1.5 space-y-1">
-                  <div className="flex justify-between text-[11px]"><span className="text-zinc-500">Total</span><span className="text-zinc-200 font-medium">{fmtCost(chartDays[hovered].cost)}</span></div>
-                  <div className="flex justify-between text-[11px]"><span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-sm bg-emerald-500 inline-block" />OpenAI</span><span className="text-emerald-400">{fmtCost(chartDays[hovered].openaiCost)}</span></div>
-                  <div className="flex justify-between text-[11px]"><span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-sm bg-orange-500 inline-block" />Anthropic</span><span className="text-orange-400">{fmtCost(chartDays[hovered].anthropicCost)}</span></div>
-                  <div className="flex justify-between text-[11px]"><span className="text-zinc-500">Calls</span><span className="text-zinc-300">{chartDays[hovered].calls}</span></div>
-                  <div className="flex justify-between text-[11px]"><span className="text-zinc-500">Tokens</span><span className="text-zinc-300">{fmtTokens(chartDays[hovered].totalTokens)}</span></div>
+                <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl shadow-black/40 min-w-[140px] overflow-hidden">
+                  <div className="px-3 py-1.5 border-b border-zinc-800 text-[11px] font-semibold text-zinc-200">{row.date}</div>
+                  <div className="px-3 py-1.5 space-y-1">
+                    <div className="flex justify-between text-[11px]"><span className="text-zinc-500">Total</span><span className="text-zinc-200 font-medium">{fmtCost(row.cost)}</span></div>
+                    <div className="flex justify-between text-[11px]"><span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-sm bg-emerald-500 inline-block" />OpenAI</span><span className="text-emerald-400">{fmtCost(row.openaiCost)}</span></div>
+                    <div className="flex justify-between text-[11px]"><span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-sm bg-orange-500 inline-block" />Anthropic</span><span className="text-orange-400">{fmtCost(row.anthropicCost)}</span></div>
+                    <div className="flex justify-between text-[11px]"><span className="text-zinc-500">Calls</span><span className="text-zinc-300">{row.calls}</span></div>
+                    <div className="flex justify-between text-[11px]"><span className="text-zinc-500">Tokens</span><span className="text-zinc-300">{fmtTokens(row.totalTokens)}</span></div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          )}
-        </div>
+              );
+            }} />
+            <Bar dataKey="openaiCost" stackId="cost" fill="#059669" radius={[0, 0, 0, 0]} />
+            <Bar dataKey="anthropicCost" stackId="cost" fill="#ea580c" radius={[2, 2, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
       </div>
 
       {/* Feature breakdown */}

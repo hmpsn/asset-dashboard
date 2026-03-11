@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 import {
-  LineChart, ChevronDown, ChevronUp, Filter, Search, Loader2,
+  LineChart as LineChartIcon, ChevronDown, ChevronUp, Filter, Search, Loader2,
 } from 'lucide-react';
+import {
+  ResponsiveContainer, AreaChart, Area,
+  XAxis, YAxis, Tooltip, PieChart, Pie, Cell,
+} from 'recharts';
 import SearchableSelect from '../SearchableSelect';
 import { OrganicInsight } from './DataSnapshots';
 import type {
@@ -139,7 +143,7 @@ export function AnalyticsTab({
   if (!ga4Overview) {
     return (
       <div className="text-center py-16">
-        <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4"><LineChart className="w-8 h-8 text-zinc-700" /></div>
+        <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4"><LineChartIcon className="w-8 h-8 text-zinc-700" /></div>
         <h3 className="text-sm font-medium text-zinc-400">Analytics Coming Soon</h3>
         <p className="text-xs text-zinc-500 mt-1 max-w-sm mx-auto">Once Google Analytics is connected, you'll see visitor trends, traffic sources, top pages, and conversion events — all in one place.</p>
       </div>
@@ -187,22 +191,38 @@ export function AnalyticsTab({
         {/* Traffic Trend (2/3) */}
         <div className="lg:col-span-2 bg-zinc-900 rounded-xl border border-zinc-800 p-5">
           <h3 className="text-sm font-semibold text-zinc-200 mb-4">Traffic Trend</h3>
-          <svg viewBox={`0 0 800 200`} className="w-full h-48">
-            {(() => {
-              const maxV = Math.max(...ga4Trend.map(d => d.users), 1);
-              const maxS = Math.max(...ga4Trend.map(d => d.sessions), 1);
-              const maxP = Math.max(...ga4Trend.map(d => d.pageviews), 1);
-              const xStep = 800 / Math.max(ga4Trend.length - 1, 1);
-              const mkPath = (vals: number[], max: number) => vals.map((v, i) => `${i === 0 ? 'M' : 'L'}${i * xStep},${190 - (v / max) * 170}`).join(' ');
-              return (<>
-                <path d={mkPath(ga4Trend.map(d => d.pageviews), maxP)} fill="none" stroke="rgba(45,212,191,0.3)" strokeWidth="1.5" />
-                <path d={mkPath(ga4Trend.map(d => d.sessions), maxS)} fill="none" stroke="rgba(96,165,250,0.5)" strokeWidth="1.5" />
-                <path d={mkPath(ga4Trend.map(d => d.users), maxV)} fill="none" stroke="rgba(45,212,191,0.9)" strokeWidth="2" />
-                <path d={`${mkPath(ga4Trend.map(d => d.users), maxV)} L${(ga4Trend.length - 1) * xStep},190 L0,190 Z`} fill="url(#ga4grad)" opacity="0.15" />
-                <defs><linearGradient id="ga4grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2dd4bf" /><stop offset="100%" stopColor="transparent" /></linearGradient></defs>
-              </>);
-            })()}
-          </svg>
+          <ResponsiveContainer width="100%" height={192}>
+            <AreaChart data={ga4Trend} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+              <defs>
+                <linearGradient id="ga4grad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#2dd4bf" stopOpacity={0.15} />
+                  <stop offset="100%" stopColor="#2dd4bf" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="date" hide />
+              <YAxis yAxisId="users" hide domain={[0, 'dataMax']} />
+              <YAxis yAxisId="sessions" hide domain={[0, 'dataMax']} orientation="right" />
+              <YAxis yAxisId="pv" hide domain={[0, 'dataMax']} orientation="right" />
+              <Tooltip content={({ active, payload }) => {
+                if (!active || !payload?.length) return null;
+                const row = payload[0]?.payload as GA4DailyTrend | undefined;
+                if (!row) return null;
+                return (
+                  <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl shadow-black/40 min-w-[140px] overflow-hidden">
+                    <div className="px-3 py-1.5 border-b border-zinc-800 text-[11px] font-semibold text-zinc-200">{row.date}</div>
+                    <div className="px-3 py-1.5 space-y-1">
+                      <div className="flex justify-between text-[11px]"><span className="text-teal-400">Users</span><span className="text-zinc-200 font-medium">{row.users.toLocaleString()}</span></div>
+                      <div className="flex justify-between text-[11px]"><span className="text-blue-400">Sessions</span><span className="text-zinc-200 font-medium">{row.sessions.toLocaleString()}</span></div>
+                      <div className="flex justify-between text-[11px]"><span className="text-teal-400/40">Pageviews</span><span className="text-zinc-200 font-medium">{row.pageviews.toLocaleString()}</span></div>
+                    </div>
+                  </div>
+                );
+              }} />
+              <Area yAxisId="pv" type="monotone" dataKey="pageviews" stroke="rgba(45,212,191,0.3)" strokeWidth={1.5} fill="none" dot={false} />
+              <Area yAxisId="sessions" type="monotone" dataKey="sessions" stroke="rgba(96,165,250,0.5)" strokeWidth={1.5} fill="none" dot={false} />
+              <Area yAxisId="users" type="monotone" dataKey="users" stroke="rgba(45,212,191,0.9)" strokeWidth={2} fill="url(#ga4grad)" dot={false} activeDot={{ r: 3, fill: '#2dd4bf', stroke: '#18181b', strokeWidth: 1.5 }} />
+            </AreaChart>
+          </ResponsiveContainer>
           <div className="flex items-center justify-center gap-6 mt-2">
             <span className="flex items-center gap-1.5 text-[11px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-teal-400 inline-block" /> Users</span>
             <span className="flex items-center gap-1.5 text-[11px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-blue-400 inline-block" /> Sessions</span>
@@ -217,25 +237,15 @@ export function AnalyticsTab({
             <div className="flex-1 flex flex-col items-center justify-center">
               {(() => {
                 const PIE_COLORS = ['#14b8a6', '#60a5fa', '#34d399', '#fbbf24'];
-                const total = ga4Devices.reduce((s, d) => s + d.sessions, 0) || 1;
-                let cumAngle = -90;
-                const slices = ga4Devices.map((d, i) => {
-                  const pct = d.sessions / total;
-                  const angle = pct * 360;
-                  const startAngle = cumAngle;
-                  cumAngle += angle;
-                  const r = 60, cx = 70, cy = 70;
-                  const startRad = (startAngle * Math.PI) / 180;
-                  const endRad = ((startAngle + angle) * Math.PI) / 180;
-                  const x1 = cx + r * Math.cos(startRad), y1 = cy + r * Math.sin(startRad);
-                  const x2 = cx + r * Math.cos(endRad), y2 = cy + r * Math.sin(endRad);
-                  const largeArc = angle > 180 ? 1 : 0;
-                  const path = `M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${largeArc} 1 ${x2},${y2} Z`;
-                  return <path key={i} d={path} fill={PIE_COLORS[i % PIE_COLORS.length]} opacity="0.85" />;
-                });
                 return (
                   <>
-                    <svg viewBox="0 0 140 140" className="w-32 h-32">{slices}</svg>
+                    <ResponsiveContainer width={128} height={128}>
+                      <PieChart>
+                        <Pie data={ga4Devices} dataKey="sessions" cx="50%" cy="50%" outerRadius={60} strokeWidth={0}>
+                          {ga4Devices.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} opacity={0.85} />)}
+                        </Pie>
+                      </PieChart>
+                    </ResponsiveContainer>
                     <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 mt-3">
                       {ga4Devices.map((d, i) => (
                         <span key={i} className="flex items-center gap-1.5 text-[11px] text-zinc-400">
@@ -407,22 +417,32 @@ export function AnalyticsTab({
                 </div>
                 <button onClick={() => { setGa4SelectedEvent(null); setGa4EventTrend([]); }} className="text-[11px] text-zinc-500 hover:text-zinc-300">Clear</button>
               </div>
-              <svg viewBox="0 0 800 120" className="w-full h-28" preserveAspectRatio="none">
-                {(() => {
-                  const maxV = Math.max(...ga4EventTrend.map(d => d.eventCount), 1);
-                  const xStep = 800 / Math.max(ga4EventTrend.length - 1, 1);
-                  const points = ga4EventTrend.map((d, i) => `${i * xStep},${110 - (d.eventCount / maxV) * 100}`);
-                  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p}`).join(' ');
-                  return (<>
-                    <path d={linePath} fill="none" stroke="#2dd4bf" strokeWidth="2" />
-                    <path d={`${linePath} L${(ga4EventTrend.length - 1) * xStep},110 L0,110 Z`} fill="url(#evtGrad)" opacity="0.15" />
-                    {ga4EventTrend.map((d, i) => (
-                      <circle key={i} cx={i * xStep} cy={110 - (d.eventCount / maxV) * 100} r="2.5" fill="#2dd4bf" opacity="0.6" />
-                    ))}
-                    <defs><linearGradient id="evtGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2dd4bf" /><stop offset="100%" stopColor="transparent" /></linearGradient></defs>
-                  </>);
-                })()}
-              </svg>
+              <ResponsiveContainer width="100%" height={112}>
+                <AreaChart data={ga4EventTrend} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+                  <defs>
+                    <linearGradient id="evtGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#2dd4bf" stopOpacity={0.15} />
+                      <stop offset="100%" stopColor="#2dd4bf" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="date" hide />
+                  <YAxis hide domain={[0, 'dataMax']} />
+                  <Tooltip content={({ active, payload }) => {
+                    if (!active || !payload?.length) return null;
+                    const row = payload[0]?.payload as GA4EventTrend | undefined;
+                    if (!row) return null;
+                    return (
+                      <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl shadow-black/40 min-w-[100px] overflow-hidden">
+                        <div className="px-3 py-1.5 border-b border-zinc-800 text-[11px] font-semibold text-zinc-200">{row.date}</div>
+                        <div className="px-3 py-1.5">
+                          <div className="flex justify-between text-[11px]"><span className="text-teal-400">Count</span><span className="text-zinc-200 font-medium">{row.eventCount.toLocaleString()}</span></div>
+                        </div>
+                      </div>
+                    );
+                  }} />
+                  <Area type="monotone" dataKey="eventCount" stroke="#2dd4bf" strokeWidth={2} fill="url(#evtGrad)" dot={{ r: 2.5, fill: '#2dd4bf', opacity: 0.6, strokeWidth: 0 }} activeDot={{ r: 3, fill: '#2dd4bf', stroke: '#18181b', strokeWidth: 1.5 }} />
+                </AreaChart>
+              </ResponsiveContainer>
               <div className="flex items-center justify-between mt-2 text-[11px] text-zinc-500">
                 <span>{ga4EventTrend[0]?.date}</span>
                 <span>Total: {ga4EventTrend.reduce((s, d) => s + d.eventCount, 0).toLocaleString()}</span>
