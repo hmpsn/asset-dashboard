@@ -89,7 +89,7 @@ import { isSemrushConfigured, getKeywordOverview, getDomainOrganicKeywords, getK
 import { createUser, verifyPassword, listUsers, getSafeUser, updateUser, changePassword, deleteUser, recordLogin, userCount } from './users.js';
 import { listClientUsers, createClientUser, updateClientUser, changeClientPassword, deleteClientUser, verifyClientPassword as verifyClientUserPassword, signClientToken, verifyClientToken, recordClientLogin, hasClientUsers, getSafeClientUser, createResetToken, resetPasswordWithToken } from './client-users.js';
 import { signToken, verifyToken as verifyJwtToken, requireAuth, requireRole, requireWorkspaceAccess, optionalAuth } from './auth.js';
-import { callOpenAI, getTokenUsage } from './openai-helpers.js';
+import { callOpenAI, getTokenUsage, getUsageByDay, getUsageByFeature } from './openai-helpers.js';
 import { addMessage, buildConversationContext, listSessions, getSession as getChatSession, deleteSession as deleteChatSession, generateSessionSummary, checkChatRateLimit } from './chat-memory.js';
 import { renderSalesReportHTML } from './sales-report-html.js';
 import { isStripeConfigured, createCheckoutSession, createCartCheckoutSession, createPaymentIntentForProduct, constructWebhookEvent, handleWebhookEvent, getProductConfig, listProducts, clearTestModeCustomerIds, initStripeBroadcast } from './stripe.js';
@@ -4959,7 +4959,11 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
 app.get('/api/ai/usage', (req, res) => {
   const workspaceId = req.query.workspaceId as string | undefined;
   const since = req.query.since as string | undefined;
-  res.json(getTokenUsage(workspaceId, since));
+  const days = parseInt(req.query.days as string || '30', 10);
+  const summary = getTokenUsage(workspaceId, since);
+  const daily = getUsageByDay(workspaceId, days);
+  const byFeature = getUsageByFeature(workspaceId, since);
+  res.json({ ...summary, daily, byFeature });
 });
 
 // --- SEMRush Utilities ---

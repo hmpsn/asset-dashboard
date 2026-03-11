@@ -2,10 +2,13 @@
  * Shared OpenAI helper utilities — retry logic, rate-limit handling, and token tracking.
  * All AI features should use these instead of raw fetch() calls.
  */
+import fs from 'fs';
+import path from 'path';
+import { getDataDir } from './data-dir.js';
 
-// --- Token / Cost Tracking ---
+// --- Token / Cost Tracking (persisted to disk) ---
 
-interface TokenUsage {
+export interface TokenUsage {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
@@ -15,12 +18,84 @@ interface TokenUsage {
   timestamp: string;
 }
 
-const usageLog: TokenUsage[] = [];
-const MAX_LOG_SIZE = 500;
+const USAGE_DIR = getDataDir('ai-usage');
+const MAX_MEMORY_LOG = 1000;
+let usageLog: TokenUsage[] = [];
+
+// Load today's usage from disk on startup
+function getUsageFilePath(date: string): string {
+  return path.join(USAGE_DIR, `${date}.json`);
+}
+
+function todayStr(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// Load existing usage files into memory (last 30 days)
+(function loadRecentUsage() {
+  try {
+    const files = fs.readdirSync(USAGE_DIR).filter(f => f.endsWith('.json')).sort().slice(-30);
+    for (const f of files) {
+      const data = JSON.parse(fs.readFileSync(path.join(USAGE_DIR, f), 'utf-8'));
+      if (Array.isArray(data)) usageLog.push(...data);
+    }
+    if (usageLog.length > MAX_MEMORY_LOG) usageLog = usageLog.slice(-MAX_MEMORY_LOG);
+  } catch { /* first run or corrupt files */ }
+})();
+
+// Flush buffer: append to today's file periodically
+let pendingWrites: TokenUsage[] = [];
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+function flushToDisk(): void {
+  if (pendingWrites.length === 0) return;
+  const today = todayStr();
+  const filePath = getUsageFilePath(today);
+  let existing: TokenUsage[] = [];
+  try { existing = JSON.parse(fs.readFileSync(filePath, 'utf-8')); } catch { /* new file */ }
+  existing.push(...pendingWrites);
+  fs.writeFileSync(filePath, JSON.stringify(existing, null, 2));
+  pendingWrites = [];
+}
 
 export function logTokenUsage(usage: Omit<TokenUsage, 'timestamp'>): void {
-  usageLog.push({ ...usage, timestamp: new Date().toISOString() });
-  if (usageLog.length > MAX_LOG_SIZE) usageLog.splice(0, usageLog.length - MAX_LOG_SIZE);
+  const entry = { ...usage, timestamp: new Date().toISOString() };
+  usageLog.push(entry);
+  if (usageLog.length > MAX_MEMORY_LOG) usageLog.splice(0, usageLog.length - MAX_MEMORY_LOG);
+  pendingWrites.push(entry);
+  // Debounce disk writes (flush every 5s or after 20 entries)
+  if (pendingWrites.length >= 20) { flushToDisk(); return; }
+  if (!flushTimer) flushTimer = setTimeout(() => { flushTimer = null; flushToDisk(); }, 5000);
+}
+
+// Flush on process exit
+process.on('beforeExit', flushToDisk);
+process.on('SIGINT', () => { flushToDisk(); process.exit(0); });
+process.on('SIGTERM', () => { flushToDisk(); process.exit(0); });
+
+// --- Cost estimation per model ---
+
+/** Per-token pricing (USD). Updated March 2026. */
+function estimateCost(entry: TokenUsage): number {
+  const m = entry.model;
+  // GPT-4.1 nano
+  if (m.includes('nano')) return (entry.promptTokens * 0.0000001) + (entry.completionTokens * 0.0000004);
+  // GPT-4.1 mini
+  if (m.includes('mini')) return (entry.promptTokens * 0.0000004) + (entry.completionTokens * 0.0000016);
+  // GPT-4.1
+  if (m.startsWith('gpt-4.1')) return (entry.promptTokens * 0.000002) + (entry.completionTokens * 0.000008);
+  // Claude Sonnet 4
+  if (m.includes('claude-sonnet-4')) return (entry.promptTokens * 0.000003) + (entry.completionTokens * 0.000015);
+  // Claude 3.5 Sonnet
+  if (m.includes('claude-3-5-sonnet')) return (entry.promptTokens * 0.000003) + (entry.completionTokens * 0.000015);
+  // Claude 3.5 Haiku
+  if (m.includes('claude-3-5-haiku')) return (entry.promptTokens * 0.0000008) + (entry.completionTokens * 0.000004);
+  // Fallback: GPT-4.1 pricing
+  return (entry.promptTokens * 0.000002) + (entry.completionTokens * 0.000008);
+}
+
+function getProvider(model: string): 'openai' | 'anthropic' {
+  return model.includes('claude') ? 'anthropic' : 'openai';
 }
 
 /** Get recent token usage, optionally filtered by workspace */
@@ -29,14 +104,92 @@ export function getTokenUsage(workspaceId?: string, since?: string): { entries: 
   if (workspaceId) entries = entries.filter(e => e.workspaceId === workspaceId);
   if (since) entries = entries.filter(e => e.timestamp >= since);
   const totalTokens = entries.reduce((s, e) => s + e.totalTokens, 0);
-  // Rough cost estimate: gpt-4.1-mini ~$0.40/1M input + $1.60/1M output, gpt-4.1 ~$2.00/1M input + $8.00/1M output
-  const estimatedCost = entries.reduce((s, e) => {
-    if (e.model.includes('mini')) {
-      return s + (e.promptTokens * 0.0000004) + (e.completionTokens * 0.0000016);
-    }
-    return s + (e.promptTokens * 0.000002) + (e.completionTokens * 0.000008);
-  }, 0);
+  const estimatedCost = entries.reduce((s, e) => s + estimateCost(e), 0);
   return { entries, totalTokens, estimatedCost };
+}
+
+/** Aggregate usage by day for charting */
+export function getUsageByDay(workspaceId?: string, days = 30): Array<{
+  date: string;
+  totalTokens: number;
+  promptTokens: number;
+  completionTokens: number;
+  cost: number;
+  calls: number;
+  openaiCost: number;
+  anthropicCost: number;
+  openaiTokens: number;
+  anthropicTokens: number;
+}> {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  const since = cutoff.toISOString();
+
+  let entries = usageLog.filter(e => e.timestamp >= since);
+  if (workspaceId) entries = entries.filter(e => e.workspaceId === workspaceId);
+
+  const byDay = new Map<string, {
+    totalTokens: number; promptTokens: number; completionTokens: number;
+    cost: number; calls: number; openaiCost: number; anthropicCost: number;
+    openaiTokens: number; anthropicTokens: number;
+  }>();
+
+  for (const e of entries) {
+    const day = e.timestamp.slice(0, 10);
+    const existing = byDay.get(day) || {
+      totalTokens: 0, promptTokens: 0, completionTokens: 0,
+      cost: 0, calls: 0, openaiCost: 0, anthropicCost: 0,
+      openaiTokens: 0, anthropicTokens: 0,
+    };
+    const cost = estimateCost(e);
+    const provider = getProvider(e.model);
+    existing.totalTokens += e.totalTokens;
+    existing.promptTokens += e.promptTokens;
+    existing.completionTokens += e.completionTokens;
+    existing.cost += cost;
+    existing.calls += 1;
+    if (provider === 'openai') { existing.openaiCost += cost; existing.openaiTokens += e.totalTokens; }
+    else { existing.anthropicCost += cost; existing.anthropicTokens += e.totalTokens; }
+    byDay.set(day, existing);
+  }
+
+  // Fill missing days with zeros
+  const result: Array<{ date: string } & typeof byDay extends Map<string, infer V> ? V : never> = [];
+  const d = new Date(cutoff);
+  const today = new Date();
+  while (d <= today) {
+    const dayStr = d.toISOString().slice(0, 10);
+    result.push({ date: dayStr, ...(byDay.get(dayStr) || {
+      totalTokens: 0, promptTokens: 0, completionTokens: 0,
+      cost: 0, calls: 0, openaiCost: 0, anthropicCost: 0,
+      openaiTokens: 0, anthropicTokens: 0,
+    })});
+    d.setDate(d.getDate() + 1);
+  }
+  return result;
+}
+
+/** Aggregate usage by feature for breakdown */
+export function getUsageByFeature(workspaceId?: string, since?: string): Array<{
+  feature: string; calls: number; totalTokens: number; cost: number; provider: string;
+}> {
+  let entries = usageLog;
+  if (workspaceId) entries = entries.filter(e => e.workspaceId === workspaceId);
+  if (since) entries = entries.filter(e => e.timestamp >= since);
+
+  const byFeature = new Map<string, { calls: number; totalTokens: number; cost: number; provider: string }>();
+  for (const e of entries) {
+    const key = `${e.feature}|${getProvider(e.model)}`;
+    const existing = byFeature.get(key) || { calls: 0, totalTokens: 0, cost: 0, provider: getProvider(e.model) };
+    existing.calls += 1;
+    existing.totalTokens += e.totalTokens;
+    existing.cost += estimateCost(e);
+    byFeature.set(key, existing);
+  }
+
+  return Array.from(byFeature.entries())
+    .map(([key, v]) => ({ feature: key.split('|')[0], ...v }))
+    .sort((a, b) => b.cost - a.cost);
 }
 
 // --- Retry-enabled OpenAI call ---
