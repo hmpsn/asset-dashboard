@@ -119,7 +119,7 @@ router.post('/api/public/forgot-password/:id', clientLoginLimiter, async (req, r
   if (result) {
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const resetUrl = `${baseUrl}/client/${req.params.id}?reset_token=${result.token}`;
-    const { renderDigest } = await import('./email-templates.js');
+    const { renderDigest } = await import('../email-templates.js');
     const event = {
       type: 'password_reset' as const,
       recipient: email,

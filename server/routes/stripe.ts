@@ -90,7 +90,7 @@ router.post('/api/stripe/create-payment-intent', checkoutLimiter, async (req, re
   try {
     const result = await createPaymentIntentForProduct({
       workspaceId,
-      productType: sanitizeString(productType, 50) as import('./payments.js').ProductType,
+      productType: sanitizeString(productType, 50) as import('../payments.js').ProductType,
       contentRequestId: contentRequestId ? sanitizeString(contentRequestId, 100) : undefined,
       topic: topic ? sanitizeString(topic, 200) : undefined,
       targetKeyword: targetKeyword ? sanitizeString(targetKeyword, 200) : undefined,
@@ -122,7 +122,7 @@ router.post('/api/stripe/create-checkout', checkoutLimiter, async (req, res) => 
   try {
     const { sessionId, url } = await createCheckoutSession({
       workspaceId,
-      productType: sanitizeString(productType, 50) as import('./payments.js').ProductType,
+      productType: sanitizeString(productType, 50) as import('../payments.js').ProductType,
       contentRequestId: contentRequestId ? sanitizeString(contentRequestId, 100) : undefined,
       topic: topic ? sanitizeString(topic, 200) : undefined,
       targetKeyword: targetKeyword ? sanitizeString(targetKeyword, 200) : undefined,
@@ -152,7 +152,7 @@ router.post('/api/stripe/cart-checkout', checkoutLimiter, async (req, res) => {
     const { sessionId, url } = await createCartCheckoutSession({
       workspaceId,
       items: items.map((i: { productType: string; quantity: number; pageIds?: string[] }) => ({
-        productType: sanitizeString(i.productType, 50) as import('./payments.js').ProductType,
+        productType: sanitizeString(i.productType, 50) as import('../payments.js').ProductType,
         quantity: Math.max(1, Math.min(100, Number(i.quantity) || 1)),
         pageIds: Array.isArray(i.pageIds) ? i.pageIds.map((p: string) => sanitizeString(p, 200)) : undefined,
       })),

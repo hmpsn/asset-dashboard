@@ -161,8 +161,8 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', async (req,
     }
 
     // Gather SEMRush data if configured
-    let semrushMetrics: import('./semrush.js').KeywordMetrics | undefined;
-    let semrushRelated: import('./semrush.js').RelatedKeyword[] | undefined;
+    let semrushMetrics: import('../semrush.js').KeywordMetrics | undefined;
+    let semrushRelated: import('../semrush.js').RelatedKeyword[] | undefined;
     if (isSemrushConfigured()) {
       try {
         const [metrics, related] = await Promise.all([

@@ -198,7 +198,7 @@ router.post('/api/workspaces/:id/generate-knowledge-base', requireWorkspaceAcces
   if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
 
   try {
-    const { scrapeUrls } = await import('./web-scraper.js');
+    const { scrapeUrls } = await import('../web-scraper.js');
 
     // Build base URL
     const token = getTokenForSite(ws.webflowSiteId) || undefined;

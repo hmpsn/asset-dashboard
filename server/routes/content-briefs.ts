@@ -71,8 +71,8 @@ router.post('/api/content-briefs/:workspaceId/generate', async (req, res) => {
     const existingPages = ws ? await getAllSitePages(ws) : [];
 
     // Gather SEMRush data if configured
-    let semrushMetrics: import('./semrush.js').KeywordMetrics | undefined;
-    let semrushRelated: import('./semrush.js').RelatedKeyword[] | undefined;
+    let semrushMetrics: import('../semrush.js').KeywordMetrics | undefined;
+    let semrushRelated: import('../semrush.js').RelatedKeyword[] | undefined;
     if (isSemrushConfigured()) {
       try {
         const [metrics, related] = await Promise.all([
@@ -85,7 +85,7 @@ router.post('/api/content-briefs/:workspaceId/generate', async (req, res) => {
     }
 
     // --- Parallel enrichment: reference URLs, SERP data, GA4 style examples ---
-    const { scrapeUrls, scrapeSerpData } = await import('./web-scraper.js');
+    const { scrapeUrls, scrapeSerpData } = await import('../web-scraper.js');
 
     // 1. Scrape reference URLs (user-provided competitor/inspiration pages)
     const refUrlList: string[] = Array.isArray(referenceUrls)
@@ -98,7 +98,7 @@ router.post('/api/content-briefs/:workspaceId/generate', async (req, res) => {
     let ga4Performance: { landingPage: string; sessions: number; users: number; bounceRate: number; avgEngagementTime: number; conversions: number }[] = [];
     if (ws?.ga4PropertyId) {
       try {
-        const { getGA4LandingPages } = await import('./google-analytics.js');
+        const { getGA4LandingPages } = await import('../google-analytics.js');
         const pages = await getGA4LandingPages(ws.ga4PropertyId, 28, 25);
         ga4Performance = pages.slice(0, 10);
         // Pick top 2 pages with lowest bounce rate + highest engagement for style examples
