@@ -8,6 +8,7 @@ import path from 'path';
 import { getDataDir } from './data-dir.js';
 import { buildSeoContext, buildKnowledgeBase, buildKeywordMapContext, buildPersonasContext } from './seo-context.js';
 import { callOpenAI } from './openai-helpers.js';
+import { callAnthropic, isAnthropicConfigured } from './anthropic-helpers.js';
 import { getWorkspace } from './workspaces.js';
 import type { ContentBrief } from './content-brief.js';
 
@@ -102,11 +103,51 @@ export function deletePost(workspaceId: string, postId: string): boolean {
 
 // --- Generation ---
 
-// AI model for content writing — gpt-4.1 is the best balance of quality, speed, and cost
-// for paid content ($250-2,500 products). Temperature 0.7 produces more engaging prose
-// while maintaining coherence and factual accuracy.
-const CONTENT_MODEL = 'gpt-4.1';
+// AI model config — Claude for creative prose, GPT for structured tasks.
+// Claude produces more natural, less formulaic writing. GPT excels at
+// JSON output, unification editing, and SEO meta generation.
+const CONTENT_MODEL = 'gpt-4.1';         // fallback + structured tasks
 const CONTENT_TEMP = 0.7;
+const CLAUDE_MODEL = 'claude-sonnet-4-20250514' as const;
+const CLAUDE_TEMP = 0.7;
+
+/**
+ * Route creative writing to Claude when available, fall back to GPT.
+ * Claude's system prompt is separate from messages (not a role).
+ */
+async function callCreativeAI(opts: {
+  systemPrompt: string;
+  userPrompt: string;
+  maxTokens: number;
+  feature: string;
+  workspaceId: string;
+}): Promise<string> {
+  const { systemPrompt, userPrompt, maxTokens, feature, workspaceId } = opts;
+
+  if (isAnthropicConfigured()) {
+    const result = await callAnthropic({
+      model: CLAUDE_MODEL,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
+      maxTokens,
+      temperature: CLAUDE_TEMP,
+      feature,
+      workspaceId,
+    });
+    return result.text.trim();
+  }
+
+  // Fallback to GPT
+  const result = await callOpenAI({
+    model: CONTENT_MODEL,
+    messages: [{ role: 'user', content: `${systemPrompt}\n\n${userPrompt}` }],
+    maxTokens,
+    temperature: CONTENT_TEMP,
+    feature,
+    workspaceId,
+  });
+  return result.text.trim();
+}
 
 function buildVoiceContext(workspaceId: string): string {
   const { brandVoiceBlock, keywordBlock } = buildSeoContext(workspaceId);
@@ -370,15 +411,15 @@ ${WRITING_QUALITY_RULES}
 
 Return ONLY the opening HTML. No headings, no labels, no meta-commentary, no markdown.`;
 
-  const result = await callOpenAI({
-    model: CONTENT_MODEL,
-    messages: [{ role: 'user', content: prompt }],
+  // Split role (system) from the writing instructions (user)
+  const systemPrompt = role;
+  return callCreativeAI({
+    systemPrompt,
+    userPrompt: prompt.replace(role + '\n\n', ''),
     maxTokens: 600,
-    temperature: CONTENT_TEMP,
     feature: 'content-post-intro',
     workspaceId,
   });
-  return result.text.trim();
 }
 
 /** Generate a single body section */
@@ -456,15 +497,15 @@ ${WRITING_QUALITY_RULES}
 
 Return ONLY the section content in clean HTML (starting with <h2>). No labels, no meta-commentary, no markdown.`;
 
-  const result = await callOpenAI({
-    model: CONTENT_MODEL,
-    messages: [{ role: 'user', content: prompt }],
+  // Split role (system) from the writing instructions (user)
+  const systemPrompt = role;
+  return callCreativeAI({
+    systemPrompt,
+    userPrompt: prompt.replace(role + '\n\n', ''),
     maxTokens: Math.max(800, sectionTarget * 2),
-    temperature: CONTENT_TEMP,
     feature: 'content-post-section',
     workspaceId,
   });
-  return result.text.trim();
 }
 
 /** Generate conclusion / closing section */
@@ -511,15 +552,15 @@ ${WRITING_QUALITY_RULES}
 
 Return ONLY the closing section in clean HTML (starting with <h2>). No labels, no meta-commentary, no markdown.`;
 
-  const result = await callOpenAI({
-    model: CONTENT_MODEL,
-    messages: [{ role: 'user', content: prompt }],
+  // Split role (system) from the writing instructions (user)
+  const systemPrompt = role;
+  return callCreativeAI({
+    systemPrompt,
+    userPrompt: prompt.replace(role + '\n\n', ''),
     maxTokens: 800,
-    temperature: CONTENT_TEMP,
     feature: 'content-post-conclusion',
     workspaceId,
   });
-  return result.text.trim();
 }
 
 function countWords(text: string): number {

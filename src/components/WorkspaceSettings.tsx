@@ -112,6 +112,9 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
   const [savingPersonas, setSavingPersonas] = useState(false);
   const [editingPersonaId, setEditingPersonaId] = useState<string | null>(null);
   const [personaDraft, setPersonaDraft] = useState({ name: '', description: '', painPoints: '', goals: '', objections: '', preferredContentFormat: '', buyingStage: '' as string });
+  // Knowledge base generation state
+  const [generatingKB, setGeneratingKB] = useState(false);
+  const [kbDraft, setKbDraft] = useState<string | null>(null);
 
   const GROUP_COLORS = ['#14b8a6', '#60a5fa', '#34d399', '#fbbf24', '#f472b6', '#fb923c', '#2dd4bf', '#e879f9'];
 
@@ -742,7 +745,8 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
             </div>
             <div className="px-5 py-4 space-y-3">
               <textarea
-                defaultValue={ws?.knowledgeBase || ''}
+                value={kbDraft !== null ? kbDraft : (ws?.knowledgeBase || '')}
+                onChange={(e) => setKbDraft(e.target.value)}
                 rows={8}
                 placeholder={"Example:\n- Industry: Home services (plumbing, HVAC)\n- Location: Denver metro area\n- Key services: Emergency repair, new installations, maintenance plans\n- Differentiators: 24/7 availability, licensed & insured, 15+ years\n- Target audience: Homeowners, property managers\n- Common client questions: pricing, response time, service areas"}
                 onBlur={async (e) => {
@@ -750,10 +754,36 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                   if (val !== (ws?.knowledgeBase || '')) {
                     await patchWorkspace({ knowledgeBase: val });
                     toast('Knowledge base saved');
+                    setKbDraft(null);
                   }
                 }}
                 className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-teal-500 resize-y font-mono leading-relaxed"
               />
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={async () => {
+                    setGeneratingKB(true);
+                    try {
+                      const res = await fetch(`/api/workspaces/${workspaceId}/generate-knowledge-base`, { method: 'POST' });
+                      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || 'Generation failed'); }
+                      const data = await res.json();
+                      setKbDraft(data.knowledgeBase);
+                      toast(`Knowledge base generated from ${data.pagesScraped} pages — review and save`);
+                    } catch (err) {
+                      toast(err instanceof Error ? err.message : 'Failed to generate', 'error');
+                    } finally {
+                      setGeneratingKB(false);
+                    }
+                  }}
+                  disabled={generatingKB || !ws?.webflowSiteId}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {generatingKB ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Crawling site...</> : <><Sparkles className="w-3.5 h-3.5" /> Generate from Website</>}
+                </button>
+                {kbDraft !== null && kbDraft !== (ws?.knowledgeBase || '') && (
+                  <span className="text-[11px] text-amber-400">Unsaved changes — click outside the textarea to save</span>
+                )}
+              </div>
               <p className="text-[11px] text-zinc-500">
                 This context is shared with both the client Insights Engine and Admin Insights chatbots.
                 You can also place <code className="text-zinc-400">.txt</code> or <code className="text-zinc-400">.md</code> files in the <code className="text-zinc-400">knowledge-docs/</code> folder for longer documents.

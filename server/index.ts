@@ -852,6 +852,144 @@ app.delete('/api/workspaces/:id', requireWorkspaceAccess(), (req, res) => {
   res.json({ ok: true });
 });
 
+// --- Auto-generate knowledge base from website crawl ---
+app.post('/api/workspaces/:id/generate-knowledge-base', requireWorkspaceAccess(), async (req, res) => {
+  const ws = getWorkspace(req.params.id);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
+
+  try {
+    const { scrapeUrls } = await import('./web-scraper.js');
+
+    // Build base URL
+    const token = getTokenForSite(ws.webflowSiteId) || undefined;
+    const subdomain = await getSiteSubdomain(ws.webflowSiteId, token);
+    const baseUrl = ws.liveDomain
+      ? (ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`)
+      : subdomain ? `https://${subdomain}.webflow.io` : '';
+    if (!baseUrl) return res.status(400).json({ error: 'Could not determine site URL' });
+
+    // Get all published pages
+    const allPages = await listPages(ws.webflowSiteId, token);
+    const published = filterPublishedPages(allPages);
+
+    // Prioritize key pages: homepage, about, services, case studies, contact
+    const priorityPatterns = [
+      /^\/?$/, // homepage
+      /about/i, /who-we-are/i, /our-story/i, /team/i,
+      /service/i, /solution/i, /what-we-do/i, /offer/i,
+      /work/i, /portfolio/i, /case-stud/i, /project/i, /client/i,
+      /contact/i, /location/i,
+      /blog/i, /insight/i, /resource/i,
+    ];
+
+    const prioritized: string[] = [];
+    const rest: string[] = [];
+
+    for (const p of published) {
+      const pagePath = p.publishedPath || `/${p.slug || ''}`;
+      const url = baseUrl + pagePath;
+      const matchesPriority = priorityPatterns.some(pat => pat.test(pagePath));
+      if (matchesPriority) {
+        prioritized.push(url);
+      } else {
+        rest.push(url);
+      }
+    }
+
+    // Also discover CMS pages (case studies, blog posts)
+    try {
+      const sitemapUrls = await discoverSitemapUrls(baseUrl);
+      for (const url of sitemapUrls) {
+        try {
+          const parsed = new URL(url);
+          const pagePath = parsed.pathname;
+          if (!prioritized.includes(url) && !rest.includes(url)) {
+            const matchesPriority = priorityPatterns.some(pat => pat.test(pagePath));
+            if (matchesPriority) prioritized.push(url);
+            else rest.push(url);
+          }
+        } catch { /* skip */ }
+      }
+    } catch { /* sitemap unavailable */ }
+
+    // Scrape up to 12 priority pages + a few extras (max 15 total)
+    const urlsToScrape = [...prioritized.slice(0, 12), ...rest.slice(0, 3)];
+    if (urlsToScrape.length === 0) return res.status(400).json({ error: 'No pages found to scrape' });
+
+    const scraped = await scrapeUrls(urlsToScrape, 3);
+    if (scraped.length === 0) return res.status(400).json({ error: 'Could not scrape any pages' });
+
+    // Build a condensed summary of all scraped content for AI
+    const pagesSummary = scraped.map(p => {
+      const headingsStr = p.headings.slice(0, 10).map(h => `${'#'.repeat(h.level)} ${h.text}`).join('\n');
+      return `--- PAGE: ${p.url} ---\nTitle: ${p.title}\nDescription: ${p.metaDescription}\nHeadings:\n${headingsStr}\nContent excerpt:\n${p.bodyText.slice(0, 1500)}`;
+    }).join('\n\n');
+
+    // AI extraction
+    const aiResult = await callOpenAI({
+      model: 'gpt-4.1',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a business analyst. Given scraped website content, extract a structured knowledge base that an AI content writer and chatbot can use to understand this business. Be specific and factual — only include information that is clearly stated or strongly implied on the website.`,
+        },
+        {
+          role: 'user',
+          content: `Analyze the following website content and produce a structured business knowledge base.
+
+${pagesSummary}
+
+Generate a knowledge base in this exact format (fill in what you find, leave sections empty with "Not found on website" if the information isn't available):
+
+BUSINESS OVERVIEW:
+- Company name: [name]
+- Industry: [industry/vertical]
+- Location: [city, state/country if mentioned]
+- Business type: [agency, SaaS, local service, e-commerce, etc.]
+- Years in business: [if mentioned]
+- Team size: [if mentioned]
+
+SERVICES & OFFERINGS:
+[List each service/product with a 1-sentence description]
+
+TARGET AUDIENCE:
+- Primary audience: [who they serve]
+- Industries served: [list industries/verticals mentioned]
+- Company sizes: [SMB, enterprise, etc. if mentioned]
+
+DIFFERENTIATORS & VALUE PROPS:
+[List what makes them unique — awards, methodology, technology, guarantees, etc.]
+
+CASE STUDIES & RESULTS:
+[List any specific client work, results, metrics, or testimonials mentioned. Include client names, industries, and outcomes with real numbers if available.]
+
+BRAND VOICE & TONE:
+[Describe the writing style observed across the site — formal/casual, technical/approachable, etc.]
+
+KEY TOPICS & EXPERTISE:
+[List the main topics, technologies, or domains they demonstrate expertise in]
+
+IMPORTANT DETAILS:
+[Any other relevant business information — certifications, partnerships, tools used, process descriptions, pricing model, etc.]
+
+Be concise but specific. Use bullet points. Only include information actually found on the website — never fabricate.`,
+        },
+      ],
+      maxTokens: 2000,
+      temperature: 0.3,
+      feature: 'knowledge-base-gen',
+      workspaceId: ws.id,
+      timeoutMs: 90_000,
+    });
+
+    res.json({ knowledgeBase: aiResult.text, pagesScraped: scraped.length });
+  } catch (err) {
+    console.error('[generate-knowledge-base]', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate knowledge base' });
+  }
+});
+
 // --- Suppression-aware audit helper ---
 // Scoring weights must mirror seo-audit.ts auditPage() exactly
 const CRITICAL_CHECKS_SET = new Set([
