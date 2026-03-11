@@ -125,19 +125,26 @@ async function callCreativeAI(opts: {
   const { systemPrompt, userPrompt, maxTokens, feature, workspaceId } = opts;
 
   if (isAnthropicConfigured()) {
-    const result = await callAnthropic({
-      model: CLAUDE_MODEL,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }],
-      maxTokens,
-      temperature: CLAUDE_TEMP,
-      feature,
-      workspaceId,
-    });
-    return result.text.trim();
+    try {
+      const result = await callAnthropic({
+        model: CLAUDE_MODEL,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+        maxTokens,
+        temperature: CLAUDE_TEMP,
+        feature,
+        workspaceId,
+        maxRetries: 3,      // patient retries — quality over speed
+        timeoutMs: 90_000,
+      });
+      console.log(`[${feature}] Generated with Claude`);
+      return result.text.trim();
+    } catch (err) {
+      console.log(`[${feature}] Claude failed (${err instanceof Error ? err.message : err}), falling back to GPT`);
+    }
   }
 
-  // Fallback to GPT
+  // Fallback to GPT (or primary if no Anthropic key)
   const result = await callOpenAI({
     model: CONTENT_MODEL,
     messages: [{ role: 'user', content: `${systemPrompt}\n\n${userPrompt}` }],
@@ -146,6 +153,7 @@ async function callCreativeAI(opts: {
     feature,
     workspaceId,
   });
+  console.log(`[${feature}] Generated with GPT`);
   return result.text.trim();
 }
 
@@ -290,6 +298,9 @@ STRUCTURAL ANTI-PATTERNS — avoid these:
 - Do NOT repeat any phrase, metaphor, or sentence structure across sections. If you used "transforms your X into a Y" in one section, never use that pattern again
 - Do NOT mention the business/brand name in every section — limit to 2-3 mentions in the entire article (intro and conclusion). The middle sections should focus on teaching, not selling
 - Do NOT put the brand name in the first paragraph of the introduction. The intro should hook the reader with their problem/opportunity, not lead with "At [Brand], we..."
+- CONCLUSION/CLOSING SECTION: Include at most ONE linked call-to-action (<a> tag) in the closing section. Do not stack 3-4 links in the final paragraph — pick the single most important action for the reader. Other internal links belong in body sections, not the conclusion
+- Do NOT repeat the same specific statistic, dollar amount, or data point more than twice in the entire article. If you've already mentioned "$1,000-$2,000 annual maximum" twice, reference it indirectly ("your annual cap", "this yearly limit") in subsequent mentions
+- BRAND MENTIONS IN CONCLUSION: The closing section should lead with editorial value (takeaways, fresh insight, forward-looking perspective) BEFORE any brand mention or CTA. The brand mention should appear only in the final 1-2 sentences, not throughout the conclusion
 
 FABRICATION RULES:
 - NEVER invent statistics, case study results, percentages, or data points. Only reference specific numbers if they were provided in the brief context or knowledge base
@@ -540,7 +551,7 @@ PAGE-TYPE-SPECIFIC REQUIREMENTS:
 ${typeInstructions}
 
 UNIVERSAL REQUIREMENTS:
-- Start with an appropriate <h2> heading (e.g., "Next Steps", "Ready to Get Started?", "Key Takeaways") — do NOT use "Conclusion" as the heading
+- Start with an appropriate <h2> heading (e.g., "Next Steps", "Take Control of Your [Topic]", "Key Takeaways", "Your Action Plan") — do NOT use "Conclusion" as the heading. Do NOT use "Ready to..." as the heading
 - Use <p> for paragraphs, <strong> for emphasis, <ul>/<li> or <ol>/<li> for lists
 - Do NOT use markdown syntax (no ##, no **, no - lists). Output HTML tags only.
 - Naturally include the target keyword one final time
@@ -806,6 +817,9 @@ export async function generatePost(
   for (let i = 0; i < brief.outline.length; i++) {
     post.sections[i].status = 'generating';
     savePost(workspaceId, post);
+
+    // Pace API calls to avoid rate limits (Claude RPM caps)
+    if (i > 0) await new Promise(r => setTimeout(r, 2000));
 
     try {
       const content = await generateSection(

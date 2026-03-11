@@ -658,11 +658,22 @@ A brief value assessment of every feature in the platform, covering what it does
 ### 60. AI Content Post Generator
 **What it does:** Generates full SEO-optimized content posts from content briefs. `server/content-posts.ts` generates each section independently using the brief's outline as the writing spec, with page-type-specific writer roles (blog, landing, service, location, product, pillar, resource). Each section gets full context: brand voice, keyword strategy, E-E-A-T guidance, SERP competitive analysis, and internal link suggestions. Every prompt includes the total article word budget and strict ±10% per-section tolerances. After all sections + conclusion are generated, a **unification pass** (`unifyPost`) reviews the full assembled draft and refines it for cohesion — smoothing transitions, removing cross-section repetition, ensuring consistent voice, verifying the intro's promises are fulfilled by the body, and **trimming word count to the brief's target** when over budget. Uses GPT-4.1 at temperature 0.4 for precise editorial refinement with dynamic maxTokens (8K–16K based on target word count). Unification status (`success`/`failed`/`skipped`) is tracked on the post and surfaced in the PostEditor UI. Non-critical: if unification fails, the post is still usable. Progress saved after each section so partial results are available during generation. API: POST `/api/content-posts/:workspaceId/generate`, GET/PATCH/DELETE per post, export as markdown/HTML. **Content quality engine (v5)**: comprehensive `WRITING_QUALITY_RULES` injected into every prompt — forbidden phrase lists (AI clichés, corporate buzzwords, hollow intensifiers, vague attribution), structural anti-patterns (no section-ending summaries, no repetitive bullet patterns), fabrication rules (no invented stats/percentages, directional case study outcomes only), anchor text accuracy rules, and mandatory H3 subheadings for sections 200+ words. Internal links use the workspace `liveDomain` for correct URLs. Full Webflow sitemap (published pages + CMS pages via `getAllSitePages`) passed to both brief and post generation for comprehensive internal link suggestions. Brand name limited to intro + conclusion only.
 
-**Agency value:** Full blog posts generated in minutes instead of hours. Page-type-specific prompts produce content that matches the intent (landing page copy reads differently from a blog post). Unification pass eliminates the "obviously AI-generated" seams between sections. Quality guardrails prevent common AI writing tells — no "Let's dive in", no fabricated statistics, no repetitive brand mentions, no buzzword-laden prose.
+**Agency value:** Full blog posts generated in minutes instead of hours. Page-type-specific prompts produce content that matches the intent (landing page copy reads differently from a blog post). Unification pass eliminates the "obviously AI-generated" seams between sections. Quality guardrails prevent common AI writing tells — no "Let's dive in", no fabricated statistics, no repetitive brand mentions, no buzzword-laden prose. Claude produces noticeably more natural prose than GPT alone.
 
 **Client value:** Content is personalized to their brand voice, actual GSC/GA4 data, and competitive landscape. Each post arrives as a polished draft with proper H2/H3 heading hierarchy, correctly linked internal pages, and industry-diverse examples — not a rough assembly of disconnected sections.
 
-**Mutual:** Transforms the content pipeline from brief → manual writing → delivery into brief → AI generation → review → delivery. Dramatically reduces content production time and cost while maintaining quality. The quality engine produces 6-7/10 content that's publish-worthy as a first draft — suitable for a content cadence strategy with human refinement for standout pieces.
+**Mutual:** Transforms the content pipeline from brief → manual writing → delivery into brief → AI generation → review → delivery. Dramatically reduces content production time and cost while maintaining quality. The hybrid Claude/GPT engine produces stronger first drafts suitable for a content cadence strategy with human refinement for standout pieces.
+
+---
+
+### 62. Knowledge Base Auto-Generation
+**What it does:** One-click knowledge base generation from the client's live website. `POST /api/workspaces/:id/generate-knowledge-base` crawls up to 15 priority pages (homepage, about, services, case studies, blog, contact — selected via regex pattern matching on URL paths) using the existing `scrapeUrls` infrastructure plus sitemap discovery for CMS pages. Scraped content (titles, meta descriptions, headings, body text excerpts) is sent to GPT-4.1 which extracts a structured knowledge base: business overview, services & offerings, target audience, differentiators, case studies & results (with real numbers when available), brand voice & tone, key topics & expertise, and important details. The generated text populates the Knowledge Base textarea in WorkspaceSettings for human review before saving. "Generate from Website" button with loading state and unsaved-changes indicator.
+
+**Agency value:** Eliminates the manual step of writing business context for each new client. One click produces a comprehensive knowledge base that immediately improves all AI outputs (chatbot, content briefs, blog posts, strategy).
+
+**Client value:** Better AI outputs from day one — the chatbot and content generation already know the business without the agency spending hours writing context documents.
+
+**Mutual:** Reduces onboarding time from hours to minutes. The auto-generated knowledge base can be refined over time, but the starting point is already rich enough for quality AI interactions.
 
 ---
 
@@ -683,7 +694,7 @@ A brief value assessment of every feature in the platform, covering what it does
 |----------|:---:|---|
 | SEO & Technical | 12 | Audit, fix, and optimize faster than manual tools |
 | Analytics & Tracking | 5 | Unified data view replaces platform-hopping |
-| Content & Strategy | 5 | Strategy → brief → AI post generation → review → delivery pipeline |
+| Content & Strategy | 6 | Strategy → brief → AI post generation → review → delivery pipeline |
 | Client Communication | 7 | Structured workflows + automated reports + expanded notifications |
 | Client Self-Service | 10 | 24/7 data access, onboarding, plans, cart, order tracking |
 | AI & Intelligence | 4 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine |
@@ -693,7 +704,7 @@ A brief value assessment of every feature in the platform, covering what it does
 | Platform & UX | 10 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home, page state model, work orders, request linkage |
 | Data Architecture | 3 | PageEditState model, cross-store writes, activity feed for client actions |
 
-**61 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**62 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
 ---
 
@@ -789,7 +800,9 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - **Content calendar**: Visual calendar view of content in production with due dates.
 - **Writer assignment**: Assign content pieces to specific writers with notifications.
 - **Content delivery**: Attach deliverables (Google Doc links, uploaded files) to completed requests.
-- **Knowledge base enrichment for content**: Feed real case study metrics (traffic increases, conversion data, timelines) into the knowledge base so AI can reference actual numbers instead of vague outcomes. Add client screenshots/visual descriptions for richer content.
+- ~~Knowledge base auto-generation~~: ✅ Shipped (March 10, 2026) — One-click website crawl extracts structured business knowledge (services, audience, differentiators, case studies, brand voice, expertise) from up to 15 priority pages. See Feature #62.
+- ~~Claude/GPT hybrid model~~: ✅ Shipped (March 10, 2026) — Claude (claude-sonnet-4-20250514) for creative prose (intro/sections/conclusion), GPT-4.1 for structured tasks (unification, SEO meta, briefs). Auto-fallback to GPT if no Anthropic key.
+- **Knowledge base enrichment**: Feed real case study metrics (traffic increases, conversion data, timelines) into the knowledge base so AI can reference actual numbers instead of vague outcomes.
 - **Brand voice training**: Allow uploading 3-5 sample blog posts as style examples so the AI can match the client's actual writing voice, not just a generic "conversational" tone.
 - **Content visual suggestions**: Generate image/diagram/table placement suggestions in the brief outline (e.g., "insert comparison table here", "add screenshot of Webflow CMS setup") to break up text walls.
 
@@ -835,4 +848,4 @@ When the user asks to update this document with recent features, follow this pro
 7. **Update Summary table**: Adjust category counts and total feature count.
 8. **Commit**: `git add FEATURE_AUDIT.md && git commit -m "docs: update FEATURE_AUDIT with recent features"`
 
-Current feature count: **61**. Last updated: March 10, 2026 (Content quality engine v5: anti-cliché guardrails, H3 subheadings, full sitemap internal linking, liveDomain URL fix, fabrication rules, brief-level quality rules for case study anonymity / FAQ formatting / industry diversity / section count / buzzword bans).
+Current feature count: **62**. Last updated: March 10, 2026 (Knowledge base auto-generation from website crawl, Claude/GPT hybrid model for content writing, content quality engine v5).
