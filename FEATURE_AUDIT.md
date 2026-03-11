@@ -644,13 +644,35 @@ A brief value assessment of every feature in the platform, covering what it does
 
 ---
 
+### 60. AI Content Post Generator
+**What it does:** Generates full SEO-optimized content posts from content briefs. `server/content-posts.ts` generates each section independently using the brief's outline as the writing spec, with page-type-specific writer roles (blog, landing, service, location, product, pillar, resource). Each section gets full context: brand voice, keyword strategy, E-E-A-T guidance, SERP competitive analysis, and internal link suggestions. After all sections + conclusion are generated, a **unification pass** (`unifyPost`) reviews the full assembled draft and refines it for cohesion — smoothing transitions between sections, removing cross-section repetition, ensuring consistent voice, and verifying the intro's promises are fulfilled by the body. Uses GPT-4.1 at temperature 0.4 for precise editorial refinement. Non-critical: if unification fails, the post is still usable. Progress saved after each section so partial results are available during generation. API: POST `/api/content-posts/:workspaceId/generate`, GET/PATCH/DELETE per post, export as markdown/HTML.
+
+**Agency value:** Full blog posts generated in minutes instead of hours. Page-type-specific prompts produce content that matches the intent (landing page copy reads differently from a blog post). Unification pass eliminates the "obviously AI-generated" seams between sections.
+
+**Client value:** Content is personalized to their brand voice, actual GSC/GA4 data, and competitive landscape. Each post arrives as a polished draft, not a rough assembly of disconnected sections.
+
+**Mutual:** Transforms the content pipeline from brief → manual writing → delivery into brief → AI generation → review → delivery. Dramatically reduces content production time and cost while maintaining quality.
+
+---
+
+### 61. Admin Content Manager
+**What it does:** Dedicated "Content" tab in the admin sidebar (SEO group) for reviewing and managing all generated content across workspaces. `ContentManager.tsx` lists all generated posts with status cards showing title, target keyword, word count, status badge, and creation date. **Status workflow**: Draft → Review → Approved (with back-to-draft). **Search and sort**: filter by title/keyword, sort by date, title, status, or word count. **Auto-refresh**: polls every 10 seconds when any post is in "generating" status. **Actions**: inline status progression, delete with confirmation, HTML export links. Opens `PostEditor` for full inline editing of any post.
+
+**Agency value:** Single screen to review all generated content, manage approval workflow, and export deliverables. No more hunting through individual briefs to find posts.
+
+**Client value:** N/A — admin-only tool (clients interact with content via the Content Hub in their portal).
+
+**Mutual:** Completes the content pipeline visibility — from strategy gap → brief → generated post → review → approved → delivered.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
 |----------|:---:|---|
 | SEO & Technical | 12 | Audit, fix, and optimize faster than manual tools |
 | Analytics & Tracking | 5 | Unified data view replaces platform-hopping |
-| Content & Strategy | 3 | Strategy → brief → approval → production pipeline |
+| Content & Strategy | 5 | Strategy → brief → AI post generation → review → delivery pipeline |
 | Client Communication | 7 | Structured workflows + automated reports + expanded notifications |
 | Client Self-Service | 10 | 24/7 data access, onboarding, plans, cart, order tracking |
 | AI & Intelligence | 4 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine |
@@ -660,7 +682,7 @@ A brief value assessment of every feature in the platform, covering what it does
 | Platform & UX | 10 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home, page state model, work orders, request linkage |
 | Data Architecture | 3 | PageEditState model, cross-store writes, activity feed for client actions |
 
-**59 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**61 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
 ---
 
@@ -668,9 +690,8 @@ A brief value assessment of every feature in the platform, covering what it does
 
 Items to revisit as budget/tier upgrades allow or when priorities shift.
 
-### OpenAI Tier Upgrade
-- **Schema Generator → gpt-4o**: Currently using `gpt-4o-mini` due to 30K TPM limit on the current org tier. Once spend pushes to the next tier (200K+ TPM on gpt-4o), switch back for marginally richer schema output. One-line change in `server/schema-suggester.ts`.
-- **SEO Audit AI → gpt-4o-mini savings**: The audit's AI recommendations (title/meta fixes) currently use gpt-4o. Could switch to mini to save cost with minimal quality loss since it's structured output.
+### OpenAI Model Upgrades
+- ~~All models upgraded to GPT-4.1 series~~: ✅ Shipped (March 10, 2026) — gpt-4o → gpt-4.1, gpt-4o-mini → gpt-4.1-mini across all endpoints (SEO rewrite, content briefs, content posts, schema, audit, anomaly detection, chat memory, strategy, keyword analysis, seo-copy, internal links). Alt text generation uses gpt-4.1-nano for cost savings on trivial tasks. Brand name context injected into all AI prompts that generate client-facing copy.
 
 ### Schema Generator Enhancements
 - ~~Bulk publish~~: ✅ Shipped — Publish to Webflow per-page via Custom Code API.
@@ -746,10 +767,13 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - ~~E-E-A-T guidelines~~: ✅ Shipped — Content briefs include E-E-A-T, content checklists, schema recs.
 - ~~Inline brief editing~~: ✅ Shipped — All key fields editable in-place with auto-save (title, meta, summary, outline, audience, tone, CTAs, word count, intent, format, competitor insights).
 - ~~SEMRush brief enrichment~~: ✅ Shipped — Real keyword volume, difficulty, CPC, competition, trend, and related keywords feed into AI prompt when SEMRush is configured.
+- ~~SEMRush graceful error handling~~: ✅ Shipped (March 10, 2026) — `getRelatedKeywords` and `getDomainOrganic` return empty arrays instead of throwing on "NOTHING FOUND". Prevents brief generation failures for obscure keywords.
 - ~~GSC query filtering fix~~: ✅ Shipped — Related queries now match any keyword word (len > 2) instead of only the first word.
 - ~~Page-type briefs~~: ✅ Shipped — 7 page types (blog, landing, service, location, product, pillar, resource) with type-specific AI prompt instructions for word count, structure, schema, CTAs, outline.
 - ~~Inline price visibility~~: ✅ Shipped — Brief/post prices on request buttons, bundle savings callouts, prices from Stripe config.
 - ~~Page type → content gap mapping~~: ✅ Shipped — Strategy AI recommends `suggestedPageType` per content gap; pre-fills page type in pricing modal.
+- ~~AI blog post generator~~: ✅ Shipped (March 10, 2026) — Full post generation from briefs with page-type-specific writer roles, section-by-section generation, and post-generation unification pass for cohesion. See Feature #60.
+- ~~Admin Content Manager~~: ✅ Shipped (March 10, 2026) — Dedicated "Content" tab in admin sidebar for reviewing/managing all generated posts with status workflow, search/sort, and inline editing. See Feature #61.
 - **Content calendar**: Visual calendar view of content in production with due dates.
 - **Writer assignment**: Assign content pieces to specific writers with notifications.
 - **Content delivery**: Attach deliverables (Google Doc links, uploaded files) to completed requests.
@@ -796,4 +820,4 @@ When the user asks to update this document with recent features, follow this pro
 7. **Update Summary table**: Adjust category counts and total feature count.
 8. **Commit**: `git add FEATURE_AUDIT.md && git commit -m "docs: update FEATURE_AUDIT with recent features"`
 
-Current feature count: **59**. Last updated: March 8, 2026 (data flow unification sprints 0-5: PageEditState model, work orders, recommendations engine, SEO cart, activity feed for client actions, approval context, command center SEO status, request-page linkage, prospect onboarding CTA, expanded email notifications).
+Current feature count: **61**. Last updated: March 10, 2026 (AI content post generator with unification pass, admin Content Manager tab, GPT-4.1 model upgrades across all endpoints, SEMRush graceful error handling, brand name context in all AI prompts).

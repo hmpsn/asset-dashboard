@@ -37,7 +37,10 @@ export interface GeneratedPost {
   sections: PostSection[];
   conclusion: string;      // markdown
   totalWordCount: number;
+  targetWordCount: number;
   status: 'generating' | 'draft' | 'review' | 'approved';
+  unificationStatus?: 'pending' | 'success' | 'failed' | 'skipped';
+  unificationNote?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -262,6 +265,7 @@ async function generateIntroduction(
   voiceCtx: string,
   workspaceId: string,
 ): Promise<string> {
+  const totalBudget = brief.wordCountTarget || 1800;
   const pageType = brief.pageType || 'blog';
   const role = PAGE_TYPE_WRITER_ROLE[pageType] || PAGE_TYPE_WRITER_ROLE.blog;
   const typeInstructions = PAGE_TYPE_INTRO_INSTRUCTIONS[pageType] || PAGE_TYPE_INTRO_INSTRUCTIONS.blog;
@@ -270,7 +274,9 @@ async function generateIntroduction(
 
   const prompt = `${role}
 
-Write a compelling opening (150-250 words) for a ${pageLabel}.
+Write a compelling opening (150-200 words) for a ${pageLabel}.
+
+TOTAL ARTICLE WORD BUDGET: ${totalBudget} words. Your intro is a small portion — be concise and impactful.
 
 TITLE: ${brief.suggestedTitle}
 TARGET KEYWORD: "${brief.targetKeyword}"
@@ -294,13 +300,14 @@ UNIVERSAL REQUIREMENTS:
 - Use markdown formatting (bold for emphasis where appropriate)
 - Do NOT include the title or any heading — just the opening paragraph(s)
 - Write for humans first, search engines second
+- Stay within 150-200 words — do not exceed 250 under any circumstances
 
 Return ONLY the opening text in markdown. No headings, no labels, no meta-commentary.`;
 
   const result = await callOpenAI({
     model: CONTENT_MODEL,
     messages: [{ role: 'user', content: prompt }],
-    maxTokens: 1200,
+    maxTokens: 600,
     temperature: CONTENT_TEMP,
     feature: 'content-post-intro',
     workspaceId,
@@ -317,6 +324,8 @@ async function generateSection(
   voiceCtx: string,
   workspaceId: string,
 ): Promise<string> {
+  const sectionTarget = section.wordCount || 300;
+  const totalBudget = brief.wordCountTarget || 1800;
   const pageType = brief.pageType || 'blog';
   const role = PAGE_TYPE_WRITER_ROLE[pageType] || PAGE_TYPE_WRITER_ROLE.blog;
   const typeInstructions = PAGE_TYPE_SECTION_INSTRUCTIONS[pageType] || PAGE_TYPE_SECTION_INSTRUCTIONS.blog;
@@ -324,7 +333,7 @@ async function generateSection(
   const briefContext = buildBriefContextBlock(brief);
 
   const prevContext = previousSections.length > 0
-    ? `\n\nPREVIOUS SECTIONS WRITTEN (for continuity — do NOT repeat these points):\n${previousSections.map((s, i) => `--- Section ${i + 1} ---\n${s.slice(0, 600)}...`).join('\n')}`
+    ? `\n\nPREVIOUS SECTIONS WRITTEN (for continuity — do NOT repeat these points):\n${previousSections.map((s, i) => `--- Section ${i + 1} ---\n${s.slice(0, 1200)}...`).join('\n')}`
     : '';
 
   // Determine which PAA questions are most relevant to this section
@@ -340,6 +349,8 @@ async function generateSection(
 
 Write section ${sectionIndex + 1} of a ${pageLabel}.
 
+TOTAL ARTICLE WORD BUDGET: ${totalBudget} words. This section's allocation is ${sectionTarget} words. Stay within ±10% of your allocation.
+
 ARTICLE TITLE: ${brief.suggestedTitle}
 TARGET KEYWORD: "${brief.targetKeyword}"
 SECONDARY KEYWORDS: ${brief.secondaryKeywords.join(', ')}
@@ -351,7 +362,7 @@ ${briefContext}
 THIS SECTION:
 - Heading: ${section.heading}
 - Guidance: ${section.notes}
-- Target word count: ${section.wordCount || 300} words
+- STRICT target word count: ${sectionTarget} words (do NOT exceed ${Math.round(sectionTarget * 1.1)} words)
 - Keywords to include naturally: ${section.keywords?.join(', ') || brief.secondaryKeywords.slice(0, 3).join(', ')}
 ${relevantPAA.length > 0 ? `- Questions to answer in this section:\n${relevantPAA.map(q => `  • ${q}`).join('\n')}` : ''}
 ${prevContext}
@@ -361,7 +372,7 @@ ${typeInstructions}
 
 UNIVERSAL REQUIREMENTS:
 - Start with the H2 heading as a markdown ## heading
-- Write approximately ${section.wordCount || 300} words of content under the heading
+- Write approximately ${sectionTarget} words of content under the heading — this is a STRICT budget, not a minimum
 - Follow the section guidance closely — cover every point mentioned
 - Weave in keywords naturally — never force or stuff them
 - Use subheadings (### H3) if the section is 300+ words
@@ -370,13 +381,14 @@ UNIVERSAL REQUIREMENTS:
 - Match the specified tone and brand voice exactly
 - Include specific, actionable, expert-level advice — never generic filler
 - Write for humans first, search engines second
+- IMPORTANT: Competitor word counts in the SERP data are for reference only — YOUR word count target is ${sectionTarget} words for this section. Do not write more because competitors wrote more.
 
 Return ONLY the section content in markdown (starting with ## heading). No labels, no meta-commentary.`;
 
   const result = await callOpenAI({
     model: CONTENT_MODEL,
     messages: [{ role: 'user', content: prompt }],
-    maxTokens: Math.max(1800, (section.wordCount || 300) * 3),
+    maxTokens: Math.max(800, sectionTarget * 2),
     temperature: CONTENT_TEMP,
     feature: 'content-post-section',
     workspaceId,
@@ -438,7 +450,7 @@ function countWords(text: string): number {
 /**
  * Unification pass — reviews the fully assembled post and returns
  * refined versions of each part with smoother transitions, consistent
- * voice, and no subtle repetition across sections.
+ * voice, no subtle repetition, and word counts trimmed to match the brief's target.
  */
 async function unifyPost(
   post: GeneratedPost,
@@ -448,16 +460,23 @@ async function unifyPost(
 ): Promise<{ introduction?: string; sections?: string[]; conclusion?: string } | null> {
   const pageType = brief.pageType || 'blog';
   const role = PAGE_TYPE_WRITER_ROLE[pageType] || PAGE_TYPE_WRITER_ROLE.blog;
+  const targetTotal = brief.wordCountTarget || 1800;
 
   // Assemble the full draft for review
   const fullDraft = [
-    `# ${post.title}\n\n${post.introduction}`,
-    ...post.sections.map(s => `## ${s.heading}\n\n${s.content}`),
-    post.conclusion,
+    `[INTRODUCTION]\n${post.introduction}`,
+    ...post.sections.map((s, i) => `[SECTION ${i + 1}: ${s.heading}]\n${s.content}`),
+    `[CONCLUSION]\n${post.conclusion}`,
   ].join('\n\n---\n\n');
 
   // If the post is very short, skip unification (not worth the cost)
-  if (post.totalWordCount < 400) return null;
+  const currentWords = countWords(post.introduction) + post.sections.reduce((sum, s) => sum + s.wordCount, 0) + countWords(post.conclusion);
+  if (currentWords < 400) return null;
+
+  const overBudget = currentWords > targetTotal * 1.1;
+  const wordBudgetInstruction = overBudget
+    ? `\n\nWORD COUNT CORRECTION REQUIRED:\n- Current total: ~${currentWords} words\n- Target total: ${targetTotal} words (from the content brief)\n- You MUST trim each section proportionally to bring the total within ±5% of ${targetTotal} words.\n- Cut filler, redundant examples, verbose phrasing, and tangential points. Preserve core arguments and actionable advice.\n- Section word budget targets:\n  - Introduction: ~${Math.round(targetTotal * 0.08)} words\n${post.sections.map((s, i) => `  - Section ${i + 1} (${s.heading}): ~${s.targetWordCount} words`).join('\n')}\n  - Conclusion: ~${Math.round(targetTotal * 0.07)} words`
+    : `\n\nWORD COUNT: Current total (~${currentWords} words) is within the ${targetTotal}-word target. Preserve depth — do not inflate or significantly reduce.`;
 
   const prompt = `${role}
 
@@ -466,44 +485,51 @@ You are performing a UNIFICATION PASS on a fully written piece of content. Each 
 - Subtle repetition of the same points, phrases, or examples across sections
 - Inconsistent tone or voice shifts between sections
 - Disconnected narrative — the intro promises one thing but sections deliver another
+${overBudget ? '- WORD COUNT BLOAT — the article significantly exceeds its target word count' : ''}
 
-YOUR TASK: Refine each section to create a cohesive, unified piece that reads as if written in a single sitting by one expert author.
+YOUR TASK: Refine each section to create a cohesive, unified piece that reads as if written in a single sitting by one expert author.${overBudget ? ' You must also trim to the target word count.' : ''}
 
 TITLE: ${post.title}
 TARGET KEYWORD: "${brief.targetKeyword}"
 AUDIENCE: ${brief.audience}
 ${brief.toneAndStyle ? `TONE & STYLE: ${brief.toneAndStyle}` : ''}
 ${voiceCtx}
+${wordBudgetInstruction}
 
 FULL DRAFT:
 ${fullDraft}
 
 RULES:
-- Preserve the meaning, depth, and word count of each section — this is a POLISH, not a rewrite
 - Smooth transitions: each section should flow naturally from the previous one
 - Remove repeated phrases, examples, or talking points that appear in multiple sections
 - Ensure the introduction's promises are fulfilled by the body sections
 - Ensure the conclusion ties back to the introduction's hook
 - Keep all markdown formatting (headings, bold, lists, etc.)
-- Do NOT add new content or significantly change word counts
-- Do NOT include the title heading — just return the body parts
+- Do NOT include section labels or the title heading — return clean markdown for each part
+- Sections array: return the body text ONLY (no ## heading prefix) — headings are stored separately
 
-Return valid JSON with this exact structure:
+Return valid JSON with this exact structure (${post.sections.length} items in the sections array):
 {
   "introduction": "refined intro text (markdown, no heading)",
-  "sections": ["refined section 1 text (markdown, no heading)", "refined section 2 text", ...],
+  "sections": ["section 1 body text only", "section 2 body text only", ...],
   "conclusion": "refined conclusion text (markdown, with its own ## heading)"
 }
 
-Return ONLY valid JSON, no markdown fences.`;
+Return ONLY valid JSON, no markdown fences, no comments.`;
+
+  // Scale maxTokens based on post length — need enough room for the full refined output
+  const estimatedOutputTokens = Math.ceil(targetTotal * 1.5);
+  const maxTokens = Math.max(8000, Math.min(estimatedOutputTokens, 16000));
+
+  console.log(`[content-posts] Unification pass: ${currentWords} words → target ${targetTotal}, overBudget=${overBudget}, maxTokens=${maxTokens}`);
 
   const result = await callOpenAI({
     model: CONTENT_MODEL,
     messages: [
-      { role: 'system', content: 'You are a senior editor performing a cohesion review. Return valid JSON only.' },
+      { role: 'system', content: 'You are a senior editor performing a cohesion and word-count review. Return valid JSON only.' },
       { role: 'user', content: prompt },
     ],
-    maxTokens: 8000,
+    maxTokens,
     temperature: 0.4,
     feature: 'content-post-unify',
     workspaceId,
@@ -511,7 +537,10 @@ Return ONLY valid JSON, no markdown fences.`;
 
   try {
     const jsonMatch = result.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
+    if (!jsonMatch) {
+      console.warn('[content-posts] Unification: no JSON object found in response');
+      return null;
+    }
     const parsed = JSON.parse(jsonMatch[0]) as { introduction?: string; sections?: string[]; conclusion?: string };
     // Validate sections count matches
     if (parsed.sections && parsed.sections.length !== post.sections.length) {
@@ -533,8 +562,9 @@ Return ONLY valid JSON, no markdown fences.`;
 export async function generatePost(
   workspaceId: string,
   brief: ContentBrief,
+  existingPostId?: string,
 ): Promise<GeneratedPost> {
-  const postId = `post_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  const postId = existingPostId || `post_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
   const voiceCtx = buildVoiceContext(workspaceId);
 
   // Initialize post with pending sections
@@ -557,7 +587,9 @@ export async function generatePost(
     })),
     conclusion: '',
     totalWordCount: 0,
+    targetWordCount: brief.wordCountTarget || 1800,
     status: 'generating',
+    unificationStatus: 'pending',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -609,8 +641,12 @@ export async function generatePost(
   post.updatedAt = new Date().toISOString();
   savePost(workspaceId, post);
 
-  // 4. Unification pass — review the full post for cohesion, smooth transitions, and consistent voice
+  // 4. Unification pass — review the full post for cohesion, smooth transitions, consistent voice, and word count correction
+  post.unificationStatus = 'pending';
+  savePost(workspaceId, post);
+
   try {
+    const preUnifyWords = countWords(post.introduction) + post.sections.reduce((s, sec) => s + sec.wordCount, 0) + countWords(post.conclusion);
     const unified = await unifyPost(post, brief, voiceCtx, workspaceId);
     if (unified) {
       if (unified.introduction) post.introduction = unified.introduction;
@@ -621,10 +657,20 @@ export async function generatePost(
         }
       }
       if (unified.conclusion) post.conclusion = unified.conclusion;
+      const postUnifyWords = countWords(post.introduction) + post.sections.reduce((s, sec) => s + sec.wordCount, 0) + countWords(post.conclusion);
+      post.unificationStatus = 'success';
+      post.unificationNote = `Unified: ${preUnifyWords} → ${postUnifyWords} words (target: ${post.targetWordCount})`;
+      console.log(`[content-posts] ${post.unificationNote}`);
       post.updatedAt = new Date().toISOString();
       savePost(workspaceId, post);
+    } else {
+      post.unificationStatus = 'skipped';
+      post.unificationNote = 'Unification returned null — post too short or JSON parse failed';
+      console.warn(`[content-posts] Unification skipped for ${postId}`);
     }
   } catch (err) {
+    post.unificationStatus = 'failed';
+    post.unificationNote = `Unification error: ${err instanceof Error ? err.message : 'Unknown'}`;
     console.error(`[content-posts] Unification pass failed (non-critical):`, err);
     // Non-critical — the post is still usable without unification
   }

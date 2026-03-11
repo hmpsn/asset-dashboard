@@ -7388,7 +7388,9 @@ app.post('/api/content-posts/:workspaceId/generate', async (req, res) => {
       })),
       conclusion: '',
       totalWordCount: 0,
+      targetWordCount: brief.wordCountTarget || 1800,
       status: 'generating' as const,
+      unificationStatus: 'pending' as const,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -7397,8 +7399,8 @@ app.post('/api/content-posts/:workspaceId/generate', async (req, res) => {
     // Return skeleton to client immediately
     res.json(skeleton);
 
-    // Generate in background
-    generatePost(req.params.workspaceId, brief).then(() => {
+    // Generate in background — pass skeleton's postId so it updates the same post
+    generatePost(req.params.workspaceId, brief, postId).then(() => {
       addActivity(req.params.workspaceId, 'post_generated', `Content generated for "${brief.targetKeyword}"`, `Title: ${brief.suggestedTitle}`);
     }).catch(err => {
       console.error(`[content-posts] Generation failed for ${req.params.workspaceId}:`, err);

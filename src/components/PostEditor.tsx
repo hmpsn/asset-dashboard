@@ -26,7 +26,10 @@ interface GeneratedPost {
   sections: PostSection[];
   conclusion: string;
   totalWordCount: number;
+  targetWordCount?: number;
   status: 'generating' | 'draft' | 'review' | 'approved';
+  unificationStatus?: 'pending' | 'success' | 'failed' | 'skipped';
+  unificationNote?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -250,10 +253,20 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
               <button onClick={() => { setEditingTitle(true); setTitleBuffer(post.title); }} className="opacity-0 group-hover:opacity-100 p-1 rounded text-zinc-500 hover:text-zinc-300 transition-all"><Pencil className="w-3 h-3" /></button>
             </div>
           )}
-          <div className="flex items-center gap-3 mt-1">
+          <div className="flex items-center gap-3 mt-1 flex-wrap">
             <StatusBadge status={post.status} />
             <span className="text-[11px] text-zinc-500 flex items-center gap-1"><Hash className="w-3 h-3" />{post.targetKeyword}</span>
-            <span className="text-[11px] text-zinc-500 flex items-center gap-1"><FileText className="w-3 h-3" />{post.totalWordCount.toLocaleString()} words</span>
+            <span className="text-[11px] text-zinc-500 flex items-center gap-1"><FileText className="w-3 h-3" />{post.totalWordCount.toLocaleString()}{post.targetWordCount ? `/${post.targetWordCount.toLocaleString()}` : ''} words</span>
+            {post.unificationStatus && post.unificationStatus !== 'pending' && (
+              <span title={post.unificationNote || ''} className={`text-[11px] px-1.5 py-0.5 rounded border font-medium flex items-center gap-1 ${
+                post.unificationStatus === 'success' ? 'text-green-400 bg-green-500/10 border-green-500/20' :
+                post.unificationStatus === 'failed' ? 'text-red-400 bg-red-500/10 border-red-500/20' :
+                'text-zinc-400 bg-zinc-500/10 border-zinc-500/20'
+              }`}>
+                <Sparkles className="w-3 h-3" />
+                {post.unificationStatus === 'success' ? 'Unified' : post.unificationStatus === 'failed' ? 'Unify Failed' : 'Unify Skipped'}
+              </span>
+            )}
             <span className="text-[11px] text-zinc-500 flex items-center gap-1"><Clock className="w-3 h-3" />{new Date(post.updatedAt).toLocaleDateString()}</span>
           </div>
         </div>

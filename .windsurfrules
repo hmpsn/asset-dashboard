@@ -53,7 +53,7 @@ Every completed task — no matter how small — must include these steps:
 **hmpsn.studio** is an SEO/web analytics platform built with **React 18 + Vite + TailwindCSS** (frontend) and **Express + TypeScript** (backend). It manages client websites via Webflow, Google Search Console, GA4, and SEMRush integrations.
 
 - **No database** — all data is JSON on disk via `~/.asset-dashboard/` and per-workspace folders
-- **AI** — OpenAI GPT-4o/4o-mini via `server/openai-helpers.ts` (`callOpenAI` with retry, timeout, token tracking)
+- **AI** — OpenAI GPT-4.1/4.1-mini/4.1-nano via `server/openai-helpers.ts` (`callOpenAI` with retry, timeout, token tracking)
 - **Payments** — Stripe Checkout (not Payment Intents). Config encrypted on disk (AES-256-GCM). Admin UI for keys + products.
 - **Auth** — Dual system: internal JWT (7-day, admin) + client JWT (24h, per-workspace). Legacy shared-password still supported.
 - **Monetization** — 3 tiers (Free/Growth/Premium), per-item content purchases, 14-day Growth trial, UX soft-gating via `<TierGate>`
@@ -71,6 +71,7 @@ Every completed task — no matter how small — must include these steps:
 | `seo-context.ts` | `buildSeoContext()`, `buildKeywordMapContext()`, `buildKnowledgeBase()` | Shared AI prompt builders — used by chat, briefs, schema |
 | `chat-memory.ts` | Chat session persistence | `addMessage`, `buildConversationContext`, `generateSessionSummary` |
 | `content-brief.ts` | AI content brief generation | 7 page-type-specific prompts, SEMRush/GSC enrichment |
+| `content-posts.ts` | AI full post generation from briefs | Section-by-section generation + unification pass for cohesion. Page-type-specific writer roles. |
 | `brief-export-html.ts` | Branded HTML/PDF brief export | Page type badge in header |
 | `content-requests.ts` | Content topic request CRUD | `ContentTopicRequest` interface (includes `pageType`, `serviceType`) |
 | `stripe.ts` | Lazy-init Stripe SDK, 14-product map, checkout, webhooks | Re-creates SDK when keys change |
@@ -107,6 +108,7 @@ Every completed task — no matter how small — must include these steps:
 | `components/AdminChat.tsx` | Admin AI chat (purple accent) | Conversation memory + history |
 | `components/KeywordStrategy.tsx` | SEO strategy + content gaps | Admin keyword strategy viewer/generator |
 | `components/ContentBriefs.tsx` | Admin content brief management | Brief preview, status management |
+| `components/ContentManager.tsx` | Admin content review & management | Lists all generated posts, status workflow (draft→review→approved), search/sort/filter, inline editing via PostEditor |
 | `components/SeoAudit.tsx` | Site health audit viewer | Main admin panel host for many sub-views |
 | `components/StripePaymentForm.tsx` | Stripe payment UI | Teal unified, `PaymentModal` wrapper |
 | `components/StripeSettings.tsx` | Admin Stripe config | Keys, product mapping, connection status |

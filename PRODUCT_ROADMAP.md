@@ -2,7 +2,7 @@
 
 > **Q2 2026 (March – May)**
 > A client-facing view of what's shipping, what's next, and where we're headed.
-> Last updated: March 8, 2026
+> Last updated: March 10, 2026
 
 ---
 
@@ -16,7 +16,7 @@ Before looking ahead, here's what you have access to today:
 | **Site Health** | Automated SEO audits with issue-level detail | ✅ Live |
 | **AI Advisor** | 24/7 AI chat that knows your site, traffic, and strategy | ✅ Live |
 | **SEO Strategy** | AI-generated keyword strategy, content gaps, quick wins | ✅ Live |
-| **Content Engine** | AI-powered content briefs and full blog posts | ✅ Live |
+| **Content Engine** | AI-powered content briefs, full post generation with unification pass, and admin content manager | ✅ Live |
 | **ROI Dashboard** | Organic traffic value tracking in real dollars | ✅ Live |
 | **Monthly Digest** | "What happened this month" performance summary | ✅ Live |
 | **Self-Service Upgrades** | Upgrade your plan instantly via Stripe | ✅ Live |
@@ -26,7 +26,7 @@ Before looking ahead, here's what you have access to today:
 | **Smart Health Scores** | Suppressed audit issues are excluded from all health scores, recommendations, and AI advice — scores reflect real priorities. | ✅ Live |
 | **CMS Sitemap Filtering** | Content editor only shows collection pages that exist in your sitemap, with full URL paths. No more noise from unpublished items. | ✅ Live |
 
-**59 documented features shipped.** Here's what's next.
+**61 documented features shipped.** Here's what's next.
 
 ---
 
@@ -156,7 +156,7 @@ Features that hit all three ship first. Everything else goes in the backlog unti
 As a beta client, you have outsized influence on what we build next. If something on this roadmap excites you — or if something's missing — tell us. The AI advisor is always listening, or just reply to any email from us.
 
 **Current platform stats:**
-- 59 features shipped
+- 61 features shipped
 - 16 vision features planned (see FEATURE_VISION.md)
 - 3-tier pricing live (Starter / Growth / Premium)
 - AI advisor available 24/7

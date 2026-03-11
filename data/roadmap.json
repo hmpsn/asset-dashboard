@@ -167,8 +167,9 @@
           "source": "Product idea Mar 2026",
           "est": "3-5h",
           "priority": "P0",
-          "notes": "Extend content brief system to generate full SEO-optimized blog posts. Section-by-section generation using the brief's outline (heading, notes, wordCount, keywords per section) as the writing spec. Each section generated independently with full context (brand voice, keyword strategy, GSC/GA4 data, E-E-A-T guidance). New endpoint: POST /api/content-posts/:workspaceId/generate (takes briefId). New UI: post editor with section cards, inline editing, regenerate-per-section, word count tracking. Export as markdown, HTML, or copy-paste-ready. Cost: ~$0.15-0.30 per post in API tokens. Tier limits: free: 0, growth: 3/mo, premium: 10/mo. Quality control: generate as draft, section-by-section review, approve/export workflow. Differentiator: no competitor generates blog posts personalized to client's actual GSC/GA4 data + brand voice.",
-          "status": "pending"
+          "notes": "Shipped — content-posts.ts: section-by-section generation with page-type-specific writer roles (blog, landing, service, location, product, pillar, resource). Full context per section: brand voice, keyword strategy, E-E-A-T, SERP analysis, internal link suggestions. Post-generation unification pass (unifyPost) smooths transitions, removes cross-section repetition, ensures consistent voice. GPT-4.1 at temp 0.4 for editorial refinement. Admin Content Manager tab (ContentManager.tsx) for reviewing/managing all generated posts with status workflow (draft→review→approved), search/sort, and inline PostEditor. SEMRush graceful error handling: getRelatedKeywords/getDomainOrganic return [] instead of throwing on NOTHING FOUND.",
+          "status": "done",
+          "shippedAt": "2026-03-10"
         },
         {
           "id": 195,
