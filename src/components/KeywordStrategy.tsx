@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { KeywordAnalysis } from './KeywordAnalysis';
 import { StatCard } from './ui';
+import type { FixContext } from '../App';
 
 interface PageKeywordMap {
   pagePath: string;
@@ -73,11 +74,12 @@ interface SeoCopy {
 interface Props {
   workspaceId: string;
   siteId?: string;
+  onNavigate?: (tab: string, ctx?: FixContext) => void;
 }
 
 type StrategyTab = 'strategy' | 'analysis';
 
-export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
+export function KeywordStrategyPanel({ workspaceId, siteId, onNavigate }: Props) {
   const [activeTab, setActiveTab] = useState<StrategyTab>('strategy');
   const [strategy, setStrategy] = useState<KeywordStrategy | null>(null);
   const [loading, setLoading] = useState(false);
@@ -743,15 +745,21 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                           )}
                         </div>
                       </div>
-                      <div className="text-[11px] text-teal-400 mt-1">Target keyword: &ldquo;{gap.targetKeyword}&rdquo;</div>
+                      <div className="flex items-center justify-between mt-1">
+                        <div className="text-[11px] text-teal-400">Target keyword: &ldquo;{gap.targetKeyword}&rdquo;</div>
+                        {onNavigate && (
+                          <button
+                            onClick={() => onNavigate('seo-briefs', { pageName: gap.targetKeyword })}
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 font-medium hover:bg-teal-600/40 transition-all flex-shrink-0"
+                          >
+                            <Sparkles className="w-3 h-3" /> Generate Brief
+                          </button>
+                        )}
+                      </div>
                       <div className="text-[11px] text-zinc-500 mt-0.5">{gap.rationale}</div>
                     </div>
                   );
                 })}
-              </div>
-              <div className="mt-3 flex items-center gap-1.5 text-[11px] text-teal-400/70 bg-teal-500/5 px-3 py-2 rounded-lg border border-teal-500/10">
-                <FileText className="w-3 h-3 flex-shrink-0" />
-                <span>Turn these into actionable content — create <strong className="text-teal-400">Content Briefs</strong> from the sidebar</span>
               </div>
             </div>
           )}
