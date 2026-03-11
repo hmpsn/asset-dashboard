@@ -276,7 +276,8 @@ const WRITING_QUALITY_RULES = `
 WRITING QUALITY RULES (apply to ALL content — violations will be rejected):
 
 FORBIDDEN PHRASES — never use these AI clichés:
-- Opening clichés: "Did you know...", "In today's [digital/fast-paced/competitive] world...", "Have you ever wondered...", "If you're like most...", "When it comes to...", "Picture this..."
+- Opening clichés: "Did you know...", "In today's [digital/fast-paced/competitive] world...", "Have you ever wondered...", "When it comes to...", "Picture this..."
+- "If you're like most" pattern: NEVER start any sentence with "If you're like most" followed by ANY word. This includes "If you're like most people", "If you're like most Texans", "If you're like most business owners", "If you're like most homeowners", etc. Rewrite as a direct statement instead (e.g., "Most Texans have dental insurance but aren't sure how it works" instead of "If you're like most Texans, you have dental insurance but aren't sure how it works")
 - Filler transitions: "Let's dive in", "Let's dive into", "Without further ado", "Let's explore", "Let's take a closer look", "Now let's talk about...", "With that said...", "That being said...", "Moving on...", "Let's get started", "Let's start with...". NEVER use "Let's" followed by a verb anywhere in the content.
 - "Ready to" rhetorical questions: NEVER write "Ready to [verb]...?" or "Ready for [noun]?" anywhere in the content. Examples of BANNED phrases: "Ready to build...", "Ready to move beyond...", "Ready for the full toolkit?", "Ready to get started?", "Ready to take your...". Use direct statements instead (e.g., "Download the guide" not "Ready to download the guide?").
 - Hollow intensifiers: "incredibly", "absolutely", "truly", "extremely", "revolutionize", "game-changing", "cutting-edge", "world-class", "best-in-class", "next-level", "top-notch"
@@ -318,6 +319,7 @@ WHAT TO DO INSTEAD:
 - Vary paragraph structure: some short (1-2 sentences), some medium (3-4), occasional longer ones for complex points
 - Go deeper than surface-level advice. Instead of "optimize your site speed", explain HOW: specific tools, settings, thresholds, and tradeoffs. The reader should learn something they didn't know before
 - Each section should teach ONE thing well rather than listing 5 things superficially
+- DEPTH OVER BREADTH: Even in short sections (150-250 words), go deep on ONE specific example rather than listing generic tips. Include a concrete scenario with dollar amounts, timelines, or step-by-step actions. The reader should learn something they couldn't get from a Google snippet
 - If a section is titled "FAQ" or "Frequently Asked Questions", format it as individual Q&A pairs: each question as an <h3> followed by a short answer paragraph. NEVER combine multiple questions into a single paragraph
 - Vary examples across industries. If the knowledge base only has one case study, reference it once (max twice), then use hypothetical examples from other industries for remaining sections
 - ANCHOR TEXT ACCURACY: When linking to internal pages, the anchor text must accurately describe the linked page. Do NOT use an external brand name (e.g., "Webflow University", "Google") as anchor text for an internal link. If linking to /services/strategy, use text like "our strategy services" or "brand and web strategy" — not an unrelated third-party name
@@ -502,6 +504,7 @@ UNIVERSAL REQUIREMENTS:
 - Match the specified tone and brand voice exactly
 - Include specific, actionable, expert-level advice — never generic filler
 - Write for humans first, search engines second
+- BRAND MENTIONS: Do NOT mention the business/brand by name in this section unless the section heading specifically references the business (e.g., "How [Brand] Helps..."). Body sections should teach — use "your dentist", "your provider", "your agency" instead of the brand name. For FAQ sections, answers should feel like neutral expert advice, not sales copy — use "your dental office" or "your provider" instead of the brand name
 - IMPORTANT: Competitor word counts in the SERP data are for reference only — YOUR word count target is ${sectionTarget} words for this section. Do not write more because competitors wrote more.
 
 ${WRITING_QUALITY_RULES}
@@ -709,6 +712,7 @@ RULES:
 - Sections array: return the FULL section HTML including its <h2> heading
 - Introduction: return HTML paragraphs only (no heading)
 - Conclusion: return full HTML including its <h2> heading
+- KEYWORD COVERAGE CHECK: The following keywords from the brief MUST each appear at least once in the final article. If any are missing, weave them into the most relevant section naturally (do not force or stuff): ${[brief.targetKeyword, ...brief.secondaryKeywords].map(k => `"${k}"`).join(', ')}
 
 Return valid JSON with this exact structure (${post.sections.length} items in the sections array):
 {

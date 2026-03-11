@@ -4755,7 +4755,7 @@ Return JSON with this EXACT structure (do NOT include a pageMap — it's already
 
 Rules:
 - siteKeywords: 8-15 broad themes covering the full site
-- contentGaps: 6-10 NEW pages/posts to create. Vary intent (informational, commercial, transactional). Mix high and medium priority${hasSemrush ? '. Prioritize competitor gap keywords.' : ''}
+- contentGaps: 6-10 NEW pages/posts to create that DO NOT overlap with existing pages listed above. Before suggesting a content gap, verify no current page already targets that keyword or covers that topic. If an existing page is thin or weak on a topic, suggest it as a quickWin improvement instead of creating a competing new page. Vary intent (informational, commercial, transactional). Mix high and medium priority${hasSemrush ? '. Prioritize competitor gap keywords.' : ''}
 - suggestedPageType: Choose the best page type for each content gap. Use "blog" for informational articles, "landing" for conversion pages, "service" for service descriptions, "location" for local SEO, "product" for product pages, "pillar" for topic hubs, "resource" for guides/downloads.
 - quickWins: 3-5 existing pages where small changes boost rankings. Use GSC data if available (high impressions + poor position = opportunity).
 - If DEVICE BREAKDOWN shows mobile ranking gaps, include a mobile-optimization quick win.
