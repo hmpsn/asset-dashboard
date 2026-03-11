@@ -109,48 +109,99 @@ export function deleteBrief(workspaceId: string, briefId: string): boolean {
   return true;
 }
 
-// Page-type-specific prompt instructions
-const PAGE_TYPE_PROMPTS: Record<string, string> = {
-  blog: `PAGE TYPE: Blog Post
+// Page-type-specific configuration: word counts, section counts, content style, and prompt instructions
+interface PageTypeConfig {
+  wordCountTarget: number;       // target word count for the JSON example
+  wordCountRange: string;        // e.g. "800-1,200"
+  sectionRange: string;          // e.g. "4-6 sections"
+  avgSectionWords: number;       // average words per section in the example
+  contentStyle: string;          // writing style guidance
+  prompt: string;                // page-type-specific instructions for the AI
+}
+
+const PAGE_TYPE_CONFIGS: Record<string, PageTypeConfig> = {
+  blog: {
+    wordCountTarget: 1800,
+    wordCountRange: '1,500-2,500',
+    sectionRange: '6-10',
+    avgSectionWords: 250,
+    contentStyle: 'Educational and engaging. Balance depth with readability. Use storytelling, data, and practical examples. Conversational but authoritative.',
+    prompt: `PAGE TYPE: Blog Post
 - Format as an educational, long-form article (1,500-2,500 words)
 - Include an engaging introduction that hooks the reader
 - Use a mix of informational and slightly commercial intent
 - Suggest internal links to service/product pages where relevant
 - Schema: Article or BlogPosting`,
+  },
 
-  landing: `PAGE TYPE: Landing Page
+  landing: {
+    wordCountTarget: 900,
+    wordCountRange: '800-1,200',
+    sectionRange: '4-6',
+    avgSectionWords: 150,
+    contentStyle: 'Punchy, conversion-focused, and scannable. Short paragraphs (2-3 sentences max). Lead every section with a benefit. Use power words. Every sentence should earn its place — cut anything that doesn\'t drive toward conversion.',
+    prompt: `PAGE TYPE: Landing Page
 - Format as a conversion-focused landing page (800-1,200 words)
 - Lead with the primary value proposition in the H1
 - Structure: Hero → Problem → Solution → Benefits → Social Proof → CTA
 - Every section should drive toward a single conversion action
 - Include trust signals (testimonials, stats, logos) in the outline
+- Keep copy punchy — short paragraphs, bold claims, clear benefits
 - Schema: WebPage with potential Organization or Product`,
+  },
 
-  service: `PAGE TYPE: Service Page
+  service: {
+    wordCountTarget: 1200,
+    wordCountRange: '1,000-1,500',
+    sectionRange: '5-8',
+    avgSectionWords: 180,
+    contentStyle: 'Professional and benefit-driven. Lead with outcomes, not features. Use confident language that builds trust. Balance detail with scannability.',
+    prompt: `PAGE TYPE: Service Page
 - Format as a service description page (1,000-1,500 words)
 - Lead with what the service solves, not what it is
 - Structure: Overview → What's Included → Process → Benefits → Pricing Signals → FAQ → CTA
 - Include specific deliverables and outcomes
 - E-E-A-T emphasis: expertise and authority signals are critical
 - Schema: Service, FAQPage`,
+  },
 
-  location: `PAGE TYPE: Location Page
+  location: {
+    wordCountTarget: 1000,
+    wordCountRange: '800-1,200',
+    sectionRange: '4-7',
+    avgSectionWords: 170,
+    contentStyle: 'Locally relevant and trustworthy. Weave in location-specific details naturally. Warm, community-oriented tone. Include proof of local expertise.',
+    prompt: `PAGE TYPE: Location Page
 - Format as a local SEO page (800-1,200 words)
 - Include the city/region name naturally in headings and body
 - Structure: Local intro → Services in [Location] → Local expertise → Testimonials → Map/Directions → Contact CTA
 - Reference local landmarks, neighborhoods, or regional specifics
 - Include NAP (Name, Address, Phone) consistency guidance
 - Schema: LocalBusiness, FAQPage`,
+  },
 
-  product: `PAGE TYPE: Product Page
+  product: {
+    wordCountTarget: 750,
+    wordCountRange: '600-1,000',
+    sectionRange: '4-6',
+    avgSectionWords: 130,
+    contentStyle: 'Concise and benefit-first. Use bullet points and comparison tables. Answer buyer objections directly. Include social proof. Every word should help the purchase decision.',
+    prompt: `PAGE TYPE: Product Page
 - Format as a product description page (600-1,000 words)
 - Lead with the key benefit, not features
 - Structure: Product Overview → Key Features → Specifications → Use Cases → Comparison → Reviews → Purchase CTA
 - Include comparison elements vs alternatives
 - Pricing and availability signals
 - Schema: Product with Review, FAQPage`,
+  },
 
-  pillar: `PAGE TYPE: Pillar / Hub Page
+  pillar: {
+    wordCountTarget: 3000,
+    wordCountRange: '2,500-4,000',
+    sectionRange: '8-12',
+    avgSectionWords: 300,
+    contentStyle: 'Comprehensive and authoritative. This is the definitive resource on the topic. Balance breadth with depth. Each section should stand alone but link to deeper content.',
+    prompt: `PAGE TYPE: Pillar / Hub Page
 - Format as a comprehensive topic hub (2,500-4,000 words)
 - This is the authoritative centerpiece for a topic cluster
 - Structure: Comprehensive overview → Major subtopics (each linking to cluster content) → FAQ → Resources
@@ -158,15 +209,29 @@ const PAGE_TYPE_PROMPTS: Record<string, string> = {
 - Cover the topic broadly; linked cluster pages go deep
 - Internal linking strategy is critical — map every subtopic to an existing or planned page
 - Schema: Article, FAQPage, BreadcrumbList`,
+  },
 
-  resource: `PAGE TYPE: Resource / Guide
+  resource: {
+    wordCountTarget: 2500,
+    wordCountRange: '2,000-3,000',
+    sectionRange: '6-10',
+    avgSectionWords: 300,
+    contentStyle: 'Practical and actionable. Include frameworks, checklists, and step-by-step processes. Reference-quality depth. Use visual aids (tables, diagrams). Write for someone who will implement immediately.',
+    prompt: `PAGE TYPE: Resource / Guide
 - Format as a downloadable or in-depth reference guide (2,000-3,000 words)
 - Include actionable frameworks, templates, or step-by-step processes
 - Structure: Executive Summary → Background → Step-by-Step Guide → Tools/Resources → Checklist → Next Steps
 - Include visual aids guidance (tables, diagrams, checklists)
 - Lead magnet potential — note where a gated PDF version could be offered
 - Schema: Article, HowTo`,
+  },
 };
+
+// Helper to get config for a page type, with blog as default
+function getPageTypeConfig(pageType?: string): PageTypeConfig {
+  if (pageType && PAGE_TYPE_CONFIGS[pageType]) return PAGE_TYPE_CONFIGS[pageType];
+  return PAGE_TYPE_CONFIGS.blog;
+}
 
 export async function generateBrief(
   workspaceId: string,
@@ -253,9 +318,10 @@ export async function generateBrief(
     ga4Block += `\n\nUse this data to:\n- Identify which existing pages perform well (low bounce, high engagement) and why\n- Spot underperforming pages that a content refresh could improve\n- Recommend internal links to high-traffic pages\n- Set realistic traffic expectations based on current performance`;
   }
 
-  // Page-type-specific instructions
-  const pageTypeBlock = context.pageType && PAGE_TYPE_PROMPTS[context.pageType]
-    ? `\n\n${PAGE_TYPE_PROMPTS[context.pageType]}\n\nTailor ALL aspects of the brief (outline structure, word count, CTA, schema, content format) to this page type.`
+  // Page-type-specific instructions and configuration
+  const ptConfig = getPageTypeConfig(context.pageType);
+  const pageTypeBlock = context.pageType && PAGE_TYPE_CONFIGS[context.pageType]
+    ? `\n\n${ptConfig.prompt}\n\nCONTENT STYLE: ${ptConfig.contentStyle}\n\nTailor ALL aspects of the brief (outline structure, word count, CTA, schema, content format) to this page type. The wordCountTarget MUST be approximately ${ptConfig.wordCountTarget} (range: ${ptConfig.wordCountRange} words). Do NOT default to 1800 words unless this is a blog post.`
     : '';
 
   const prompt = `You are an expert content strategist and SEO specialist. Generate a comprehensive, production-ready content brief for a new piece of content targeting the keyword "${targetKeyword}".${pageTypeBlock}
@@ -277,16 +343,16 @@ Generate a content brief in the following JSON format:
   "contentFormat": "The recommended format: guide, listicle, how-to, comparison, FAQ, case-study, pillar-page, or landing-page",
   "toneAndStyle": "Specific tone and style guidance for the writer (e.g., authoritative but approachable, data-driven, conversational)",
   "outline": [
-    { "heading": "H2 heading text", "notes": "Detailed guidance for this section: what to cover, key points, data to include (3-5 sentences)", "wordCount": 250, "keywords": ["keywords to naturally include in this section"] }
+    { "heading": "H2 heading text", "notes": "Detailed guidance for this section: what to cover, key points, data to include (3-5 sentences)", "wordCount": ${ptConfig.avgSectionWords}, "keywords": ["keywords to naturally include in this section"] }
   ],
-  "wordCountTarget": 1800,
+  "wordCountTarget": ${ptConfig.wordCountTarget},
   "intent": "Search intent (informational/transactional/navigational/commercial)",
   "audience": "Detailed target audience description including their pain points and what they need from this content",
   "peopleAlsoAsk": ["Question 1 searchers commonly ask?", "Question 2?", "Question 3?", "Question 4?", "Question 5?"],
   "topicalEntities": ["entity1", "entity2", "entity3", "entity4", "entity5", "entity6", "entity7", "entity8"],
   "serpAnalysis": {
     "contentType": "What type of content dominates the SERP for this keyword",
-    "avgWordCount": 1800,
+    "avgWordCount": ${ptConfig.wordCountTarget},
     "commonElements": ["Elements found in top-ranking content (e.g., comparison tables, images, expert quotes)"],
     "gaps": ["Content angles missing from top results that represent an opportunity"]
   },
@@ -314,7 +380,7 @@ Generate a content brief in the following JSON format:
 }
 
 Requirements:
-- The outline should have 6-10 sections with H2 headings, each with specific wordCount targets that sum to the total wordCountTarget
+- The outline should have ${ptConfig.sectionRange} sections with H2 headings, each with specific wordCount targets that sum to the total wordCountTarget (${ptConfig.wordCountRange} words)
 - Each outline section must include keywords to weave naturally into that section
 - Secondary keywords: 6-8 naturally related terms including long-tail variations
 - People Also Ask: 5 real questions searchers ask about this topic
