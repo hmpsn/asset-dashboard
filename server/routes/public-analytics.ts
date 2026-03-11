@@ -511,26 +511,4 @@ router.get('/api/public/analytics-organic/:workspaceId', async (req, res) => {
   }
 });
 
-router.get('/api/public/analytics-comparison/:workspaceId', async (req, res) => {
-  const ws = getWorkspace(req.params.workspaceId);
-  if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
-  const days = parseInt(req.query.days as string) || 28;
-  try {
-    res.json(await getGA4PeriodComparison(ws.ga4PropertyId, days, parseDateRange(req.query)));
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
-  }
-});
-
-router.get('/api/public/analytics-new-vs-returning/:workspaceId', async (req, res) => {
-  const ws = getWorkspace(req.params.workspaceId);
-  if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
-  const days = parseInt(req.query.days as string) || 28;
-  try {
-    res.json(await getGA4NewVsReturning(ws.ga4PropertyId, days, parseDateRange(req.query)));
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
-  }
-});
-
 export default router;

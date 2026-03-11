@@ -58,7 +58,8 @@ export function signClientSession(workspaceId: string): string {
 
 export function verifyClientSession(workspaceId: string, token: string): boolean {
   const expected = signClientSession(workspaceId);
-  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(token || ''.padEnd(expected.length)));
+  try { return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(token || ''.padEnd(expected.length))); }
+  catch { return false; }
 }
 
 // Admin auth token (HMAC instead of raw password)
