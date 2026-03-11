@@ -39,6 +39,8 @@ services:
         sync: false
       - key: JWT_SECRET
         generateValue: true
+      - key: SESSION_SECRET
+        generateValue: true
       - key: WEBFLOW_API_TOKEN
         fromGroup: shared-api-keys
       - key: OPENAI_API_KEY
@@ -51,9 +53,31 @@ services:
         fromGroup: shared-google
       - key: GOOGLE_REDIRECT_URI
         sync: false  # differs per environment
+      - key: GOOGLE_PSI_KEY
+        fromGroup: shared-api-keys
+      - key: SEMRUSH_API_KEY
+        fromGroup: shared-api-keys
       - key: STRIPE_SECRET_KEY
         sync: false  # live keys for prod
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
       - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: SMTP_HOST
+        fromGroup: shared-smtp
+      - key: SMTP_PORT
+        fromGroup: shared-smtp
+      - key: SMTP_USER
+        fromGroup: shared-smtp
+      - key: SMTP_PASS
+        fromGroup: shared-smtp
+      - key: SMTP_FROM
+        fromGroup: shared-smtp
+      - key: SMTP_FROM_NAME
+        fromGroup: shared-smtp
+      - key: NOTIFICATION_EMAIL
+        sync: false
+      - key: ALLOWED_ORIGINS
         sync: false
     disk:
       name: asset-dashboard-data
@@ -83,6 +107,8 @@ services:
         sync: false
       - key: JWT_SECRET
         generateValue: true
+      - key: SESSION_SECRET
+        generateValue: true
       - key: WEBFLOW_API_TOKEN
         fromGroup: shared-api-keys
       - key: OPENAI_API_KEY
@@ -95,9 +121,31 @@ services:
         fromGroup: shared-google
       - key: GOOGLE_REDIRECT_URI
         sync: false  # staging callback URL
+      - key: GOOGLE_PSI_KEY
+        fromGroup: shared-api-keys
+      - key: SEMRUSH_API_KEY
+        fromGroup: shared-api-keys
       - key: STRIPE_SECRET_KEY
         sync: false  # test keys for staging
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
       - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: SMTP_HOST
+        fromGroup: shared-smtp
+      - key: SMTP_PORT
+        fromGroup: shared-smtp
+      - key: SMTP_USER
+        fromGroup: shared-smtp
+      - key: SMTP_PASS
+        fromGroup: shared-smtp
+      - key: SMTP_FROM
+        fromGroup: shared-smtp
+      - key: SMTP_FROM_NAME
+        fromGroup: shared-smtp
+      - key: NOTIFICATION_EMAIL
+        sync: false
+      - key: ALLOWED_ORIGINS
         sync: false
     disk:
       name: asset-dashboard-staging-data
@@ -114,9 +162,27 @@ envVarGroups:
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
+      - key: GOOGLE_PSI_KEY
+        sync: false
+      - key: SEMRUSH_API_KEY
+        sync: false
   - name: shared-google
     envVars:
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
+        sync: false
+  - name: shared-smtp
+    envVars:
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: SMTP_FROM_NAME
         sync: false
