@@ -226,12 +226,13 @@ WRITING QUALITY RULES (apply to ALL content — violations will be rejected):
 
 FORBIDDEN PHRASES — never use these AI clichés:
 - Opening clichés: "Did you know...", "In today's [digital/fast-paced/competitive] world...", "Have you ever wondered...", "If you're like most...", "When it comes to...", "Picture this..."
-- Filler transitions: "Let's dive in", "Without further ado", "Let's explore", "Let's take a closer look", "Now let's talk about...", "With that said...", "That being said...", "Moving on..."
+- Filler transitions: "Let's dive in", "Let's dive into", "Without further ado", "Let's explore", "Let's take a closer look", "Now let's talk about...", "With that said...", "That being said...", "Moving on...", "Let's get started"
 - Hollow intensifiers: "incredibly", "absolutely", "truly", "extremely", "revolutionize", "game-changing", "cutting-edge", "world-class", "best-in-class", "next-level", "top-notch"
 - Corporate buzzwords: "leverage", "utilize", "optimize", "streamline", "empower", "harness", "navigate the landscape", "unlock the power of", "take your X to the next level", "in the realm of"
-- Emotional hedging: "It's important to note that...", "It's worth mentioning that...", "It goes without saying...", "Needless to say...", "At the end of the day...", "The reality is that..."
+- Emotional hedging: "It's important to note that...", "It's worth mentioning that...", "It goes without saying...", "Needless to say...", "At the end of the day...", "The reality is that...", "X is key to Y", "X is crucial for Y", "X is essential for Y"
 - Vague attribution: "Studies show...", "Research suggests...", "Experts agree...", "According to industry data...", "Many businesses have found..." — if you cite something, name the specific source or don't cite at all
 - Conclusion starters: "In conclusion...", "To sum up...", "In summary...", "All in all...", "At the end of the day..."
+- Metaphor clichés: "growth engine", "game changer", "secret sauce", "silver bullet", "deep dive", "move the needle", "from X to Y" (e.g., "from brochure to growth engine")
 
 STRUCTURAL ANTI-PATTERNS — avoid these:
 - Do NOT end every section with a one-sentence summary of what the section just said
@@ -239,14 +240,26 @@ STRUCTURAL ANTI-PATTERNS — avoid these:
 - Do NOT use exactly 3 or 5 items in every list — vary list lengths naturally (2, 4, 6, 7 are all fine)
 - Do NOT repeat the same point from the intro in the conclusion using synonyms — add NEW value in the conclusion
 - Do NOT use "Conclusion" as the final heading — use a specific, action-oriented heading instead
+- Do NOT give every section the same structure (intro paragraph → bullet list → summary). Vary it: some sections should be all prose, some should lead with a list, some should use a numbered process, some should use a comparison or example-first approach
+- Do NOT reference the same case study, example, or data point more than twice in the entire article. Spread different examples across sections. If you only have one example, use it once or twice max and fill other sections with actionable advice instead
+- Do NOT repeat any phrase, metaphor, or sentence structure across sections. If you used "transforms your X into a Y" in one section, never use that pattern again
+- Do NOT mention the business/brand name in every section — limit to 2-3 mentions in the entire article (intro and conclusion). The middle sections should focus on teaching, not selling
+
+FABRICATION RULES:
+- NEVER invent statistics, case study results, percentages, or data points. Only reference specific numbers if they were provided in the brief context or knowledge base
+- NEVER fabricate quotes, client testimonials, or attributed statements
+- If no specific data is available, give actionable advice instead of making up numbers
+- It's better to say "this approach typically improves conversion rates" than to invent "this approach improved conversion rates by 47%"
 
 WHAT TO DO INSTEAD:
-- Use concrete specifics: real numbers, named tools, actual processes, specific examples
+- Use concrete specifics: real numbers (only if provided), named tools, actual processes, specific examples
 - Vary sentence length: mix short punchy sentences with longer explanatory ones
 - Use active voice and direct language: "do X" not "it is recommended that one should consider doing X"
-- Let evidence speak: instead of "incredibly effective", say "reduced bounce rate by 34%"
+- Let evidence speak: instead of "incredibly effective", reference specific outcomes from the brief's knowledge base
 - Write like a knowledgeable colleague explaining over coffee, not a brochure or a textbook
 - Vary paragraph structure: some short (1-2 sentences), some medium (3-4), occasional longer ones for complex points
+- Go deeper than surface-level advice. Instead of "optimize your site speed", explain HOW: specific tools, settings, thresholds, and tradeoffs. The reader should learn something they didn't know before
+- Each section should teach ONE thing well rather than listing 5 things superficially
 `;
 
 /** Build a rich context block from all available brief fields */
@@ -371,7 +384,7 @@ async function generateSection(
   const briefContext = buildBriefContextBlock(brief);
 
   const prevContext = previousSections.length > 0
-    ? `\n\nPREVIOUS SECTIONS WRITTEN (for continuity — do NOT repeat these points):\n${previousSections.map((s, i) => `--- Section ${i + 1} ---\n${s.slice(0, 1200)}...`).join('\n')}`
+    ? `\n\nPREVIOUS SECTIONS WRITTEN (for continuity — do NOT repeat these points, examples, case studies, or phrases):\n${previousSections.map((s, i) => `--- Section ${i + 1} ---\n${s.slice(0, 800)}`).join('\n')}\n\nCRITICAL: Do NOT re-use any example, case study, statistic, or metaphor that already appeared above. Use a DIFFERENT example or angle. If you have no new example, teach with actionable specifics instead.`
     : '';
 
   // Determine which PAA questions are most relevant to this section
