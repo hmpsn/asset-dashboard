@@ -18,15 +18,36 @@ export interface LinkCheckResult {
   redirects: DeadLink[];
   healthy: number;
   checkedAt: string;
+  crawledDomain?: string;
 }
 
-async function getSiteSubdomain(siteId: string, token: string): Promise<string | null> {
+export interface SiteDomainInfo {
+  staging: string;           // e.g. https://mysite.webflow.io
+  customDomains: string[];   // e.g. ["https://example.com", "https://www.example.com"]
+  defaultDomain: string;     // custom domain if available, otherwise staging
+}
+
+export async function getSiteDomains(siteId: string, token: string): Promise<SiteDomainInfo | null> {
   const res = await fetch(`${WEBFLOW_API}/sites/${siteId}`, {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
   });
   if (!res.ok) return null;
-  const data = await res.json() as { shortName?: string };
-  return data.shortName || null;
+  const data = await res.json() as {
+    shortName?: string;
+    customDomains?: Array<{ url?: string }>;
+  };
+  if (!data.shortName) return null;
+
+  const staging = `https://${data.shortName}.webflow.io`;
+  const customDomains = (data.customDomains || [])
+    .map(d => d.url ? (d.url.startsWith('http') ? d.url : `https://${d.url}`) : '')
+    .filter(Boolean);
+
+  return {
+    staging,
+    customDomains,
+    defaultDomain: customDomains[0] || staging,
+  };
 }
 
 async function fetchPublishedHtml(url: string): Promise<string | null> {
@@ -120,13 +141,14 @@ async function checkUrl(url: string, timeout = 10000): Promise<{ status: number 
   }
 }
 
-export async function checkSiteLinks(siteId: string, tokenOverride?: string): Promise<LinkCheckResult> {
+export async function checkSiteLinks(siteId: string, tokenOverride?: string, domain?: string): Promise<LinkCheckResult> {
   const token = tokenOverride || process.env.WEBFLOW_API_TOKEN || '';
-  const subdomain = await getSiteSubdomain(siteId, token);
-  const baseUrl = subdomain ? `https://${subdomain}.webflow.io` : '';
-  if (!baseUrl) {
+  const domains = await getSiteDomains(siteId, token);
+  if (!domains) {
     return { totalLinks: 0, deadLinks: [], redirects: [], healthy: 0, checkedAt: new Date().toISOString() };
   }
+  // Use provided domain, or default (custom domain if available, otherwise staging)
+  const baseUrl = (domain || domains.defaultDomain).replace(/\/$/, '');
 
   const allPages = await listPages(siteId, tokenOverride);
   const pages = filterPublishedPages(allPages);
@@ -258,5 +280,6 @@ export async function checkSiteLinks(siteId: string, tokenOverride?: string): Pr
     redirects,
     healthy,
     checkedAt: new Date().toISOString(),
+    crawledDomain: baseUrl,
   };
 }

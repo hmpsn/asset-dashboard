@@ -20,6 +20,13 @@ interface LinkCheckResult {
   redirects: DeadLink[];
   healthy: number;
   checkedAt: string;
+  crawledDomain?: string;
+}
+
+interface SiteDomainInfo {
+  staging: string;
+  customDomains: string[];
+  defaultDomain: string;
 }
 
 interface Props {
@@ -32,11 +39,26 @@ export function LinkChecker({ siteId }: Props) {
   const [hasRun, setHasRun] = useState(false);
   const [tab, setTab] = useState<'dead' | 'redirects'>('dead');
   const [typeFilter, setTypeFilter] = useState<'all' | 'internal' | 'external'>('all');
+  const [domains, setDomains] = useState<SiteDomainInfo | null>(null);
+  const [selectedDomain, setSelectedDomain] = useState<string>('');
+
+  // Fetch available domains when site changes
+  useEffect(() => {
+    setDomains(null); setSelectedDomain('');
+    fetch(`/api/webflow/link-check-domains/${siteId}`)
+      .then(r => r.json())
+      .then((d: SiteDomainInfo) => {
+        setDomains(d);
+        setSelectedDomain(d.defaultDomain || d.staging);
+      })
+      .catch(() => {});
+  }, [siteId]);
 
   const runCheck = () => {
     setLoading(true);
     setHasRun(true);
-    fetch(`/api/webflow/link-check/${siteId}`)
+    const domainParam = selectedDomain ? `?domain=${encodeURIComponent(selectedDomain)}` : '';
+    fetch(`/api/webflow/link-check/${siteId}${domainParam}`)
       .then(r => r.json())
       .then(d => setData(d))
       .catch(() => {})
@@ -81,11 +103,27 @@ export function LinkChecker({ siteId }: Props) {
         </div>
         <p className="text-zinc-400 text-sm">Find broken links and redirect chains across your site</p>
         <p className="text-xs text-zinc-500 max-w-md text-center">
-          Crawls every page, extracts all links, and checks each one for 404s, timeouts, and redirects
+          Crawls every page, extracts all links (including buttons &amp; onclick), and checks each one for 404s, timeouts, and redirects
         </p>
+        {domains && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-zinc-500">Crawl domain:</span>
+            <select
+              value={selectedDomain}
+              onChange={e => setSelectedDomain(e.target.value)}
+              className="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-300 focus:border-teal-500/50 focus:outline-none"
+            >
+              <option value={domains.staging}>{domains.staging.replace('https://', '')} (staging)</option>
+              {domains.customDomains.map(d => (
+                <option key={d} value={d}>{d.replace('https://', '')} (live)</option>
+              ))}
+            </select>
+          </div>
+        )}
         <button
           onClick={runCheck}
-          className="px-5 py-2.5 bg-teal-600 hover:bg-teal-500 rounded-lg text-sm font-medium transition-colors"
+          disabled={!selectedDomain}
+          className="px-5 py-2.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors"
         >
           Run Link Check
         </button>
@@ -229,7 +267,7 @@ export function LinkChecker({ siteId }: Props) {
       </div>
 
       <div className="text-[11px] text-zinc-500 text-center">
-        Last checked: {new Date(data.checkedAt).toLocaleString()}
+        Last checked: {new Date(data.checkedAt).toLocaleString()}{data.crawledDomain && ` · ${data.crawledDomain.replace('https://', '')}`}
       </div>
     </div>
   );

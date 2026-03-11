@@ -1,9 +1,11 @@
 import fs from 'fs';
 import path from 'path';
-import { buildSeoContext, buildKeywordMapContext } from './seo-context.js';
+import { buildSeoContext, buildKeywordMapContext, buildKnowledgeBase, buildPersonasContext } from './seo-context.js';
 import { getUploadRoot, getDataDir } from './data-dir.js';
 import type { KeywordMetrics, RelatedKeyword } from './semrush.js';
 import { callOpenAI } from './openai-helpers.js';
+import { buildReferenceContext, buildSerpContext, buildStyleExampleContext } from './web-scraper.js';
+import type { ScrapedPage } from './web-scraper.js';
 
 const UPLOAD_ROOT = getUploadRoot();
 const BRIEFS_DIR = getDataDir('content-briefs');
@@ -45,6 +47,11 @@ export interface ContentBrief {
   schemaRecommendations?: { type: string; notes: string }[];
   // Page type (v4)
   pageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource';
+  // Reference URLs (v5) — competitor/inspiration URLs scraped for context
+  referenceUrls?: string[];
+  // Real SERP data (v5) — actual PAA questions and top results from Google
+  realPeopleAlsoAsk?: string[];
+  realTopResults?: { position: number; title: string; url: string }[];
 }
 
 function getBriefFile(workspaceId: string): string {
@@ -172,6 +179,10 @@ export async function generateBrief(
     semrushRelated?: RelatedKeyword[];
     pageType?: string;
     ga4PagePerformance?: { landingPage: string; sessions: number; users: number; bounceRate: number; avgEngagementTime: number; conversions: number }[];
+    referenceUrls?: string[];
+    scrapedReferences?: ScrapedPage[];
+    serpData?: { peopleAlsoAsk: string[]; organicResults: { position: number; title: string; url: string }[] };
+    styleExamples?: ScrapedPage[];
   }
 ): Promise<ContentBrief> {
   const openaiKey = process.env.OPENAI_API_KEY;
@@ -186,7 +197,29 @@ export async function generateBrief(
   // Pull in keyword strategy context for alignment
   const { keywordBlock, brandVoiceBlock, businessContext: stratBizCtx } = buildSeoContext(workspaceId);
   const kwMapContext = buildKeywordMapContext(workspaceId);
+  const knowledgeBlock = buildKnowledgeBase(workspaceId);
+  const personasBlock = buildPersonasContext(workspaceId);
   const bizCtx = context.businessContext || stratBizCtx;
+
+  // Reference URL context (competitor/inspiration pages)
+  const referenceBlock = context.scrapedReferences?.length
+    ? buildReferenceContext(context.scrapedReferences)
+    : '';
+
+  // Real SERP data (PAA + top results)
+  const serpBlock = context.serpData
+    ? buildSerpContext({
+        query: targetKeyword,
+        peopleAlsoAsk: context.serpData.peopleAlsoAsk,
+        organicResults: context.serpData.organicResults.map(r => ({ ...r, snippet: '' })),
+        fetchedAt: new Date().toISOString(),
+      })
+    : '';
+
+  // Style examples from top-performing pages on the site
+  const styleBlock = context.styleExamples?.length
+    ? buildStyleExampleContext(context.styleExamples)
+    : '';
 
   // Build SEMRush data block (real metrics replace hallucinated data)
   let semrushBlock = '';
@@ -233,7 +266,7 @@ Related search queries from Google Search Console:
 ${relatedStr}
 
 Existing pages on the site:
-${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${semrushBlock}${ga4Block}
+${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${semrushBlock}${ga4Block}${referenceBlock}${serpBlock}${styleBlock}
 
 Generate a content brief in the following JSON format:
 {
@@ -289,6 +322,7 @@ Requirements:
 - SERP analysis should reflect realistic analysis of what ranks for this keyword
 - difficultyScore: 1-100 based on estimated keyword competition
 - Make every section actionable and specific — a copywriter or AI tool should be able to write directly from this brief
+- LOCATION RULE: If the target keyword references a specific city/region, ALL content in this brief (title, meta description, outline, headings) must target THAT location. Do NOT substitute the business headquarters or a different city from the general business context. The target keyword is the authoritative location signal.
 - Internal link suggestions should reference existing pages where relevant
 - E-E-A-T guidance must be specific and actionable for this particular topic, not generic advice
 - Content checklist: 8-10 concrete, verifiable items tailored to this brief (not generic SEO advice)

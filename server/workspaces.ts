@@ -94,6 +94,17 @@ export interface PageEditState {
   updatedBy?: 'admin' | 'client' | 'system';
 }
 
+export interface AudiencePersona {
+  id: string;
+  name: string;                   // e.g. "Small Business Owner"
+  description: string;            // demographic / psychographic overview
+  painPoints: string[];           // what problems they face
+  goals: string[];                // what they're trying to achieve
+  objections: string[];           // common hesitations / barriers
+  preferredContentFormat?: string; // e.g. "how-to guides", "case studies"
+  buyingStage?: 'awareness' | 'consideration' | 'decision';
+}
+
 export interface Workspace {
   id: string;
   name: string;
@@ -109,6 +120,7 @@ export interface Workspace {
   eventGroups?: EventGroup[];
   keywordStrategy?: KeywordStrategy;
   competitorDomains?: string[];
+  personas?: AudiencePersona[];
   // Feature toggles
   clientPortalEnabled?: boolean;
   seoClientView?: boolean;
@@ -215,7 +227,7 @@ export function createWorkspace(name: string, webflowSiteId?: string, webflowSit
   return workspace;
 }
 
-export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'tier' | 'trialEndsAt' | 'auditSuppressions' | 'seoEditTracking' | 'pageEditStates'>>): Workspace | null {
+export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'tier' | 'trialEndsAt' | 'auditSuppressions' | 'seoEditTracking' | 'pageEditStates'>>): Workspace | null {
   const workspaces = readConfig();
   const idx = workspaces.findIndex(w => w.id === id);
   if (idx === -1) return null;

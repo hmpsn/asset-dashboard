@@ -54,7 +54,7 @@ import {
 } from './webflow.js';
 import { generateAltText } from './alttext.js';
 import { runSeoAudit, type SeoAuditResult } from './seo-audit.js';
-import { checkSiteLinks } from './link-checker.js';
+import { checkSiteLinks, getSiteDomains } from './link-checker.js';
 import { scanRedirects } from './redirect-scanner.js';
 import { saveRedirectSnapshot, getRedirectSnapshot } from './redirect-store.js';
 import { savePageWeight, getPageWeight, savePageSpeed, getPageSpeed, saveSinglePageSpeed, saveLinkCheck, getLinkCheck, saveInternalLinks, getInternalLinks, saveCompetitorCompare, getCompetitorCompare, getLatestCompetitorCompareForSite } from './performance-store.js';
@@ -2067,10 +2067,25 @@ app.post('/api/webflow/publish/:siteId', async (req, res) => {
 });
 
 // --- Dead Link Checker ---
+
+// Get available domains for a site (staging + custom)
+app.get('/api/webflow/link-check-domains/:siteId', async (req, res) => {
+  try {
+    const token = getTokenForSite(req.params.siteId) || undefined;
+    const domains = await getSiteDomains(req.params.siteId, token || '');
+    if (!domains) return res.json({ staging: '', customDomains: [], defaultDomain: '' });
+    res.json(domains);
+  } catch (err) {
+    console.error('Domain fetch error:', err);
+    res.json({ staging: '', customDomains: [], defaultDomain: '' });
+  }
+});
+
 app.get('/api/webflow/link-check/:siteId', async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
-    const result = await checkSiteLinks(req.params.siteId, token);
+    const domain = typeof req.query.domain === 'string' ? req.query.domain : undefined;
+    const result = await checkSiteLinks(req.params.siteId, token, domain);
     saveLinkCheck(req.params.siteId, result);
     res.json(result);
   } catch (err) {
@@ -2260,6 +2275,7 @@ Requirements for EACH variation:
 - Natural, not keyword-stuffed
 - Compelling enough to increase click-through rate from search results
 - If keyword strategy is provided, naturally incorporate the primary keyword
+- LOCATION RULE: If this page's primary keyword targets a specific city/region, ALWAYS use THAT location. Never substitute the business HQ or a different city from the general business context. The page keyword is the authoritative location signal.
 ${brandName ? `- The brand name is "${brandName}" — use this exact name if referencing the brand (never use a shortened/abbreviated version)` : ''}
 - Each variation must be meaningfully different, not just a word swap
 
@@ -2284,6 +2300,7 @@ Requirements for EACH variation:
 ${brandName ? `- Brand name is "${brandName}" — use this exact name (NOT a shortened/abbreviated version) at the end with a pipe separator when appropriate` : '- Include brand name at end if appropriate (use pipe separator: |)'}
 - Compelling and descriptive
 - If keyword strategy is provided, front-load the primary keyword
+- LOCATION RULE: If this page's primary keyword targets a specific city/region, ALWAYS use THAT location. Never substitute the business HQ or a different city from the general business context. The page keyword is the authoritative location signal.
 - Each variation must be meaningfully different, not just a word swap
 
 Variation approaches:
@@ -2375,9 +2392,10 @@ app.post('/api/webflow/seo-bulk-fix/:siteId', async (req, res) => {
 
       const contentSection = contentExcerpt ? `\nPage content excerpt: ${contentExcerpt}` : '';
       const brandNote = inlineBrandName ? `\nBrand name is "${inlineBrandName}" — use this exact name, never an abbreviated version.` : '';
+      const locationRule = `\n- LOCATION RULE: If this page's primary keyword targets a specific city/region, ALWAYS use THAT location. Never substitute the business HQ or a different city from the general business context.`;
       const prompt = field === 'description'
-        ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}".${contentSection}${keywordBlock}${bvBlock}${brandNote}\n\nRules:\n- 150-160 characters, hard limit 160\n- Include primary keyword naturally\n- Include a call-to-action or value proposition\n- Match the brand voice if provided\nReturn ONLY the text.`
-        : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}".${contentSection}${keywordBlock}${bvBlock}${brandNote}\n\nRules:\n- 50-60 characters, hard limit 60\n- Front-load the primary keyword\n- Match the brand voice if provided\nReturn ONLY the text.`;
+        ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}".${contentSection}${keywordBlock}${bvBlock}${brandNote}\n\nRules:\n- 150-160 characters, hard limit 160\n- Include primary keyword naturally\n- Include a call-to-action or value proposition\n- Match the brand voice if provided${locationRule}\nReturn ONLY the text.`
+        : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}".${contentSection}${keywordBlock}${bvBlock}${brandNote}\n\nRules:\n- 50-60 characters, hard limit 60\n- Front-load the primary keyword\n- Match the brand voice if provided${locationRule}\nReturn ONLY the text.`;
 
       const aiResult = await callOpenAI({
         model: 'gpt-4.1-mini',
@@ -4388,7 +4406,8 @@ Return a JSON array with one entry per page:
 Rules:
 - Each primaryKeyword must be UNIQUE across all pages — no keyword cannibalization
 - Keywords should be specific and high-intent, NOT generic
-- If business has locations, include location modifiers
+- LOCATION TARGETING: If a page's URL, title, or content references a specific city/state/region (e.g. /houston, /san-antonio, "Houston Office"), that page's keywords MUST target THAT location — NOT the business headquarters or any other location. Each location page gets its own city. Do NOT default all pages to the same city.
+- For non-location pages (e.g. /about, /services), use the broadest relevant geographic scope from the business context (nationwide, statewide, or primary city as appropriate)
 - If GSC data is available, leverage it: high impressions + poor position = opportunity
 - Cover ALL ${batch.length} pages — do not skip any
 - Return ONLY valid JSON array, no markdown, no explanation`;
@@ -7275,7 +7294,7 @@ app.patch('/api/content-briefs/:workspaceId/:briefId', (req, res) => {
 // Generate a new content brief
 app.post('/api/content-briefs/:workspaceId/generate', async (req, res) => {
   try {
-    const { targetKeyword, businessContext, pageType } = req.body;
+    const { targetKeyword, businessContext, pageType, referenceUrls } = req.body;
     if (!targetKeyword) return res.status(400).json({ error: 'targetKeyword required' });
 
     const ws = getWorkspace(req.params.workspaceId);
@@ -7311,6 +7330,43 @@ app.post('/api/content-briefs/:workspaceId/generate', async (req, res) => {
       } catch (e) { console.error('SEMRush brief enrichment error:', e); }
     }
 
+    // --- Parallel enrichment: reference URLs, SERP data, GA4 style examples ---
+    const { scrapeUrls, scrapeSerpData } = await import('./web-scraper.js');
+
+    // 1. Scrape reference URLs (user-provided competitor/inspiration pages)
+    const refUrlList: string[] = Array.isArray(referenceUrls)
+      ? referenceUrls.filter((u: unknown) => typeof u === 'string' && (u as string).startsWith('http')).slice(0, 5)
+      : [];
+
+    // 2. Scrape Google SERP for target keyword (best-effort, may be blocked)
+    // 3. If site has GA4 + liveDomain, scrape top-performing pages for style context
+    const topPageUrls: string[] = [];
+    let ga4Performance: { landingPage: string; sessions: number; users: number; bounceRate: number; avgEngagementTime: number; conversions: number }[] = [];
+    if (ws?.ga4PropertyId) {
+      try {
+        const { getGA4LandingPages } = await import('./google-analytics.js');
+        const pages = await getGA4LandingPages(ws.ga4PropertyId, 28, 25);
+        ga4Performance = pages.slice(0, 10);
+        // Pick top 2 pages with lowest bounce rate + highest engagement for style examples
+        if (ws.liveDomain) {
+          const sortedByQuality = [...pages]
+            .filter(p => p.sessions > 10 && p.avgEngagementTime > 30)
+            .sort((a, b) => (b.avgEngagementTime * b.sessions) - (a.avgEngagementTime * a.sessions));
+          for (const p of sortedByQuality.slice(0, 2)) {
+            const domain = ws.liveDomain.replace(/\/+$/, '');
+            topPageUrls.push(`https://${domain}${p.landingPage}`);
+          }
+        }
+      } catch { /* GA4 not available */ }
+    }
+
+    // Run all scraping in parallel
+    const [scrapedRefs, serpData, stylePages] = await Promise.all([
+      refUrlList.length > 0 ? scrapeUrls(refUrlList, 3) : Promise.resolve([]),
+      scrapeSerpData(targetKeyword).catch(() => null),
+      topPageUrls.length > 0 ? scrapeUrls(topPageUrls, 2) : Promise.resolve([]),
+    ]);
+
     const validPageTypes = ['blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource'];
     const resolvedPageType = validPageTypes.includes(pageType) ? pageType : undefined;
 
@@ -7321,6 +7377,11 @@ app.post('/api/content-briefs/:workspaceId/generate', async (req, res) => {
       semrushMetrics,
       semrushRelated,
       pageType: resolvedPageType,
+      referenceUrls: refUrlList.length > 0 ? refUrlList : undefined,
+      scrapedReferences: scrapedRefs.length > 0 ? scrapedRefs : undefined,
+      serpData: serpData ? { peopleAlsoAsk: serpData.peopleAlsoAsk, organicResults: serpData.organicResults } : undefined,
+      ga4PagePerformance: ga4Performance.length > 0 ? ga4Performance : undefined,
+      styleExamples: stylePages.length > 0 ? stylePages : undefined,
     });
     res.json(brief);
   } catch (err) {

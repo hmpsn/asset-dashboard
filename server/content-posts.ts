@@ -6,7 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 import { getDataDir } from './data-dir.js';
-import { buildSeoContext } from './seo-context.js';
+import { buildSeoContext, buildKnowledgeBase, buildKeywordMapContext, buildPersonasContext } from './seo-context.js';
 import { callOpenAI } from './openai-helpers.js';
 import type { ContentBrief } from './content-brief.js';
 
@@ -109,7 +109,10 @@ const CONTENT_TEMP = 0.7;
 
 function buildVoiceContext(workspaceId: string): string {
   const { brandVoiceBlock, keywordBlock } = buildSeoContext(workspaceId);
-  return `${brandVoiceBlock}${keywordBlock}`;
+  const knowledgeBlock = buildKnowledgeBase(workspaceId);
+  const kwMapBlock = buildKeywordMapContext(workspaceId);
+  const personasBlock = buildPersonasContext(workspaceId);
+  return `${brandVoiceBlock}${keywordBlock}${knowledgeBlock}${kwMapBlock}${personasBlock}`;
 }
 
 // --- Page-type-specific writing instructions ---

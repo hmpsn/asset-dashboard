@@ -35,6 +35,10 @@ interface ContentBrief {
   eeatGuidance?: { experience: string; expertise: string; authority: string; trust: string };
   contentChecklist?: string[];
   schemaRecommendations?: { type: string; notes: string }[];
+  pageType?: string;
+  referenceUrls?: string[];
+  realPeopleAlsoAsk?: string[];
+  realTopResults?: { position: number; title: string; url: string }[];
 }
 
 interface ContentTopicRequest {
@@ -97,6 +101,9 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
   const [deliveringReqId, setDeliveringReqId] = useState<string | null>(null);
   const [deliveryUrl, setDeliveryUrl] = useState('');
   const [deliveryNotes, setDeliveryNotes] = useState('');
+  const [pageType, setPageType] = useState('');
+  const [refUrls, setRefUrls] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const saveBriefField = async (briefId: string, updates: Partial<ContentBrief>) => {
     try {
@@ -320,7 +327,14 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
       const res = await fetch(`/api/content-briefs/${workspaceId}/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetKeyword: keyword.trim(), businessContext: businessCtx.trim() || undefined, targetPageId: fixContext?.pageId, targetPageSlug: fixContext?.pageSlug }),
+        body: JSON.stringify({
+          targetKeyword: keyword.trim(),
+          businessContext: businessCtx.trim() || undefined,
+          targetPageId: fixContext?.pageId,
+          targetPageSlug: fixContext?.pageSlug,
+          pageType: pageType || undefined,
+          referenceUrls: refUrls.trim() ? refUrls.split('\n').map(u => u.trim()).filter(u => u.startsWith('http')) : undefined,
+        }),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -881,16 +895,35 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
           <span className="text-xs font-medium text-zinc-300">Generate AI Content Brief</span>
         </div>
         <div className="grid grid-cols-1 gap-2">
-          <div>
-            <label className="text-[11px] text-zinc-500 block mb-0.5">Target Keyword *</label>
-            <input
-              type="text"
-              value={keyword}
-              onChange={e => setKeyword(e.target.value)}
-              placeholder="e.g. dental implants near me"
-              className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600"
-              onKeyDown={e => e.key === 'Enter' && !generating && handleGenerate()}
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_160px] gap-2">
+            <div>
+              <label className="text-[11px] text-zinc-500 block mb-0.5">Target Keyword *</label>
+              <input
+                type="text"
+                value={keyword}
+                onChange={e => setKeyword(e.target.value)}
+                placeholder="e.g. dental implants near me"
+                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600"
+                onKeyDown={e => e.key === 'Enter' && !generating && handleGenerate()}
+              />
+            </div>
+            <div>
+              <label className="text-[11px] text-zinc-500 block mb-0.5">Page Type</label>
+              <select
+                value={pageType}
+                onChange={e => setPageType(e.target.value)}
+                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 focus:outline-none cursor-pointer"
+              >
+                <option value="">Auto-detect</option>
+                <option value="blog">Blog Post</option>
+                <option value="landing">Landing Page</option>
+                <option value="service">Service Page</option>
+                <option value="location">Location Page</option>
+                <option value="product">Product Page</option>
+                <option value="pillar">Pillar Page</option>
+                <option value="resource">Resource / Guide</option>
+              </select>
+            </div>
           </div>
           <div>
             <label className="text-[11px] text-zinc-500 block mb-0.5">Business Context (optional)</label>
@@ -903,15 +936,48 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
             />
           </div>
         </div>
-        {error && <p className="text-xs text-red-400">{error}</p>}
+
+        {/* Advanced Options */}
         <button
-          onClick={handleGenerate}
-          disabled={!keyword.trim() || generating}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 transition-colors"
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className="flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-zinc-400 transition-colors"
         >
-          {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-          {generating ? 'Generating...' : 'Generate Brief'}
+          {showAdvanced ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          Advanced Options
         </button>
+        {showAdvanced && (
+          <div className="space-y-2 pl-1 border-l-2 border-zinc-800 ml-1">
+            <div>
+              <label className="text-[11px] text-zinc-500 block mb-0.5">
+                <ExternalLink className="w-3 h-3 inline mr-1" />
+                Reference URLs (competitor/inspiration pages — one per line)
+              </label>
+              <textarea
+                value={refUrls}
+                onChange={e => setRefUrls(e.target.value)}
+                placeholder={"https://competitor.com/their-great-article\nhttps://example.com/inspiring-content"}
+                rows={3}
+                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 resize-none font-mono"
+              />
+              <p className="text-[11px] text-zinc-600 mt-0.5">We&apos;ll scrape these pages and use their structure/tone as context (up to 5 URLs)</p>
+            </div>
+          </div>
+        )}
+
+        {error && <p className="text-xs text-red-400">{error}</p>}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleGenerate}
+            disabled={!keyword.trim() || generating}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 transition-colors"
+          >
+            {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+            {generating ? 'Generating...' : 'Generate Brief'}
+          </button>
+          {generating && (
+            <span className="text-[11px] text-zinc-500 animate-pulse">Enriching with SERP data, GA4 insights, and knowledge base...</span>
+          )}
+        </div>
       </div>
 
       {/* Briefs list (standalone — not linked to a request) */}

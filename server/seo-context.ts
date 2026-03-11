@@ -52,26 +52,28 @@ export function buildSeoContext(workspaceId?: string, pagePath?: string): SeoCon
   const siteKw = strategy.siteKeywords?.slice(0, 8).join(', ');
   if (siteKw) keywordBlock += `Site target keywords: ${siteKw}`;
 
-  // Page-specific keywords (if pagePath provided)
+  // Business context (general — placed BEFORE page-specific so page keywords take priority)
+  const businessContext = strategy.businessContext || '';
+  if (businessContext) {
+    keywordBlock += `\nGeneral business context: ${businessContext}`;
+  }
+
+  // Page-specific keywords (if pagePath provided) — these OVERRIDE general context
   if (pagePath && strategy.pageMap?.length) {
     const pageKw = strategy.pageMap.find(
       p => p.pagePath === pagePath || pagePath.includes(p.pagePath) || p.pagePath.includes(pagePath)
     );
     if (pageKw) {
-      keywordBlock += `\nThis page's primary keyword: "${pageKw.primaryKeyword}"`;
+      keywordBlock += `\n\nTHIS PAGE'S TARGET (overrides general context):`;
+      keywordBlock += `\nPrimary keyword: "${pageKw.primaryKeyword}"`;
       if (pageKw.secondaryKeywords?.length) {
         keywordBlock += `\nSecondary keywords: ${pageKw.secondaryKeywords.join(', ')}`;
       }
       if (pageKw.searchIntent) {
         keywordBlock += `\nSearch intent: ${pageKw.searchIntent}`;
       }
+      keywordBlock += `\nIMPORTANT: If this page's keywords reference a specific location (city, state, region), ALWAYS use THAT location. Do NOT substitute the business headquarters or a different location from the general business context. The page-level keyword is the authoritative signal for what this page targets.`;
     }
-  }
-
-  // Business context
-  const businessContext = strategy.businessContext || '';
-  if (businessContext) {
-    keywordBlock += `\nBusiness context: ${businessContext}`;
   }
 
   if (keywordBlock) {
@@ -187,6 +189,27 @@ RULES FOR RICH BLOCKS:
 - You can mix rich blocks with normal markdown in the same response
 - Always provide text context around blocks explaining what the data means
 `;
+
+/**
+ * Build an audience personas block for AI prompts.
+ * Returns structured persona data including pain points, goals, and objections.
+ */
+export function buildPersonasContext(workspaceId?: string): string {
+  if (!workspaceId) return '';
+  const ws = getWorkspace(workspaceId);
+  if (!ws?.personas?.length) return '';
+
+  const personaStr = ws.personas.map(p => {
+    const parts = [`**${p.name}**${p.buyingStage ? ` (${p.buyingStage} stage)` : ''}: ${p.description}`];
+    if (p.painPoints.length) parts.push(`  Pain points: ${p.painPoints.join('; ')}`);
+    if (p.goals.length) parts.push(`  Goals: ${p.goals.join('; ')}`);
+    if (p.objections.length) parts.push(`  Objections: ${p.objections.join('; ')}`);
+    if (p.preferredContentFormat) parts.push(`  Prefers: ${p.preferredContentFormat}`);
+    return parts.join('\n');
+  }).join('\n\n');
+
+  return `\n\nTARGET AUDIENCE PERSONAS (write to address these specific people — their pain points, goals, and objections):\n${personaStr}`;
+}
 
 /**
  * Build a full keyword map string for prompts that need cross-page awareness
