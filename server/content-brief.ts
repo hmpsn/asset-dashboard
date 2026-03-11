@@ -24,7 +24,7 @@ export interface ContentBrief {
   secondaryKeywords: string[];
   suggestedTitle: string;
   suggestedMetaDesc: string;
-  outline: { heading: string; notes: string; wordCount?: number; keywords?: string[] }[];
+  outline: { heading: string; subheadings?: string[]; notes: string; wordCount?: number; keywords?: string[] }[];
   wordCountTarget: number;
   intent: string;
   audience: string;
@@ -343,7 +343,7 @@ Generate a content brief in the following JSON format:
   "contentFormat": "The recommended format: guide, listicle, how-to, comparison, FAQ, case-study, pillar-page, or landing-page",
   "toneAndStyle": "Specific tone and style guidance for the writer (e.g., authoritative but approachable, data-driven, conversational)",
   "outline": [
-    { "heading": "H2 heading text", "notes": "Detailed guidance for this section: what to cover, key points, data to include (3-5 sentences)", "wordCount": ${ptConfig.avgSectionWords}, "keywords": ["keywords to naturally include in this section"] }
+    { "heading": "H2 heading text", "subheadings": ["H3 subtopic 1", "H3 subtopic 2"], "notes": "Detailed guidance for this section: what to cover, key points, data to include (3-5 sentences)", "wordCount": ${ptConfig.avgSectionWords}, "keywords": ["keywords to naturally include in this section"] }
   ],
   "wordCountTarget": ${ptConfig.wordCountTarget},
   "intent": "Search intent (informational/transactional/navigational/commercial)",
@@ -381,6 +381,7 @@ Generate a content brief in the following JSON format:
 
 Requirements:
 - The outline should have ${ptConfig.sectionRange} sections with H2 headings, each with specific wordCount targets that sum to the total wordCountTarget (${ptConfig.wordCountRange} words)
+- Each outline section MUST include 2-3 subheadings (H3 topics) that break the section into scannable subtopics. These guide the writer to create well-structured, scannable content. Every section with 200+ words should have at least 2 subheadings
 - Each outline section must include keywords to weave naturally into that section
 - Secondary keywords: 6-8 naturally related terms including long-tail variations
 - People Also Ask: 5 real questions searchers ask about this topic

@@ -131,7 +131,8 @@ const PAGE_TYPE_WRITER_ROLE: Record<string, string> = {
 const PAGE_TYPE_INTRO_INSTRUCTIONS: Record<string, string> = {
   blog: `- Open with a specific, concrete scenario, bold claim, or unexpected angle — NOT a generic stat question
 - Preview what the reader will learn (without giving everything away)
-- End with a smooth transition into the first section`,
+- End with a smooth transition into the first section
+- CRITICAL: Do NOT end the intro with "Let's" followed by any verb (e.g., "Let's start by exploring...", "Let's begin with..."). Use a direct transition instead`,
   landing: `- Lead with the primary value proposition — what transformation does the reader get?
 - Identify the reader's core pain point or desire in 1-2 sentences
 - Create urgency or curiosity that compels scrolling
@@ -254,6 +255,7 @@ FABRICATION RULES:
 - NEVER fabricate quotes, client testimonials, or attributed statements
 - If no specific data is available, give actionable advice instead of making up numbers
 - It's better to say "this approach typically improves conversion rates" than to invent "this approach improved conversion rates by 47%"
+- CASE STUDIES: When writing case study sections, describe directional outcomes ("saw a notable increase in organic traffic") unless specific numbers were provided in the knowledge base. NEVER invent percentages like "65% increase" or "30% rise" — these sound authoritative but are fabricated and damage credibility
 
 WHAT TO DO INSTEAD:
 - Use concrete specifics: real numbers (only if provided), named tools, actual processes, specific examples
@@ -426,6 +428,7 @@ ${briefContext}
 
 THIS SECTION:
 - Heading: ${section.heading}
+${section.subheadings?.length ? `- Suggested H3 subheadings: ${section.subheadings.join(', ')}` : '- Create 2-3 H3 subheadings to break this section into scannable subtopics'}
 - Guidance: ${section.notes}
 - STRICT target word count: ${sectionTarget} words (do NOT exceed ${Math.round(sectionTarget * 1.1)} words)
 - Keywords to include naturally: ${section.keywords?.join(', ') || brief.secondaryKeywords.slice(0, 3).join(', ')}
@@ -440,7 +443,7 @@ UNIVERSAL REQUIREMENTS:
 - Write approximately ${sectionTarget} words of content under the heading — this is a STRICT budget, not a minimum
 - Follow the section guidance closely — cover every point mentioned
 - Weave in keywords naturally — never force or stuff them
-- Use <h3> subheadings if the section is 300+ words
+- ALWAYS use <h3> subheadings to break sections into scannable subtopics. For sections 200+ words, include at least 2 <h3> subheadings. Use the suggested subheadings from the brief if provided, or create logical ones
 - Use <ul>/<li> for bullet lists, <ol>/<li> for numbered lists, <strong> for bold emphasis
 - Use <p> tags for paragraphs — do NOT use markdown syntax (no ##, no **, no - lists)
 - Maintain continuity with previous sections (don't repeat points already covered)
