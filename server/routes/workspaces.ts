@@ -1,0 +1,560 @@
+/**
+ * workspaces routes — extracted from server/index.ts
+ */
+import { Router } from 'express';
+
+const router = Router();
+
+import bcrypt from 'bcryptjs';
+import express from 'express';
+import { listBatches } from '../approvals.js';
+import { requireWorkspaceAccess } from '../auth.js';
+import { broadcast, broadcastToWorkspace } from '../broadcast.js';
+import {
+  listClientUsers,
+  createClientUser,
+  updateClientUser,
+  changeClientPassword,
+  deleteClientUser,
+} from '../client-users.js';
+import { listContentRequests } from '../content-requests.js';
+import { notifyClientWelcome } from '../email.js';
+import { applySuppressionsToAudit, CRITICAL_CHECKS_SET, MODERATE_CHECKS_SET } from '../helpers.js';
+import { callOpenAI } from '../openai-helpers.js';
+import { getLatestSnapshot } from '../reports.js';
+import { listRequests } from '../requests.js';
+import { type SeoAuditResult } from '../seo-audit.js';
+import {
+  listPages,
+  filterPublishedPages,
+  getSiteSubdomain,
+  discoverSitemapUrls,
+} from '../webflow.js';
+import { listWorkOrders } from '../work-orders.js';
+import {
+  listWorkspaces,
+  createWorkspace,
+  updateWorkspace,
+  deleteWorkspace,
+  getWorkspace,
+  getTokenForSite,
+  updatePageState,
+  getPageState,
+  getAllPageStates,
+  clearPageState,
+} from '../workspaces.js';
+
+// Workspaces
+router.get('/api/workspaces', (_req, res) => {
+  const workspaces = listWorkspaces().map(ws => ({ ...ws, webflowToken: undefined, clientPassword: undefined, hasPassword: !!ws.clientPassword }));
+  res.json(workspaces);
+});
+
+// Workspace overview: aggregated metrics for all workspaces
+router.get('/api/workspace-overview', (_req, res) => {
+  const workspaces = listWorkspaces();
+  const overview = workspaces.map(ws => {
+    // Audit
+    let audit: { score: number; totalPages: number; errors: number; warnings: number; previousScore?: number; lastAuditDate?: string } | null = null;
+    if (ws.webflowSiteId) {
+      const snap = getLatestSnapshot(ws.webflowSiteId);
+      if (snap) {
+        const filtered = applySuppressionsToAudit(snap.audit, ws.auditSuppressions || []);
+        audit = {
+          score: filtered.siteScore,
+          totalPages: filtered.totalPages,
+          errors: filtered.errors,
+          warnings: filtered.warnings,
+          previousScore: snap.previousScore,
+          lastAuditDate: snap.createdAt,
+        };
+      }
+    }
+    // Requests
+    const reqs = listRequests(ws.id);
+    const reqNew = reqs.filter(r => r.status === 'new').length;
+    const reqActive = reqs.filter(r => r.status === 'in_review' || r.status === 'in_progress').length;
+    const reqTotal = reqs.length;
+    const latestReq = reqs.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0];
+    // Approvals
+    const batches = listBatches(ws.id);
+    const pendingApprovals = batches.reduce((sum, b) => sum + b.items.filter((i: { status: string }) => i.status === 'pending').length, 0);
+    const totalApprovalItems = batches.reduce((sum, b) => sum + b.items.length, 0);
+    // Content requests (from client portal)
+    const contentReqs = listContentRequests(ws.id);
+    const pendingContentReqs = contentReqs.filter(r => r.status === 'requested').length;
+    const inProgressContentReqs = contentReqs.filter(r => ['brief_generated', 'client_review', 'approved', 'in_progress'].includes(r.status)).length;
+    const deliveredContentReqs = contentReqs.filter(r => r.status === 'delivered' || r.status === 'published').length;
+
+    // Work orders
+    const workOrders = listWorkOrders(ws.id);
+    const pendingWorkOrders = workOrders.filter(o => o.status === 'pending' || o.status === 'in_progress').length;
+
+    // Page edit states summary
+    const allStates = getAllPageStates(ws.id);
+    const stateVals = Object.values(allStates);
+    const pageStates = {
+      issueDetected: stateVals.filter((s: { status: string }) => s.status === 'issue-detected').length,
+      inReview: stateVals.filter((s: { status: string }) => s.status === 'in-review').length,
+      approved: stateVals.filter((s: { status: string }) => s.status === 'approved').length,
+      rejected: stateVals.filter((s: { status: string }) => s.status === 'rejected').length,
+      live: stateVals.filter((s: { status: string }) => s.status === 'live').length,
+      total: stateVals.length,
+    };
+
+    const trialEnd = ws.trialEndsAt ? new Date(ws.trialEndsAt) : null;
+    const isTrial = trialEnd ? trialEnd > new Date() : false;
+    const trialDaysRemaining = isTrial && trialEnd ? Math.max(0, Math.ceil((trialEnd.getTime() - Date.now()) / 86400000)) : undefined;
+
+    return {
+      id: ws.id,
+      name: ws.name,
+      webflowSiteId: ws.webflowSiteId || null,
+      webflowSiteName: ws.webflowSiteName || null,
+      hasGsc: !!ws.gscPropertyUrl,
+      hasGa4: !!ws.ga4PropertyId,
+      hasPassword: !!ws.clientPassword,
+      tier: ws.tier || 'free',
+      isTrial,
+      trialDaysRemaining,
+      audit,
+      requests: { total: reqTotal, new: reqNew, active: reqActive, latestDate: latestReq?.updatedAt || null },
+      approvals: { pending: pendingApprovals, total: totalApprovalItems },
+      contentRequests: { pending: pendingContentReqs, inProgress: inProgressContentReqs, delivered: deliveredContentReqs, total: contentReqs.length },
+      workOrders: { pending: pendingWorkOrders, total: workOrders.length },
+      pageStates,
+    };
+  });
+  res.json(overview);
+});
+
+router.get('/api/workspaces/:id', requireWorkspaceAccess(), (req, res) => {
+  const ws = getWorkspace(req.params.id);
+  if (!ws) return res.status(404).json({ error: 'Not found' });
+  const safe = { ...ws, webflowToken: undefined, clientPassword: undefined, hasPassword: !!ws.clientPassword };
+  res.json(safe);
+});
+
+router.post('/api/workspaces', (req, res) => {
+  const { name, webflowSiteId, webflowSiteName } = req.body;
+  if (!name) return res.status(400).json({ error: 'Name required' });
+  const ws = createWorkspace(name, webflowSiteId, webflowSiteName);
+  broadcast('workspace:created', ws);
+  res.json(ws);
+});
+
+router.patch('/api/workspaces/:id', requireWorkspaceAccess(), async (req, res) => {
+  const updates = { ...req.body };
+  // When unlinking, clear the token too
+  if (updates.webflowSiteId === null || updates.webflowSiteId === '') {
+    updates.webflowToken = '';
+    updates.liveDomain = '';
+  }
+  // Hash clientPassword with bcrypt before saving (empty string = remove password)
+  if (typeof updates.clientPassword === 'string') {
+    updates.clientPassword = updates.clientPassword
+      ? await bcrypt.hash(updates.clientPassword, 12)
+      : '';
+  }
+  // Auto-resolve live domain when linking a site
+  if (updates.webflowSiteId && updates.webflowSiteId !== '') {
+    try {
+      const token = updates.webflowToken || getTokenForSite(updates.webflowSiteId) || process.env.WEBFLOW_API_TOKEN || '';
+      if (token) {
+        const domRes = await fetch(`https://api.webflow.com/v2/sites/${updates.webflowSiteId}/custom_domains`, {
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        });
+        if (domRes.ok) {
+          const domData = await domRes.json() as { customDomains?: { url?: string }[] };
+          const domains = domData.customDomains || [];
+          if (domains.length > 0 && domains[0].url) {
+            const d = domains[0].url;
+            updates.liveDomain = d.startsWith('http') ? d : `https://${d}`;
+          }
+        }
+      }
+    } catch { /* best-effort live domain resolution */ }
+  }
+  const ws = updateWorkspace(req.params.id, updates);
+  if (!ws) return res.status(404).json({ error: 'Not found' });
+  // Strip token from response to avoid leaking to frontend
+  const safe = { ...ws, webflowToken: undefined, clientPassword: undefined, hasPassword: !!ws.clientPassword };
+  broadcast('workspace:updated', safe);
+  broadcastToWorkspace(req.params.id, 'workspace:updated', safe);
+  res.json(safe);
+});
+
+router.delete('/api/workspaces/:id', requireWorkspaceAccess(), (req, res) => {
+  const ok = deleteWorkspace(req.params.id);
+  if (!ok) return res.status(404).json({ error: 'Not found' });
+  broadcast('workspace:deleted', { id: req.params.id });
+  res.json({ ok: true });
+});
+
+// --- Auto-generate knowledge base from website crawl ---
+router.post('/api/workspaces/:id/generate-knowledge-base', requireWorkspaceAccess(), async (req, res) => {
+  const ws = getWorkspace(req.params.id);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
+
+  try {
+    const { scrapeUrls } = await import('./web-scraper.js');
+
+    // Build base URL
+    const token = getTokenForSite(ws.webflowSiteId) || undefined;
+    const subdomain = await getSiteSubdomain(ws.webflowSiteId, token);
+    const baseUrl = ws.liveDomain
+      ? (ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`)
+      : subdomain ? `https://${subdomain}.webflow.io` : '';
+    if (!baseUrl) return res.status(400).json({ error: 'Could not determine site URL' });
+
+    // Get all published pages
+    const allPages = await listPages(ws.webflowSiteId, token);
+    const published = filterPublishedPages(allPages);
+
+    // Prioritize key pages: homepage, about, services, case studies, contact
+    const priorityPatterns = [
+      /^\/?$/, // homepage
+      /about/i, /who-we-are/i, /our-story/i, /team/i,
+      /service/i, /solution/i, /what-we-do/i, /offer/i,
+      /work/i, /portfolio/i, /case-stud/i, /project/i, /client/i,
+      /contact/i, /location/i,
+      /blog/i, /insight/i, /resource/i,
+    ];
+
+    const prioritized: string[] = [];
+    const rest: string[] = [];
+
+    for (const p of published) {
+      const pagePath = p.publishedPath || `/${p.slug || ''}`;
+      const url = baseUrl + pagePath;
+      const matchesPriority = priorityPatterns.some(pat => pat.test(pagePath));
+      if (matchesPriority) {
+        prioritized.push(url);
+      } else {
+        rest.push(url);
+      }
+    }
+
+    // Also discover CMS pages (case studies, blog posts)
+    try {
+      const sitemapUrls = await discoverSitemapUrls(baseUrl);
+      for (const url of sitemapUrls) {
+        try {
+          const parsed = new URL(url);
+          const pagePath = parsed.pathname;
+          if (!prioritized.includes(url) && !rest.includes(url)) {
+            const matchesPriority = priorityPatterns.some(pat => pat.test(pagePath));
+            if (matchesPriority) prioritized.push(url);
+            else rest.push(url);
+          }
+        } catch { /* skip */ }
+      }
+    } catch { /* sitemap unavailable */ }
+
+    // Scrape up to 12 priority pages + a few extras (max 15 total)
+    const urlsToScrape = [...prioritized.slice(0, 12), ...rest.slice(0, 3)];
+    if (urlsToScrape.length === 0) return res.status(400).json({ error: 'No pages found to scrape' });
+
+    const scraped = await scrapeUrls(urlsToScrape, 3);
+    if (scraped.length === 0) return res.status(400).json({ error: 'Could not scrape any pages' });
+
+    // Build a condensed summary of all scraped content for AI
+    const pagesSummary = scraped.map(p => {
+      const headingsStr = p.headings.slice(0, 10).map(h => `${'#'.repeat(h.level)} ${h.text}`).join('\n');
+      return `--- PAGE: ${p.url} ---\nTitle: ${p.title}\nDescription: ${p.metaDescription}\nHeadings:\n${headingsStr}\nContent excerpt:\n${p.bodyText.slice(0, 1500)}`;
+    }).join('\n\n');
+
+    // AI extraction
+    const aiResult = await callOpenAI({
+      model: 'gpt-4.1',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a business analyst. Given scraped website content, extract a structured knowledge base that an AI content writer and chatbot can use to understand this business. Be specific and factual — only include information that is clearly stated or strongly implied on the website.`,
+        },
+        {
+          role: 'user',
+          content: `Analyze the following website content and produce a structured business knowledge base.
+
+${pagesSummary}
+
+Generate a knowledge base in this exact format (fill in what you find, leave sections empty with "Not found on website" if the information isn't available):
+
+BUSINESS OVERVIEW:
+- Company name: [name]
+- Industry: [industry/vertical]
+- Location: [city, state/country if mentioned]
+- Business type: [agency, SaaS, local service, e-commerce, etc.]
+- Years in business: [if mentioned]
+- Team size: [if mentioned]
+
+SERVICES & OFFERINGS:
+[List each service/product with a 1-sentence description]
+
+TARGET AUDIENCE:
+- Primary audience: [who they serve]
+- Industries served: [list industries/verticals mentioned]
+- Company sizes: [SMB, enterprise, etc. if mentioned]
+
+DIFFERENTIATORS & VALUE PROPS:
+[List what makes them unique — awards, methodology, technology, guarantees, etc.]
+
+CASE STUDIES & RESULTS:
+[List any specific client work, results, metrics, or testimonials mentioned. Include client names, industries, and outcomes with real numbers if available.]
+
+BRAND VOICE & TONE:
+[Describe the writing style observed across the site — formal/casual, technical/approachable, etc.]
+
+KEY TOPICS & EXPERTISE:
+[List the main topics, technologies, or domains they demonstrate expertise in]
+
+IMPORTANT DETAILS:
+[Any other relevant business information — certifications, partnerships, tools used, process descriptions, pricing model, etc.]
+
+Be concise but specific. Use bullet points. Only include information actually found on the website — never fabricate.`,
+        },
+      ],
+      maxTokens: 2000,
+      temperature: 0.3,
+      feature: 'knowledge-base-gen',
+      workspaceId: ws.id,
+      timeoutMs: 90_000,
+    });
+
+    res.json({ knowledgeBase: aiResult.text, pagesScraped: scraped.length });
+  } catch (err) {
+    console.error('[generate-knowledge-base]', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate knowledge base' });
+  }
+});
+
+// --- Suppression-aware audit helper ---
+// Scoring weights must mirror seo-audit.ts auditPage() exactly
+const CRITICAL_CHECKS_SET = new Set([
+  'title', 'meta-description', 'canonical', 'h1', 'robots',
+  'duplicate-title', 'mixed-content', 'ssl', 'robots-txt',
+]);
+const MODERATE_CHECKS_SET = new Set([
+  'content-length', 'heading-hierarchy', 'internal-links', 'img-alt',
+  'og-tags', 'og-image', 'link-text', 'url', 'lang', 'viewport',
+  'duplicate-description', 'img-filesize', 'html-size',
+]);
+
+interface AuditSuppression { check: string; pageSlug: string; reason?: string; createdAt: string }
+
+function applySuppressionsToAudit(
+  audit: SeoAuditResult,
+  suppressions: AuditSuppression[],
+): SeoAuditResult {
+  if (!suppressions || suppressions.length === 0) return audit;
+
+  // Build a fast lookup: "check::pageSlug" → true
+  const suppSet = new Set(suppressions.map(s => `${s.check}::${s.pageSlug}`));
+
+  let totalErrors = 0, totalWarnings = 0, totalInfos = 0;
+
+  const filteredPages = audit.pages.map(page => {
+    const filteredIssues = page.issues.filter(issue => {
+      const key = `${issue.check}::${page.slug}`;
+      return !suppSet.has(key);
+    });
+
+    // Recalculate page score with remaining issues
+    let score = 100;
+    for (const issue of filteredIssues) {
+      const isCritical = CRITICAL_CHECKS_SET.has(issue.check);
+      const isModerate = MODERATE_CHECKS_SET.has(issue.check);
+      if (issue.severity === 'error') {
+        score -= isCritical ? 20 : 12;
+      } else if (issue.severity === 'warning') {
+        score -= isCritical ? 10 : isModerate ? 6 : 4;
+      } else {
+        score -= 1;
+      }
+    }
+    score = Math.max(0, Math.min(100, score));
+
+    for (const i of filteredIssues) {
+      if (i.severity === 'error') totalErrors++;
+      else if (i.severity === 'warning') totalWarnings++;
+      else totalInfos++;
+    }
+
+    return { ...page, issues: filteredIssues, score };
+  });
+
+  // Site-wide issues are not per-page, so they aren't suppressed
+  for (const i of audit.siteWideIssues) {
+    if (i.severity === 'error') totalErrors++;
+    else if (i.severity === 'warning') totalWarnings++;
+    else totalInfos++;
+  }
+
+  const siteScore = filteredPages.length > 0
+    ? Math.round(filteredPages.reduce((s, r) => s + r.score, 0) / filteredPages.length)
+    : 100;
+
+  return {
+    siteScore,
+    totalPages: filteredPages.length,
+    errors: totalErrors,
+    warnings: totalWarnings,
+    infos: audit.infos !== undefined ? totalInfos : totalInfos,
+    pages: filteredPages,
+    siteWideIssues: audit.siteWideIssues,
+  };
+}
+
+// --- Audit Issue Suppressions ---
+router.get('/api/workspaces/:id/audit-suppressions', requireWorkspaceAccess(), (req, res) => {
+  const ws = getWorkspace(req.params.id);
+  if (!ws) return res.status(404).json({ error: 'Not found' });
+  res.json(ws.auditSuppressions || []);
+});
+
+router.post('/api/workspaces/:id/audit-suppressions', requireWorkspaceAccess(), (req, res) => {
+  const ws = getWorkspace(req.params.id);
+  if (!ws) return res.status(404).json({ error: 'Not found' });
+  const { check, pageSlug, reason } = req.body;
+  if (!check || !pageSlug) return res.status(400).json({ error: 'check and pageSlug required' });
+  const suppressions = ws.auditSuppressions || [];
+  if (suppressions.some(s => s.check === check && s.pageSlug === pageSlug)) {
+    return res.json({ ok: true, suppressions });
+  }
+  suppressions.push({ check, pageSlug, reason: reason || undefined, createdAt: new Date().toISOString() });
+  updateWorkspace(req.params.id, { auditSuppressions: suppressions });
+  res.json({ ok: true, suppressions });
+});
+
+router.delete('/api/workspaces/:id/audit-suppressions', requireWorkspaceAccess(), (req, res) => {
+  const ws = getWorkspace(req.params.id);
+  if (!ws) return res.status(404).json({ error: 'Not found' });
+  const { check, pageSlug } = req.body;
+  if (!check || !pageSlug) return res.status(400).json({ error: 'check and pageSlug required' });
+  const suppressions = (ws.auditSuppressions || []).filter(s => !(s.check === check && s.pageSlug === pageSlug));
+  updateWorkspace(req.params.id, { auditSuppressions: suppressions });
+  res.json({ ok: true, suppressions });
+});
+
+// --- SEO Edit Tracking ---
+// GET edit tracking for a workspace
+router.get('/api/workspaces/:id/seo-edit-tracking', requireWorkspaceAccess(), (req, res) => {
+  const ws = getWorkspace(req.params.id);
+  if (!ws) return res.status(404).json({ error: 'Not found' });
+  res.json(ws.seoEditTracking || {});
+});
+
+// PATCH: manually set status for a page
+router.patch('/api/workspaces/:id/seo-edit-tracking', requireWorkspaceAccess(), (req, res) => {
+  const ws = getWorkspace(req.params.id);
+  if (!ws) return res.status(404).json({ error: 'Not found' });
+  const { pageId, status, fields } = req.body;
+  if (!pageId || !status) return res.status(400).json({ error: 'pageId and status required' });
+  if (!['flagged', 'in-review', 'live'].includes(status)) return res.status(400).json({ error: 'status must be flagged, in-review, or live' });
+  const tracking = ws.seoEditTracking || {};
+  tracking[pageId] = { status, updatedAt: new Date().toISOString(), fields };
+  updateWorkspace(req.params.id, { seoEditTracking: tracking });
+  res.json({ ok: true, tracking });
+});
+
+// DELETE: clear tracking for a page
+router.delete('/api/workspaces/:id/seo-edit-tracking', requireWorkspaceAccess(), (req, res) => {
+  const ws = getWorkspace(req.params.id);
+  if (!ws) return res.status(404).json({ error: 'Not found' });
+  const { pageId } = req.body;
+  if (!pageId) return res.status(400).json({ error: 'pageId required' });
+  const tracking = ws.seoEditTracking || {};
+  delete tracking[pageId];
+  updateWorkspace(req.params.id, { seoEditTracking: tracking });
+  res.json({ ok: true, tracking });
+});
+
+// --- Unified Page Edit States ---
+// GET all page states for a workspace (admin)
+router.get('/api/workspaces/:id/page-states', requireWorkspaceAccess(), (req, res) => {
+  res.json(getAllPageStates(req.params.id));
+});
+
+// GET single page state (admin)
+router.get('/api/workspaces/:id/page-states/:pageId', requireWorkspaceAccess(), (req, res) => {
+  const state = getPageState(req.params.id, req.params.pageId);
+  if (!state) return res.status(404).json({ error: 'No state for this page' });
+  res.json(state);
+});
+
+// PATCH: update page state (admin)
+router.patch('/api/workspaces/:id/page-states/:pageId', requireWorkspaceAccess(), (req, res) => {
+  const result = updatePageState(req.params.id, req.params.pageId, req.body);
+  if (!result) return res.status(404).json({ error: 'Workspace not found' });
+  res.json(result);
+});
+
+// DELETE: clear page state (admin)
+router.delete('/api/workspaces/:id/page-states/:pageId', requireWorkspaceAccess(), (req, res) => {
+  const ok = clearPageState(req.params.id, req.params.pageId);
+  if (!ok) return res.status(404).json({ error: 'Not found' });
+  res.json({ ok: true });
+});
+
+// --- Admin: Client User Management (requires internal auth) ---
+
+// List client users for a workspace
+router.get('/api/workspaces/:id/client-users', requireWorkspaceAccess(), (_req, res) => {
+  res.json(listClientUsers(_req.params.id));
+});
+
+// Create/invite a client user
+router.post('/api/workspaces/:id/client-users', requireWorkspaceAccess(), express.json(), async (req, res) => {
+  try {
+    const { email, password, name, role } = req.body;
+    if (!email || !password || !name) return res.status(400).json({ error: 'email, password, and name are required' });
+    if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    const invitedBy = req.user?.id;
+    const user = await createClientUser(email, password, name, req.params.id, role || 'client_member', invitedBy);
+    // Send welcome email to the new client user
+    const ws = getWorkspace(req.params.id);
+    if (ws) {
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const dashboardUrl = `${baseUrl}/client/${req.params.id}`;
+      notifyClientWelcome({ clientEmail: email, clientName: name, workspaceName: ws.name, workspaceId: req.params.id, dashboardUrl });
+    }
+    res.json(user);
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// Update a client user
+router.patch('/api/workspaces/:id/client-users/:userId', requireWorkspaceAccess(), express.json(), async (req, res) => {
+  try {
+    const { name, email, role, avatarUrl } = req.body;
+    const user = await updateClientUser(req.params.userId, { name, email, role, avatarUrl });
+    if (!user) return res.status(404).json({ error: 'Client user not found' });
+    res.json(user);
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// Change client user password
+router.post('/api/workspaces/:id/client-users/:userId/password', requireWorkspaceAccess(), express.json(), async (req, res) => {
+  try {
+    const { password } = req.body;
+    if (!password || password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    const ok = await changeClientPassword(req.params.userId, password);
+    if (!ok) return res.status(404).json({ error: 'Client user not found' });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// Delete a client user
+router.delete('/api/workspaces/:id/client-users/:userId', requireWorkspaceAccess(), (req, res) => {
+  const ok = deleteClientUser(req.params.userId);
+  if (!ok) return res.status(404).json({ error: 'Client user not found' });
+  res.json({ ok: true });
+});
+
+export default router;
