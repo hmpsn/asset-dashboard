@@ -257,7 +257,7 @@ export async function generateBrief(
     .map(q => `"${q.query}" (pos #${q.position}, ${q.clicks} clicks, ${q.impressions} imp)`)
     .join('\n') || 'No related query data available';
 
-  const pagesStr = context.existingPages?.slice(0, 15).join('\n') || 'No existing pages provided';
+  const pagesStr = context.existingPages?.slice(0, 50).join('\n') || 'No existing pages provided';
 
   // Pull in keyword strategy context for alignment
   const { keywordBlock, brandVoiceBlock, businessContext: stratBizCtx } = buildSeoContext(workspaceId);
@@ -389,7 +389,7 @@ Requirements:
 - difficultyScore: 1-100 based on estimated keyword competition
 - Make every section actionable and specific — a copywriter or AI tool should be able to write directly from this brief
 - LOCATION RULE: If the target keyword references a specific city/region, ALL content in this brief (title, meta description, outline, headings) must target THAT location. Do NOT substitute the business headquarters or a different city from the general business context. The target keyword is the authoritative location signal.
-- Internal link suggestions should reference existing pages where relevant
+- Internal link suggestions: pick 3-5 pages from the "Existing pages on the site" list that are topically related to this content. Use the EXACT paths from that list. Prefer service pages, case studies, and related blog posts over generic pages like /about or /contact
 - E-E-A-T guidance must be specific and actionable for this particular topic, not generic advice
 - Content checklist: 8-10 concrete, verifiable items tailored to this brief (not generic SEO advice)
 - Schema recommendations: 1-3 relevant schema types with specific implementation guidance

@@ -5507,6 +5507,66 @@ app.delete('/api/content-requests/:workspaceId/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// --- Helper: fetch all published site pages for content brief internal linking ---
+async function getAllSitePages(ws: { webflowSiteId?: string; liveDomain?: string; keywordStrategy?: { pageMap?: { pagePath: string; primaryKeyword?: string }[] } }): Promise<string[]> {
+  const pageMap = new Map<string, string>(); // path -> "path — title"
+
+  // 1. Keyword strategy pages (always available, have keyword context)
+  if (ws.keywordStrategy?.pageMap) {
+    for (const p of ws.keywordStrategy.pageMap) {
+      const path = p.pagePath.startsWith('/') ? p.pagePath : `/${p.pagePath}`;
+      const label = p.primaryKeyword ? `${path} — targets: "${p.primaryKeyword}"` : path;
+      pageMap.set(path.toLowerCase(), label);
+    }
+  }
+
+  // 2. Webflow API pages (static pages with titles)
+  if (ws.webflowSiteId) {
+    try {
+      const token = getTokenForSite(ws.webflowSiteId) || undefined;
+      const allPages = await listPages(ws.webflowSiteId, token);
+      const published = filterPublishedPages(allPages);
+      for (const p of published) {
+        const pagePath = p.publishedPath || (p.slug ? `/${p.slug}` : '/');
+        const key = pagePath.toLowerCase();
+        if (!pageMap.has(key)) {
+          const title = p.title || p.slug || 'Home';
+          pageMap.set(key, `${pagePath} — "${title}"`);
+        }
+      }
+    } catch { /* Webflow API unavailable */ }
+  }
+
+  // 3. Sitemap discovery (CMS pages: blog posts, case studies, etc.)
+  if (ws.webflowSiteId) {
+    try {
+      const token = getTokenForSite(ws.webflowSiteId) || undefined;
+      const subdomain = await getSiteSubdomain(ws.webflowSiteId, token);
+      const baseUrl = ws.liveDomain
+        ? `https://${ws.liveDomain}`
+        : subdomain ? `https://${subdomain}.webflow.io` : '';
+      if (baseUrl) {
+        const sitemapUrls = await discoverSitemapUrls(baseUrl);
+        for (const url of sitemapUrls) {
+          try {
+            const parsed = new URL(url);
+            const pagePath = parsed.pathname === '/' ? '/' : parsed.pathname.replace(/\/$/, '');
+            const key = pagePath.toLowerCase();
+            if (!pageMap.has(key)) {
+              // Derive a readable title from the slug
+              const slug = pagePath.split('/').pop() || '';
+              const title = slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+              pageMap.set(key, `${pagePath} — "${title}"`);
+            }
+          } catch { /* skip malformed URL */ }
+        }
+      }
+    } catch { /* sitemap unavailable */ }
+  }
+
+  return Array.from(pageMap.values());
+}
+
 // Generate a brief for a content request
 app.post('/api/content-requests/:workspaceId/:id/generate-brief', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
@@ -5550,7 +5610,8 @@ app.post('/api/content-requests/:workspaceId/:id/generate-brief', async (req, re
       } catch { /* GA4 unavailable */ }
     }
 
-    const existingPages = ws.keywordStrategy?.pageMap?.map(p => p.pagePath) || [];
+    // Fetch all published pages (Webflow API + sitemap CMS pages) for internal link suggestions
+    const existingPages = await getAllSitePages(ws);
     const brief = await generateBrief(req.params.workspaceId, request.targetKeyword, {
       relatedQueries,
       businessContext: ws.keywordStrategy?.businessContext || '',
@@ -7403,7 +7464,6 @@ app.post('/api/content-briefs/:workspaceId/generate', async (req, res) => {
 
     // No usage limit — briefs are paid add-ons purchased via Stripe
     let relatedQueries: { query: string; position: number; clicks: number; impressions: number }[] = [];
-    let existingPages: string[] = [];
 
     // Fetch GSC data if available
     if (ws?.gscPropertyUrl) {
@@ -7412,11 +7472,11 @@ app.post('/api/content-briefs/:workspaceId/generate', async (req, res) => {
         relatedQueries = overview.topQueries
           .filter(q => { const ql = q.query.toLowerCase(); return targetKeyword.toLowerCase().split(' ').some((w: string) => w.length > 2 && ql.includes(w)); })
           .slice(0, 20);
-        existingPages = overview.topPages.map(p => {
-          try { return new URL(p.page).pathname; } catch { return p.page; }
-        });
       } catch { /* GSC not available */ }
     }
+
+    // Fetch all published pages (Webflow API + sitemap CMS pages) for internal link suggestions
+    const existingPages = ws ? await getAllSitePages(ws) : [];
 
     // Gather SEMRush data if configured
     let semrushMetrics: import('./semrush.js').KeywordMetrics | undefined;

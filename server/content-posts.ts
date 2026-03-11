@@ -8,6 +8,7 @@ import path from 'path';
 import { getDataDir } from './data-dir.js';
 import { buildSeoContext, buildKnowledgeBase, buildKeywordMapContext, buildPersonasContext } from './seo-context.js';
 import { callOpenAI } from './openai-helpers.js';
+import { getWorkspace } from './workspaces.js';
 import type { ContentBrief } from './content-brief.js';
 
 const POSTS_DIR = getDataDir('content-posts');
@@ -226,13 +227,13 @@ WRITING QUALITY RULES (apply to ALL content — violations will be rejected):
 
 FORBIDDEN PHRASES — never use these AI clichés:
 - Opening clichés: "Did you know...", "In today's [digital/fast-paced/competitive] world...", "Have you ever wondered...", "If you're like most...", "When it comes to...", "Picture this..."
-- Filler transitions: "Let's dive in", "Let's dive into", "Without further ado", "Let's explore", "Let's take a closer look", "Now let's talk about...", "With that said...", "That being said...", "Moving on...", "Let's get started"
+- Filler transitions: "Let's dive in", "Let's dive into", "Without further ado", "Let's explore", "Let's explore why", "Let's explore how", "Let's take a closer look", "Now let's talk about...", "With that said...", "That being said...", "Moving on...", "Let's get started", "Ready to see...", "Ready to learn...". NEVER start or end a sentence with "Let's" followed by a verb.
 - Hollow intensifiers: "incredibly", "absolutely", "truly", "extremely", "revolutionize", "game-changing", "cutting-edge", "world-class", "best-in-class", "next-level", "top-notch"
 - Corporate buzzwords: "leverage", "utilize", "optimize", "streamline", "empower", "harness", "navigate the landscape", "unlock the power of", "take your X to the next level", "in the realm of"
 - Emotional hedging: "It's important to note that...", "It's worth mentioning that...", "It goes without saying...", "Needless to say...", "At the end of the day...", "The reality is that...", "X is key to Y", "X is crucial for Y", "X is essential for Y"
 - Vague attribution: "Studies show...", "Research suggests...", "Experts agree...", "According to industry data...", "Many businesses have found..." — if you cite something, name the specific source or don't cite at all
 - Conclusion starters: "In conclusion...", "To sum up...", "In summary...", "All in all...", "At the end of the day..."
-- Metaphor clichés: "growth engine", "game changer", "secret sauce", "silver bullet", "deep dive", "move the needle", "from X to Y" (e.g., "from brochure to growth engine")
+- Metaphor clichés: "growth engine", "game changer", "secret sauce", "silver bullet", "deep dive", "move the needle", "from X to Y" (e.g., "from brochure to growth engine"), "powerful [noun]", "trusted [noun] hub", "one-stop shop"
 
 STRUCTURAL ANTI-PATTERNS — avoid these:
 - Do NOT end every section with a one-sentence summary of what the section just said
@@ -263,7 +264,7 @@ WHAT TO DO INSTEAD:
 `;
 
 /** Build a rich context block from all available brief fields */
-function buildBriefContextBlock(brief: ContentBrief): string {
+function buildBriefContextBlock(brief: ContentBrief, siteDomain?: string): string {
   const parts: string[] = [];
 
   if (brief.executiveSummary) {
@@ -291,7 +292,12 @@ function buildBriefContextBlock(brief: ContentBrief): string {
   }
 
   if (brief.internalLinkSuggestions?.length) {
-    parts.push(`INTERNAL LINKS TO INCLUDE (reference these pages naturally where relevant):\n${brief.internalLinkSuggestions.map(l => `- /${l}`).join('\n')}`);
+    const domain = siteDomain ? `https://${siteDomain}` : '';
+    const linkLines = brief.internalLinkSuggestions.map(l => {
+      const slug = l.startsWith('/') ? l : `/${l}`;
+      return domain ? `- ${domain}${slug}` : `- ${slug}`;
+    }).join('\n');
+    parts.push(`INTERNAL LINKS TO INCLUDE (link to these pages naturally where relevant — use the EXACT URLs below):\n${linkLines}${domain ? `\n\nIMPORTANT: All internal links MUST use the domain ${domain}. Do NOT link to any other domain. Use <a href="${domain}/slug"> format.` : ''}`);
   }
 
   if (brief.eeatGuidance) {
@@ -312,13 +318,14 @@ async function generateIntroduction(
   brief: ContentBrief,
   voiceCtx: string,
   workspaceId: string,
+  siteDomain?: string,
 ): Promise<string> {
   const totalBudget = brief.wordCountTarget || 1800;
   const pageType = brief.pageType || 'blog';
   const role = PAGE_TYPE_WRITER_ROLE[pageType] || PAGE_TYPE_WRITER_ROLE.blog;
   const typeInstructions = PAGE_TYPE_INTRO_INSTRUCTIONS[pageType] || PAGE_TYPE_INTRO_INSTRUCTIONS.blog;
   const pageLabel = pageType === 'blog' ? 'blog post' : pageType === 'landing' ? 'landing page' : pageType === 'pillar' ? 'pillar page' : `${pageType} page`;
-  const briefContext = buildBriefContextBlock(brief);
+  const briefContext = buildBriefContextBlock(brief, siteDomain);
 
   const prompt = `${role}
 
@@ -374,6 +381,7 @@ async function generateSection(
   previousSections: string[],
   voiceCtx: string,
   workspaceId: string,
+  siteDomain?: string,
 ): Promise<string> {
   const sectionTarget = section.wordCount || 300;
   const totalBudget = brief.wordCountTarget || 1800;
@@ -381,7 +389,7 @@ async function generateSection(
   const role = PAGE_TYPE_WRITER_ROLE[pageType] || PAGE_TYPE_WRITER_ROLE.blog;
   const typeInstructions = PAGE_TYPE_SECTION_INSTRUCTIONS[pageType] || PAGE_TYPE_SECTION_INSTRUCTIONS.blog;
   const pageLabel = pageType === 'blog' ? 'blog post' : pageType === 'landing' ? 'landing page' : pageType === 'pillar' ? 'pillar page' : `${pageType} page`;
-  const briefContext = buildBriefContextBlock(brief);
+  const briefContext = buildBriefContextBlock(brief, siteDomain);
 
   const prevContext = previousSections.length > 0
     ? `\n\nPREVIOUS SECTIONS WRITTEN (for continuity — do NOT repeat these points, examples, case studies, or phrases):\n${previousSections.map((s, i) => `--- Section ${i + 1} ---\n${s.slice(0, 800)}`).join('\n')}\n\nCRITICAL: Do NOT re-use any example, case study, statistic, or metaphor that already appeared above. Use a DIFFERENT example or angle. If you have no new example, teach with actionable specifics instead.`
@@ -455,11 +463,13 @@ async function generateConclusion(
   brief: ContentBrief,
   voiceCtx: string,
   workspaceId: string,
+  siteDomain?: string,
 ): Promise<string> {
   const pageType = brief.pageType || 'blog';
   const role = PAGE_TYPE_WRITER_ROLE[pageType] || PAGE_TYPE_WRITER_ROLE.blog;
   const typeInstructions = PAGE_TYPE_CONCLUSION_INSTRUCTIONS[pageType] || PAGE_TYPE_CONCLUSION_INSTRUCTIONS.blog;
   const pageLabel = pageType === 'blog' ? 'blog post' : pageType === 'landing' ? 'landing page' : pageType === 'pillar' ? 'pillar page' : `${pageType} page`;
+  const briefContext = buildBriefContextBlock(brief, siteDomain);
 
   const prompt = `${role}
 
@@ -471,6 +481,7 @@ AUDIENCE: ${brief.audience}
 ${brief.toneAndStyle ? `TONE & STYLE: ${brief.toneAndStyle}` : ''}
 ${brief.ctaRecommendations?.length ? `CTA RECOMMENDATIONS:\n${brief.ctaRecommendations.map((c, i) => `${i === 0 ? '- PRIMARY' : '- Secondary'}: ${c}`).join('\n')}` : ''}
 ${voiceCtx}
+${briefContext}
 
 SECTIONS COVERED:
 ${brief.outline.map((s, i) => `${i + 1}. ${s.heading}`).join('\n')}
@@ -697,6 +708,10 @@ export async function generatePost(
   const postId = existingPostId || `post_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
   const voiceCtx = buildVoiceContext(workspaceId);
 
+  // Resolve the site's live domain for internal link URLs
+  const ws = getWorkspace(workspaceId);
+  const siteDomain = ws?.liveDomain || undefined;
+
   // Initialize post with pending sections
   const post: GeneratedPost = {
     id: postId,
@@ -729,7 +744,7 @@ export async function generatePost(
 
   // 1. Generate introduction
   try {
-    post.introduction = await generateIntroduction(brief, voiceCtx, workspaceId);
+    post.introduction = await generateIntroduction(brief, voiceCtx, workspaceId, siteDomain);
     post.updatedAt = new Date().toISOString();
     savePost(workspaceId, post);
   } catch (err) {
@@ -744,7 +759,7 @@ export async function generatePost(
 
     try {
       const content = await generateSection(
-        brief, brief.outline[i], i, completedSections, voiceCtx, workspaceId,
+        brief, brief.outline[i], i, completedSections, voiceCtx, workspaceId, siteDomain,
       );
       post.sections[i].content = content;
       post.sections[i].wordCount = countWords(content);
@@ -763,7 +778,7 @@ export async function generatePost(
 
   // 3. Generate conclusion
   try {
-    post.conclusion = await generateConclusion(brief, voiceCtx, workspaceId);
+    post.conclusion = await generateConclusion(brief, voiceCtx, workspaceId, siteDomain);
   } catch (err) {
     post.conclusion = `*[Conclusion generation failed: ${err instanceof Error ? err.message : 'Unknown error'}]*`;
   }
