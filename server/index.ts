@@ -4930,9 +4930,111 @@ app.get('/api/public/workspace/:id', (req, res) => {
       : 0,
     trialEndsAt: ws.trialEndsAt || null,
     stripeEnabled: isStripeConfigured(),
+    // Onboarding
+    onboardingEnabled: ws.onboardingEnabled ?? false,
+    onboardingCompleted: ws.onboardingCompleted ?? false,
     // Auth mode
     hasClientUsers: hasClientUsers(req.params.id),
   });
+});
+
+// Public onboarding questionnaire submission — transforms responses into KB, brand voice, personas
+app.post('/api/public/onboarding/:id', async (req, res) => {
+  try {
+    const ws = getWorkspace(req.params.id);
+    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+    const { business, audience, brand, competitors } = req.body;
+
+    // 1. Build knowledge base from business info
+    const kbParts: string[] = [];
+    if (business?.businessName) kbParts.push(`Business Name: ${business.businessName}`);
+    if (business?.industry) kbParts.push(`Industry: ${business.industry}`);
+    if (business?.description) kbParts.push(`About: ${business.description}`);
+    if (business?.services) kbParts.push(`Key Services/Products:\n${business.services}`);
+    if (business?.locations) kbParts.push(`Service Locations: ${business.locations}`);
+    if (business?.differentiators) kbParts.push(`Differentiators: ${business.differentiators}`);
+    if (business?.website) kbParts.push(`Website: ${business.website}`);
+    if (competitors?.competitors) kbParts.push(`Competitors:\n${competitors.competitors}`);
+    if (competitors?.whatTheyDoBetter) kbParts.push(`Competitor Strengths: ${competitors.whatTheyDoBetter}`);
+    if (competitors?.whatYouDoBetter) kbParts.push(`Our Advantages: ${competitors.whatYouDoBetter}`);
+
+    // Merge with existing knowledge base (don't overwrite)
+    const existingKb = ws.knowledgeBase || '';
+    const onboardingKb = kbParts.join('\n\n');
+    const mergedKb = existingKb
+      ? `${existingKb}\n\n--- Client Onboarding Responses ---\n${onboardingKb}`
+      : onboardingKb;
+
+    // 2. Build brand voice from brand info
+    const voiceParts: string[] = [];
+    if (brand?.personality?.length) voiceParts.push(`Brand Personality: ${brand.personality.join(', ')}`);
+    if (brand?.tone) voiceParts.push(`Tone: ${brand.tone}`);
+    if (brand?.avoidWords) voiceParts.push(`Words to Avoid: ${brand.avoidWords}`);
+    if (brand?.contentFormats?.length) voiceParts.push(`Preferred Content Formats: ${brand.contentFormats.join(', ')}`);
+    if (brand?.existingExamples) voiceParts.push(`Reference Examples:\n${brand.existingExamples}`);
+
+    const existingVoice = ws.brandVoice || '';
+    const onboardingVoice = voiceParts.join('\n');
+    const mergedVoice = existingVoice
+      ? `${existingVoice}\n\n--- Client Onboarding Responses ---\n${onboardingVoice}`
+      : onboardingVoice;
+
+    // 3. Build personas from audience info
+    const personas = [...(ws.personas || [])];
+    if (audience?.primaryAudience || audience?.painPoints || audience?.goals) {
+      const primaryPersona = {
+        id: `persona_onboard_${Date.now()}`,
+        name: audience.primaryAudience?.split(/[,.\n]/)[0]?.trim()?.slice(0, 60) || 'Primary Audience',
+        description: audience.primaryAudience || '',
+        painPoints: audience.painPoints ? audience.painPoints.split('\n').map((s: string) => s.trim()).filter(Boolean) : [],
+        goals: audience.goals ? audience.goals.split('\n').map((s: string) => s.trim()).filter(Boolean) : [],
+        objections: audience.objections ? audience.objections.split('\n').map((s: string) => s.trim()).filter(Boolean) : [],
+        preferredContentFormat: brand?.contentFormats?.join(', ') || undefined,
+        buyingStage: (audience.buyingStage === 'mixed' ? undefined : audience.buyingStage) as 'awareness' | 'consideration' | 'decision' | undefined,
+      };
+      personas.push(primaryPersona);
+    }
+    if (audience?.secondaryAudience) {
+      const secondaryPersona = {
+        id: `persona_onboard2_${Date.now()}`,
+        name: audience.secondaryAudience.split(/[,.\n]/)[0]?.trim()?.slice(0, 60) || 'Secondary Audience',
+        description: audience.secondaryAudience,
+        painPoints: [] as string[],
+        goals: [] as string[],
+        objections: [] as string[],
+      };
+      personas.push(secondaryPersona);
+    }
+
+    // 4. Save competitor domains if provided
+    const competitorDomains = [...(ws.competitorDomains || [])];
+    if (competitors?.competitors) {
+      const urls = competitors.competitors.split('\n')
+        .map((line: string) => {
+          const match = line.match(/https?:\/\/([^/\s]+)/);
+          return match ? match[1].replace(/^www\./, '') : null;
+        })
+        .filter(Boolean) as string[];
+      for (const d of urls) {
+        if (!competitorDomains.includes(d)) competitorDomains.push(d);
+      }
+    }
+
+    // 5. Update workspace
+    updateWorkspace(req.params.id, {
+      knowledgeBase: mergedKb,
+      brandVoice: mergedVoice,
+      personas,
+      competitorDomains: competitorDomains.length > 0 ? competitorDomains : ws.competitorDomains,
+      onboardingCompleted: true,
+    });
+
+    res.json({ ok: true, message: 'Onboarding responses saved successfully' });
+  } catch (err) {
+    console.error('[onboarding] Error saving responses:', err);
+    res.status(500).json({ error: 'Failed to save onboarding responses' });
+  }
 });
 
 // Public tier endpoint — returns effective tier for a workspace

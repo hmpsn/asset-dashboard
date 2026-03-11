@@ -15,6 +15,7 @@ import { InsightsEngine } from './client/InsightsEngine';
 import { CartProvider } from './client/useCart';
 import { SeoCartButton, SeoCartDrawer } from './client/SeoCart';
 import { OnboardingWizard } from './client/OnboardingWizard';
+import { ClientOnboardingQuestionnaire, type OnboardingData } from './client/ClientOnboardingQuestionnaire';
 import { ROIDashboard } from './client/ROIDashboard';
 import { PlansTab } from './client/PlansTab';
 import { StrategyTab } from './client/StrategyTab';
@@ -167,6 +168,8 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
     isFull: boolean;
   } | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingSaving, setOnboardingSaving] = useState(false);
   // Track data-loading errors per section for inline error indicators
   const [sectionErrors, setSectionErrors] = useState<Record<string, string>>({});
 
@@ -265,10 +268,15 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
         }
         setLoading(false);
 
+        // Show onboarding questionnaire if enabled and not yet completed
+        if (data.onboardingEnabled && !data.onboardingCompleted) {
+          setShowOnboarding(true);
+        }
+
         // Show welcome modal on first visit (user-aware key when logged in)
         const welcomeUserId = resolvedUserId;
         const welcomeKey = welcomeUserId ? `welcome_seen_${workspaceId}_${welcomeUserId}` : `welcome_seen_${workspaceId}`;
-        if (!localStorage.getItem(welcomeKey)) {
+        if (!localStorage.getItem(welcomeKey) && !data.onboardingEnabled) {
           setShowWelcome(true);
         }
 
@@ -1565,6 +1573,46 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
             fetch(`/api/public/content-requests/${workspaceId}`).then(r => r.json()).then(setContentRequests).catch(() => {});
           }}
           onClose={() => setStripePayment(null)}
+        />
+      )}
+
+      {/* Client onboarding questionnaire */}
+      {showOnboarding && ws && (
+        <ClientOnboardingQuestionnaire
+          workspaceName={ws.name}
+          saving={onboardingSaving}
+          onComplete={async (data: OnboardingData) => {
+            setOnboardingSaving(true);
+            try {
+              const res = await fetch(`/api/public/onboarding/${workspaceId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+              });
+              if (res.ok) {
+                setShowOnboarding(false);
+                setWs(prev => prev ? { ...prev, onboardingCompleted: true } : prev);
+                setToast({ message: 'Thanks! Your responses will help us create better content.', type: 'success' });
+                setTimeout(() => setToast(null), 6000);
+                // Show welcome wizard after onboarding
+                const welcomeKey = clientUser ? `welcome_seen_${workspaceId}_${clientUser.id}` : `welcome_seen_${workspaceId}`;
+                if (!localStorage.getItem(welcomeKey)) setShowWelcome(true);
+              } else {
+                setToast({ message: 'Failed to save responses. Please try again.', type: 'error' });
+                setTimeout(() => setToast(null), 6000);
+              }
+            } catch {
+              setToast({ message: 'Failed to save responses. Please try again.', type: 'error' });
+              setTimeout(() => setToast(null), 6000);
+            }
+            setOnboardingSaving(false);
+          }}
+          onSkip={() => {
+            setShowOnboarding(false);
+            // Show welcome wizard after skipping onboarding
+            const welcomeKey = clientUser ? `welcome_seen_${workspaceId}_${clientUser.id}` : `welcome_seen_${workspaceId}`;
+            if (!localStorage.getItem(welcomeKey)) setShowWelcome(true);
+          }}
         />
       )}
 

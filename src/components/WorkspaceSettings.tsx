@@ -33,6 +33,8 @@ interface WorkspaceData {
   contentPricing?: { briefPrice: number; fullPostPrice: number; currency: string; briefLabel?: string; fullPostLabel?: string; briefDescription?: string; fullPostDescription?: string } | null;
   tier?: 'free' | 'growth' | 'premium';
   trialEndsAt?: string;
+  onboardingEnabled?: boolean;
+  onboardingCompleted?: boolean;
 }
 
 interface AudiencePersona {
@@ -570,6 +572,43 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                     ws?.analyticsClientView !== false ? 'translate-x-4' : 'translate-x-0.5'
                   }`} />
                 </button>
+              </label>
+              {/* Client Onboarding Questionnaire */}
+              <label className="flex items-center justify-between cursor-pointer group">
+                <div className="flex items-center gap-3">
+                  <Sparkles className="w-4 h-4 text-zinc-500" />
+                  <div>
+                    <div className="text-xs font-medium text-zinc-200">Client Onboarding Questionnaire</div>
+                    <div className="text-[11px] text-zinc-500">
+                      Prompt new clients to share business info, audience, and brand voice
+                      {ws?.onboardingCompleted && <span className="ml-1 text-teal-400">(completed)</span>}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {ws?.onboardingCompleted && (
+                    <button onClick={async (e) => {
+                      e.stopPropagation();
+                      await patchWorkspace({ onboardingCompleted: false });
+                      toast('Onboarding reset — client will see the questionnaire again');
+                    }}
+                      className="text-[10px] text-zinc-500 hover:text-zinc-300 px-2 py-1 rounded bg-zinc-800 border border-zinc-700 transition-colors">
+                      Reset
+                    </button>
+                  )}
+                  <button onClick={async () => {
+                    const val = !ws?.onboardingEnabled;
+                    await patchWorkspace({ onboardingEnabled: val });
+                    toast(val ? 'Onboarding questionnaire enabled' : 'Onboarding questionnaire disabled');
+                  }}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                      ws?.onboardingEnabled ? 'bg-teal-500' : 'bg-zinc-700'
+                    }`}>
+                    <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                      ws?.onboardingEnabled ? 'translate-x-4' : 'translate-x-0.5'
+                    }`} />
+                  </button>
+                </div>
               </label>
             </div>
           </section>
