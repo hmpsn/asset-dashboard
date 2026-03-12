@@ -9,6 +9,7 @@ import type {
   GA4Overview, GA4ConversionSummary, GA4NewVsReturning, GA4OrganicOverview,
   SearchComparison, GA4Comparison, ClientKeywordStrategy, ClientTab,
 } from './types';
+import { fmtNum } from '../../utils/formatNumbers';
 
 // ─── Types ───
 
@@ -45,11 +46,6 @@ interface InsightsDigestProps {
 
 function pct(n: number): string {
   return `${n > 0 ? '+' : ''}${n}%`;
-}
-function fmtNum(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
 }
 
 // ─── Insight Generator ───

@@ -7,7 +7,7 @@ import {
   Sun, Moon, Plus, FileText, Calendar, Clock, CreditCard,
 } from 'lucide-react';
 import { StripePaymentModal } from './StripePaymentForm';
-import { type Tier } from './ui';
+import { type Tier, Skeleton, OverviewSkeleton } from './ui';
 import { RenderMarkdown } from './client/helpers';
 import { STUDIO_NAME } from '../constants';
 import { HealthTab } from './client/HealthTab';
@@ -31,6 +31,7 @@ import { useClientAuth } from '../hooks/useClientAuth';
 import { useClientData } from '../hooks/useClientData';
 import { useChat } from '../hooks/useChat';
 import { usePayments } from '../hooks/usePayments';
+import { useToast } from '../hooks/useToast';
 import {
   QUICK_QUESTIONS, LEARN_SEO_QUESTIONS,
   type WorkspaceInfo,
@@ -71,7 +72,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
   } = useClientData(workspaceId);
 
   // ── UI-only state (declared early — needed by hooks below) ──
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const { toast, setToast, clearToast } = useToast();
 
   // ── Payments hook ──
   const {
@@ -250,14 +251,12 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
         const paymentStatus = params.get('payment');
         if (paymentStatus === 'success') {
           setToast({ message: 'Payment successful! Your content request is being processed.', type: 'success' });
-          setTimeout(() => setToast(null), 8000);
           const url = new URL(window.location.href);
           url.searchParams.delete('payment');
           url.searchParams.delete('session_id');
           window.history.replaceState({}, '', url.toString());
         } else if (paymentStatus === 'cancelled') {
           setToast({ message: 'Payment was cancelled. You can try again anytime.', type: 'error' });
-          setTimeout(() => setToast(null), 6000);
           const url = new URL(window.location.href);
           url.searchParams.delete('payment');
           window.history.replaceState({}, '', url.toString());
@@ -293,18 +292,16 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
     <div className="min-h-screen bg-[#0f1219] text-zinc-200">
       <header className="border-b border-zinc-800">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-4">
-          <div className="h-6 w-24 bg-zinc-800 rounded animate-pulse" />
+          <Skeleton className="h-6 w-24" />
           <div className="w-px h-8 bg-zinc-800" />
-          <div><div className="h-5 w-40 bg-zinc-800 rounded animate-pulse" /><div className="h-3 w-28 bg-zinc-800/50 rounded animate-pulse mt-1.5" /></div>
+          <div><Skeleton className="h-5 w-40" /><Skeleton className="h-3 w-28 mt-1.5" /></div>
         </div>
         <div className="max-w-6xl mx-auto px-6 pb-3 flex gap-4">
-          {[1,2,3,4].map(i => <div key={i} className="h-4 w-20 bg-zinc-800/50 rounded animate-pulse" />)}
+          {[1,2,3,4].map(i => <Skeleton key={i} className="h-4 w-20" />)}
         </div>
       </header>
       <main className="max-w-6xl mx-auto px-6 py-6">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {[1,2,3,4,5].map(i => <div key={i} className="bg-zinc-900 rounded-xl p-4 border border-zinc-800"><div className="h-4 w-4 bg-zinc-800 rounded mb-2 animate-pulse" /><div className="h-7 w-16 bg-zinc-800 rounded animate-pulse" /><div className="h-3 w-20 bg-zinc-800/50 rounded animate-pulse mt-2" /></div>)}
-        </div>
+        <OverviewSkeleton />
       </main>
     </div>
   );
@@ -581,7 +578,10 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
                 {[7, 28, 90, 180, 365].map(d => (
                   <button key={d} onClick={() => changeDays(d, ws)}
                     className={`px-3 py-2 min-h-[44px] rounded-md text-xs font-medium transition-colors ${!customDateRange && days === d ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}
-                  >{d >= 365 ? '1y' : d >= 180 ? '6mo' : `${d}d`}</button>
+                  >
+                    {d >= 365 ? '1y' : d >= 180 ? '6mo' : `${d}d`}
+                    {!customDateRange && days === d && <span className="block text-[9px] text-zinc-400 font-normal">vs prev {d >= 365 ? '1y' : d >= 180 ? '6mo' : `${d}d`}</span>}
+                  </button>
                 ))}
                 <button onClick={() => effectiveTier !== 'free' && setShowDatePicker(p => !p)}
                   className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${effectiveTier === 'free' ? 'text-zinc-600 cursor-not-allowed' : customDateRange ? 'bg-teal-600/20 text-teal-300 border border-teal-500/30' : 'text-zinc-500 hover:text-zinc-300'}`}
@@ -599,9 +599,10 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
                   )}
                 </button>
                 {showDatePicker && (<>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowDatePicker(false)} />
-                  <div className="absolute right-0 top-full mt-2 z-50 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl p-4 w-72"
+                  <div className="fixed inset-0 z-40 sm:bg-transparent bg-black/50" onClick={() => setShowDatePicker(false)} />
+                  <div className="fixed sm:absolute inset-x-0 bottom-0 sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-2 z-50 bg-zinc-900 border-t sm:border border-zinc-700 rounded-t-2xl sm:rounded-xl shadow-2xl p-4 sm:w-72"
                     onClick={e => e.stopPropagation()}>
+                    <div className="sm:hidden w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-3" />
                     <p className="text-xs font-medium text-zinc-400 mb-3">Custom date range</p>
                     <div className="space-y-2">
                       <label className="block">
@@ -609,7 +610,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
                         <input type="date" ref={customStartRef}
                           defaultValue={customDateRange?.startDate || new Date(Date.now() - 28 * 86400000).toISOString().split('T')[0]}
                           max={new Date().toISOString().split('T')[0]}
-                          className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
+                          className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm sm:text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
                         />
                       </label>
                       <label className="block">
@@ -617,13 +618,13 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
                         <input type="date" ref={customEndRef}
                           defaultValue={customDateRange?.endDate || new Date().toISOString().split('T')[0]}
                           max={new Date().toISOString().split('T')[0]}
-                          className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
+                          className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm sm:text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
                         />
                       </label>
                     </div>
                     <div className="flex items-center gap-2 mt-3">
                       <button onClick={() => setShowDatePicker(false)}
-                        className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors">
+                        className="flex-1 px-3 py-2.5 sm:py-1.5 text-sm sm:text-xs rounded-lg border border-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors">
                         Cancel
                       </button>
                       <button onClick={() => {
@@ -631,7 +632,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
                         const e = customEndRef.current?.value;
                         if (s && e && s <= e) applyCustomRange(s, e, ws);
                       }}
-                        className="flex-1 px-3 py-1.5 text-xs rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-medium transition-colors">
+                        className="flex-1 px-3 py-2.5 sm:py-1.5 text-sm sm:text-xs rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-medium transition-colors">
                         Apply
                       </button>
                     </div>
@@ -916,7 +917,6 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
                 if (data.url) window.location.href = data.url;
               } catch (err) {
                 setToast({ message: err instanceof Error ? err.message : 'Upgrade failed. Please try again.', type: 'error' });
-                setTimeout(() => setToast(null), 6000);
               }
             }}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium transition-colors cursor-pointer">
@@ -1063,7 +1063,6 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
           onSuccess={() => {
             setStripePayment(null);
             setToast({ message: `Payment successful! Your ${stripePayment.productName.toLowerCase()} is being prepared.`, type: 'success' });
-            setTimeout(() => setToast(null), 6000);
             // Refresh content requests
             fetch(`/api/public/content-requests/${workspaceId}`).then(r => r.json()).then(setContentRequests).catch(() => {});
           }}
@@ -1088,17 +1087,14 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
                 setShowOnboarding(false);
                 setWs(prev => prev ? { ...prev, onboardingCompleted: true } : prev);
                 setToast({ message: 'Thanks! Your responses will help us create better content.', type: 'success' });
-                setTimeout(() => setToast(null), 6000);
                 // Show welcome wizard after onboarding
                 const welcomeKey = clientUser ? `welcome_seen_${workspaceId}_${clientUser.id}` : `welcome_seen_${workspaceId}`;
                 if (!localStorage.getItem(welcomeKey)) setShowWelcome(true);
               } else {
                 setToast({ message: 'Failed to save responses. Please try again.', type: 'error' });
-                setTimeout(() => setToast(null), 6000);
               }
             } catch {
               setToast({ message: 'Failed to save responses. Please try again.', type: 'error' });
-              setTimeout(() => setToast(null), 6000);
             }
             setOnboardingSaving(false);
           }}
@@ -1132,14 +1128,14 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
       )}
 
       {/* Beta Feedback Widget */}
-      {ws && <FeedbackWidget workspaceId={workspaceId} currentTab={tab} submittedBy={undefined} />}
+      {ws && <FeedbackWidget workspaceId={workspaceId} currentTab={tab} submittedBy={undefined} chatExpanded={chatExpanded} />}
 
       {/* Toast notification */}
       {toast && (
         <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] px-5 py-3 rounded-xl border shadow-lg backdrop-blur-sm flex items-center gap-2.5 animate-[slideUp_0.3s_ease] ${toast.type === 'success' ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' : 'bg-red-500/15 border-red-500/30 text-red-300'}`}>
           {toast.type === 'success' ? <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> : <AlertTriangle className="w-4 h-4 flex-shrink-0" />}
           <span className="text-xs font-medium">{toast.message}</span>
-          <button onClick={() => setToast(null)} className="ml-2 text-zinc-400 hover:text-zinc-200"><X className="w-3.5 h-3.5" /></button>
+          <button onClick={clearToast} className="ml-2 text-zinc-400 hover:text-zinc-200"><X className="w-3.5 h-3.5" /></button>
         </div>
       )}
 

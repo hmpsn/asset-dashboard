@@ -1,6 +1,6 @@
 import {
   AlertTriangle, Users, MousePointerClick, Eye, BarChart3, Shield, Target,
-  Sparkles, Activity,
+  Sparkles, Activity, FileText,
 } from 'lucide-react';
 import { StatCard } from '../ui';
 import { Explainer } from './SeoGlossary';
@@ -142,6 +142,33 @@ export function OverviewTab({
       );
     })()}
 
+    {/* Action-needed banner — full-width, above content grid */}
+    {(() => {
+      const actions: { label: string; count: number; tab: ClientTab; color: string; icon: string }[] = [];
+      if (pendingApprovals > 0) actions.push({ label: `${pendingApprovals} SEO change${pendingApprovals > 1 ? 's' : ''} to review`, count: pendingApprovals, tab: 'inbox', color: 'text-amber-400', icon: 'approval' });
+      const contentReviews = contentRequests.filter(r => r.status === 'client_review').length;
+      if (!betaMode && contentReviews > 0) actions.push({ label: `${contentReviews} content brief${contentReviews > 1 ? 's' : ''} ready for review`, count: contentReviews, tab: 'inbox', color: 'text-blue-400', icon: 'content' });
+      if (unreadTeamNotes > 0) actions.push({ label: `${unreadTeamNotes} request${unreadTeamNotes > 1 ? 's' : ''} with new team replies`, count: unreadTeamNotes, tab: 'inbox', color: 'text-teal-400', icon: 'reply' });
+      if (actions.length === 0) return null;
+      const total = actions.reduce((s, a) => s + a.count, 0);
+      return (
+        <div className="bg-gradient-to-r from-amber-600/10 via-zinc-900 to-teal-600/10 border border-amber-500/20 rounded-xl px-4 py-3">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-5 h-5 rounded-md bg-amber-500/15 flex items-center justify-center"><AlertTriangle className="w-3 h-3 text-amber-400" /></div>
+            <span className="text-xs font-medium text-zinc-200">{total} item{total > 1 ? 's' : ''} need{total === 1 ? 's' : ''} your attention</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {actions.map((a, i) => (
+              <button key={i} onClick={() => setTab(a.tab)} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/50 transition-colors text-left">
+                <span className={`text-[11px] font-semibold ${a.color}`}>{a.count}</span>
+                <span className="text-[11px] text-zinc-400">{a.label.replace(/^\d+\s*/, '')}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+    })()}
+
     {/* Main content: insights + sidebar */}
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
       {/* Left column (3/5) — Insights feed */}
@@ -178,33 +205,6 @@ export function OverviewTab({
 
       {/* Right sidebar (2/5) */}
       <div className="lg:col-span-2 space-y-4">
-        {/* Action-needed banner */}
-        {(() => {
-          const actions: { label: string; count: number; tab: ClientTab; color: string }[] = [];
-          if (pendingApprovals > 0) actions.push({ label: `${pendingApprovals} SEO change${pendingApprovals > 1 ? 's' : ''} to review`, count: pendingApprovals, tab: 'inbox', color: 'text-amber-400' });
-          const contentReviews = contentRequests.filter(r => r.status === 'client_review').length;
-          if (!betaMode && contentReviews > 0) actions.push({ label: `${contentReviews} content brief${contentReviews > 1 ? 's' : ''} ready for review`, count: contentReviews, tab: 'inbox', color: 'text-blue-400' });
-          if (unreadTeamNotes > 0) actions.push({ label: `${unreadTeamNotes} request${unreadTeamNotes > 1 ? 's' : ''} with new team replies`, count: unreadTeamNotes, tab: 'inbox', color: 'text-teal-400' });
-          if (actions.length === 0) return null;
-          const total = actions.reduce((s, a) => s + a.count, 0);
-          return (
-            <div className="bg-gradient-to-r from-amber-600/10 via-zinc-900 to-teal-600/10 border border-amber-500/20 rounded-xl px-4 py-3">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-5 h-5 rounded-md bg-amber-500/15 flex items-center justify-center"><AlertTriangle className="w-3 h-3 text-amber-400" /></div>
-                <span className="text-xs font-medium text-zinc-200">{total} item{total > 1 ? 's' : ''} need{total === 1 ? 's' : ''} your attention</span>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {actions.map((a, i) => (
-                  <button key={i} onClick={() => setTab(a.tab)} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/50 transition-colors text-left">
-                    <span className={`text-[11px] font-semibold ${a.color}`}>{a.count}</span>
-                    <span className="text-[11px] text-zinc-400">{a.label.replace(/^\d+\s*/, '')}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
-
         {/* Ask the Insights Engine */}
         <div className="bg-gradient-to-br from-teal-500/5 via-zinc-900 to-zinc-900 rounded-xl border border-teal-500/15 p-4">
           <div className="flex items-center gap-2 mb-3">
@@ -241,6 +241,36 @@ export function OverviewTab({
           </div>
         </div>
 
+
+        {/* Content opportunities preview — revenue moment */}
+        {(() => {
+          const gaps = strategyData?.contentGaps?.slice(0, 2);
+          if (!gaps || gaps.length === 0) return null;
+          return (
+            <div className="bg-gradient-to-br from-teal-950/30 via-zinc-900 to-zinc-900 rounded-xl border border-teal-500/15 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-6 h-6 rounded-lg bg-teal-500/15 flex items-center justify-center">
+                  <FileText className="w-3.5 h-3.5 text-teal-400" />
+                </div>
+                <span className="text-xs font-medium text-zinc-300">Content Opportunities</span>
+              </div>
+              <div className="space-y-2">
+                {gaps.map((gap, i) => (
+                  <div key={i} className="px-3 py-2 rounded-lg bg-zinc-800/40 border border-zinc-800/60">
+                    <div className="text-[11px] font-medium text-zinc-200 mb-0.5">{gap.topic}</div>
+                    <div className="text-[10px] text-zinc-500 line-clamp-1">{gap.rationale}</div>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={() => setTab('strategy')}
+                className="mt-2 w-full text-center px-3 py-1.5 rounded-lg bg-teal-600/15 border border-teal-500/20 text-[11px] text-teal-300 font-medium hover:bg-teal-600/25 transition-colors"
+              >
+                View all {strategyData?.contentGaps?.length ?? 0} opportunities
+              </button>
+            </div>
+          );
+        })()}
 
         {/* Activity timeline — only real team work, no system/anomaly entries */}
         {(() => {

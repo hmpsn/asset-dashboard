@@ -51,7 +51,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
         setNewReqTitle(''); setNewReqDesc(''); setNewReqCategory('other'); setNewReqPage(''); setNewReqName(''); setNewReqFiles([]); setShowNewRequest(false);
         loadRequests(workspaceId);
       }
-    } catch { setToast({ message: 'Failed to submit request. Please try again.', type: 'error' }); setTimeout(() => setToast(null), 5000); }
+    } catch { setToast({ message: 'Failed to submit request. Please try again.', type: 'error' }); }
     finally { setSubmittingReq(false); }
   };
 
@@ -72,7 +72,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
       }
       setReqNoteInput(''); setNoteFiles([]);
       loadRequests(workspaceId);
-    } catch { setToast({ message: 'Failed to send note. Please try again.', type: 'error' }); setTimeout(() => setToast(null), 5000); }
+    } catch { setToast({ message: 'Failed to send note. Please try again.', type: 'error' }); }
     finally { setSendingNote(false); }
   };
 

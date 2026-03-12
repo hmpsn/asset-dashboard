@@ -4,6 +4,7 @@ import {
   Loader2, Lock, Shield, MousePointerClick, Eye,
 } from 'lucide-react';
 import { EmptyState } from '../ui';
+import { fmtMoney, fmtMoneyFull } from '../../utils/formatNumbers';
 
 interface PageROI {
   pagePath: string;
@@ -45,16 +46,6 @@ interface ROIData {
 interface ROIDashboardProps {
   workspaceId: string;
   tier: 'free' | 'growth' | 'premium';
-}
-
-function fmtMoney(value: number): string {
-  if (value >= 10000) return `$${(value / 1000).toFixed(1)}k`;
-  if (value >= 1000) return `$${(value / 1000).toFixed(1)}k`;
-  return `$${value.toFixed(2)}`;
-}
-
-function fmtMoneyFull(value: number): string {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
 }
 
 export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {

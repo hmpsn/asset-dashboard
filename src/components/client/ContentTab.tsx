@@ -4,9 +4,10 @@ import {
   Check, Edit3, X, TrendingUp, Download, ExternalLink,
 } from 'lucide-react';
 import { TierGate, type Tier } from '../ui';
-import type { ClientContentRequest, ClientBriefPreview, ClientTab } from './types';
+import type { ClientContentRequest, ClientTab } from './types';
 import type { PricingModalState } from './StrategyTab';
 import { STUDIO_NAME } from '../../constants';
+import { useContentRequests } from '../../hooks/useContentRequests';
 
 interface ContentTabProps {
   contentRequests: ClientContentRequest[];
@@ -35,85 +36,19 @@ export function ContentTab({
   const [newTopicServiceType, setNewTopicServiceType] = useState<'brief_only' | 'full_post'>('brief_only');
   const [newTopicPageType] = useState<'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource'>('blog');
 
-  // Expansion / interaction state
-  const [expandedContentReq, setExpandedContentReq] = useState<string | null>(null);
-  const [contentComment, setContentComment] = useState('');
-  const [sendingContentComment, setSendingContentComment] = useState(false);
-  const [declineReqId, setDeclineReqId] = useState<string | null>(null);
-  const [declineReason, setDeclineReason] = useState('');
-  const [feedbackReqId, setFeedbackReqId] = useState<string | null>(null);
-  const [feedbackText, setFeedbackText] = useState('');
-  const [briefPreviews, setBriefPreviews] = useState<Record<string, ClientBriefPreview>>({});
-
-  // ── Content-specific API functions ──
-
-  const declineTopic = async (reqId: string) => {
-    try {
-      const res = await fetch(`/api/public/content-request/${workspaceId}/${reqId}/decline`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: declineReason.trim() || undefined }),
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setContentRequests(prev => prev.map(r => r.id === reqId ? updated : r));
-        setDeclineReqId(null); setDeclineReason('');
-      }
-    } catch { setToast({ message: 'Failed to decline topic. Please try again.', type: 'error' }); setTimeout(() => setToast(null), 5000); }
-  };
-
-  const approveBrief = async (reqId: string) => {
-    try {
-      const res = await fetch(`/api/public/content-request/${workspaceId}/${reqId}/approve`, { method: 'POST' });
-      if (res.ok) {
-        const updated = await res.json();
-        setContentRequests(prev => prev.map(r => r.id === reqId ? updated : r));
-        setToast({ message: `Brief approved! ${STUDIO_NAME} will begin content production.`, type: 'success' });
-        setTimeout(() => setToast(null), 5000);
-      }
-    } catch { setToast({ message: 'Failed to approve brief. Please try again.', type: 'error' }); setTimeout(() => setToast(null), 5000); }
-  };
-
-  const requestChanges = async (reqId: string) => {
-    try {
-      const res = await fetch(`/api/public/content-request/${workspaceId}/${reqId}/request-changes`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ feedback: feedbackText.trim() }),
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setContentRequests(prev => prev.map(r => r.id === reqId ? updated : r));
-        setFeedbackReqId(null); setFeedbackText('');
-      }
-    } catch { setToast({ message: 'Failed to submit feedback. Please try again.', type: 'error' }); setTimeout(() => setToast(null), 5000); }
-  };
-
-  const addContentComment = async (reqId: string) => {
-    if (!contentComment.trim()) return;
-    setSendingContentComment(true);
-    try {
-      const res = await fetch(`/api/public/content-request/${workspaceId}/${reqId}/comment`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: contentComment.trim(), author: 'client' }),
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setContentRequests(prev => prev.map(r => r.id === reqId ? updated : r));
-        setContentComment('');
-      }
-    } catch { setToast({ message: 'Failed to send comment. Please try again.', type: 'error' }); setTimeout(() => setToast(null), 5000); }
-    setSendingContentComment(false);
-  };
-
-  const loadBriefPreview = async (briefId: string) => {
-    if (briefPreviews[briefId]) return;
-    try {
-      const res = await fetch(`/api/public/content-brief/${workspaceId}/${briefId}`);
-      if (res.ok) {
-        const brief = await res.json();
-        setBriefPreviews(prev => ({ ...prev, [briefId]: brief }));
-      }
-    } catch { setToast({ message: 'Failed to load brief preview.', type: 'error' }); setTimeout(() => setToast(null), 5000); }
-  };
+  // ── Content-specific API functions + interaction state (extracted hook) ──
+  const {
+    expandedContentReq, setExpandedContentReq,
+    contentComment, setContentComment,
+    sendingContentComment,
+    declineReqId, setDeclineReqId,
+    declineReason, setDeclineReason,
+    feedbackReqId, setFeedbackReqId,
+    feedbackText, setFeedbackText,
+    briefPreviews,
+    declineTopic, approveBrief, requestChanges,
+    addContentComment, loadBriefPreview,
+  } = useContentRequests({ workspaceId, setContentRequests, setToast });
 
   return (<>
     {/* Alert banner for items needing review */}
