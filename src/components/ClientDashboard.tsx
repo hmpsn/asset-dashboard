@@ -601,9 +601,10 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
                   )}
                 </button>
                 {showDatePicker && (<>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowDatePicker(false)} />
-                  <div className="absolute right-0 top-full mt-2 z-50 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl p-4 w-72"
+                  <div className="fixed inset-0 z-40 sm:bg-transparent bg-black/50" onClick={() => setShowDatePicker(false)} />
+                  <div className="fixed sm:absolute inset-x-0 bottom-0 sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-2 z-50 bg-zinc-900 border-t sm:border border-zinc-700 rounded-t-2xl sm:rounded-xl shadow-2xl p-4 sm:w-72"
                     onClick={e => e.stopPropagation()}>
+                    <div className="sm:hidden w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-3" />
                     <p className="text-xs font-medium text-zinc-400 mb-3">Custom date range</p>
                     <div className="space-y-2">
                       <label className="block">
@@ -611,7 +612,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
                         <input type="date" ref={customStartRef}
                           defaultValue={customDateRange?.startDate || new Date(Date.now() - 28 * 86400000).toISOString().split('T')[0]}
                           max={new Date().toISOString().split('T')[0]}
-                          className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
+                          className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm sm:text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
                         />
                       </label>
                       <label className="block">
@@ -619,13 +620,13 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
                         <input type="date" ref={customEndRef}
                           defaultValue={customDateRange?.endDate || new Date().toISOString().split('T')[0]}
                           max={new Date().toISOString().split('T')[0]}
-                          className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
+                          className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm sm:text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
                         />
                       </label>
                     </div>
                     <div className="flex items-center gap-2 mt-3">
                       <button onClick={() => setShowDatePicker(false)}
-                        className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors">
+                        className="flex-1 px-3 py-2.5 sm:py-1.5 text-sm sm:text-xs rounded-lg border border-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors">
                         Cancel
                       </button>
                       <button onClick={() => {
@@ -633,7 +634,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
                         const e = customEndRef.current?.value;
                         if (s && e && s <= e) applyCustomRange(s, e, ws);
                       }}
-                        className="flex-1 px-3 py-1.5 text-xs rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-medium transition-colors">
+                        className="flex-1 px-3 py-2.5 sm:py-1.5 text-sm sm:text-xs rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-medium transition-colors">
                         Apply
                       </button>
                     </div>
