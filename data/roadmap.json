@@ -3,7 +3,7 @@
     {
       "id": "sprint-B",
       "name": "Client Impact & Retention",
-      "hours": "20-25",
+      "hours": "21-27",
       "rationale": "PRIORITY 1: Make existing clients see undeniable value. Prove ROI of every change, reduce churn, and bridge strategy to action.",
       "items": [
         {
@@ -230,13 +230,22 @@
           "priority": "P1",
           "notes": "The 'Not Yet Ranking' summary card in StrategyTab shows a count but offers no actionable path — violates diagnosis→plan→action principle. New expandable section (after Content Opportunities, before Quick Wins): per-page breakdown of unranked pages with AI-diagnosed likely reason (thin content, not indexed, high KD, cannibalization, technical issues from audit data), recommended action per page (request content expansion, view in Health tab, submit optimization request), priority sorting (commercial intent first, fixable issues above difficulty-based, pages with impressions above zero-impression), status badges if hmpsn studio is already working on it. Data sources: strategyData.pageMap (currentPosition, primaryKeyword, intent), audit detail (page issues, word count), GSC (impressions for near-ranking detection), existing request/work-order status. Placement: after Content Opportunities, before Quick Wins — 'here's what's not ranking' → 'here's why' → 'here's what to do about it'. Cross-links: 'View issues' navigates to Health tab, 'Request optimization' opens Requests, 'Get content brief' opens content flow. Future: auto-generate optimization work orders for pages with simple fixes.",
           "status": "pending"
+        },
+        {
+          "id": 207,
+          "title": "Client audit completion email notification",
+          "source": "Roadmap review Mar 2026",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Send branded email when audit completes showing updated health score and delta ('Your site health improved from 72 → 85 after last week's changes'). Low-effort, high-engagement retention touchpoint. Reuse existing email-templates.ts pattern (renderAuditComplete). Trigger from audit:complete event. Include top 3 fixed issues + top 3 remaining issues + CTA to Health tab.",
+          "status": "pending"
         }
       ]
     },
     {
       "id": "sprint-C",
       "name": "Content Pipeline Completion",
-      "hours": "22-30",
+      "hours": "24-33",
       "rationale": "PRIORITY 2: Close the brief → publish → measure loop. Enable recurring content revenue. The pipeline is built — now close the last-mile gap.",
       "items": [
         {
@@ -321,8 +330,8 @@
           "title": "Content calendar",
           "source": "FEATURE_AUDIT",
           "est": "3-4h",
-          "priority": "P2",
-          "notes": "Visual calendar/timeline view of content in production with due dates. Shows briefs, posts, and published content. Natural fit with content pipeline completion.",
+          "priority": "P1",
+          "notes": "Visual calendar/timeline view of content in production with due dates. Shows briefs, posts, and published content. Essential interface for recurring content subscriptions (#111). Elevated from P2 — becomes the primary pipeline management UI once subscriptions are live.",
           "status": "pending"
         },
         {
@@ -342,13 +351,22 @@
           "priority": "P2",
           "notes": "Let clients download or print a polished branded HTML brief. Currently admin-only via renderBriefHTML(). Add public endpoint + download button in client Inbox.",
           "status": "pending"
+        },
+        {
+          "id": 212,
+          "title": "Data export / portability (CSV/JSON)",
+          "source": "Roadmap review Mar 2026",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "CSV/JSON export for key datasets: audit history, keyword strategy, content briefs, ROI data, activity log. Reduces churn anxiety ('what if I leave?') and is often a procurement requirement for larger agency clients. Add export buttons to Strategy, Health, ROI, and Content tabs. Server endpoints return formatted CSV or JSON.",
+          "status": "pending"
         }
       ]
     },
     {
       "id": "sprint-D",
       "name": "Self-Service & Distribution",
-      "hours": "24-34",
+      "hours": "26-37",
       "rationale": "PRIORITY 3: Remove admin bottleneck. Enable organic acquisition at scale via OAuth self-service and Webflow Marketplace.",
       "items": [
         {
@@ -405,13 +423,22 @@
           "priority": "P1",
           "notes": "CNAME + reverse proxy. Configurable branding (logo, colors, favicon, email sender, chatbot persona). Agency resale tiers ($299-999/mo). Moved from Sprint C — fits better with distribution/growth.",
           "status": "pending"
+        },
+        {
+          "id": 209,
+          "title": "Public API rate limiting & bot protection",
+          "source": "Roadmap review Mar 2026",
+          "est": "2-3h",
+          "priority": "P0",
+          "notes": "Harden /api/public/* endpoints before marketplace launch (#119). Per-IP rate limiting (express-rate-limit tiers: 100/min general, 10/min auth, 5/min AI endpoints), bot fingerprinting, credential stuffing protection on client login. Add Cloudflare Turnstile or similar on public forms. Prerequisite for self-service distribution at scale.",
+          "status": "pending"
         }
       ]
     },
     {
       "id": "sprint-E",
       "name": "Admin Polish & DX",
-      "hours": "14-20",
+      "hours": "16-23",
       "rationale": "PRIORITY 4: Small improvements that compound UX quality. Each item is low-effort, high-polish. Run in parallel with or between larger sprints.",
       "items": [
         {
@@ -495,14 +522,49 @@
           "priority": "P2",
           "notes": "Per-tab first-visit tooltip tours, onboarding wizard AI integration, optional 'SEO Basics' learning path. Builds on #191 and #192. Moved from Sprint B.",
           "status": "pending"
+        },
+        {
+          "id": 210,
+          "title": "Error monitoring & observability (Sentry)",
+          "source": "Roadmap review Mar 2026",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Add Sentry (or similar) for client-facing error tracking on both frontend and backend. Critical before scaling via marketplace — need visibility into errors without relying on the feedback widget (#190). Source maps for frontend, Express error handler integration for backend. Alert rules for payment flow errors, WebSocket disconnects, and AI generation failures.",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "sprint-infra",
+      "name": "Infrastructure & Reliability",
+      "hours": "18-26",
+      "rationale": "PRIORITY 5: Foundation work that de-risks scaling. Database migration unblocks team features and concurrent writes. E2E tests protect critical revenue paths. Execute before or in parallel with SEO Intelligence.",
+      "items": [
+        {
+          "id": 211,
+          "title": "PostgreSQL migration (from JSON-on-disk)",
+          "source": "Roadmap review Mar 2026",
+          "est": "8-12h",
+          "priority": "P1",
+          "notes": "Migrate from JSON file persistence to PostgreSQL. Currently noted as 'deferred until 5-10GB' on #195, but concurrent write issues and relational query needs will surface well before that — especially with team management (#16), permissions (#17), and recurring subscriptions (#111). Phased approach: (1) Add Drizzle/Prisma ORM + schema definitions, (2) Migration scripts to import existing JSON data, (3) Swap data layer one domain at a time (workspaces → payments → activity → content), (4) Keep JSON backup scheduler as fallback during transition. Much harder to migrate later with more features built on file I/O.",
+          "status": "pending"
+        },
+        {
+          "id": 208,
+          "title": "Critical-path E2E tests",
+          "source": "Roadmap review Mar 2026",
+          "est": "6-8h",
+          "priority": "P1",
+          "notes": "End-to-end tests for revenue-critical and data-critical flows: Stripe checkout (single + cart), audit run → score calculation → suppression, content brief generation → post generation, approval workflow (propose → review → apply to Webflow), WebSocket broadcast delivery, client login + JWT refresh. Use Vitest + Supertest for API tests, Playwright for critical UI flows. No competitor can break your payment pipeline with confidence if this exists.",
+          "status": "pending"
         }
       ]
     },
     {
       "id": "sprint-F",
       "name": "SEO Intelligence Expansion",
-      "hours": "24-32",
-      "rationale": "PRIORITY 5: Deeper competitive and technical SEO capabilities that differentiate the platform.",
+      "hours": "28-40",
+      "rationale": "PRIORITY 6: Deeper competitive and technical SEO capabilities that differentiate the platform.",
       "items": [
         {
           "id": 199,
@@ -548,6 +610,15 @@
           "priority": "P2",
           "notes": "Select multiple pages → apply same fix pattern (e.g., append brand name to all titles). Checkbox multi-select, bulk AI rewrite, preview diff, one-click apply.",
           "status": "pending"
+        },
+        {
+          "id": 213,
+          "title": "Lightweight backlink profile overview",
+          "source": "Roadmap review Mar 2026",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Quick win using existing SEMRush integration (getDomainOrganic already available). Show: total backlinks, referring domains count, top 10 referring domains, new/lost backlinks trend (30d). Add as sub-section in Strategy tab or standalone panel. Backlinks are a top-3 ranking factor — even a basic view strengthens premium tier value prop significantly. Full backlink intelligence (#110) is a separate, larger effort.",
+          "status": "pending"
         }
       ]
     },
@@ -555,7 +626,7 @@
       "id": "sprint-G-new",
       "name": "Team & Collaboration",
       "hours": "20-26",
-      "rationale": "PRIORITY 6: Multi-user support for growing agencies. Execute when team size or client demands justify it.",
+      "rationale": "PRIORITY 7: Multi-user support for growing agencies. Execute when team size or client demands justify it.",
       "items": [
         {
           "id": 16,
@@ -786,8 +857,8 @@
           "title": "Backlink intelligence & outreach",
           "source": "FEATURE_VISION #5",
           "est": "10-15h",
-          "priority": "P3",
-          "notes": "Ahrefs/Moz API → backlink profile → link gaps → AI outreach templates.",
+          "priority": "P2",
+          "notes": "Ahrefs/Moz API → backlink profile → link gaps → AI outreach templates. Elevated from P3 — backlinks are a top-3 ranking factor and this capability justifies premium pricing. Lightweight overview (#213) ships first in Sprint F; this is the full-featured follow-up.",
           "status": "pending"
         },
         {
