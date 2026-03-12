@@ -349,8 +349,10 @@ A brief value assessment of every feature in the platform, covering what it does
 
 ---
 
-### 29. Competitor SEO Analysis
+### 29. Competitor SEO Analysis *(removed from sidebar — component retained)*
 **What it does:** Side-by-side SEO comparison between your site and any competitor URL. Runs a full audit on both sites simultaneously, then compares scores, page counts, error/warning ratios, title/description lengths, OG coverage, schema coverage, H1 coverage, and issue distribution. Surfaces **quick wins** — issues the competitor handles well that your site doesn't. Color-coded metric comparisons (green = winning, red = losing) with per-category breakdowns. **Auto-restore**: comparison results persist to disk — the most recent comparison for your site loads on mount, pre-filling the competitor URL.
+
+**Status:** Removed from sidebar as standalone tab (March 2026). Component (`CompetitorAnalysis.tsx`) retained for future reuse. Will be replaced by **Competitive Intelligence Hub** integrated into the Strategy tab — see roadmap item #199. The new approach uses SEMRush keyword gap data + workspace competitor domains for actionable intelligence (keyword gaps, content gaps, SERP overlap, competitive monitoring) instead of basic HTML metric comparison.
 
 **Agency value:** Answers the #1 client question — "how do we compare to [competitor]?" — with data instead of guesswork. Identifies specific areas where the competitor is ahead.
 
@@ -880,10 +882,23 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - **Heavy dependency audit**: Identify if any large libraries (chart libs, PDF generators) can be loaded on-demand.
 - **Tree-shaking**: Verify Lucide icons are tree-shaken (only used icons in bundle, not the full set).
 
-### Competitor Analysis Enhancements
-- **Historical comparisons**: Track how you vs. competitor gap changes over time.
-- **Multi-competitor**: Compare against 2-3 competitors simultaneously.
-- **Keyword overlap**: Show which keywords both sites rank for and where you're winning/losing.
+### Competitive Intelligence (Roadmap #199)
+- ~~Standalone Competitors tab~~: ✅ Removed from sidebar (March 2026) — component retained. Will be replaced by Competitive Intelligence Hub in Strategy tab.
+- **Phase 1: Keyword gap analysis** — Wire SEMRush `getKeywordGap()` into Strategy tab. Show competitor keywords, optimization targets, advantages.
+- **Phase 2: Content gap analysis** — Compare sitemaps, AI-categorize missing topics, generate brief suggestions.
+- **Phase 3: Competitive monitoring** — Monthly automated competitor audits, historical tracking, anomaly alerts.
+- **Phase 4: SERP overlap dashboard** — Head-to-head keyword positions, win/loss tracking over time.
+
+### Admin Navigation
+- ~~Sidebar restructure~~: ✅ Shipped (March 2026) — Reorganized from 4 groups/18 items to 4 groups/14 items. New structure: ANALYTICS (Search Console, GA, Rank Tracker, Annotations), SITE HEALTH (Site Audit, Performance, Links, Assets), SEO (Brand & AI, Strategy, Editor, Schema), CONTENT (Content Briefs, Content, Content Perf).
+- ~~Merged Links tab~~: ✅ Shipped (March 2026) — Redirects + Internal Links merged into single Links tab (`LinksPanel.tsx`) with sub-tab navigation.
+- ~~Header request widget~~: ✅ Shipped (March 2026) — Requests moved from sidebar to header bar as badge widget with pending count indicator. NotificationBell also moved to header.
+- ~~Command palette sync~~: ✅ Shipped (March 2026) — CommandPalette.tsx updated to match new sidebar structure.
+- ~~Sidebar colored group icons~~: ✅ Shipped (March 2026) — Activity (blue) for ANALYTICS, Shield (emerald) for SITE HEALTH, Zap (teal) for SEO, BookOpen (amber) for CONTENT. Hover opacity transition.
+
+### Roadmap & Project Management
+- ~~Shipping velocity chart~~: ✅ Shipped (March 2026) — Pure SVG area chart in Roadmap.tsx showing cumulative features shipped per month. Teal gradient fill, per-month count labels, month axis.
+- ~~Sprint restructure~~: ✅ Shipped (March 2026) — Reorganized from 3 active sprints + 1 backlog to 7 themed sprints: B (Client Impact & Retention), C (Content Pipeline Completion), D (Self-Service & Distribution), E (Admin Polish & DX), F (SEO Intelligence Expansion), G (Team & Collaboration), + trimmed Backlog. Added 4 new roadmap items (#201-204).
 
 ### Sales Report Enhancements
 - **Branded PDF export**: Generate prospect reports as downloadable PDFs with agency branding.
@@ -916,4 +931,4 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
-Current feature count: **66**. Last updated: March 2026 (Brand & AI Hub consolidation shipped).
+Current feature count: **69**. Last updated: March 2026 (Sidebar colored icons + roadmap velocity chart shipped).

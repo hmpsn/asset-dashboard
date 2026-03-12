@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
-  Search, Globe, BarChart3, Shield, Gauge, Pencil, CornerDownRight,
-  Share2, Target, Code2, Clipboard, Image, Flag, TrendingUp, Swords,
+  Search, Globe, BarChart3, Shield, Gauge, Pencil, Link2,
+  Target, Code2, Clipboard, Image, Flag, TrendingUp, Sparkles, FileText,
   LayoutDashboard, Settings, Command, ArrowUp, ArrowDown, CornerDownLeft,
-  Zap, FileSearch,
+  Zap, FileSearch, MessageSquare,
 } from 'lucide-react';
 import { type Workspace } from './WorkspaceSelector';
 
@@ -11,8 +11,9 @@ type Page =
   | 'home'
   | 'media'
   | 'seo-audit' | 'seo-editor'
-  | 'seo-redirects' | 'seo-internal'
-  | 'seo-strategy' | 'seo-schema' | 'seo-briefs' | 'seo-competitors' | 'seo-ranks'
+  | 'links'
+  | 'seo-strategy' | 'seo-schema' | 'seo-briefs' | 'seo-ranks'
+  | 'content' | 'brand'
   | 'search' | 'analytics' | 'annotations'
   | 'performance'
   | 'content-perf'
@@ -43,19 +44,19 @@ const NAV_ITEMS: Array<{ id: Page; label: string; icon: typeof Search; group: st
   { id: 'search', label: 'Search Console', icon: Search, group: 'Analytics', needsSite: true },
   { id: 'analytics', label: 'Google Analytics', icon: BarChart3, group: 'Analytics', needsSite: true },
   { id: 'seo-ranks', label: 'Rank Tracker', icon: TrendingUp, group: 'Analytics', needsSite: true },
+  { id: 'annotations', label: 'Annotations', icon: Flag, group: 'Analytics', needsSite: true },
   { id: 'seo-audit', label: 'Site Audit', icon: Globe, group: 'Site Health', needsSite: true },
   { id: 'performance', label: 'Performance', icon: Gauge, group: 'Site Health', needsSite: true },
-  { id: 'seo-redirects', label: 'Redirects', icon: CornerDownRight, group: 'Site Health', needsSite: true },
-  { id: 'seo-internal', label: 'Internal Links', icon: Share2, group: 'Site Health', needsSite: true },
+  { id: 'links', label: 'Links', icon: Link2, group: 'Site Health', needsSite: true },
+  { id: 'media', label: 'Assets', icon: Image, group: 'Site Health' },
+  { id: 'brand', label: 'Brand & AI', icon: Sparkles, group: 'SEO' },
   { id: 'seo-strategy', label: 'Strategy', icon: Target, group: 'SEO', needsSite: true },
   { id: 'seo-editor', label: 'SEO Editor', icon: Pencil, group: 'SEO', needsSite: true },
   { id: 'seo-schema', label: 'Schema', icon: Code2, group: 'SEO', needsSite: true },
-  { id: 'seo-briefs', label: 'Content Briefs', icon: Clipboard, group: 'SEO', needsSite: true },
-  { id: 'seo-competitors', label: 'Competitors', icon: Swords, group: 'SEO', needsSite: true },
-  { id: 'content-perf', label: 'Content Performance', icon: BarChart3, group: 'SEO', needsSite: true },
-  { id: 'requests', label: 'Requests', icon: Clipboard, group: 'Manage' },
-  { id: 'media', label: 'Assets', icon: Image, group: 'Manage' },
-  { id: 'annotations', label: 'Annotations', icon: Flag, group: 'Manage', needsSite: true },
+  { id: 'seo-briefs', label: 'Content Briefs', icon: Clipboard, group: 'Content', needsSite: true },
+  { id: 'content', label: 'Content', icon: FileText, group: 'Content', needsSite: true },
+  { id: 'content-perf', label: 'Content Performance', icon: BarChart3, group: 'Content', needsSite: true },
+  { id: 'requests', label: 'Requests', icon: MessageSquare, group: '' },
   { id: 'settings', label: 'Settings', icon: Settings, group: '' },
   { id: 'prospect', label: 'Prospect', icon: FileSearch, group: '' },
   { id: 'roadmap', label: 'Roadmap', icon: Shield, group: '' },

@@ -2,9 +2,9 @@
   "sprints": [
     {
       "id": "sprint-B",
-      "name": "Proof of Value",
-      "hours": "14-20",
-      "rationale": "PRIORITY 1: Prove platform ROI to existing studio clients. Every item here makes the value of the platform undeniable — growth tracking, impact attribution, shareable proof, and delivery notifications.",
+      "name": "Client Impact & Retention",
+      "hours": "20-25",
+      "rationale": "PRIORITY 1: Make existing clients see undeniable value. Prove ROI of every change, reduce churn, and bridge strategy to action.",
       "items": [
         {
           "id": 74,
@@ -183,15 +183,6 @@
           "shippedAt": "2026-03-10"
         },
         {
-          "id": 193,
-          "title": "Onboarding-integrated SEO education",
-          "source": "Product idea Mar 2026",
-          "est": "2-3h",
-          "priority": "P1",
-          "notes": "First-time visitors get contextual educational tips as they explore each tab. Phase 1: per-tab first-visit tooltip tour — 'This is your Health Score — it measures technical SEO issues. Above 80 is great.' Trigger on first visit per tab per user (localStorage tracking). Phase 2: onboarding wizard suggests 'Ask the AI to explain your dashboard' as a first action, linking to the SEO tutor chatbot mode (#192). Phase 3: optional 'SEO Basics' learning path — 5 short lessons (What is SEO, How Google Works, Your Site Health, Keywords & Content, Measuring Success) with completion tracking. Builds on #191 explainers and #192 tutor mode. Reduces time-to-value for SEO-novice clients.",
-          "status": "pending"
-        },
-        {
           "id": 194,
           "title": "AI blog post generator (brief → full post)",
           "source": "Product idea Mar 2026",
@@ -202,13 +193,34 @@
           "shippedAt": "2026-03-10"
         },
         {
-          "id": 195,
-          "title": "Storage optimization & monitoring",
-          "source": "Infrastructure review Mar 2026",
+          "id": 200,
+          "title": "Admin sidebar restructure + request widget",
+          "source": "UX cleanup Mar 2026",
+          "est": "3-4h",
+          "priority": "P0",
+          "notes": "Shipped — Reorganized admin sidebar from 4 groups/18 items to 4 groups/14 items. New structure: ANALYTICS (Search Console, GA, Rank Tracker, Annotations), SITE HEALTH (Site Audit, Performance, Links [merged Redirects+Internal Links], Assets), SEO (Brand & AI [moved to top], Strategy, Editor, Schema), CONTENT (Content Briefs, Content, Content Performance). Removed Competitors tab from sidebar (component retained, future competitive intelligence will live in Strategy per #199). Moved Requests to header bar as badge widget alongside NotificationBell. Merged Redirects + Internal Links into single Links tab with sub-tabs.",
+          "status": "done",
+          "shippedAt": "2026-03-11"
+        },
+        {
+          "id": 205,
+          "title": "Sidebar group colored icons + visual polish",
+          "source": "UX polish Mar 2026",
+          "est": "30m",
+          "priority": "P1",
+          "notes": "Shipped — Added colored lucide icons to sidebar group headers: Activity (blue) for ANALYTICS, Shield (emerald) for SITE HEALTH, Zap (teal) for SEO, BookOpen (amber) for CONTENT. Hover opacity transition, moved chevron to right side, increased padding for visual weight.",
+          "status": "done",
+          "shippedAt": "2026-03-11"
+        },
+        {
+          "id": 206,
+          "title": "Roadmap shipping velocity chart + sprint restructure",
+          "source": "Product management Mar 2026",
           "est": "2-3h",
-          "priority": "P2",
-          "notes": "Currently at 0.4GB on Render persistent disk (50GB limit). Growth drivers: chat history (no pruning), daily backups (7-day retention = 7x multiplier), rank tracking snapshots, activity logs. Phase 1: Add /api/admin/storage-stats endpoint with per-directory breakdown visible in Command Center. Phase 2: Chat history pruning — archive messages older than 90 days, keep conversation summaries. Activity log rotation — compress logs older than 6 months. Reduce backup retention from 7→3 days or switch to incremental backups. Phase 3 (when approaching 5-10GB): migrate structured data to PostgreSQL (Render managed DB or Supabase), move files to S3/Cloudflare R2, add Redis for caching. Estimated timeline: Phase 1-2 keeps us under 2GB for 12+ months. Phase 3 needed at ~20+ active workspaces.",
-          "status": "pending"
+          "priority": "P1",
+          "notes": "Shipped — (1) SVG shipping velocity chart in Roadmap.tsx showing cumulative features shipped per month with teal gradient area chart. (2) Full roadmap restructure: renamed Sprint B → Client Impact & Retention, Sprint C → Content Pipeline Completion, Sprint D → Self-Service & Distribution. Created 3 new sprints: Sprint E (Admin Polish & DX), Sprint F (SEO Intelligence Expansion), Sprint G (Team & Collaboration). Added 4 new items: #201 brief regeneration, #202 client brief export, #203 brand docs upload UI, #204 bulk SEO editor operations. Trimmed backlog from 30+ unsorted items to 24 organized items.",
+          "status": "done",
+          "shippedAt": "2026-03-11"
         },
         {
           "id": 179,
@@ -223,9 +235,9 @@
     },
     {
       "id": "sprint-C",
-      "name": "Revenue Expansion",
-      "hours": "18-26",
-      "rationale": "PRIORITY 2: New revenue streams from existing infrastructure. Expand what existing studio clients can buy, add agency resale, and track platform revenue.",
+      "name": "Content Pipeline Completion",
+      "hours": "22-30",
+      "rationale": "PRIORITY 2: Close the brief → publish → measure loop. Enable recurring content revenue. The pipeline is built — now close the last-mile gap.",
       "items": [
         {
           "id": 25,
@@ -268,12 +280,22 @@
           "shippedAt": "2026-02"
         },
         {
-          "id": 27,
-          "title": "White-label domain support",
-          "source": "MONETIZATION.md White-Label",
-          "est": "4-6h",
+          "id": 178,
+          "title": "Brand voice & personas auto-generation",
+          "source": "Product Vision Mar 2026",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — One-click auto-generation from website crawl. Consolidated into Brand & AI Hub (BrandHub.tsx).",
+          "status": "done",
+          "shippedAt": "2026-03"
+        },
+        {
+          "id": 106,
+          "title": "Auto-publish to Webflow CMS",
+          "source": "FEATURE_VISION #1",
+          "est": "6-8h",
           "priority": "P0",
-          "notes": "CNAME + reverse proxy. Configurable branding (logo, colors, favicon, email sender, chatbot persona). Agency resale tiers ($299-999/mo). New revenue stream.",
+          "notes": "Brief → AI generates → client approves → one-click publish to CMS collection. Already have Webflow CMS write access (PATCH collections/:id/items/:id). Gap is markdown → Webflow rich text formatting. Killer differentiator — no competitor goes from brief to live on site.",
           "status": "pending"
         },
         {
@@ -282,25 +304,7 @@
           "source": "FEATURE_VISION #6",
           "est": "6-8h",
           "priority": "P1",
-          "notes": "Monthly content packages: '4 posts/mo from strategy gaps → generate → approve → publish.' Content pipeline fully built. Add Stripe subscription product + scheduler. Transforms content from transactional to recurring. $500-2K/mo additional recurring per client.",
-          "status": "pending"
-        },
-        {
-          "id": 106,
-          "title": "Auto-publish to Webflow CMS",
-          "source": "FEATURE_VISION #1",
-          "est": "6-8h",
-          "priority": "P1",
-          "notes": "Brief → AI generates → client approves → one-click publish to CMS collection. Already have Webflow CMS write access (PATCH collections/:id/items/:id). Gap is markdown → Webflow rich text formatting. Killer differentiator — no competitor goes from brief to live on site.",
-          "status": "pending"
-        },
-        {
-          "id": 76,
-          "title": "Strategy & implementation hours system",
-          "source": "Tier audit discussion",
-          "est": "4-6h",
-          "priority": "P2",
-          "notes": "Premium includes 3 strategy & implementation hrs/mo. Additional hours: $200/hr ad-hoc, $175/hr 5-hr block, $150/hr 10-hr block. Scoped to SEO execution. Hour tracking, usage dashboard, Stripe add-on products.",
+          "notes": "Monthly content packages: '4 posts/mo from strategy gaps → generate → approve → publish.' Add Stripe subscription product + scheduler. $500-2K/mo additional recurring per client. Depends on auto-publish (#106).",
           "status": "pending"
         },
         {
@@ -309,26 +313,43 @@
           "source": "Platform Audit Mar 2026",
           "est": "3-4h",
           "priority": "P1",
-          "notes": "Admin-only revenue dashboard: total MRR, revenue by workspace, revenue by product type (tiers, content, fixes, hours), MoM growth chart, payment history. Data from payments.ts + Stripe. Visible in Command Center settings area.",
+          "notes": "Admin-only revenue dashboard: total MRR, revenue by workspace, revenue by product type (tiers, content, fixes, hours), MoM growth chart, payment history. Data from payments.ts + Stripe.",
           "status": "pending"
         },
         {
-          "id": 178,
-          "title": "Brand voice & personas auto-generation",
-          "source": "Product Vision Mar 2026",
-          "est": "2-3h",
-          "priority": "P1",
-          "notes": "Shipped — Phase 1: One-click auto-generation from website crawl. Phase 2: Consolidated into Brand & AI Hub (BrandHub.tsx) — dedicated sidebar tab housing Brand Voice, Knowledge Base, and Audience Personas in one screen. Shared scrapeWorkspaceSite() helper extracts content from up to 15 priority pages. (1) Brand Voice: GPT-4.1 brand strategist prompt. (2) Personas: GPT-4.1 marketing strategist prompt, structured JSON output. (3) Knowledge Base: GPT-4.1 business analyst prompt. All three sections include 'Generate from Website' buttons and auto-save. Remaining phases: intake wizard, StoryBrand framework, Whisper transcription.",
-          "status": "done",
-          "shippedAt": "2026-03"
+          "id": 21,
+          "title": "Content calendar",
+          "source": "FEATURE_AUDIT",
+          "est": "3-4h",
+          "priority": "P2",
+          "notes": "Visual calendar/timeline view of content in production with due dates. Shows briefs, posts, and published content. Natural fit with content pipeline completion.",
+          "status": "pending"
+        },
+        {
+          "id": 201,
+          "title": "Brief regeneration with feedback",
+          "source": "Content pipeline enhancement",
+          "est": "3-4h",
+          "priority": "P2",
+          "notes": "Re-generate a content brief with user instructions: 'make it more commercial', 'add a comparison table section'. Re-prompt with context from previous version + user feedback. Preserves version history.",
+          "status": "pending"
+        },
+        {
+          "id": 202,
+          "title": "Client brief export (download/print)",
+          "source": "Content pipeline enhancement",
+          "est": "2h",
+          "priority": "P2",
+          "notes": "Let clients download or print a polished branded HTML brief. Currently admin-only via renderBriefHTML(). Add public endpoint + download button in client Inbox.",
+          "status": "pending"
         }
       ]
     },
     {
       "id": "sprint-D",
-      "name": "Self-Service & Growth",
-      "hours": "18-26",
-      "rationale": "PRIORITY 3 (deferred until market rollout): Remove admin bottleneck and enable client acquisition at scale. Execute after proving value with existing studio clients.",
+      "name": "Self-Service & Distribution",
+      "hours": "24-34",
+      "rationale": "PRIORITY 3: Remove admin bottleneck. Enable organic acquisition at scale via OAuth self-service and Webflow Marketplace.",
       "items": [
         {
           "id": 22,
@@ -346,7 +367,7 @@
           "source": "Tier audit discussion",
           "est": "4-6h",
           "priority": "P0",
-          "notes": "OAuth Webflow App for zero-instruction client connection. Conditional OnboardingWizard step. Prerequisite for Marketplace listing.",
+          "notes": "OAuth Webflow App for zero-instruction client connection. Conditional OnboardingWizard step. Prerequisite for Marketplace listing (#119).",
           "status": "pending"
         },
         {
@@ -364,7 +385,7 @@
           "source": "ADMIN_UX_AUDIT P2-7",
           "est": "2-3h",
           "priority": "P1",
-          "notes": "7-step checklist on empty command center: create workspace, link Webflow, connect GSC, connect GA4, run audit, set client password, configure email. Progress bar, dismissable.",
+          "notes": "7-step checklist on empty command center: create workspace, link Webflow, connect GSC, connect GA4, run audit, set client password, configure email.",
           "status": "pending"
         },
         {
@@ -377,371 +398,29 @@
           "status": "pending"
         },
         {
-          "id": 26,
-          "title": "Webhook / Zapier triggers",
-          "source": "ACTION_PLAN",
-          "est": "3-4h",
-          "priority": "P2",
-          "notes": "Fire webhooks on key events (audit complete, content delivered, payment received, chat session). Enables automation integrations.",
-          "status": "pending"
-        },
-        {
-          "id": 52,
-          "title": "Responsive mobile layout",
-          "source": "FEATURE_AUDIT",
+          "id": 27,
+          "title": "White-label domain support",
+          "source": "MONETIZATION.md White-Label",
           "est": "4-6h",
-          "priority": "P2",
-          "notes": "Sidebar → bottom nav, stacked cards on small screens. Required for white-label clients on mobile.",
+          "priority": "P1",
+          "notes": "CNAME + reverse proxy. Configurable branding (logo, colors, favicon, email sender, chatbot persona). Agency resale tiers ($299-999/mo). Moved from Sprint C — fits better with distribution/growth.",
           "status": "pending"
         }
       ]
     },
     {
-      "id": "backlog",
-      "name": "Backlog",
-      "hours": "60+",
-      "rationale": "Revisit quarterly. Prioritize when a specific client need or revenue opportunity justifies it.",
+      "id": "sprint-E",
+      "name": "Admin Polish & DX",
+      "hours": "14-20",
+      "rationale": "PRIORITY 4: Small improvements that compound UX quality. Each item is low-effort, high-polish. Run in parallel with or between larger sprints.",
       "items": [
         {
-          "id": 24,
-          "title": "Multi-competitor analysis",
-          "source": "FEATURE_AUDIT",
-          "est": "3-4h",
-          "priority": "P3",
-          "notes": "Compare against 2-3 competitors simultaneously",
-          "status": "pending"
-        },
-        {
-          "id": 32,
-          "title": "Shared notes / wiki per workspace",
-          "source": "ACTION_PLAN",
+          "id": 195,
+          "title": "Storage optimization & monitoring",
+          "source": "Infrastructure review Mar 2026",
           "est": "2-3h",
-          "priority": "P3",
-          "notes": "Team-internal notes about a client",
-          "status": "pending"
-        },
-        {
-          "id": 34,
-          "title": "Client NPS survey",
-          "source": "ACTION_PLAN",
-          "est": "2h",
-          "priority": "P3",
-          "notes": "Periodic in-dashboard satisfaction survey",
-          "status": "pending"
-        },
-        {
-          "id": 36,
-          "title": "GSC 404 import for redirect scanner",
-          "source": "FEATURE_AUDIT",
-          "est": "2-3h",
-          "priority": "P3",
-          "notes": "Pull crawl errors from GSC to seed redirect scanner",
-          "status": "pending"
-        },
-        {
-          "id": 37,
-          "title": "Audit historical trend charts",
-          "source": "FEATURE_AUDIT",
-          "est": "3-4h",
-          "priority": "P3",
-          "notes": "Track audit score over time per-page, not just site-wide",
-          "status": "pending"
-        },
-        {
-          "id": 38,
-          "title": "Schema auto-schedule",
-          "source": "FEATURE_AUDIT",
-          "est": "2-3h",
-          "priority": "P3",
-          "notes": "Re-generate schemas on cadence, flag stale pages",
-          "status": "pending"
-        },
-        {
-          "id": 39,
-          "title": "Competitor historical comparisons",
-          "source": "FEATURE_AUDIT",
-          "est": "3-4h",
-          "priority": "P3",
-          "notes": "Track competitor gap over time",
-          "status": "pending"
-        },
-        {
-          "id": 40,
-          "title": "Competitor keyword overlap",
-          "source": "FEATURE_AUDIT",
-          "est": "3-4h",
-          "priority": "P3",
-          "notes": "Show shared keywords and where you win/lose",
-          "status": "pending"
-        },
-        {
-          "id": 41,
-          "title": "Historical redirect comparison",
-          "source": "FEATURE_AUDIT",
-          "est": "2-3h",
-          "priority": "P3",
-          "notes": "Track redirect status over time, detect new 404s",
-          "status": "pending"
-        },
-        {
-          "id": 42,
-          "title": "Full-site PageSpeed scan",
-          "source": "FEATURE_AUDIT",
-          "est": "3-4h",
-          "priority": "P3",
-          "notes": "Multi-page PSI scan as background job",
-          "status": "pending"
-        },
-        {
-          "id": 43,
-          "title": "Accessibility audit expansion",
-          "source": "FEATURE_AUDIT",
-          "est": "3-4h",
-          "priority": "P3",
-          "notes": "WCAG contrast, ARIA, heading order, form labels",
-          "status": "pending"
-        },
-        {
-          "id": 44,
-          "title": "WCAG AA full compliance",
-          "source": "FEATURE_AUDIT",
-          "est": "3-4h",
-          "priority": "P3",
-          "notes": "Focus indicators, keyboard nav for all interactive elements",
-          "status": "pending"
-        },
-        {
-          "id": 45,
-          "title": "GSC: URL Inspection API",
-          "source": "Memory/Roadmap",
-          "est": "3-4h",
-          "priority": "P4",
-          "notes": "Per-URL indexing status, crawl info",
-          "status": "pending"
-        },
-        {
-          "id": 46,
-          "title": "GA4: Exit pages + attribution",
-          "source": "Memory/Roadmap",
-          "est": "3-4h",
-          "priority": "P4",
-          "notes": "Advanced analytics",
-          "status": "pending"
-        },
-        {
-          "id": 47,
-          "title": "Webflow Enterprise API: 301 redirects",
-          "source": "FEATURE_AUDIT",
-          "est": "1-2h",
-          "priority": "P4",
-          "notes": "Push rules via API (Enterprise-only)",
-          "status": "pending"
-        },
-        {
-          "id": 48,
-          "title": "Sales report: branded PDF export",
-          "source": "FEATURE_AUDIT",
-          "est": "3-4h",
-          "priority": "P4",
-          "notes": "Downloadable prospect reports with agency branding",
-          "status": "pending"
-        },
-        {
-          "id": 49,
-          "title": "Sales report: email delivery",
-          "source": "FEATURE_AUDIT",
-          "est": "2h",
-          "priority": "P4",
-          "notes": "Send reports directly to prospects",
-          "status": "pending"
-        },
-        {
-          "id": 51,
-          "title": "Heavy dependency audit / tree-shaking",
-          "source": "FEATURE_AUDIT",
-          "est": "2h",
-          "priority": "P4",
-          "notes": "Verify Lucide tree-shaking, audit chart libs",
-          "status": "pending"
-        },
-        {
-          "id": 89,
-          "title": "Sales report: CRM integration",
-          "source": "FEATURE_AUDIT",
-          "est": "3-4h",
-          "priority": "P4",
-          "notes": "Push prospect data to HubSpot/Pipedrive when a report is generated",
-          "status": "pending"
-        },
-        {
-          "id": 90,
-          "title": "Schema generator → gpt-4o upgrade",
-          "source": "FEATURE_AUDIT",
-          "est": "15m",
-          "priority": "P3",
-          "notes": "CONDITIONAL: One-line model change in schema-suggester.ts. Blocked by 30K TPM limit on current OpenAI org tier. Switch when tier reaches 200K+ TPM on gpt-4o.",
-          "status": "pending"
-        },
-        {
-          "id": 107,
-          "title": "AI-powered internal linking engine",
-          "source": "FEATURE_VISION #2",
-          "est": "8-10h",
-          "priority": "P3",
-          "notes": "Scan all pages → AI identifies contextual linking opportunities → generate anchor text → preview → one-click implement via Webflow API. Ongoing orphan page detection. Agencies charge $500-2K for a one-time audit; we do it continuously.",
-          "status": "pending"
-        },
-        {
-          "id": 108,
-          "title": "Predictive SEO & trend forecasting",
-          "source": "FEATURE_VISION #3",
-          "est": "8-12h",
-          "priority": "P4",
-          "notes": "Historical GSC data + Google Trends API + seasonal patterns → predict growing keywords 30-90 days out → proactive content recommendations. Forward-looking vs competitors' backward-looking tools.",
-          "status": "pending"
-        },
-        {
-          "id": 109,
-          "title": "Cross-client benchmarking network",
-          "source": "FEATURE_VISION #4",
-          "est": "6-8h",
-          "priority": "P4",
-          "notes": "Anonymized benchmarks across all clients. 'Your health score of 78 is top 25% for your size.' Creates network effects — every new client makes data more valuable. Needs 20+ active clients.",
-          "status": "pending"
-        },
-        {
-          "id": 110,
-          "title": "Backlink intelligence & outreach",
-          "source": "FEATURE_VISION #5",
-          "est": "10-15h",
-          "priority": "P3",
-          "notes": "Ahrefs/Moz API integration → backlink profile → link gaps vs competitors → AI outreach templates → campaign tracking. Biggest current blind spot. Managed link building add-on $500-2K/mo.",
-          "status": "pending"
-        },
-        {
-          "id": 112,
-          "title": "Local SEO module",
-          "source": "FEATURE_VISION #7",
-          "est": "15-20h",
-          "priority": "P4",
-          "notes": "GBP integration, local keyword tracking, citation monitoring, local competitor analysis, review monitoring, LocalBusiness schema. 46% of Google searches have local intent. Add-on $99-149/mo.",
-          "status": "pending"
-        },
-        {
-          "id": 116,
-          "title": "AI strategy memory & learning",
-          "source": "FEATURE_VISION #11",
-          "est": "8-12h",
-          "priority": "P3",
-          "notes": "AI learns from conversations, approved changes, rejected suggestions. Understands which topics perform, what gets approved, client priorities. Creates proprietary knowledge asset — switching cost becomes enormous.",
-          "status": "pending"
-        },
-        {
-          "id": 117,
-          "title": "Client team collaboration",
-          "source": "FEATURE_VISION #12",
-          "est": "8-10h",
-          "priority": "P3",
-          "notes": "Comments on strategy items, @mentions on briefs, shared notes, assignment workflows. Multiple team members = higher switching cost. Per-seat pricing opportunity.",
-          "status": "pending"
-        },
-        {
-          "id": 118,
-          "title": "WordPress / Shopify support",
-          "source": "FEATURE_VISION #13",
-          "est": "15-20h",
-          "priority": "P4",
-          "notes": "Abstract CMS integration layer for WordPress REST API and Shopify Admin API. Same AI strategy + content engine, different publishing endpoint. WordPress is 43% of CMS market vs Webflow ~1%. Only after Webflow PMF proven.",
-          "status": "pending"
-        },
-        {
-          "id": 120,
-          "title": "Embeddable SEO widgets",
-          "source": "FEATURE_VISION #15",
-          "est": "4-6h",
-          "priority": "P4",
-          "notes": "Embeddable site health badge, traffic counter, 'Powered by' footer. Every client site becomes a lead gen channel. Passive referral generation at scale.",
-          "status": "pending"
-        },
-        {
-          "id": 29,
-          "title": "Automated competitive monitoring",
-          "source": "ACTION_PLAN",
-          "est": "3-4h",
-          "priority": "P3",
-          "notes": "Monthly competitor audit, alert on improvements. Moved from Sprint C.",
-          "status": "pending"
-        },
-        {
-          "id": 16,
-          "title": "Internal team management",
-          "source": "AUTH_ROADMAP Phase 3",
-          "est": "4-5h",
-          "priority": "P3",
-          "notes": "Invite team members, manage roles, assign workspaces. Needed when hiring/contracting. Moved from Sprint E.",
-          "status": "pending"
-        },
-        {
-          "id": 17,
-          "title": "Permission-based feature access",
-          "source": "AUTH_ROADMAP Phase 5",
-          "est": "3-4h",
-          "priority": "P3",
-          "notes": "Fine-grained: client_member view-only on approvals, member can't delete workspaces. Moved from Sprint E.",
-          "status": "pending"
-        },
-        {
-          "id": 23,
-          "title": "Writer assignment",
-          "source": "FEATURE_AUDIT",
-          "est": "2-3h",
-          "priority": "P3",
-          "notes": "Assign content briefs to specific writers. Moved from Sprint E.",
-          "status": "pending"
-        },
-        {
-          "id": 21,
-          "title": "Content calendar",
-          "source": "FEATURE_AUDIT",
-          "est": "3-4h",
-          "priority": "P3",
-          "notes": "Visual calendar of content in production with due dates. Moved from Sprint E.",
-          "status": "pending"
-        },
-        {
-          "id": 20,
-          "title": "Notification preferences",
-          "source": "AUTH_ROADMAP Phase 6",
-          "est": "2-3h",
-          "priority": "P4",
-          "notes": "Per-user email settings, digest frequency. Moved from Sprint E.",
-          "status": "pending"
-        },
-        {
-          "id": 167,
-          "title": "Sidebar tool descriptions / tooltips",
-          "source": "ADMIN_UX_AUDIT P2-8",
-          "est": "1h",
-          "priority": "P3",
-          "notes": "Hover tooltips on sidebar items. Moved from Sprint G.",
-          "status": "pending"
-        },
-        {
-          "id": 168,
-          "title": "WorkspaceHome data freshness indicators",
-          "source": "ADMIN_UX_AUDIT P2-9",
-          "est": "1-2h",
-          "priority": "P3",
-          "notes": "Last updated timestamps, stale data warning. Moved from Sprint G.",
-          "status": "pending"
-        },
-        {
-          "id": 169,
-          "title": "Consistent back navigation patterns",
-          "source": "ADMIN_UX_AUDIT P2-10",
-          "est": "1-2h",
-          "priority": "P3",
-          "notes": "Contextual back link, lightweight nav stack. Moved from Sprint G.",
+          "priority": "P2",
+          "notes": "Phase 1: /api/admin/storage-stats endpoint with per-directory breakdown. Phase 2: Chat history pruning, activity log rotation, backup retention 7→3 days. Phase 3 (at 5-10GB): PostgreSQL migration. Moved from Sprint B.",
           "status": "pending"
         },
         {
@@ -749,8 +428,17 @@
           "title": "AdminChat improvements",
           "source": "ADMIN_UX_AUDIT P2-11",
           "est": "2-3h",
-          "priority": "P3",
-          "notes": "Resizable panel, dock mode, adopt ChatPanel.tsx. Moved from Sprint G.",
+          "priority": "P2",
+          "notes": "Resizable panel, dock mode, adopt ChatPanel.tsx. High-use surface, low effort.",
+          "status": "pending"
+        },
+        {
+          "id": 203,
+          "title": "Brand docs upload UI",
+          "source": "Content pipeline gap",
+          "est": "2h",
+          "priority": "P2",
+          "notes": "readBrandDocs() reads from workspace brand-docs/ folder but no UI exists to upload/manage files. Add drag-and-drop upload section to BrandHub.tsx. Quick win that makes knowledge base self-service.",
           "status": "pending"
         },
         {
@@ -759,7 +447,382 @@
           "source": "ADMIN_UX_AUDIT P2-12",
           "est": "1-2h",
           "priority": "P3",
-          "notes": "Audit admin components for light-mode rendering. Moved from Sprint G.",
+          "notes": "Audit admin components for light-mode rendering.",
+          "status": "pending"
+        },
+        {
+          "id": 168,
+          "title": "WorkspaceHome data freshness indicators",
+          "source": "ADMIN_UX_AUDIT P2-9",
+          "est": "1-2h",
+          "priority": "P3",
+          "notes": "Last updated timestamps, stale data warning. Trust signal.",
+          "status": "pending"
+        },
+        {
+          "id": 169,
+          "title": "Consistent back navigation patterns",
+          "source": "ADMIN_UX_AUDIT P2-10",
+          "est": "1-2h",
+          "priority": "P3",
+          "notes": "Contextual back link, lightweight nav stack.",
+          "status": "pending"
+        },
+        {
+          "id": 167,
+          "title": "Sidebar tool descriptions / tooltips",
+          "source": "ADMIN_UX_AUDIT P2-8",
+          "est": "1h",
+          "priority": "P3",
+          "notes": "Hover tooltips on sidebar items. Complements the new colored group header icons.",
+          "status": "pending"
+        },
+        {
+          "id": 51,
+          "title": "Heavy dependency audit / tree-shaking",
+          "source": "FEATURE_AUDIT",
+          "est": "2h",
+          "priority": "P3",
+          "notes": "Verify Lucide tree-shaking, audit chart libs.",
+          "status": "pending"
+        },
+        {
+          "id": 193,
+          "title": "Onboarding-integrated SEO education",
+          "source": "Product idea Mar 2026",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Per-tab first-visit tooltip tours, onboarding wizard AI integration, optional 'SEO Basics' learning path. Builds on #191 and #192. Moved from Sprint B.",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "sprint-F",
+      "name": "SEO Intelligence Expansion",
+      "hours": "24-32",
+      "rationale": "PRIORITY 5: Deeper competitive and technical SEO capabilities that differentiate the platform.",
+      "items": [
+        {
+          "id": 199,
+          "title": "Competitive intelligence hub (in Strategy tab)",
+          "source": "Sidebar cleanup Mar 2026 — consolidates #24, #39, #40, #29",
+          "est": "10-14h",
+          "priority": "P2",
+          "notes": "Phased: (1) Keyword Gap Analysis via SEMRush getKeywordGap() — 3-4h, (2) Content Gap Analysis via sitemap comparison — 2-3h, (3) Competitive Monitoring via automated audits — 2-3h, (4) SERP Overlap Dashboard — 2-3h. Reuses existing infrastructure.",
+          "status": "pending"
+        },
+        {
+          "id": 107,
+          "title": "AI-powered internal linking engine",
+          "source": "FEATURE_VISION #2",
+          "est": "8-10h",
+          "priority": "P2",
+          "notes": "Scan all pages → AI identifies contextual linking opportunities → generate anchor text → preview → one-click implement via Webflow API. Ongoing orphan page detection.",
+          "status": "pending"
+        },
+        {
+          "id": 36,
+          "title": "GSC 404 import for redirect scanner",
+          "source": "FEATURE_AUDIT",
+          "est": "2-3h",
+          "priority": "P3",
+          "notes": "Pull crawl errors from GSC to seed redirect scanner in Links tab.",
+          "status": "pending"
+        },
+        {
+          "id": 37,
+          "title": "Audit historical trend charts",
+          "source": "FEATURE_AUDIT",
+          "est": "3-4h",
+          "priority": "P3",
+          "notes": "Track audit score over time per-page, not just site-wide.",
+          "status": "pending"
+        },
+        {
+          "id": 204,
+          "title": "Bulk page operations in SEO Editor",
+          "source": "Workflow optimization",
+          "est": "4-6h",
+          "priority": "P2",
+          "notes": "Select multiple pages → apply same fix pattern (e.g., append brand name to all titles). Checkbox multi-select, bulk AI rewrite, preview diff, one-click apply.",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "sprint-G-new",
+      "name": "Team & Collaboration",
+      "hours": "20-26",
+      "rationale": "PRIORITY 6: Multi-user support for growing agencies. Execute when team size or client demands justify it.",
+      "items": [
+        {
+          "id": 16,
+          "title": "Internal team management",
+          "source": "AUTH_ROADMAP Phase 3",
+          "est": "4-5h",
+          "priority": "P2",
+          "notes": "Invite team members, manage roles, assign workspaces.",
+          "status": "pending"
+        },
+        {
+          "id": 17,
+          "title": "Permission-based feature access",
+          "source": "AUTH_ROADMAP Phase 5",
+          "est": "3-4h",
+          "priority": "P2",
+          "notes": "Fine-grained: client_member view-only on approvals, member can't delete workspaces.",
+          "status": "pending"
+        },
+        {
+          "id": 23,
+          "title": "Writer assignment",
+          "source": "FEATURE_AUDIT",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Assign content briefs to specific writers with notifications.",
+          "status": "pending"
+        },
+        {
+          "id": 117,
+          "title": "Client team collaboration",
+          "source": "FEATURE_VISION #12",
+          "est": "8-10h",
+          "priority": "P3",
+          "notes": "Comments on strategy items, @mentions on briefs, shared notes. Per-seat pricing opportunity.",
+          "status": "pending"
+        },
+        {
+          "id": 20,
+          "title": "Notification preferences",
+          "source": "AUTH_ROADMAP Phase 6",
+          "est": "2-3h",
+          "priority": "P3",
+          "notes": "Per-user email settings, digest frequency.",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "backlog",
+      "name": "Backlog",
+      "hours": "80+",
+      "rationale": "Revisit quarterly. Prioritize when a specific client need, revenue opportunity, or scale threshold justifies it.",
+      "items": [
+        {
+          "id": 76,
+          "title": "Strategy & implementation hours system",
+          "source": "Tier audit discussion",
+          "est": "4-6h",
+          "priority": "P3",
+          "notes": "Premium includes 3 strategy & implementation hrs/mo. Defer until premium tier has more subscribers.",
+          "status": "pending"
+        },
+        {
+          "id": 26,
+          "title": "Webhook / Zapier triggers",
+          "source": "ACTION_PLAN",
+          "est": "3-4h",
+          "priority": "P3",
+          "notes": "Fire webhooks on key events. Enables automation integrations.",
+          "status": "pending"
+        },
+        {
+          "id": 52,
+          "title": "Responsive mobile layout",
+          "source": "FEATURE_AUDIT",
+          "est": "4-6h",
+          "priority": "P3",
+          "notes": "Sidebar → bottom nav, stacked cards on small screens.",
+          "status": "pending"
+        },
+        {
+          "id": 32,
+          "title": "Shared notes / wiki per workspace",
+          "source": "ACTION_PLAN",
+          "est": "2-3h",
+          "priority": "P3",
+          "notes": "Team-internal notes about a client.",
+          "status": "pending"
+        },
+        {
+          "id": 34,
+          "title": "Client NPS survey",
+          "source": "ACTION_PLAN",
+          "est": "2h",
+          "priority": "P3",
+          "notes": "Periodic in-dashboard satisfaction survey.",
+          "status": "pending"
+        },
+        {
+          "id": 38,
+          "title": "Schema auto-schedule",
+          "source": "FEATURE_AUDIT",
+          "est": "2-3h",
+          "priority": "P3",
+          "notes": "Re-generate schemas on cadence, flag stale pages.",
+          "status": "pending"
+        },
+        {
+          "id": 41,
+          "title": "Historical redirect comparison",
+          "source": "FEATURE_AUDIT",
+          "est": "2-3h",
+          "priority": "P3",
+          "notes": "Track redirect status over time, detect new 404s.",
+          "status": "pending"
+        },
+        {
+          "id": 42,
+          "title": "Full-site PageSpeed scan",
+          "source": "FEATURE_AUDIT",
+          "est": "3-4h",
+          "priority": "P3",
+          "notes": "Multi-page PSI scan as background job.",
+          "status": "pending"
+        },
+        {
+          "id": 43,
+          "title": "Accessibility audit expansion",
+          "source": "FEATURE_AUDIT",
+          "est": "3-4h",
+          "priority": "P3",
+          "notes": "WCAG contrast, ARIA, heading order, form labels.",
+          "status": "pending"
+        },
+        {
+          "id": 44,
+          "title": "WCAG AA full compliance",
+          "source": "FEATURE_AUDIT",
+          "est": "3-4h",
+          "priority": "P3",
+          "notes": "Focus indicators, keyboard nav for all interactive elements.",
+          "status": "pending"
+        },
+        {
+          "id": 90,
+          "title": "Schema generator → gpt-4o upgrade",
+          "source": "FEATURE_AUDIT",
+          "est": "15m",
+          "priority": "P3",
+          "notes": "CONDITIONAL: Blocked by 30K TPM limit.",
+          "status": "pending"
+        },
+        {
+          "id": 45,
+          "title": "GSC: URL Inspection API",
+          "source": "Memory/Roadmap",
+          "est": "3-4h",
+          "priority": "P4",
+          "notes": "Per-URL indexing status, crawl info.",
+          "status": "pending"
+        },
+        {
+          "id": 46,
+          "title": "GA4: Exit pages + attribution",
+          "source": "Memory/Roadmap",
+          "est": "3-4h",
+          "priority": "P4",
+          "notes": "Advanced analytics.",
+          "status": "pending"
+        },
+        {
+          "id": 47,
+          "title": "Webflow Enterprise API: 301 redirects",
+          "source": "FEATURE_AUDIT",
+          "est": "1-2h",
+          "priority": "P4",
+          "notes": "Push rules via API (Enterprise-only).",
+          "status": "pending"
+        },
+        {
+          "id": 48,
+          "title": "Sales report: branded PDF export",
+          "source": "FEATURE_AUDIT",
+          "est": "3-4h",
+          "priority": "P4",
+          "notes": "Downloadable prospect reports with agency branding.",
+          "status": "pending"
+        },
+        {
+          "id": 49,
+          "title": "Sales report: email delivery",
+          "source": "FEATURE_AUDIT",
+          "est": "2h",
+          "priority": "P4",
+          "notes": "Send reports directly to prospects.",
+          "status": "pending"
+        },
+        {
+          "id": 89,
+          "title": "Sales report: CRM integration",
+          "source": "FEATURE_AUDIT",
+          "est": "3-4h",
+          "priority": "P4",
+          "notes": "Push prospect data to HubSpot/Pipedrive.",
+          "status": "pending"
+        },
+        {
+          "id": 108,
+          "title": "Predictive SEO & trend forecasting",
+          "source": "FEATURE_VISION #3",
+          "est": "8-12h",
+          "priority": "P4",
+          "notes": "Historical GSC data + Google Trends API + seasonal patterns → predict growing keywords 30-90 days out.",
+          "status": "pending"
+        },
+        {
+          "id": 109,
+          "title": "Cross-client benchmarking network",
+          "source": "FEATURE_VISION #4",
+          "est": "6-8h",
+          "priority": "P4",
+          "notes": "Anonymized benchmarks across all clients. Needs 20+ active clients.",
+          "status": "pending"
+        },
+        {
+          "id": 110,
+          "title": "Backlink intelligence & outreach",
+          "source": "FEATURE_VISION #5",
+          "est": "10-15h",
+          "priority": "P3",
+          "notes": "Ahrefs/Moz API → backlink profile → link gaps → AI outreach templates.",
+          "status": "pending"
+        },
+        {
+          "id": 112,
+          "title": "Local SEO module",
+          "source": "FEATURE_VISION #7",
+          "est": "15-20h",
+          "priority": "P4",
+          "notes": "GBP integration, local keyword tracking, citation monitoring. Add-on $99-149/mo.",
+          "status": "pending"
+        },
+        {
+          "id": 116,
+          "title": "AI strategy memory & learning",
+          "source": "FEATURE_VISION #11",
+          "est": "8-12h",
+          "priority": "P3",
+          "notes": "AI learns from conversations, approved changes, rejected suggestions. Proprietary knowledge asset.",
+          "status": "pending"
+        },
+        {
+          "id": 118,
+          "title": "WordPress / Shopify support",
+          "source": "FEATURE_VISION #13",
+          "est": "15-20h",
+          "priority": "P4",
+          "notes": "Abstract CMS integration layer. Only after Webflow PMF proven.",
+          "status": "pending"
+        },
+        {
+          "id": 120,
+          "title": "Embeddable SEO widgets",
+          "source": "FEATURE_VISION #15",
+          "est": "4-6h",
+          "priority": "P4",
+          "notes": "Embeddable site health badge, traffic counter. Passive referral generation.",
           "status": "pending"
         }
       ]

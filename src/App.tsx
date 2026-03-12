@@ -15,8 +15,9 @@ import { NotificationBell } from './components/NotificationBell';
 import { CommandPalette } from './components/CommandPalette';
 import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, Search, FileText,
-  Pencil, CornerDownRight, Share2, Target, Code2, LogOut, Swords, TrendingUp, Flag,
-  Sun, Moon, LayoutDashboard, ChevronRight, Sparkles,
+  Pencil, Target, Code2, LogOut, TrendingUp, Flag, Link2, MessageSquare,
+  Sun, Moon, LayoutDashboard, ChevronRight, Sparkles, Activity, Shield,
+  Zap, BookOpen,
 } from 'lucide-react';
 
 // ── Lazy-loaded route-level chunks ──
@@ -42,12 +43,10 @@ const WorkspaceHome = lazy(() => import('./components/WorkspaceHome').then(m => 
 // ── Lazy-loaded SEO sub-tool chunks (split from SeoAudit #131) ──
 const SeoEditorWrapper = lazy(() => import('./components/SeoEditorWrapper').then(m => ({ default: m.SeoEditorWrapper })));
 const KeywordStrategyPanel = lazy(() => import('./components/KeywordStrategy').then(m => ({ default: m.KeywordStrategyPanel })));
-const RedirectManager = lazy(() => import('./components/RedirectManager').then(m => ({ default: m.RedirectManager })));
-const InternalLinks = lazy(() => import('./components/InternalLinks').then(m => ({ default: m.InternalLinks })));
 const SchemaSuggester = lazy(() => import('./components/SchemaSuggester').then(m => ({ default: m.SchemaSuggester })));
 const ContentBriefs = lazy(() => import('./components/ContentBriefs').then(m => ({ default: m.ContentBriefs })));
 const ContentPerformance = lazy(() => import('./components/ContentPerformance').then(m => ({ default: m.ContentPerformance })));
-const CompetitorAnalysis = lazy(() => import('./components/CompetitorAnalysis').then(m => ({ default: m.CompetitorAnalysis })));
+const LinksPanel = lazy(() => import('./components/LinksPanel').then(m => ({ default: m.LinksPanel })));
 const RankTracker = lazy(() => import('./components/RankTracker').then(m => ({ default: m.RankTracker })));
 const ContentManager = lazy(() => import('./components/ContentManager').then(m => ({ default: m.ContentManager })));
 const BrandHub = lazy(() => import('./components/BrandHub').then(m => ({ default: m.BrandHub })));
@@ -60,8 +59,8 @@ type Page =
   | 'home'
   | 'media'
   | 'seo-audit' | 'seo-editor'
-  | 'seo-redirects' | 'seo-internal'
-  | 'seo-strategy' | 'seo-schema' | 'seo-briefs' | 'seo-competitors' | 'seo-ranks'
+  | 'links'
+  | 'seo-strategy' | 'seo-schema' | 'seo-briefs' | 'seo-ranks'
   | 'content' | 'brand'
   | 'search' | 'analytics' | 'annotations'
   | 'performance'
@@ -135,7 +134,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   const [pendingContentRequests, setPendingContentRequests] = useState(0);
 
   // ── Collapsible sidebar groups (#160) ──
-  const ALL_GROUP_LABELS = ['ANALYTICS', 'SITE HEALTH', 'SEO', 'MANAGE'];
+  const ALL_GROUP_LABELS = ['ANALYTICS', 'SITE HEALTH', 'SEO', 'CONTENT'];
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
     try {
       const stored = localStorage.getItem('admin-sidebar-collapsed');
@@ -323,43 +322,40 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   }, [tab]);
 
   // ── Sidebar navigation groups ──
-  const navGroups: Array<{ label: string; items: Array<{ id: Page; label: string; icon: typeof Globe; needsSite?: boolean }> }> = [
+  const navGroups: Array<{ label: string; groupIcon?: typeof Globe; groupColor?: string; items: Array<{ id: Page; label: string; icon: typeof Globe; needsSite?: boolean }> }> = [
     { label: '', items: [
       { id: 'home', label: 'Home', icon: LayoutDashboard },
     ]},
-    { label: 'ANALYTICS', items: [
+    { label: 'ANALYTICS', groupIcon: Activity, groupColor: 'text-blue-400', items: [
       { id: 'search', label: 'Search Console', icon: Search, needsSite: true },
       { id: 'analytics', label: 'Google Analytics', icon: BarChart3, needsSite: true },
       { id: 'seo-ranks', label: 'Rank Tracker', icon: TrendingUp, needsSite: true },
+      { id: 'annotations', label: 'Annotations', icon: Flag, needsSite: true },
     ]},
-    { label: 'SITE HEALTH', items: [
+    { label: 'SITE HEALTH', groupIcon: Shield, groupColor: 'text-emerald-400', items: [
       { id: 'seo-audit', label: 'Site Audit', icon: Globe, needsSite: true },
       { id: 'performance', label: 'Performance', icon: Gauge, needsSite: true },
-      { id: 'seo-redirects', label: 'Redirects', icon: CornerDownRight, needsSite: true },
-      { id: 'seo-internal', label: 'Internal Links', icon: Share2, needsSite: true },
+      { id: 'links', label: 'Links', icon: Link2, needsSite: true },
+      { id: 'media', label: 'Assets', icon: Image },
     ]},
-    { label: 'SEO', items: [
+    { label: 'SEO', groupIcon: Zap, groupColor: 'text-teal-400', items: [
+      { id: 'brand', label: 'Brand & AI', icon: Sparkles, needsSite: false },
       { id: 'seo-strategy', label: 'Strategy', icon: Target, needsSite: true },
       { id: 'seo-editor', label: 'SEO Editor', icon: Pencil, needsSite: true },
       { id: 'seo-schema', label: 'Schema', icon: Code2, needsSite: true },
+    ]},
+    { label: 'CONTENT', groupIcon: BookOpen, groupColor: 'text-amber-400', items: [
       { id: 'seo-briefs', label: 'Content Briefs', icon: Clipboard, needsSite: true },
       { id: 'content', label: 'Content', icon: FileText, needsSite: true },
-      { id: 'brand', label: 'Brand & AI', icon: Sparkles, needsSite: false },
-      { id: 'seo-competitors', label: 'Competitors', icon: Swords, needsSite: true },
       { id: 'content-perf', label: 'Content Perf', icon: BarChart3, needsSite: true },
-    ]},
-    { label: 'MANAGE', items: [
-      { id: 'requests', label: 'Requests', icon: Clipboard },
-      { id: 'media', label: 'Assets', icon: Image },
-      { id: 'annotations', label: 'Annotations', icon: Flag, needsSite: true },
     ]},
   ];
 
   // ── Breadcrumb tab label map ──
   const TAB_LABELS: Record<string, string> = {
     home: 'Home', media: 'Assets', 'seo-audit': 'Site Audit', 'seo-editor': 'SEO Editor',
-    'seo-redirects': 'Redirects', 'seo-internal': 'Internal Links', 'seo-strategy': 'Strategy',
-    'seo-schema': 'Schema', 'seo-briefs': 'Content Briefs', content: 'Content', brand: 'Brand & AI', 'seo-competitors': 'Competitors',
+    links: 'Links', 'seo-strategy': 'Strategy',
+    'seo-schema': 'Schema', 'seo-briefs': 'Content Briefs', content: 'Content', brand: 'Brand & AI',
     'seo-ranks': 'Rank Tracker', search: 'Search Console', analytics: 'Google Analytics',
     annotations: 'Annotations', performance: 'Performance', 'content-perf': 'Content Performance',
     'workspace-settings': 'Workspace Settings', prospect: 'Prospect', roadmap: 'Roadmap',
@@ -367,7 +363,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   };
 
   // ── Content renderer ──
-  const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'seo-redirects', 'seo-internal', 'seo-strategy', 'seo-schema', 'seo-briefs', 'seo-competitors', 'seo-ranks', 'content-perf', 'content', 'brand']);
+  const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'links', 'seo-strategy', 'seo-schema', 'seo-briefs', 'seo-ranks', 'content-perf', 'content', 'brand']);
   const needsSite = !!(SEO_TABS.has(tab) || tab === 'search' || tab === 'analytics' || tab === 'annotations' || tab === 'performance');
   const seoNavigate = (t: string, ctx?: FixContext) => { setFixContext(ctx || null); setTab(t as Page); };
 
@@ -405,13 +401,11 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (tab === 'seo-audit') return <SeoAudit key={`seo-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} siteName={selected.webflowSiteName || selected.name} onNavigate={seoNavigate} />;
     if (tab === 'seo-editor') return <SeoEditorWrapper key={`editor-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} />;
     if (tab === 'seo-strategy') return <KeywordStrategyPanel key={`strategy-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId!} onNavigate={seoNavigate} />;
-    if (tab === 'seo-redirects') return <RedirectManager key={`redirects-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
-    if (tab === 'seo-internal') return <InternalLinks key={`internal-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} />;
+    if (tab === 'links') return <LinksPanel key={`links-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} />;
     if (tab === 'seo-schema') return <SchemaSuggester key={`schema-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} />;
     if (tab === 'seo-briefs') return <ContentBriefs key={`briefs-${selected.id}`} workspaceId={selected.id} onRequestCountChange={setPendingContentRequests} fixContext={fixContext} onNavigate={(t) => setTab(t as Page)} />;
     if (tab === 'content') return <ContentManager key={`content-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'brand') return <BrandHub key={`brand-${selected.id}`} workspaceId={selected.id} webflowSiteId={selected.webflowSiteId} />;
-    if (tab === 'seo-competitors') return <CompetitorAnalysis key={`competitors-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
     if (tab === 'seo-ranks') return <RankTracker key={`ranks-${selected.id}`} workspaceId={selected.id} hasGsc={!!selected.gscPropertyUrl} />;
     if (tab === 'search') return <SearchConsole key={`search-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} gscPropertyUrl={selected.gscPropertyUrl} />;
     if (tab === 'performance') return <Performance key={`perf-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
@@ -461,10 +455,14 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
                 {group.label ? (
                   <button
                     onClick={() => toggleGroup(group.label)}
-                    className="w-full flex items-center gap-1 px-2 py-1 mb-0.5 rounded-md hover:bg-zinc-800/30 transition-colors"
+                    className="w-full flex items-center gap-1.5 px-2 py-1.5 mb-0.5 rounded-md hover:bg-zinc-800/30 transition-colors group/hdr"
                   >
-                    <ChevronRight className={`w-3 h-3 text-zinc-600 transition-transform duration-150 ${!isCollapsed ? 'rotate-90' : ''}`} />
+                    {group.groupIcon && (() => {
+                      const GIcon = group.groupIcon;
+                      return <GIcon className={`w-3.5 h-3.5 ${group.groupColor || 'text-zinc-500'} opacity-70 group-hover/hdr:opacity-100 transition-opacity`} />;
+                    })()}
                     <span className="text-[11px] text-zinc-500 font-semibold tracking-widest flex-1 text-left">{group.label}</span>
+                    <ChevronRight className={`w-3 h-3 text-zinc-600 transition-transform duration-150 ${!isCollapsed ? 'rotate-90' : ''}`} />
                     {isCollapsed && groupBadgeCount > 0 && (
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 tabular-nums min-w-[18px] text-center leading-tight">
                         {groupBadgeCount}
@@ -505,10 +503,6 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
 
         {/* Bottom: icon-only utility bar */}
         <div className="px-3 py-2.5 border-t border-zinc-800 flex items-center justify-center gap-1">
-          <NotificationBell onSelectWorkspace={(wsId, wsTab) => {
-            const ws = workspaces.find(w => w.id === wsId);
-            if (ws) { setSelected(ws); setTab(wsTab as Page); }
-          }} />
           <button
             onClick={() => setTab('settings')}
             title="Settings"
@@ -537,7 +531,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
 
       {/* ── Main content area ── */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Breadcrumb bar (#165) */}
+        {/* Breadcrumb bar (#165) + header widgets */}
         <div className="flex items-center gap-1.5 px-5 py-2 border-b border-zinc-800 text-[11px] min-h-[36px]">
           <button
             onClick={() => { setSelected(null); setTab('home'); }}
@@ -585,6 +579,30 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
               </span>
             </>
           )}
+
+          {/* ── Header widgets (right side) ── */}
+          <div className="ml-auto flex items-center gap-1">
+            {/* Requests widget */}
+            {selected && (
+              <button
+                onClick={() => setTab('requests')}
+                title="Client Requests"
+                className={`relative p-1.5 rounded-lg transition-all ${tab === 'requests' ? 'text-teal-400 bg-teal-500/10' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'}`}
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                {pendingContentRequests > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 text-[9px] font-bold px-1 py-0 rounded-full bg-amber-500/90 text-[#0f1219] min-w-[14px] text-center leading-[14px]">
+                    {pendingContentRequests}
+                  </span>
+                )}
+              </button>
+            )}
+            {/* Notification bell */}
+            <NotificationBell onSelectWorkspace={(wsId, wsTab) => {
+              const ws = workspaces.find(w => w.id === wsId);
+              if (ws) { setSelected(ws); setTab(wsTab as Page); }
+            }} />
+          </div>
         </div>
         {clipboardStatus && (
           <div className="flex items-center gap-1.5 px-5 py-1.5 text-[11px] font-medium bg-teal-500/10 text-teal-400 border-b border-zinc-800">

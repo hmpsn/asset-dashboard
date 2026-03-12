@@ -44,13 +44,13 @@ const ISSUE_FIX_MAP: Record<string, string> = {
   'meta-description': 'seo-editor', 'meta_length': 'seo-editor', 'missing_meta': 'seo-editor',
   'missing_h1': 'seo-editor', 'duplicate_h1': 'seo-editor', 'og-tags': 'seo-editor',
   'missing_schema': 'seo-schema', 'schema_errors': 'seo-schema',
-  'redirect_chain': 'seo-redirects', 'broken_link': 'seo-redirects', 'missing_canonical': 'seo-redirects',
+  'redirect_chain': 'links', 'broken_link': 'links', 'missing_canonical': 'links',
   'thin_content': 'seo-briefs', 'low_word_count': 'seo-briefs',
 };
 
 const FIX_TAB_LABELS: Record<string, string> = {
-  'seo-editor': 'SEO Editor', 'seo-schema': 'Schema Generator', 'seo-redirects': 'Redirects',
-  'seo-briefs': 'Content Briefs', 'seo-internal': 'Internal Links', 'performance': 'Performance',
+  'seo-editor': 'SEO Editor', 'seo-schema': 'Schema Generator', 'links': 'Links',
+  'seo-briefs': 'Content Briefs', 'performance': 'Performance',
 };
 
 function getFixTab(issue: SeoIssue): string | null {
