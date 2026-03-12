@@ -610,6 +610,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
           </div>
         )}
         <main className="flex-1 overflow-auto p-6">
+          {/* max-w-5xl for admin (sidebar present); client uses max-w-6xl (full-width data) */}
           <div className="max-w-5xl mx-auto">
             {pendingContentRequests > 0 && selected && tab !== 'seo-briefs' && (
               <button

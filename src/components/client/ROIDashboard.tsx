@@ -3,6 +3,7 @@ import {
   DollarSign, BarChart3, Target, TrendingUp,
   Loader2, Lock, Shield, MousePointerClick, Eye,
 } from 'lucide-react';
+import { EmptyState } from '../ui';
 
 interface PageROI {
   pagePath: string;
@@ -100,12 +101,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
 
   if (error || !data) {
     return (
-      <div className="bg-zinc-900/60 rounded-xl border border-zinc-800 p-8 text-center">
-        <DollarSign className="w-8 h-8 text-zinc-600 mx-auto mb-3" />
-        <p className="text-sm text-zinc-500">
-          {error || 'ROI data requires a keyword strategy with CPC data. Run a strategy with SEMRush enrichment to unlock this.'}
-        </p>
-      </div>
+      <EmptyState icon={DollarSign} title="ROI data unavailable" description={error || 'ROI data requires a keyword strategy with CPC data. Run a strategy with SEMRush enrichment to unlock this.'} />
     );
   }
 
