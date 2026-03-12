@@ -1,7 +1,7 @@
-import { useState, useRef, useCallback } from 'react';
-import { VariableSizeList as VList } from 'react-window';
+import { useState } from 'react';
 import { AlertTriangle, Info, CheckCircle2, ChevronDown, Shield } from 'lucide-react';
 import { MetricRing } from '../ui';
+import { scoreColorClass } from '../ui/constants';
 import { ScoreHistoryChart } from './helpers';
 import { toLiveUrl } from './utils';
 import { SEV, CAT_LABELS } from './types';
@@ -28,14 +28,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, tie
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
   const [auditSearch, setAuditSearch] = useState('');
 
-  const listRef = useRef<VList>(null);
-  const togglePage = (id: string) => setExpandedPages(prev => {
-    const n = new Set(prev);
-    if (n.has(id)) n.delete(id); else n.add(id);
-    // Reset cached sizes so react-window recalculates heights
-    if (listRef.current) listRef.current.resetAfterIndex(0);
-    return n;
-  });
+  const togglePage = (id: string) => setExpandedPages(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   const filteredPages = auditDetail?.audit.pages.filter(p => {
     if (auditSearch && !p.page.toLowerCase().includes(auditSearch.toLowerCase()) && !toLiveUrl(p.url, liveDomain).toLowerCase().includes(auditSearch.toLowerCase())) return false;
@@ -165,70 +158,53 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, tie
           <input type="text" value={auditSearch} onChange={e => setAuditSearch(e.target.value)} placeholder="Search pages..."
             className="bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-[11px] text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-600 w-40" />
         </div>
-        {filteredPages.length === 0 ? (
-          <div className="px-4 py-8 text-center text-xs text-zinc-500">No pages match your filters</div>
-        ) : (
-          <VList
-            ref={listRef}
-            height={600}
-            width="100%"
-            itemCount={filteredPages.length}
-            itemSize={(index: number) => {
-              const page = filteredPages[index];
-              const isExp = expandedPages.has(page.pageId);
-              if (!isExp) return 52; // collapsed row height
-              const issueCount = severityFilter === 'all' ? page.issues.length : page.issues.filter(i => i.severity === severityFilter).length;
-              return 52 + Math.max(issueCount, 1) * 54 + 12; // row + issues + padding
-            }}
-            overscanCount={5}
-          >
-            {({ index, style }: { index: number; style: React.CSSProperties }) => {
-              const page = filteredPages[index];
-              const isExp = expandedPages.has(page.pageId);
-              const pageIssues = severityFilter === 'all' ? page.issues : page.issues.filter(i => i.severity === severityFilter);
-              const errs = page.issues.filter(i => i.severity === 'error').length;
-              const warns = page.issues.filter(i => i.severity === 'warning').length;
-              return (
-                <div style={style} className="border-b border-zinc-800/50">
-                  <button onClick={() => togglePage(page.pageId)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/30 transition-colors text-left">
-                    <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${isExp ? '' : '-rotate-90'}`} />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium text-zinc-300 truncate">{page.page}</div>
-                      <div className="text-[11px] text-zinc-500 truncate">{toLiveUrl(page.url, liveDomain)}</div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {errs > 0 && <span className="text-[11px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">{errs} err</span>}
-                      {warns > 0 && <span className="text-[11px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">{warns} warn</span>}
-                      <div className={`text-xs font-bold ${page.score >= 80 ? 'text-green-400' : page.score >= 60 ? 'text-amber-400' : 'text-red-400'}`}>{page.score}</div>
-                    </div>
-                  </button>
-                  {isExp && pageIssues.length > 0 && (
-                    <div className="px-4 pb-3 pl-11 space-y-1.5">
-                      {pageIssues.map((issue, i) => {
-                        const sc = SEV[issue.severity] || SEV.info;
-                        return (
-                          <div key={i} className={`px-3 py-2 rounded-lg ${sc.bg} border ${sc.border}`}>
-                            <div className="flex items-start gap-2">
-                              {issue.severity === 'error' && <AlertTriangle className={`w-3.5 h-3.5 ${sc.text} flex-shrink-0 mt-0.5`} />}
-                              {issue.severity === 'warning' && <Info className={`w-3.5 h-3.5 ${sc.text} flex-shrink-0 mt-0.5`} />}
-                              {issue.severity === 'info' && <CheckCircle2 className={`w-3.5 h-3.5 ${sc.text} flex-shrink-0 mt-0.5`} />}
-                              <span className={`text-[11px] font-medium uppercase ${sc.text} flex-shrink-0 mt-0.5`}>{issue.severity}</span>
-                              <div>
-                                <div className="text-[11px] text-zinc-300">{issue.message}</div>
-                                <div className="text-[11px] text-zinc-500 mt-0.5">{issue.recommendation}</div>
-                                {issue.value && <div className="text-[11px] text-zinc-500 mt-0.5 font-mono">Current: {issue.value}</div>}
-                              </div>
+        <div className="divide-y divide-zinc-800/50 max-h-[600px] overflow-y-auto">
+          {filteredPages.map(page => {
+            const isExp = expandedPages.has(page.pageId);
+            const pageIssues = severityFilter === 'all' ? page.issues : page.issues.filter(i => i.severity === severityFilter);
+            const errs = page.issues.filter(i => i.severity === 'error').length;
+            const warns = page.issues.filter(i => i.severity === 'warning').length;
+            return (
+              <div key={page.pageId}>
+                <button onClick={() => togglePage(page.pageId)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/30 transition-colors text-left">
+                  <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${isExp ? '' : '-rotate-90'}`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-medium text-zinc-300 truncate">{page.page}</div>
+                    <div className="text-[11px] text-zinc-500 truncate">{toLiveUrl(page.url, liveDomain)}</div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {errs > 0 && <span className="text-[11px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">{errs} err</span>}
+                    {warns > 0 && <span className="text-[11px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">{warns} warn</span>}
+                    <div className={`text-xs font-bold ${scoreColorClass(page.score)}`}>{page.score}</div>
+                  </div>
+                </button>
+                {isExp && pageIssues.length > 0 && (
+                  <div className="px-4 pb-3 pl-11 space-y-1.5">
+                    {pageIssues.map((issue, i) => {
+                      const sc = SEV[issue.severity] || SEV.info;
+                      return (
+                        <div key={i} className={`px-3 py-2 rounded-lg ${sc.bg} border ${sc.border}`}>
+                          <div className="flex items-start gap-2">
+                            {issue.severity === 'error' && <AlertTriangle className={`w-3.5 h-3.5 ${sc.text} flex-shrink-0 mt-0.5`} />}
+                            {issue.severity === 'warning' && <Info className={`w-3.5 h-3.5 ${sc.text} flex-shrink-0 mt-0.5`} />}
+                            {issue.severity === 'info' && <CheckCircle2 className={`w-3.5 h-3.5 ${sc.text} flex-shrink-0 mt-0.5`} />}
+                            <span className={`text-[11px] font-medium uppercase ${sc.text} flex-shrink-0 mt-0.5`}>{issue.severity}</span>
+                            <div>
+                              <div className="text-[11px] text-zinc-300">{issue.message}</div>
+                              <div className="text-[11px] text-zinc-500 mt-0.5">{issue.recommendation}</div>
+                              {issue.value && <div className="text-[11px] text-zinc-500 mt-0.5 font-mono">Current: {issue.value}</div>}
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            }}
-          </VList>
-        )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {filteredPages.length === 0 && <div className="px-4 py-8 text-center text-xs text-zinc-500">No pages match your filters</div>}
+        </div>
       </div>
     </div>
   );
