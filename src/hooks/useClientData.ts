@@ -94,41 +94,68 @@ export function useClientData(_workspaceId: string) {
     }
   }, []);
 
-  const loadGA4Data = useCallback(async (wsId: string, numDays: number, dateRange?: { startDate: string; endDate: string }) => {
-    try {
-      const drParams = dateRange ? `&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}` : '';
-      const [ovRes, trRes, pgRes, srcRes, devRes, ctryRes, evtRes, convRes, cmpRes, nvrRes, orgRes, lpRes] = await Promise.all([
-        fetch(`/api/public/analytics-overview/${wsId}?days=${numDays}${drParams}`),
-        fetch(`/api/public/analytics-trend/${wsId}?days=${numDays}${drParams}`),
-        fetch(`/api/public/analytics-top-pages/${wsId}?days=${numDays}${drParams}`),
-        fetch(`/api/public/analytics-sources/${wsId}?days=${numDays}${drParams}`),
-        fetch(`/api/public/analytics-devices/${wsId}?days=${numDays}${drParams}`),
-        fetch(`/api/public/analytics-countries/${wsId}?days=${numDays}${drParams}`),
-        fetch(`/api/public/analytics-events/${wsId}?days=${numDays}${drParams}`),
-        fetch(`/api/public/analytics-conversions/${wsId}?days=${numDays}${drParams}`),
-        fetch(`/api/public/analytics-comparison/${wsId}?days=${numDays}${drParams}`),
-        fetch(`/api/public/analytics-new-vs-returning/${wsId}?days=${numDays}${drParams}`),
-        fetch(`/api/public/analytics-organic/${wsId}?days=${numDays}${drParams}`),
-        fetch(`/api/public/analytics-landing-pages/${wsId}?days=${numDays}${drParams}&organic=true&limit=15`),
-      ]);
-      const [ov, tr, pg, src, dev, ctry, evt, conv, cmp, nvr, org, lp] = await Promise.all([ovRes.json(), trRes.json(), pgRes.json(), srcRes.json(), devRes.json(), ctryRes.json(), evtRes.json(), convRes.json(), cmpRes.json(), nvrRes.json(), orgRes.json(), lpRes.json()]);
-      if (!ov.error) setGa4Overview(ov);
-      if (Array.isArray(tr)) setGa4Trend(tr);
-      if (Array.isArray(pg)) setGa4Pages(pg);
-      if (Array.isArray(src)) setGa4Sources(src);
-      if (Array.isArray(dev)) setGa4Devices(dev);
-      if (Array.isArray(ctry)) setGa4Countries(ctry);
-      if (Array.isArray(evt)) setGa4Events(evt);
-      if (Array.isArray(conv)) setGa4Conversions(conv);
-      if (cmp && !cmp.error) setGa4Comparison(cmp);
-      if (Array.isArray(nvr)) setGa4NewVsReturning(nvr);
-      if (org && !org.error) setGa4Organic(org);
-      if (Array.isArray(lp)) setGa4LandingPages(lp);
-    } catch (err) {
-      console.error('GA4 data load error:', err);
-      setSectionError('analytics', 'Unable to load analytics data');
+  const fetchWithRetry = useCallback(async (url: string, retries = 2): Promise<Response> => {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const res = await fetch(url);
+        if (res.ok || attempt === retries) return res;
+      } catch (err) {
+        if (attempt === retries) throw err;
+      }
+      await new Promise(r => setTimeout(r, 500 * (attempt + 1))); // backoff
     }
-  }, [setSectionError]);
+    return fetch(url); // fallback (unreachable but satisfies TS)
+  }, []);
+
+  const loadGA4Data = useCallback(async (wsId: string, numDays: number, dateRange?: { startDate: string; endDate: string }) => {
+    clearSectionError('analytics');
+    const drParams = dateRange ? `&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}` : '';
+    const endpoints = [
+      { key: 'overview', url: `/api/public/analytics-overview/${wsId}?days=${numDays}${drParams}` },
+      { key: 'trend', url: `/api/public/analytics-trend/${wsId}?days=${numDays}${drParams}` },
+      { key: 'pages', url: `/api/public/analytics-top-pages/${wsId}?days=${numDays}${drParams}` },
+      { key: 'sources', url: `/api/public/analytics-sources/${wsId}?days=${numDays}${drParams}` },
+      { key: 'devices', url: `/api/public/analytics-devices/${wsId}?days=${numDays}${drParams}` },
+      { key: 'countries', url: `/api/public/analytics-countries/${wsId}?days=${numDays}${drParams}` },
+      { key: 'events', url: `/api/public/analytics-events/${wsId}?days=${numDays}${drParams}` },
+      { key: 'conversions', url: `/api/public/analytics-conversions/${wsId}?days=${numDays}${drParams}` },
+      { key: 'comparison', url: `/api/public/analytics-comparison/${wsId}?days=${numDays}${drParams}` },
+      { key: 'nvr', url: `/api/public/analytics-new-vs-returning/${wsId}?days=${numDays}${drParams}` },
+      { key: 'organic', url: `/api/public/analytics-organic/${wsId}?days=${numDays}${drParams}` },
+      { key: 'landing', url: `/api/public/analytics-landing-pages/${wsId}?days=${numDays}${drParams}&organic=true&limit=15` },
+    ];
+
+    // Use Promise.allSettled for coordinated loading — partial failures don't block others
+    const results = await Promise.allSettled(endpoints.map(ep => fetchWithRetry(ep.url).then(r => r.json())));
+    const failedSections: string[] = [];
+
+    results.forEach((result, i) => {
+      const key = endpoints[i].key;
+      if (result.status === 'rejected') { failedSections.push(key); return; }
+      const d = result.value;
+      switch (key) {
+        case 'overview': if (d && !d.error) setGa4Overview(d); else failedSections.push(key); break;
+        case 'trend': if (Array.isArray(d)) setGa4Trend(d); break;
+        case 'pages': if (Array.isArray(d)) setGa4Pages(d); break;
+        case 'sources': if (Array.isArray(d)) setGa4Sources(d); break;
+        case 'devices': if (Array.isArray(d)) setGa4Devices(d); break;
+        case 'countries': if (Array.isArray(d)) setGa4Countries(d); break;
+        case 'events': if (Array.isArray(d)) setGa4Events(d); break;
+        case 'conversions': if (Array.isArray(d)) setGa4Conversions(d); break;
+        case 'comparison': if (d && !d.error) setGa4Comparison(d); break;
+        case 'nvr': if (Array.isArray(d)) setGa4NewVsReturning(d); break;
+        case 'organic': if (d && !d.error) setGa4Organic(d); break;
+        case 'landing': if (Array.isArray(d)) setGa4LandingPages(d); break;
+      }
+    });
+
+    if (failedSections.length > 0) {
+      const msg = failedSections.length === endpoints.length
+        ? 'Unable to load analytics data'
+        : `Partial analytics load — failed: ${failedSections.join(', ')}`;
+      setSectionError('analytics', msg);
+    }
+  }, [fetchWithRetry, setSectionError, clearSectionError]);
 
   /** Load all dashboard data for a workspace. Accepts optional setPricingData callback for payment hook integration. */
   const loadDashboardData = useCallback((data: WorkspaceInfo, setPricingData?: (p: unknown) => void) => {

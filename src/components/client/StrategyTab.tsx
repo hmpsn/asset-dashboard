@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   Zap, FileText, Sparkles, Target, Search, CheckCircle2,
 } from 'lucide-react';
-import { TierGate, type Tier } from '../ui';
+import { TierGate, StatCard, EmptyState, type Tier } from '../ui';
 import type { ClientKeywordStrategy, ClientContentRequest } from './types';
 import { useBetaMode } from './BetaContext';
 import { STUDIO_NAME } from '../../constants';
@@ -39,11 +39,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
 
   if (!strategyData) {
     return (
-      <div className="text-center py-16">
-        <Target className="w-8 h-8 text-zinc-500 mx-auto mb-2" />
-        <p className="text-sm text-zinc-500">SEO strategy is being prepared</p>
-        <p className="text-xs text-zinc-500 mt-1">{STUDIO_NAME} is building a keyword strategy for your site. Check back soon!</p>
-      </div>
+      <EmptyState icon={Target} title="SEO strategy is being prepared" description={`${STUDIO_NAME} is building a keyword strategy for your site. Check back soon!`} />
     );
   }
 
@@ -65,26 +61,10 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         const pagesWithoutRankings = strategyData.pageMap.filter(p => !p.currentPosition).length;
         return (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-              <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Target className="w-3 h-3" /> Keywords Tracked</div>
-              <div className="text-xl font-bold text-zinc-100">{keywordsTracked}</div>
-              <div className="text-[11px] text-zinc-500">{strategyData.pageMap.length} pages mapped</div>
-            </div>
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-              <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><FileText className="w-3 h-3" /> Content Gaps</div>
-              <div className={`text-xl font-bold ${contentGapsFound > 0 ? 'text-teal-400' : 'text-zinc-500'}`}>{contentGapsFound}</div>
-              <div className="text-[11px] text-zinc-500">{contentGapsFound > 0 ? 'topics identified' : 'none found yet'}</div>
-            </div>
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-              <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Zap className="w-3 h-3" /> Quick Wins</div>
-              <div className={`text-xl font-bold ${quickWinsAvailable > 0 ? 'text-amber-400' : 'text-zinc-500'}`}>{quickWinsAvailable}</div>
-              <div className="text-[11px] text-zinc-500">{quickWinsAvailable > 0 ? 'low-effort improvements' : 'none right now'}</div>
-            </div>
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-              <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Search className="w-3 h-3" /> Not Yet Ranking</div>
-              <div className={`text-xl font-bold ${pagesWithoutRankings > 0 ? 'text-red-400' : 'text-emerald-400'}`}>{pagesWithoutRankings}</div>
-              <div className="text-[11px] text-zinc-500">{pagesWithoutRankings > 0 ? 'pages need attention' : 'all pages ranking'}</div>
-            </div>
+            <StatCard icon={Target} label="Keywords Tracked" value={keywordsTracked} sub={`${strategyData.pageMap.length} pages mapped`} />
+            <StatCard icon={FileText} label="Content Gaps" value={contentGapsFound} valueColor={contentGapsFound > 0 ? 'text-teal-400' : 'text-zinc-500'} sub={contentGapsFound > 0 ? 'topics identified' : 'none found yet'} />
+            <StatCard icon={Zap} label="Quick Wins" value={quickWinsAvailable} valueColor={quickWinsAvailable > 0 ? 'text-amber-400' : 'text-zinc-500'} sub={quickWinsAvailable > 0 ? 'low-effort improvements' : 'none right now'} />
+            <StatCard icon={Search} label="Not Yet Ranking" value={pagesWithoutRankings} valueColor={pagesWithoutRankings > 0 ? 'text-red-400' : 'text-emerald-400'} sub={pagesWithoutRankings > 0 ? 'pages need attention' : 'all pages ranking'} />
           </div>
         );
       })()}

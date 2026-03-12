@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Inbox, ClipboardCheck, MessageSquare, FileText } from 'lucide-react';
+import { EmptyState } from '../ui';
 import { ApprovalsTab } from './ApprovalsTab';
 import { RequestsTab } from './RequestsTab';
 import { ContentTab } from './ContentTab';
@@ -190,32 +191,16 @@ export function InboxTab({
 
       {/* Empty state when filtered view has nothing */}
       {filter === 'approvals' && !hasApprovals && !approvalsLoading && (
-        <div className="text-center py-12">
-          <ClipboardCheck className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
-          <p className="text-sm text-zinc-400">No SEO changes to review yet.</p>
-          <p className="text-[11px] text-zinc-500 mt-1">{STUDIO_NAME} will send proposed changes here for your approval.</p>
-        </div>
+        <EmptyState icon={ClipboardCheck} title="No SEO changes to review yet." description={`${STUDIO_NAME} will send proposed changes here for your approval.`} />
       )}
       {filter === 'requests' && !hasRequests && !requestsLoading && (
-        <div className="text-center py-12">
-          <MessageSquare className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
-          <p className="text-sm text-zinc-400">No requests yet.</p>
-          <p className="text-[11px] text-zinc-500 mt-1">Submit a request and {STUDIO_NAME} will respond here.</p>
-        </div>
+        <EmptyState icon={MessageSquare} title="No requests yet." description={`Submit a request and ${STUDIO_NAME} will respond here.`} />
       )}
       {!betaMode && filter === 'content' && contentRequests.length === 0 && (
-        <div className="text-center py-12">
-          <FileText className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
-          <p className="text-sm text-zinc-400">No content requests yet.</p>
-          <p className="text-[11px] text-zinc-500 mt-1">{effectiveTier === 'free' ? 'Upgrade to Growth to request content briefs and blog posts.' : `Request content from the Strategy tab or ask ${STUDIO_NAME}.`}</p>
-        </div>
+        <EmptyState icon={FileText} title="No content requests yet." description={effectiveTier === 'free' ? 'Upgrade to Growth to request content briefs and blog posts.' : `Request content from the Strategy tab or ask ${STUDIO_NAME}.`} />
       )}
       {filter === 'all' && !hasApprovals && !hasRequests && contentRequests.length === 0 && !approvalsLoading && !requestsLoading && (
-        <div className="text-center py-12">
-          <Inbox className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
-          <p className="text-sm text-zinc-400">Your inbox is empty.</p>
-          <p className="text-[11px] text-zinc-500 mt-1">{betaMode ? `SEO changes and requests will appear here as ${STUDIO_NAME} works on your site.` : `SEO changes, requests, and content items will appear here as ${STUDIO_NAME} works on your site.`}</p>
-        </div>
+        <EmptyState icon={Inbox} title="Your inbox is empty." description={betaMode ? `SEO changes and requests will appear here as ${STUDIO_NAME} works on your site.` : `SEO changes, requests, and content items will appear here as ${STUDIO_NAME} works on your site.`} />
       )}
     </div>
   );

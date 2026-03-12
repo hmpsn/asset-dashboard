@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Loader2,
   Sparkles, Send, AlertTriangle,
@@ -46,6 +46,10 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
     setTheme(next);
     try { localStorage.setItem('dashboard-theme', next); } catch { /* skip */ }
   };
+  // ── Date picker refs (replaces document.getElementById) ──
+  const customStartRef = useRef<HTMLInputElement>(null);
+  const customEndRef = useRef<HTMLInputElement>(null);
+
   // ── Data hook (dashboard state + data loading) ──
   const {
     ws, setWs,
@@ -602,7 +606,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
                     <div className="space-y-2">
                       <label className="block">
                         <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Start date</span>
-                        <input type="date" id="custom-start"
+                        <input type="date" ref={customStartRef}
                           defaultValue={customDateRange?.startDate || new Date(Date.now() - 28 * 86400000).toISOString().split('T')[0]}
                           max={new Date().toISOString().split('T')[0]}
                           className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
@@ -610,7 +614,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
                       </label>
                       <label className="block">
                         <span className="text-[10px] text-zinc-500 uppercase tracking-wider">End date</span>
-                        <input type="date" id="custom-end"
+                        <input type="date" ref={customEndRef}
                           defaultValue={customDateRange?.endDate || new Date().toISOString().split('T')[0]}
                           max={new Date().toISOString().split('T')[0]}
                           className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
@@ -623,8 +627,8 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
                         Cancel
                       </button>
                       <button onClick={() => {
-                        const s = (document.getElementById('custom-start') as HTMLInputElement)?.value;
-                        const e = (document.getElementById('custom-end') as HTMLInputElement)?.value;
+                        const s = customStartRef.current?.value;
+                        const e = customEndRef.current?.value;
                         if (s && e && s <= e) applyCustomRange(s, e, ws);
                       }}
                         className="flex-1 px-3 py-1.5 text-xs rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-medium transition-colors">
@@ -638,7 +642,13 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
           </div>
         </div>
         <div className="max-w-6xl mx-auto px-6">
-          <nav className="flex items-center gap-1 -mb-px overflow-x-auto scrollbar-none">
+          <nav role="tablist" className="flex items-center gap-1 -mb-px overflow-x-auto scrollbar-none"
+            onKeyDown={(e) => {
+              const unlocked = NAV.filter(n => !n.locked);
+              const idx = unlocked.findIndex(n => n.id === tab);
+              if (e.key === 'ArrowRight' && idx < unlocked.length - 1) { setTab(unlocked[idx + 1].id); e.preventDefault(); }
+              if (e.key === 'ArrowLeft' && idx > 0) { setTab(unlocked[idx - 1].id); e.preventDefault(); }
+            }}>
             {NAV.map(t => {
               const Icon = t.icon;
               const active = tab === t.id;
@@ -648,7 +658,8 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
                 (t.id === 'inbox');
               const pendingReviews = contentRequests.filter(r => r.status === 'client_review').length;
               return (
-                <button key={t.id} onClick={() => t.locked ? setShowUpgradeModal(true) : setTab(t.id)}
+                <button key={t.id} role="tab" aria-selected={active} tabIndex={active ? 0 : -1}
+                  onClick={() => t.locked ? setShowUpgradeModal(true) : setTab(t.id)}
                   className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
                     t.locked ? 'border-transparent text-zinc-500 cursor-default' :
                     active ? 'border-teal-500 text-teal-300' :
@@ -657,7 +668,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
                   <Icon className="w-3.5 h-3.5" /> {t.label}
                   {t.locked && <Lock className="w-3 h-3 ml-0.5 text-zinc-500" />}
                   {t.id === 'inbox' && (pendingApprovals + pendingReviews + unreadTeamNotes) > 0 && <span className="ml-1 px-1.5 py-0.5 text-[11px] font-bold rounded-full bg-teal-500 text-white flex-shrink-0 min-w-[20px] text-center leading-tight">{pendingApprovals + pendingReviews + unreadTeamNotes}</span>}
-                  {!t.locked && hasData && !active && t.id !== 'inbox' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" />}
+                  {!t.locked && hasData && !active && t.id !== 'inbox' && <span className="w-2 h-2 rounded-full bg-emerald-400/60" title="Data available" />}
                 </button>
               );
             })}
@@ -742,7 +753,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
           </button>
         )}
         {chatOpen && (
-          <div className={`fixed bottom-6 right-6 bg-zinc-900 rounded-2xl border border-zinc-800 shadow-2xl shadow-black/40 overflow-hidden z-50 flex flex-col transition-all duration-200 ${chatExpanded ? 'w-[600px] max-h-[700px]' : 'w-96 max-h-[500px]'}`}>
+          <div className={`fixed bg-zinc-900 border-zinc-800 shadow-2xl shadow-black/40 overflow-hidden z-50 flex flex-col transition-all duration-200 ${chatExpanded ? 'inset-y-0 right-0 w-full sm:w-[480px] border-l rounded-none' : 'bottom-6 right-6 w-96 max-h-[500px] rounded-2xl border'}`}>
             <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 flex-shrink-0">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-teal-400" /><span className="text-sm font-medium text-zinc-200">Insights Engine</span>
@@ -1125,7 +1136,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
 
       {/* Toast notification */}
       {toast && (
-        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] px-5 py-3 rounded-xl border shadow-lg backdrop-blur-sm flex items-center gap-2.5 animate-[slideUp_0.3s_ease] ${toast.type === 'success' ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' : 'bg-red-500/15 border-red-500/30 text-red-300'}`}>
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] px-5 py-3 rounded-xl border shadow-lg backdrop-blur-sm flex items-center gap-2.5 animate-[slideUp_0.3s_ease] ${toast.type === 'success' ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' : 'bg-red-500/15 border-red-500/30 text-red-300'}`}>
           {toast.type === 'success' ? <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> : <AlertTriangle className="w-4 h-4 flex-shrink-0" />}
           <span className="text-xs font-medium">{toast.message}</span>
           <button onClick={() => setToast(null)} className="ml-2 text-zinc-400 hover:text-zinc-200"><X className="w-3.5 h-3.5" /></button>
