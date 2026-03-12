@@ -124,6 +124,16 @@
           "shippedAt": "2026-03"
         },
         {
+          "id": 196,
+          "title": "Server refactor: index.ts → 38 route modules",
+          "source": "Architecture debt",
+          "est": "4-6h",
+          "priority": "P0",
+          "notes": "Shipped — Split server/index.ts from ~8,300 lines into ~450 lines + 38 Express Router files in server/routes/ + 3 shared modules (broadcast.ts, helpers.ts, middleware.ts). Each route file owns one domain. Zero endpoint changes — pure refactor.",
+          "status": "done",
+          "shippedAt": "2026-03-11"
+        },
+        {
           "id": 190,
           "title": "Beta client feedback & bug submission",
           "source": "Product idea Mar 2026",

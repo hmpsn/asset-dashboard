@@ -688,6 +688,17 @@ A brief value assessment of every feature in the platform, covering what it does
 
 ---
 
+### 63. Server Refactor (index.ts → Route Modules)
+**What it does:** Split `server/index.ts` from ~8,300 lines into ~450 lines + 38 Express Router files in `server/routes/` + 3 shared modules (`broadcast.ts`, `helpers.ts`, `middleware.ts`). Each route file owns one domain (e.g., `auth.ts`, `webflow.ts`, `content-briefs.ts`, `public-portal.ts`). Shared middleware (`middleware.ts`) is the single source of truth for rate limiting, session signing, file upload, and auth helpers. `helpers.ts` extracts pure functions (sanitize, validate, date parsing, audit traffic). `broadcast.ts` provides a singleton WebSocket broadcast pattern so route files can emit events without importing the WS server directly. Index.ts retains only: Express setup, Helmet/CORS/cookie-parser, Stripe webhook (raw body), WebSocket server, route mounting (38 `app.use()` calls), and startup initialization.
+
+**Agency value:** Dramatically improves developer velocity — finding and modifying endpoints goes from scanning 8K lines to opening a single file. New features slot into the correct route file without merge conflicts. Shared modules eliminate copy-paste patterns that previously drifted out of sync.
+
+**Client value:** N/A — internal architecture improvement. Indirectly improves reliability by reducing the chance of regressions when adding features.
+
+**Mutual:** Sustainable codebase that can grow to 100+ endpoints without becoming unmaintainable. Foundation for future team collaboration — multiple developers can work on different route files simultaneously.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
@@ -703,8 +714,9 @@ A brief value assessment of every feature in the platform, covering what it does
 | Monetization | 1 | Stripe Checkout, admin settings, payment tracking, trials, encrypted config |
 | Platform & UX | 10 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home, page state model, work orders, request linkage |
 | Data Architecture | 3 | PageEditState model, cross-store writes, activity feed for client actions |
+| Architecture | 1 | Server refactor: 8K-line monolith → 38 route modules + 3 shared modules |
 
-**62 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**63 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
 ---
 
@@ -848,4 +860,4 @@ When the user asks to update this document with recent features, follow this pro
 7. **Update Summary table**: Adjust category counts and total feature count.
 8. **Commit**: `git add FEATURE_AUDIT.md && git commit -m "docs: update FEATURE_AUDIT with recent features"`
 
-Current feature count: **62**. Last updated: March 10, 2026 (Knowledge base auto-generation from website crawl, Claude/GPT hybrid model for content writing, content quality engine v5).
+Current feature count: **63**. Last updated: March 11, 2026 (Server refactor: index.ts split into 38 route modules + 3 shared modules).

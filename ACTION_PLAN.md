@@ -242,11 +242,12 @@ Track key decisions here as they're made:
 | 2026-03-08 | Sprint 3 shipped: Self-Service Fulfillment | WorkOrder model, Stripe webhook → work order creation, SeoCart + FixRecommendations, OrderStatus client view. |
 | 2026-03-08 | Sprint 4 shipped: Recommendations Unification | recommendations.ts engine, auto-regeneration after audits, FixRecommendations client view, recommendation flags in editors. |
 | 2026-03-08 | Sprint 5 shipped: Cross-Tool Polish | WorkspaceHome SEO status, activity feed for client actions, approval context, apply confirmation dialog, Command Center page states, request pageId linkage, prospect onboarding CTA, recommendations_ready + audit_improved email notifications. |
+| 2026-03-11 | Server refactor shipped | `server/index.ts` split from ~8,300 lines into ~450 lines + 38 Express Router files in `server/routes/` + 3 shared modules (`broadcast.ts`, `helpers.ts`, `middleware.ts`). Zero endpoint changes — pure architecture improvement. Each route file owns one domain. |
 
 ---
 
 *Compiled: March 7, 2026*
-*Last updated: March 8, 2026 (Data flow unification complete: 6 sprints shipped, 59 features total)*
-*Next up: Sprint A — Quick Wins (3-5 hrs)*
-*Total items tracked: 90+ (48 original + 6 unification sprints shipped, remaining per Sprints A–E)*
+*Last updated: March 11, 2026 (Server refactor: index.ts → 38 route modules, 63 features total)*
+*Next up: Sprint B — Proof of Value (pending items)*
+*Total items tracked: 90+ (48 original + 6 unification sprints shipped, remaining per Sprints B–D)*
 *Data source: Server-side `data/roadmap.json` (managed via /api/roadmap)*
