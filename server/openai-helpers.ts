@@ -154,7 +154,7 @@ export function getUsageByDay(workspaceId?: string, days = 30): Array<{
   }
 
   // Fill missing days with zeros
-  const result: Array<{ date: string } & typeof byDay extends Map<string, infer V> ? V : never> = [];
+  const result: Array<{ date: string; totalTokens: number; promptTokens: number; completionTokens: number; cost: number; calls: number; openaiCost: number; anthropicCost: number; openaiTokens: number; anthropicTokens: number }> = [];
   const d = new Date(cutoff);
   const today = new Date();
   while (d <= today) {

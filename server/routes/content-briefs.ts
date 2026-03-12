@@ -13,7 +13,6 @@ import {
   deleteBrief,
   generateBrief,
 } from '../content-brief.js';
-import { getGA4LandingPages } from '../google-analytics.js';
 import { getSearchOverview } from '../search-console.js';
 import { isSemrushConfigured, getKeywordOverview, getRelatedKeywords } from '../semrush.js';
 import { getWorkspace } from '../workspaces.js';

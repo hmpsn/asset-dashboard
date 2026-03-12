@@ -7,7 +7,7 @@ import path from 'path';
 import type { SeoAuditResult } from './seo-audit.js';
 import type { SchemaContext } from './schema-suggester.js';
 import type { CustomDateRange } from './google-analytics.js';
-import { listWorkspaces, getWorkspace } from './workspaces.js';
+import { listWorkspaces } from './workspaces.js';
 import { getAllGscPages } from './search-console.js';
 import { getGA4TopPages } from './google-analytics.js';
 
