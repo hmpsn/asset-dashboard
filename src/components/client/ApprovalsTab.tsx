@@ -36,13 +36,17 @@ export function ApprovalsTab({
 
   const approveAllInBatch = async (batch: ApprovalBatch) => {
     const pending = batch.items.filter(i => i.status === 'pending');
-    await Promise.all(pending.map(item => updateApprovalItem(batch.id, item.id, { status: 'approved' })));
+    for (const item of pending) {
+      await updateApprovalItem(batch.id, item.id, { status: 'approved' });
+    }
     setToast({ message: `Approved ${pending.length} change${pending.length !== 1 ? 's' : ''}`, type: 'success' });
   };
 
   const approveAllForPage = async (batchId: string, items: ApprovalItem[]) => {
     const pending = items.filter(i => i.status === 'pending');
-    await Promise.all(pending.map(item => updateApprovalItem(batchId, item.id, { status: 'approved' })));
+    for (const item of pending) {
+      await updateApprovalItem(batchId, item.id, { status: 'approved' });
+    }
   };
 
   const updateApprovalItem = async (batchId: string, itemId: string, update: { status?: string; clientValue?: string; clientNote?: string }) => {
