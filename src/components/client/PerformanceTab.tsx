@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Search, LineChart } from 'lucide-react';
+import { TabBar } from '../ui';
 import { SearchTab } from './SearchTab';
 import { AnalyticsTab } from './AnalyticsTab';
 import type {
@@ -57,28 +58,15 @@ export function PerformanceTab(props: PerformanceTabProps) {
     <>
       {/* Sub-tab selector — only show when both data sources exist */}
       {(hasSearch || hasAnalytics) && (
-        <div className="flex items-center gap-1 bg-zinc-900/60 rounded-lg border border-zinc-800 p-1 w-fit mb-1">
-          <button
-            onClick={() => setSubTab('search')}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-medium transition-colors ${
-              subTab === 'search'
-                ? 'bg-zinc-700 text-zinc-200'
-                : 'text-zinc-500 hover:text-zinc-300'
-            }`}
-          >
-            <Search className="w-3.5 h-3.5" /> Search
-          </button>
-          <button
-            onClick={() => setSubTab('analytics')}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-medium transition-colors ${
-              subTab === 'analytics'
-                ? 'bg-zinc-700 text-zinc-200'
-                : 'text-zinc-500 hover:text-zinc-300'
-            }`}
-          >
-            <LineChart className="w-3.5 h-3.5" /> Analytics
-          </button>
-        </div>
+        <TabBar
+          tabs={[
+            { id: 'search', label: 'Search', icon: Search },
+            { id: 'analytics', label: 'Analytics', icon: LineChart },
+          ]}
+          active={subTab}
+          onChange={(id) => setSubTab(id as 'search' | 'analytics')}
+          className="mb-1 w-fit"
+        />
       )}
 
       {subTab === 'search' && (
