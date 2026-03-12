@@ -70,10 +70,11 @@ export function SettingsPanel() {
     finally { setStorageLoading(false); }
   };
 
-  const runPrune = async (type: 'chat' | 'backups' | 'activity') => {
+  const runPrune = async (type: 'chat' | 'backups' | 'activity' | 'reports') => {
     const endpoints: Record<string, string> = {
       chat: '/api/admin/storage/prune-chat',
       backups: '/api/admin/storage/prune-backups',
+      reports: '/api/admin/storage/prune-reports',
       activity: '/api/admin/storage/prune-activity',
     };
     setPruning(type);
@@ -358,6 +359,18 @@ export function SettingsPanel() {
                     <span className="text-[11px] text-zinc-500 ml-1.5">Keep last 3 days</span>
                   </div>
                   {pruning === 'backups' && <Loader2 className="w-3 h-3 animate-spin text-zinc-500" />}
+                </button>
+                <button
+                  onClick={() => runPrune('reports')}
+                  disabled={!!pruning}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition-colors text-left"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-violet-400 shrink-0" />
+                  <div className="flex-1">
+                    <span className="text-xs text-zinc-300">Prune audit snapshots</span>
+                    <span className="text-[11px] text-zinc-500 ml-1.5">Keep last 20 per site</span>
+                  </div>
+                  {pruning === 'reports' && <Loader2 className="w-3 h-3 animate-spin text-zinc-500" />}
                 </button>
                 <button
                   onClick={() => runPrune('chat')}

@@ -13,7 +13,7 @@ import { isEmailConfigured } from '../email.js';
 import { getGoogleCredentials } from '../google-auth.js';
 import { isStripeConfigured } from '../stripe.js';
 import { listWorkspaces, getTokenForSite } from '../workspaces.js';
-import { getStorageReport, pruneChatSessions, pruneBackups, pruneActivityLogs } from '../storage-stats.js';
+import { getStorageReport, pruneChatSessions, pruneBackups, pruneReportSnapshots, pruneActivityLogs } from '../storage-stats.js';
 
 const DATA_ROOT = DATA_BASE || path.join(process.env.HOME || '', '.asset-dashboard');
 
@@ -127,6 +127,16 @@ router.post('/api/admin/storage/prune-backups', (req, res) => {
     res.json({ ...result, retainDays });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Backup prune failed' });
+  }
+});
+
+router.post('/api/admin/storage/prune-reports', (req, res) => {
+  const keepPerSite = typeof req.body?.keepPerSite === 'number' ? req.body.keepPerSite : 20;
+  try {
+    const result = pruneReportSnapshots(keepPerSite);
+    res.json({ ...result, keepPerSite });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Report prune failed' });
   }
 });
 

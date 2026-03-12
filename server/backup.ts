@@ -4,7 +4,7 @@
  * Backs up: workspace config, client users, auth data, reports, schemas, payments,
  * content requests, chat sessions, activity logs, rank tracking, annotations, etc.
  * 
- * Retention: keeps last 7 daily backups (configurable via BACKUP_RETENTION_DAYS).
+ * Retention: keeps last 3 daily backups (configurable via BACKUP_RETENTION_DAYS).
  * Storage: local disk by default (DATA_DIR/backups/). Set BACKUP_DIR to override.
  * 
  * Future: add S3/GCS upload when cloud credentials are configured.
@@ -15,7 +15,7 @@ import path from 'path';
 import { DATA_BASE, getDataDir, getUploadRoot } from './data-dir.js';
 
 const BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
-const RETENTION_DAYS = parseInt(process.env.BACKUP_RETENTION_DAYS || '7', 10);
+const RETENTION_DAYS = parseInt(process.env.BACKUP_RETENTION_DAYS || '3', 10);
 
 function getBackupRoot(): string {
   const dir = process.env.BACKUP_DIR || (DATA_BASE ? path.join(DATA_BASE, 'backups') : path.join(process.env.HOME || '', '.asset-dashboard', 'backups'));

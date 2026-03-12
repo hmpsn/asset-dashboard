@@ -269,6 +269,51 @@ export function pruneBackups(retainDays: number = 3): PruneResult {
   return result;
 }
 
+/* ── Pruning: Audit report snapshots ── */
+
+/**
+ * Keep only the most recent `keepPerSite` audit snapshots per site.
+ * Reports are stored as individual JSON files in DATA_DIR/reports/{siteId}/.
+ */
+export function pruneReportSnapshots(keepPerSite: number = 20): PruneResult {
+  const dataRoot = DATA_BASE || path.join(process.env.HOME || '', '.asset-dashboard');
+  const reportsDir = path.join(dataRoot, 'reports');
+  const result: PruneResult = { sessionsRemoved: 0, bytesFreed: 0, errors: [] };
+
+  try {
+    if (!fs.existsSync(reportsDir)) return result;
+    const siteDirs = fs.readdirSync(reportsDir, { withFileTypes: true }).filter(d => d.isDirectory());
+    for (const siteDir of siteDirs) {
+      const sitePath = path.join(reportsDir, siteDir.name);
+      const files = fs.readdirSync(sitePath).filter(f => f.endsWith('.json'));
+      if (files.length <= keepPerSite) continue;
+
+      // Sort by mtime descending (newest first)
+      const withTime = files.map(f => {
+        const fp = path.join(sitePath, f);
+        try { return { name: f, mtime: fs.statSync(fp).mtimeMs, size: fs.statSync(fp).size }; }
+        catch { return { name: f, mtime: 0, size: 0 }; }
+      }).sort((a, b) => b.mtime - a.mtime);
+
+      // Delete everything beyond keepPerSite
+      const toDelete = withTime.slice(keepPerSite);
+      for (const f of toDelete) {
+        try {
+          fs.unlinkSync(path.join(sitePath, f.name));
+          result.sessionsRemoved++;
+          result.bytesFreed += f.size;
+        } catch (err) {
+          result.errors.push(`${siteDir.name}/${f.name}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+    }
+  } catch (err) {
+    result.errors.push(`Report prune failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  return result;
+}
+
 /* ── Pruning: Activity logs ── */
 
 /**
