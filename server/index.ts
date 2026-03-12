@@ -1,5 +1,4 @@
 import 'dotenv/config';
-import crypto from 'crypto';
 import express from 'express';
 import helmet from 'helmet';
 import { createServer } from 'http';
@@ -25,6 +24,13 @@ import { startMonthlyReports } from './monthly-report.js';
 import { startChurnSignalScheduler } from './churn-signals.js';
 import { startAnomalyDetection, initAnomalyBroadcast } from './anomaly-detection.js';
 import { initJobs } from './jobs.js';
+import { setBroadcast } from './broadcast.js';
+import {
+  publicApiLimiter,
+  publicWriteLimiter,
+  verifyAdminToken,
+  verifyClientSession,
+} from './middleware.js';
 
 // ─── Route modules ───
 import authRoutes from './routes/auth.js';
@@ -80,54 +86,10 @@ for (const dir of [getUploadRoot(), getOptRoot()]) {
   fs.mkdirSync(dir, { recursive: true });
 }
 
-// --- Security utilities ---
-
-// In-memory rate limiter (per IP)
-const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
-function rateLimit(windowMs: number, maxRequests: number) {
-  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const ip = req.ip || req.socket.remoteAddress || 'unknown';
-    const key = `${ip}:${req.path}`;
-    const now = Date.now();
-    const bucket = rateLimitBuckets.get(key);
-    if (!bucket || now > bucket.resetAt) {
-      rateLimitBuckets.set(key, { count: 1, resetAt: now + windowMs });
-      return next();
-    }
-    bucket.count++;
-    if (bucket.count > maxRequests) {
-      return res.status(429).json({ error: 'Too many requests. Please try again later.' });
-    }
-    next();
-  };
-}
-// Clean up stale rate limit entries every 5 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, bucket] of rateLimitBuckets) {
-    if (now > bucket.resetAt) rateLimitBuckets.delete(key);
-  }
-}, 5 * 60 * 1000);
-
-// Session signing for client dashboard auth
-const SESSION_SECRET = process.env.SESSION_SECRET || process.env.APP_PASSWORD || crypto.randomBytes(32).toString('hex');
-function signClientSession(workspaceId: string): string {
-  return crypto.createHmac('sha256', SESSION_SECRET).update(`client:${workspaceId}`).digest('hex');
-}
-function verifyClientSession(workspaceId: string, token: string): boolean {
-  const expected = signClientSession(workspaceId);
-  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(token || ''.padEnd(expected.length)));
-}
-
-// Admin auth token (HMAC instead of raw password)
-function signAdminToken(): string {
-  return crypto.createHmac('sha256', SESSION_SECRET).update('admin').digest('hex');
-}
-function verifyAdminToken(token: string): boolean {
-  const expected = signAdminToken();
-  try { return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(token || '')); }
-  catch { return false; }
-}
+// Rate limiting, session signing, and admin token verification are all
+// imported from middleware.ts — the single source of truth.
+// Route files also import from middleware.ts, so they share the same
+// SESSION_SECRET and rate-limit buckets.
 
 // --- Core middleware (must come before auth) ---
 
@@ -185,12 +147,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
 app.use(express.json({ limit: '10mb' }));
 
 // --- Rate limiting for public API routes ---
-// General public API rate limit: 60 requests per minute per IP
-const publicApiLimiter = rateLimit(60 * 1000, 60);
-// Stricter limit for write operations: 10 per minute per IP
-const publicWriteLimiter = rateLimit(60 * 1000, 10);
-// Checkout-specific limit: exported from middleware.ts for route files
-
+// Limiters imported from middleware.ts (shared buckets with route files)
 app.use('/api/public/', publicApiLimiter);
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/public/') && (req.method === 'POST' || req.method === 'PATCH' || req.method === 'DELETE')) {
@@ -312,7 +269,7 @@ function getPresence(): Record<string, Array<{ userId: string; email: string; na
 /** Broadcast presence update to all admin clients. */
 function broadcastPresenceUpdate() {
   const presence = getPresence();
-  broadcast('presence:update', presence);
+  _broadcast('presence:update', presence);
 }
 
 wss.on('connection', (ws) => {
@@ -354,8 +311,9 @@ wss.on('connection', (ws) => {
   });
 });
 
-/** Broadcast to ALL connected clients (global events like jobs, queue). */
-function broadcast(event: string, data: unknown) {
+// Wire up the broadcast singleton so route files (which import from broadcast.ts)
+// use the same WebSocket-backed functions defined here.
+function _broadcast(event: string, data: unknown) {
   const msg = JSON.stringify({ event, data });
   for (const ws of clients) {
     if (ws.readyState === WebSocket.OPEN) {
@@ -363,9 +321,7 @@ function broadcast(event: string, data: unknown) {
     }
   }
 }
-
-/** Broadcast to clients subscribed to a specific workspace. */
-function broadcastToWorkspace(workspaceId: string, event: string, data: unknown) {
+function _broadcastToWorkspace(workspaceId: string, event: string, data: unknown) {
   const msg = JSON.stringify({ event, data, workspaceId });
   for (const [ws, subs] of clientWorkspaces) {
     if (ws.readyState === WebSocket.OPEN && subs.has(workspaceId)) {
@@ -373,6 +329,7 @@ function broadcastToWorkspace(workspaceId: string, event: string, data: unknown)
     }
   }
 }
+setBroadcast(_broadcast, _broadcastToWorkspace);
 
 // --- User Presence API (admin) ---
 app.get('/api/presence', (_req, res) => {
@@ -380,13 +337,13 @@ app.get('/api/presence', (_req, res) => {
 });
 
 // --- Background Jobs ---
-initJobs(broadcast);
+initJobs(_broadcast);
 
 // --- Activity broadcast (every addActivity auto-notifies subscribed WS clients) ---
-initActivityBroadcast(broadcastToWorkspace);
+initActivityBroadcast(_broadcastToWorkspace);
 // --- Anomaly broadcast (notify workspace clients when new anomalies detected) ---
-initAnomalyBroadcast(broadcastToWorkspace);
-initStripeBroadcast(broadcastToWorkspace);
+initAnomalyBroadcast(_broadcastToWorkspace);
+initStripeBroadcast(_broadcastToWorkspace);
 
 
 // ─── Mount route modules ───
@@ -460,7 +417,7 @@ startAnomalyDetection();
 
 // Start
 const PORT = parseInt(process.env.PORT || '3001', 10);
-startWatcher(broadcast);
+startWatcher(_broadcast);
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Asset Dashboard running on http://localhost:${PORT} [${IS_PROD ? 'production' : 'development'}]`);
   // Startup diagnostics
