@@ -67,7 +67,7 @@ Every completed task — no matter how small — must include these steps:
 | File | Purpose | Notes |
 |------|---------|-------|
 | `index.ts` | **App setup, middleware, WS, route mounting** (~450 lines) | No route handlers — all moved to `server/routes/`. |
-| `routes/` | 38 Express Router files | One file per domain: `auth.ts`, `webflow.ts`, `jobs.ts`, `keyword-strategy.ts`, `public-analytics.ts`, etc. |
+| `routes/` | 46 Express Router files | One file per domain: `auth.ts`, `webflow.ts`, `webflow-alt-text.ts`, `webflow-audit.ts`, `webflow-cms.ts`, `webflow-keywords.ts`, `webflow-organize.ts`, `aeo-review.ts`, `feedback.ts`, `public-feedback.ts`, etc. |
 | `helpers.ts` | Shared pure functions | `sanitizeString`, `validateEnum`, `parseDateRange`, `applySuppressionsToAudit`, `buildSchemaContext`, `getAuditTrafficForWorkspace`, `readEnvFile`, `writeEnvFile` |
 | `middleware.ts` | Shared middleware + auth (single source of truth) | Rate limiters, `signClientSession`/`verifyClientSession`, `signAdminToken`/`verifyAdminToken`, `upload` (multer), `moveUploadedFiles`, `IS_PROD`, `APP_PASSWORD` |
 | `broadcast.ts` | WebSocket broadcast singleton | `setBroadcast()` called in index.ts, `broadcast()`/`broadcastToWorkspace()` imported by route files |
@@ -89,7 +89,9 @@ Every completed task — no matter how small — must include these steps:
 | `google-analytics.ts` | GA4 API | All functions accept optional `dateRange?: CustomDateRange` |
 | `search-console.ts` | GSC API | All functions accept optional `dateRange?: CustomDateRange` |
 | `semrush.ts` | SEMRush API | Keyword overview, domain organic, gaps, related |
-| `seo-audit.ts` | Site health audit engine | Crawl + scoring |
+| `seo-audit.ts` | Site health audit engine | Crawl + scoring. Per-page logic extracted to `audit-page.ts`. |
+| `audit-page.ts` | Per-page audit check runner | Extracted from `seo-audit.ts` — runs individual page checks |
+| `seo-audit-html.ts` | Audit HTML report rendering | Extracted from `seo-audit.ts` |
 | `monthly-report.ts` | Auto-report scheduler | `gatherMonthlyData`, trial banner support |
 | `email-templates.ts` | HTML email builders | 15 `EmailEventType`s: approval, request, content, audit, welcome, trial, password, churn, payment, fixes, recommendations, audit_improved |
 | `activity-log.ts` | Activity logging | `addActivity(workspaceId, type, title, detail, metadata?, actor?)`. Types: audit, seo_edit, schema, request, approval, content, chat, fix_completed, etc. |
@@ -139,13 +141,20 @@ Every completed task — no matter how small — must include these steps:
 | `components/Roadmap.tsx` | Admin roadmap tracker | Sprint progress bars, velocity chart, status toggle |
 | `components/LandingPage.tsx` | GTM lead-gen landing page | Public-facing marketing page with pricing, features, CTAs |
 | `components/MobileGuard.tsx` | Mobile device interstitial | Dismissible guard recommending desktop experience |
-| `components/WorkspaceSettings.tsx` | Admin workspace config | Knowledge base, client users, branding |
+| `components/WorkspaceSettings.tsx` | Admin workspace config | Shell with tab routing; tabs extracted to `settings/` |
+| `components/settings/` | **WorkspaceSettings tab modules** | `ConnectionsTab.tsx` (integrations), `FeaturesTab.tsx` (feature toggles), `ClientDashboardTab.tsx` (client portal config, client users) |
+| `components/audit/` | **SeoAudit extracted modules** | `ScoreTrendChart.tsx`, `ActionItemsPanel.tsx`, `AuditHistory.tsx`, `types.ts` (shared audit interfaces) |
+| `components/briefs/` | **ContentBriefs extracted modules** | `BriefDetail.tsx` (expanded brief view with all fields) |
+| `components/schema/` | **SchemaSuggester extracted modules** | `CmsTemplatePanel.tsx` (CMS template schema UI) |
+| `components/strategy/` | **KeywordStrategy extracted modules** | `SeoCopyPanel.tsx` (SEO copy generation panel) |
+| `components/assets/` | **AssetBrowser extracted modules** | `OrganizePreview.tsx` (asset organize preview) |
+| `components/workspace-home/` | **WorkspaceHome extracted modules** | `ActiveRequestsAnnotations.tsx`, `ActivityFeed.tsx`, `RankingsSnapshot.tsx`, `SeoWorkStatus.tsx`, `index.ts` (barrel) |
 | `components/LoginScreen.tsx` | Admin login UI | Setup flow + email/password |
 | `components/Styleguide.tsx` | Design system reference page | Color swatches, component demos |
-| `components/ui/` | **15 shared UI primitives** | See § 4 below |
+| `components/ui/` | **17 shared UI primitives** | See § 4 below |
 | `components/client/` | **Client tab components** (28 files) | `types.ts`, `helpers.tsx`, `utils.ts`, `index.ts`, `OverviewTab.tsx`, `SearchTab.tsx`, `AnalyticsTab.tsx`, `PerformanceTab.tsx` (merged Search+Analytics), `StrategyTab.tsx`, `ContentTab.tsx`, `ApprovalsTab.tsx`, `RequestsTab.tsx`, `PlansTab.tsx`, `InboxTab.tsx` (composes Approvals+Requests+Content), `HealthTab.tsx`, `InsightsDigest.tsx`, `InsightsEngine.tsx`, `MonthlySummary.tsx`, `DataSnapshots.tsx`, `ROIDashboard.tsx`, `OrderStatus.tsx`, `FixRecommendations.tsx`, `SeoCart.tsx`, `useCart.tsx`, `OnboardingWizard.tsx`, `BetaContext.tsx` (beta mode feature flag), `ClientOnboardingQuestionnaire.tsx`, `FeedbackWidget.tsx`, `SeoGlossary.tsx` |
 | `components/shared/` | **Shared cross-dashboard components** | `RankTable.tsx` (position colors, history chart, rank change indicators) |
-| `hooks/` | **Shared React hooks** (9 files) | `useAuth.ts`, `useWebSocket.ts`, `useBackgroundTasks.tsx`, `useAuditSummary.ts`, `useSearchData.ts`, `useGA4Overview.ts`, `usePageEditStates.ts`, `useRecommendations.ts`, `useWorkspaceEvents.ts` |
+| `hooks/` | **Shared React hooks** (15 files) | `useAuth.ts`, `useWebSocket.ts`, `useBackgroundTasks.tsx`, `useAuditSummary.ts`, `useSearchData.ts`, `useGA4Overview.ts`, `usePageEditStates.ts`, `useRecommendations.ts`, `useWorkspaceEvents.ts`, `useChat.ts`, `useClientAuth.ts`, `useClientData.ts`, `useContentRequests.ts`, `usePayments.ts`, `useToast.ts` |
 
 ### Data & Config
 
@@ -178,7 +187,7 @@ Every completed task — no matter how small — must include these steps:
 ### Feature work
 | Priority | Doc | What it tells you |
 |----------|-----|-------------------|
-| 1 | `FEATURE_AUDIT.md` | 70-feature inventory with agency/client/mutual value, Future Additions backlog |
+| 1 | `FEATURE_AUDIT.md` | 82-feature inventory with agency/client/mutual value, Future Additions backlog |
 | 2 | `.windsurf/workflows/feature-integration.md` | How to connect features (cross-links, client dashboard, approvals) |
 | 3 | `.windsurf/workflows/wiring-patterns.md` | How to wire data into chat, strategy, briefs, reports |
 | 4 | `data/roadmap.json` | Sprint tracking — check what's done/pending before starting work |
@@ -243,6 +252,7 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 | `scoreColor()` / `scoreColorClass()` | `./ui` | Score-based color helpers |
 | `AIContextIndicator` | `./ui` | AI data source completeness bar (feature-filterable, compact mode) |
 | `StatusBadge` | `./ui` | Unified status badges with `statusConfig.ts` color map |
+| `Skeleton` | `./ui` | Shimmer/skeleton loading placeholders |
 
 ### When creating new UI primitives
 1. Create in `src/components/ui/`

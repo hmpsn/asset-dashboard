@@ -311,6 +311,7 @@ For switching between sub-views within a page.
 | Button transition | `transition-colors` (0.15s ease) |
 | Active tab | `bg-zinc-700 text-zinc-200` (segmented) or `border-teal-500 text-teal-300` (underline) |
 | Loading spinner | `Loader2` icon with `animate-spin text-zinc-500` or `text-teal-400` |
+| Skeleton loading | `Skeleton` primitive: `animate-pulse rounded-md bg-zinc-800`. Composed variants: `StatCardSkeleton`, `SectionCardSkeleton`, `OverviewSkeleton`, `AnalyticsSkeleton` |
 
 ---
 
@@ -327,6 +328,13 @@ src/components/ui/
 ├── Badge.tsx            # Status/category pill
 ├── EmptyState.tsx       # Placeholder for empty/unconfigured states
 ├── TabBar.tsx           # Sub-navigation tabs
+├── Skeleton.tsx         # Shimmer/skeleton loading placeholders (5 variants)
+├── AIContextIndicator.tsx # AI data source completeness bar
+├── StatusBadge.tsx      # Unified status badges with statusConfig color map
+├── TierGate.tsx         # Tier lock overlay + TierBadge
+├── constants.ts         # scoreColor, scoreColorClass, scoreBgBarClass, DATE_PRESETS
+├── statusConfig.ts      # Status→color mapping for StatusBadge
+├── index.ts             # Barrel export
 ```
 
 ---

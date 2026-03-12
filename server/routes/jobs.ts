@@ -416,10 +416,11 @@ router.post('/api/jobs', async (req, res) => {
             const businessContext = (params.businessContext as string) || stratWs.keywordStrategy?.businessContext || '';
             const semrushMode = (params.semrushMode as string) || 'none';
             const competitorDomains = (params.competitorDomains as string[]) || stratWs.competitorDomains || [];
+            const maxPages = params.maxPages != null ? Number(params.maxPages) : undefined;
             const stratRes = await fetch(stratUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', ...(APP_PASSWORD ? { 'x-auth-token': APP_PASSWORD } : {}) },
-              body: JSON.stringify({ businessContext, semrushMode, competitorDomains }),
+              body: JSON.stringify({ businessContext, semrushMode, competitorDomains, maxPages }),
             });
             if (!stratRes.ok) {
               const errText = await stratRes.text();

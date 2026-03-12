@@ -60,6 +60,8 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
   const businessContext = (req.body?.businessContext as string) || ws.keywordStrategy?.businessContext || '';
   const semrushMode = (req.body?.semrushMode as string) || 'none'; // 'quick', 'full', 'none'
   const competitorDomains = (req.body?.competitorDomains as string[]) || ws.competitorDomains || [];
+  const rawMaxPages = req.body?.maxPages != null ? Number(req.body.maxPages) : 500;
+  const maxPagesParam = rawMaxPages > 0 ? Math.min(rawMaxPages, 2000) : 0; // 0 = no cap, clamped at 2000
   const token = getTokenForSite(ws.webflowSiteId) || undefined;
 
   // Save competitor domains if provided
@@ -174,10 +176,33 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     sendProgress('discovery', `Found ${allPaths.size} live pages`, 0.12);
     console.log(`[Strategy] Total live pages: ${allPaths.size}`);
 
-    // 3. Fetch actual page content for ALL discovered pages (parallel, batched)
-    sendProgress('content', `Fetching content from ${allPaths.size} pages...`, 0.15);
+    // --- Page cap: prevent OOM on large sites ---
+    // maxPagesParam: 0 = no cap, otherwise cap at user-chosen limit (200/500/1000)
+    // Even with "All", streaming HTML reads + snippet limits keep memory bounded.
+    let pathArray = Array.from(allPaths);
+    let cappedFromTotal = 0;
+    if (maxPagesParam > 0 && pathArray.length > maxPagesParam) {
+      cappedFromTotal = pathArray.length;
+      // Prioritize: homepage → short paths (key pages) → pages with WF metadata → rest
+      const scorePath = (p: string): number => {
+        if (p === '/') return 0;                            // homepage always first
+        const depth = p.split('/').filter(Boolean).length;
+        const hasWfMeta = wfMetaByPath.has(p) ? 0 : 100;   // prefer pages with metadata
+        return depth * 10 + hasWfMeta;
+      };
+      pathArray.sort((a, b) => scorePath(a) - scorePath(b));
+      pathArray = pathArray.slice(0, maxPagesParam);
+      console.log(`[Strategy] Capped from ${cappedFromTotal} → ${maxPagesParam} pages (prioritized by depth + metadata)`);
+      sendProgress('discovery', `Large site — prioritized top ${maxPagesParam} of ${cappedFromTotal} pages`, 0.13);
+    }
+
+    // Content snippet size: reduce for large sites to control memory
+    const SNIPPET_LIMIT = cappedFromTotal > 0 ? 800 : 1200;
+    const HTML_READ_LIMIT = 100_000; // 100KB max per page — enough for snippet extraction
+
+    // 3. Fetch actual page content for prioritized pages (parallel, batched)
+    sendProgress('content', `Fetching content from ${pathArray.length} pages...`, 0.15);
     const pageInfo: Array<{ path: string; title: string; seoTitle: string; seoDesc: string; contentSnippet: string }> = [];
-    const pathArray = Array.from(allPaths);
     const contentBatch = 6;
     for (let i = 0; i < pathArray.length; i += contentBatch) {
       const chunk = pathArray.slice(i, i + contentBatch);
@@ -196,7 +221,22 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
               // Non-200 = page doesn't exist on live site (e.g. non-live CMS collection)
               if (!wfMeta) return null; // Skip sitemap-only pages that 404
             } else {
-              const html = await htmlRes.text();
+              // Read limited body to prevent OOM on huge pages
+              let html = '';
+              if (htmlRes.body) {
+                const reader = htmlRes.body.getReader();
+                const decoder = new TextDecoder();
+                let bytesRead = 0;
+                while (bytesRead < HTML_READ_LIMIT) {
+                  const { done, value } = await reader.read();
+                  if (done) break;
+                  html += decoder.decode(value, { stream: true });
+                  bytesRead += value.byteLength;
+                }
+                reader.cancel().catch(() => {});
+              } else {
+                html = (await htmlRes.text()).slice(0, HTML_READ_LIMIT);
+              }
               // Extract title and meta description from HTML for pages without Webflow metadata
               if (!wfMeta) {
                 const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
@@ -217,7 +257,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
                 .replace(/&[a-z]+;/gi, ' ')
                 .replace(/\s+/g, ' ')
                 .trim()
-                .slice(0, 1200);
+                .slice(0, SNIPPET_LIMIT);
             }
           } catch {
             if (!wfMeta) return null; // Skip unreachable sitemap-only pages
@@ -250,7 +290,8 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
       console.log(`[Strategy] Removed ${thinPages.length} thin content pages`);
     }
 
-    sendProgress('content', `Fetched ${pageInfo.length} live pages (${skipped} non-live, ${beforeThinFilter - pageInfo.length} thin filtered)`, 0.46);
+    const capNote = cappedFromTotal > 0 ? ` of ${cappedFromTotal} total` : '';
+    sendProgress('content', `Fetched ${pageInfo.length} live pages${capNote} (${skipped} non-live, ${beforeThinFilter - pageInfo.length} thin filtered)`, 0.46);
 
     // 4. Try to gather GSC data if connected
     sendProgress('search_data', 'Fetching Google Search Console data...', 0.48);

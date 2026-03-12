@@ -662,8 +662,9 @@
           "source": "Market prep analysis Mar 2026",
           "est": "1-2h",
           "priority": "P2",
-          "notes": "When loadDashboardData fires after login, the client sees empty tab content until 4-12 parallel fetches complete. Add shimmer/skeleton loading states for key components: OverviewTab metric cards, HealthTab score ring, PerformanceTab charts, StrategyTab keyword table. Use shared Skeleton primitive component. Small polish that makes the app feel faster and more professional on first load.",
-          "status": "pending"
+          "notes": "Shipped — Skeleton.tsx UI primitive with shimmer animation. Applied to client dashboard data loading across tabs (OverviewTab metric cards, HealthTab score ring, PerformanceTab charts, StrategyTab keyword table). Centralized number formatting utilities shipped alongside.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
         },
         {
           "id": 207,

@@ -94,6 +94,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId, onNavigate }: Props)
   const [contextOpen, setContextOpen] = useState(false);
   const [semrushAvailable, setSemrushAvailable] = useState(false);
   const [semrushMode, setSemrushMode] = useState<'none' | 'quick' | 'full'>('none');
+  const [maxPages, setMaxPages] = useState<number>(500);
   const [competitors, setCompetitors] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [progressStep, setProgressStep] = useState('');
@@ -166,6 +167,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId, onNavigate }: Props)
           businessContext: businessContext.trim() || undefined,
           semrushMode: semrushAvailable ? semrushMode : 'none',
           competitorDomains: compList,
+          maxPages: maxPages || undefined,
         }),
       });
 
@@ -495,6 +497,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId, onNavigate }: Props)
             {!settingsOpen && (
               <span className="text-[11px] text-zinc-500">
                 {semrushMode !== 'none' ? `SEMRush: ${semrushMode}` : ''}
+                {maxPages > 0 ? `${semrushMode !== 'none' ? ' · ' : ''}${maxPages} pages max` : `${semrushMode !== 'none' ? ' · ' : ''}All pages`}
                 {businessContext ? ` · Context set` : ''}
                 {competitors.trim() ? ` · ${competitors.split(/[,\n]+/).filter(Boolean).length} competitors` : ''}
               </span>
@@ -556,6 +559,40 @@ export function KeywordStrategyPanel({ workspaceId, siteId, onNavigate }: Props)
                 <p className="text-[11px] text-zinc-500 mt-1">Comma-separated. SEMRush will find keywords they rank for that you don't (max 3).</p>
               </div>
             )}
+
+            {/* Page Limit */}
+            <div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <FileText className="w-3.5 h-3.5 text-teal-400" />
+                <span className="text-[11px] text-zinc-400 font-semibold uppercase tracking-wider">Page Limit</span>
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                {([200, 500, 1000, 0] as const).map(cap => (
+                  <button
+                    key={cap}
+                    onClick={() => setMaxPages(cap)}
+                    className={`px-3 py-2 rounded-lg border text-xs font-medium transition-all ${
+                      maxPages === cap
+                        ? 'border-teal-500/50 bg-teal-500/10 text-teal-300'
+                        : 'border-zinc-700 bg-zinc-800 text-zinc-500 hover:text-zinc-300'
+                    }`}
+                  >
+                    <div className="font-semibold">{cap === 0 ? 'All' : cap}</div>
+                    <div className="text-[11px] mt-0.5 opacity-70">
+                      {cap === 200 && '~2-3 min'}
+                      {cap === 500 && '~5-7 min'}
+                      {cap === 1000 && '~10-15 min'}
+                      {cap === 0 && 'No limit'}
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-zinc-500 mt-1.5">
+                {maxPages === 0
+                  ? 'Processes every page on the site. May be slow for 500+ page sites.'
+                  : `Prioritizes the top ${maxPages} pages by importance (homepage, key service pages, pages with metadata). Skips utility pages.`}
+              </p>
+            </div>
 
             {/* Business Context */}
             <div>

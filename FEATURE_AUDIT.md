@@ -75,7 +75,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ### 7. SEO Strategy (Keyword Mapping)
 **What it does:** Maps every page to primary/secondary keywords using GSC data, competitor analysis, SEMRush metrics (volume, KD%, intent), and AI. Batched parallel AI processing for large sites. Identifies content gaps, quick wins, low-hanging fruit, and keyword opportunities. Summary dashboard with performance tiers, search intent badges, and sortable/filterable page map. Runs as a background job with real-time progress. Smart page filtering excludes utility pages. **Conversion-aware**: GA4 conversion events and events-by-page data injected into the master synthesis prompt; AI protects "money pages" and references specific conversion events in quickWin rationales. **Audit-aware**: `getAuditTrafficForWorkspace` cross-references SEO audit errors with traffic data; high-traffic pages with issues surfaced as quickWins with specific fix actions. **Page type mapping**: content gap recommendations now include `suggestedPageType` (blog, landing, service, location, product, pillar, resource) — the AI selects the best format for each opportunity based on intent and keyword context. Page type badges (violet) display on content gap cards in both admin and client views.
 
-**Agency value:** Automates the most labor-intensive part of SEO — the keyword strategy document. Pulls real data from GSC + GA4 conversions + SEMRush + audit intelligence instead of guesswork. Batched processing handles 100+ page sites efficiently. Conversion data ensures the strategy never deprioritizes pages that drive revenue.
+**Agency value:** Automates the most labor-intensive part of SEO — the keyword strategy document. Pulls real data from GSC + GA4 conversions + SEMRush + audit intelligence instead of guesswork. Batched processing handles 100+ page sites efficiently. Conversion data ensures the strategy never deprioritizes pages that drive revenue. **Large-site safety (March 2026):** Configurable page cap in Strategy Settings (200 / 500 / 1000 / All — default 500). Pages prioritized by path depth + Webflow metadata availability (homepage first, then key service/product pages). HTML body reads limited to 100KB per page via streaming to prevent OOM. Content snippets reduced from 1200→800 chars for capped sites. Prevents exit-134 crashes on 750+ page sites.
 
 **Client value:** A clear roadmap: which pages target which keywords, what content is missing, and where the quick wins are. Interactive strategy view with "Request This Topic" buttons. Strategy now reflects which pages actually convert, not just which pages rank.
 
@@ -713,7 +713,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 63. Server Refactor (index.ts → Route Modules)
-**What it does:** Split `server/index.ts` from ~8,300 lines into ~450 lines + 38 Express Router files in `server/routes/` + 3 shared modules (`broadcast.ts`, `helpers.ts`, `middleware.ts`). Each route file owns one domain (e.g., `auth.ts`, `webflow.ts`, `content-briefs.ts`, `public-portal.ts`). Shared middleware (`middleware.ts`) is the single source of truth for rate limiting, session signing, file upload, and auth helpers. `helpers.ts` extracts pure functions (sanitize, validate, date parsing, audit traffic). `broadcast.ts` provides a singleton WebSocket broadcast pattern so route files can emit events without importing the WS server directly. Index.ts retains only: Express setup, Helmet/CORS/cookie-parser, Stripe webhook (raw body), WebSocket server, route mounting (38 `app.use()` calls), and startup initialization.
+**What it does:** Split `server/index.ts` from ~8,300 lines into ~450 lines + 46 Express Router files in `server/routes/` + 3 shared modules (`broadcast.ts`, `helpers.ts`, `middleware.ts`). Each route file owns one domain (e.g., `auth.ts`, `webflow.ts`, `content-briefs.ts`, `public-portal.ts`). Shared middleware (`middleware.ts`) is the single source of truth for rate limiting, session signing, file upload, and auth helpers. `helpers.ts` extracts pure functions (sanitize, validate, date parsing, audit traffic). `broadcast.ts` provides a singleton WebSocket broadcast pattern so route files can emit events without importing the WS server directly. Index.ts retains only: Express setup, Helmet/CORS/cookie-parser, Stripe webhook (raw body), WebSocket server, route mounting, and startup initialization. **Extended decomposition (March 2026):** `webflow.ts` route split into 6 focused sub-routes (`webflow-alt-text.ts`, `webflow-audit.ts`, `webflow-cms.ts`, `webflow-keywords.ts`, `webflow-organize.ts`, `webflow.ts` core). `seo-audit.ts` decomposed: per-page check logic extracted to `audit-page.ts`, HTML report rendering to `seo-audit-html.ts`.
 
 **Agency value:** Dramatically improves developer velocity — finding and modifying endpoints goes from scanning 8K lines to opening a single file. New features slot into the correct route file without merge conflicts. Shared modules eliminate copy-paste patterns that previously drifted out of sync.
 
@@ -760,7 +760,7 @@ A brief value assessment of every feature in the platform, covering what it does
 | Monetization | 1 | Stripe Checkout, admin settings, payment tracking, trials, encrypted config |
 | Platform & UX | 10 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home, page state model, work orders, request linkage |
 | Data Architecture | 3 | PageEditState model, cross-store writes, activity feed for client actions |
-| Architecture | 1 | Server refactor: 8K-line monolith → 38 route modules + 3 shared modules |
+| Architecture | 2 | Server refactor (46 route modules + 3 shared modules), frontend component decomposition |
 
 **65 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
@@ -873,6 +873,12 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - ~~Component Styleguide~~: ✅ Shipped — `/styleguide` route with all UI primitives, charts, tables, modals, toasts, forms, loading states, progress bars, and sidebar nav.
 - ~~Selective type size bump~~: ✅ Shipped — `text-[11px]`/`text-xs` → 13.5px, `text-sm` → 15.5px.
 - ~~Heading contrast~~: ✅ Shipped — SectionCard and PageHeader titles punched up.
+- ~~Skeleton/shimmer loading states~~: ✅ Shipped (March 2026) — `Skeleton.tsx` UI primitive with shimmer animation. Applied to client dashboard data loading across tabs. See Feature #83.
+- ~~Centralized number formatting~~: ✅ Shipped (March 2026) — Duplicate number formatting utilities consolidated into shared helpers. Eliminates inconsistent formatting across components.
+- ~~Mobile date picker~~: ✅ Shipped (March 2026) — Date picker popover made mobile-friendly with responsive positioning.
+- ~~Chat/FeedbackWidget mobile overlap fix~~: ✅ Shipped (March 2026) — Fixed z-index and positioning conflict between floating chat button and feedback widget on small screens.
+- ~~Frontend component decomposition~~: ✅ Shipped (March 2026) — 7 monolithic components decomposed into focused sub-modules (SeoAudit, ContentBriefs, SchemaSuggester, KeywordStrategy, AssetBrowser, WorkspaceSettings, WorkspaceHome). See Feature #83.
+- ~~Server route decomposition (webflow.ts)~~: ✅ Shipped (March 2026) — `webflow.ts` route split into 6 focused sub-routes. `seo-audit.ts` decomposed into `audit-page.ts` + `seo-audit-html.ts`. See Feature #63.
 - **WCAG AA compliance**: Full contrast ratio audit, focus indicators, keyboard navigation for all interactive elements.
 - **Responsive mobile layout**: Sidebar collapses to bottom nav, cards stack vertically on small screens.
 
@@ -1087,6 +1093,17 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 83. Frontend Component Decomposition
+**What it does:** Systematic extraction of large monolithic components into focused sub-modules. **SeoAudit.tsx**: extracted `ScoreTrendChart`, `ActionItemsPanel`, `AuditHistory`, and shared `types.ts` into `src/components/audit/`. **ContentBriefs.tsx**: extracted `BriefDetail` into `src/components/briefs/`. **SchemaSuggester.tsx**: extracted `CmsTemplatePanel` into `src/components/schema/`. **KeywordStrategy.tsx**: extracted `SeoCopyPanel` into `src/components/strategy/`. **AssetBrowser.tsx**: extracted `OrganizePreview` into `src/components/assets/`. **WorkspaceSettings.tsx**: extracted `ConnectionsTab`, `FeaturesTab`, `ClientDashboardTab` into `src/components/settings/`. **WorkspaceHome**: extracted `ActiveRequestsAnnotations`, `ActivityFeed`, `RankingsSnapshot`, `SeoWorkStatus` into `src/components/workspace-home/`. **Client dashboard**: extracted `useContentRequests` hook for Content tab API logic. **UX improvements shipped alongside**: skeleton/shimmer loading states (`Skeleton.tsx` UI primitive), mobile-friendly date picker popover, Chat/FeedbackWidget overlap fix on mobile, centralized number formatting utilities, sequential batch approve (race condition fix), and strategy generation error handling with user-facing error messages.
+
+**Agency value:** Dramatically smaller file sizes — easier code reviews, faster navigation, fewer merge conflicts. Each extracted module is independently testable and importable. Skeleton loading states make the dashboard feel faster during data fetches.
+
+**Client value:** Smoother loading experience with skeleton placeholders instead of blank screens. Mobile date picker usability improved.
+
+**Mutual:** Sustainable frontend architecture that scales. New components slot into the correct module directory. The decomposition pattern (extract to `src/components/{domain}/`, keep parent as shell with state + routing) is established for future extractions.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
@@ -1102,8 +1119,8 @@ When the user asks to update this document with recent features, follow this pro
 | Monetization | 1 | Stripe Checkout, admin settings, payment tracking, trials, encrypted config |
 | Platform & UX | 14 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home, page state model, work orders, request linkage, admin UX overhaul, landing page, mobile guard, Recharts |
 | Data Architecture | 3 | PageEditState model, cross-store writes, activity feed for client actions |
-| Architecture | 1 | Server refactor: 8K-line monolith → 38 route modules + 3 shared modules |
+| Architecture | 2 | Server refactor (46 route modules + 3 shared modules), frontend component decomposition |
 
-**82 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**83 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **82**. Last updated: March 2026 (AEO Page Review: AI-powered per-page content change recommendations).
+Current feature count: **83**. Last updated: March 2026 (frontend decomposition, skeleton loading, UX polish).
