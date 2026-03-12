@@ -66,6 +66,9 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
     changeDays, applyCustomRange, refetchClient,
   } = useClientData(workspaceId);
 
+  // ── UI-only state (declared early — needed by hooks below) ──
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
   // ── Payments hook ──
   const {
     pricingModal, setPricingModal,
@@ -132,7 +135,6 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
     window.history.replaceState({}, '', url.toString());
   };
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingSaving, setOnboardingSaving] = useState(false);
