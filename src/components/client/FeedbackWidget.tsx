@@ -42,9 +42,10 @@ interface Props {
   workspaceId: string;
   currentTab: string;
   submittedBy?: string;
+  chatExpanded?: boolean;
 }
 
-export function FeedbackWidget({ workspaceId, currentTab, submittedBy }: Props) {
+export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpanded }: Props) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<'form' | 'list'>('form');
   const [items, setItems] = useState<FeedbackItem[]>([]);
@@ -122,7 +123,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy }: Props) 
     return (
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 left-6 flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-zinc-800/90 hover:bg-zinc-700/90 border border-zinc-700/50 text-zinc-300 hover:text-zinc-100 text-xs font-medium shadow-lg transition-all z-50 backdrop-blur-sm"
+        className={`fixed bottom-6 left-6 flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-zinc-800/90 hover:bg-zinc-700/90 border border-zinc-700/50 text-zinc-300 hover:text-zinc-100 text-xs font-medium shadow-lg transition-all z-40 backdrop-blur-sm ${chatExpanded ? 'sm:flex hidden' : ''}`}
       >
         <MessageSquarePlus className="w-3.5 h-3.5" />
         Feedback
@@ -134,7 +135,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy }: Props) 
   }
 
   return (
-    <div className="fixed bottom-6 left-6 w-[360px] max-h-[520px] bg-zinc-900 rounded-2xl border border-zinc-800 shadow-2xl shadow-black/40 overflow-hidden z-50 flex flex-col">
+    <div className={`fixed bottom-6 left-6 w-[360px] max-h-[520px] bg-zinc-900 rounded-2xl border border-zinc-800 shadow-2xl shadow-black/40 overflow-hidden z-40 flex flex-col ${chatExpanded ? 'sm:flex hidden' : ''}`}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 flex-shrink-0">
         <div className="flex items-center gap-2">

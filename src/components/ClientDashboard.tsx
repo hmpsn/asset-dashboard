@@ -1129,7 +1129,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
       )}
 
       {/* Beta Feedback Widget */}
-      {ws && <FeedbackWidget workspaceId={workspaceId} currentTab={tab} submittedBy={undefined} />}
+      {ws && <FeedbackWidget workspaceId={workspaceId} currentTab={tab} submittedBy={undefined} chatExpanded={chatExpanded} />}
 
       {/* Toast notification */}
       {toast && (
