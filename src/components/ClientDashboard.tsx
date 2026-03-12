@@ -7,7 +7,7 @@ import {
   Sun, Moon, Plus, FileText, Calendar, Clock, CreditCard,
 } from 'lucide-react';
 import { StripePaymentModal } from './StripePaymentForm';
-import { type Tier } from './ui';
+import { type Tier, Skeleton, OverviewSkeleton } from './ui';
 import { RenderMarkdown } from './client/helpers';
 import { STUDIO_NAME } from '../constants';
 import { HealthTab } from './client/HealthTab';
@@ -292,18 +292,16 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
     <div className="min-h-screen bg-[#0f1219] text-zinc-200">
       <header className="border-b border-zinc-800">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-4">
-          <div className="h-6 w-24 bg-zinc-800 rounded animate-pulse" />
+          <Skeleton className="h-6 w-24" />
           <div className="w-px h-8 bg-zinc-800" />
-          <div><div className="h-5 w-40 bg-zinc-800 rounded animate-pulse" /><div className="h-3 w-28 bg-zinc-800/50 rounded animate-pulse mt-1.5" /></div>
+          <div><Skeleton className="h-5 w-40" /><Skeleton className="h-3 w-28 mt-1.5" /></div>
         </div>
         <div className="max-w-6xl mx-auto px-6 pb-3 flex gap-4">
-          {[1,2,3,4].map(i => <div key={i} className="h-4 w-20 bg-zinc-800/50 rounded animate-pulse" />)}
+          {[1,2,3,4].map(i => <Skeleton key={i} className="h-4 w-20" />)}
         </div>
       </header>
       <main className="max-w-6xl mx-auto px-6 py-6">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {[1,2,3,4,5].map(i => <div key={i} className="bg-zinc-900 rounded-xl p-4 border border-zinc-800"><div className="h-4 w-4 bg-zinc-800 rounded mb-2 animate-pulse" /><div className="h-7 w-16 bg-zinc-800 rounded animate-pulse" /><div className="h-3 w-20 bg-zinc-800/50 rounded animate-pulse mt-2" /></div>)}
-        </div>
+        <OverviewSkeleton />
       </main>
     </div>
   );

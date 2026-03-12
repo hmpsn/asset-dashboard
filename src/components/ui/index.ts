@@ -9,6 +9,7 @@ export { EmptyState } from './EmptyState';
 export { TabBar } from './TabBar';
 export { TierGate, TierBadge, type Tier } from './TierGate';
 export { AIContextIndicator } from './AIContextIndicator';
+export { Skeleton, StatCardSkeleton, SectionCardSkeleton, OverviewSkeleton, AnalyticsSkeleton } from './Skeleton';
 export {
   scoreColor,
   scoreColorClass,
