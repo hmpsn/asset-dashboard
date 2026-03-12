@@ -4,7 +4,7 @@ import {
   TrendingUp, AlertCircle, Sparkles, Pencil, Check, X, Briefcase,
   BarChart3, Shield, DollarSign, Users, Search, Zap, FileText,
   Eye, MousePointerClick, Trophy, ArrowUp, ArrowDown, Wand2,
-  Copy, Link, MessageSquare, Save,
+  Copy, Link, MessageSquare,
 } from 'lucide-react';
 import { KeywordAnalysis } from './KeywordAnalysis';
 import { StatCard, AIContextIndicator } from './ui';
@@ -103,10 +103,6 @@ export function KeywordStrategyPanel({ workspaceId, siteId, onNavigate }: Props)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [generatingCopy, setGeneratingCopy] = useState<string | null>(null);
   const [seoCopyResults, setSeoCopyResults] = useState<Map<string, SeoCopy>>(new Map());
-  const [brandVoice, setBrandVoice] = useState('');
-  const [brandVoiceOpen, setBrandVoiceOpen] = useState(false);
-  const [savingBrandVoice, setSavingBrandVoice] = useState(false);
-  const [generatingBrandVoice, setGeneratingBrandVoice] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const stepLabels: Record<string, string> = {
@@ -314,25 +310,6 @@ export function KeywordStrategyPanel({ workspaceId, siteId, onNavigate }: Props)
     .sort((a, b) => (b.impressions || 0) - (a.impressions || 0))
     .slice(0, 6);
 
-  // Load brand voice on mount
-  useEffect(() => {
-    if (!workspaceId) return;
-    fetch(`/api/workspaces/${workspaceId}`).then(r => r.json()).then(ws => {
-      if (ws.brandVoice) setBrandVoice(ws.brandVoice);
-    }).catch(() => {});
-  }, [workspaceId]);
-
-  const saveBrandVoiceHandler = async () => {
-    setSavingBrandVoice(true);
-    try {
-      await fetch(`/api/workspaces/${workspaceId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brandVoice: brandVoice.trim() }),
-      });
-    } catch { /* ignore */ }
-    finally { setSavingBrandVoice(false); }
-  };
 
   const generateSeoCopy = async (page: PageKeywordMap) => {
     setGeneratingCopy(page.pagePath);
@@ -1155,63 +1132,6 @@ export function KeywordStrategyPanel({ workspaceId, siteId, onNavigate }: Props)
               </div>
             </div>
           )}
-
-          {/* Brand Voice Settings */}
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-            <button
-              onClick={() => setBrandVoiceOpen(!brandVoiceOpen)}
-              className="flex items-center justify-between w-full text-left"
-            >
-              <h4 className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-                <MessageSquare className="w-3.5 h-3.5 text-teal-400" /> Brand Voice & Style Guidelines
-                {brandVoice && <span className="text-[11px] text-emerald-400 font-normal ml-1">(configured)</span>}
-              </h4>
-              {brandVoiceOpen ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500" />}
-            </button>
-            {brandVoiceOpen && (
-              <div className="mt-3 space-y-2">
-                <p className="text-[11px] text-zinc-500">
-                  Define your brand's voice and tone. This will be used in ALL AI-generated copy — SEO rewrites, content briefs, and SEO copy generation.
-                  You can also drop <code className="text-teal-400">.txt</code> or <code className="text-teal-400">.md</code> files into the <code className="text-teal-400">brand-docs/</code> folder in your workspace uploads.
-                </p>
-                <textarea
-                  value={brandVoice}
-                  onChange={e => setBrandVoice(e.target.value)}
-                  placeholder="e.g., Professional but approachable. Use active voice. Avoid jargon. Speak directly to the reader. Our tone is confident and helpful, never salesy..."
-                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500 min-h-[80px] resize-y"
-                  rows={4}
-                />
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={saveBrandVoiceHandler}
-                    disabled={savingBrandVoice}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-[11px] font-medium"
-                  >
-                    {savingBrandVoice ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save Brand Voice
-                  </button>
-                  <button
-                    onClick={async () => {
-                      setGeneratingBrandVoice(true);
-                      try {
-                        const res = await fetch(`/api/workspaces/${workspaceId}/generate-brand-voice`, { method: 'POST' });
-                        if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || 'Generation failed'); }
-                        const data = await res.json();
-                        setBrandVoice(data.brandVoice);
-                      } catch (err) {
-                        console.error('[generate-brand-voice]', err);
-                      } finally {
-                        setGeneratingBrandVoice(false);
-                      }
-                    }}
-                    disabled={generatingBrandVoice}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {generatingBrandVoice ? <><Loader2 className="w-3 h-3 animate-spin" /> Crawling site...</> : <><Sparkles className="w-3 h-3" /> Generate from Website</>}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
 
           {/* How it works */}
           <div className="bg-zinc-800/30 rounded-lg border border-zinc-800 px-4 py-3">

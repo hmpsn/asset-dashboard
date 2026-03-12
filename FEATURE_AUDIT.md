@@ -667,7 +667,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 62. Knowledge Base Auto-Generation
-**What it does:** One-click knowledge base generation from the client's live website. `POST /api/workspaces/:id/generate-knowledge-base` crawls up to 15 priority pages (homepage, about, services, case studies, blog, contact — selected via regex pattern matching on URL paths) using the shared `scrapeWorkspaceSite()` helper plus sitemap discovery for CMS pages. Scraped content (titles, meta descriptions, headings, body text excerpts) is sent to GPT-4.1 which extracts a structured knowledge base: business overview, services & offerings, target audience, differentiators, case studies & results (with real numbers when available), brand voice & tone, key topics & expertise, and important details. The generated text populates the Knowledge Base textarea in WorkspaceSettings for human review before saving. "Generate from Website" button with loading state and unsaved-changes indicator.
+**What it does:** One-click knowledge base generation from the client's live website. `POST /api/workspaces/:id/generate-knowledge-base` crawls up to 15 priority pages (homepage, about, services, case studies, blog, contact — selected via regex pattern matching on URL paths) using the shared `scrapeWorkspaceSite()` helper plus sitemap discovery for CMS pages. Scraped content (titles, meta descriptions, headings, body text excerpts) is sent to GPT-4.1 which extracts a structured knowledge base: business overview, services & offerings, target audience, differentiators, case studies & results (with real numbers when available), brand voice & tone, key topics & expertise, and important details. The generated text populates the Knowledge Base textarea in the Brand & AI hub (`BrandHub.tsx`) for human review before saving. "Generate from Website" button with loading state and unsaved-changes indicator.
 
 **Agency value:** Eliminates the manual step of writing business context for each new client. One click produces a comprehensive knowledge base that immediately improves all AI outputs (chatbot, content briefs, blog posts, strategy).
 
@@ -678,7 +678,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 65. Brand Voice Auto-Generation
-**What it does:** One-click brand voice guide generation from the client's live website. `POST /api/workspaces/:id/generate-brand-voice` reuses the shared `scrapeWorkspaceSite()` helper to crawl up to 15 priority pages, then sends the content to GPT-4.1 with a brand strategist prompt that analyzes writing patterns across the site. Produces a comprehensive guide covering: tone & personality (overall tone, personality traits, formality level), writing style (sentence structure, vocabulary level, person/perspective, active vs passive voice), messaging patterns (service descriptions, reader address style, CTA style, recurring phrases), do's and don'ts, and example phrases lifted directly from the site. The generated text populates the Brand Voice textarea in KeywordStrategy for human review before saving. "Generate from Website" button next to "Save Brand Voice" with loading state.
+**What it does:** One-click brand voice guide generation from the client's live website. `POST /api/workspaces/:id/generate-brand-voice` reuses the shared `scrapeWorkspaceSite()` helper to crawl up to 15 priority pages, then sends the content to GPT-4.1 with a brand strategist prompt that analyzes writing patterns across the site. Produces a comprehensive guide covering: tone & personality (overall tone, personality traits, formality level), writing style (sentence structure, vocabulary level, person/perspective, active vs passive voice), messaging patterns (service descriptions, reader address style, CTA style, recurring phrases), do's and don'ts, and example phrases lifted directly from the site. The generated text populates the Brand Voice textarea in the Brand & AI hub (`BrandHub.tsx`) for human review before saving. "Generate from Website" button next to "Save Brand Voice" with loading state.
 
 **Agency value:** Eliminates guesswork when defining brand voice for new clients. The AI analyzes actual writing patterns instead of relying on the agency's subjective impression. Produces actionable guidelines that all AI features follow immediately.
 
@@ -689,7 +689,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 66. Audience Personas Auto-Generation
-**What it does:** One-click audience persona generation from the client's live website. `POST /api/workspaces/:id/generate-personas` reuses the shared `scrapeWorkspaceSite()` helper, then sends content to GPT-4.1 with a marketing strategist prompt that identifies 2-5 distinct audience segments. Returns structured JSON personas with: name, description, pain points, goals, objections, preferred content format, and buying stage. The AI identifies personas based on evidence from the website — who the services target, case study clients, language used. Results populate the Audience Personas manager in WorkspaceSettings as draft personas for human review before saving. "Generate from Website" button in the personas section with loading state and toast notification showing count and pages scraped.
+**What it does:** One-click audience persona generation from the client's live website. `POST /api/workspaces/:id/generate-personas` reuses the shared `scrapeWorkspaceSite()` helper, then sends content to GPT-4.1 with a marketing strategist prompt that identifies 2-5 distinct audience segments. Returns structured JSON personas with: name, description, pain points, goals, objections, preferred content format, and buying stage. The AI identifies personas based on evidence from the website — who the services target, case study clients, language used. Results populate the Audience Personas manager in the Brand & AI hub (`BrandHub.tsx`) as draft personas for human review before saving. "Generate from Website" button in the personas section with loading state and toast notification showing count and pages scraped.
 
 **Agency value:** Skips the manual persona research step for new client onboarding. AI-generated personas are evidence-based (derived from actual website content) and immediately usable in content briefs, blog posts, and strategy.
 
@@ -905,4 +905,15 @@ When the user asks to update this document with recent features, follow this pro
 7. **Update Summary table**: Adjust category counts and total feature count.
 8. **Commit**: `git add FEATURE_AUDIT.md && git commit -m "docs: update FEATURE_AUDIT with recent features"`
 
-Current feature count: **65**. Last updated: March 11, 2026 (Beta client feedback widget shipped).
+### 68. Brand & AI Hub (BrandHub)
+**What it does:** Dedicated "Brand & AI" tab in the admin sidebar (SEO group) consolidating all AI content generation inputs into a single screen. `BrandHub.tsx` houses three sections previously scattered across KeywordStrategy (Brand Voice) and WorkspaceSettings (Knowledge Base, Audience Personas). Each section retains full functionality: inline editing, auto-save on blur, "Generate from Website" one-click AI generation, and unsaved-changes indicators. PageHeader with Sparkles icon and explanatory subtitle. Info footer explains how the three sources feed into all AI outputs. Brand Voice moved from collapsible panel in Strategy → dedicated section with violet accent. Knowledge Base moved from Features tab in Settings → dedicated section with teal accent. Personas moved from Features tab in Settings → dedicated section with blue accent. Registered as `brand` tab in App.tsx, lazy-loaded, receives `workspaceId` and `webflowSiteId` props.
+
+**Agency value:** All AI context inputs in one place instead of hunting across Strategy and Settings tabs. Faster client onboarding — open one tab, click three "Generate from Website" buttons, review, done.
+
+**Client value:** N/A — admin-only tool. Indirectly improves all AI-generated content quality by making it easier for the agency to maintain complete, up-to-date context.
+
+**Mutual:** Reduces the friction of maintaining AI context, which means it actually gets maintained. Better context → better AI outputs → fewer revision cycles.
+
+---
+
+Current feature count: **66**. Last updated: March 2026 (Brand & AI Hub consolidation shipped).

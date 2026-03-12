@@ -318,7 +318,7 @@
           "source": "Product Vision Mar 2026",
           "est": "2-3h",
           "priority": "P1",
-          "notes": "Shipped — Phase 1: One-click auto-generation from website crawl. Shared scrapeWorkspaceSite() helper extracts content from up to 15 priority pages. (1) POST /api/workspaces/:id/generate-brand-voice: GPT-4.1 brand strategist prompt produces comprehensive voice guide (tone, personality, writing style, messaging patterns, do's/don'ts, example phrases). 'Generate from Website' button in KeywordStrategy brand voice section. (2) POST /api/workspaces/:id/generate-personas: GPT-4.1 marketing strategist prompt identifies 2-5 audience personas with structured JSON output (name, description, pain points, goals, objections, content format, buying stage). 'Generate from Website' button in WorkspaceSettings personas section. Both populate drafts for human review before saving. Remaining phases: intake wizard, StoryBrand framework, Whisper transcription.",
+          "notes": "Shipped — Phase 1: One-click auto-generation from website crawl. Phase 2: Consolidated into Brand & AI Hub (BrandHub.tsx) — dedicated sidebar tab housing Brand Voice, Knowledge Base, and Audience Personas in one screen. Shared scrapeWorkspaceSite() helper extracts content from up to 15 priority pages. (1) Brand Voice: GPT-4.1 brand strategist prompt. (2) Personas: GPT-4.1 marketing strategist prompt, structured JSON output. (3) Knowledge Base: GPT-4.1 business analyst prompt. All three sections include 'Generate from Website' buttons and auto-save. Remaining phases: intake wizard, StoryBrand framework, Whisper transcription.",
           "status": "done",
           "shippedAt": "2026-03"
         }
