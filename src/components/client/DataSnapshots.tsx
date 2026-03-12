@@ -8,6 +8,7 @@ import type {
   GA4OrganicOverview, GA4LandingPage,
 } from './types';
 import { ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { fmtNum as formatNum } from '../../utils/formatNumbers';
 
 // ─── Helpers ───
 
@@ -45,12 +46,6 @@ function DeviceIcon({ device }: { device: string }) {
   if (d === 'mobile') return <Smartphone className="w-3.5 h-3.5" />;
   if (d === 'tablet') return <Tablet className="w-3.5 h-3.5" />;
   return <Monitor className="w-3.5 h-3.5" />;
-}
-
-function formatNum(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
 }
 
 // ─── Search Snapshot ───

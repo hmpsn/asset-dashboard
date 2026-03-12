@@ -7,6 +7,7 @@ import {
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import { PageHeader, StatCard, SectionCard, TabBar, DateRangeSelector, DataList, EmptyState } from './ui';
 import { DATE_PRESETS_FULL } from './ui/constants';
+import { fmtNum as formatNumber } from '../utils/formatNumbers';
 
 interface GA4Overview {
   totalUsers: number;
@@ -153,12 +154,6 @@ function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = Math.round(seconds % 60);
   return `${m}m ${s}s`;
-}
-
-function formatNumber(n: number): string {
-  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
-  return n.toLocaleString();
 }
 
 function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
