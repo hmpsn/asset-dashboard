@@ -667,13 +667,35 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 62. Knowledge Base Auto-Generation
-**What it does:** One-click knowledge base generation from the client's live website. `POST /api/workspaces/:id/generate-knowledge-base` crawls up to 15 priority pages (homepage, about, services, case studies, blog, contact — selected via regex pattern matching on URL paths) using the existing `scrapeUrls` infrastructure plus sitemap discovery for CMS pages. Scraped content (titles, meta descriptions, headings, body text excerpts) is sent to GPT-4.1 which extracts a structured knowledge base: business overview, services & offerings, target audience, differentiators, case studies & results (with real numbers when available), brand voice & tone, key topics & expertise, and important details. The generated text populates the Knowledge Base textarea in WorkspaceSettings for human review before saving. "Generate from Website" button with loading state and unsaved-changes indicator.
+**What it does:** One-click knowledge base generation from the client's live website. `POST /api/workspaces/:id/generate-knowledge-base` crawls up to 15 priority pages (homepage, about, services, case studies, blog, contact — selected via regex pattern matching on URL paths) using the shared `scrapeWorkspaceSite()` helper plus sitemap discovery for CMS pages. Scraped content (titles, meta descriptions, headings, body text excerpts) is sent to GPT-4.1 which extracts a structured knowledge base: business overview, services & offerings, target audience, differentiators, case studies & results (with real numbers when available), brand voice & tone, key topics & expertise, and important details. The generated text populates the Knowledge Base textarea in WorkspaceSettings for human review before saving. "Generate from Website" button with loading state and unsaved-changes indicator.
 
 **Agency value:** Eliminates the manual step of writing business context for each new client. One click produces a comprehensive knowledge base that immediately improves all AI outputs (chatbot, content briefs, blog posts, strategy).
 
 **Client value:** Better AI outputs from day one — the chatbot and content generation already know the business without the agency spending hours writing context documents.
 
 **Mutual:** Reduces onboarding time from hours to minutes. The auto-generated knowledge base can be refined over time, but the starting point is already rich enough for quality AI interactions.
+
+---
+
+### 65. Brand Voice Auto-Generation
+**What it does:** One-click brand voice guide generation from the client's live website. `POST /api/workspaces/:id/generate-brand-voice` reuses the shared `scrapeWorkspaceSite()` helper to crawl up to 15 priority pages, then sends the content to GPT-4.1 with a brand strategist prompt that analyzes writing patterns across the site. Produces a comprehensive guide covering: tone & personality (overall tone, personality traits, formality level), writing style (sentence structure, vocabulary level, person/perspective, active vs passive voice), messaging patterns (service descriptions, reader address style, CTA style, recurring phrases), do's and don'ts, and example phrases lifted directly from the site. The generated text populates the Brand Voice textarea in KeywordStrategy for human review before saving. "Generate from Website" button next to "Save Brand Voice" with loading state.
+
+**Agency value:** Eliminates guesswork when defining brand voice for new clients. The AI analyzes actual writing patterns instead of relying on the agency's subjective impression. Produces actionable guidelines that all AI features follow immediately.
+
+**Client value:** AI-generated content (briefs, posts, SEO rewrites) matches their actual brand voice from day one instead of sounding generic.
+
+**Mutual:** Turns implicit brand voice knowledge into an explicit, reusable asset. Better brand alignment in all AI outputs means less revision cycles and faster content approval.
+
+---
+
+### 66. Audience Personas Auto-Generation
+**What it does:** One-click audience persona generation from the client's live website. `POST /api/workspaces/:id/generate-personas` reuses the shared `scrapeWorkspaceSite()` helper, then sends content to GPT-4.1 with a marketing strategist prompt that identifies 2-5 distinct audience segments. Returns structured JSON personas with: name, description, pain points, goals, objections, preferred content format, and buying stage. The AI identifies personas based on evidence from the website — who the services target, case study clients, language used. Results populate the Audience Personas manager in WorkspaceSettings as draft personas for human review before saving. "Generate from Website" button in the personas section with loading state and toast notification showing count and pages scraped.
+
+**Agency value:** Skips the manual persona research step for new client onboarding. AI-generated personas are evidence-based (derived from actual website content) and immediately usable in content briefs, blog posts, and strategy.
+
+**Client value:** Content that speaks to their actual audience segments from day one. Each persona's pain points and goals are addressed naturally in generated content.
+
+**Mutual:** Transforms audience research from a multi-hour workshop exercise into a one-click starting point. Generated personas can be refined, but the initial set is specific enough to dramatically improve content targeting.
 
 ---
 
@@ -710,6 +732,17 @@ A brief value assessment of every feature in the platform, covering what it does
 
 ---
 
+### 67. Beta Client Feedback Widget
+**What it does:** In-dashboard floating feedback widget for beta clients. Positioned bottom-left in the client portal — clients can submit bug reports, feature requests, or general feedback without leaving the dashboard. Auto-captures context (current tab, browser, screen size, URL) with every submission. Feedback stored per-workspace on disk (`DATA_DIR/feedback/`). Admin Command Center shows a cross-workspace feed of all submissions with status tracking (New → Acknowledged → Resolved / Won't Fix), threaded replies (team ↔ client), and inline reply input. Email notification sent to admin on each new submission. Activity log entry auto-created. Real-time WebSocket broadcast on new feedback.
+
+**Agency value:** Structured beta feedback collection without external tools (replaces Canny, Intercom, or email chaos). Every submission includes auto-attached context so you know exactly where the client was when they hit the issue. Status workflow keeps feedback organized.
+
+**Client value:** One-click bug reports and feature requests from inside the dashboard they're already using. Can track status of their submissions and see team replies without switching tools. Feels heard.
+
+**Mutual:** Lightweight alternative to heavyweight feedback tools. Keeps everything in-platform. Reply threads create a natural conversation about priorities.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
@@ -717,7 +750,7 @@ A brief value assessment of every feature in the platform, covering what it does
 | SEO & Technical | 12 | Audit, fix, and optimize faster than manual tools |
 | Analytics & Tracking | 5 | Unified data view replaces platform-hopping |
 | Content & Strategy | 6 | Strategy → brief → AI post generation → review → delivery pipeline |
-| Client Communication | 7 | Structured workflows + automated reports + expanded notifications |
+| Client Communication | 8 | Structured workflows + automated reports + expanded notifications + feedback widget |
 | Client Self-Service | 10 | 24/7 data access, onboarding, plans, cart, order tracking |
 | AI & Intelligence | 5 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine + context completeness |
 | Auth & Access Control | 3 | Internal user accounts, workspace ACL, client user accounts |
@@ -727,7 +760,7 @@ A brief value assessment of every feature in the platform, covering what it does
 | Data Architecture | 3 | PageEditState model, cross-store writes, activity feed for client actions |
 | Architecture | 1 | Server refactor: 8K-line monolith → 38 route modules + 3 shared modules |
 
-**64 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**65 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
 ---
 
@@ -872,4 +905,4 @@ When the user asks to update this document with recent features, follow this pro
 7. **Update Summary table**: Adjust category counts and total feature count.
 8. **Commit**: `git add FEATURE_AUDIT.md && git commit -m "docs: update FEATURE_AUDIT with recent features"`
 
-Current feature count: **63**. Last updated: March 11, 2026 (Server refactor: index.ts split into 38 route modules + 3 shared modules).
+Current feature count: **65**. Last updated: March 11, 2026 (Beta client feedback widget shipped).

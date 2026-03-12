@@ -304,6 +304,20 @@ export function notifyClientContentPublished(opts: {
   }));
 }
 
+export function notifyTeamNewFeedback(opts: {
+  workspaceName: string;
+  workspaceId: string;
+  feedbackType: string;
+  title: string;
+  description: string;
+}): void {
+  const to = getNotificationEmail();
+  if (!to || !isEmailConfigured()) return;
+  queueEmail(makeEvent('feedback_new', to, opts.workspaceId, opts.workspaceName, undefined, {
+    feedbackType: opts.feedbackType, title: opts.title, description: opts.description,
+  }));
+}
+
 export function notifyTeamChurnSignal(opts: {
   workspaceName: string;
   workspaceId: string;

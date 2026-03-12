@@ -106,6 +106,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId, onNavigate }: Props)
   const [brandVoice, setBrandVoice] = useState('');
   const [brandVoiceOpen, setBrandVoiceOpen] = useState(false);
   const [savingBrandVoice, setSavingBrandVoice] = useState(false);
+  const [generatingBrandVoice, setGeneratingBrandVoice] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const stepLabels: Record<string, string> = {
@@ -1180,13 +1181,34 @@ export function KeywordStrategyPanel({ workspaceId, siteId, onNavigate }: Props)
                   className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500 min-h-[80px] resize-y"
                   rows={4}
                 />
-                <button
-                  onClick={saveBrandVoiceHandler}
-                  disabled={savingBrandVoice}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-[11px] font-medium"
-                >
-                  {savingBrandVoice ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save Brand Voice
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={saveBrandVoiceHandler}
+                    disabled={savingBrandVoice}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-[11px] font-medium"
+                  >
+                    {savingBrandVoice ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save Brand Voice
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setGeneratingBrandVoice(true);
+                      try {
+                        const res = await fetch(`/api/workspaces/${workspaceId}/generate-brand-voice`, { method: 'POST' });
+                        if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || 'Generation failed'); }
+                        const data = await res.json();
+                        setBrandVoice(data.brandVoice);
+                      } catch (err) {
+                        console.error('[generate-brand-voice]', err);
+                      } finally {
+                        setGeneratingBrandVoice(false);
+                      }
+                    }}
+                    disabled={generatingBrandVoice}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {generatingBrandVoice ? <><Loader2 className="w-3 h-3 animate-spin" /> Crawling site...</> : <><Sparkles className="w-3 h-3" /> Generate from Website</>}
+                  </button>
+                </div>
               </div>
             )}
           </div>

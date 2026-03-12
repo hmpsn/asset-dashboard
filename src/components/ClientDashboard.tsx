@@ -17,6 +17,7 @@ import { SeoCartButton, SeoCartDrawer } from './client/SeoCart';
 import { OnboardingWizard } from './client/OnboardingWizard';
 import { ClientOnboardingQuestionnaire, type OnboardingData } from './client/ClientOnboardingQuestionnaire';
 import { ROIDashboard } from './client/ROIDashboard';
+import { FeedbackWidget } from './client/FeedbackWidget';
 import { PlansTab } from './client/PlansTab';
 import { StrategyTab } from './client/StrategyTab';
 import { PerformanceTab } from './client/PerformanceTab';
@@ -1635,6 +1636,9 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
           onNavigate={(t) => setTab(t as ClientTab)}
         />
       )}
+
+      {/* Beta Feedback Widget */}
+      {ws && <FeedbackWidget workspaceId={workspaceId} currentTab={tab} submittedBy={undefined} />}
 
       {/* Toast notification */}
       {toast && (

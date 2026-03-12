@@ -159,8 +159,8 @@
           "source": "Product idea Mar 2026",
           "est": "2-3h",
           "priority": "P1",
-          "notes": "In-dashboard feedback widget for beta clients: floating button or Inbox tab section. Submit bug reports (with screenshot/context auto-attached: current page, browser, workspace, user), feature requests, and general feedback. Stored per-workspace in DATA_DIR. Admin view in Command Center: feed of all submissions across workspaces, status tracking (new/acknowledged/fixed/wontfix), reply capability that notifies client. Optional: auto-create activity log entry on submission, email notification to admin. Lightweight alternative to external tools (Canny, Intercom) — keeps everything in-platform. Could also wire into AI chat: 'Report a bug' intent triggers structured form.",
-          "status": "pending"
+          "notes": "Shipped — Floating feedback widget (bottom-left, client portal). Bug/feature/general types with auto-context capture. Per-workspace disk storage. Admin Command Center feed with status workflow + threaded replies. Email notification + activity log on submission. WebSocket broadcast for real-time updates.",
+          "status": "done"
         },
         {
           "id": 191,
@@ -314,12 +314,13 @@
         },
         {
           "id": 178,
-          "title": "Client brand voice generator",
+          "title": "Brand voice & personas auto-generation",
           "source": "Product Vision Mar 2026",
-          "est": "8-12h",
+          "est": "2-3h",
           "priority": "P1",
-          "notes": "Multi-phase brand voice engine: Phase 1 — Intake form (brand values, tone adjectives, audience personas, competitor differentiation, sample content) + optional client call transcript upload. Phase 2 — AI-generated StoryBrand framework (character, problem, guide, plan, CTA, success, failure) from intake data. Phase 3 — Distill into reusable tone & voice doc (writing style rules, vocabulary do/don't, sample rewrites). Phase 4 — Wire voice doc into content brief generation, AI chat persona, and strategy recommendations so all output matches client's brand. Stored per-workspace (ws.brandVoice). Admin UI: BrandVoiceEditor with intake wizard + generated framework preview + manual override. Future: ingest client call recordings via Whisper transcription, analyze existing site copy for implicit voice patterns. High-value differentiator — no SEO tool personalizes content to brand voice.",
-          "status": "pending"
+          "notes": "Shipped — Phase 1: One-click auto-generation from website crawl. Shared scrapeWorkspaceSite() helper extracts content from up to 15 priority pages. (1) POST /api/workspaces/:id/generate-brand-voice: GPT-4.1 brand strategist prompt produces comprehensive voice guide (tone, personality, writing style, messaging patterns, do's/don'ts, example phrases). 'Generate from Website' button in KeywordStrategy brand voice section. (2) POST /api/workspaces/:id/generate-personas: GPT-4.1 marketing strategist prompt identifies 2-5 audience personas with structured JSON output (name, description, pain points, goals, objections, content format, buying stage). 'Generate from Website' button in WorkspaceSettings personas section. Both populate drafts for human review before saving. Remaining phases: intake wizard, StoryBrand framework, Whisper transcription.",
+          "status": "done",
+          "shippedAt": "2026-03"
         }
       ]
     },

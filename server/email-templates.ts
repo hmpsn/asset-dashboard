@@ -156,7 +156,8 @@ export type EmailEventType =
   | 'recommendations_ready'
   | 'audit_improved'
   | 'anomaly_alert'
-  | 'content_published';
+  | 'content_published'
+  | 'feedback_new';
 
 // ── Template renderers ──
 
@@ -209,12 +210,34 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
       return renderAnomalyAlert(events, count, ws, dashUrl, logoUrl);
     case 'content_published':
       return renderContentPublished(events, count, ws, dashUrl, logoUrl);
+    case 'feedback_new':
+      return renderFeedbackNew(events, count, ws, dashUrl, logoUrl);
     default:
       return { subject: 'Notification', html: '' };
   }
 }
 
 // ── Individual template renderers ──
+
+function renderFeedbackNew(events: EmailEvent[], count: number, ws: string, _dashUrl?: string, logoUrl?: string) {
+  const items = events.map((e, i) => itemRow({
+    title: (e.data.title as string) || 'Feedback',
+    detail: (e.data.description as string) || '',
+    badge: { label: (e.data.feedbackType as string) || 'general', color: '#6366f1', bg: '#eef2ff' },
+    isLast: i === events.length - 1,
+  })).join('');
+
+  return {
+    subject: `${count} new feedback submission${count !== 1 ? 's' : ''} — ${ws}`,
+    html: layout({
+      preheader: `New client feedback from ${ws}`,
+      headline: 'Client Feedback Received',
+      subtitle: ws,
+      body: countPill(count, 'feedback item') + items,
+      logoUrl,
+    }),
+  };
+}
 
 function renderApprovalReady(events: EmailEvent[], _count: number, ws: string, dashUrl?: string, logoUrl?: string) {
   const totalItems = events.reduce((sum, e) => sum + ((e.data.itemCount as number) || 1), 0);

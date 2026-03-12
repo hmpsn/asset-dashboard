@@ -71,6 +71,8 @@ import recommendationsRoutes from './routes/recommendations.js';
 import churnSignalsRoutes from './routes/churn-signals.js';
 import anomaliesRoutes from './routes/anomalies.js';
 import miscRoutes from './routes/misc.js';
+import feedbackRoutes from './routes/feedback.js';
+import publicFeedbackRoutes from './routes/public-feedback.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_ROOT = DATA_BASE || path.join(process.env.HOME || '', '.asset-dashboard');
@@ -393,6 +395,8 @@ app.use(recommendationsRoutes);
 app.use(churnSignalsRoutes);
 app.use(anomaliesRoutes);
 app.use(miscRoutes);
+app.use(feedbackRoutes);
+app.use(publicFeedbackRoutes);
 
 
 // --- Serve frontend in production (MUST be after all API routes) ---

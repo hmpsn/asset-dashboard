@@ -190,6 +190,67 @@ router.delete('/api/workspaces/:id', requireWorkspaceAccess(), (req, res) => {
   res.json({ ok: true });
 });
 
+// --- Shared: scrape website pages for AI analysis ---
+import type { Workspace } from '../workspaces.js';
+import type { ScrapedPage } from '../web-scraper.js';
+
+async function scrapeWorkspaceSite(ws: Workspace): Promise<{ scraped: ScrapedPage[]; pagesSummary: string }> {
+  const { scrapeUrls } = await import('../web-scraper.js');
+
+  const token = getTokenForSite(ws.webflowSiteId!) || undefined;
+  const subdomain = await getSiteSubdomain(ws.webflowSiteId!, token);
+  const baseUrl = ws.liveDomain
+    ? (ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`)
+    : subdomain ? `https://${subdomain}.webflow.io` : '';
+  if (!baseUrl) throw new Error('Could not determine site URL');
+
+  const allPages = await listPages(ws.webflowSiteId!, token);
+  const published = filterPublishedPages(allPages);
+
+  const priorityPatterns = [
+    /^\/?$/, /about/i, /who-we-are/i, /our-story/i, /team/i,
+    /service/i, /solution/i, /what-we-do/i, /offer/i,
+    /work/i, /portfolio/i, /case-stud/i, /project/i, /client/i,
+    /contact/i, /location/i, /blog/i, /insight/i, /resource/i,
+  ];
+
+  const prioritized: string[] = [];
+  const rest: string[] = [];
+
+  for (const p of published) {
+    const pagePath = p.publishedPath || `/${p.slug || ''}`;
+    const url = baseUrl + pagePath;
+    if (priorityPatterns.some(pat => pat.test(pagePath))) prioritized.push(url);
+    else rest.push(url);
+  }
+
+  try {
+    const sitemapUrls = await discoverSitemapUrls(baseUrl);
+    for (const url of sitemapUrls) {
+      try {
+        const pagePath = new URL(url).pathname;
+        if (!prioritized.includes(url) && !rest.includes(url)) {
+          if (priorityPatterns.some(pat => pat.test(pagePath))) prioritized.push(url);
+          else rest.push(url);
+        }
+      } catch { /* skip */ }
+    }
+  } catch { /* sitemap unavailable */ }
+
+  const urlsToScrape = [...prioritized.slice(0, 12), ...rest.slice(0, 3)];
+  if (urlsToScrape.length === 0) throw new Error('No pages found to scrape');
+
+  const scraped = await scrapeUrls(urlsToScrape, 3);
+  if (scraped.length === 0) throw new Error('Could not scrape any pages');
+
+  const pagesSummary = scraped.map(p => {
+    const headingsStr = p.headings.slice(0, 10).map(h => `${'#'.repeat(h.level)} ${h.text}`).join('\n');
+    return `--- PAGE: ${p.url} ---\nTitle: ${p.title}\nDescription: ${p.metaDescription}\nHeadings:\n${headingsStr}\nContent excerpt:\n${p.bodyText.slice(0, 1500)}`;
+  }).join('\n\n');
+
+  return { scraped, pagesSummary };
+}
+
 // --- Auto-generate knowledge base from website crawl ---
 router.post('/api/workspaces/:id/generate-knowledge-base', requireWorkspaceAccess(), async (req, res) => {
   const ws = getWorkspace(req.params.id);
@@ -197,74 +258,8 @@ router.post('/api/workspaces/:id/generate-knowledge-base', requireWorkspaceAcces
   if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
 
   try {
-    const { scrapeUrls } = await import('../web-scraper.js');
+    const { scraped, pagesSummary } = await scrapeWorkspaceSite(ws);
 
-    // Build base URL
-    const token = getTokenForSite(ws.webflowSiteId) || undefined;
-    const subdomain = await getSiteSubdomain(ws.webflowSiteId, token);
-    const baseUrl = ws.liveDomain
-      ? (ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`)
-      : subdomain ? `https://${subdomain}.webflow.io` : '';
-    if (!baseUrl) return res.status(400).json({ error: 'Could not determine site URL' });
-
-    // Get all published pages
-    const allPages = await listPages(ws.webflowSiteId, token);
-    const published = filterPublishedPages(allPages);
-
-    // Prioritize key pages: homepage, about, services, case studies, contact
-    const priorityPatterns = [
-      /^\/?$/, // homepage
-      /about/i, /who-we-are/i, /our-story/i, /team/i,
-      /service/i, /solution/i, /what-we-do/i, /offer/i,
-      /work/i, /portfolio/i, /case-stud/i, /project/i, /client/i,
-      /contact/i, /location/i,
-      /blog/i, /insight/i, /resource/i,
-    ];
-
-    const prioritized: string[] = [];
-    const rest: string[] = [];
-
-    for (const p of published) {
-      const pagePath = p.publishedPath || `/${p.slug || ''}`;
-      const url = baseUrl + pagePath;
-      const matchesPriority = priorityPatterns.some(pat => pat.test(pagePath));
-      if (matchesPriority) {
-        prioritized.push(url);
-      } else {
-        rest.push(url);
-      }
-    }
-
-    // Also discover CMS pages (case studies, blog posts)
-    try {
-      const sitemapUrls = await discoverSitemapUrls(baseUrl);
-      for (const url of sitemapUrls) {
-        try {
-          const parsed = new URL(url);
-          const pagePath = parsed.pathname;
-          if (!prioritized.includes(url) && !rest.includes(url)) {
-            const matchesPriority = priorityPatterns.some(pat => pat.test(pagePath));
-            if (matchesPriority) prioritized.push(url);
-            else rest.push(url);
-          }
-        } catch { /* skip */ }
-      }
-    } catch { /* sitemap unavailable */ }
-
-    // Scrape up to 12 priority pages + a few extras (max 15 total)
-    const urlsToScrape = [...prioritized.slice(0, 12), ...rest.slice(0, 3)];
-    if (urlsToScrape.length === 0) return res.status(400).json({ error: 'No pages found to scrape' });
-
-    const scraped = await scrapeUrls(urlsToScrape, 3);
-    if (scraped.length === 0) return res.status(400).json({ error: 'Could not scrape any pages' });
-
-    // Build a condensed summary of all scraped content for AI
-    const pagesSummary = scraped.map(p => {
-      const headingsStr = p.headings.slice(0, 10).map(h => `${'#'.repeat(h.level)} ${h.text}`).join('\n');
-      return `--- PAGE: ${p.url} ---\nTitle: ${p.title}\nDescription: ${p.metaDescription}\nHeadings:\n${headingsStr}\nContent excerpt:\n${p.bodyText.slice(0, 1500)}`;
-    }).join('\n\n');
-
-    // AI extraction
     const aiResult = await callOpenAI({
       model: 'gpt-4.1',
       messages: [
@@ -325,6 +320,158 @@ Be concise but specific. Use bullet points. Only include information actually fo
   } catch (err) {
     console.error('[generate-knowledge-base]', err);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate knowledge base' });
+  }
+});
+
+// --- Auto-generate brand voice from website crawl ---
+router.post('/api/workspaces/:id/generate-brand-voice', requireWorkspaceAccess(), async (req, res) => {
+  const ws = getWorkspace(req.params.id);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
+
+  try {
+    const { scraped, pagesSummary } = await scrapeWorkspaceSite(ws);
+
+    const aiResult = await callOpenAI({
+      model: 'gpt-4.1',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a brand strategist and copywriting expert. Given scraped website content, analyze the writing style, tone, and voice patterns used across the site. Be specific and evidence-based — only describe patterns you actually observe in the content.`,
+        },
+        {
+          role: 'user',
+          content: `Analyze the following website content and produce a comprehensive brand voice guide that an AI content writer can follow to match this brand's writing style.
+
+${pagesSummary}
+
+Generate a brand voice guide covering these areas:
+
+TONE & PERSONALITY:
+- Overall tone: [e.g. professional, casual, authoritative, friendly, etc.]
+- Personality traits: [3-5 adjectives that describe the brand's character]
+- Formality level: [formal / semi-formal / casual / conversational]
+
+WRITING STYLE:
+- Sentence structure: [short & punchy / long & detailed / mixed]
+- Vocabulary level: [technical jargon / industry terms / plain language / mix]
+- Person/perspective: [first person "we" / second person "you" / third person]
+- Active vs passive voice: [preference observed]
+
+MESSAGING PATTERNS:
+- How they describe their services: [direct claims / benefit-led / story-driven]
+- How they address the reader: [as a peer / as an expert to client / as a helper]
+- CTAs and persuasion style: [soft / direct / urgency-driven / value-led]
+- Common phrases or language patterns: [list any recurring phrases, slogans, or distinctive word choices]
+
+DO's:
+[5-8 specific writing guidelines based on what the brand does well]
+
+DON'Ts:
+[5-8 things to avoid based on what's absent or contrary to the brand's style]
+
+EXAMPLE PHRASES:
+[5-10 short phrases or sentences lifted directly from the site that exemplify the brand voice]
+
+Be specific and actionable. An AI writer should be able to follow this guide to produce copy that sounds like it belongs on this website.`,
+        },
+      ],
+      maxTokens: 2000,
+      temperature: 0.4,
+      feature: 'brand-voice-gen',
+      workspaceId: ws.id,
+      timeoutMs: 90_000,
+    });
+
+    res.json({ brandVoice: aiResult.text, pagesScraped: scraped.length });
+  } catch (err) {
+    console.error('[generate-brand-voice]', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate brand voice' });
+  }
+});
+
+// --- Auto-generate audience personas from website crawl ---
+router.post('/api/workspaces/:id/generate-personas', requireWorkspaceAccess(), async (req, res) => {
+  const ws = getWorkspace(req.params.id);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
+
+  try {
+    const { scraped, pagesSummary } = await scrapeWorkspaceSite(ws);
+
+    const aiResult = await callOpenAI({
+      model: 'gpt-4.1',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a marketing strategist. Given scraped website content, identify the distinct audience segments this business targets. Be specific and evidence-based — only identify personas that are clearly implied by the website's messaging, services, case studies, or content.`,
+        },
+        {
+          role: 'user',
+          content: `Analyze the following website content and identify 2-5 distinct audience personas this business targets.
+
+${pagesSummary}
+
+Return ONLY a valid JSON array of persona objects. No markdown, no explanation — just the JSON array.
+
+Each persona object must have exactly these fields:
+{
+  "name": "Short persona name (e.g. 'Marketing Director', 'Small Business Owner')",
+  "description": "1-2 sentence description of who this person is",
+  "painPoints": ["pain point 1", "pain point 2", "pain point 3"],
+  "goals": ["goal 1", "goal 2", "goal 3"],
+  "objections": ["likely objection 1", "likely objection 2"],
+  "preferredContentFormat": "e.g. case studies, how-to guides, comparison articles",
+  "buyingStage": "awareness" or "consideration" or "decision"
+}
+
+Rules:
+- Identify 2-5 personas based on evidence from the website (who the services target, case study clients, language used)
+- Each persona should be distinct — different roles, industries, or needs
+- Pain points, goals, and objections should be specific to THIS business's offerings
+- If buying stage isn't clear, default to "consideration"
+- ONLY return the JSON array, nothing else`,
+        },
+      ],
+      maxTokens: 2500,
+      temperature: 0.4,
+      feature: 'personas-gen',
+      workspaceId: ws.id,
+      timeoutMs: 90_000,
+    });
+
+    // Parse the AI response as JSON
+    let personas;
+    try {
+      const { parseAIJson } = await import('../openai-helpers.js');
+      personas = parseAIJson<Array<{
+        name: string; description: string; painPoints: string[]; goals: string[];
+        objections: string[]; preferredContentFormat?: string; buyingStage?: string;
+      }>>(aiResult.text);
+    } catch {
+      return res.status(500).json({ error: 'AI returned invalid JSON — try again' });
+    }
+
+    if (!Array.isArray(personas) || personas.length === 0) {
+      return res.status(500).json({ error: 'AI did not return valid personas — try again' });
+    }
+
+    // Add IDs and normalize
+    const normalized = personas.slice(0, 5).map((p, i) => ({
+      id: `persona_${Date.now()}_${i}`,
+      name: p.name || `Persona ${i + 1}`,
+      description: p.description || '',
+      painPoints: Array.isArray(p.painPoints) ? p.painPoints : [],
+      goals: Array.isArray(p.goals) ? p.goals : [],
+      objections: Array.isArray(p.objections) ? p.objections : [],
+      preferredContentFormat: p.preferredContentFormat || undefined,
+      buyingStage: (['awareness', 'consideration', 'decision'].includes(p.buyingStage || '') ? p.buyingStage : 'consideration') as 'awareness' | 'consideration' | 'decision',
+    }));
+
+    res.json({ personas: normalized, pagesScraped: scraped.length });
+  } catch (err) {
+    console.error('[generate-personas]', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate personas' });
   }
 });
 

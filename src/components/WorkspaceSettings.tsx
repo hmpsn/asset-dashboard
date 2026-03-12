@@ -112,6 +112,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
   const [savingPersonas, setSavingPersonas] = useState(false);
   const [editingPersonaId, setEditingPersonaId] = useState<string | null>(null);
   const [personaDraft, setPersonaDraft] = useState({ name: '', description: '', painPoints: '', goals: '', objections: '', preferredContentFormat: '', buyingStage: '' as string });
+  const [generatingPersonas, setGeneratingPersonas] = useState(false);
   // Knowledge base generation state
   const [generatingKB, setGeneratingKB] = useState(false);
   const [kbDraft, setKbDraft] = useState<string | null>(null);
@@ -953,6 +954,26 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                     }}
                     className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition-colors disabled:opacity-50">
                     {savingPersonas ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save Personas
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setGeneratingPersonas(true);
+                      try {
+                        const res = await fetch(`/api/workspaces/${workspaceId}/generate-personas`, { method: 'POST' });
+                        if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || 'Generation failed'); }
+                        const data = await res.json();
+                        setLocalPersonas(data.personas);
+                        toast(`${data.personas.length} personas generated from ${data.pagesScraped} pages — review and save`);
+                      } catch (err) {
+                        toast(err instanceof Error ? err.message : 'Failed to generate', 'error');
+                      } finally {
+                        setGeneratingPersonas(false);
+                      }
+                    }}
+                    disabled={generatingPersonas || !ws?.webflowSiteId}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {generatingPersonas ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Crawling site...</> : <><Sparkles className="w-3.5 h-3.5" /> Generate from Website</>}
                   </button>
                   <span className="text-[11px] text-zinc-500">{localPersonas.length} persona{localPersonas.length !== 1 ? 's' : ''}</span>
                 </div>

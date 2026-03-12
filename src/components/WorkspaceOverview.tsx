@@ -5,7 +5,7 @@ import {
   CheckCircle2, ArrowUpRight, ArrowDownRight, Minus, Loader2,
   Search, BarChart3, Lock, ExternalLink, Bell, Activity, FileText, Zap,
   Map, Rocket, FileSearch,
-  TrendingDown,
+  TrendingDown, MessageSquarePlus, Bug, Lightbulb, MessageCircle, Send,
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import { MetricRingSvg, PageHeader, SectionCard, Badge, StatCard } from './ui';
@@ -46,6 +46,20 @@ interface WorkspaceSummary {
 }
 
 
+interface FeedbackItem {
+  id: string;
+  workspaceId: string;
+  type: 'bug' | 'feature' | 'general';
+  title: string;
+  description: string;
+  status: 'new' | 'acknowledged' | 'fixed' | 'wontfix';
+  context?: { currentTab?: string };
+  submittedBy?: string;
+  replies: Array<{ id: string; author: 'team' | 'client'; content: string; createdAt: string }>;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface AnomalySummary {
   id: string;
   workspaceId: string;
@@ -76,6 +90,8 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
   const [recentActivity, setRecentActivity] = useState<ActivityEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [anomalies, setAnomalies] = useState<AnomalySummary[]>([]);
+  const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
+  const [feedbackReply, setFeedbackReply] = useState<Record<string, string>>({});
   const [presence, setPresence] = useState<Record<string, Array<{ userId: string; email: string; name?: string; role: string; connectedAt: string; lastSeen: string }>>>({});
 
   type PresenceMap = typeof presence;
@@ -91,11 +107,13 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
       fetch('/api/activity?limit=15').then(r => r.json()).catch(() => []),
       fetch('/api/anomalies').then(r => r.ok ? r.json() : []).catch(() => []),
       fetch('/api/presence').then(r => r.ok ? r.json() : {}).catch(() => ({})),
-    ]).then(([d, act, anom, pres]) => {
+      fetch('/api/feedback').then(r => r.ok ? r.json() : []).catch(() => []),
+    ]).then(([d, act, anom, pres, fb]) => {
       if (Array.isArray(d)) setData(d);
       if (Array.isArray(act)) setRecentActivity(act);
       if (Array.isArray(anom)) setAnomalies(anom.filter((a: AnomalySummary) => !a.dismissedAt));
       if (pres && typeof pres === 'object') setPresence(pres as PresenceMap);
+      if (Array.isArray(fb)) setFeedback(fb);
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
@@ -415,6 +433,120 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
           })}
         </div>
       </div>
+
+      {/* ── Client Feedback ── */}
+      {feedback.length > 0 && (() => {
+        const fbTypeIcon: Record<string, typeof Bug> = { bug: Bug, feature: Lightbulb, general: MessageCircle };
+        const fbTypeColor: Record<string, string> = { bug: 'text-red-400', feature: 'text-amber-400', general: 'text-teal-400' };
+        const fbTypeBg: Record<string, string> = { bug: 'bg-red-500/10', feature: 'bg-amber-500/10', general: 'bg-teal-500/10' };
+        const fbStatusColor: Record<string, string> = { new: 'text-blue-400 bg-blue-500/10', acknowledged: 'text-amber-400 bg-amber-500/10', fixed: 'text-emerald-400 bg-emerald-500/10', wontfix: 'text-zinc-400 bg-zinc-500/10' };
+        const fbStatusLabel: Record<string, string> = { new: 'New', acknowledged: 'Acknowledged', fixed: 'Resolved', wontfix: 'Noted' };
+        const newCount = feedback.filter(f => f.status === 'new').length;
+
+        const handleStatusChange = async (wsId: string, id: string, status: string) => {
+          const res = await fetch(`/api/feedback/${wsId}/${id}`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status }),
+          });
+          if (res.ok) {
+            const updated = await res.json();
+            setFeedback(prev => prev.map(f => f.id === updated.id ? updated : f));
+          }
+        };
+
+        const handleReply = async (wsId: string, id: string) => {
+          const content = feedbackReply[id]?.trim();
+          if (!content) return;
+          const res = await fetch(`/api/feedback/${wsId}/${id}/reply`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content }),
+          });
+          if (res.ok) {
+            const updated = await res.json();
+            setFeedback(prev => prev.map(f => f.id === updated.id ? updated : f));
+            setFeedbackReply(prev => ({ ...prev, [id]: '' }));
+          }
+        };
+
+        return (
+          <SectionCard
+            title={`Client Feedback${newCount > 0 ? ` · ${newCount} new` : ''}`}
+            titleIcon={<MessageSquarePlus className="w-4 h-4 text-violet-400" />}
+            noPadding
+          >
+            <div className="divide-y divide-zinc-800/50">
+              {feedback.slice(0, 20).map(item => {
+                const Icon = fbTypeIcon[item.type] || MessageCircle;
+                const wsName = data.find(w => w.id === item.workspaceId)?.name || item.workspaceId;
+                return (
+                  <div key={item.id} className="px-4 py-3">
+                    <div className="flex items-start gap-3">
+                      <div className={`w-7 h-7 rounded-lg ${fbTypeBg[item.type]} flex items-center justify-center flex-shrink-0 mt-0.5`}>
+                        <Icon className={`w-3.5 h-3.5 ${fbTypeColor[item.type]}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-medium text-zinc-200">{item.title}</span>
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${fbStatusColor[item.status]}`}>{fbStatusLabel[item.status]}</span>
+                          <span className="text-[9px] text-zinc-600 capitalize">{item.type}</span>
+                        </div>
+                        <p className="text-[11px] text-zinc-400 mt-1 line-clamp-2">{item.description}</p>
+                        <div className="flex items-center gap-3 mt-1.5">
+                          <span className="text-[10px] text-zinc-500">{wsName}</span>
+                          <span className="text-[10px] text-zinc-600">{timeAgo(item.createdAt)}</span>
+                          {item.context?.currentTab && <span className="text-[10px] text-zinc-600">from: {item.context.currentTab}</span>}
+                          {item.submittedBy && <span className="text-[10px] text-zinc-600">by: {item.submittedBy}</span>}
+                        </div>
+
+                        {/* Replies */}
+                        {item.replies.length > 0 && (
+                          <div className="mt-2 space-y-1.5">
+                            {item.replies.map(r => (
+                              <div key={r.id} className={`rounded-lg px-2.5 py-1.5 text-[11px] ${r.author === 'team' ? 'bg-teal-500/5 border border-teal-500/10 text-teal-300' : 'bg-zinc-800/80 border border-zinc-700/50 text-zinc-300'}`}>
+                                <span className="font-medium">{r.author === 'team' ? 'You' : 'Client'}:</span> {r.content}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-2 mt-2">
+                          {item.status === 'new' && (
+                            <button onClick={() => handleStatusChange(item.workspaceId, item.id, 'acknowledged')} className="text-[10px] px-2 py-1 rounded bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors">Acknowledge</button>
+                          )}
+                          {(item.status === 'new' || item.status === 'acknowledged') && (
+                            <button onClick={() => handleStatusChange(item.workspaceId, item.id, 'fixed')} className="text-[10px] px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors">Resolve</button>
+                          )}
+                          {item.status !== 'wontfix' && item.status !== 'fixed' && (
+                            <button onClick={() => handleStatusChange(item.workspaceId, item.id, 'wontfix')} className="text-[10px] px-2 py-1 rounded bg-zinc-800 text-zinc-400 hover:bg-zinc-700 transition-colors">Won't Fix</button>
+                          )}
+                        </div>
+
+                        {/* Reply input */}
+                        {item.status !== 'fixed' && item.status !== 'wontfix' && (
+                          <div className="flex gap-1.5 mt-2">
+                            <input
+                              type="text"
+                              value={feedbackReply[item.id] || ''}
+                              onChange={e => setFeedbackReply(prev => ({ ...prev, [item.id]: e.target.value }))}
+                              onKeyDown={e => e.key === 'Enter' && handleReply(item.workspaceId, item.id)}
+                              placeholder="Reply to client..."
+                              className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-[11px] text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-violet-500"
+                            />
+                            <button onClick={() => handleReply(item.workspaceId, item.id)} disabled={!feedbackReply[item.id]?.trim()} className="px-2 py-1.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 rounded-lg transition-colors">
+                              <Send className="w-3 h-3 text-white" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </SectionCard>
+        );
+      })()}
 
       {/* ── AI Usage ── */}
       <AIUsageSection />
