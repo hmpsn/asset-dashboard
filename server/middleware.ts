@@ -111,7 +111,8 @@ export function moveUploadedFiles(
 
   const paths: string[] = [];
   for (const f of files) {
-    const target = path.join(dest, f.originalname);
+    const safeName = path.basename(f.originalname);
+    const target = path.join(dest, safeName);
     fs.renameSync(f.path, target);
     paths.push(target);
   }

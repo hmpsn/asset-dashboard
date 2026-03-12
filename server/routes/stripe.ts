@@ -5,7 +5,6 @@ import { Router } from 'express';
 
 const router = Router();
 
-import express from 'express';
 import { sanitizeString } from '../helpers.js';
 import { checkoutLimiter } from '../middleware.js';
 import { listPayments, getPayment } from '../payments.js';
@@ -23,26 +22,13 @@ import {
   createCheckoutSession,
   createCartCheckoutSession,
   createPaymentIntentForProduct,
-  constructWebhookEvent,
-  handleWebhookEvent,
   getProductConfig,
   listProducts,
 } from '../stripe.js';
 import { getWorkspace } from '../workspaces.js';
 
-// Stripe webhook must receive raw body (before express.json parses it)
-router.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-  const sig = req.headers['stripe-signature'] as string;
-  if (!sig) return res.status(400).json({ error: 'Missing stripe-signature header' });
-  try {
-    const event = constructWebhookEvent(req.body, sig);
-    await handleWebhookEvent(event);
-    res.json({ received: true });
-  } catch (err) {
-    console.error('[stripe] Webhook error:', err instanceof Error ? err.message : err);
-    res.status(400).json({ error: 'Webhook verification failed' });
-  }
-});
+// NOTE: Stripe webhook is in server/index.ts — it must be registered before
+// express.json() middleware to receive the raw body needed for signature verification.
 
 // --- Stripe Config (admin) ---
 
