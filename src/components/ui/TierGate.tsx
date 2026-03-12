@@ -25,9 +25,10 @@ interface TierGateProps {
   children: ReactNode;
   className?: string;
   compact?: boolean;
+  roiValue?: number | null;
 }
 
-export function TierGate({ tier, required, feature, teaser, children, className, compact }: TierGateProps) {
+export function TierGate({ tier, required, feature, teaser, children, className, compact, roiValue }: TierGateProps) {
   const hasAccess = TIER_LEVEL[tier] >= TIER_LEVEL[required];
 
   if (hasAccess) return <>{children}</>;
@@ -72,6 +73,11 @@ export function TierGate({ tier, required, feature, teaser, children, className,
             <div className="text-[11px] text-zinc-500 leading-relaxed">
               {teaser || `Upgrade to ${TIER_LABELS[required]} to unlock this feature`}
             </div>
+            {roiValue && roiValue > 0 && (
+              <div className="text-[10px] text-emerald-400/80 mt-1 font-medium">
+                Your site generates ${Math.round(roiValue).toLocaleString()}/mo in organic value
+              </div>
+            )}
           </div>
 
           {/* Badge */}

@@ -4,7 +4,7 @@ import {
   Globe, Shield, MessageSquare, ClipboardCheck, AlertTriangle,
   CheckCircle2, ArrowUpRight, ArrowDownRight, Minus, Loader2,
   Search, BarChart3, Lock, ExternalLink, Bell, Activity, FileText, Zap,
-  Map, Rocket, FileSearch,
+  Map, Rocket, FileSearch, Clock,
   TrendingDown, MessageSquarePlus, Bug, Lightbulb, MessageCircle, Send,
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
@@ -93,6 +93,7 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
   const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
   const [feedbackReply, setFeedbackReply] = useState<Record<string, string>>({});
   const [presence, setPresence] = useState<Record<string, Array<{ userId: string; email: string; name?: string; role: string; connectedAt: string; lastSeen: string }>>>({});
+  const [timeSaved, setTimeSaved] = useState<{ totalHoursSaved: number; operationCount: number } | null>(null);
 
   type PresenceMap = typeof presence;
   // Real-time presence updates via WebSocket
@@ -108,12 +109,14 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
       fetch('/api/anomalies').then(r => r.ok ? r.json() : []).catch(() => []),
       fetch('/api/presence').then(r => r.ok ? r.json() : {}).catch(() => ({})),
       fetch('/api/feedback').then(r => r.ok ? r.json() : []).catch(() => []),
-    ]).then(([d, act, anom, pres, fb]) => {
+      fetch(`/api/ai/time-saved?since=${new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()}`).then(r => r.ok ? r.json() : null).catch(() => null),
+    ]).then(([d, act, anom, pres, fb, ts]) => {
       if (Array.isArray(d)) setData(d);
       if (Array.isArray(act)) setRecentActivity(act);
       if (Array.isArray(anom)) setAnomalies(anom.filter((a: AnomalySummary) => !a.dismissedAt));
       if (pres && typeof pres === 'object') setPresence(pres as PresenceMap);
       if (Array.isArray(fb)) setFeedback(fb);
+      if (ts && typeof ts === 'object') setTimeSaved(ts as { totalHoursSaved: number; operationCount: number });
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
@@ -212,12 +215,13 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
       )}
 
       {/* ── Global Stats ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <StatCard label="New Requests" value={totalNewRequests} icon={Bell} iconColor={totalNewRequests > 0 ? '#f87171' : '#71717a'} />
         <StatCard label="Active Requests" value={totalActiveRequests} icon={MessageSquare} iconColor={totalActiveRequests > 0 ? '#fbbf24' : '#71717a'} />
         <StatCard label="Content Pipeline" value={`${totalPendingContent + totalInProgressContent}/${totalDeliveredContent}`} icon={FileText} iconColor={totalPendingContent > 0 ? '#f59e0b' : totalInProgressContent > 0 ? '#60a5fa' : '#71717a'} />
         <StatCard label="Approvals" value={totalPendingApprovals} icon={ClipboardCheck} iconColor={totalPendingApprovals > 0 ? '#2dd4bf' : '#71717a'} />
         <StatCard label="Avg Health" value={avgScore !== null ? avgScore : '—'} icon={Shield} iconColor={avgScore !== null ? (avgScore >= 80 ? '#4ade80' : avgScore >= 60 ? '#fbbf24' : '#f87171') : '#71717a'} />
+        <StatCard label="Hours Saved" value={timeSaved ? `${timeSaved.totalHoursSaved}h` : '—'} icon={Clock} iconColor={timeSaved && timeSaved.totalHoursSaved > 0 ? '#a78bfa' : '#71717a'} sub={timeSaved ? `${timeSaved.operationCount} AI ops this month` : undefined} />
       </div>
 
       {/* ── Online Now ── */}

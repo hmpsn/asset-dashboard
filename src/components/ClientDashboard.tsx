@@ -1,10 +1,10 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Loader2,
   Sparkles, Send, AlertTriangle,
   Target, Zap, Shield, MessageSquare, X,
   CheckCircle2, LineChart, Lock, Trophy, Check,
-  Sun, Moon, Plus, FileText, Calendar, Clock, CreditCard,
+  Sun, Moon, Plus, FileText, Calendar, Clock, CreditCard, Mail,
 } from 'lucide-react';
 import { StripePaymentModal } from './StripePaymentForm';
 import { type Tier, Skeleton, OverviewSkeleton } from './ui';
@@ -121,6 +121,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
     chatSessions, setChatSessions,
     showChatHistory, setShowChatHistory,
     chatUsage,
+    roiValue,
     proactiveInsight, proactiveInsightLoading,
     askAi,
   } = useChat(chatDeps);
@@ -143,6 +144,42 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
   const [showWelcome, setShowWelcome] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingSaving, setOnboardingSaving] = useState(false);
+
+  // ── Email capture gate (shared-password visitors on free tier) ──
+  const [emailGateOpen, setEmailGateOpen] = useState(false);
+  const [captureEmail, setCaptureEmail] = useState('');
+  const [captureName, setCaptureName] = useState('');
+  const [captureSubmitting, setCaptureSubmitting] = useState(false);
+  const emailGateChecked = useRef(false);
+
+  // Check if email gate is needed after shared-password auth
+  useEffect(() => {
+    if (!authenticated || clientUser || emailGateChecked.current) return;
+    emailGateChecked.current = true;
+    // Only gate shared-password visitors who haven't provided email
+    if (ws?.requiresPassword) {
+      try {
+        const stored = localStorage.getItem(`portal_email_${workspaceId}`);
+        if (!stored) setEmailGateOpen(true);
+      } catch { /* skip */ }
+    }
+  }, [authenticated, clientUser, ws, workspaceId]);
+
+  const submitEmailCapture = useCallback(async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!captureEmail.trim() || captureSubmitting) return;
+    setCaptureSubmitting(true);
+    try {
+      await fetch(`/api/public/capture-email/${workspaceId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: captureEmail.trim(), name: captureName.trim() || undefined }),
+      });
+      localStorage.setItem(`portal_email_${workspaceId}`, captureEmail.trim());
+    } catch { /* best-effort */ }
+    setCaptureSubmitting(false);
+    setEmailGateOpen(false);
+  }, [captureEmail, captureName, captureSubmitting, workspaceId]);
 
   // ── Real-time workspace events ──
   const wsIdentity = useMemo(() => clientUser ? {
@@ -180,7 +217,34 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
       .then(async (data: WorkspaceInfo) => {
         if (!data.id) { setError('Workspace not found'); setLoading(false); return; }
         setWs(data);
-        document.title = `${data.name} — Insights Engine`;
+        // Update document head: title, OG meta, Twitter cards, favicon
+        const portalTitle = `${data.name} — Insights Engine`;
+        const portalDesc = `Performance insights, SEO opportunities, and growth recommendations for ${data.name}.`;
+        document.title = portalTitle;
+        const setMeta = (attr: string, key: string, content: string) => {
+          let el = document.querySelector(`meta[${attr}="${key}"]`) as HTMLMetaElement | null;
+          if (!el) { el = document.createElement('meta'); el.setAttribute(attr, key); document.head.appendChild(el); }
+          el.setAttribute('content', content);
+        };
+        setMeta('property', 'og:title', portalTitle);
+        setMeta('property', 'og:description', portalDesc);
+        setMeta('property', 'og:type', 'website');
+        setMeta('property', 'og:url', window.location.href);
+        setMeta('name', 'twitter:title', portalTitle);
+        setMeta('name', 'twitter:description', portalDesc);
+        setMeta('name', 'twitter:card', 'summary');
+        setMeta('name', 'description', portalDesc);
+        if (data.brandLogoUrl) {
+          setMeta('property', 'og:image', data.brandLogoUrl);
+          setMeta('name', 'twitter:image', data.brandLogoUrl);
+        }
+        // Dynamic favicon — use workspace logo if available, else keep default
+        if (data.brandLogoUrl) {
+          let faviconEl = document.querySelector('link[rel="icon"]') as HTMLLinkElement | null;
+          if (!faviconEl) { faviconEl = document.createElement('link'); faviconEl.rel = 'icon'; document.head.appendChild(faviconEl); }
+          faviconEl.href = data.brandLogoUrl;
+          faviconEl.type = data.brandLogoUrl.endsWith('.svg') ? 'image/svg+xml' : 'image/png';
+        }
 
         // Fetch auth mode (shared password vs individual accounts)
         try {
@@ -507,6 +571,54 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
 
   const insights = getInsights();
 
+  // Email capture gate UI — shown after password auth, before dashboard
+  if (emailGateOpen && authenticated && !clientUser) return (
+    <div className="min-h-screen bg-[#0f1219] flex items-center justify-center">
+      <div className="w-full max-w-sm">
+        <div className="bg-zinc-900 rounded-2xl border border-zinc-800 p-8 shadow-2xl shadow-black/40">
+          <div className="flex flex-col items-center mb-6">
+            <div className="w-12 h-12 rounded-2xl bg-teal-500/10 flex items-center justify-center mb-4">
+              <Mail className="w-6 h-6 text-teal-400" />
+            </div>
+            <h2 className="text-lg font-semibold text-zinc-200">Welcome to {ws?.name}</h2>
+            <p className="text-xs text-zinc-500 mt-1 text-center">Enter your email to receive performance reports and important updates about your site.</p>
+          </div>
+          <form onSubmit={submitEmailCapture} className="space-y-3">
+            <input
+              type="text"
+              value={captureName}
+              onChange={e => setCaptureName(e.target.value)}
+              placeholder="Your name (optional)"
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors"
+            />
+            <input
+              type="email"
+              value={captureEmail}
+              onChange={e => setCaptureEmail(e.target.value)}
+              placeholder="Your email address"
+              required
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors"
+              autoFocus
+            />
+            <button
+              type="submit"
+              disabled={captureSubmitting || !captureEmail.trim()}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white text-sm font-medium transition-all flex items-center justify-center gap-2"
+            >
+              {captureSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Continue to Dashboard'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setEmailGateOpen(false); try { localStorage.setItem(`portal_email_${workspaceId}`, '__skipped__'); } catch {/* skip */} }}
+              className="w-full text-center text-[11px] text-zinc-600 hover:text-zinc-400 transition-colors"
+            >
+              Skip for now
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
 
   const pendingApprovals = approvalBatches.reduce((sum, b) => sum + b.items.filter(i => i.status === 'pending').length, 0);
   const unreadTeamNotes = requests.filter(r => r.notes.length > 0 && r.notes[r.notes.length - 1].author === 'team' && r.status !== 'completed' && r.status !== 'closed').length;
@@ -722,7 +834,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
         {/* ════════════ SITE HEALTH TAB ════════════ */}
         {tab === 'health' && (<>
           <ErrorBoundary label="Site Health">
-            <HealthTab audit={audit} auditDetail={auditDetail} liveDomain={ws.liveDomain} tier={effectiveTier} workspaceId={workspaceId} initialSeverity={(() => { const s = new URLSearchParams(window.location.search).get('severity'); return s && ['error','warning','info'].includes(s) ? s as 'error' | 'warning' | 'info' : 'all'; })()} />
+            <HealthTab audit={audit} auditDetail={auditDetail} liveDomain={ws.liveDomain} tier={effectiveTier} workspaceId={workspaceId} initialSeverity={(() => { const s = new URLSearchParams(window.location.search).get('severity'); return s && ['error','warning','info'].includes(s) ? s as 'error' | 'warning' | 'info' : 'all'; })()} onContentRequested={() => setToast({ message: 'Content improvement request created! Check the Content tab to track progress.', type: 'success' })} />
           </ErrorBoundary>
           {workspaceId && auditDetail && (
             <div className="mt-5">
@@ -858,7 +970,11 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
             <div className="px-4 py-3 border-t border-zinc-800 flex-shrink-0">
               <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-amber-500/5 border border-amber-500/20">
                 <Lock className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-                <p className="text-[11px] text-amber-300/80 flex-1">You've used all {chatUsage.limit} free conversations this month.</p>
+                <p className="text-[11px] text-amber-300/80 flex-1">
+                  {roiValue && roiValue > 0
+                    ? <>Your organic traffic is worth <span className="font-semibold text-emerald-400">${Math.round(roiValue).toLocaleString()}/mo</span> — unlock unlimited insights with Growth.</>
+                    : <>You've used all {chatUsage.limit} free conversations this month. Upgrade to Growth for unlimited access.</>}
+                </p>
               </div>
             </div>
             ) : (

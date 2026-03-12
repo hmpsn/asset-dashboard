@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertTriangle, Info, CheckCircle2, ChevronDown, Shield } from 'lucide-react';
+import { AlertTriangle, Info, CheckCircle2, ChevronDown, Shield, FileEdit } from 'lucide-react';
 import { MetricRing } from '../ui';
 import { scoreColorClass } from '../ui/constants';
 import { ScoreHistoryChart } from './helpers';
@@ -19,14 +19,51 @@ export interface HealthTabProps {
   initialSeverity?: 'all' | 'error' | 'warning' | 'info';
   tier?: 'free' | 'growth' | 'premium';
   workspaceId?: string;
+  onContentRequested?: () => void;
 }
 
-export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, tier, workspaceId }: HealthTabProps) {
+const CONTENT_ISSUE_CHECKS = ['content-length', 'heading', 'h1', 'h1-missing', 'h1-multiple', 'word-count'];
+function hasContentIssues(issues: { check: string; message: string }[]): boolean {
+  return issues.some(i => {
+    const chk = i.check?.toLowerCase() || '';
+    const msg = i.message?.toLowerCase() || '';
+    return CONTENT_ISSUE_CHECKS.some(c => chk.includes(c)) || msg.includes('thin content') || msg.includes('word');
+  });
+}
+
+export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, tier, workspaceId, onContentRequested }: HealthTabProps) {
   // Default to 'error' filter when there are errors — most actionable view first
   const defaultSeverity = initialSeverity || (auditDetail && auditDetail.audit.errors > 0 ? 'error' : 'all');
   const [severityFilter, setSeverityFilter] = useState<'all' | 'error' | 'warning' | 'info'>(defaultSeverity);
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
   const [auditSearch, setAuditSearch] = useState('');
+  const [requestedPages, setRequestedPages] = useState<Set<string>>(new Set());
+  const [requestingPage, setRequestingPage] = useState<string | null>(null);
+
+  const requestContentImprovement = async (page: { pageId: string; page: string; slug: string; issues: { check: string; message: string }[] }) => {
+    if (!workspaceId || requestedPages.has(page.pageId)) return;
+    setRequestingPage(page.pageId);
+    try {
+      const wordIssue = page.issues.find(i => i.check?.toLowerCase().includes('content-length'));
+      const wordMatch = wordIssue?.message?.match(/(\d+)\s*words?/i);
+      const wordCount = wordMatch ? parseInt(wordMatch[1], 10) : undefined;
+      const res = await fetch(`/api/public/content-request/${workspaceId}/from-audit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pageSlug: page.slug,
+          pageName: page.page,
+          issues: page.issues.filter(i => hasContentIssues([i])).map(i => i.message),
+          wordCount,
+        }),
+      });
+      if (res.ok) {
+        setRequestedPages(prev => new Set(prev).add(page.pageId));
+        onContentRequested?.();
+      }
+    } catch { /* silent fail */ }
+    finally { setRequestingPage(null); }
+  };
 
   const togglePage = (id: string) => setExpandedPages(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
@@ -198,6 +235,20 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, tie
                         </div>
                       );
                     })}
+                    {hasContentIssues(page.issues) && workspaceId && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); requestContentImprovement(page); }}
+                        disabled={requestedPages.has(page.pageId) || requestingPage === page.pageId}
+                        className={`mt-1.5 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
+                          requestedPages.has(page.pageId)
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-default'
+                            : 'bg-teal-600 hover:bg-teal-500 text-white'
+                        }`}
+                      >
+                        <FileEdit className="w-3 h-3" />
+                        {requestedPages.has(page.pageId) ? 'Content request created' : requestingPage === page.pageId ? 'Creating request...' : 'Request Content Improvement'}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

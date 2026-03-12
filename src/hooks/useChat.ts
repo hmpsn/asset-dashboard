@@ -47,6 +47,7 @@ export interface ChatState {
   chatSessions: Array<{ id: string; title: string; messageCount: number; updatedAt: string }>;
   showChatHistory: boolean;
   chatUsage: { allowed: boolean; used: number; limit: number; remaining: number; tier: string } | null;
+  roiValue: number | null;
   proactiveInsight: string | null;
   proactiveInsightLoading: boolean;
 }
@@ -82,6 +83,7 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
   const [chatSessions, setChatSessions] = useState<Array<{ id: string; title: string; messageCount: number; updatedAt: string }>>([]);
   const [showChatHistory, setShowChatHistory] = useState(false);
   const [chatUsage, setChatUsage] = useState<{ allowed: boolean; used: number; limit: number; remaining: number; tier: string } | null>(null);
+  const [roiValue, setRoiValue] = useState<number | null>(null);
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
 
@@ -175,7 +177,10 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
       });
       const data = await res.json();
       if (res.status === 429) {
-        setChatMessages(prev => [...prev, { role: 'assistant', content: `You've used all your free conversations this month. Upgrade to Growth for unlimited chat access.` }]);
+        const roiMsg = roiValue && roiValue > 0
+          ? ` You've already identified **$${Math.round(roiValue).toLocaleString()}** in organic traffic value this month — Growth ($249/mo) pays for itself.`
+          : ' Upgrade to Growth ($249/mo) for unlimited chat access.';
+        setChatMessages(prev => [...prev, { role: 'assistant', content: `You've used all your free conversations this month.${roiMsg}` }]);
         setChatUsage(u => u ? { ...u, allowed: false, remaining: 0 } : u);
       } else {
         setChatMessages(prev => [...prev, { role: 'assistant', content: data.error ? `Error: ${data.error}` : data.answer }]);
@@ -184,7 +189,7 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
     } catch {
       setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong.' }]);
     } finally { setChatLoading(false); }
-  }, [deps, buildChatContext, chatSessionId]);
+  }, [deps, buildChatContext, chatSessionId, roiValue]);
 
   const fetchProactiveInsight = useCallback(async () => {
     const { ws, overview, ga4Overview, betaMode } = deps;
@@ -232,10 +237,16 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deps.overview, deps.ga4Overview, deps.ws]);
 
-  // Fetch chat usage when chat opens
+  // Fetch chat usage and ROI data when chat opens
   useEffect(() => {
     if (chatOpen && deps.ws) {
       fetch(`/api/public/chat-usage/${deps.ws.id}`).then(r => r.json()).then(d => setChatUsage(d)).catch(() => {});
+      // Fetch ROI for upgrade prompts (best-effort, silent fail)
+      if (roiValue === null) {
+        fetch(`/api/public/roi/${deps.ws.id}`).then(r => r.ok ? r.json() : null).then(d => {
+          if (d?.organicTrafficValue) setRoiValue(d.organicTrafficValue);
+        }).catch(() => {});
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatOpen]);
@@ -261,6 +272,7 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
     chatSessions, setChatSessions,
     showChatHistory, setShowChatHistory,
     chatUsage, setChatUsage,
+    roiValue,
     proactiveInsight, setProactiveInsight,
     proactiveInsightLoading, setProactiveInsightLoading,
     askAi,

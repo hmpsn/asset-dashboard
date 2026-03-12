@@ -1104,23 +1104,89 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 84. Client Portal Favicon + OG Meta Tags
+**What it does:** Dynamically updates the document head when a client portal loads: `og:title`, `og:description`, `og:type`, `og:url`, `twitter:title`, `twitter:description`, `twitter:card`, and `meta description` — all personalized per workspace. If the workspace has a `brandLogoUrl`, it's set as `og:image`, `twitter:image`, and the page favicon (SVG or PNG detection). Added `brandLogoUrl` and `brandAccentColor` to the `WorkspaceInfo` TypeScript type.
+
+**Agency value:** Professional appearance when clients bookmark or share their dashboard in Slack/Teams. Branded favicon differentiates it from generic apps.
+
+**Client value:** Their portal looks and feels like a custom product — not a white-label dashboard.
+
+**Mutual:** Small polish, significant perception improvement. Reinforces the premium positioning of the platform.
+
+---
+
+### 85. AI Chatbot ROI-Backed Upgrade Prompts
+**What it does:** When the AI chatbot hits the free-tier rate limit (429), the upgrade message now includes the workspace's organic traffic value: "You've already identified **$X** in organic traffic value — Growth ($249/mo) pays for itself." The `useChat` hook fetches ROI data (`/api/public/roi/:wsId`) when chat opens. The chat-exhausted bar in the header shows ROI-backed copy with emerald highlight. `TierGate` component accepts an optional `roiValue` prop to display organic traffic value in any upgrade overlay. All best-effort with silent fail if ROI data is unavailable.
+
+**Agency value:** Upgrade prompts now connect value proof to purchase decision at the exact moment of highest intent. Conversion optimization without additional sales effort.
+
+**Client value:** Clients see concrete dollar values rather than abstract feature lists — makes the upgrade decision rational rather than emotional.
+
+**Mutual:** Data-driven nudges that respect the client's intelligence. Higher conversion rates mean sustainable revenue growth.
+
+---
+
+### 86. Pre-Populate Content Requests from Audit Issues
+**What it does:** New endpoint `POST /api/public/content-request/:wsId/from-audit` creates a pre-populated content request from audit data. Accepts `pageSlug`, `pageName`, `issues`, and `wordCount`. Auto-enriches with top 5 GSC keywords for the page and keyword strategy target keyword. Creates a content request with rich rationale including identified issues, current word count, and top organic keywords. In the client Health tab, pages with content-related issues (thin content, heading/H1 problems) show a "Request Content Improvement" button. One click creates the request → success toast → WebSocket auto-refreshes the Content tab.
+
+**Agency value:** Removes friction from the revenue funnel — audit findings automatically convert into actionable content requests. Pre-filled context (keywords, word count, issues) means the team starts with full context instead of vague requests.
+
+**Client value:** No need to manually copy audit findings into a request form. One click turns a problem into a solution in progress.
+
+**Mutual:** Shortest path from "problem identified" to "solution requested." Every content issue becomes a potential engagement opportunity with zero manual data entry.
+
+---
+
+### 87. Client Email Capture on Free Tier
+**What it does:** After shared-password authentication succeeds, the client dashboard shows a lightweight email capture gate before loading the dashboard. The form collects email (required) and name (optional). Emails are stored server-side via `POST /api/public/capture-email/:id` in the workspace's `portalContacts` array (deduped by email). `localStorage` tracks captured email to skip the gate on return visits. A "Skip for now" option is available. Backend adds `portalContacts` to the Workspace interface with `email`, `name`, and `capturedAt` fields.
+
+**Agency value:** Unlocks the entire email marketing funnel for shared-password clients — monthly reports, trial expiry emails, re-engagement campaigns, and upgrade prompts now have a delivery address. Zero ongoing effort after setup.
+
+**Client value:** Clients who provide their email receive performance reports and important site updates automatically. The gate is non-intrusive with a skip option.
+
+**Mutual:** Every email captured extends the communication channel. Higher report reach → higher engagement → higher retention and upgrade conversion.
+
+---
+
+### 88. "Time Saved" Metric on Admin Dashboard
+**What it does:** Tracks `durationMs` on every `callOpenAI()` invocation. `getTimeSaved()` in `openai-helpers.ts` maps each AI feature to a human-equivalent time estimate (e.g., content brief = 150 min, keyword strategy = 240 min, schema generation = 60 min). New endpoint `GET /api/ai/time-saved?workspaceId=&since=` returns `totalHoursSaved`, `operationCount`, and per-feature breakdown. The Command Center (WorkspaceOverview) shows an "Hours Saved" StatCard with purple Clock icon displaying total hours and AI operation count for the current month.
+
+**Agency value:** Concrete "hours saved" metric for client conversations, proposals, and marketing materials. "We saved you 47 hours this month" is more compelling than "we used AI."
+
+**Client value:** Transparent view of the platform's operational impact. Reinforces value perception.
+
+**Mutual:** Quantified ROI metric that justifies platform investment for both sides.
+
+---
+
+### 89. Stripe Recurring Billing for Tier Subscriptions
+**What it does:** Tier upgrades (Growth $249/mo, Premium $999/mo) now use Stripe Checkout with `mode: 'subscription'` instead of one-time `mode: 'payment'`. `createCheckoutSession` in `server/stripe.ts` detects `plan_growth`/`plan_premium` and creates subscription sessions with `subscription_data` metadata. Full subscription lifecycle handling via webhooks: `customer.subscription.created/updated` (sets tier + stores `stripeSubscriptionId`), `customer.subscription.deleted` (downgrades to free), `invoice.paid` (activity log), `invoice.payment_failed` (warning). New functions: `createBillingPortalSession()` for Stripe Customer Portal self-service, `cancelSubscription()` with graceful cancel-at-period-end. New routes: `POST /api/public/billing-portal/:wsId`, `POST /api/public/cancel-subscription/:wsId`. PlansTab shows "Manage Billing" button for paid subscribers that opens the Stripe Customer Portal.
+
+**Agency value:** Monthly recurring revenue without manual invoicing. Subscription lifecycle is fully automated — upgrades, renewals, cancellations, and failed payments are all handled. Customer Portal eliminates billing support tickets.
+
+**Client value:** Self-service billing management (update payment method, view invoices, cancel). Graceful cancellation at period end means no surprise loss of access.
+
+**Mutual:** Sustainable revenue model with professional billing experience. Stripe handles all payment compliance, invoicing, and dunning.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
 |----------|:---:|---|
 | SEO & Technical | 13 | Audit, fix, and optimize faster than manual tools + AEO trust signals |
-| Analytics & Tracking | 6 | Unified data view replaces platform-hopping |
-| Content & Strategy | 7 | Strategy → brief → AI post generation → review → delivery pipeline |
-| Client Communication | 8 | Structured workflows + automated reports + expanded notifications + feedback widget |
-| Client Self-Service | 12 | 24/7 data access, onboarding, plans, cart, order tracking, glossary, questionnaire |
+| Analytics & Tracking | 7 | Unified data view replaces platform-hopping + AI time-saved tracking |
+| Content & Strategy | 8 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request |
+| Client Communication | 9 | Structured workflows + automated reports + expanded notifications + feedback widget + email capture funnel |
+| Client Self-Service | 13 | 24/7 data access, onboarding, plans, cart, order tracking, glossary, questionnaire, ROI upgrade prompts |
 | AI & Intelligence | 7 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine + context completeness + usage dashboard + AEO page review |
 | Auth & Access Control | 3 | Internal user accounts, workspace ACL, client user accounts |
 | Security | 1 | Helmet, HTTPS, rate limiting, input sanitization |
-| Monetization | 1 | Stripe Checkout, admin settings, payment tracking, trials, encrypted config |
-| Platform & UX | 14 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home, page state model, work orders, request linkage, admin UX overhaul, landing page, mobile guard, Recharts |
+| Monetization | 2 | Stripe Checkout + Subscriptions, admin settings, payment tracking, trials, encrypted config, billing portal |
+| Platform & UX | 15 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home, page state model, work orders, request linkage, admin UX overhaul, landing page, mobile guard, Recharts, portal OG/favicon |
 | Data Architecture | 3 | PageEditState model, cross-store writes, activity feed for client actions |
 | Architecture | 2 | Server refactor (46 route modules + 3 shared modules), frontend component decomposition |
 
-**83 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**89 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **83**. Last updated: March 2026 (frontend decomposition, skeleton loading, UX polish).
+Current feature count: **89**. Last updated: March 2026 (Launch Readiness sprint complete: email capture, time saved metric, Stripe recurring billing).

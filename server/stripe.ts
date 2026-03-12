@@ -113,10 +113,17 @@ export async function createCheckoutSession(params: CheckoutParams): Promise<{ s
   if (params.topic) metadata.topic = params.topic;
   if (params.targetKeyword) metadata.targetKeyword = params.targetKeyword;
 
+  const isSubscription = params.productType === 'plan_growth' || params.productType === 'plan_premium';
+
+  // Get or create a Stripe Customer for subscription mode (required) and useful for one-time too
+  const customerId = await getOrCreateCustomer(stripe, params.workspaceId);
+
   const session = await stripe.checkout.sessions.create({
-    mode: 'payment',
+    mode: isSubscription ? 'subscription' : 'payment',
+    customer: customerId,
     line_items: [{ price: config.stripePriceId, quantity: 1 }],
     metadata,
+    ...(isSubscription ? { subscription_data: { metadata } } : {}),
     success_url: params.successUrl,
     cancel_url: params.cancelUrl,
   });
@@ -273,6 +280,34 @@ export async function createPaymentIntentForProduct(params: PaymentIntentParams)
 }
 
 // --- Startup: clear stale test-mode customer IDs when using live keys ---
+
+// --- Billing Portal (self-service subscription management) ---
+
+export async function createBillingPortalSession(workspaceId: string, returnUrl: string): Promise<{ url: string }> {
+  const stripe = getStripe();
+  if (!stripe) throw new Error('Stripe is not configured');
+  const ws = getWorkspace(workspaceId);
+  if (!ws?.stripeCustomerId) throw new Error('No Stripe customer found for this workspace');
+
+  const session = await stripe.billingPortal.sessions.create({
+    customer: ws.stripeCustomerId,
+    return_url: returnUrl,
+  });
+  return { url: session.url };
+}
+
+// --- Cancel subscription ---
+
+export async function cancelSubscription(workspaceId: string): Promise<{ ok: boolean }> {
+  const stripe = getStripe();
+  if (!stripe) throw new Error('Stripe is not configured');
+  const ws = getWorkspace(workspaceId);
+  if (!ws?.stripeSubscriptionId) throw new Error('No active subscription found');
+
+  // Cancel at period end (graceful — user keeps access until billing period ends)
+  await stripe.subscriptions.update(ws.stripeSubscriptionId, { cancel_at_period_end: true });
+  return { ok: true };
+}
 
 export function clearTestModeCustomerIds(): number {
   const key = getStripeSecretKey();
@@ -462,6 +497,62 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
         `Stripe PaymentIntent: ${intent.id}`,
         { stripePaymentIntentId: intent.id }
       );
+      break;
+    }
+
+    // --- Subscription lifecycle events ---
+
+    case 'customer.subscription.created':
+    case 'customer.subscription.updated': {
+      const subscription = event.data.object as Stripe.Subscription;
+      const workspaceId = subscription.metadata?.workspaceId;
+      if (!workspaceId) return;
+
+      const productType = subscription.metadata?.productType;
+      const newTier = productType === 'plan_premium' ? 'premium' : productType === 'plan_growth' ? 'growth' : null;
+
+      if (subscription.status === 'active' || subscription.status === 'trialing') {
+        const updates: Record<string, unknown> = { stripeSubscriptionId: subscription.id };
+        if (newTier) { updates.tier = newTier; updates.trialEndsAt = undefined; }
+        updateWorkspace(workspaceId, updates as Parameters<typeof updateWorkspace>[1]);
+        _broadcastFn?.(workspaceId, 'workspace:updated', { tier: newTier, subscriptionStatus: subscription.status });
+        console.log(`[stripe] Subscription ${event.type}: workspace=${workspaceId} status=${subscription.status} tier=${newTier}`);
+      } else if (subscription.status === 'past_due' || subscription.status === 'unpaid') {
+        console.warn(`[stripe] Subscription ${subscription.status}: workspace=${workspaceId} sub=${subscription.id}`);
+        addActivity(workspaceId, 'subscription_issue', `Subscription payment ${subscription.status} — please update billing`, '', { subscriptionId: subscription.id });
+      }
+      break;
+    }
+
+    case 'customer.subscription.deleted': {
+      const subscription = event.data.object as Stripe.Subscription;
+      const workspaceId = subscription.metadata?.workspaceId;
+      if (!workspaceId) return;
+
+      // Downgrade to free tier
+      updateWorkspace(workspaceId, { tier: 'free', stripeSubscriptionId: undefined, trialEndsAt: undefined });
+      _broadcastFn?.(workspaceId, 'workspace:updated', { tier: 'free' });
+      addActivity(workspaceId, 'subscription_cancelled', 'Subscription cancelled — downgraded to Free tier', '', { subscriptionId: subscription.id });
+      console.log(`[stripe] Subscription cancelled: workspace=${workspaceId} sub=${subscription.id} → free tier`);
+      break;
+    }
+
+    case 'invoice.paid': {
+      const invoice = event.data.object as Stripe.Invoice;
+      const subId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id;
+      if (!subId || !invoice.metadata?.workspaceId) return;
+      const workspaceId = invoice.metadata.workspaceId;
+      addActivity(workspaceId, 'invoice_paid', `Invoice paid: $${((invoice.amount_paid || 0) / 100).toFixed(2)}`, '', { invoiceId: invoice.id, subscriptionId: subId });
+      console.log(`[stripe] Invoice paid: workspace=${workspaceId} amount=$${((invoice.amount_paid || 0) / 100).toFixed(2)}`);
+      break;
+    }
+
+    case 'invoice.payment_failed': {
+      const invoice = event.data.object as Stripe.Invoice;
+      const workspaceId = invoice.metadata?.workspaceId;
+      if (!workspaceId) return;
+      addActivity(workspaceId, 'invoice_failed', 'Subscription payment failed — please update your payment method', '', { invoiceId: invoice.id });
+      console.warn(`[stripe] Invoice payment failed: workspace=${workspaceId} invoice=${invoice.id}`);
       break;
     }
 

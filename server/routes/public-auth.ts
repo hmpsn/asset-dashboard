@@ -144,4 +144,28 @@ router.post('/api/public/reset-password', async (req, res) => {
   res.json({ ok: true });
 });
 
+// --- Portal Email Capture (shared-password visitors) ---
+router.post('/api/public/capture-email/:id', (req, res) => {
+  const ws = getWorkspace(req.params.id);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const email = sanitizeString(req.body.email, 200)?.toLowerCase().trim();
+  const name = sanitizeString(req.body.name, 100)?.trim() || undefined;
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'Valid email is required' });
+  }
+
+  const contacts = ws.portalContacts || [];
+  // Don't duplicate — update name if already exists
+  const existing = contacts.find(c => c.email === email);
+  if (existing) {
+    if (name && !existing.name) existing.name = name;
+  } else {
+    contacts.push({ email, name, capturedAt: new Date().toISOString() });
+  }
+
+  updateWorkspace(ws.id, { portalContacts: contacts });
+  res.json({ ok: true });
+});
+
 export default router;

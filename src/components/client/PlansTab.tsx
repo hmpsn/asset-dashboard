@@ -1,4 +1,4 @@
-import { CheckCircle2, FileText, MessageSquare, Sparkles, X, Zap, DollarSign, TrendingUp } from 'lucide-react';
+import { CheckCircle2, FileText, MessageSquare, Sparkles, X, Zap, DollarSign, TrendingUp, CreditCard, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { STUDIO_NAME } from '../../constants';
 import type { Tier } from '../ui';
@@ -19,6 +19,19 @@ interface PlansTabProps {
 export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setTab, setToast, onOpenChat }: PlansTabProps) {
   const tier = effectiveTier;
   const isTrial = ws.isTrial && ws.trialDaysRemaining != null && ws.trialDaysRemaining > 0;
+  const [billingLoading, setBillingLoading] = useState(false);
+
+  const openBillingPortal = async () => {
+    setBillingLoading(true);
+    try {
+      const res = await fetch(`/api/public/billing-portal/${workspaceId}`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to open billing portal');
+      if (data.url) window.location.href = data.url;
+    } catch (err) {
+      setToast({ message: err instanceof Error ? err.message : 'Could not open billing portal', type: 'error' });
+    } finally { setBillingLoading(false); }
+  };
   type FeatureGroup = { category: string; features: { label: string; included: boolean }[] };
   const plans: { id: Tier; name: string; price: string; tagline: string; color: string; borderColor: string; bgColor: string; featureGroups: FeatureGroup[] }[] = [
     {
@@ -143,8 +156,20 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                 </div>
                 <div className="mt-5">
                   {isCurrent ? (
-                    <div className={`w-full py-2 rounded-lg text-xs font-medium text-center border ${plan.id !== 'free' ? 'bg-teal-500/10 border-teal-500/20 text-teal-300' : 'bg-zinc-800 border-zinc-700 text-zinc-400'}`}>
-                      {isTrial ? 'Trialing Now' : 'Your Plan'}
+                    <div className="space-y-2">
+                      <div className={`w-full py-2 rounded-lg text-xs font-medium text-center border ${plan.id !== 'free' ? 'bg-teal-500/10 border-teal-500/20 text-teal-300' : 'bg-zinc-800 border-zinc-700 text-zinc-400'}`}>
+                        {isTrial ? 'Trialing Now' : 'Your Plan'}
+                      </div>
+                      {plan.id !== 'free' && !isTrial && (
+                        <button
+                          onClick={openBillingPortal}
+                          disabled={billingLoading}
+                          className="w-full py-2 rounded-lg text-[11px] font-medium text-center border border-zinc-700 bg-zinc-800/50 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-300 transition-colors flex items-center justify-center gap-1.5"
+                        >
+                          {billingLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <CreditCard className="w-3 h-3" />}
+                          Manage Billing
+                        </button>
+                      )}
                     </div>
                   ) : isUpgrade ? (
                     <button onClick={async () => {

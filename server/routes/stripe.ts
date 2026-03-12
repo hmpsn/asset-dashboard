@@ -22,6 +22,8 @@ import {
   createCheckoutSession,
   createCartCheckoutSession,
   createPaymentIntentForProduct,
+  createBillingPortalSession,
+  cancelSubscription,
   getProductConfig,
   listProducts,
 } from '../stripe.js';
@@ -214,6 +216,43 @@ router.get('/api/public/roi/:workspaceId', (req, res) => {
   const roi = computeROI(req.params.workspaceId);
   if (!roi) return res.status(404).json({ error: 'ROI data not available — requires keyword strategy with CPC data' });
   res.json(roi);
+});
+
+// --- Subscription Management ---
+
+// Create a Stripe Billing Portal session (client self-service: update payment, cancel)
+router.post('/api/public/billing-portal/:workspaceId', checkoutLimiter, async (req, res) => {
+  if (!isStripeConfigured()) return res.status(503).json({ error: 'Stripe is not configured' });
+  const wsId = req.params.workspaceId;
+  const ws = getWorkspace(wsId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  const returnUrl = `${baseUrl}/client/${wsId}?tab=plans`;
+
+  try {
+    const { url } = await createBillingPortalSession(wsId, returnUrl);
+    res.json({ url });
+  } catch (err) {
+    console.error('[stripe] Billing portal error:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to create billing portal session' });
+  }
+});
+
+// Cancel subscription (graceful — at period end)
+router.post('/api/public/cancel-subscription/:workspaceId', checkoutLimiter, async (req, res) => {
+  if (!isStripeConfigured()) return res.status(503).json({ error: 'Stripe is not configured' });
+  const wsId = req.params.workspaceId;
+  const ws = getWorkspace(wsId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  try {
+    const result = await cancelSubscription(wsId);
+    res.json(result);
+  } catch (err) {
+    console.error('[stripe] Cancel subscription error:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to cancel subscription' });
+  }
 });
 
 export default router;

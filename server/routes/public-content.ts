@@ -18,7 +18,7 @@ import {
 import { notifyTeamContentRequest } from '../email.js';
 import { sanitizeString, validateEnum } from '../helpers.js';
 import { getClientActor } from '../middleware.js';
-import { getPageTrend } from '../search-console.js';
+import { getPageTrend, getQueryPageData } from '../search-console.js';
 import { getWorkspace } from '../workspaces.js';
 import { handleContentPerformance } from './content-requests.js';
 
@@ -240,6 +240,78 @@ router.get('/api/public/content-performance/:workspaceId/:requestId/trend', asyn
     const msg = err instanceof Error ? err.message : 'Unknown error';
     res.status(500).json({ error: msg });
   }
+});
+
+// --- Pre-populate content request from audit issues ---
+router.post('/api/public/content-request/:workspaceId/from-audit', async (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const pageSlug = sanitizeString(req.body.pageSlug, 200);
+  const pageName = sanitizeString(req.body.pageName, 200);
+  const issues = Array.isArray(req.body.issues) ? req.body.issues.map((i: string) => sanitizeString(i, 300)).filter(Boolean) : [];
+  const wordCount = typeof req.body.wordCount === 'number' ? req.body.wordCount : undefined;
+
+  if (!pageSlug || !pageName) return res.status(400).json({ error: 'pageSlug and pageName are required' });
+
+  // Best-effort: fetch top GSC keywords for this page
+  let topKeywords: { query: string; clicks: number; impressions: number; position: number }[] = [];
+  if (ws.gscPropertyUrl && ws.webflowSiteId) {
+    try {
+      const qpData = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90);
+      const slug = pageSlug.startsWith('/') ? pageSlug : `/${pageSlug}`;
+      topKeywords = qpData
+        .filter(r => {
+          try { return new URL(r.page).pathname.replace(/\/$/, '') === slug.replace(/\/$/, ''); } catch { return false; }
+        })
+        .sort((a, b) => b.clicks - a.clicks)
+        .slice(0, 5)
+        .map(r => ({ query: r.query, clicks: r.clicks, impressions: r.impressions, position: r.position }));
+    } catch { /* GSC unavailable */ }
+  }
+
+  // Also check keyword strategy for this page's target keyword
+  let strategyKeyword = '';
+  if (ws.keywordStrategy?.pageMap) {
+    const slug = pageSlug.startsWith('/') ? pageSlug : `/${pageSlug}`;
+    const match = ws.keywordStrategy.pageMap.find((p: { pagePath: string }) =>
+      p.pagePath.replace(/\/$/, '') === slug.replace(/\/$/, '')
+    );
+    if (match && 'primaryKeyword' in match) strategyKeyword = (match as { primaryKeyword?: string }).primaryKeyword || '';
+  }
+
+  // Build the target keyword: prefer strategy keyword, then top GSC query, then page name
+  const targetKeyword = strategyKeyword || (topKeywords.length > 0 ? topKeywords[0].query : pageName.replace(/-/g, ' '));
+
+  // Build rich rationale with context
+  const issueList = issues.length > 0 ? `\nIssues found:\n${issues.map((i: string) => `• ${i}`).join('\n')}` : '';
+  const kwList = topKeywords.length > 0
+    ? `\nTop organic keywords: ${topKeywords.map(k => `"${k.query}" (${k.clicks} clicks, pos ${k.position})`).join(', ')}`
+    : '';
+  const wcNote = wordCount != null ? `\nCurrent word count: ${wordCount}` : '';
+  const rationale = `Auto-generated from site audit for page: ${pageSlug}${wcNote}${issueList}${kwList}`;
+
+  const topic = `Content improvement: ${pageName}`;
+
+  const request = createContentRequest(req.params.workspaceId, {
+    topic,
+    targetKeyword,
+    intent: 'informational',
+    priority: 'high',
+    rationale,
+    clientNote: `This page was flagged in our site audit with content issues that could impact search performance.${wcNote}`,
+    source: 'strategy',
+    serviceType: 'brief_only',
+    pageType: 'blog',
+    targetPageSlug: pageSlug,
+  });
+
+  const actor = getClientActor(req, req.params.workspaceId);
+  addActivity(req.params.workspaceId, 'content_requested', `Content improvement requested for "${pageName}" (from audit)`, `Keyword: "${targetKeyword}" · ${issues.length} issues identified`, { requestId: request.id }, actor);
+  broadcastToWorkspace(req.params.workspaceId, 'content-request:created', { id: request.id, topic });
+  notifyTeamContentRequest({ workspaceName: ws.name, workspaceId: req.params.workspaceId, topic, targetKeyword, priority: 'high', rationale });
+
+  res.json({ ...request, topKeywords });
 });
 
 export default router;

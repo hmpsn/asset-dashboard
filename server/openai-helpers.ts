@@ -16,6 +16,7 @@ export interface TokenUsage {
   feature: string;
   workspaceId?: string;
   timestamp: string;
+  durationMs?: number;
 }
 
 const USAGE_DIR = getDataDir('ai-usage');
@@ -247,6 +248,7 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     temperature,
   });
 
+  const callStartMs = Date.now();
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const res = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -292,7 +294,8 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
       const totalTokens = data.usage?.total_tokens || 0;
 
       // Track usage
-      logTokenUsage({ promptTokens, completionTokens, totalTokens, model, feature, workspaceId });
+      const durationMs = Date.now() - callStartMs;
+      logTokenUsage({ promptTokens, completionTokens, totalTokens, model, feature, workspaceId, durationMs });
 
       return { text, promptTokens, completionTokens, totalTokens };
     } catch (err) {
@@ -308,6 +311,55 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     }
   }
   throw new Error(`[${feature}] OpenAI call failed after ${maxRetries} retries`);
+}
+
+// --- Time Saved Estimation ---
+
+/** Estimated human-equivalent minutes per AI feature operation */
+const HUMAN_MINUTES_PER_OP: Record<string, number> = {
+  'content-brief': 150,       // 2.5 hours of research & writing
+  'keyword-strategy': 240,    // 4 hours of keyword research
+  'schema-generation': 60,    // 1 hour of schema markup
+  'cms-schema-template': 45,  // 45 min CMS template setup
+  'seo-audit-recs': 30,       // 30 min analyzing audit results
+  'seo-rewrite': 15,          // 15 min per title/meta rewrite
+  'seo-bulk-fix': 10,         // 10 min per bulk fix item
+  'keyword-analysis': 20,     // 20 min keyword research
+  'internal-links': 30,       // 30 min finding link opportunities
+  'content-score': 20,        // 20 min content analysis
+  'search-chat': 10,          // 10 min answering a data question
+  'client-search-chat': 10,   // 10 min client question
+  'alt-text': 5,              // 5 min per image alt text
+};
+const DEFAULT_HUMAN_MINUTES = 10;
+
+export function getTimeSaved(workspaceId?: string, since?: string): {
+  totalMinutesSaved: number;
+  totalHoursSaved: number;
+  operationCount: number;
+  byFeature: Record<string, { count: number; minutesSaved: number }>;
+} {
+  let entries = usageLog;
+  if (workspaceId) entries = entries.filter(e => e.workspaceId === workspaceId);
+  if (since) entries = entries.filter(e => e.timestamp >= since);
+
+  const byFeature: Record<string, { count: number; minutesSaved: number }> = {};
+  let totalMinutesSaved = 0;
+
+  for (const e of entries) {
+    const humanMin = HUMAN_MINUTES_PER_OP[e.feature] || DEFAULT_HUMAN_MINUTES;
+    if (!byFeature[e.feature]) byFeature[e.feature] = { count: 0, minutesSaved: 0 };
+    byFeature[e.feature].count++;
+    byFeature[e.feature].minutesSaved += humanMin;
+    totalMinutesSaved += humanMin;
+  }
+
+  return {
+    totalMinutesSaved,
+    totalHoursSaved: Math.round((totalMinutesSaved / 60) * 10) / 10,
+    operationCount: entries.length,
+    byFeature,
+  };
 }
 
 /**

@@ -16,6 +16,7 @@ import { applySuppressionsToAudit, getAuditTrafficForWorkspace } from '../helper
 import {
   callOpenAI,
   getTokenUsage,
+  getTimeSaved,
   getUsageByDay,
   getUsageByFeature,
 } from '../openai-helpers.js';
@@ -179,6 +180,13 @@ router.get('/api/ai/usage', (req, res) => {
   const semrush = getSemrushUsage(workspaceId, since);
   const semrushDaily = getSemrushByDay(workspaceId, days);
   res.json({ ...summary, daily, byFeature, semrush, semrushDaily });
+});
+
+// --- Time Saved Metric ---
+router.get('/api/ai/time-saved', (req, res) => {
+  const workspaceId = req.query.workspaceId as string | undefined;
+  const since = req.query.since as string | undefined;
+  res.json(getTimeSaved(workspaceId, since));
 });
 
 export default router;

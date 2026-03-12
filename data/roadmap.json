@@ -12,8 +12,9 @@
           "source": "Market prep analysis Mar 2026",
           "est": "4-6h",
           "priority": "P0",
-          "notes": "LAUNCH BLOCKER — Tier upgrades (Growth $249/mo, Premium $999/mo) currently use Stripe Checkout with mode:'payment' (one-time). Must switch to mode:'subscription' with recurring Price IDs. Without this, monthly tier revenue requires manual invoicing. Implementation: create Stripe subscription products + recurring prices, update createCheckoutSession to use mode:'subscription' for plan_growth/plan_premium, handle subscription lifecycle webhooks (invoice.paid, invoice.payment_failed, customer.subscription.deleted), add subscription management UI (cancel/change plan). Stripe customer portal integration for self-service billing management.",
-          "status": "pending"
+          "notes": "Shipped — createCheckoutSession in server/stripe.ts now detects plan_growth/plan_premium and uses mode:'subscription' with subscription_data metadata. Added webhook handlers for customer.subscription.created/updated/deleted, invoice.paid, invoice.payment_failed. Subscription lifecycle: active → sets tier + stores stripeSubscriptionId; deleted → downgrades to free; past_due → activity log warning. Added createBillingPortalSession() for Stripe Customer Portal self-service. New routes: POST /api/public/billing-portal/:wsId, POST /api/public/cancel-subscription/:wsId. PlansTab shows 'Manage Billing' button for paid subscribers. cancelSubscription() uses cancel_at_period_end for graceful cancellation.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
         },
         {
           "id": 215,
@@ -21,8 +22,9 @@
           "source": "Market prep analysis Mar 2026",
           "est": "2-3h",
           "priority": "P0",
-          "notes": "Free tier clients can access the dashboard without providing an email (shared password auth). No email = no monthly reports, no trial expiry emails, no re-engagement, no upgrade prompts. Fix: require email on first login even for shared-password workspaces (lightweight email gate before dashboard loads). Store email in workspace contacts or auto-create a client user. Unlocks the entire email marketing funnel and makes monthly reports reach every client.",
-          "status": "pending"
+          "notes": "Shipped — After shared-password auth succeeds, ClientDashboard shows email capture gate (name + email form) before loading dashboard. Email stored via POST /api/public/capture-email/:id to workspace.portalContacts array (deduped by email). localStorage tracks captured email to skip on return visits. Skip button available (stores __skipped__ marker). Backend: portalContacts added to Workspace interface + updateWorkspace type. Captures feed into email marketing funnel for reports, trial nudges, upgrade prompts.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
         },
         {
           "id": 216,
@@ -30,8 +32,9 @@
           "source": "Market prep analysis Mar 2026",
           "est": "1-2h",
           "priority": "P1",
-          "notes": "Easy win — The chatbot currently says 'Upgrade to Growth for unlimited chat.' Should say 'Upgrade to Growth ($249/mo) — you've already identified $X in organic traffic value this month.' The ROI data already exists via /api/public/roi/:wsId. Wire it into the chatbot upgrade prompt and TierGate overlay copy. Connects value proof to purchase decision at the exact moment of highest intent.",
-          "status": "pending"
+          "notes": "Shipped — useChat hook fetches ROI data (organicTrafficValue) when chat opens. 429 rate-limit message shows '$X in organic traffic value — Growth pays for itself.' Chat-exhausted bar shows ROI-backed copy with emerald highlight. TierGate accepts optional roiValue prop and displays organic traffic value in upgrade overlays. All best-effort with silent fail if ROI data unavailable.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
         },
         {
           "id": 217,
@@ -39,8 +42,9 @@
           "source": "Market prep analysis Mar 2026",
           "est": "2-3h",
           "priority": "P1",
-          "notes": "Easy win — Track duration of AI operations (brief generation, post generation, schema generation, strategy generation, audit runs) and show a running 'X hours saved this month' counter on the Command Center and Workspace Home. Data partially exists via activity log timestamps. Add timing metadata to AI generation endpoints, aggregate per-workspace and globally. Useful for client conversations ('we saved you 12 hours this month') and marketing materials.",
-          "status": "pending"
+          "notes": "Shipped — Added durationMs to TokenUsage interface, tracked in callOpenAI(). getTimeSaved() in openai-helpers.ts uses per-feature human-equivalent minute multipliers (e.g. content-brief=150min, keyword-strategy=240min, schema=60min). GET /api/ai/time-saved?workspaceId=&since= returns totalHoursSaved, operationCount, byFeature breakdown. WorkspaceOverview Command Center shows 'Hours Saved' StatCard (purple Clock icon) with monthly AI ops count. Fetches current month data on load.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
         },
         {
           "id": 218,
@@ -48,8 +52,9 @@
           "source": "Market prep analysis Mar 2026",
           "est": "1-2h",
           "priority": "P1",
-          "notes": "Easy win — When the audit finds thin content on a high-traffic page, auto-create a draft content request with page context pre-filled (URL, current word count, top keywords from GSC, identified issues). Client just has to approve. Partially exists via Fix routing in audit, but going one step further to pre-create the request removes another click from the revenue funnel. Wire into FixRecommendations component for content-related issues.",
-          "status": "pending"
+          "notes": "Shipped — POST /api/public/content-request/:wsId/from-audit endpoint in public-content.ts. Accepts pageSlug, pageName, issues, wordCount. Auto-enriches with top 5 GSC keywords for the page + keyword strategy target keyword. Creates content request with rich rationale (issues, word count, keywords). HealthTab.tsx shows 'Request Content Improvement' button on expanded pages with content-related issues (thin content, heading, h1). Button → creates request → toast → WebSocket auto-refreshes Content tab.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
         },
         {
           "id": 219,
@@ -57,8 +62,9 @@
           "source": "Market prep analysis Mar 2026",
           "est": "30m",
           "priority": "P1",
-          "notes": "Easy win — The portal sets document.title dynamically but has no custom favicon or OG meta. When a client bookmarks their dashboard or shares it in Slack, it shows a generic icon. Add per-workspace favicon (use workspace logo or branded default) and OG tags (og:title, og:description, og:image) in ClientDashboard. Small polish, big perception improvement for a professional SaaS product.",
-          "status": "pending"
+          "notes": "Shipped — ClientDashboard.tsx dynamically updates document head when workspace loads: og:title, og:description, og:type, og:url, twitter:title, twitter:description, twitter:card, meta description. brandLogoUrl sets og:image, twitter:image, and dynamic favicon (SVG or PNG). Added brandLogoUrl and brandAccentColor to WorkspaceInfo type.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
         }
       ]
     },
