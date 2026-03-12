@@ -169,10 +169,10 @@ export function KeywordStrategyPanel({ workspaceId, siteId, onNavigate }: Props)
         }),
       });
 
-      if (!res.body) {
-        // Fallback: no streaming support
+      if (!res.ok || !res.body) {
+        // Non-streaming error response (429, 400, 500, etc.) or no streaming support
         const data = await res.json();
-        if (data.error) { setError(data.error); } else { setStrategy(data); }
+        if (!res.ok || data.error) { setError(data.message || data.error || 'Request failed'); } else { setStrategy(data); }
         return;
       }
 
