@@ -138,8 +138,8 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
     try {
       const stored = localStorage.getItem('admin-sidebar-collapsed');
-      return stored ? new Set(JSON.parse(stored)) : new Set(ALL_GROUP_LABELS);
-    } catch { return new Set(ALL_GROUP_LABELS); }
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); }
   });
   const toggleGroup = useCallback((label: string) => {
     setCollapsedGroups(prev => {
