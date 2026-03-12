@@ -453,6 +453,12 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     contentChecklist: (parsed.contentChecklist as string[]) || undefined,
     schemaRecommendations: (parsed.schemaRecommendations as ContentBrief['schemaRecommendations']) || undefined,
     pageType: (context.pageType as ContentBrief['pageType']) || undefined,
+    // Persist real SERP data so post generation can use it
+    realPeopleAlsoAsk: context.serpData?.peopleAlsoAsk?.length ? context.serpData.peopleAlsoAsk : undefined,
+    realTopResults: context.serpData?.organicResults?.length
+      ? context.serpData.organicResults.map(r => ({ position: r.position, title: r.title, url: r.url }))
+      : undefined,
+    referenceUrls: context.referenceUrls,
   };
 
   const briefs = readBriefs(workspaceId);

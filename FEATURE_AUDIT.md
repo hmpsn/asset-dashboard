@@ -699,6 +699,17 @@ A brief value assessment of every feature in the platform, covering what it does
 
 ---
 
+### 64. AI Context Completeness Indicator
+**What it does:** Shared utility (`server/ai-context-check.ts`) evaluates all 8 AI data sources for a workspace and returns a completeness score. Checks: Webflow site, GSC, GA4, Knowledge Base (inline + files), Brand Voice (inline + files), Audience Personas, Keyword Strategy, and SEMRush. Each source reports status (connected/missing), detail text, which features it impacts, and a fix action link. API endpoint `GET /api/ai/context/:workspaceId` exposes the data. Reusable React component `AIContextIndicator` (`src/components/ui/AIContextIndicator.tsx`) renders an expandable bar with score percentage, connected/total count, missing source summary, and per-source detail rows with "Set up" buttons that navigate to the appropriate settings tab. Supports `feature` prop to filter sources by relevance (e.g., `feature="briefs"` only shows sources that impact brief generation). Compact mode available for inline pill display. Wired into Content Briefs (above Generate button) and Keyword Strategy (before first generation).
+
+**Agency value:** Immediately surfaces which data sources are missing before generating AI content — no more wondering why a brief came out generic. Self-guiding onboarding: the indicator tells you exactly what to set up next and links directly to the right settings page.
+
+**Client value:** N/A — admin-only indicator. Indirectly improves all AI-generated content quality by ensuring the agency fills in context before generating.
+
+**Mutual:** Turns a hidden dependency chain (integrations → knowledge base → strategy → briefs → posts) into a visible, actionable checklist. Reduces wasted AI tokens on context-poor generations.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
@@ -708,7 +719,7 @@ A brief value assessment of every feature in the platform, covering what it does
 | Content & Strategy | 6 | Strategy → brief → AI post generation → review → delivery pipeline |
 | Client Communication | 7 | Structured workflows + automated reports + expanded notifications |
 | Client Self-Service | 10 | 24/7 data access, onboarding, plans, cart, order tracking |
-| AI & Intelligence | 4 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine |
+| AI & Intelligence | 5 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine + context completeness |
 | Auth & Access Control | 3 | Internal user accounts, workspace ACL, client user accounts |
 | Security | 1 | Helmet, HTTPS, rate limiting, input sanitization |
 | Monetization | 1 | Stripe Checkout, admin settings, payment tracking, trials, encrypted config |
@@ -716,7 +727,7 @@ A brief value assessment of every feature in the platform, covering what it does
 | Data Architecture | 3 | PageEditState model, cross-store writes, activity feed for client actions |
 | Architecture | 1 | Server refactor: 8K-line monolith → 38 route modules + 3 shared modules |
 
-**63 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**64 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
 ---
 
@@ -814,6 +825,7 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - **Content delivery**: Attach deliverables (Google Doc links, uploaded files) to completed requests.
 - ~~Knowledge base auto-generation~~: ✅ Shipped (March 10, 2026) — One-click website crawl extracts structured business knowledge (services, audience, differentiators, case studies, brand voice, expertise) from up to 15 priority pages. See Feature #62.
 - ~~Claude/GPT hybrid model~~: ✅ Shipped (March 10, 2026) — Claude (claude-sonnet-4-20250514) for creative prose (intro/sections/conclusion), GPT-4.1 for structured tasks (unification, SEO meta, briefs). Auto-fallback to GPT if no Anthropic key.
+- ~~AI context enrichment audit~~: ✅ Shipped (March 11, 2026) — Full audit of all AI-powered features for context completeness. Fixes: (1) Content briefs now persist real SERP data (PAA questions + top results) instead of losing them after generation. (2) Keyword strategy master synthesis now receives knowledge base for better content gap alignment with business services. (3) Client chat now receives structured SEO context (keyword strategy + brand voice + keyword map) matching admin chat quality. (4) Internal link analyzer now receives knowledge base for better anchor text and link priority suggestions.
 - **Knowledge base enrichment**: Feed real case study metrics (traffic increases, conversion data, timelines) into the knowledge base so AI can reference actual numbers instead of vague outcomes.
 - **Brand voice training**: Allow uploading 3-5 sample blog posts as style examples so the AI can match the client's actual writing voice, not just a generic "conversational" tone.
 - **Content visual suggestions**: Generate image/diagram/table placement suggestions in the brief outline (e.g., "insert comparison table here", "add screenshot of Webflow CMS setup") to break up text walls.

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import type { FixContext } from '../App';
 import { PostEditor } from './PostEditor';
+import { AIContextIndicator } from './ui';
 
 interface ContentBrief {
   id: string;
@@ -67,7 +68,7 @@ interface ContentTopicRequest {
   updatedAt: string;
 }
 
-export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }: { workspaceId: string; onRequestCountChange?: (pending: number) => void; fixContext?: FixContext | null }) {
+export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, onNavigate }: { workspaceId: string; onRequestCountChange?: (pending: number) => void; fixContext?: FixContext | null; onNavigate?: (tab: string) => void }) {
   const [briefs, setBriefs] = useState<ContentBrief[]>([]);
   const [clientRequests, setClientRequests] = useState<ContentTopicRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -963,6 +964,8 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
             </div>
           </div>
         )}
+
+        <AIContextIndicator workspaceId={workspaceId} feature="briefs" onNavigate={onNavigate} />
 
         {error && <p className="text-xs text-red-400">{error}</p>}
         <div className="flex items-center gap-3">

@@ -7,7 +7,7 @@ import {
   Copy, Link, MessageSquare, Save,
 } from 'lucide-react';
 import { KeywordAnalysis } from './KeywordAnalysis';
-import { StatCard } from './ui';
+import { StatCard, AIContextIndicator } from './ui';
 import type { FixContext } from '../App';
 
 interface PageKeywordMap {
@@ -479,6 +479,10 @@ export function KeywordStrategyPanel({ workspaceId, siteId, onNavigate }: Props)
           )}
         </button>
       </div>
+
+      {!strategy && !generating && (
+        <AIContextIndicator workspaceId={workspaceId} feature="strategy" onNavigate={onNavigate} />
+      )}
 
       {/* Progress Indicator */}
       {generating && progressStep && (

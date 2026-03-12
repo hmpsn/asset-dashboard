@@ -28,6 +28,7 @@ import {
   RICH_BLOCKS_PROMPT,
 } from '../seo-context.js';
 import { getWorkspace } from '../workspaces.js';
+import { checkAIContext } from '../ai-context-check.js';
 
 // ── Admin AI Chat (auth-gated, internal analyst persona) ──
 router.post('/api/admin-chat', async (req, res) => {
@@ -160,6 +161,11 @@ ${JSON.stringify(context, null, 2)}`;
     const msg = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: msg });
   }
+});
+
+// --- AI Context Completeness ---
+router.get('/api/ai/context/:workspaceId', (req, res) => {
+  res.json(checkAIContext(req.params.workspaceId));
 });
 
 // --- AI Token Usage Tracking ---

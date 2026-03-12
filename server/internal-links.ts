@@ -9,7 +9,7 @@ import {
 } from './webflow.js';
 import { getWorkspace } from './workspaces.js';
 import { callOpenAI } from './openai-helpers.js';
-import { buildSeoContext } from './seo-context.js';
+import { buildSeoContext, buildKnowledgeBase } from './seo-context.js';
 
 export interface PageContent {
   path: string;
@@ -170,12 +170,15 @@ export async function analyzeInternalLinks(
     kwContext = `\n\nKeyword targets per page:\n${kwMap}`;
   }
 
+  // Add business knowledge for better link priority and anchor text
+  const knowledgeBlock = workspaceId ? buildKnowledgeBase(workspaceId) : '';
+
   const prompt = `You are an expert SEO strategist analyzing internal linking opportunities for a website. 
 
 Here are all the pages on the site with their content and existing internal links:
 
 ${pageSummaries}
-${kwContext}
+${kwContext}${knowledgeBlock}
 
 Analyze the content relationships between pages and suggest internal links that are MISSING. For each suggestion:
 1. Identify WHERE a link should be added (source page)

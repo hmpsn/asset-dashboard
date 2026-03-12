@@ -40,7 +40,7 @@ import {
   getSearchTypeBreakdown,
   getSearchPeriodComparison,
 } from '../search-console.js';
-import { buildKnowledgeBase, RICH_BLOCKS_PROMPT } from '../seo-context.js';
+import { buildSeoContext, buildKeywordMapContext, buildKnowledgeBase, RICH_BLOCKS_PROMPT } from '../seo-context.js';
 import { incrementUsage } from '../usage-tracking.js';
 import { getWorkspace } from '../workspaces.js';
 
@@ -188,6 +188,10 @@ router.post('/api/public/search-chat/:workspaceId', async (req, res) => {
 
     const teamName = 'hmpsn studio';
 
+    // Pre-compute SEO context blocks for the system prompt
+    const seoCtx = buildSeoContext(ws.id);
+    const seoContextBlock = seoCtx.keywordBlock + seoCtx.brandVoiceBlock + buildKeywordMapContext(ws.id) + buildKnowledgeBase(ws.id);
+
     // --- Data inventory (shared across modes) ---
     const dataInventory = `DATA YOU HAVE ACCESS TO:
 ${hasSearch ? '✅ **Google Search Console** — search queries, clicks, impressions, CTR, positions, top pages, search trend over time' : ''}
@@ -282,7 +286,7 @@ CRITICAL RULES:
 
 Site: ${ws.webflowSiteName || ws.name}
 Date range: last ${context?.days || 28} days
-${buildKnowledgeBase(ws.id)}
+${seoContextBlock}
 Current data context:
 ${JSON.stringify(context, null, 2)}`;
 

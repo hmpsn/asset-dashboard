@@ -134,6 +134,26 @@
           "shippedAt": "2026-03-11"
         },
         {
+          "id": 198,
+          "title": "AI Context Completeness Indicator",
+          "source": "AI audit Mar 2026",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped — server/ai-context-check.ts checks 8 AI data sources (Webflow, GSC, GA4, Knowledge Base, Brand Voice, Personas, Keyword Strategy, SEMRush) per workspace. GET /api/ai/context/:workspaceId returns score, connected/total, per-source status + detail + fix actions. AIContextIndicator.tsx reusable UI component with expandable detail, feature filtering, navigation links. Wired into ContentBriefs + KeywordStrategy.",
+          "status": "done",
+          "shippedAt": "2026-03-11"
+        },
+        {
+          "id": 197,
+          "title": "AI context enrichment audit",
+          "source": "AI audit Mar 2026",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped — Full audit of all AI-powered features for context completeness. Fixes: (1) content-brief.ts persists real SERP data (PAA + top results) on briefs. (2) keyword-strategy.ts master synthesis receives knowledge base for better content gap alignment. (3) Client chat receives structured SEO context (keyword strategy + brand voice + keyword map) matching admin chat. (4) internal-links.ts receives knowledge base for better anchor text.",
+          "status": "done",
+          "shippedAt": "2026-03-11"
+        },
+        {
           "id": 190,
           "title": "Beta client feedback & bug submission",
           "source": "Product idea Mar 2026",

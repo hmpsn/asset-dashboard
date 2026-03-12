@@ -34,6 +34,7 @@ import {
   getSiteSubdomain,
   discoverSitemapUrls,
 } from '../webflow.js';
+import { buildKnowledgeBase } from '../seo-context.js';
 import { updateWorkspace, getWorkspace, getTokenForSite } from '../workspaces.js';
 
 // --- Keyword Strategy Generation (SSE progress) ---
@@ -411,6 +412,11 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     let businessSection = '';
     if (businessContext) {
       businessSection = `\nBUSINESS CONTEXT: ${businessContext}\n`;
+    }
+    // Add knowledge base for deeper business understanding (services, expertise, differentiators)
+    const knowledgeBlock = buildKnowledgeBase(ws.id);
+    if (knowledgeBlock) {
+      businessSection += knowledgeBlock + '\n';
     }
 
     // Build per-page GSC context lookup
