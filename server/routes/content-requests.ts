@@ -5,7 +5,6 @@ import { Router } from 'express';
 
 const router = Router();
 
-import path from 'path';
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { generateBrief } from '../content-brief.js';

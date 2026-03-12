@@ -5,7 +5,6 @@ import { Router } from 'express';
 
 const router = Router();
 
-import path from 'path';
 import { callOpenAI } from '../openai-helpers.js';
 import { getLatestSnapshot } from '../reports.js';
 import { runSeoAudit } from '../seo-audit.js';

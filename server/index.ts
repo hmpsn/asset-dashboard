@@ -25,7 +25,6 @@ import { startMonthlyReports } from './monthly-report.js';
 import { startChurnSignalScheduler } from './churn-signals.js';
 import { startAnomalyDetection, initAnomalyBroadcast } from './anomaly-detection.js';
 import { initJobs } from './jobs.js';
-import { setBroadcast } from './broadcast.js';
 
 // ─── Route modules ───
 import authRoutes from './routes/auth.js';
@@ -190,8 +189,7 @@ app.use(express.json({ limit: '10mb' }));
 const publicApiLimiter = rateLimit(60 * 1000, 60);
 // Stricter limit for write operations: 10 per minute per IP
 const publicWriteLimiter = rateLimit(60 * 1000, 10);
-// Checkout-specific limit (when Stripe is added): 5 per minute per IP
-const checkoutLimiter = rateLimit(60 * 1000, 5);
+// Checkout-specific limit: exported from middleware.ts for route files
 
 app.use('/api/public/', publicApiLimiter);
 app.use((req, res, next) => {

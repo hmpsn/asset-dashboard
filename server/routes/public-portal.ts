@@ -5,7 +5,6 @@ import { Router } from 'express';
 
 const router = Router();
 
-import path from 'path';
 import { hasClientUsers } from '../client-users.js';
 import { getGA4TopPages } from '../google-analytics.js';
 import { applySuppressionsToAudit } from '../helpers.js';

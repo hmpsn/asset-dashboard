@@ -9,7 +9,6 @@ import fs from 'fs';
 import path from 'path';
 import { addActivity } from '../activity-log.js';
 import { generateAltText } from '../alttext.js';
-import { upload } from '../middleware.js';
 import { callOpenAI } from '../openai-helpers.js';
 import { savePageWeight, getPageWeight } from '../performance-store.js';
 import { getQueue, getMetadata } from '../processor.js';

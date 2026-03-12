@@ -19,11 +19,10 @@ import {
 } from '../client-users.js';
 import { listContentRequests } from '../content-requests.js';
 import { notifyClientWelcome } from '../email.js';
-import { applySuppressionsToAudit, CRITICAL_CHECKS_SET, MODERATE_CHECKS_SET } from '../helpers.js';
+import { applySuppressionsToAudit } from '../helpers.js';
 import { callOpenAI } from '../openai-helpers.js';
 import { getLatestSnapshot } from '../reports.js';
 import { listRequests } from '../requests.js';
-import { type SeoAuditResult } from '../seo-audit.js';
 import {
   listPages,
   filterPublishedPages,
@@ -328,83 +327,6 @@ Be concise but specific. Use bullet points. Only include information actually fo
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate knowledge base' });
   }
 });
-
-// --- Suppression-aware audit helper ---
-// Scoring weights must mirror seo-audit.ts auditPage() exactly
-const CRITICAL_CHECKS_SET = new Set([
-  'title', 'meta-description', 'canonical', 'h1', 'robots',
-  'duplicate-title', 'mixed-content', 'ssl', 'robots-txt',
-]);
-const MODERATE_CHECKS_SET = new Set([
-  'content-length', 'heading-hierarchy', 'internal-links', 'img-alt',
-  'og-tags', 'og-image', 'link-text', 'url', 'lang', 'viewport',
-  'duplicate-description', 'img-filesize', 'html-size',
-]);
-
-interface AuditSuppression { check: string; pageSlug: string; reason?: string; createdAt: string }
-
-function applySuppressionsToAudit(
-  audit: SeoAuditResult,
-  suppressions: AuditSuppression[],
-): SeoAuditResult {
-  if (!suppressions || suppressions.length === 0) return audit;
-
-  // Build a fast lookup: "check::pageSlug" → true
-  const suppSet = new Set(suppressions.map(s => `${s.check}::${s.pageSlug}`));
-
-  let totalErrors = 0, totalWarnings = 0, totalInfos = 0;
-
-  const filteredPages = audit.pages.map(page => {
-    const filteredIssues = page.issues.filter(issue => {
-      const key = `${issue.check}::${page.slug}`;
-      return !suppSet.has(key);
-    });
-
-    // Recalculate page score with remaining issues
-    let score = 100;
-    for (const issue of filteredIssues) {
-      const isCritical = CRITICAL_CHECKS_SET.has(issue.check);
-      const isModerate = MODERATE_CHECKS_SET.has(issue.check);
-      if (issue.severity === 'error') {
-        score -= isCritical ? 20 : 12;
-      } else if (issue.severity === 'warning') {
-        score -= isCritical ? 10 : isModerate ? 6 : 4;
-      } else {
-        score -= 1;
-      }
-    }
-    score = Math.max(0, Math.min(100, score));
-
-    for (const i of filteredIssues) {
-      if (i.severity === 'error') totalErrors++;
-      else if (i.severity === 'warning') totalWarnings++;
-      else totalInfos++;
-    }
-
-    return { ...page, issues: filteredIssues, score };
-  });
-
-  // Site-wide issues are not per-page, so they aren't suppressed
-  for (const i of audit.siteWideIssues) {
-    if (i.severity === 'error') totalErrors++;
-    else if (i.severity === 'warning') totalWarnings++;
-    else totalInfos++;
-  }
-
-  const siteScore = filteredPages.length > 0
-    ? Math.round(filteredPages.reduce((s, r) => s + r.score, 0) / filteredPages.length)
-    : 100;
-
-  return {
-    siteScore,
-    totalPages: filteredPages.length,
-    errors: totalErrors,
-    warnings: totalWarnings,
-    infos: audit.infos !== undefined ? totalInfos : totalInfos,
-    pages: filteredPages,
-    siteWideIssues: audit.siteWideIssues,
-  };
-}
 
 // --- Audit Issue Suppressions ---
 router.get('/api/workspaces/:id/audit-suppressions', requireWorkspaceAccess(), (req, res) => {
