@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useToast } from './Toast';
 import {
   Check, Search, Loader2, LogIn, LogOut, Globe, ExternalLink, Unplug,
-  Shield, Key, Mail, CreditCard, Wifi, WifiOff,
+  Shield, Key, Mail, CreditCard, Wifi, WifiOff, HardDrive, Trash2, RefreshCw,
 } from 'lucide-react';
 import { StripeSettings } from './StripeSettings';
 
@@ -26,6 +26,30 @@ interface HealthStatus {
   hasStripe: boolean;
 }
 
+interface StorageDirStats {
+  name: string;
+  bytes: number;
+  fileCount: number;
+  label: string;
+}
+
+interface StorageReport {
+  totalBytes: number;
+  totalFiles: number;
+  breakdown: StorageDirStats[];
+  backupRetentionDays: number;
+  chatSessionCount: number;
+  oldestChatSession: string | null;
+  timestamp: string;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  return `${(bytes / Math.pow(1024, i)).toFixed(i > 1 ? 1 : 0)} ${units[i]}`;
+}
+
 export function SettingsPanel() {
   const { toast } = useToast();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -33,6 +57,34 @@ export function SettingsPanel() {
   const [gscSites, setGscSites] = useState<GscSite[]>([]);
   const [loadingGsc, setLoadingGsc] = useState(false);
   const [health, setHealth] = useState<HealthStatus | null>(null);
+  const [storage, setStorage] = useState<StorageReport | null>(null);
+  const [storageLoading, setStorageLoading] = useState(false);
+  const [pruning, setPruning] = useState<string | null>(null);
+
+  const loadStorage = async () => {
+    setStorageLoading(true);
+    try {
+      const res = await fetch('/api/admin/storage-stats');
+      if (res.ok) setStorage(await res.json());
+    } catch { /* ignore */ }
+    finally { setStorageLoading(false); }
+  };
+
+  const runPrune = async (type: 'chat' | 'backups' | 'activity') => {
+    const endpoints: Record<string, string> = {
+      chat: '/api/admin/storage/prune-chat',
+      backups: '/api/admin/storage/prune-backups',
+      activity: '/api/admin/storage/prune-activity',
+    };
+    setPruning(type);
+    try {
+      const res = await fetch(endpoints[type], { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const data = await res.json();
+      toast(`Pruned ${type}: ${formatBytes(data.bytesFreed || 0)} freed`);
+      loadStorage();
+    } catch { toast('Prune failed'); }
+    finally { setPruning(null); }
+  };
 
   useEffect(() => {
     fetch('/api/workspaces').then(r => r.json()).then(setWorkspaces).catch(() => {});
@@ -41,6 +93,7 @@ export function SettingsPanel() {
       if (s.connected) loadGscSites();
     }).catch(() => {});
     fetch('/api/health').then(r => r.json()).then((h: HealthStatus) => setHealth(h)).catch(() => {});
+    loadStorage();
   }, []);
 
   const loadGscSites = async () => {
@@ -220,6 +273,126 @@ export function SettingsPanel() {
             </div>
           </div>
         </div>
+      </section>
+
+      {/* Storage Monitor */}
+      <section className="bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800">
+        <div className="px-5 py-4 border-b border-zinc-800 flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+            <HardDrive className="w-4 h-4 text-amber-400" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-zinc-200">Storage Monitor</h3>
+            <p className="text-xs text-zinc-500">Persistent disk usage breakdown &amp; cleanup tools</p>
+          </div>
+          <button onClick={loadStorage} disabled={storageLoading} className="p-1.5 rounded-lg hover:bg-white/5 transition-colors" title="Refresh">
+            <RefreshCw className={`w-4 h-4 text-zinc-500 ${storageLoading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+
+        {storage ? (
+          <div className="px-5 py-4 space-y-4">
+            {/* Total usage bar */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-medium text-zinc-300">{formatBytes(storage.totalBytes)}</span>
+                <span className="text-[11px] text-zinc-500">{storage.totalFiles.toLocaleString()} files</span>
+              </div>
+              <div className="h-3 bg-zinc-800 rounded-full overflow-hidden flex">
+                {storage.breakdown.slice(0, 6).map((d, i) => {
+                  const pct = storage.totalBytes > 0 ? (d.bytes / storage.totalBytes) * 100 : 0;
+                  if (pct < 0.5) return null;
+                  const colors = ['bg-amber-500', 'bg-teal-500', 'bg-blue-500', 'bg-violet-500', 'bg-rose-500', 'bg-emerald-500'];
+                  return <div key={d.name} className={`h-full ${colors[i % colors.length]} transition-all`} style={{ width: `${pct}%` }} title={`${d.label}: ${formatBytes(d.bytes)}`} />;
+                })}
+              </div>
+            </div>
+
+            {/* Per-category breakdown */}
+            <div className="space-y-1">
+              {storage.breakdown.map((d, i) => {
+                const pct = storage.totalBytes > 0 ? (d.bytes / storage.totalBytes) * 100 : 0;
+                const colors = ['text-amber-400', 'text-teal-400', 'text-blue-400', 'text-violet-400', 'text-rose-400', 'text-emerald-400'];
+                return (
+                  <div key={d.name} className="flex items-center gap-2 py-1">
+                    <span className={`w-1.5 h-1.5 rounded-full ${colors[i % colors.length].replace('text-', 'bg-')}`} />
+                    <span className="text-xs text-zinc-400 flex-1 truncate">{d.label}</span>
+                    <span className="text-[11px] text-zinc-500 tabular-nums">{d.fileCount} files</span>
+                    <span className="text-xs font-medium text-zinc-300 tabular-nums w-16 text-right">{formatBytes(d.bytes)}</span>
+                    <span className="text-[11px] text-zinc-600 tabular-nums w-10 text-right">{pct.toFixed(0)}%</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Quick stats */}
+            <div className="grid grid-cols-3 gap-3 pt-2 border-t border-zinc-800">
+              <div className="text-center">
+                <div className="text-xs font-medium text-zinc-300">{storage.chatSessionCount}</div>
+                <div className="text-[11px] text-zinc-500">Chat sessions</div>
+              </div>
+              <div className="text-center">
+                <div className="text-xs font-medium text-zinc-300">{storage.backupRetentionDays}d</div>
+                <div className="text-[11px] text-zinc-500">Backup retention</div>
+              </div>
+              <div className="text-center">
+                <div className="text-xs font-medium text-zinc-300">
+                  {storage.oldestChatSession ? new Date(storage.oldestChatSession).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'}
+                </div>
+                <div className="text-[11px] text-zinc-500">Oldest chat</div>
+              </div>
+            </div>
+
+            {/* Prune actions */}
+            <div className="pt-2 border-t border-zinc-800">
+              <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-2">Cleanup Actions</div>
+              <div className="space-y-1.5">
+                <button
+                  onClick={() => runPrune('backups')}
+                  disabled={!!pruning}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition-colors text-left"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <div className="flex-1">
+                    <span className="text-xs text-zinc-300">Prune old backups</span>
+                    <span className="text-[11px] text-zinc-500 ml-1.5">Keep last 3 days</span>
+                  </div>
+                  {pruning === 'backups' && <Loader2 className="w-3 h-3 animate-spin text-zinc-500" />}
+                </button>
+                <button
+                  onClick={() => runPrune('chat')}
+                  disabled={!!pruning}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition-colors text-left"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+                  <div className="flex-1">
+                    <span className="text-xs text-zinc-300">Prune chat history</span>
+                    <span className="text-[11px] text-zinc-500 ml-1.5">&gt;90 days old</span>
+                  </div>
+                  {pruning === 'chat' && <Loader2 className="w-3 h-3 animate-spin text-zinc-500" />}
+                </button>
+                <button
+                  onClick={() => runPrune('activity')}
+                  disabled={!!pruning}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition-colors text-left"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                  <div className="flex-1">
+                    <span className="text-xs text-zinc-300">Prune activity logs</span>
+                    <span className="text-[11px] text-zinc-500 ml-1.5">&gt;6 months old</span>
+                  </div>
+                  {pruning === 'activity' && <Loader2 className="w-3 h-3 animate-spin text-zinc-500" />}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : storageLoading ? (
+          <div className="px-5 py-8 flex items-center justify-center gap-2 text-xs text-zinc-500">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Scanning storage...
+          </div>
+        ) : (
+          <div className="px-5 py-4 text-xs text-zinc-500">Unable to load storage stats</div>
+        )}
       </section>
 
       {/* Stripe / Payments */}

@@ -420,8 +420,9 @@
           "source": "Infrastructure review Mar 2026",
           "est": "2-3h",
           "priority": "P2",
-          "notes": "Phase 1: /api/admin/storage-stats endpoint with per-directory breakdown. Phase 2: Chat history pruning, activity log rotation, backup retention 7→3 days. Phase 3 (at 5-10GB): PostgreSQL migration. Moved from Sprint B.",
-          "status": "pending"
+          "notes": "Shipped — Phase 1+2: server/storage-stats.ts scans all data directories (25 categories + uploads + optimized). GET /api/admin/storage-stats returns per-directory breakdown with bytes, file count, labels. POST endpoints for pruning: /prune-chat (>90 day sessions), /prune-backups (keep 3 days), /prune-activity (>6 month entries). Storage Monitor UI panel in SettingsPanel.tsx: colored stacked bar chart, per-category row breakdown, chat/backup/oldest stats, one-click prune buttons with toast feedback. Phase 3 (PostgreSQL migration) deferred until 5-10GB threshold.",
+          "status": "done",
+          "shippedAt": "2026-03-11"
         },
         {
           "id": 170,

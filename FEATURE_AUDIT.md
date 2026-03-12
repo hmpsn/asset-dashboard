@@ -929,6 +929,15 @@ When the user asks to update this document with recent features, follow this pro
 
 **Mutual:** Reduces the friction of maintaining AI context, which means it actually gets maintained. Better context → better AI outputs → fewer revision cycles.
 
+### 69. Storage Monitor & Pruning Tools
+**What it does:** `server/storage-stats.ts` scans all 25+ data directories (chat sessions, backups, reports, uploads, optimized images, etc.) and returns a per-category size breakdown via `GET /api/admin/storage-stats`. Three POST pruning endpoints: `/prune-chat` (delete sessions >90 days), `/prune-backups` (reduce retention to 3 days), `/prune-activity` (trim log entries >6 months). Storage Monitor UI panel in Settings: colored stacked bar chart showing top-6 categories, per-row breakdown with file count/size/percentage, quick stats (chat session count, backup retention, oldest chat), and one-click prune buttons with loading states and toast feedback.
+
+**Agency value:** Visibility into what's consuming disk on Render persistent storage. One-click cleanup when approaching limits instead of manual SSH. Prevents surprise downtime from full disk.
+
+**Client value:** N/A — admin-only infrastructure tool.
+
+**Mutual:** Platform stability. Proactive monitoring prevents data loss from disk exhaustion.
+
 ---
 
-Current feature count: **69**. Last updated: March 2026 (Sidebar colored icons + roadmap velocity chart shipped).
+Current feature count: **70**. Last updated: March 2026 (Storage monitor + pruning tools shipped).

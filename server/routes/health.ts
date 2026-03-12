@@ -13,6 +13,7 @@ import { isEmailConfigured } from '../email.js';
 import { getGoogleCredentials } from '../google-auth.js';
 import { isStripeConfigured } from '../stripe.js';
 import { listWorkspaces, getTokenForSite } from '../workspaces.js';
+import { getStorageReport, pruneChatSessions, pruneBackups, pruneActivityLogs } from '../storage-stats.js';
 
 const DATA_ROOT = DATA_BASE || path.join(process.env.HOME || '', '.asset-dashboard');
 
@@ -96,6 +97,47 @@ router.get('/api/health', (_req, res) => {
     notificationEmail: process.env.NOTIFICATION_EMAIL || null,
     emailQueue: getQueueStats(),
   });
+});
+
+// ── Storage monitoring & pruning ──
+
+router.get('/api/admin/storage-stats', (_req, res) => {
+  try {
+    const report = getStorageReport();
+    res.json(report);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to get storage stats' });
+  }
+});
+
+router.post('/api/admin/storage/prune-chat', (req, res) => {
+  const maxAgeDays = typeof req.body?.maxAgeDays === 'number' ? req.body.maxAgeDays : 90;
+  try {
+    const result = pruneChatSessions(maxAgeDays);
+    res.json({ ...result, maxAgeDays });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Chat prune failed' });
+  }
+});
+
+router.post('/api/admin/storage/prune-backups', (req, res) => {
+  const retainDays = typeof req.body?.retainDays === 'number' ? req.body.retainDays : 3;
+  try {
+    const result = pruneBackups(retainDays);
+    res.json({ ...result, retainDays });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Backup prune failed' });
+  }
+});
+
+router.post('/api/admin/storage/prune-activity', (req, res) => {
+  const maxAgeDays = typeof req.body?.maxAgeDays === 'number' ? req.body.maxAgeDays : 180;
+  try {
+    const result = pruneActivityLogs(maxAgeDays);
+    res.json({ ...result, maxAgeDays });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Activity prune failed' });
+  }
 });
 
 export default router;
