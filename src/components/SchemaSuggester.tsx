@@ -574,11 +574,6 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
             <Loader2 className="w-4 h-4 animate-spin" /> Generating schema...
           </div>
         )}
-        {generatingCmsTemplate && !cmsTemplateResult && (
-          <div className="flex items-center gap-2 text-amber-400/70 text-sm mt-2">
-            <Loader2 className="w-4 h-4 animate-spin" /> Generating CMS template schema...
-          </div>
-        )}
       </div>
     );
   }

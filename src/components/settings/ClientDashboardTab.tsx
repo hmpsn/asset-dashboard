@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Search, Loader2, Check, X, Users, ExternalLink, ChevronRight,
   Copy, CheckCircle, Lock, KeyRound, Plus, Trash2, Pencil, Save,
@@ -236,7 +236,10 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
   };
 
   // Load users on mount
-  useState(() => { loadClientUsers(); });
+  useEffect(() => { loadClientUsers(); }, []);
+
+  // Sync clientEmail when ws loads asynchronously
+  useEffect(() => { if (ws?.clientEmail !== undefined) setClientEmail(ws.clientEmail || ''); }, [ws?.clientEmail]);
 
   if (!webflowSiteId) {
     return (
