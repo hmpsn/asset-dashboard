@@ -37,7 +37,7 @@ export function TrendChart({ data, metric, color }: { data: PerformanceTrend[]; 
         <YAxis hide domain={['dataMin', 'dataMax']} />
         <Tooltip content={<DarkTooltip metrics={[
           { label: 'Clicks', key: 'clicks', color: '#60a5fa' },
-          { label: 'Impressions', key: 'impressions', color: '#a78bfa' },
+          { label: 'Impressions', key: 'impressions', color: '#60a5fa' },
           { label: 'CTR', key: 'ctr', color: '#34d399', fmt: v => `${v}%` },
           { label: 'Position', key: 'position', color: '#fbbf24' },
         ]} />} />

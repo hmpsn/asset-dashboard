@@ -108,7 +108,7 @@ export function OverviewTab({
       }
       if (overview) {
         cards.push({ label: <><span>Search Clicks</span><Explainer term="clicks" /></>, value: overview.totalClicks.toLocaleString(), icon: MousePointerClick, color: '#60a5fa', sub: overview.totalImpressions > 0 ? `${((overview.totalClicks / overview.totalImpressions) * 100).toFixed(1)}% CTR` : undefined, delta: searchComparison?.changePercent.clicks });
-        cards.push({ label: <><span>Impressions</span><Explainer term="impressions" /></>, value: overview.totalImpressions.toLocaleString(), icon: Eye, color: '#a78bfa', sub: 'Google searches', delta: searchComparison?.changePercent.impressions });
+        cards.push({ label: <><span>Impressions</span><Explainer term="impressions" /></>, value: overview.totalImpressions.toLocaleString(), icon: Eye, color: '#60a5fa', sub: 'Google searches', delta: searchComparison?.changePercent.impressions });
       } else if (ga4Overview) {
         cards.push({ label: 'Sessions', value: ga4Overview.totalSessions.toLocaleString(), icon: BarChart3, color: '#60a5fa', sub: 'last period', delta: ga4Comparison?.changePercent.sessions });
       }
@@ -250,7 +250,7 @@ export function OverviewTab({
           const icons: Record<string, { color: string; label: string }> = {
             audit_completed: { color: '#60a5fa', label: 'Audit' },
             request_resolved: { color: '#34d399', label: 'Done' },
-            approval_applied: { color: '#a78bfa', label: 'Applied' },
+            approval_applied: { color: '#2dd4bf', label: 'Applied' },
             seo_updated: { color: '#fbbf24', label: 'SEO' },
             images_optimized: { color: '#f472b6', label: 'Media' },
             links_fixed: { color: '#fb923c', label: 'Links' },

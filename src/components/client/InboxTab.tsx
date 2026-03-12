@@ -95,7 +95,7 @@ export function InboxTab({
             <button
               key={f.id}
               onClick={() => setFilter(f.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              className={`flex items-center gap-1.5 px-3.5 py-2.5 min-h-[44px] rounded-lg text-xs font-medium transition-colors ${
                 filter === f.id
                   ? 'bg-teal-500/15 border border-teal-500/30 text-teal-300'
                   : 'bg-zinc-800/50 border border-zinc-800 text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800'
@@ -166,7 +166,7 @@ export function InboxTab({
         <div>
           {filter === 'all' && (
             <div className="flex items-center gap-2 mb-3 mt-2">
-              <FileText className="w-4 h-4 text-violet-400" />
+              <FileText className="w-4 h-4 text-teal-400" />
               <span className="text-sm font-medium text-zinc-300">Content</span>
               {contentReviews > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20">Waiting on you · {contentReviews}</span>}
               {contentReviews === 0 && contentRequests.filter(r => r.status === 'in_progress' || r.status === 'approved').length > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">In progress</span>}
