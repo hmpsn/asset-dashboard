@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { AlertTriangle, Info, CheckCircle2, ChevronDown, Shield } from 'lucide-react';
 import { MetricRing } from '../ui';
+import { scoreColorClass } from '../ui/constants';
 import { ScoreHistoryChart } from './helpers';
 import { toLiveUrl } from './utils';
 import { SEV, CAT_LABELS } from './types';
@@ -174,7 +175,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, tie
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {errs > 0 && <span className="text-[11px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">{errs} err</span>}
                     {warns > 0 && <span className="text-[11px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">{warns} warn</span>}
-                    <div className={`text-xs font-bold ${page.score >= 80 ? 'text-green-400' : page.score >= 60 ? 'text-amber-400' : 'text-red-400'}`}>{page.score}</div>
+                    <div className={`text-xs font-bold ${scoreColorClass(page.score)}`}>{page.score}</div>
                   </div>
                 </button>
                 {isExp && pageIssues.length > 0 && (
