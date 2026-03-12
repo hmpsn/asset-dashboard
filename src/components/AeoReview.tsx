@@ -8,6 +8,7 @@ import {
   FileText, User, Calendar, Quote, ListChecks, LayoutList, Table2,
   BookOpen, EyeOff, RefreshCw,
 } from 'lucide-react';
+import { aeoScoreColorClass, aeoScoreBgBarClass } from './ui';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -83,19 +84,6 @@ const PRIORITY_CONFIG: Record<string, { color: string; bg: string }> = {
   low:    { color: 'text-blue-400',  bg: 'bg-blue-500/10 border-blue-500/20' },
 };
 
-function scoreColor(score: number): string {
-  if (score >= 80) return 'text-green-400';
-  if (score >= 60) return 'text-teal-400';
-  if (score >= 30) return 'text-amber-400';
-  return 'text-red-400';
-}
-
-function scoreBg(score: number): string {
-  if (score >= 80) return 'bg-green-500';
-  if (score >= 60) return 'bg-teal-500';
-  if (score >= 30) return 'bg-amber-500';
-  return 'bg-red-500';
-}
 
 // ─── Component ────────────────────────────────────────────────────
 
@@ -253,9 +241,9 @@ export function AeoReview({ workspaceId }: Props) {
       <div className="grid grid-cols-5 gap-3">
         <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
           <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-1">Avg AEO Score</div>
-          <div className={`text-3xl font-bold ${scoreColor(avgScore)}`}>{avgScore}</div>
+          <div className={`text-3xl font-bold ${aeoScoreColorClass(avgScore)}`}>{avgScore}</div>
           <div className="mt-2 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-            <div className={`h-full rounded-full ${scoreBg(avgScore)}`} style={{ width: `${avgScore}%` }} />
+            <div className={`h-full rounded-full ${aeoScoreBgBarClass(avgScore)}`} style={{ width: `${avgScore}%` }} />
           </div>
         </div>
         <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
@@ -372,7 +360,7 @@ export function AeoReview({ workspaceId }: Props) {
                     </span>
                   )}
                   <span className="text-[11px] text-zinc-500">{page.changes.length} changes</span>
-                  <span className={`text-sm font-bold tabular-nums ${scoreColor(page.overallScore)}`}>
+                  <span className={`text-sm font-bold tabular-nums ${aeoScoreColorClass(page.overallScore)}`}>
                     {page.overallScore}
                   </span>
                 </div>

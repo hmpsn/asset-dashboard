@@ -15,6 +15,8 @@ export {
   scoreColorClass,
   scoreBgClass,
   scoreBgBarClass,
+  aeoScoreColorClass,
+  aeoScoreBgBarClass,
   DATE_PRESETS_SHORT,
   DATE_PRESETS_FULL,
   DATE_PRESETS_SEARCH,

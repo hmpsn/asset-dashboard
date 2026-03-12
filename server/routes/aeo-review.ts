@@ -45,8 +45,9 @@ router.post('/api/aeo-review/:workspaceId/page', async (req, res) => {
 
   try {
     // Fetch page HTML
-    const targetUrl = pageUrl || `https://${ws.liveDomain || ''}/${pageSlug || ''}`;
-    const htmlRes = await fetch(targetUrl, { redirect: 'follow' });
+    const targetUrl = pageUrl || (ws.liveDomain ? `https://${ws.liveDomain}/${pageSlug || ''}` : '');
+    if (!targetUrl) return res.status(400).json({ error: 'No pageUrl provided and workspace has no liveDomain configured' });
+    const htmlRes = await fetch(targetUrl, { redirect: 'follow', signal: AbortSignal.timeout(10_000) });
     if (!htmlRes.ok) return res.status(400).json({ error: `Failed to fetch page: ${htmlRes.status}` });
     const html = await htmlRes.text();
 
@@ -120,17 +121,17 @@ router.post('/api/aeo-review/:workspaceId/site', async (req, res) => {
 
     // Fetch HTML for each page
     const pagesToReview: { url: string; title: string; html: string; issues: SeoIssue[] }[] = [];
-    for (const page of pagesWithAeo) {
+    await Promise.all(pagesWithAeo.map(async (page) => {
       const pageUrl = page.slug ? `${baseUrl}/${page.slug}` : baseUrl;
       try {
-        const htmlRes = await fetch(pageUrl, { redirect: 'follow' });
+        const htmlRes = await fetch(pageUrl, { redirect: 'follow', signal: AbortSignal.timeout(10_000) });
         if (htmlRes.ok) {
           const html = await htmlRes.text();
           const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || page.slug;
           pagesToReview.push({ url: pageUrl, title, html, issues: page.issues });
         }
-      } catch { /* skip unreachable pages */ }
-    }
+      } catch { /* skip unreachable / timed-out pages */ }
+    }));
 
     const result = await reviewSitePages(workspaceId, pagesToReview);
 
