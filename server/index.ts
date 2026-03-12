@@ -211,6 +211,14 @@ app.use((req, res, next) => {
   if (!workspaceId) return next();
   const ws = getWorkspace(workspaceId);
   if (!ws || !ws.clientPassword) return next(); // No password = open access
+  // Allow admin users through (they have their own auth layer)
+  const adminToken = (req.headers['x-auth-token'] || req.cookies?.auth_token || '') as string;
+  if (adminToken && (adminToken === APP_PASSWORD || verifyAdminToken(adminToken))) return next();
+  const jwtToken = req.cookies?.token || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : '');
+  if (jwtToken) {
+    const jwtPayload = verifyJwtToken(jwtToken);
+    if (jwtPayload) return next();
+  }
   // Verify session cookie (legacy shared password)
   const sessionToken = req.cookies?.[`client_session_${workspaceId}`];
   if (sessionToken && verifyClientSession(workspaceId, sessionToken)) return next();
