@@ -225,6 +225,56 @@ const PAGE_TYPE_CONFIGS: Record<string, PageTypeConfig> = {
 - Lead magnet potential — note where a gated PDF version could be offered
 - Schema: Article, HowTo`,
   },
+
+  'provider-profile': {
+    wordCountTarget: 1200,
+    wordCountRange: '800-1,500',
+    sectionRange: '5-8',
+    avgSectionWords: 180,
+    contentStyle: 'Professional, trustworthy, and encyclopedic. Write like a medical directory — factual, credential-forward, neutral tone. No marketing fluff. Every claim should be verifiable. Citation-worthy.',
+    prompt: `PAGE TYPE: Provider Profile (AEO-optimized)
+- Format as a healthcare provider profile page (800-1,500 words)
+- ANSWER-FIRST: Open with a 2-3 sentence summary of who this provider is, their specialty, and where they practice
+- Structure: Provider Summary → Credentials & Education → Specialties → Procedures Offered → Practice Locations → Patient Reviews Distribution → Professional Affiliations → Disclosures
+- Include structured data hooks: credentials, medicalSpecialty, hospitalAffiliation
+- Use neutral, encyclopedic tone — write as a reference, not an ad
+- Include citations to licensing boards, medical associations, or published research where applicable
+- Schema: Physician, MedicalBusiness, FAQPage`,
+  },
+
+  'procedure-guide': {
+    wordCountTarget: 2000,
+    wordCountRange: '1,500-2,500',
+    sectionRange: '7-10',
+    avgSectionWords: 250,
+    contentStyle: 'Evidence-based, comprehensive, and patient-friendly. Balance medical accuracy with accessibility. Every medical claim must reference a source. Use definition blocks for medical terms. Neutral and informative — not salesy.',
+    prompt: `PAGE TYPE: Procedure Guide (AEO-optimized)
+- Format as a comprehensive medical/dental procedure guide (1,500-2,500 words)
+- ANSWER-FIRST: Open with a 2-3 sentence direct answer to "What is [procedure]?" — this becomes the AI-cited snippet
+- Structure: What It Is (definition block) → Who It's For (indications) → Who Should Avoid It (contraindications) → How It Works (step-by-step) → Cost Ranges (city-specific if possible, with comparison table) → Risks & Side Effects → Alternatives (comparison table) → Recovery & Aftercare → FAQ
+- CITATION DENSITY: Target 1 citation per ~200 words. Cite medical journals, professional associations (ADA, AMA), or .gov sources
+- Include DEFINITION BLOCKS for key medical terms: Term → 1-2 sentence definition → Common misconceptions → Related terms
+- Include COMPARISON TABLE: procedure vs. alternatives with measurable fields (cost range, recovery time, success rate, longevity). Include units, footnotes, and "data as of" date
+- FAQ section must use real patient questions with 30-80 word answers
+- Schema: MedicalProcedure, FAQPage, HowTo, Article`,
+  },
+
+  'pricing-page': {
+    wordCountTarget: 1500,
+    wordCountRange: '1,000-2,000',
+    sectionRange: '5-8',
+    avgSectionWords: 220,
+    contentStyle: 'Data-driven, transparent, and citeable. Write like a consumer research report. Include specific numbers with sources. Comparison tables are essential. Methodology section required. Neutral tone — "costs depend on X, Y, Z" not "we offer the best prices."',
+    prompt: `PAGE TYPE: Pricing / Cost Guide (AEO-optimized)
+- Format as a comprehensive pricing/cost guide (1,000-2,000 words)
+- ANSWER-FIRST: Open with a direct cost range answer: "[Procedure] in [City] typically costs $X-$Y, depending on [factors]." This is the snippet LLMs will cite
+- Structure: Cost Summary (direct answer) → Cost Breakdown Table → Factors That Affect Price → Insurance & Financing → How to Compare Providers → Methodology → FAQ
+- COMPARISON TABLE (required): rows = options/providers, columns = cost range, what's included, pros, cons. Include units ($), footnotes per row, "Data as of [date]" note
+- Include a METHODOLOGY section: where the price data comes from, how it was collected, sample size, date range, known limitations. This is non-negotiable for AI citation trust
+- CITATION DENSITY: Target 1 citation per ~300 words. Cite industry surveys, insurance databases, professional fee guides
+- Avoid vague adjectives — use measurable fields: "$2,500-$5,000" not "affordable", "3-6 months" not "quick recovery"
+- Schema: Article, Dataset, FAQPage`,
+  },
 };
 
 // Helper to get config for a page type, with blog as default
@@ -398,6 +448,14 @@ Requirements:
 - E-E-A-T guidance must be specific and actionable for this particular topic, not generic advice
 - Content checklist: 8-10 concrete, verifiable items tailored to this brief (not generic SEO advice)
 - Schema recommendations: 1-3 relevant schema types with specific implementation guidance
+
+AEO (ANSWER ENGINE OPTIMIZATION) RULES — make content citeable by AI systems:
+- ANSWER-FIRST LAYOUT: The first outline section MUST be a direct-answer summary (2-3 sentences answering the core question, then key bullets). This is what LLMs extract as the cited snippet. Do NOT open with generic intros like "Welcome to…" or "In this guide…"
+- CITATION TARGETS: Include a note in the content checklist about citation density. For medical/health content: 1 citation per ~200 words. For business content: 1 citation per ~400 words. Prefer primary sources: journals, .gov, .edu, professional associations
+- DEFINITION BLOCKS: For any content with technical or specialized terms, recommend definition blocks in the outline notes: Term → 1-2 sentence definition → Common misconceptions → Related terms. These become cited snippets
+- COMPARISON TABLES: Where applicable, recommend comparison tables with measurable fields (costs, percentages, timeframes), stated units, footnotes/citations per row, and a "Data as of [date]" note. Vague adjective tables ("good", "better") are useless — use numbers
+- FAQ QUALITY: FAQ answers should be 30-80 words each. Each answer should link to a deeper section. Write real questions patients/customers ask, not keyword-stuffed variations
+- AUTHOR & DATE: Include in content checklist: "Add author byline with credentials" and "Add visible 'Last updated: [date]' below the title"
 
 LANGUAGE RULES for the brief itself:
 - Do NOT use corporate buzzwords in any field: "empower", "leverage", "streamline", "optimize", "harness", "revolutionize", "game-changing", "cutting-edge", "powerful", "world-class"

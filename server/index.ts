@@ -73,6 +73,7 @@ import anomaliesRoutes from './routes/anomalies.js';
 import miscRoutes from './routes/misc.js';
 import feedbackRoutes from './routes/feedback.js';
 import publicFeedbackRoutes from './routes/public-feedback.js';
+import aeoReviewRoutes from './routes/aeo-review.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_ROOT = DATA_BASE || path.join(process.env.HOME || '', '.asset-dashboard');
@@ -397,6 +398,7 @@ app.use(anomaliesRoutes);
 app.use(miscRoutes);
 app.use(feedbackRoutes);
 app.use(publicFeedbackRoutes);
+app.use(aeoReviewRoutes);
 
 
 // --- Serve frontend in production (MUST be after all API routes) ---

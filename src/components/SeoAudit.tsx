@@ -5,7 +5,7 @@ import {
   AlertTriangle, AlertCircle, Info, CheckCircle, Globe, FileText,
   RefreshCw, X, Clock, Share2, Copy, ExternalLink, Send, Wrench,
   TrendingUp, TrendingDown, Minus, Plus, ListChecks, Trash2, Circle, ClipboardList,
-  MoreVertical, Pencil, EyeOff,
+  MoreVertical, Pencil, EyeOff, Sparkles,
 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { StatCard, scoreColorClass, scoreBgBarClass } from './ui';
@@ -16,6 +16,7 @@ import type { FixContext } from '../App';
 
 // ── Lazy-loaded sub-tool (only LinkChecker used internally for Dead Links sub-tab) ──
 const LinkChecker = lazy(() => import('./LinkChecker').then(m => ({ default: m.LinkChecker })));
+const AeoReview = lazy(() => import('./AeoReview'));
 
 type Severity = 'error' | 'warning' | 'info';
 
@@ -488,7 +489,7 @@ function AuditHistory({ siteId, history, onRefresh }: { siteId: string; history:
   );
 }
 
-type AuditSubTab = 'audit' | 'links' | 'history';
+type AuditSubTab = 'audit' | 'links' | 'history' | 'aeo-review';
 
 function SeoAudit({ siteId, workspaceId, siteName, onNavigate }: Props) {
   const { startJob, jobs } = useBackgroundTasks();
@@ -1107,6 +1108,7 @@ function SeoAudit({ siteId, workspaceId, siteName, onNavigate }: Props) {
         { id: 'audit' as const, label: 'Site Audit', icon: Globe },
         { id: 'links' as const, label: 'Dead Links', icon: ExternalLink },
         { id: 'history' as const, label: 'History', icon: Clock },
+        { id: 'aeo-review' as const, label: 'AEO Review', icon: Sparkles },
       ]).map(t => (
         <button
           key={t.id}
@@ -1124,6 +1126,9 @@ function SeoAudit({ siteId, workspaceId, siteName, onNavigate }: Props) {
     </div>
   );
 
+  if (auditSubTab === 'aeo-review' && workspaceId) {
+    return <div>{auditTabBar}<Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-purple-400" /></div>}><AeoReview workspaceId={workspaceId} /></Suspense></div>;
+  }
   if (auditSubTab === 'links') {
     return <div>{auditTabBar}<Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>}><LinkChecker siteId={siteId} /></Suspense></div>;
   }

@@ -39,6 +39,7 @@ export type ActivityType =
   | 'anomaly_detected'
   | 'anomaly_positive'
   | 'post_generated'
+  | 'aeo_review'
   | 'note';
 
 export interface ActivityEntry {

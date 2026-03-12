@@ -47,6 +47,11 @@ const CHECK_CATEGORY: Record<string, CheckCategory> = {
   'cwv': 'performance', 'cwv-lcp': 'performance', 'cwv-cls': 'performance', 'cwv-tbt': 'performance',
   // Accessibility
   'img-alt': 'accessibility',
+  // AEO (Answer Engine Optimization)
+  'aeo-author': 'content', 'aeo-date': 'content', 'aeo-answer-first': 'content',
+  'aeo-faq-no-schema': 'technical', 'aeo-hidden-content': 'technical',
+  'aeo-citations': 'content', 'aeo-dark-patterns': 'technical',
+  'aeo-trust-pages': 'content',
 };
 
 // Scoring weights: higher-impact SEO checks get steeper deductions.
@@ -475,6 +480,129 @@ function auditPage(
       issues.push({ check: 'render-blocking', severity: 'warning', message: `${resources.stylesheets} CSS + ${resources.scripts} JS files (${resources.stylesheets + resources.scripts} total)`, recommendation: 'Too many external resources can slow page rendering. Combine files, defer non-critical scripts, and lazy-load CSS where possible.' });
     }
 
+    // --- AEO (Answer Engine Optimization) CHECKS ---
+    // These checks help pages get cited by LLMs and AI answer engines.
+
+    // AEO-1: Author/reviewer attribution detection
+    const authorMeta = extractMetaContent(html, 'author');
+    const hasAuthorSchema = /"author"/i.test(html) && /"@type"\s*:\s*"Person"/i.test(html);
+    const hasByline = /<[^>]*class=["'][^"']*(?:author|byline|writer|reviewer)[^"']*["'][^>]*>/i.test(html);
+    const hasReviewedBy = /(?:reviewed|verified|fact[- ]checked)\s+by/i.test(html);
+    if (!authorMeta && !hasAuthorSchema && !hasByline && !hasReviewedBy) {
+      issues.push({
+        check: 'aeo-author', severity: 'info',
+        message: 'No author attribution detected',
+        recommendation: 'Add author information (byline, author meta tag, or Person schema) to improve E-E-A-T trust signals. LLMs and AI answer engines prefer content with clear editorial accountability.',
+      });
+    }
+
+    // AEO-2: Last-updated / review date detection
+    const hasDateModified = /"dateModified"/i.test(html);
+    const hasVisibleDate = /(?:last\s+(?:updated|modified|reviewed)|published\s+on|updated\s+on|reviewed\s+on)\s*:?\s*\w/i.test(html);
+    const hasTimeDateElement = /<time[^>]*datetime=/i.test(html);
+    if (!hasDateModified && !hasVisibleDate && !hasTimeDateElement) {
+      issues.push({
+        check: 'aeo-date', severity: 'info',
+        message: 'No content date or "last updated" indicator found',
+        recommendation: 'Add a visible "Last updated" or "Reviewed on" date and dateModified in your schema. AI systems trust dated content more — it signals the information is maintained.',
+      });
+    }
+
+    // AEO-3: Answer-first content structure
+    // Extract text after the first H1/H2 and check if it starts with a direct answer
+    const bodyText = html
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+      .replace(/<header[\s\S]*?<\/header>/gi, '')
+      .replace(/<footer[\s\S]*?<\/footer>/gi, '');
+    const afterH1Match = bodyText.match(/<\/h1>([\s\S]{200,800}?)(?:<h[2-6]|$)/i);
+    if (afterH1Match) {
+      const introText = afterH1Match[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      const introWords = introText.split(/\s+/).slice(0, 40);
+      const genericIntroPatterns = /^(?:welcome\s+to|in\s+(?:this|today)|are\s+you\s+looking|if\s+you(?:'re|\s+are)\s+(?:looking|searching|wondering)|(?:we|our\s+team)\s+(?:are|is)\s+(?:here|dedicated|committed|passionate)|at\s+\w+,\s+we)/i;
+      if (genericIntroPatterns.test(introWords.join(' '))) {
+        issues.push({
+          check: 'aeo-answer-first', severity: 'info',
+          message: 'Page opens with generic intro instead of a direct answer',
+          recommendation: 'Restructure to put a 2-3 sentence direct answer immediately after the H1. AI retrievers extract answer spans from the top of the page — generic intros ("Welcome to…", "Are you looking for…") waste that prime position.',
+        });
+      }
+    }
+
+    // AEO-4: FAQ content without FAQPage schema
+    const faqHeadingPattern = /<h[2-4][^>]*>[^<]*(?:FAQ|Frequently\s+Asked|Common\s+Questions)[^<]*<\/h[2-4]>/i;
+    const hasQuestionHeadings = (bodyText.match(/<h[2-4][^>]*>[^<]*\?[^<]*<\/h[2-4]>/gi) || []).length >= 3;
+    const hasFaqSchema = /"FAQPage"/i.test(html);
+    if ((faqHeadingPattern.test(html) || hasQuestionHeadings) && !hasFaqSchema) {
+      issues.push({
+        check: 'aeo-faq-no-schema', severity: 'warning',
+        message: 'FAQ content detected but no FAQPage schema found',
+        recommendation: 'This page has FAQ-structured content (question headings) but no FAQPage JSON-LD schema. Adding FAQ schema dramatically increases citation likelihood — LLMs disproportionately cite FAQ-marked pages because they match question prompts and are cleanly chunked.',
+      });
+    }
+
+    // AEO-5: Hidden content behind UI (accordions, tabs)
+    const hiddenContentBlocks = (html.match(/<(?:div|section|article)[^>]*(?:style=["'][^"']*display\s*:\s*none|aria-hidden=["']true["']|class=["'][^"']*(?:accordion-body|tab-pane|collapse\b|hidden\b))[^>]*>[\s\S]{100,}?<\/(?:div|section|article)>/gi) || []);
+    if (hiddenContentBlocks.length > 0) {
+      const totalHiddenChars = hiddenContentBlocks.reduce((sum, b) => sum + b.replace(/<[^>]+>/g, '').length, 0);
+      if (totalHiddenChars > 500) {
+        issues.push({
+          check: 'aeo-hidden-content', severity: 'warning',
+          message: `${hiddenContentBlocks.length} content block${hiddenContentBlocks.length > 1 ? 's' : ''} hidden behind UI elements (~${Math.round(totalHiddenChars / 100) * 100} chars)`,
+          recommendation: 'Critical content is hidden behind accordions, tabs, or collapsed sections. LLMs and search crawlers often read only what\'s visible in the initial DOM. Move important answers into the main content flow.',
+        });
+      }
+    }
+
+    // AEO-6: Citation/reference density
+    const allLinks = extractLinks(html);
+    const authorityDomains = /\.gov$|\.edu$|\.org$|pubmed|scholar\.google|doi\.org|ncbi\.nlm|mayoclinic|webmd|clevelandclinic|who\.int|cdc\.gov|ada\.org|nih\.gov/i;
+    const externalCitations = allLinks.filter(l => {
+      if (!l.href.startsWith('http')) return false;
+      try {
+        const host = new URL(l.href).hostname;
+        // Exclude same-domain links and social media
+        if (host.includes('webflow.io') || host.includes('facebook.') || host.includes('twitter.') || host.includes('instagram.') || host.includes('linkedin.') || host.includes('youtube.')) return false;
+        return true;
+      } catch { return false; }
+    });
+    const authorityCitations = externalCitations.filter(l => {
+      try { return authorityDomains.test(new URL(l.href).hostname); } catch { return false; }
+    });
+    const wordCount2 = countWords(html);
+    if (wordCount2 > 500 && externalCitations.length === 0) {
+      issues.push({
+        check: 'aeo-citations', severity: 'info',
+        message: 'No external citations or references found',
+        recommendation: 'Add citations to authoritative sources (journals, .gov, .edu, industry bodies). LLMs prefer pages where claims are grounded in evidence. Target: 1 citation per ~200 words for medical content, 1 per ~400 for business content.',
+      });
+    } else if (wordCount2 > 800 && externalCitations.length > 0 && authorityCitations.length === 0) {
+      issues.push({
+        check: 'aeo-citations', severity: 'info',
+        message: `${externalCitations.length} external link${externalCitations.length > 1 ? 's' : ''} but none to authoritative sources`,
+        recommendation: 'Your page links externally but not to high-authority sources (.gov, .edu, medical journals, professional associations). Adding citations to primary sources significantly increases AI citation trust.',
+      });
+    }
+
+    // AEO-7: Dark patterns (aggressive popups, auto-play, interstitials)
+    const hasAutoPlay = /<video[^>]*autoplay/i.test(html) || /<audio[^>]*autoplay/i.test(html);
+    const hasAggressiveModal = /<div[^>]*class=["'][^"']*(?:popup|modal|overlay|interstitial)[^"']*["'][^>]*(?:style=["'][^"']*(?:display\s*:\s*(?:block|flex)|position\s*:\s*fixed))/i.test(html);
+    if (hasAutoPlay) {
+      issues.push({
+        check: 'aeo-dark-patterns', severity: 'info',
+        message: 'Auto-playing media detected',
+        recommendation: 'Auto-play video/audio can trigger spam signals in retrieval systems. Use click-to-play instead.',
+      });
+    }
+    if (hasAggressiveModal) {
+      issues.push({
+        check: 'aeo-dark-patterns', severity: 'info',
+        message: 'Popup/overlay modal detected in initial HTML',
+        recommendation: 'Aggressive popups and interstitials reduce content accessibility for AI retrievers. Avoid overlays that block the main content on load.',
+      });
+    }
+
   }
 
   // Auto-assign categories
@@ -786,6 +914,26 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
     } catch (err) {
       console.error('[seo-audit] PageSpeed check failed (non-fatal):', err);
     }
+  }
+
+  // --- AEO: Site-wide trust pages check ---
+  // Check if the site has essential trust-building pages (about, contact)
+  const allSlugs = new Set(results.map(r => r.slug.toLowerCase().replace(/^\//, '')));
+  const trustPages = [
+    { slug: 'about', variants: ['about', 'about-us', 'who-we-are', 'our-story', 'our-team'], label: 'About' },
+    { slug: 'contact', variants: ['contact', 'contact-us', 'get-in-touch'], label: 'Contact' },
+  ];
+  const missingTrustPages: string[] = [];
+  for (const tp of trustPages) {
+    const found = tp.variants.some(v => allSlugs.has(v) || [...allSlugs].some(s => s.includes(v)));
+    if (!found) missingTrustPages.push(tp.label);
+  }
+  if (missingTrustPages.length > 0) {
+    siteWideIssues.push({
+      check: 'aeo-trust-pages', severity: 'warning',
+      message: `Missing trust page${missingTrustPages.length > 1 ? 's' : ''}: ${missingTrustPages.join(', ')}`,
+      recommendation: `LLMs and AI answer engines trust sites with clear ownership signals. Create these essential pages: ${missingTrustPages.map(p => `/${p.toLowerCase()}`).join(', ')}. For healthcare/medical sites, also consider /editorial-policy, /corrections, and /medical-review-board.`,
+    });
   }
 
   const titleMap = new Map<string, string[]>();

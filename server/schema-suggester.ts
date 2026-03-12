@@ -36,6 +36,7 @@ export interface SchemaContext {
   searchIntent?: string;
   siteKeywords?: string[];
   workspaceId?: string;
+  knowledgeBase?: string;
 }
 
 // Google required fields per @type (for validation)
@@ -249,6 +250,7 @@ SITE INFO:
 - Logo: ${ctx.logoUrl || '(not available)'}
 ${ctx.businessContext ? `- Business Context: ${ctx.businessContext}` : ''}
 ${keywordBlock}
+${ctx.knowledgeBase ? `\nBUSINESS KNOWLEDGE BASE (use ONLY confirmed facts from this for schema fields like credentials, locations, sameAs URLs, specialties — never fabricate):\n${ctx.knowledgeBase.slice(0, 2000)}` : ''}
 
 PAGE INFO:
 - URL: ${pageUrl}
@@ -272,17 +274,24 @@ REQUIREMENTS:
 3. Include an Organization node with "@id": "${siteUrl}/#organization" on every page
 4. ONLY add a WebSite node on the HOMEPAGE (isHomepage=true). NEVER include WebSite on subpages.
 5. NEVER include a SearchAction unless the site has a real, confirmed search endpoint. Do NOT use "?s={search_term_string}" — that is a WordPress convention.
-6. Add page-specific types based on content (Article, FAQPage, Service, Product, BreadcrumbList, HowTo, Event, LocalBusiness, etc.)
+6. Add page-specific types based on content (Article, FAQPage, Service, Product, BreadcrumbList, HowTo, Event, LocalBusiness, Dataset, etc.)
 7. Use "@id" cross-references between nodes (e.g. Organization "@id": "${siteUrl}/#organization")
 8. Fill ALL values from actual page content — ZERO placeholders, ZERO fabricated data
 9. CRITICAL: NEVER invent or fabricate addresses, phone numbers, email addresses, opening hours, geo coordinates, or any contact information. Only include these fields if the EXACT data appears in the page content above. If a LocalBusiness is appropriate but the page lacks an address, include the LocalBusiness with only the fields you can confirm from the content (name, url, description). Omit address/telephone/openingHours/geo entirely if not found.
 10. For images, use full absolute URLs (prefix with ${siteUrl} if relative). Only use image URLs found in the page content.
 11. FAQPage: extract REAL questions and answers from the page content. Never fabricate Q&A pairs.
-12. Article/BlogPosting: use real author name, real dates, real headline from the content
+12. Article/BlogPosting: use real author name, real dates, real headline from the content. ALWAYS include "author" with "@type": "Person" and real credentials if found. If a medical/health reviewer is mentioned, add "reviewedBy" with "@type": "Person" and their credentials.
 13. BreadcrumbList: use the FLAT format — each ListItem has "name" and "item" (URL string) directly, NOT nested inside an "item" object. Example: {"@type":"ListItem","position":1,"name":"Home","item":"${siteUrl}/"}
 14. LocalBusiness for multi-location/region pages: include "parentOrganization": {"@id": "${siteUrl}/#organization"} to link the location to the parent brand
 15. Every @type must have all Google-required fields filled with REAL data from the page
 16. If you cannot determine a required value from the content, OMIT that @type entirely rather than using a placeholder or fabricating data
+17. HEALTHCARE / MEDICAL SITES: If the business context or page content indicates a healthcare provider (dental, medical, clinic, hospital, therapy, etc.):
+    - Use "MedicalBusiness" or more specific subtypes ("Dentist", "Physician", "Optician", etc.) instead of generic "LocalBusiness"
+    - For treatment/procedure pages, use "MedicalProcedure" with procedureType, howPerformed, preparation, followup if found in content
+    - For provider/doctor profile pages, use "Physician" with medicalSpecialty, credentials, and hospitalAffiliation from content
+    - For procedural how-to content, use "HowTo" with step-by-step instructions extracted from the page
+18. DATASET PAGES: If the page presents data tables, rankings, indexes, or structured data collections, include "Dataset" schema with name, description, distribution (if downloadable), dateModified, and creator referencing the Organization
+19. ENTITY LINKING (sameAs): On the Organization node, include a "sameAs" array with links to the business's verified external profiles (Google Business, LinkedIn, Facebook, Yelp, industry association pages) — but ONLY if these URLs actually appear in the page content or site footer. Never fabricate profile URLs
 
 QUALITY RULES — strict:
 17. NEVER include empty arrays or empty strings. If a property has no value (e.g. "sameAs": []), OMIT it entirely.

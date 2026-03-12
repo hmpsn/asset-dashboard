@@ -323,6 +323,14 @@ WHAT TO DO INSTEAD:
 - If a section is titled "FAQ" or "Frequently Asked Questions", format it as individual Q&A pairs: each question as an <h3> followed by a short answer paragraph. NEVER combine multiple questions into a single paragraph
 - Vary examples across industries. If the knowledge base only has one case study, reference it once (max twice), then use hypothetical examples from other industries for remaining sections
 - ANCHOR TEXT ACCURACY: When linking to internal pages, the anchor text must accurately describe the linked page. Do NOT use an external brand name (e.g., "Webflow University", "Google") as anchor text for an internal link. If linking to /services/strategy, use text like "our strategy services" or "brand and web strategy" — not an unrelated third-party name
+
+AEO (ANSWER ENGINE OPTIMIZATION) — CITATION-WORTHY WRITING:
+- Write content that AI systems want to cite: encyclopedic, neutral, precise, defensible
+- CLAIM DISCIPLINE: Replace superlatives with evidence. "This is the safest option" → "Safety depends on factors X, Y, and Z; evidence from [source] suggests…". Replace "We're the best" → "Common factors to evaluate include…"
+- EVIDENCE FRAMING: Use "According to [specific source]…", "In general…", "Common factors include…", "Limitations include…". Ground claims in evidence, not marketing assertions
+- For medical/health content: adopt an encyclopedic neutral tone. Write like a medical reference, not a brochure. Every factual medical claim should cite or reference a specific source (journal, professional association, .gov)
+- DEFINITION BLOCKS: When introducing a technical term, use the pattern: define it in 1-2 sentences → note common misconceptions → list related terms. These blocks are disproportionately cited by LLMs
+- COMPARISON CONTENT: When comparing options, use measurable fields (costs, percentages, timeframes) with stated units. Include "Data as of [date]" notes. Tables with vague adjectives ("good", "excellent") are not citeable — use numbers
 `;
 
 /** Build a rich context block from all available brief fields */

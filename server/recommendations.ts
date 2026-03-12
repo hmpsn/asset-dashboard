@@ -27,7 +27,7 @@ const REC_DIR = getDataDir('recommendations');
 // ─── Types ────────────────────────────────────────────────────────
 
 export type RecPriority = 'fix_now' | 'fix_soon' | 'fix_later' | 'ongoing';
-export type RecType = 'technical' | 'content' | 'schema' | 'metadata' | 'performance' | 'accessibility' | 'strategy';
+export type RecType = 'technical' | 'content' | 'schema' | 'metadata' | 'performance' | 'accessibility' | 'strategy' | 'aeo';
 export type RecStatus = 'pending' | 'in_progress' | 'completed' | 'dismissed';
 export type RecActionType = 'automated' | 'manual' | 'content_creation' | 'purchase';
 
@@ -152,6 +152,7 @@ const CRITICAL_CHECKS = new Set([
   'title', 'meta-description', 'canonical', 'h1', 'robots',
   'duplicate-title', 'mixed-content', 'ssl', 'robots-txt',
   'redirect-chains', 'redirects',
+  'aeo-author', 'aeo-answer-first', 'aeo-trust-pages',
 ]);
 
 function isCriticalCheck(check: string): boolean {
@@ -202,6 +203,7 @@ function determinePriority(
 /** Map check name to recommendation type */
 function checkToRecType(check: string, category?: string): RecType {
   const chk = check.toLowerCase();
+  if (chk.startsWith('aeo-')) return 'aeo';
   if (chk.includes('meta') || chk.includes('title') || chk.includes('description')) return 'metadata';
   if (chk.includes('schema') || chk.includes('structured')) return 'schema';
   if (chk.includes('img-alt') || chk.includes('alt')) return 'accessibility';
@@ -223,6 +225,10 @@ function mapToProduct(recType: RecType, pageCount: number): { productType?: stri
         : { productType: 'schema_page', productPrice: 39 };
     case 'accessibility':
       return { productType: 'fix_alt', productPrice: 50 };
+    case 'aeo':
+      return pageCount >= 5
+        ? { productType: 'aeo_site_review', productPrice: 499 }
+        : { productType: 'aeo_page_review', productPrice: 99 };
     default:
       return {};
   }
@@ -274,6 +280,39 @@ function auditInsight(
   }
   if (chk.includes('og-tags') || chk.includes('og-image')) {
     return `${affectedCount} pages are missing Open Graph tags. When shared on social media, these pages won't display a proper preview — reducing click-through from social channels.`;
+  }
+  // AEO-specific insights
+  if (chk === 'aeo-author') {
+    return hasTraffic
+      ? `${affectedCount} pages receiving ${trafficStr} clicks/mo lack author attribution. AI answer engines (ChatGPT, Perplexity, Google AI Overviews) strongly prefer citing content with named, credentialed authors — especially for health, finance, and legal topics.`
+      : `${affectedCount} pages are missing author bylines or reviewer attribution. AI systems treat anonymous content as less trustworthy and are less likely to cite it in generated answers.`;
+  }
+  if (chk === 'aeo-date') {
+    return hasTraffic
+      ? `${affectedCount} pages with ${trafficStr} clicks/mo have no visible "last updated" date. AI systems deprioritize undated content because they can't verify freshness — adding dates is a quick trust signal.`
+      : `${affectedCount} pages are missing visible dates. LLMs and AI answer engines use recency as a ranking signal — undated content gets deprioritized in AI-generated answers.`;
+  }
+  if (chk === 'aeo-answer-first') {
+    return hasTraffic
+      ? `${affectedCount} pages driving ${trafficStr} clicks/mo open with generic intros instead of direct answers. AI systems extract the first substantive paragraph as the cited snippet — burying the answer below fluff means you won't get cited.`
+      : `${affectedCount} pages start with "Welcome to…" or similar generic intros instead of directly answering the search query. Restructuring to answer-first layout makes content extractable by LLM retrievers.`;
+  }
+  if (chk === 'aeo-faq-no-schema') {
+    return `${affectedCount} pages have FAQ-style content but no FAQPage schema markup. This is a low-hanging win — adding FAQPage JSON-LD enables rich snippets in Google AND makes Q&A pairs directly extractable by AI answer engines.`;
+  }
+  if (chk === 'aeo-hidden-content') {
+    return `${affectedCount} pages hide significant content behind accordions, tabs, or collapsed sections. LLMs typically read only what's visible in the initial HTML — critical information in hidden elements won't get cited.`;
+  }
+  if (chk === 'aeo-citations') {
+    return hasTraffic
+      ? `${affectedCount} pages receiving ${trafficStr} clicks/mo lack external citations to authoritative sources. AI systems prefer citing pages that themselves cite primary sources (.gov, .edu, journals, professional associations) — it's a chain-of-trust signal.`
+      : `${affectedCount} pages have no outbound links to authoritative sources. Content without citations appears less credible to AI systems — adding references to journals, .gov, .edu, or industry associations increases citation likelihood.`;
+  }
+  if (chk === 'aeo-dark-patterns') {
+    return `${affectedCount} pages contain aggressive popups, autoplay media, or interstitials. AI retrieval systems downrank pages with dark patterns because they signal low-quality user experience.`;
+  }
+  if (chk === 'aeo-trust-pages') {
+    return `Your site is missing essential trust pages (/about, /contact). AI systems use the presence of trust pages as a site-level credibility signal — especially for YMYL (Your Money or Your Life) topics like health, finance, and legal.`;
   }
   if (chk.includes('cwv') || chk.includes('performance')) {
     return hasTraffic

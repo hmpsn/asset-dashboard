@@ -103,6 +103,15 @@ Every completed task — no matter how small — must include these steps:
 | `roi.ts` | ROI calculations | Organic traffic value tracking |
 | `trial-reminders.ts` | Trial expiry emails | Scheduled daily check for expiring trials |
 | `backup.ts` | Data backup scheduler | Periodic JSON backup of all data stores |
+| `data-dir.ts` | Data directory path singleton | `DATA_BASE`, `getDataDir(subdir)`, `getUploadRoot()`, `getOptRoot()`. Zero duplicated path patterns. |
+| `ai-context-check.ts` | AI context completeness checker | `getContextCompleteness()` — evaluates 8 data sources per workspace. Used by `AIContextIndicator` component. |
+| `feedback.ts` | Beta client feedback CRUD | Per-workspace feedback storage (`DATA_DIR/feedback/`), status workflow (new → acknowledged → resolved), threaded replies |
+| `web-scraper.ts` | Website crawling for knowledge base | `scrapeWorkspaceSite()` — crawls up to 15 priority pages. Used by brand voice, knowledge base, and personas auto-generation. |
+| `anomaly-detection.ts` | Traffic/ranking anomaly detection | `startAnomalyDetection()`, background scheduler, WebSocket alerts |
+| `storage-stats.ts` | Storage monitoring & pruning | `getStorageStats()`, prune endpoints for chat/backups/activity |
+| `usage-tracking.ts` | SEMRush credit usage tracking | `checkUsageLimit()`, `incrementUsage()`, daily reset |
+| `email.ts` / `email-queue.ts` | Email transport + batched queue | Nodemailer, 5-min sliding window digest, 7 event types, disk-persisted queue |
+| `google-auth.ts` | Google OAuth2 flow | Global + per-site token management, auto-refresh |
 
 ### Frontend (`src/`)
 
@@ -114,21 +123,35 @@ Every completed task — no matter how small — must include these steps:
 | `components/KeywordStrategy.tsx` | SEO strategy + content gaps | Admin keyword strategy viewer/generator |
 | `components/ContentBriefs.tsx` | Admin content brief management | Brief preview, status management |
 | `components/ContentManager.tsx` | Admin content review & management | Lists all generated posts, status workflow (draft→review→approved), search/sort/filter, inline editing via PostEditor |
+| `components/ContentPerformance.tsx` | Content performance tracking | GSC + GA4 metrics per published content piece. Recharts line charts. |
+| `components/BrandHub.tsx` | Brand & AI Hub | Consolidates Brand Voice, Knowledge Base, Audience Personas. Three "Generate from Website" buttons. |
+| `components/PostEditor.tsx` | Content post inline editor | Section-by-section editing, HTML preview, export |
 | `components/SeoAudit.tsx` | Site health audit viewer | Main admin panel host for many sub-views |
 | `components/StripePaymentForm.tsx` | Stripe payment UI | Teal unified, `PaymentModal` wrapper |
 | `components/StripeSettings.tsx` | Admin Stripe config | Keys, product mapping, connection status |
-| `components/WorkspaceOverview.tsx` | Admin workspace grid | Workspace cards with tier badges |
+| `components/WorkspaceOverview.tsx` | Admin workspace grid | Workspace cards with tier badges, presence dots, anomaly badges |
+| `components/LinksPanel.tsx` | Merged Links tab | Redirects + Internal Links with sub-tab navigation |
+| `components/NotificationBell.tsx` | Admin notification bell | Polling every 5min, sidebar utility bar |
+| `components/CommandPalette.tsx` | Spotlight / ⌘K command palette | Fuzzy search, keyboard navigation |
+| `components/ChatPanel.tsx` | Shared chat component | Message bubbles, loading dots, input bar, quick questions. Teal/purple accent theming. |
+| `components/ChatBlocks.tsx` | Rich chat message blocks | MetricBlock, data tables, formatted AI responses |
+| `components/ErrorBoundary.tsx` | Error boundary with retry | Wraps major sections (admin content, WorkspaceHome, client tabs) |
+| `components/Roadmap.tsx` | Admin roadmap tracker | Sprint progress bars, velocity chart, status toggle |
+| `components/LandingPage.tsx` | GTM lead-gen landing page | Public-facing marketing page with pricing, features, CTAs |
+| `components/MobileGuard.tsx` | Mobile device interstitial | Dismissible guard recommending desktop experience |
 | `components/WorkspaceSettings.tsx` | Admin workspace config | Knowledge base, client users, branding |
 | `components/LoginScreen.tsx` | Admin login UI | Setup flow + email/password |
 | `components/Styleguide.tsx` | Design system reference page | Color swatches, component demos |
-| `components/ui/` | **12 shared UI primitives** | See § 4 below |
-| `components/client/` | **Client tab components** | `types.ts` (interfaces + ClientTab type), `helpers.tsx`, `OverviewTab.tsx`, `SearchTab.tsx`, `AnalyticsTab.tsx`, `StrategyTab.tsx`, `ContentTab.tsx`, `ApprovalsTab.tsx`, `RequestsTab.tsx`, `PlansTab.tsx`, `InboxTab.tsx` (composes Approvals+Requests+Content), `HealthTab.tsx`, `InsightsDigest.tsx`, `InsightsEngine.tsx`, `MonthlySummary.tsx`, `DataSnapshots.tsx`, `ROIDashboard.tsx`, `OrderStatus.tsx`, `FixRecommendations.tsx`, `SeoCart.tsx`, `useCart.tsx`, `OnboardingWizard.tsx` |
+| `components/ui/` | **15 shared UI primitives** | See § 4 below |
+| `components/client/` | **Client tab components** (28 files) | `types.ts`, `helpers.tsx`, `utils.ts`, `index.ts`, `OverviewTab.tsx`, `SearchTab.tsx`, `AnalyticsTab.tsx`, `PerformanceTab.tsx` (merged Search+Analytics), `StrategyTab.tsx`, `ContentTab.tsx`, `ApprovalsTab.tsx`, `RequestsTab.tsx`, `PlansTab.tsx`, `InboxTab.tsx` (composes Approvals+Requests+Content), `HealthTab.tsx`, `InsightsDigest.tsx`, `InsightsEngine.tsx`, `MonthlySummary.tsx`, `DataSnapshots.tsx`, `ROIDashboard.tsx`, `OrderStatus.tsx`, `FixRecommendations.tsx`, `SeoCart.tsx`, `useCart.tsx`, `OnboardingWizard.tsx`, `BetaContext.tsx` (beta mode feature flag), `ClientOnboardingQuestionnaire.tsx`, `FeedbackWidget.tsx`, `SeoGlossary.tsx` |
+| `components/shared/` | **Shared cross-dashboard components** | `RankTable.tsx` (position colors, history chart, rank change indicators) |
+| `hooks/` | **Shared React hooks** (9 files) | `useAuth.ts`, `useWebSocket.ts`, `useBackgroundTasks.tsx`, `useAuditSummary.ts`, `useSearchData.ts`, `useGA4Overview.ts`, `usePageEditStates.ts`, `useRecommendations.ts`, `useWorkspaceEvents.ts` |
 
 ### Data & Config
 
 | Path | Purpose |
 |------|---------|
-| `data/roadmap.json` | Sprint-level tracking (86+ items across 11 sprints) |
+| `data/roadmap.json` | Sprint-level tracking (200+ items across 15+ sprints) |
 | `IMPLEMENTATION_ROADMAP.md` | Data flow unification plan (6 sprints, all complete) — historical reference |
 | `~/.asset-dashboard/` | Runtime data directory (workspaces, uploads, payments, auth) |
 | `.env` / `.env.example` | Environment variables |
@@ -155,7 +178,7 @@ Every completed task — no matter how small — must include these steps:
 ### Feature work
 | Priority | Doc | What it tells you |
 |----------|-----|-------------------|
-| 1 | `FEATURE_AUDIT.md` | 49-feature inventory with agency/client/mutual value, Future Additions backlog |
+| 1 | `FEATURE_AUDIT.md` | 70-feature inventory with agency/client/mutual value, Future Additions backlog |
 | 2 | `.windsurf/workflows/feature-integration.md` | How to connect features (cross-links, client dashboard, approvals) |
 | 3 | `.windsurf/workflows/wiring-patterns.md` | How to wire data into chat, strategy, briefs, reports |
 | 4 | `data/roadmap.json` | Sprint tracking — check what's done/pending before starting work |
@@ -218,6 +241,8 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 | `EmptyState` | `./ui` | Empty data placeholders |
 | `TierGate` / `TierBadge` | `./ui` | Tier lock overlay + badge |
 | `scoreColor()` / `scoreColorClass()` | `./ui` | Score-based color helpers |
+| `AIContextIndicator` | `./ui` | AI data source completeness bar (feature-filterable, compact mode) |
+| `StatusBadge` | `./ui` | Unified status badges with `statusConfig.ts` color map |
 
 ### When creating new UI primitives
 1. Create in `src/components/ui/`

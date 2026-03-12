@@ -664,6 +664,46 @@
           "priority": "P2",
           "notes": "When loadDashboardData fires after login, the client sees empty tab content until 4-12 parallel fetches complete. Add shimmer/skeleton loading states for key components: OverviewTab metric cards, HealthTab score ring, PerformanceTab charts, StrategyTab keyword table. Use shared Skeleton primitive component. Small polish that makes the app feel faster and more professional on first load.",
           "status": "pending"
+        },
+        {
+          "id": 207,
+          "title": "Recharts migration (all custom SVG charts)",
+          "source": "Tech debt Mar 2026",
+          "est": "4-6h",
+          "priority": "P1",
+          "notes": "Shipped — Migrated all hand-rolled SVG charts across admin and client dashboards to Recharts library. Covers: traffic trends, search performance, GA4 metrics, rank tracking, content performance, anomaly charts, roadmap velocity. ResponsiveContainer + LineChart/AreaChart/BarChart with XAxis/YAxis/Tooltip.",
+          "status": "done",
+          "shippedAt": "2026-03"
+        },
+        {
+          "id": 208,
+          "title": "AI Usage Dashboard in Command Center",
+          "source": "Cost visibility Mar 2026",
+          "est": "3-4h",
+          "priority": "P1",
+          "notes": "Shipped — GET /api/ai/usage returns per-feature token consumption with timestamps, model, estimated cost. Dashboard: total tokens, cost estimate, per-feature breakdown, SEMRush credit tracking via usage-tracking.ts. Filterable by workspace and date range.",
+          "status": "done",
+          "shippedAt": "2026-03"
+        },
+        {
+          "id": 209,
+          "title": "Mobile Guard interstitial",
+          "source": "UX guard Mar 2026",
+          "est": "30m",
+          "priority": "P2",
+          "notes": "Shipped — MobileGuard.tsx: dismissible interstitial on <768px screens recommending desktop. sessionStorage persistence. Re-checks on resize.",
+          "status": "done",
+          "shippedAt": "2026-03"
+        },
+        {
+          "id": 210,
+          "title": "Client Onboarding Questionnaire",
+          "source": "Client intake Mar 2026",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — ClientOnboardingQuestionnaire.tsx: structured multi-step intake form collecting business info, goals, audience, competitors, content preferences. Feeds into workspace AI context.",
+          "status": "done",
+          "shippedAt": "2026-03"
         }
       ]
     },
@@ -779,6 +819,214 @@
           "priority": "P3",
           "notes": "Per-user email settings, digest frequency.",
           "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "sprint-H",
+      "name": "AEO — Answer Engine Optimization",
+      "hours": "10-14",
+      "rationale": "Beta client feedback: LLMs and AI answer engines cite pages with trust signals, clean structure, and rich schema. Three feature groups: new audit checks, schema expansion, and content brief enhancements.",
+      "items": [
+        {
+          "id": 211,
+          "title": "AEO Trust Audit: trust pages existence check",
+          "source": "Beta client AEO feedback A1",
+          "est": "1h",
+          "priority": "P0",
+          "notes": "Shipped — Site-wide check in runSeoAudit(): scans allSlugs for /about, /contact variants. Flags missing trust pages. Recommends /editorial-policy, /corrections, /medical-review-board for healthcare.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 212,
+          "title": "AEO Trust Audit: author/reviewer markup detection",
+          "source": "Beta client AEO feedback A1, D3",
+          "est": "1h",
+          "priority": "P0",
+          "notes": "Shipped — Per-page aeo-author check: detects author meta tag, Person schema, byline/reviewer CSS classes, 'reviewed by' text patterns. Flags pages missing all attribution signals.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 213,
+          "title": "AEO Trust Audit: last-updated date detection",
+          "source": "Beta client AEO feedback A1, C2",
+          "est": "30m",
+          "priority": "P1",
+          "notes": "Shipped — Per-page aeo-date check: detects dateModified in schema, visible 'last updated/reviewed on' text, and <time> elements. Flags pages missing all date signals.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 214,
+          "title": "AEO Trust Audit: answer-first content structure",
+          "source": "Beta client AEO feedback B1",
+          "est": "1h",
+          "priority": "P1",
+          "notes": "Shipped — Per-page aeo-answer-first check: extracts 200-800 chars after H1, tests first 40 words against generic intro patterns (welcome to, are you looking, if you're). Flags pages opening with fluff instead of direct answers.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 215,
+          "title": "AEO Trust Audit: FAQ without schema detection",
+          "source": "Beta client AEO feedback B5",
+          "est": "30m",
+          "priority": "P1",
+          "notes": "Shipped — Per-page aeo-faq-no-schema check: detects FAQ headings and 3+ question-mark H2-H4s, then checks for FAQPage JSON-LD. Warns when FAQ content exists without schema markup.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 216,
+          "title": "AEO Trust Audit: hidden content behind UI",
+          "source": "Beta client AEO feedback E3",
+          "est": "30m",
+          "priority": "P1",
+          "notes": "Shipped — Per-page aeo-hidden-content check: regex matches display:none, aria-hidden=true, accordion-body/tab-pane/collapse/hidden classes on content blocks >100 chars. Warns if >500 chars hidden.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 217,
+          "title": "AEO Trust Audit: citation/reference density",
+          "source": "Beta client AEO feedback A2",
+          "est": "1h",
+          "priority": "P1",
+          "notes": "Shipped — Per-page aeo-citations check: counts external links excluding social media, then checks for authority domains (.gov, .edu, .org, pubmed, ADA, NIH, CDC, WHO, etc.). Two-tier: flags zero citations AND flags links without authority sources.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 218,
+          "title": "AEO Trust Audit: dark pattern detection",
+          "source": "Beta client AEO feedback A4",
+          "est": "30m",
+          "priority": "P2",
+          "notes": "Shipped — Per-page aeo-dark-patterns check: detects autoplay on video/audio elements and aggressive modal/popup/overlay/interstitial classes with fixed positioning or display:block/flex in initial HTML.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 219,
+          "title": "Schema: healthcare types (MedicalBusiness, Dentist, Physician, MedicalProcedure)",
+          "source": "Beta client AEO feedback D1",
+          "est": "1-2h",
+          "priority": "P0",
+          "notes": "Shipped — Added requirement #17 to schema-suggester.ts prompt: MedicalBusiness/Dentist/Physician/Optician subtypes, MedicalProcedure with procedureType/howPerformed/preparation/followup, Physician with medicalSpecialty/credentials, HowTo for procedural content.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 220,
+          "title": "Schema: HowTo + Dataset types",
+          "source": "Beta client AEO feedback D1",
+          "est": "30m",
+          "priority": "P1",
+          "notes": "Shipped — Added requirement #18 to schema-suggester.ts: Dataset schema with name, description, distribution, dateModified, creator for data-heavy pages. HowTo covered in #17 healthcare section.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 221,
+          "title": "Schema: author + reviewedBy on Article schemas",
+          "source": "Beta client AEO feedback D3",
+          "est": "1h",
+          "priority": "P0",
+          "notes": "Shipped — Updated requirement #12 in schema-suggester.ts: Article/BlogPosting ALWAYS includes author Person with credentials. If medical/health reviewer mentioned, adds reviewedBy Person with credentials.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 222,
+          "title": "Schema: sameAs entity linking on Organization",
+          "source": "Beta client AEO feedback D2",
+          "est": "30m",
+          "priority": "P1",
+          "notes": "Shipped — Added requirement #19 to schema-suggester.ts: sameAs array on Organization node with verified external profiles (Google Business, LinkedIn, Facebook, Yelp, association pages). Only from page content/footer — never fabricated.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 223,
+          "title": "Content Brief: answer-first layout template",
+          "source": "Beta client AEO feedback B1",
+          "est": "1h",
+          "priority": "P0",
+          "notes": "Shipped — Added AEO RULES block to generateBrief() prompt: ANSWER-FIRST LAYOUT rule requires first outline section to be direct-answer summary (2-3 sentences + bullets). Bans generic intros.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 224,
+          "title": "Content Brief: citation density targets + definition blocks + comparison tables",
+          "source": "Beta client AEO feedback A2, B3, B4",
+          "est": "1h",
+          "priority": "P1",
+          "notes": "Shipped — Added to AEO RULES in brief prompt: citation density targets (1/200w medical, 1/400w business), definition block pattern (Term→Definition→Misconceptions→Related), comparison table guidance (measurable fields, units, footnotes, 'data as of' date).",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 225,
+          "title": "Content Brief: citation-worthy tone rules for medical/authority content",
+          "source": "Beta client AEO feedback F1, F2",
+          "est": "30m",
+          "priority": "P1",
+          "notes": "Shipped — Added AEO CITATION-WORTHY WRITING section to WRITING_QUALITY_RULES in content-posts.ts: claim discipline, evidence framing ('according to…'), encyclopedic neutral tone for medical, definition block pattern, comparison content rules.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 226,
+          "title": "Content Brief: new page types (Provider Profile, Procedure Guide, Pricing Page)",
+          "source": "Beta client AEO feedback G2, G3, G4",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped — Added 3 new PAGE_TYPE_CONFIGS to content-brief.ts: provider-profile (Physician schema, credential-forward, encyclopedic), procedure-guide (MedicalProcedure schema, citation-dense, definition blocks, comparison tables), pricing-page (Dataset schema, methodology section, measurable fields only).",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 227,
+          "title": "Schema: wire Knowledge Base into schema generation pipeline",
+          "source": "Data pipeline audit",
+          "est": "1h",
+          "priority": "P1",
+          "notes": "Shipped — Added knowledgeBase field to SchemaContext interface. buildSchemaContext() in helpers.ts now reads ws.knowledgeBase + knowledge-docs/ folder files (truncated to 4000 chars). Injected into AI prompt as BUSINESS KNOWLEDGE BASE section with strict 'never fabricate' guard. Schema AI can now use staff credentials, locations, social profiles, association memberships from KB.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 228,
+          "title": "Recommendations: AEO awareness (RecType, insights, products, critical checks)",
+          "source": "Beta client AEO feedback + data pipeline audit",
+          "est": "2h",
+          "priority": "P0",
+          "notes": "Shipped — Added 'aeo' RecType. All aeo-* audit checks now map to dedicated AEO recommendation type via checkToRecType(). Added 8 AEO-specific insight text generators with traffic-aware variants. aeo-author, aeo-answer-first, aeo-trust-pages added to CRITICAL_CHECKS (fix_now on high-traffic pages). AEO product mapping: aeo_page_review ($99) and aeo_site_review ($499).",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 229,
+          "title": "AEO Page Review: AI-powered per-page content change recommendations",
+          "source": "Beta client feedback — AEO audit flags issues but doesn't suggest specific content changes",
+          "est": "4h",
+          "priority": "P0",
+          "notes": "Shipped — server/aeo-page-review.ts (GPT-4.1 review engine with 12 change types), routes/aeo-review.ts (single-page + batch + saved review endpoints), AeoReview.tsx (lazy-loaded sub-tab in SeoAudit with summary cards, effort/priority filters, expandable current→suggested diff). Admin-first: agency sees all recommendations, cherry-picks what to action or send to client.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 230,
+          "title": "Fix notification bell tray not opening in admin dashboard",
+          "source": "Bug report — bell positioned bottom-full (opens upward off-screen from top header)",
+          "est": "5m",
+          "priority": "P1",
+          "notes": "Shipped — Changed NotificationBell.tsx dropdown from 'bottom-full left-0 mb-2' to 'top-full right-0 mt-2'. Panel now opens downward and right-aligned from the header bell icon.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
         }
       ]
     },

@@ -839,8 +839,8 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - ~~Suppression-aware health scores~~: ✅ Shipped — applySuppressionsToAudit() filters suppressed issues and recalculates scores. Wired into all 6 data exit points (audit-summary, audit-detail, reports/latest, admin/client/strategy chat contexts). Suppressed issues excluded from all scores, issue lists, and AI recommendations.
 - ~~SEO edit tracking (teal=live, purple=in-review, yellow=flagged)~~: ✅ Shipped — seoEditTracking on Workspace model with trackSeoEdit() helper. Auto-wired into SEO save→live, CMS save→live, approval→in-review, audit→flagged. Colored borders + badge pills in SeoEditor, CmsEditor, and SeoAudit page cards. Optimistic local state updates.
 - ~~Hide non-sitemap collection pages~~: ✅ Shipped — Server fetches sitemap.xml, filters collection items to sitemap matches (falls back to all). Frontend shows full path with parent collection slug (e.g., /locations/houston-midtown).
-- **Real-time data updates** — WebSocket/SSE for live dashboard sync between admin and client (audit results, activity, requests).
-- **Unified Performance tab** — Merge Analytics + Search into single client tab showing complementary Google data.
+- ~~Real-time data updates~~: ✅ Shipped — WebSocket workspace subscriptions with `broadcastToWorkspace()`. Events: activity:new, approval:update, request:created, content-request:update, audit:complete. `useWorkspaceEvents` hook on frontend.
+- ~~Unified Performance tab~~: ✅ Shipped — `PerformanceTab.tsx` merges Search + Analytics into single tab with sub-tabs. Backward-compatible URL params. See Feature #74.
 
 ### Content Pipeline
 - ~~Service tiers~~: ✅ Shipped — Brief vs. Full Post with configurable pricing.
@@ -940,4 +940,170 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
-Current feature count: **70**. Last updated: March 2026 (Storage monitor + pruning tools shipped).
+### 70. Recharts Migration
+**What it does:** Migrated all custom hand-rolled SVG charts across both admin and client dashboards to the **Recharts** library. Replaces bespoke `<svg>` sparklines, area charts, dual-trend charts, and bar charts with `ResponsiveContainer`, `LineChart`, `AreaChart`, `BarChart`, `XAxis`, `YAxis`, `Tooltip`, and `CartesianGrid` components. Covers: traffic trends, search performance, GA4 metrics, rank tracking history, content performance, anomaly charts, and the roadmap velocity chart. All charts retain hover tooltips and responsive sizing.
+
+**Agency value:** Maintainable chart code — adding a new chart takes minutes instead of hours of SVG math. Recharts handles responsive sizing, axis formatting, and tooltip positioning automatically.
+
+**Client value:** Smoother, more polished chart interactions with consistent tooltip behavior across every tab.
+
+**Mutual:** Eliminates an entire class of chart rendering bugs. New data visualizations can be added rapidly as the platform grows.
+
+---
+
+### 71. AI Usage Dashboard
+**What it does:** Admin-facing AI usage monitoring panel in the Command Center. `GET /api/ai/usage` returns per-feature token consumption with timestamps, model used, and estimated cost. Dashboard shows: total tokens consumed, estimated cost, per-feature breakdown (briefs, posts, chat, schema, strategy, etc.), and SEMRush credit usage tracking via `server/usage-tracking.ts` (daily limit checks, increment/reset). Filterable by workspace and date range.
+
+**Agency value:** Cost visibility for AI operations. Know exactly which features and which clients consume the most tokens. SEMRush credit tracking prevents unexpected overage charges.
+
+**Client value:** N/A — admin-only tool.
+
+**Mutual:** Data-driven decisions about AI feature usage and tier pricing. Prevents surprise API bills.
+
+---
+
+### 72. Content Performance Tracking
+**What it does:** `ContentPerformance.tsx` — dedicated admin tab that tracks the real-world performance of published content pieces. Cross-references content requests and generated posts with GSC metrics (clicks, impressions, CTR, position) and GA4 metrics (sessions, users, bounce rate, engagement time, conversions) for the target page. Recharts line charts show performance trends over time. Expandable per-content cards with status badges, target keyword, page type, and publication date.
+
+**Agency value:** Proves content ROI with real data — "that blog post we wrote generated 340 clicks and 12 conversions this month." Identifies which content types and topics perform best for each client.
+
+**Client value:** N/A — admin-only (clients see content status in their portal's Content tab).
+
+**Mutual:** Closes the feedback loop from content strategy → brief → post → published → measured impact. Informs future content priorities.
+
+---
+
+### 73. Admin UX Overhaul
+**What it does:** Comprehensive admin dashboard UX improvements shipped as Sprint G. **Collapsible sidebar navigation** — accordion groups with `localStorage` persistence for collapse state. **Command palette (⌘K)** — `CommandPalette.tsx` with fuzzy search across all tools, workspaces, and actions; full keyboard navigation (↑↓ to navigate, Enter to select, Esc to close). **Notification bell** — `NotificationBell.tsx` in sidebar utility bar, polls every 5 minutes for pending approvals, new requests, and attention items; badge count on bell icon. **Workspace quick-switch breadcrumb** — breadcrumb bar with dropdown for fast workspace switching without returning to Command Center. **User presence tracking** — WebSocket identify/heartbeat protocol, `GET /api/presence` endpoint, green dots + user names on workspace cards in Command Center. **Client overview declutter** — removed redundant AnomalyAlerts, AI Hero Insight, and MonthlySummary from overview; InsightsDigest is now the single source of AI insight.
+
+**Agency value:** Dramatically faster admin navigation — ⌘K gets you anywhere in 2 keystrokes, collapsible sidebar reduces visual noise, presence dots show who's working on what.
+
+**Client value:** N/A — admin-only improvements.
+
+**Mutual:** Reduces the cognitive load of managing 10+ client workspaces. Every UX improvement compounds across hundreds of daily admin interactions.
+
+---
+
+### 74. Merged Client Performance Tab
+**What it does:** `PerformanceTab.tsx` merges the previously separate Search and Analytics client tabs into a single unified "Performance" tab with internal sub-tabs (Search / Analytics). Backward-compatible URL params (`?tab=search` and `?tab=analytics` redirect to `?tab=performance`). All `setTab` references updated across InsightsDigest, OnboardingWizard, and overview action banners.
+
+**Agency value:** Cleaner client navigation — complementary Google data lives in one place instead of two separate tabs.
+
+**Client value:** One tab for all performance data instead of switching between Search and Analytics. Easier to understand the full traffic picture.
+
+**Mutual:** Reduces tab count without losing any data. The sub-tab pattern can be reused for future consolidations.
+
+---
+
+### 75. Beta Client Dashboard Mode
+**What it does:** `/client/beta/:workspaceId` route with `betaMode` prop. `BetaContext.tsx` + `useBetaMode()` hook provide a feature flag system that hides monetization features for beta testers. **Hidden in beta:** Plans tab, ROI tab, trial badges/banners, upgrade/pricing/Stripe modals, SeoCart, chat usage limits, purchase buttons on fix recommendations and content opportunities. **Override:** `effectiveTier` forced to `premium` so beta users see all features. **AI guardrails:** `betaMode` flag passed to `/api/public/search-chat` — conditional system prompt swaps revenue hooks for beta rules (never mention purchasing/pricing/plans, frame content gaps as topics not products, collaborative tone with hmpsn studio). Chat rate limiting skipped in beta.
+
+**Agency value:** Ship the full platform experience to beta clients without exposing unfinished payment flows or confusing trial messaging. Single codebase — no duplication.
+
+**Client value:** Beta clients get the premium experience with no purchase pressure. AI chatbot gives collaborative, non-salesy recommendations.
+
+**Mutual:** Clean beta testing without monetization friction. Easy to flip off when transitioning beta clients to paid plans.
+
+---
+
+### 76. Client Onboarding Questionnaire
+**What it does:** `ClientOnboardingQuestionnaire.tsx` — structured intake form that appears during client onboarding. Collects business information, goals, target audience, competitive landscape, and content preferences in a guided multi-step flow. Responses feed into workspace configuration and AI context for better-tailored outputs from day one.
+
+**Agency value:** Structured client intake replaces ad-hoc email conversations. Responses automatically enrich the workspace's AI context (knowledge base, brand voice inputs).
+
+**Client value:** Clear, professional onboarding experience. Their answers directly improve the quality of AI-generated content and recommendations.
+
+**Mutual:** Faster onboarding with richer AI context from the start. Reduces the "garbage in, garbage out" problem with AI features.
+
+---
+
+### 77. Landing Page
+**What it does:** `LandingPage.tsx` — GTM-driven lead generation page for the hmpsn.studio platform. Public-facing marketing page with: hero section, feature highlights with icons, pricing section, social proof, and CTA buttons. Fully styled in the brand design language (dark theme, teal CTAs, zinc cards). NavBar with logo and "Start Free" button. Responsive layout.
+
+**Agency value:** A professional public-facing page to drive signups and demonstrate platform capabilities without requiring a demo call.
+
+**Client value:** N/A — pre-signup marketing page.
+
+**Mutual:** Passive lead generation. The landing page sells the platform 24/7.
+
+---
+
+### 78. Mobile Guard
+**What it does:** `MobileGuard.tsx` — dismissible interstitial shown on small screens (<768px) recommending the desktop experience. Stores dismissal in `sessionStorage` so it only appears once per session. Shows a monitor icon, explanation text, and a dismiss button. Re-checks on window resize.
+
+**Agency value:** Sets expectations — the dashboard is designed for desktop workflows. Prevents support tickets about mobile layout issues.
+
+**Client value:** Clear guidance instead of a broken mobile experience. Can still dismiss and proceed if needed.
+
+**Mutual:** Honest UX — better to acknowledge the limitation than pretend it doesn't exist.
+
+---
+
+### 79. SEO Glossary
+**What it does:** `SeoGlossary.tsx` — contextual SEO terminology reference embedded in the client dashboard. Provides plain-language definitions for SEO terms that appear throughout the platform (impressions, CTR, position, bounce rate, etc.). Accessible from the Strategy tab and other data-heavy views.
+
+**Agency value:** Reduces "what does this mean?" support questions. Clients educate themselves in-context.
+
+**Client value:** No more Googling SEO jargon. Every metric on the dashboard has an accessible explanation.
+
+**Mutual:** Empowered clients make better decisions and ask smarter questions. Reduces the knowledge gap between agency and client.
+
+---
+
+### 80. AEO — Answer Engine Optimization
+**What it does:** Comprehensive Answer Engine Optimization system shipped as Sprint H, driven by beta client feedback. Three feature groups:
+
+**1. AEO Trust Audit (8 new checks in `seo-audit.ts`):** Per-page checks for author/reviewer attribution (meta tag, Person schema, byline classes, "reviewed by" patterns), last-updated date detection (dateModified schema, visible date text, `<time>` elements), answer-first content structure (flags generic intros after H1 — "Welcome to…", "Are you looking for…"), FAQ content without FAQPage schema, hidden content behind accordions/tabs/collapsed sections (>500 chars behind display:none/aria-hidden), citation/reference density (two-tier: zero external citations AND links without authority domains like .gov/.edu/pubmed/ADA/NIH), dark pattern detection (autoplay media, aggressive modal overlays). Site-wide check for missing trust pages (/about, /contact) with healthcare recommendations (/editorial-policy, /corrections, /medical-review-board).
+
+**2. Schema Suggester Expansion (`schema-suggester.ts`):** Healthcare schema types (MedicalBusiness, Dentist, Physician, MedicalProcedure with procedureType/howPerformed/preparation/followup), HowTo for procedural content, Dataset schema for data-heavy pages, author + reviewedBy Person with credentials on all Article/BlogPosting schemas, sameAs entity linking on Organization (Google Business, LinkedIn, Yelp, association profiles — only from actual page content, never fabricated). **Knowledge Base integration:** `buildSchemaContext()` in `helpers.ts` now reads workspace `knowledgeBase` field + `knowledge-docs/` folder files (truncated to 4000 chars) and injects into the schema AI prompt as BUSINESS KNOWLEDGE BASE. Schema AI can now use staff credentials, locations, social profiles, and association memberships from the KB to enrich Organization, Physician, LocalBusiness, and sameAs schemas — without needing that data on every page's HTML.
+
+**3. Content Brief & Writing Rules Enhancement (`content-brief.ts`, `content-posts.ts`):** AEO rules block in brief generation prompt (answer-first layout, citation density targets, definition block guidance, comparison table requirements, FAQ quality rules, author/date checklist items). Three new AEO-optimized page types: provider-profile (Physician schema, credential-forward, encyclopedic), procedure-guide (MedicalProcedure schema, citation-dense, definition blocks, comparison tables, indications/contraindications/costs/risks/alternatives), pricing-page (Dataset schema, methodology section required, measurable fields only). Citation-worthy writing rules added to WRITING_QUALITY_RULES: claim discipline, evidence framing, encyclopedic neutral tone for medical content, definition block pattern, comparison content rules.
+
+**4. AEO Recommendation Engine (`recommendations.ts`):** All 8 AEO audit checks now flow into the existing Recommendation Engine as a dedicated `aeo` RecType. Custom insight text generators for each AEO check explain *why* each issue matters for AI visibility (with traffic-aware variants showing clicks at risk). `aeo-author`, `aeo-answer-first`, and `aeo-trust-pages` added to CRITICAL_CHECKS — these become "Fix Now" recommendations on high-traffic pages. AEO product mapping enables purchasable fix upsells: `aeo_page_review` ($99) and `aeo_site_review` ($499, 5+ pages).
+
+**Agency value:** Every audit now surfaces AEO opportunities alongside traditional SEO issues as structured, prioritized recommendations. Content briefs automatically produce LLM-citeable content structure. Schema generation handles healthcare verticals natively and enriches from the knowledge base. The platform doesn't just optimize for Google — it optimizes for ChatGPT, Perplexity, and every AI answer engine.
+
+**Client value:** Their content becomes more likely to be cited by AI systems. AEO recommendations explain *why* author attribution, dates, and citations matter for AI visibility — with real traffic-at-risk numbers. Healthcare clients get industry-specific schema and content templates out of the box. Schema generation is enriched with KB data they've already provided.
+
+**Mutual:** Positions hmpsn.studio ahead of competitors who only optimize for traditional search. AEO is the next frontier — clients who adopt these practices now will dominate AI-generated answers in their verticals. New AEO product tiers create revenue from the recommendations.
+
+---
+
+### 81. AEO Page Review — AI-Powered Content Change Recommendations
+**What it does:** `aeo-page-review.ts` + `AeoReview.tsx` — admin-first AI-powered per-page content change recommendations. Unlike the AEO audit (which flags issues with generic fix guidance), the Page Review uses GPT-4.1 to generate **specific, implementable changes** for each page: actual replacement intro paragraphs, specific author bylines sourced from the knowledge base, named citation targets (e.g., "cite ADA.org guidelines on…"), comparison table column specs, definition block content, and exact restructuring instructions.
+
+**Architecture:**
+- **Server:** `server/aeo-page-review.ts` — review engine. Takes page HTML + AEO audit issues + workspace knowledge base + keyword strategy + brand voice + personas. Produces structured JSON with `AeoPageChange[]` (12 change types: `rewrite_intro`, `add_author`, `add_date`, `add_section`, `add_citations`, `add_schema`, `add_faq`, `add_comparison`, `add_definition`, `restructure_content`, `remove_dark_pattern`, `copy_edit`). Each change has location, current content excerpt, suggested replacement, rationale, effort estimate, priority, and AEO impact description.
+- **Routes:** `server/routes/aeo-review.ts` — `POST /api/aeo-review/:workspaceId/page` (single page), `POST /api/aeo-review/:workspaceId/site` (batch up to 25 pages, prioritized by AEO issue count), `GET /api/aeo-review/:workspaceId` (load saved review). Reviews saved to `aeo-reviews/` data directory.
+- **Frontend:** `src/components/AeoReview.tsx` — lazy-loaded sub-tab within SeoAudit. Summary cards (avg score, pages reviewed, total changes, quick wins, est. time). Filterable by effort (quick/moderate/significant) and priority (high/medium/low). Expandable page cards with AI summary, per-change cards with current→suggested diff view, rationale, and AEO impact. Single-page re-review button.
+
+**Admin-first design:** Recommendations shown only to the agency team. They cherry-pick what to action or send to the client. No client-facing exposure yet — the review output is frank and technical.
+
+**Agency value:** Transforms AEO audit flags into a ready-to-implement content change list. Instead of "this page needs author attribution," the review says "add 'Written by Dr. Jane Smith, DDS — 15 years of cosmetic dentistry experience' below the H1, sourced from your knowledge base." Copywriters can implement changes without further research.
+
+**Client value (future):** Once battle-tested, curated recommendations can be exposed in the client portal as a "content improvement plan."
+
+**Mutual:** Closes the gap between "what's wrong" and "exactly what to do about it." Makes AEO optimization actionable at scale.
+
+---
+
+## Summary
+
+| Category | Feature Count | Primary Value Driver |
+|----------|:---:|---|
+| SEO & Technical | 13 | Audit, fix, and optimize faster than manual tools + AEO trust signals |
+| Analytics & Tracking | 6 | Unified data view replaces platform-hopping |
+| Content & Strategy | 7 | Strategy → brief → AI post generation → review → delivery pipeline |
+| Client Communication | 8 | Structured workflows + automated reports + expanded notifications + feedback widget |
+| Client Self-Service | 12 | 24/7 data access, onboarding, plans, cart, order tracking, glossary, questionnaire |
+| AI & Intelligence | 7 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine + context completeness + usage dashboard + AEO page review |
+| Auth & Access Control | 3 | Internal user accounts, workspace ACL, client user accounts |
+| Security | 1 | Helmet, HTTPS, rate limiting, input sanitization |
+| Monetization | 1 | Stripe Checkout, admin settings, payment tracking, trials, encrypted config |
+| Platform & UX | 14 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home, page state model, work orders, request linkage, admin UX overhaul, landing page, mobile guard, Recharts |
+| Data Architecture | 3 | PageEditState model, cross-store writes, activity feed for client actions |
+| Architecture | 1 | Server refactor: 8K-line monolith → 38 route modules + 3 shared modules |
+
+**82 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+
+Current feature count: **82**. Last updated: March 2026 (AEO Page Review: AI-powered per-page content change recommendations).
