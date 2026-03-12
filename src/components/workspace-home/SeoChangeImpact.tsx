@@ -38,6 +38,8 @@ const SOURCE_LABELS: Record<string, string> = {
   approval: 'Approval',
   'cart-fix': 'Cart Fix',
   'content-delivery': 'Content',
+  schema: 'Schema',
+  'schema-template': 'CMS Schema',
 };
 
 function DeltaBadge({ before, after, label, invert }: { before: number; after: number; label: string; invert?: boolean }) {

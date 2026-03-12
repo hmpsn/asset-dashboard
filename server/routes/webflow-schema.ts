@@ -17,6 +17,7 @@ import {
   publishRawSchemaToPage,
 } from '../webflow.js';
 import { listWorkspaces, getTokenForSite, updatePageState } from '../workspaces.js';
+import { recordSeoChange } from '../seo-change-tracker.js';
 
 router.get('/api/webflow/schema-suggestions/:siteId', async (req, res) => {
   try {
@@ -78,6 +79,7 @@ router.post('/api/webflow/schema-publish/:siteId', async (req, res) => {
     if (pubWs) {
       addActivity(pubWs.id, 'schema_published', 'Schema published to Webflow', `Page ${pageId.slice(0, 8)}… — ${published ? 'site published' : 'saved as draft'}`, { pageId });
       updatePageState(pubWs.id, pageId, { status: 'live', source: 'schema', fields: ['schema'], updatedBy: 'admin' });
+      recordSeoChange(pubWs.id, pageId, req.body.pageSlug || '', req.body.pageTitle || '', ['schema'], 'schema');
     }
 
     res.json({ success: true, published });
@@ -117,6 +119,13 @@ router.post('/api/webflow/schema-cms-template/:siteId/publish', async (req, res)
     if (publishAfter) {
       const pubResult = await publishSite(req.params.siteId, token);
       published = pubResult.success;
+    }
+
+    // Track schema change
+    const cmsWs = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+    if (cmsWs) {
+      updatePageState(cmsWs.id, pageId, { status: 'live', source: 'schema', fields: ['schema'], updatedBy: 'admin' });
+      recordSeoChange(cmsWs.id, pageId, req.body.pageSlug || '', req.body.pageTitle || '', ['schema'], 'schema-template');
     }
 
     res.json({ success: true, published });

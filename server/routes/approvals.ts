@@ -164,8 +164,8 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', async (req, res
       if (r.success) {
         updatePageState(req.params.workspaceId, r.pageId, { status: 'live', updatedBy: 'admin' });
         const appliedItem = approved.find(i => i.id === r.itemId);
-        if (appliedItem && (appliedItem.field === 'seoTitle' || appliedItem.field === 'seoDescription')) {
-          const fieldName = appliedItem.field === 'seoTitle' ? 'title' : 'description';
+        if (appliedItem && (appliedItem.field === 'seoTitle' || appliedItem.field === 'seoDescription' || appliedItem.field === 'schema')) {
+          const fieldName = appliedItem.field === 'seoTitle' ? 'title' : appliedItem.field === 'seoDescription' ? 'description' : 'schema';
           recordSeoChange(req.params.workspaceId, r.pageId, appliedItem.pageSlug || '', appliedItem.pageTitle || '', [fieldName], 'approval');
         }
       }
