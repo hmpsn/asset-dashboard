@@ -66,7 +66,11 @@ Every completed task — no matter how small — must include these steps:
 
 | File | Purpose | Notes |
 |------|---------|-------|
-| `index.ts` | **All Express routes** (~7,300 lines) | Chat endpoints, strategy generation, CRUD. The largest file. |
+| `index.ts` | **App setup, middleware, WS, route mounting** (~450 lines) | No route handlers — all moved to `server/routes/`. |
+| `routes/` | 38 Express Router files | One file per domain: `auth.ts`, `webflow.ts`, `jobs.ts`, `keyword-strategy.ts`, `public-analytics.ts`, etc. |
+| `helpers.ts` | Shared pure functions | `sanitizeString`, `validateEnum`, `parseDateRange`, `applySuppressionsToAudit`, `buildSchemaContext`, `getAuditTrafficForWorkspace`, `readEnvFile`, `writeEnvFile` |
+| `middleware.ts` | Shared middleware + auth (single source of truth) | Rate limiters, `signClientSession`/`verifyClientSession`, `signAdminToken`/`verifyAdminToken`, `upload` (multer), `moveUploadedFiles`, `IS_PROD`, `APP_PASSWORD` |
+| `broadcast.ts` | WebSocket broadcast singleton | `setBroadcast()` called in index.ts, `broadcast()`/`broadcastToWorkspace()` imported by route files |
 | `workspaces.ts` | Workspace CRUD, `Workspace` interface, `PageEditState` model, `KeywordStrategy` types | Core data model. `updatePageState()`, `getPageState()`, `getAllPageStates()` manage the unified page lifecycle. |
 | `seo-context.ts` | `buildSeoContext()`, `buildKeywordMapContext()`, `buildKnowledgeBase()` | Shared AI prompt builders — used by chat, briefs, schema |
 | `chat-memory.ts` | Chat session persistence | `addMessage`, `buildConversationContext`, `generateSessionSummary` |
