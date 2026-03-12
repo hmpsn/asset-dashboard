@@ -850,18 +850,12 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
             </p>
           </div>
 
-          {/* Tab toggle when both modes are available */}
-          {showsBothModes && (
-            <div className="flex items-center gap-1 mb-5 bg-zinc-800 rounded-xl p-1">
-              <button onClick={() => { setLoginTab('user'); setAuthError(''); }}
-                className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${loginTab === 'user' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-400'}`}>
-                Email Login
-              </button>
-              <button onClick={() => { setLoginTab('password'); setAuthError(''); }}
-                className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${loginTab === 'password' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-400'}`}>
-                Shared Password
-              </button>
-            </div>
+          {/* Mode switch link when both modes are available */}
+          {showsBothModes && loginTab === 'password' && (
+            <button onClick={() => { setLoginTab('user'); setAuthError(''); }}
+              className="w-full text-center text-xs text-zinc-500 hover:text-zinc-300 mb-4 transition-colors">
+              Sign in with your email instead
+            </button>
           )}
 
           {/* Individual user login / forgot / reset form */}
@@ -991,6 +985,12 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
                 className="w-full py-1 text-xs text-zinc-500 hover:text-zinc-400 transition-colors">
                 Forgot your password?
               </button>
+              {showsBothModes && (
+                <button type="button" onClick={() => { setLoginTab('password'); setAuthError(''); }}
+                  className="w-full py-1 text-xs text-zinc-500 hover:text-zinc-400 transition-colors">
+                  Have a shared password instead?
+                </button>
+              )}
             </form>
             )
           ) : (
@@ -1093,7 +1093,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
               <div className="relative flex items-center gap-1 bg-zinc-900 rounded-lg border border-zinc-800 p-0.5">
                 {[7, 28, 90, 180, 365].map(d => (
                   <button key={d} onClick={() => changeDays(d)}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${!customDateRange && days === d ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    className={`px-3 py-2 min-h-[44px] rounded-md text-xs font-medium transition-colors ${!customDateRange && days === d ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}
                   >{d >= 365 ? '1y' : d >= 180 ? '6mo' : `${d}d`}</button>
                 ))}
                 <button onClick={() => effectiveTier !== 'free' && setShowDatePicker(p => !p)}
@@ -1307,7 +1307,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
                   <p className="text-xs text-zinc-500">Ask anything about your site performance:</p>
                   <div className="grid grid-cols-1 gap-2">
                     {QUICK_QUESTIONS.map((q, i) => (
-                      <button key={i} onClick={() => askAi(q)} className="text-left px-3 py-2.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-800 text-[11px] text-zinc-300 transition-colors">
+                      <button key={i} onClick={() => askAi(q)} className="text-left px-3.5 py-3 min-h-[44px] rounded-lg bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-800 text-[11px] text-zinc-300 transition-colors">
                         <MessageSquare className="w-3 h-3 text-teal-400 mb-1" />{q}
                       </button>
                     ))}
@@ -1315,7 +1315,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
                   <div className="pt-3 border-t border-zinc-800/50">
                     <p className="text-[10px] text-zinc-600 uppercase tracking-wider font-medium mb-2">New to SEO? Ask the AI</p>
                     {LEARN_SEO_QUESTIONS.slice(0, 3).map((q, i) => (
-                      <button key={`learn-${i}`} onClick={() => askAi(q)} className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-emerald-500/5 border border-transparent hover:border-emerald-500/15 transition-colors text-[11px] text-emerald-400/70 hover:text-emerald-400">
+                      <button key={`learn-${i}`} onClick={() => askAi(q)} className="w-full text-left px-3.5 py-2.5 min-h-[44px] rounded-lg hover:bg-emerald-500/5 border border-transparent hover:border-emerald-500/15 transition-colors text-[11px] text-emerald-400/70 hover:text-emerald-400">
                         💡 {q}
                       </button>
                     ))}
@@ -1342,13 +1342,13 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
                     <div className="space-y-1.5 pt-1">
                       <p className="text-[10px] text-zinc-600 uppercase tracking-wider font-medium">Ask a follow-up</p>
                       {QUICK_QUESTIONS.slice(0, 3).map((q, i) => (
-                        <button key={i} onClick={() => askAi(q)} className="w-full text-left px-3 py-2 rounded-lg bg-zinc-800/30 hover:bg-zinc-800/60 border border-zinc-800/50 text-[11px] text-zinc-400 hover:text-zinc-300 transition-colors">
+                        <button key={i} onClick={() => askAi(q)} className="w-full text-left px-3.5 py-2.5 min-h-[44px] rounded-lg bg-zinc-800/30 hover:bg-zinc-800/60 border border-zinc-800/50 text-[11px] text-zinc-400 hover:text-zinc-300 transition-colors">
                           {q}
                         </button>
                       ))}
                       <p className="text-[10px] text-zinc-600 uppercase tracking-wider font-medium mt-3">New to SEO?</p>
                       {LEARN_SEO_QUESTIONS.slice(0, 2).map((q, i) => (
-                        <button key={`learn-${i}`} onClick={() => askAi(q)} className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-emerald-500/5 border border-transparent hover:border-emerald-500/15 transition-colors text-[11px] text-emerald-400/70 hover:text-emerald-400">
+                        <button key={`learn-${i}`} onClick={() => askAi(q)} className="w-full text-left px-3.5 py-2.5 min-h-[44px] rounded-lg hover:bg-emerald-500/5 border border-transparent hover:border-emerald-500/15 transition-colors text-[11px] text-emerald-400/70 hover:text-emerald-400">
                           💡 {q}
                         </button>
                       ))}
@@ -1381,6 +1381,13 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
         {/* ════════════ PLANS TAB ════════════ */}
         {tab === 'plans' && (
           <PlansTab workspaceId={workspaceId} ws={ws} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setTab={setTab} setToast={setToast} onOpenChat={() => setChatOpen(true)} />
+        )}
+
+        {/* ════════════ ROI TAB ════════════ */}
+        {tab === 'roi' && (
+          <ErrorBoundary label="ROI Dashboard">
+            <ROIDashboard workspaceId={workspaceId} tier={effectiveTier} />
+          </ErrorBoundary>
         )}
 
       </main>
@@ -1548,13 +1555,6 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
           </div>
         );
       })()}
-
-      {/* ════════════ ROI TAB ════════════ */}
-      {tab === 'roi' && (
-        <ErrorBoundary label="ROI Dashboard">
-          <ROIDashboard workspaceId={workspaceId} tier={effectiveTier} />
-        </ErrorBoundary>
-      )}
 
       {/* Stripe Elements inline payment modal */}
       {!betaMode && stripePayment && (

@@ -438,7 +438,7 @@ export function PerformancePulse({ overview, searchComparison, ga4Overview, ga4C
       label: 'Impressions',
       value: fmtNum(overview.totalImpressions),
       change: searchComparison?.changePercent.impressions,
-      color: 'text-purple-400',
+      color: 'text-blue-400',
     });
   } else if (ga4Overview) {
     metrics.push({

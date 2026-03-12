@@ -95,11 +95,11 @@ export function SearchSnapshot({ overview, trend, comparison, devices, onViewMor
         </div>
         <div className="bg-zinc-800/40 rounded-lg px-3 py-2.5">
           <div className="flex items-center gap-1.5 mb-0.5">
-            <Eye className="w-3 h-3 text-purple-400" />
+            <Eye className="w-3 h-3 text-blue-400" />
             <span className="text-[11px] text-zinc-500">Impressions</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-lg font-bold text-purple-400">{formatNum(overview.totalImpressions)}</span>
+            <span className="text-lg font-bold text-blue-400">{formatNum(overview.totalImpressions)}</span>
             {comparison && <ChangeBadge value={comparison.changePercent.impressions} />}
           </div>
         </div>
