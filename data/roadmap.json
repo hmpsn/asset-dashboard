@@ -657,7 +657,7 @@
           "status": "pending"
         },
         {
-          "id": 223,
+          "id": 255,
           "title": "Loading skeleton for client dashboard first load",
           "source": "Market prep analysis Mar 2026",
           "est": "1-2h",
@@ -667,7 +667,7 @@
           "shippedAt": "2026-03-12"
         },
         {
-          "id": 207,
+          "id": 231,
           "title": "Recharts migration (all custom SVG charts)",
           "source": "Tech debt Mar 2026",
           "est": "4-6h",
@@ -677,7 +677,7 @@
           "shippedAt": "2026-03"
         },
         {
-          "id": 208,
+          "id": 232,
           "title": "AI Usage Dashboard in Command Center",
           "source": "Cost visibility Mar 2026",
           "est": "3-4h",
@@ -687,7 +687,7 @@
           "shippedAt": "2026-03"
         },
         {
-          "id": 209,
+          "id": 233,
           "title": "Mobile Guard interstitial",
           "source": "UX guard Mar 2026",
           "est": "30m",
@@ -697,7 +697,7 @@
           "shippedAt": "2026-03"
         },
         {
-          "id": 210,
+          "id": 234,
           "title": "Client Onboarding Questionnaire",
           "source": "Client intake Mar 2026",
           "est": "2-3h",
@@ -830,7 +830,7 @@
       "rationale": "Beta client feedback: LLMs and AI answer engines cite pages with trust signals, clean structure, and rich schema. Three feature groups: new audit checks, schema expansion, and content brief enhancements.",
       "items": [
         {
-          "id": 211,
+          "id": 235,
           "title": "AEO Trust Audit: trust pages existence check",
           "source": "Beta client AEO feedback A1",
           "est": "1h",
@@ -840,7 +840,7 @@
           "shippedAt": "2026-03-12"
         },
         {
-          "id": 212,
+          "id": 236,
           "title": "AEO Trust Audit: author/reviewer markup detection",
           "source": "Beta client AEO feedback A1, D3",
           "est": "1h",
@@ -850,7 +850,7 @@
           "shippedAt": "2026-03-12"
         },
         {
-          "id": 213,
+          "id": 237,
           "title": "AEO Trust Audit: last-updated date detection",
           "source": "Beta client AEO feedback A1, C2",
           "est": "30m",
@@ -860,7 +860,7 @@
           "shippedAt": "2026-03-12"
         },
         {
-          "id": 214,
+          "id": 238,
           "title": "AEO Trust Audit: answer-first content structure",
           "source": "Beta client AEO feedback B1",
           "est": "1h",
@@ -870,7 +870,7 @@
           "shippedAt": "2026-03-12"
         },
         {
-          "id": 215,
+          "id": 239,
           "title": "AEO Trust Audit: FAQ without schema detection",
           "source": "Beta client AEO feedback B5",
           "est": "30m",
@@ -880,7 +880,7 @@
           "shippedAt": "2026-03-12"
         },
         {
-          "id": 216,
+          "id": 240,
           "title": "AEO Trust Audit: hidden content behind UI",
           "source": "Beta client AEO feedback E3",
           "est": "30m",
@@ -890,7 +890,7 @@
           "shippedAt": "2026-03-12"
         },
         {
-          "id": 217,
+          "id": 241,
           "title": "AEO Trust Audit: citation/reference density",
           "source": "Beta client AEO feedback A2",
           "est": "1h",
@@ -900,7 +900,7 @@
           "shippedAt": "2026-03-12"
         },
         {
-          "id": 218,
+          "id": 242,
           "title": "AEO Trust Audit: dark pattern detection",
           "source": "Beta client AEO feedback A4",
           "est": "30m",
@@ -910,7 +910,7 @@
           "shippedAt": "2026-03-12"
         },
         {
-          "id": 219,
+          "id": 243,
           "title": "Schema: healthcare types (MedicalBusiness, Dentist, Physician, MedicalProcedure)",
           "source": "Beta client AEO feedback D1",
           "est": "1-2h",
@@ -920,7 +920,7 @@
           "shippedAt": "2026-03-12"
         },
         {
-          "id": 220,
+          "id": 244,
           "title": "Schema: HowTo + Dataset types",
           "source": "Beta client AEO feedback D1",
           "est": "30m",
@@ -930,7 +930,7 @@
           "shippedAt": "2026-03-12"
         },
         {
-          "id": 221,
+          "id": 245,
           "title": "Schema: author + reviewedBy on Article schemas",
           "source": "Beta client AEO feedback D3",
           "est": "1h",
@@ -940,7 +940,7 @@
           "shippedAt": "2026-03-12"
         },
         {
-          "id": 222,
+          "id": 246,
           "title": "Schema: sameAs entity linking on Organization",
           "source": "Beta client AEO feedback D2",
           "est": "30m",
@@ -950,7 +950,7 @@
           "shippedAt": "2026-03-12"
         },
         {
-          "id": 223,
+          "id": 247,
           "title": "Content Brief: answer-first layout template",
           "source": "Beta client AEO feedback B1",
           "est": "1h",
@@ -960,7 +960,7 @@
           "shippedAt": "2026-03-12"
         },
         {
-          "id": 224,
+          "id": 248,
           "title": "Content Brief: citation density targets + definition blocks + comparison tables",
           "source": "Beta client AEO feedback A2, B3, B4",
           "est": "1h",
