@@ -1,10 +1,125 @@
 {
   "sprints": [
     {
+      "id": "sprint-launch",
+      "name": "Launch Readiness",
+      "hours": "18-26",
+      "rationale": "PRIORITY 0 — LAUNCH BLOCKER: Items that must ship before go-to-market. Stripe recurring billing is a hard blocker (can’t charge monthly without subscriptions). Email capture unlocks the growth loop. Easy wins are high-impact, low-effort polish items that improve first impressions and conversion.",
+      "items": [
+        {
+          "id": 214,
+          "title": "Stripe recurring billing for tier subscriptions",
+          "source": "Market prep analysis Mar 2026",
+          "est": "4-6h",
+          "priority": "P0",
+          "notes": "LAUNCH BLOCKER — Tier upgrades (Growth $249/mo, Premium $999/mo) currently use Stripe Checkout with mode:'payment' (one-time). Must switch to mode:'subscription' with recurring Price IDs. Without this, monthly tier revenue requires manual invoicing. Implementation: create Stripe subscription products + recurring prices, update createCheckoutSession to use mode:'subscription' for plan_growth/plan_premium, handle subscription lifecycle webhooks (invoice.paid, invoice.payment_failed, customer.subscription.deleted), add subscription management UI (cancel/change plan). Stripe customer portal integration for self-service billing management.",
+          "status": "pending"
+        },
+        {
+          "id": 215,
+          "title": "Client email capture on free tier",
+          "source": "Market prep analysis Mar 2026",
+          "est": "2-3h",
+          "priority": "P0",
+          "notes": "Free tier clients can access the dashboard without providing an email (shared password auth). No email = no monthly reports, no trial expiry emails, no re-engagement, no upgrade prompts. Fix: require email on first login even for shared-password workspaces (lightweight email gate before dashboard loads). Store email in workspace contacts or auto-create a client user. Unlocks the entire email marketing funnel and makes monthly reports reach every client.",
+          "status": "pending"
+        },
+        {
+          "id": 216,
+          "title": "AI chatbot upgrade prompts with ROI dollar values",
+          "source": "Market prep analysis Mar 2026",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Easy win — The chatbot currently says 'Upgrade to Growth for unlimited chat.' Should say 'Upgrade to Growth ($249/mo) — you've already identified $X in organic traffic value this month.' The ROI data already exists via /api/public/roi/:wsId. Wire it into the chatbot upgrade prompt and TierGate overlay copy. Connects value proof to purchase decision at the exact moment of highest intent.",
+          "status": "pending"
+        },
+        {
+          "id": 217,
+          "title": "\"Time saved\" metric on admin dashboard",
+          "source": "Market prep analysis Mar 2026",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Easy win — Track duration of AI operations (brief generation, post generation, schema generation, strategy generation, audit runs) and show a running 'X hours saved this month' counter on the Command Center and Workspace Home. Data partially exists via activity log timestamps. Add timing metadata to AI generation endpoints, aggregate per-workspace and globally. Useful for client conversations ('we saved you 12 hours this month') and marketing materials.",
+          "status": "pending"
+        },
+        {
+          "id": 218,
+          "title": "Pre-populate content requests from audit issues",
+          "source": "Market prep analysis Mar 2026",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Easy win — When the audit finds thin content on a high-traffic page, auto-create a draft content request with page context pre-filled (URL, current word count, top keywords from GSC, identified issues). Client just has to approve. Partially exists via Fix routing in audit, but going one step further to pre-create the request removes another click from the revenue funnel. Wire into FixRecommendations component for content-related issues.",
+          "status": "pending"
+        },
+        {
+          "id": 219,
+          "title": "Client portal favicon + OG meta tags",
+          "source": "Market prep analysis Mar 2026",
+          "est": "30m",
+          "priority": "P1",
+          "notes": "Easy win — The portal sets document.title dynamically but has no custom favicon or OG meta. When a client bookmarks their dashboard or shares it in Slack, it shows a generic icon. Add per-workspace favicon (use workspace logo or branded default) and OG tags (og:title, og:description, og:image) in ClientDashboard. Small polish, big perception improvement for a professional SaaS product.",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "sprint-infra",
+      "name": "Infrastructure & Reliability",
+      "hours": "22-32",
+      "rationale": "PRIORITY 1 — SCALE RISK: Foundation work that de-risks scaling. Database migration prevents data corruption under concurrent load. Structured logging and error tracking are operational necessities before supporting paying customers. Execute before or in parallel with Client Impact sprint.",
+      "items": [
+        {
+          "id": 211,
+          "title": "PostgreSQL migration (from JSON-on-disk)",
+          "source": "Roadmap review Mar 2026",
+          "est": "8-12h",
+          "priority": "P0",
+          "notes": "LAUNCH RISK — Migrate from JSON file persistence to PostgreSQL. Currently noted as 'deferred until 5-10GB' on #195, but concurrent write issues and relational query needs will surface well before that — especially with team management (#16), permissions (#17), and recurring subscriptions (#111). Phased approach: (1) Add Drizzle/Prisma ORM + schema definitions, (2) Migration scripts to import existing JSON data, (3) Swap data layer one domain at a time (workspaces → payments → activity → content), (4) Keep JSON backup scheduler as fallback during transition. Much harder to migrate later with more features built on file I/O.",
+          "status": "pending"
+        },
+        {
+          "id": 208,
+          "title": "Critical-path E2E tests",
+          "source": "Roadmap review Mar 2026",
+          "est": "6-8h",
+          "priority": "P1",
+          "notes": "End-to-end tests for revenue-critical and data-critical flows: Stripe checkout (single + cart), audit run → score calculation → suppression, content brief generation → post generation, approval workflow (propose → review → apply to Webflow), WebSocket broadcast delivery, client login + JWT refresh. Use Vitest + Supertest for API tests, Playwright for critical UI flows. No competitor can break your payment pipeline with confidence if this exists.",
+          "status": "pending"
+        },
+        {
+          "id": 210,
+          "title": "Error monitoring & observability (Sentry)",
+          "source": "Roadmap review Mar 2026",
+          "est": "2-3h",
+          "priority": "P0",
+          "notes": "OPERATIONAL NECESSITY — Add Sentry (or similar) for client-facing error tracking on both frontend and backend. Critical before scaling via marketplace — need visibility into errors without relying on the feedback widget (#190). Source maps for frontend, Express error handler integration for backend. Alert rules for payment flow errors, WebSocket disconnects, and AI generation failures.",
+          "status": "pending"
+        },
+        {
+          "id": 222,
+          "title": "Structured logging (replace console.log)",
+          "source": "Market prep analysis Mar 2026",
+          "est": "2-3h",
+          "priority": "P0",
+          "notes": "OPERATIONAL NECESSITY — Raw console.log/warn/error throughout server code means no searchable logs, no log levels, no alerting on production issues. Replace with pino (lightweight, JSON structured logging). Add log levels (error, warn, info, debug), request ID tracing, per-workspace context. Enables: searching errors by workspace, monitoring AI costs, debugging client issues without SSH, and integration with log aggregation services (Datadog, Papertrail, etc.).",
+          "status": "pending"
+        },
+        {
+          "id": 224,
+          "title": "API documentation (OpenAPI/Swagger spec)",
+          "source": "Market prep analysis Mar 2026",
+          "est": "3-4h",
+          "priority": "P2",
+          "notes": "38+ route files with no formal API docs beyond the code itself. If you bring on another developer or a client asks for API access, this becomes a blocker. Auto-generate OpenAPI spec from route definitions using tsoa or swagger-jsdoc. Host interactive docs at /api/docs. Document auth requirements, request/response schemas, and error codes for all public and admin endpoints.",
+          "status": "pending"
+        }
+      ]
+    },
+    {
       "id": "sprint-B",
       "name": "Client Impact & Retention",
       "hours": "21-27",
-      "rationale": "PRIORITY 1: Make existing clients see undeniable value. Prove ROI of every change, reduce churn, and bridge strategy to action.",
+      "rationale": "PRIORITY 2 — COMPETITIVE MOAT: Make existing clients see undeniable value. SEO change impact tracking is the hardest thing for competitors to replicate. Shareable reports reduce churn by reaching budget-holders. Content refresh engine justifies ongoing subscriptions.",
       "items": [
         {
           "id": 74,
@@ -82,7 +197,7 @@
           "source": "FEATURE_VISION #10",
           "est": "6-8h",
           "priority": "P0",
-          "notes": "Log every SEO change with timestamp → track GSC/GA4 before/after → show impact: 'After updating meta title on /services, CTR improved +124%.' Hardest thing for competitors to replicate. Infrastructure exists: trackSeoEdit timestamps + audit snapshots + getPageTrend daily GSC data.",
+          "notes": "COMPETITIVE MOAT — Log every SEO change with timestamp → track GSC/GA4 before/after → show impact: 'After updating meta title on /services, CTR improved +124%.' Hardest thing for competitors to replicate. Infrastructure exists: trackSeoEdit timestamps + audit snapshots + getPageTrend daily GSC data.",
           "status": "pending"
         },
         {
@@ -90,8 +205,8 @@
           "title": "Shareable client reports",
           "source": "FEATURE_VISION #8",
           "est": "4-6h",
-          "priority": "P1",
-          "notes": "Monthly reports already generate full HTML via renderReportHTML(). Add hosted permalink route (/report/:wsId/:reportId) + one-click 'Share this report' button. Clients forward to decision-makers. Reduces churn (budget-holders see value) + referral channel.",
+          "priority": "P0",
+          "notes": "CHURN REDUCER — Monthly reports already generate full HTML via renderReportHTML(). Add hosted permalink route (/report/:wsId/:reportId) + one-click 'Share this report' button. Clients forward to decision-makers. Reduces churn (budget-holders see value) + referral channel.",
           "status": "pending"
         },
         {
@@ -360,6 +475,24 @@
           "priority": "P2",
           "notes": "CSV/JSON export for key datasets: audit history, keyword strategy, content briefs, ROI data, activity log. Reduces churn anxiety ('what if I leave?') and is often a procurement requirement for larger agency clients. Add export buttons to Strategy, Health, ROI, and Content tabs. Server endpoints return formatted CSV or JSON.",
           "status": "pending"
+        },
+        {
+          "id": 220,
+          "title": "Content versioning for generated posts",
+          "source": "Market prep analysis Mar 2026",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "If you regenerate a section, the old version is gone. For a $500-$1,500 deliverable, clients expect to compare or revert versions. Add version history to content-posts.ts: snapshot current post before regeneration, store version array with timestamp and trigger (manual edit, AI regeneration, unification pass). PostEditor UI shows version timeline with diff view and one-click revert.",
+          "status": "pending"
+        },
+        {
+          "id": 221,
+          "title": "Human-in-the-loop post review checklist",
+          "source": "Market prep analysis Mar 2026",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Briefs have an approval workflow, but full posts go straight from AI to draft status. For a paid deliverable, clients expect human polish. Add structured review checklist to PostEditor: factual accuracy verified, brand voice match confirmed, internal links verified and working, no AI hallucinations/fabricated stats, meta title/description optimized, word count within brief target. Post cannot move to review status until all checklist items checked. Shows professionalism and catches AI errors before client sees them.",
+          "status": "pending"
         }
       ]
     },
@@ -524,38 +657,12 @@
           "status": "pending"
         },
         {
-          "id": 210,
-          "title": "Error monitoring & observability (Sentry)",
-          "source": "Roadmap review Mar 2026",
-          "est": "2-3h",
-          "priority": "P1",
-          "notes": "Add Sentry (or similar) for client-facing error tracking on both frontend and backend. Critical before scaling via marketplace — need visibility into errors without relying on the feedback widget (#190). Source maps for frontend, Express error handler integration for backend. Alert rules for payment flow errors, WebSocket disconnects, and AI generation failures.",
-          "status": "pending"
-        }
-      ]
-    },
-    {
-      "id": "sprint-infra",
-      "name": "Infrastructure & Reliability",
-      "hours": "18-26",
-      "rationale": "PRIORITY 5: Foundation work that de-risks scaling. Database migration unblocks team features and concurrent writes. E2E tests protect critical revenue paths. Execute before or in parallel with SEO Intelligence.",
-      "items": [
-        {
-          "id": 211,
-          "title": "PostgreSQL migration (from JSON-on-disk)",
-          "source": "Roadmap review Mar 2026",
-          "est": "8-12h",
-          "priority": "P1",
-          "notes": "Migrate from JSON file persistence to PostgreSQL. Currently noted as 'deferred until 5-10GB' on #195, but concurrent write issues and relational query needs will surface well before that — especially with team management (#16), permissions (#17), and recurring subscriptions (#111). Phased approach: (1) Add Drizzle/Prisma ORM + schema definitions, (2) Migration scripts to import existing JSON data, (3) Swap data layer one domain at a time (workspaces → payments → activity → content), (4) Keep JSON backup scheduler as fallback during transition. Much harder to migrate later with more features built on file I/O.",
-          "status": "pending"
-        },
-        {
-          "id": 208,
-          "title": "Critical-path E2E tests",
-          "source": "Roadmap review Mar 2026",
-          "est": "6-8h",
-          "priority": "P1",
-          "notes": "End-to-end tests for revenue-critical and data-critical flows: Stripe checkout (single + cart), audit run → score calculation → suppression, content brief generation → post generation, approval workflow (propose → review → apply to Webflow), WebSocket broadcast delivery, client login + JWT refresh. Use Vitest + Supertest for API tests, Playwright for critical UI flows. No competitor can break your payment pipeline with confidence if this exists.",
+          "id": 223,
+          "title": "Loading skeleton for client dashboard first load",
+          "source": "Market prep analysis Mar 2026",
+          "est": "1-2h",
+          "priority": "P2",
+          "notes": "When loadDashboardData fires after login, the client sees empty tab content until 4-12 parallel fetches complete. Add shimmer/skeleton loading states for key components: OverviewTab metric cards, HealthTab score ring, PerformanceTab charts, StrategyTab keyword table. Use shared Skeleton primitive component. Small polish that makes the app feel faster and more professional on first load.",
           "status": "pending"
         }
       ]
@@ -564,7 +671,7 @@
       "id": "sprint-F",
       "name": "SEO Intelligence Expansion",
       "hours": "28-40",
-      "rationale": "PRIORITY 6: Deeper competitive and technical SEO capabilities that differentiate the platform.",
+      "rationale": "PRIORITY 5: Deeper competitive and technical SEO capabilities that differentiate the platform.",
       "items": [
         {
           "id": 199,
@@ -626,7 +733,7 @@
       "id": "sprint-G-new",
       "name": "Team & Collaboration",
       "hours": "20-26",
-      "rationale": "PRIORITY 7: Multi-user support for growing agencies. Execute when team size or client demands justify it.",
+      "rationale": "PRIORITY 6: Multi-user support for growing agencies. Execute when team size or client demands justify it.",
       "items": [
         {
           "id": 16,
