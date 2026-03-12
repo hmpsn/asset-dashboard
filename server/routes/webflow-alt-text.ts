@@ -291,7 +291,7 @@ router.post('/api/webflow/compress/:assetId', async (req, res) => {
     const savings = originalSize - newSize;
     const savingsPercent = Math.round((savings / originalSize) * 100);
 
-    if (savingsPercent < 5) {
+    if (ext !== 'svg' && savingsPercent < 5) {
       return res.json({
         skipped: true,
         reason: `Already optimized (only ${savingsPercent}% savings)`,
