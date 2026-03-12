@@ -4,6 +4,7 @@
  */
 import { Router } from 'express';
 import { addActivity } from '../activity-log.js';
+import { recordSeoChange } from '../seo-change-tracker.js';
 import { getQueue, getMetadata } from '../processor.js';
 import {
   listSites,
@@ -113,6 +114,7 @@ router.put('/api/webflow/pages/:pageId/seo', async (req, res) => {
         const changedFields = [seo?.title && 'title', seo?.description && 'description', openGraph && 'OG'].filter(Boolean) as string[];
         addActivity(seoWs.id, 'seo_updated', `Updated SEO ${changedFields.join(', ')} for a page`, undefined, { pageId: req.params.pageId });
         updatePageState(seoWs.id, req.params.pageId, { status: 'live', source: 'editor', fields: changedFields, updatedBy: 'admin' });
+        recordSeoChange(seoWs.id, req.params.pageId, req.body.slug || '', req.body.pageTitle || title || '', changedFields, 'editor');
       }
     }
     res.json(result);

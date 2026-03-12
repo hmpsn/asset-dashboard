@@ -1170,11 +1170,55 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 90. SEO Change Performance Tracker
+**What it does:** Records every SEO change (title, description, OG) applied to pages — whether via the SEO Editor, Bulk Fix, Approval flow, or background jobs. Stores a persistent log per workspace in `~/.asset-dashboard/seo-changes/`. The `SeoChangeImpact` component on the Workspace Home page lists recent changes with a "Compare GSC Impact" button. When clicked, it fetches GSC page-level data for before/after periods (28-day windows around the change date, accounting for GSC's 3-day data delay) and shows delta badges for clicks, impressions, CTR, and position. Changes less than 7 days old are marked "too recent."
+
+**Agency value:** Concrete proof that SEO work drives measurable results. "After we rewrote your meta descriptions, clicks to that page increased 34%" is a retention-winning conversation.
+
+**Client value:** Transparency into what was changed and whether it's working. Builds trust in the agency's recommendations.
+
+**Mutual:** Data-driven feedback loop — the agency knows which types of SEO changes produce the best results, and the client sees the ROI.
+
+---
+
+### 91. AI Usage as Standalone Nav Page
+**What it does:** The AI Usage dashboard (token consumption, cost tracking, per-feature breakdown) was previously embedded inline in the Command Center. Now exported as a standalone page accessible via an amber-accented "AI Usage" button in the Command Center header nav, alongside Prospect and Roadmap. Routes through `'ai-usage'` page type in App.tsx.
+
+**Agency value:** Faster access to AI cost tracking without scrolling through the Command Center.
+
+**Client value:** N/A (admin-only feature).
+
+**Mutual:** Better operational visibility into AI spend.
+
+---
+
+### 92. Keyword Difficulty / Impressions Zero-Value Fix
+**What it does:** Fixed a display bug in the admin KeywordStrategy component where Keyword Difficulty and volume/impressions were showing as "0" instead of being hidden. Applied conditional rendering (`> 0`) to siteKeywords, pageMap metrics, and secondaryMetrics sections. The client-side StrategyTab already had this logic; the admin side was missing it.
+
+**Agency value:** Clean, accurate data display — no misleading zero values that erode confidence in the data.
+
+**Client value:** N/A (admin-side fix, client side was already correct).
+
+**Mutual:** Data integrity across both sides of the platform.
+
+---
+
+### 93. Admin Sidebar Per-Group Color Accents
+**What it does:** Each sidebar navigation group now has its own color scheme: Analytics (blue), Site Health (emerald), SEO (teal), Content (amber). Active items show a gradient background and full-color icon matching their group. Inactive items show a muted version of the group color on hover. Tailwind JIT-compatible with explicit color properties per group.
+
+**Agency value:** Faster visual scanning — color-coded groups let the admin find the right tool instantly without reading labels.
+
+**Client value:** N/A (admin-only UI).
+
+**Mutual:** Polished professional interface that reinforces the premium positioning of the platform.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
 |----------|:---:|---|
-| SEO & Technical | 13 | Audit, fix, and optimize faster than manual tools + AEO trust signals |
+| SEO & Technical | 14 | Audit, fix, and optimize faster than manual tools + AEO trust signals + change impact tracking |
 | Analytics & Tracking | 7 | Unified data view replaces platform-hopping + AI time-saved tracking |
 | Content & Strategy | 8 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request |
 | Client Communication | 9 | Structured workflows + automated reports + expanded notifications + feedback widget + email capture funnel |
@@ -1183,10 +1227,10 @@ When the user asks to update this document with recent features, follow this pro
 | Auth & Access Control | 3 | Internal user accounts, workspace ACL, client user accounts |
 | Security | 1 | Helmet, HTTPS, rate limiting, input sanitization |
 | Monetization | 2 | Stripe Checkout + Subscriptions, admin settings, payment tracking, trials, encrypted config, billing portal |
-| Platform & UX | 15 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home, page state model, work orders, request linkage, admin UX overhaul, landing page, mobile guard, Recharts, portal OG/favicon |
+| Platform & UX | 17 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home, page state model, work orders, request linkage, admin UX overhaul, landing page, mobile guard, Recharts, portal OG/favicon, sidebar color accents, AI Usage standalone page |
 | Data Architecture | 3 | PageEditState model, cross-store writes, activity feed for client actions |
 | Architecture | 2 | Server refactor (46 route modules + 3 shared modules), frontend component decomposition |
 
-**89 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**93 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **89**. Last updated: March 2026 (Launch Readiness sprint complete: email capture, time saved metric, Stripe recurring billing).
+Current feature count: **93**. Last updated: March 2026 (SEO Change Performance Tracker, AI Usage nav, KD/impressions fix, sidebar color accents).

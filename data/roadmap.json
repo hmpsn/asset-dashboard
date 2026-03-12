@@ -1034,6 +1034,46 @@
           "notes": "Shipped — Changed NotificationBell.tsx dropdown from 'bottom-full left-0 mb-2' to 'top-full right-0 mt-2'. Panel now opens downward and right-aligned from the header bell icon.",
           "status": "done",
           "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 231,
+          "title": "SEO Change Performance Tracker — track pages after meta/description updates, compare GSC before/after",
+          "source": "Admin request — want to see how SEO changes improve page performance over time",
+          "est": "3-4h",
+          "priority": "P0",
+          "notes": "Shipped — server/seo-change-tracker.ts (persistent change log + GSC before/after comparison), routes/seo-change-tracker.ts (GET changes + GET impact with GSC data), SeoChangeImpact.tsx component in WorkspaceHome. recordSeoChange() hooked into editor, bulk-fix, approval, and job routes. Shows recent changes list with 'Compare GSC Impact' button that fetches before/after clicks, impressions, CTR, position with delta badges.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 232,
+          "title": "Move AI Usage to top nav button in Command Center header",
+          "source": "Admin request — easier access to AI usage dashboard",
+          "est": "30m",
+          "priority": "P1",
+          "notes": "Shipped — AIUsageSection exported from WorkspaceOverview.tsx, rendered as standalone page via 'ai-usage' route in App.tsx. Amber-accented button added to Command Center header alongside Prospect and Roadmap. Removed inline rendering from Command Center body.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 233,
+          "title": "Fix Keyword Difficulty and impressions showing 0 in admin dashboard",
+          "source": "Bug report — KD and volume showing 0 in strategy tab and content briefs",
+          "est": "15m",
+          "priority": "P0",
+          "notes": "Shipped — Display logic fix in KeywordStrategy.tsx: conditionally render volume/difficulty only when > 0. Applied to siteKeywords, pageMap, and secondaryMetrics sections. Client-side already had this logic; admin side was missing it.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 234,
+          "title": "Stylize admin sidebar nav links with per-group color accents",
+          "source": "Admin request — make sidebar more colorful and eye-catching",
+          "est": "30m",
+          "priority": "P1",
+          "notes": "Shipped — Each sidebar group (Analytics=blue, Site Health=emerald, SEO=teal, Content=amber) now has its own active background, text color, icon color, and hover state. Icons show muted group color when inactive, full color when active.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
         }
       ]
     },

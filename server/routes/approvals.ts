@@ -29,6 +29,7 @@ import {
   getClientPortalUrl,
   updatePageState,
 } from '../workspaces.js';
+import { recordSeoChange } from '../seo-change-tracker.js';
 
 // --- Approvals (admin, authenticated) ---
 router.post('/api/approvals/:workspaceId', (req, res) => {
@@ -158,9 +159,16 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', async (req, res
 
   if (appliedIds.length > 0) {
     markBatchApplied(req.params.workspaceId, req.params.batchId, appliedIds);
-    // Mark applied pages as live in edit tracking
+    // Mark applied pages as live in edit tracking + record SEO changes
     for (const r of results) {
-      if (r.success) updatePageState(req.params.workspaceId, r.pageId, { status: 'live', updatedBy: 'admin' });
+      if (r.success) {
+        updatePageState(req.params.workspaceId, r.pageId, { status: 'live', updatedBy: 'admin' });
+        const appliedItem = approved.find(i => i.id === r.itemId);
+        if (appliedItem && (appliedItem.field === 'seoTitle' || appliedItem.field === 'seoDescription')) {
+          const fieldName = appliedItem.field === 'seoTitle' ? 'title' : 'description';
+          recordSeoChange(req.params.workspaceId, r.pageId, appliedItem.pageSlug || '', appliedItem.pageTitle || '', [fieldName], 'approval');
+        }
+      }
     }
     // Log activity
     const batchData = getBatch(req.params.workspaceId, req.params.batchId);

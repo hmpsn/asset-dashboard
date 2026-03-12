@@ -38,6 +38,7 @@ const Annotations = lazy(() => import('./components/Annotations').then(m => ({ d
 const RequestManager = lazy(() => import('./components/RequestManager').then(m => ({ default: m.RequestManager })));
 const SalesReport = lazy(() => import('./components/SalesReport').then(m => ({ default: m.SalesReport })));
 const Roadmap = lazy(() => import('./components/Roadmap').then(m => ({ default: m.Roadmap })));
+const AIUsagePage = lazy(() => import('./components/WorkspaceOverview').then(m => ({ default: m.AIUsageSection })));
 const WorkspaceHome = lazy(() => import('./components/WorkspaceHome').then(m => ({ default: m.WorkspaceHome })));
 
 // ── Lazy-loaded SEO sub-tool chunks (split from SeoAudit #131) ──
@@ -68,6 +69,7 @@ type Page =
   | 'workspace-settings'
   | 'prospect'
   | 'roadmap'
+  | 'ai-usage'
   | 'requests'
   | 'settings';
 
@@ -322,29 +324,37 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   }, [tab]);
 
   // ── Sidebar navigation groups ──
-  const navGroups: Array<{ label: string; groupIcon?: typeof Globe; groupColor?: string; items: Array<{ id: Page; label: string; icon: typeof Globe; needsSite?: boolean }> }> = [
+  const navGroups: Array<{ label: string; groupIcon?: typeof Globe; groupColor?: string; activeBg?: string; activeText?: string; activeIcon?: string; inactiveIcon?: string; hoverBg?: string; hoverText?: string; items: Array<{ id: Page; label: string; icon: typeof Globe; needsSite?: boolean }> }> = [
     { label: '', items: [
       { id: 'home', label: 'Home', icon: LayoutDashboard },
     ]},
-    { label: 'ANALYTICS', groupIcon: Activity, groupColor: 'text-blue-400', items: [
+    { label: 'ANALYTICS', groupIcon: Activity, groupColor: 'text-blue-400',
+      activeBg: 'bg-blue-500/10', activeText: 'text-blue-300', activeIcon: 'text-blue-400', inactiveIcon: 'text-blue-500/40', hoverBg: 'hover:bg-blue-500/5', hoverText: 'hover:text-blue-300',
+      items: [
       { id: 'search', label: 'Search Console', icon: Search, needsSite: true },
       { id: 'analytics', label: 'Google Analytics', icon: BarChart3, needsSite: true },
       { id: 'seo-ranks', label: 'Rank Tracker', icon: TrendingUp, needsSite: true },
       { id: 'annotations', label: 'Annotations', icon: Flag, needsSite: true },
     ]},
-    { label: 'SITE HEALTH', groupIcon: Shield, groupColor: 'text-emerald-400', items: [
+    { label: 'SITE HEALTH', groupIcon: Shield, groupColor: 'text-emerald-400',
+      activeBg: 'bg-emerald-500/10', activeText: 'text-emerald-300', activeIcon: 'text-emerald-400', inactiveIcon: 'text-emerald-500/40', hoverBg: 'hover:bg-emerald-500/5', hoverText: 'hover:text-emerald-300',
+      items: [
       { id: 'seo-audit', label: 'Site Audit', icon: Globe, needsSite: true },
       { id: 'performance', label: 'Performance', icon: Gauge, needsSite: true },
       { id: 'links', label: 'Links', icon: Link2, needsSite: true },
       { id: 'media', label: 'Assets', icon: Image },
     ]},
-    { label: 'SEO', groupIcon: Zap, groupColor: 'text-teal-400', items: [
+    { label: 'SEO', groupIcon: Zap, groupColor: 'text-teal-400',
+      activeBg: 'bg-teal-500/10', activeText: 'text-teal-300', activeIcon: 'text-teal-400', inactiveIcon: 'text-teal-500/40', hoverBg: 'hover:bg-teal-500/5', hoverText: 'hover:text-teal-300',
+      items: [
       { id: 'brand', label: 'Brand & AI', icon: Sparkles, needsSite: false },
       { id: 'seo-strategy', label: 'Strategy', icon: Target, needsSite: true },
       { id: 'seo-editor', label: 'SEO Editor', icon: Pencil, needsSite: true },
       { id: 'seo-schema', label: 'Schema', icon: Code2, needsSite: true },
     ]},
-    { label: 'CONTENT', groupIcon: BookOpen, groupColor: 'text-amber-400', items: [
+    { label: 'CONTENT', groupIcon: BookOpen, groupColor: 'text-amber-400',
+      activeBg: 'bg-amber-500/10', activeText: 'text-amber-300', activeIcon: 'text-amber-400', inactiveIcon: 'text-amber-500/40', hoverBg: 'hover:bg-amber-500/5', hoverText: 'hover:text-amber-300',
+      items: [
       { id: 'seo-briefs', label: 'Content Briefs', icon: Clipboard, needsSite: true },
       { id: 'content', label: 'Content', icon: FileText, needsSite: true },
       { id: 'content-perf', label: 'Content Perf', icon: BarChart3, needsSite: true },
@@ -359,7 +369,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     'seo-ranks': 'Rank Tracker', search: 'Search Console', analytics: 'Google Analytics',
     annotations: 'Annotations', performance: 'Performance', 'content-perf': 'Content Performance',
     'workspace-settings': 'Workspace Settings', prospect: 'Prospect', roadmap: 'Roadmap',
-    requests: 'Requests', settings: 'Settings',
+    'ai-usage': 'AI Usage', requests: 'Requests', settings: 'Settings',
   };
 
   // ── Content renderer ──
@@ -376,6 +386,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
       setWorkspaces(prev => prev.map(w => w.id === selected.id ? updated : w));
     }} />;
     if (tab === 'prospect') return <SalesReport />;
+    if (tab === 'ai-usage') return <AIUsagePage />;
 
     if (!selected) {
       return <WorkspaceOverview onSelectWorkspace={(id) => {
@@ -480,13 +491,13 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
                       onClick={() => !disabled && setTab(item.id)}
                       className={`w-full flex items-center gap-2.5 px-2.5 py-[5px] rounded-lg text-[12px] font-medium transition-all ${
                         active
-                          ? 'bg-teal-500/10 text-teal-300'
+                          ? `${group.activeBg || 'bg-teal-500/10'} ${group.activeText || 'text-teal-300'}`
                           : disabled
                             ? 'text-zinc-700 cursor-not-allowed'
-                            : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
+                            : `text-zinc-500 ${group.hoverText || 'hover:text-zinc-300'} ${group.hoverBg || 'hover:bg-zinc-800/50'}`
                       }`}
                     >
-                      <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${active ? 'text-teal-400' : ''}`} />
+                      <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${active ? (group.activeIcon || 'text-teal-400') : (group.inactiveIcon || '')}`} />
                       <span className="truncate">{item.label}</span>
                       {item.id === 'seo-briefs' && pendingContentRequests > 0 && (
                         <span className="ml-auto text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 tabular-nums flex-shrink-0 min-w-[20px] text-center leading-tight">

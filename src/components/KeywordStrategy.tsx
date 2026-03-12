@@ -795,10 +795,10 @@ export function KeywordStrategyPanel({ workspaceId, siteId, onNavigate }: Props)
                 return (
                   <span key={i} className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-teal-500/10 border border-teal-500/20 rounded text-[11px] text-teal-300">
                     {kw}
-                    {metrics && (
+                    {metrics && (metrics.volume > 0 || metrics.difficulty > 0) && (
                       <>
-                        <span className="text-[11px] text-zinc-500 font-mono">{metrics.volume.toLocaleString()}/mo</span>
-                        <span className={`text-[11px] font-mono ${difficultyColor(metrics.difficulty)}`}>KD {metrics.difficulty}%</span>
+                        {metrics.volume > 0 && <span className="text-[11px] text-zinc-500 font-mono">{metrics.volume.toLocaleString()}/mo</span>}
+                        {metrics.difficulty > 0 && <span className={`text-[11px] font-mono ${difficultyColor(metrics.difficulty)}`}>KD {metrics.difficulty}%</span>}
                       </>
                     )}
                   </span>
@@ -939,13 +939,13 @@ export function KeywordStrategyPanel({ workspaceId, siteId, onNavigate }: Props)
                           </div>
                           {/* Metrics row */}
                           <div className="flex flex-wrap gap-3 mt-1">
-                            {page.volume !== undefined && (
+                            {page.volume != null && page.volume > 0 && (
                               <div className="text-[11px] text-zinc-500 flex items-center gap-1">
                                 <BarChart3 className="w-3 h-3 text-orange-400" />
                                 <span className="text-zinc-300 font-medium">{page.volume.toLocaleString()}</span>/mo
                               </div>
                             )}
-                            {page.difficulty !== undefined && (
+                            {page.difficulty != null && page.difficulty > 0 && (
                               <div className="text-[11px] text-zinc-500 flex items-center gap-1">
                                 <Shield className="w-3 h-3" />
                                 KD: <span className={`font-medium ${difficultyColor(page.difficulty)}`}>{page.difficulty}%</span>
@@ -979,9 +979,9 @@ export function KeywordStrategyPanel({ workspaceId, siteId, onNavigate }: Props)
                             <div className="mt-1">
                               <span className="text-[11px] text-zinc-500 uppercase tracking-wider">Secondary keyword data</span>
                               <div className="flex flex-wrap gap-1 mt-0.5">
-                                {page.secondaryMetrics.map((sm, si) => (
+                                {page.secondaryMetrics.filter(sm => sm.volume > 0 || sm.difficulty > 0).map((sm, si) => (
                                   <span key={si} className="text-[11px] px-1.5 py-0.5 bg-zinc-800/80 border border-zinc-700/50 rounded text-zinc-500">
-                                    {sm.keyword} <span className="text-zinc-400">{sm.volume}/mo</span> <span className={difficultyColor(sm.difficulty)}>KD {sm.difficulty}%</span>
+                                    {sm.keyword} {sm.volume > 0 && <span className="text-zinc-400">{sm.volume}/mo</span>} {sm.difficulty > 0 && <span className={difficultyColor(sm.difficulty)}>KD {sm.difficulty}%</span>}
                                   </span>
                                 ))}
                               </div>

@@ -8,6 +8,7 @@ const router = Router();
 import fs from 'fs';
 import path from 'path';
 import { addActivity } from '../activity-log.js';
+import { recordSeoChange } from '../seo-change-tracker.js';
 import { generateAltText } from '../alttext.js';
 import { getDataDir } from '../data-dir.js';
 import { notifyClientRecommendationsReady, notifyClientAuditImproved } from '../email.js';
@@ -358,7 +359,10 @@ router.post('/api/jobs', async (req, res) => {
                 if (text) {
                   const seoFields = field === 'description' ? { seo: { description: text } } : { seo: { title: text } };
                   await updatePageSeo(page.pageId, seoFields, token);
-                  if (bwsId) updatePageState(bwsId, page.pageId, { status: 'live', source: 'bulk-fix', fields: [field], updatedBy: 'system' });
+                  if (bwsId) {
+                    updatePageState(bwsId, page.pageId, { status: 'live', source: 'bulk-fix', fields: [field], updatedBy: 'system' });
+                    recordSeoChange(bwsId, page.pageId, page.slug || '', page.title || '', [field], 'bulk-fix');
+                  }
                   results.push({ pageId: page.pageId, text, applied: true });
                 } else {
                   results.push({ pageId: page.pageId, text: '', applied: false, error: 'Empty AI response' });

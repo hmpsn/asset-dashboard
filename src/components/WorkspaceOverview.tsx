@@ -192,6 +192,9 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
             <button onClick={() => onNavigate('roadmap')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-800 transition-all">
               <Map className="w-3.5 h-3.5" /> Roadmap
             </button>
+            <button onClick={() => onNavigate('ai-usage')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-amber-400/80 hover:text-amber-300 bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20 transition-all">
+              <Zap className="w-3.5 h-3.5" /> AI Usage
+            </button>
           </div>
         )}
       />
@@ -552,9 +555,6 @@ export function WorkspaceOverview({ onSelectWorkspace, onNavigate }: { onSelectW
         );
       })()}
 
-      {/* ── AI Usage ── */}
-      <AIUsageSection />
-
       {/* ── Recent Activity ── */}
       {recentActivity.length > 0 && (
         <SectionCard title="Recent Activity" titleIcon={<Activity className="w-4 h-4 text-zinc-500" />} noPadding>
@@ -642,7 +642,7 @@ interface AIUsageData {
   semrushDaily: SemrushDailyUsage[];
 }
 
-function AIUsageSection() {
+export function AIUsageSection() {
   const [data, setData] = useState<AIUsageData | null>(null);
   const [days, setDays] = useState(14);
 

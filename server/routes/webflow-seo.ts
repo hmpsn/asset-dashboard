@@ -16,6 +16,7 @@ import {
   getTokenForSite,
   updatePageState,
 } from '../workspaces.js';
+import { recordSeoChange } from '../seo-change-tracker.js';
 
 // --- SEO Audit ---
 router.get('/api/webflow/seo-audit/:siteId', async (req, res) => {
@@ -293,7 +294,10 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', async (req, res) => {
           ? { seo: { description: text } }
           : { seo: { title: text } };
         await updatePageSeo(page.pageId, seoFields, token);
-        if (ws) updatePageState(ws.id, page.pageId, { status: 'live', source: 'bulk-fix', fields: [field], updatedBy: 'admin' });
+        if (ws) {
+          updatePageState(ws.id, page.pageId, { status: 'live', source: 'bulk-fix', fields: [field], updatedBy: 'admin' });
+          recordSeoChange(ws.id, page.pageId, page.slug || '', page.title || '', [field], 'bulk-fix');
+        }
         results.push({ pageId: page.pageId, text, applied: true });
       } else {
         results.push({ pageId: page.pageId, text: '', applied: false, error: 'Empty AI response' });

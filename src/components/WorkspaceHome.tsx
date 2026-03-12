@@ -11,7 +11,7 @@ import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useAuditSummary } from '../hooks/useAuditSummary';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { AnomalyAlerts } from './AnomalyAlerts';
-import { SeoWorkStatus, ActivityFeed, RankingsSnapshot, ActiveRequestsAnnotations } from './workspace-home';
+import { SeoWorkStatus, ActivityFeed, RankingsSnapshot, ActiveRequestsAnnotations, SeoChangeImpact } from './workspace-home';
 
 interface WorkspaceHomeProps {
   workspaceId: string;
@@ -253,6 +253,9 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
 
       {/* ── SEO Work Status ── */}
       <SeoWorkStatus seoStatus={seoStatus} onNavigate={onNavigate} />
+
+      {/* ── SEO Change Impact Tracker ── */}
+      <SeoChangeImpact workspaceId={workspaceId} hasGsc={!!gscPropertyUrl} />
 
       {/* ── Action Items ── */}
       {actions.length > 0 && (
