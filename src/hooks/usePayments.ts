@@ -135,7 +135,6 @@ export function usePayments(
           const updated = await upRes.json();
           setContentRequests(prev => prev.map(r => r.id === pricingModal.upgradeReqId ? updated : r));
           setToast({ message: `Upgraded to full blog post! ${STUDIO_NAME} will begin writing.`, type: 'success' });
-          setTimeout(() => setToast(null), 5000);
         }
       } else if (pricingModal.source === 'strategy') {
         setRequestingTopic(pricingModal.targetKeyword);
@@ -150,7 +149,6 @@ export function usePayments(
         }).catch(() => {});
         const label = pricingModal.serviceType === 'full_post' ? 'Full blog post' : 'Brief';
         setToast({ message: `${label} requested for "${pricingModal.topic}"! Check the Content tab.`, type: 'success' });
-        setTimeout(() => setToast(null), 5000);
         setRequestingTopic(null);
       } else {
         const res = await fetch(`/api/public/content-request/${workspaceId}/submit`, {
@@ -162,13 +160,11 @@ export function usePayments(
           setContentRequests(prev => [created, ...prev]);
           setRequestedTopics(prev => new Set(prev).add(created.targetKeyword));
           setToast({ message: `Topic submitted! ${STUDIO_NAME} will review it.`, type: 'success' });
-          setTimeout(() => setToast(null), 5000);
         }
       }
     } catch (err) {
       console.error('Content request failed:', err);
       setToast({ message: err instanceof Error ? err.message : 'Failed to submit request. Please try again.', type: 'error' });
-      setTimeout(() => setToast(null), 5000);
     }
     setPricingConfirming(false);
     setPricingModal(null);

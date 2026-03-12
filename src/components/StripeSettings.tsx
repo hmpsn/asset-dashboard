@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   CreditCard, Eye, EyeOff, Save, Trash2, Loader2,
   CheckCircle2, AlertTriangle, ChevronDown, ChevronUp, DollarSign,
 } from 'lucide-react';
 import { SectionCard, Badge } from './ui';
+import { useToast } from '../hooks/useToast';
 
 interface StripeProduct {
   productType: string;
@@ -50,7 +51,8 @@ export function StripeSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingProducts, setSavingProducts] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const { toast, setToast, clearToast } = useToast();
+  const showToast = useCallback((message: string, type: 'success' | 'error') => setToast({ message, type }), [setToast]);
 
   // Key inputs
   const [secretKey, setSecretKey] = useState('');
@@ -62,11 +64,6 @@ export function StripeSettings() {
   // Products
   const [products, setProducts] = useState<StripeProduct[]>([]);
   const [productsExpanded, setProductsExpanded] = useState(false);
-
-  const showToast = (message: string, type: 'success' | 'error') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  };
 
   useEffect(() => {
     fetch('/api/stripe/config')

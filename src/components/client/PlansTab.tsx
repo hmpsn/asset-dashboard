@@ -158,7 +158,6 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                         if (data.url) window.location.href = data.url;
                       } catch (err) {
                         setToast({ message: err instanceof Error ? err.message : 'Upgrade failed. Please try again.', type: 'error' });
-                        setTimeout(() => setToast(null), 6000);
                       }
                     }}
                       className="block w-full py-2.5 rounded-lg text-xs font-semibold text-center transition-all bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white cursor-pointer">

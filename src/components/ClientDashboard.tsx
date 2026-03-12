@@ -31,6 +31,7 @@ import { useClientAuth } from '../hooks/useClientAuth';
 import { useClientData } from '../hooks/useClientData';
 import { useChat } from '../hooks/useChat';
 import { usePayments } from '../hooks/usePayments';
+import { useToast } from '../hooks/useToast';
 import {
   QUICK_QUESTIONS, LEARN_SEO_QUESTIONS,
   type WorkspaceInfo,
@@ -71,7 +72,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
   } = useClientData(workspaceId);
 
   // ── UI-only state (declared early — needed by hooks below) ──
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const { toast, setToast, clearToast } = useToast();
 
   // ── Payments hook ──
   const {
@@ -250,14 +251,12 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
         const paymentStatus = params.get('payment');
         if (paymentStatus === 'success') {
           setToast({ message: 'Payment successful! Your content request is being processed.', type: 'success' });
-          setTimeout(() => setToast(null), 8000);
           const url = new URL(window.location.href);
           url.searchParams.delete('payment');
           url.searchParams.delete('session_id');
           window.history.replaceState({}, '', url.toString());
         } else if (paymentStatus === 'cancelled') {
           setToast({ message: 'Payment was cancelled. You can try again anytime.', type: 'error' });
-          setTimeout(() => setToast(null), 6000);
           const url = new URL(window.location.href);
           url.searchParams.delete('payment');
           window.history.replaceState({}, '', url.toString());
@@ -919,7 +918,6 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
                 if (data.url) window.location.href = data.url;
               } catch (err) {
                 setToast({ message: err instanceof Error ? err.message : 'Upgrade failed. Please try again.', type: 'error' });
-                setTimeout(() => setToast(null), 6000);
               }
             }}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium transition-colors cursor-pointer">
@@ -1066,7 +1064,6 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
           onSuccess={() => {
             setStripePayment(null);
             setToast({ message: `Payment successful! Your ${stripePayment.productName.toLowerCase()} is being prepared.`, type: 'success' });
-            setTimeout(() => setToast(null), 6000);
             // Refresh content requests
             fetch(`/api/public/content-requests/${workspaceId}`).then(r => r.json()).then(setContentRequests).catch(() => {});
           }}
@@ -1091,17 +1088,14 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
                 setShowOnboarding(false);
                 setWs(prev => prev ? { ...prev, onboardingCompleted: true } : prev);
                 setToast({ message: 'Thanks! Your responses will help us create better content.', type: 'success' });
-                setTimeout(() => setToast(null), 6000);
                 // Show welcome wizard after onboarding
                 const welcomeKey = clientUser ? `welcome_seen_${workspaceId}_${clientUser.id}` : `welcome_seen_${workspaceId}`;
                 if (!localStorage.getItem(welcomeKey)) setShowWelcome(true);
               } else {
                 setToast({ message: 'Failed to save responses. Please try again.', type: 'error' });
-                setTimeout(() => setToast(null), 6000);
               }
             } catch {
               setToast({ message: 'Failed to save responses. Please try again.', type: 'error' });
-              setTimeout(() => setToast(null), 6000);
             }
             setOnboardingSaving(false);
           }}
@@ -1142,7 +1136,7 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
         <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] px-5 py-3 rounded-xl border shadow-lg backdrop-blur-sm flex items-center gap-2.5 animate-[slideUp_0.3s_ease] ${toast.type === 'success' ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' : 'bg-red-500/15 border-red-500/30 text-red-300'}`}>
           {toast.type === 'success' ? <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> : <AlertTriangle className="w-4 h-4 flex-shrink-0" />}
           <span className="text-xs font-medium">{toast.message}</span>
-          <button onClick={() => setToast(null)} className="ml-2 text-zinc-400 hover:text-zinc-200"><X className="w-3.5 h-3.5" /></button>
+          <button onClick={clearToast} className="ml-2 text-zinc-400 hover:text-zinc-200"><X className="w-3.5 h-3.5" /></button>
         </div>
       )}
 

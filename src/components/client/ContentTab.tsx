@@ -58,7 +58,7 @@ export function ContentTab({
         setContentRequests(prev => prev.map(r => r.id === reqId ? updated : r));
         setDeclineReqId(null); setDeclineReason('');
       }
-    } catch { setToast({ message: 'Failed to decline topic. Please try again.', type: 'error' }); setTimeout(() => setToast(null), 5000); }
+    } catch { setToast({ message: 'Failed to decline topic. Please try again.', type: 'error' }); }
   };
 
   const approveBrief = async (reqId: string) => {
@@ -68,9 +68,8 @@ export function ContentTab({
         const updated = await res.json();
         setContentRequests(prev => prev.map(r => r.id === reqId ? updated : r));
         setToast({ message: `Brief approved! ${STUDIO_NAME} will begin content production.`, type: 'success' });
-        setTimeout(() => setToast(null), 5000);
       }
-    } catch { setToast({ message: 'Failed to approve brief. Please try again.', type: 'error' }); setTimeout(() => setToast(null), 5000); }
+    } catch { setToast({ message: 'Failed to approve brief. Please try again.', type: 'error' }); }
   };
 
   const requestChanges = async (reqId: string) => {
@@ -84,7 +83,7 @@ export function ContentTab({
         setContentRequests(prev => prev.map(r => r.id === reqId ? updated : r));
         setFeedbackReqId(null); setFeedbackText('');
       }
-    } catch { setToast({ message: 'Failed to submit feedback. Please try again.', type: 'error' }); setTimeout(() => setToast(null), 5000); }
+    } catch { setToast({ message: 'Failed to submit feedback. Please try again.', type: 'error' }); }
   };
 
   const addContentComment = async (reqId: string) => {
@@ -100,7 +99,7 @@ export function ContentTab({
         setContentRequests(prev => prev.map(r => r.id === reqId ? updated : r));
         setContentComment('');
       }
-    } catch { setToast({ message: 'Failed to send comment. Please try again.', type: 'error' }); setTimeout(() => setToast(null), 5000); }
+    } catch { setToast({ message: 'Failed to send comment. Please try again.', type: 'error' }); }
     setSendingContentComment(false);
   };
 
@@ -112,7 +111,7 @@ export function ContentTab({
         const brief = await res.json();
         setBriefPreviews(prev => ({ ...prev, [briefId]: brief }));
       }
-    } catch { setToast({ message: 'Failed to load brief preview.', type: 'error' }); setTimeout(() => setToast(null), 5000); }
+    } catch { setToast({ message: 'Failed to load brief preview.', type: 'error' }); }
   };
 
   return (<>

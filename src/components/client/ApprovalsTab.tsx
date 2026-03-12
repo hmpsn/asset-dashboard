@@ -38,7 +38,6 @@ export function ApprovalsTab({
     const pending = batch.items.filter(i => i.status === 'pending');
     await Promise.all(pending.map(item => updateApprovalItem(batch.id, item.id, { status: 'approved' })));
     setToast({ message: `Approved ${pending.length} change${pending.length !== 1 ? 's' : ''}`, type: 'success' });
-    setTimeout(() => setToast(null), 3000);
   };
 
   const approveAllForPage = async (batchId: string, items: ApprovalItem[]) => {
@@ -57,7 +56,7 @@ export function ApprovalsTab({
       if (updated.id) {
         setApprovalBatches(prev => prev.map(b => b.id === batchId ? updated : b));
       }
-    } catch { setToast({ message: 'Failed to update approval. Please try again.', type: 'error' }); setTimeout(() => setToast(null), 5000); }
+    } catch { setToast({ message: 'Failed to update approval. Please try again.', type: 'error' }); }
     setEditingApproval(null);
     setEditDraft('');
   };
@@ -71,7 +70,7 @@ export function ApprovalsTab({
       if (data.applied > 0) {
         loadApprovals(workspaceId);
       }
-    } catch { setToast({ message: 'Failed to apply changes. Please try again.', type: 'error' }); setTimeout(() => setToast(null), 5000); }
+    } catch { setToast({ message: 'Failed to apply changes. Please try again.', type: 'error' }); }
     setApplyingBatch(null);
   };
 
