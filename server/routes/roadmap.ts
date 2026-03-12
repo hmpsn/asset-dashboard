@@ -24,24 +24,10 @@ function loadRoadmap() {
       const repoMtime = fs.statSync(ROADMAP_REPO_FILE).mtimeMs;
       const runtimeMtime = fs.statSync(ROADMAP_RUNTIME_FILE).mtimeMs;
       if (repoMtime > runtimeMtime) {
+        // Repo was updated more recently (new commit) — repo is authoritative.
+        // Don't merge stale runtime statuses that could be corrupted or intentionally corrected.
         repoNewer = true;
         const repoData = JSON.parse(fs.readFileSync(ROADMAP_REPO_FILE, 'utf-8'));
-        const runtimeData = JSON.parse(fs.readFileSync(ROADMAP_RUNTIME_FILE, 'utf-8'));
-        const runtimeStatuses: Record<string, string> = {};
-        for (const sprint of runtimeData.sprints || []) {
-          for (const item of sprint.items || []) {
-            runtimeStatuses[String(item.id)] = item.status;
-          }
-        }
-        for (const sprint of repoData.sprints || []) {
-          for (const item of sprint.items || []) {
-            const rtStatus = runtimeStatuses[String(item.id)];
-            if (rtStatus && rtStatus !== item.status) {
-              const priority: Record<string, number> = { pending: 0, in_progress: 1, done: 2 };
-              item.status = (priority[rtStatus] ?? 0) >= (priority[item.status] ?? 0) ? rtStatus : item.status;
-            }
-          }
-        }
         fs.writeFileSync(ROADMAP_RUNTIME_FILE, JSON.stringify(repoData, null, 2));
         return repoData;
       }
