@@ -5,6 +5,10 @@ import { Router } from 'express';
 
 const router = Router();
 
+/** Set to true during graceful shutdown so /api/health returns 503. */
+let shuttingDown = false;
+export function setShuttingDown(): void { shuttingDown = true; }
+
 import fs from 'fs';
 import path from 'path';
 import { DATA_BASE, getUploadRoot } from '../data-dir.js';
@@ -87,6 +91,9 @@ router.get('/api/health/diag', async (_req, res) => {
 // NOTE: /api/presence route stays in index.ts (depends on WebSocket state)
 
 router.get('/api/health', (_req, res) => {
+  if (shuttingDown) {
+    return res.status(503).json({ status: 'shutting_down' });
+  }
   res.json({
     ok: true,
     hasOpenAIKey: !!process.env.OPENAI_API_KEY,

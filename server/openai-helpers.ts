@@ -51,7 +51,7 @@ function todayStr(): string {
 let pendingWrites: TokenUsage[] = [];
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
-function flushToDisk(): void {
+export function flushToDisk(): void {
   if (pendingWrites.length === 0) return;
   const today = todayStr();
   const filePath = getUsageFilePath(today);
@@ -72,10 +72,8 @@ export function logTokenUsage(usage: Omit<TokenUsage, 'timestamp'>): void {
   if (!flushTimer) flushTimer = setTimeout(() => { flushTimer = null; flushToDisk(); }, 5000);
 }
 
-// Flush on process exit
+// Flush on normal process exit (graceful shutdown handles SIGTERM/SIGINT)
 process.on('beforeExit', flushToDisk);
-process.on('SIGINT', () => { flushToDisk(); process.exit(0); });
-process.on('SIGTERM', () => { flushToDisk(); process.exit(0); });
 
 // --- Cost estimation per model ---
 
