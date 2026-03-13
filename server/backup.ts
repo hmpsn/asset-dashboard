@@ -13,6 +13,7 @@
 import fs from 'fs';
 import path from 'path';
 import { DATA_BASE, getDataDir, getUploadRoot } from './data-dir.js';
+import db from './db/index.js';
 
 const BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const RETENTION_DAYS = parseInt(process.env.BACKUP_RETENTION_DAYS || '3', 10);
@@ -77,7 +78,17 @@ export function runBackup(): { backupDir: string; files: number; bytes: number }
     } catch { /* directory doesn't exist yet */ }
   }
 
-  // 3. Write backup manifest
+  // 3. Back up SQLite database (synchronous via VACUUM INTO)
+  try {
+    const dbBackupPath = path.join(backupDir, 'dashboard.db');
+    db.exec(`VACUUM INTO '${dbBackupPath.replace(/'/g, "''")}'`);
+    stats.files++;
+    stats.bytes += fs.statSync(dbBackupPath).size;
+  } catch (err) {
+    console.error('[backup] SQLite backup failed:', err);
+  }
+
+  // 4. Write backup manifest
   const manifest = {
     timestamp: new Date().toISOString(),
     files: stats.files,

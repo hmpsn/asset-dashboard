@@ -25,6 +25,7 @@ import { startChurnSignalScheduler } from './churn-signals.js';
 import { startAnomalyDetection, initAnomalyBroadcast } from './anomaly-detection.js';
 import { initJobs } from './jobs.js';
 import { setBroadcast } from './broadcast.js';
+import { runMigrations } from './db/index.js';
 import {
   publicApiLimiter,
   publicWriteLimiter,
@@ -95,6 +96,9 @@ const IS_PROD = process.env.NODE_ENV === 'production';
 for (const dir of [getUploadRoot(), getOptRoot()]) {
   fs.mkdirSync(dir, { recursive: true });
 }
+
+// Run pending SQLite migrations before anything touches the database
+runMigrations();
 
 // Rate limiting, session signing, and admin token verification are all
 // imported from middleware.ts — the single source of truth.
