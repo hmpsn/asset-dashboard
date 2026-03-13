@@ -90,6 +90,7 @@ interface Stmts {
   insert: ReturnType<typeof db.prepare>;
   selectByWorkspace: ReturnType<typeof db.prepare>;
   selectAll: ReturnType<typeof db.prepare>;
+  selectClientVisible: ReturnType<typeof db.prepare>;
   deleteById: ReturnType<typeof db.prepare>;
   countAll: ReturnType<typeof db.prepare>;
   pruneOldest: ReturnType<typeof db.prepare>;
@@ -111,6 +112,9 @@ function stmts(): Stmts {
       ),
       selectAll: db.prepare(
         'SELECT * FROM activity_log ORDER BY created_at DESC LIMIT ?',
+      ),
+      selectClientVisible: db.prepare(
+        `SELECT * FROM activity_log WHERE workspace_id = ? AND type IN (${[...CLIENT_VISIBLE_TYPES].map(() => '?').join(',')}) ORDER BY created_at DESC LIMIT ?`,
       ),
       deleteById: db.prepare('DELETE FROM activity_log WHERE id = ?'),
       countAll: db.prepare('SELECT COUNT(*) as count FROM activity_log'),
@@ -181,12 +185,8 @@ const CLIENT_VISIBLE_TYPES: Set<ActivityType> = new Set([
 ]);
 
 export function listClientActivity(workspaceId: string, limit = 50): ActivityEntry[] {
-  // Fetch more rows than needed, then filter by client-visible types
-  const rows = stmts().selectByWorkspace.all(workspaceId, limit * 3) as ActivityRow[];
-  return rows
-    .filter(r => CLIENT_VISIBLE_TYPES.has(r.type as ActivityType))
-    .slice(0, limit)
-    .map(rowToEntry);
+  const rows = stmts().selectClientVisible.all(workspaceId, ...CLIENT_VISIBLE_TYPES, limit) as ActivityRow[];
+  return rows.map(rowToEntry);
 }
 
 export function deleteActivity(id: string): boolean {
