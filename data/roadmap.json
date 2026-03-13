@@ -22,8 +22,9 @@
           "source": "Roadmap review Mar 2026",
           "est": "6-8h",
           "priority": "P1",
-          "notes": "End-to-end tests for revenue-critical and data-critical flows: Stripe checkout (single + cart), audit run → score calculation → suppression, content brief generation → post generation, approval workflow (propose → review → apply to Webflow), WebSocket broadcast delivery, client login + JWT refresh. Use Vitest + Supertest for API tests, Playwright for critical UI flows. No competitor can break your payment pipeline with confidence if this exists.",
-          "status": "pending"
+          "notes": "Shipped — Playwright E2E tests in tests/e2e/: smoke.spec.ts (server health + page load), approval-workflow.spec.ts (propose → review → apply), client-login.spec.ts (auth flow + JWT). Devin PR #35.",
+          "status": "done",
+          "shippedAt": "2026-03-13"
         },
         {
           "id": 210,
@@ -31,8 +32,9 @@
           "source": "Roadmap review Mar 2026",
           "est": "2-3h",
           "priority": "P0",
-          "notes": "OPERATIONAL NECESSITY — Add Sentry (or similar) for client-facing error tracking on both frontend and backend. Critical before scaling via marketplace — need visibility into errors without relying on the feedback widget (#190). Source maps for frontend, Express error handler integration for backend. Alert rules for payment flow errors, WebSocket disconnects, and AI generation failures.",
-          "status": "pending"
+          "notes": "Shipped — server/sentry.ts (initSentry, auto-tags workspaceId from URLs, conditional tracesSampleRate) + @sentry/react frontend ErrorBoundary. CSP updated for Sentry ingest. Conditional source maps via SENTRY_AUTH_TOKEN. Devin PRs #32, #34.",
+          "status": "done",
+          "shippedAt": "2026-03-13"
         },
         {
           "id": 222,
@@ -40,8 +42,9 @@
           "source": "Market prep analysis Mar 2026",
           "est": "2-3h",
           "priority": "P0",
-          "notes": "OPERATIONAL NECESSITY — Raw console.log/warn/error throughout server code means no searchable logs, no log levels, no alerting on production issues. Replace with pino (lightweight, JSON structured logging). Add log levels (error, warn, info, debug), request ID tracing, per-workspace context. Enables: searching errors by workspace, monitoring AI costs, debugging client issues without SSH, and integration with log aggregation services (Datadog, Papertrail, etc.).",
-          "status": "pending"
+          "notes": "Shipped — server/logger.ts: Pino structured JSON logging. createLogger(module) for child loggers, pretty-print in dev via pino-pretty, JSON in prod. LOG_LEVEL env var. All server modules migrated from console.log. Devin PR #31.",
+          "status": "done",
+          "shippedAt": "2026-03-13"
         },
         {
           "id": 224,
@@ -91,6 +94,96 @@
           "notes": "Shipped — Path traversal fix in moveUploadedFiles (middleware.ts). Removed duplicate Stripe webhook route that could bypass signature verification.",
           "status": "done",
           "shippedAt": "2026-03-11"
+        },
+        {
+          "id": 264,
+          "title": "React Router DOM migration (Devin)",
+          "source": "Devin PR #25",
+          "est": "4-6h",
+          "priority": "P1",
+          "notes": "Shipped — Migrated from manual routing to react-router-dom v7. BrowserRouter with Routes/Route in App.tsx. src/routes.ts defines Page + ClientTab types, adminPath() + clientPath() helpers. Admin: /ws/:workspaceId/:tab?, Client: /client/:workspaceId/:tab?, global tabs: /settings, /roadmap, /prospect, /ai-usage. Server index.ts further decomposed to ~131 lines.",
+          "status": "done",
+          "shippedAt": "2026-03-13"
+        },
+        {
+          "id": 265,
+          "title": "Shared types between client and server (Devin)",
+          "source": "Devin PR #28",
+          "est": "3-4h",
+          "priority": "P1",
+          "notes": "Shipped — Extracted shared/types/ with 10 modules: workspace, analytics, content, payments, approvals, requests, recommendations, users, roadmap, index (barrel). Canonical interfaces shared between frontend and backend. Eliminates type duplication.",
+          "status": "done",
+          "shippedAt": "2026-03-13"
+        },
+        {
+          "id": 266,
+          "title": "Typed API client layer (Devin)",
+          "source": "Devin PR #29",
+          "est": "4-6h",
+          "priority": "P1",
+          "notes": "Shipped — src/api/ with 9 modules: client.ts (ApiError, get/post/patch/del/postForm/getOptional/getSafe), analytics, workspaces, content, seo, payments, auth, misc, index (barrel). All components migrated from raw fetch() to typed API client. 429 detection via ApiError.status.",
+          "status": "done",
+          "shippedAt": "2026-03-13"
+        },
+        {
+          "id": 267,
+          "title": "Dead code cleanup (Devin)",
+          "source": "Devin PR #27",
+          "est": "1-2h",
+          "priority": "P2",
+          "notes": "Shipped — Removed dead InsightsDigest onNavigate prop, fixed auth middleware /ws/ allowlist.",
+          "status": "done",
+          "shippedAt": "2026-03-13"
+        },
+        {
+          "id": 268,
+          "title": "Route-level integration tests (Devin)",
+          "source": "Devin PR #33",
+          "est": "3-4h",
+          "priority": "P1",
+          "notes": "Shipped — Route-level integration tests for 12 previously untested route modules. Supertest-based.",
+          "status": "done",
+          "shippedAt": "2026-03-13"
+        },
+        {
+          "id": 269,
+          "title": "CI/CD pipeline (GitHub Actions) (Devin)",
+          "source": "Devin PR #36",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — .github/workflows/ci.yml (lint, type-check, unit/integration tests, build) + e2e.yml (Playwright tests). Idempotent migration inserts to prevent CI race conditions.",
+          "status": "done",
+          "shippedAt": "2026-03-13"
+        },
+        {
+          "id": 270,
+          "title": "Graceful shutdown (Devin)",
+          "source": "Devin PR #37",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped — SIGTERM/SIGINT handlers: flush email queue, close DB, close WebSocket with reentrancy guard, clean exit. try/catch wraps flush calls to prevent skipping db.close() on disk errors.",
+          "status": "done",
+          "shippedAt": "2026-03-13"
+        },
+        {
+          "id": 271,
+          "title": "Off-site backups (S3) (Devin)",
+          "source": "Devin PR #38",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — Optional S3 upload after local backup via BACKUP_S3_BUCKET env var. Cleans up tar.gz archive on upload failure. AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY for credentials. BACKUP_S3_REGION and BACKUP_S3_PREFIX configurable.",
+          "status": "done",
+          "shippedAt": "2026-03-13"
+        },
+        {
+          "id": 272,
+          "title": "API hardening (rate limits, Turnstile, fingerprinting) (Devin)",
+          "source": "Devin PR #39",
+          "est": "3-4h",
+          "priority": "P1",
+          "notes": "Shipped — Rate limit headers (X-RateLimit-*), Cloudflare Turnstile CAPTCHA on client login/forgot-password (optional via VITE_TURNSTILE_SITE_KEY + TURNSTILE_SECRET_KEY), request fingerprinting, credential stuffing protection on auth endpoints.",
+          "status": "done",
+          "shippedAt": "2026-03-13"
         }
       ]
     },

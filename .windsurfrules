@@ -50,14 +50,21 @@ Every completed task — no matter how small — must include these steps:
 
 ## 1. Project Overview
 
-**hmpsn.studio** is an SEO/web analytics platform built with **React 19 + Vite 8 + TailwindCSS 4** (frontend) and **Express + TypeScript** (backend). It manages client websites via Webflow, Google Search Console, GA4, and SEMRush integrations.
+**hmpsn.studio** is an SEO/web analytics platform built with **React 19 + Vite 8 + TailwindCSS 4 + React Router DOM 7** (frontend) and **Express + TypeScript** (backend). It manages client websites via Webflow, Google Search Console, GA4, and SEMRush integrations.
 
+- **Routing** — **React Router DOM 7** (`src/routes.ts` defines `Page` + `ClientTab` types, `adminPath()` + `clientPath()` helpers). Admin: `/ws/:workspaceId/:tab?`, Client: `/client/:workspaceId/:tab?`, global tabs: `/settings`, `/roadmap`, `/prospect`, `/ai-usage`.
+- **API Client** — Typed fetch wrappers in `src/api/` (9 modules). All components import from `src/api/` — no raw `fetch()` calls in components. `ApiError` class with `.status` for error handling.
+- **Shared Types** — `shared/types/` (10 modules) shared between client and server. Canonical interfaces for workspace, analytics, content, payments, approvals, etc.
 - **Storage** — **SQLite** via `better-sqlite3` (WAL mode, foreign keys ON) at `DATA_BASE/dashboard.db`. All 5 migration PRs merged to `main` — 30+ modules now use SQLite. See § 2a below.
 - **AI** — OpenAI GPT-4.1/4.1-mini/4.1-nano via `server/openai-helpers.ts` (`callOpenAI`), Anthropic Claude via `server/anthropic-helpers.ts` (`callAnthropic`) for creative prose
 - **Payments** — Stripe Checkout (not Payment Intents). Config encrypted on disk (AES-256-GCM). Admin UI for keys + products.
-- **Auth** — Dual system: internal JWT (7-day, admin) + client JWT (24h, per-workspace). Legacy shared-password still supported.
+- **Auth** — Dual system: internal JWT (7-day, admin) + client JWT (24h, per-workspace). Legacy shared-password still supported. Turnstile CAPTCHA on client login/forgot-password (optional).
 - **Monetization** — 3 tiers (Free/Growth/Premium), per-item content purchases, 14-day Growth trial, UX soft-gating via `<TierGate>`
-- **Client routing** — Path-based: `/client/:workspaceId/:tab?` with backward-compat redirect from `?tab=X`
+- **Logging** — **Pino** structured JSON logging (`server/logger.ts`). `createLogger(module)` for child loggers. Pretty-print in dev, JSON in prod.
+- **Error monitoring** — **Sentry** (`server/sentry.ts` + frontend `@sentry/react`). Auto-tags errors with `workspaceId`. Conditional source maps.
+- **CI/CD** — GitHub Actions (`.github/workflows/ci.yml` for lint/test/build, `e2e.yml` for Playwright).
+- **Graceful shutdown** — SIGTERM/SIGINT handlers: flush email queue, close DB, close WebSocket, clean exit.
+- **Backups** — Local periodic backups + optional S3 off-site upload (`BACKUP_S3_BUCKET`).
 
 ---
 
@@ -67,7 +74,7 @@ Every completed task — no matter how small — must include these steps:
 
 | File | Purpose | Notes |
 |------|---------|-------|
-| `index.ts` | **App setup, middleware, WS, route mounting** (~450 lines) | No route handlers — all moved to `server/routes/`. |
+| `index.ts` | **App setup, middleware, WS, route mounting** (~131 lines) | Minimal bootstrap: imports, middleware, Sentry init, route mounting, WS server, startup schedulers, graceful shutdown. No route handlers. |
 | `routes/` | **48 Express Router files** | One file per domain: `auth.ts`, `webflow.ts`, `webflow-alt-text.ts`, `webflow-audit.ts`, `webflow-cms.ts`, `webflow-keywords.ts`, `webflow-organize.ts`, `aeo-review.ts`, `feedback.ts`, `public-feedback.ts`, `content-decay.ts`, `seo-change-tracker.ts`, etc. |
 | `helpers.ts` | Shared pure functions | `sanitizeString`, `validateEnum`, `parseDateRange`, `applySuppressionsToAudit`, `buildSchemaContext`, `getAuditTrafficForWorkspace`, `readEnvFile`, `writeEnvFile` |
 | `middleware.ts` | Shared middleware + auth (single source of truth) | Rate limiters, `signClientSession`/`verifyClientSession`, `signAdminToken`/`verifyAdminToken`, `upload` (multer), `moveUploadedFiles`, `IS_PROD`, `APP_PASSWORD` |
@@ -105,7 +112,9 @@ Every completed task — no matter how small — must include these steps:
 | `churn-signals.ts` | Churn risk detection | Background scheduler (6h), signals based on inactivity + score drops |
 | `roi.ts` | ROI calculations | Organic traffic value tracking |
 | `trial-reminders.ts` | Trial expiry emails | Scheduled daily check for expiring trials |
-| `backup.ts` | Data backup scheduler | Periodic JSON backup of all data stores |
+| `backup.ts` | Data backup scheduler | Periodic local backup + optional S3 off-site upload (`BACKUP_S3_BUCKET`). Cleans tar.gz on upload failure. |
+| `logger.ts` | **Pino structured logging** | `createLogger(module)` for child loggers. JSON in prod, pretty-print in dev. `LOG_LEVEL` env var. |
+| `sentry.ts` | **Sentry error monitoring** | `initSentry()`, `isSentryEnabled`, auto-tags `workspaceId` from request URLs. Conditional `tracesSampleRate`. |
 | `data-dir.ts` | Data directory path singleton | `DATA_BASE`, `getDataDir(subdir)`, `getUploadRoot()`, `getOptRoot()`. Zero duplicated path patterns. |
 | `ai-context-check.ts` | AI context completeness checker | `getContextCompleteness()` — evaluates 8 data sources per workspace. Used by `AIContextIndicator` component. |
 | `feedback.ts` | Beta client feedback CRUD | Per-workspace feedback storage (`DATA_DIR/feedback/`), status workflow (new → acknowledged → resolved), threaded replies |
@@ -151,7 +160,9 @@ Every completed task — no matter how small — must include these steps:
 
 | File | Purpose | Notes |
 |------|---------|-------|
-| `App.tsx` | Router, workspace selector, admin tabs (lazy-loaded) | `Page` type union defines all admin routes |
+| `routes.ts` | **Route definitions** | `Page` + `ClientTab` type unions, `adminPath()` + `clientPath()` helpers, `GLOBAL_TABS` set |
+| `api/` | **Typed API client** (9 modules) | `client.ts` (ApiError, get/post/patch/del/postForm), `analytics.ts`, `workspaces.ts`, `content.ts`, `seo.ts`, `payments.ts`, `auth.ts`, `misc.ts`, `index.ts` (barrel). All components import from here — no raw fetch. |
+| `App.tsx` | **BrowserRouter**, workspace selector, admin tabs (lazy-loaded) | Uses react-router-dom Routes/Route. Imports from `src/api/` and `src/routes.ts`. |
 | `components/ClientDashboard.tsx` | **Client portal shell** (~1,520 lines) | Login gate, shared state, tab routing, chat, Stripe modals. Tab rendering delegated to extracted components. |
 | `components/AdminChat.tsx` | Admin AI chat (purple accent) | Conversation memory + history |
 | `components/KeywordStrategy.tsx` | SEO strategy + content gaps | Admin keyword strategy viewer/generator |
@@ -198,6 +209,23 @@ Every completed task — no matter how small — must include these steps:
 | `components/client/` | **Client tab components** (28 files) | `types.ts`, `helpers.tsx`, `utils.ts`, `index.ts`, `OverviewTab.tsx`, `SearchTab.tsx`, `AnalyticsTab.tsx`, `PerformanceTab.tsx` (merged Search+Analytics), `StrategyTab.tsx`, `ContentTab.tsx`, `ApprovalsTab.tsx`, `RequestsTab.tsx`, `PlansTab.tsx`, `InboxTab.tsx` (composes Approvals+Requests+Content), `HealthTab.tsx`, `InsightsDigest.tsx`, `InsightsEngine.tsx`, `MonthlySummary.tsx`, `DataSnapshots.tsx`, `ROIDashboard.tsx`, `OrderStatus.tsx`, `FixRecommendations.tsx`, `SeoCart.tsx`, `useCart.tsx`, `OnboardingWizard.tsx`, `BetaContext.tsx` (beta mode feature flag), `ClientOnboardingQuestionnaire.tsx`, `FeedbackWidget.tsx`, `SeoGlossary.tsx` |
 | `components/shared/` | **Shared cross-dashboard components** | `RankTable.tsx` (position colors, history chart, rank change indicators) |
 | `hooks/` | **Shared React hooks** (15 files) | `useAuth.ts`, `useWebSocket.ts`, `useBackgroundTasks.tsx`, `useAuditSummary.ts`, `useSearchData.ts`, `useGA4Overview.ts`, `usePageEditStates.ts`, `useRecommendations.ts`, `useWorkspaceEvents.ts`, `useChat.ts`, `useClientAuth.ts`, `useClientData.ts`, `useContentRequests.ts`, `usePayments.ts`, `useToast.ts` |
+
+### Shared (`shared/`)
+
+| File | Purpose |
+|------|---------|
+| `shared/types/` | **10 shared type modules** between client and server: `workspace.ts`, `analytics.ts`, `content.ts`, `payments.ts`, `approvals.ts`, `requests.ts`, `recommendations.ts`, `users.ts`, `roadmap.ts`, `index.ts` (barrel) |
+
+### Tests
+
+| Path | Purpose |
+|------|---------|
+| `tests/unit/` | Backend unit tests (Vitest) — core modules |
+| `tests/integration/` | API integration tests (Supertest) — route-level |
+| `tests/component/` | Frontend component tests (Vitest + Testing Library) — UI primitives |
+| `tests/e2e/` | Playwright E2E tests — `smoke.spec.ts`, `approval-workflow.spec.ts`, `client-login.spec.ts` |
+| `.github/workflows/ci.yml` | CI pipeline: lint, type-check, unit/integration tests, build |
+| `.github/workflows/e2e.yml` | E2E pipeline: Playwright tests against running server |
 
 ### Data & Config
 
@@ -343,6 +371,9 @@ These will be addressed in a dedicated cleanup pass. **Do not attempt to fix the
 | `npx tsc --noEmit --skipLibCheck` | Type-check without building |
 | `npx vite build` | Production build |
 | `npm start` | Production server |
+| `npx vitest run` | Run unit + integration + component tests |
+| `npx playwright test` | Run E2E tests (requires server running) |
+| `npx tsx scripts/sort-roadmap.ts` | Auto-archive completed sprints in roadmap |
 
 **Always verify after UI changes:** `npx tsc --noEmit --skipLibCheck && npx vite build`
 
@@ -352,14 +383,21 @@ These will be addressed in a dedicated cleanup pass. **Do not attempt to fix the
 
 | Variable | Required | Purpose |
 |----------|----------|---------|
-| `OPENAI_API_KEY` | Yes | GPT-4o for AI features |
-| `ANTHROPIC_API_KEY` | Yes | Claude for some AI features |
-| `WEBFLOW_API_TOKEN` | Yes | Webflow CMS integration |
+| `OPENAI_API_KEY` | Yes | GPT-4.1 for AI features |
+| `ANTHROPIC_API_KEY` | Yes | Claude for creative prose |
+| `WEBFLOW_API_TOKEN` | Yes | Webflow CMS integration (fallback; per-workspace tokens override) |
+| `JWT_SECRET` | Yes (prod) | Secret for signing admin & client JWTs |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | For GSC/GA4 | OAuth2 for Google APIs |
 | `STRIPE_SECRET_KEY` | For payments | Or configure via admin UI |
 | `APP_PASSWORD` | Optional | Legacy admin password gate |
 | `PORT` | Optional | Default: 3001 |
 | `DATA_DIR` | Optional | Default: `~/.asset-dashboard` |
+| `SENTRY_DSN` / `VITE_SENTRY_DSN` | Optional | Sentry error monitoring (server / frontend) |
+| `SENTRY_AUTH_TOKEN` | Optional | Sentry source map uploads during build |
+| `LOG_LEVEL` | Optional | Pino log level (default: `info` prod, `debug` dev) |
+| `BACKUP_S3_BUCKET` | Optional | S3 bucket for off-site backups |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | For S3 | AWS credentials for off-site backups |
+| `VITE_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | Optional | Cloudflare Turnstile CAPTCHA on client login |
 
 > **REMINDER**: Switch Stripe to production keys (`sk_live_...`) before launch.
 

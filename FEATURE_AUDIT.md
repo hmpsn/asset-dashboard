@@ -1269,6 +1269,116 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 98. Structured Logging (Pino)
+**What it does:** `server/logger.ts` — Pino structured JSON logging replacing all `console.log/warn/error`. `createLogger(module)` for child loggers with module context. Pretty-print in dev (via pino-pretty), JSON in prod. Configurable via `LOG_LEVEL` env var.
+
+**Agency value:** Searchable, structured logs enable debugging client issues without SSH. Log levels filter noise. JSON output integrates with log aggregation (Datadog, Papertrail).
+
+**Client value:** Indirect — faster issue resolution, less downtime.
+
+**Mutual:** Operational maturity that prevents small issues from becoming outages.
+
+---
+
+### 99. Sentry Error Monitoring
+**What it does:** `server/sentry.ts` + `@sentry/react` frontend. Server-side: auto-tags errors with `workspaceId` from request URLs, conditional `tracesSampleRate` (0.2 prod, 1.0 dev). Frontend: React ErrorBoundary integration. Conditional source maps via `SENTRY_AUTH_TOKEN`.
+
+**Agency value:** Real-time error visibility across all workspaces without waiting for client reports. Payment flow errors, AI generation failures, and WebSocket disconnects surface immediately.
+
+**Client value:** Indirect — issues get fixed before clients notice them.
+
+**Mutual:** Proactive error resolution builds trust and prevents churn.
+
+---
+
+### 100. CI/CD Pipeline (GitHub Actions)
+**What it does:** `.github/workflows/ci.yml` (lint, type-check, unit/integration tests, build) + `e2e.yml` (Playwright tests against running server). Automated on every push and PR.
+
+**Agency value:** Catches regressions before they reach production. Enables confident merging of Devin PRs and contributor code.
+
+**Client value:** Indirect — fewer bugs shipped to production.
+
+**Mutual:** Quality gate that scales with the team.
+
+---
+
+### 101. Graceful Shutdown
+**What it does:** SIGTERM/SIGINT handlers in `server/index.ts`: flush email queue, close DB connection, close WebSocket server. Reentrancy guard prevents double-shutdown. try/catch wraps flush calls to prevent skipping `db.close()` on disk errors.
+
+**Agency value:** Zero data loss during deploys and restarts. Email queue flushes before exit — no lost notifications.
+
+**Client value:** Indirect — no data corruption, no missing emails.
+
+**Mutual:** Production reliability that prevents silent failures.
+
+---
+
+### 102. Off-site Backups (S3)
+**What it does:** `server/backup.ts` enhanced with optional S3 upload after local backup. Triggered via `BACKUP_S3_BUCKET` env var. Cleans up local tar.gz on successful upload. Configurable region (`BACKUP_S3_REGION`), prefix (`BACKUP_S3_PREFIX`), and retention (`BACKUP_RETENTION_DAYS`).
+
+**Agency value:** Disaster recovery — database recoverable even if server disk is lost. Automated, no manual intervention.
+
+**Client value:** Indirect — their data is safe.
+
+**Mutual:** Business continuity insurance.
+
+---
+
+### 103. API Hardening
+**What it does:** Rate limit headers (`X-RateLimit-Limit/Remaining/Reset`), Cloudflare Turnstile CAPTCHA on client login/forgot-password (optional via `VITE_TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY`), request fingerprinting, credential stuffing protection on auth endpoints.
+
+**Agency value:** Protects against bot attacks and credential stuffing without breaking legitimate usage. Rate limit headers help debug client-side 429 errors.
+
+**Client value:** Login security via CAPTCHA, protection against account takeover.
+
+**Mutual:** Security hardening that scales with the user base.
+
+---
+
+### 104. React Router DOM Migration
+**What it does:** Migrated from manual routing to `react-router-dom` v7. `BrowserRouter` with `Routes`/`Route` in `App.tsx`. `src/routes.ts` defines `Page` + `ClientTab` type unions, `adminPath()` + `clientPath()` helpers. Admin: `/ws/:workspaceId/:tab?`, Client: `/client/:workspaceId/:tab?`, global tabs: `/settings`, `/roadmap`, `/prospect`, `/ai-usage`.
+
+**Agency value:** Standard routing enables deep linking, browser back/forward, bookmarkable URLs. Easier onboarding for new developers.
+
+**Client value:** Bookmarkable URLs, browser navigation works as expected.
+
+**Mutual:** Better UX + maintainable codebase.
+
+---
+
+### 105. Typed API Client Layer
+**What it does:** `src/api/` with 9 modules: `client.ts` (ApiError, get/post/patch/del/postForm/getOptional/getSafe), `analytics.ts`, `workspaces.ts`, `content.ts`, `seo.ts`, `payments.ts`, `auth.ts`, `misc.ts`, `index.ts` (barrel). All components migrated from raw `fetch()` calls.
+
+**Agency value:** Type-safe API calls catch errors at compile time. Centralized error handling (429 detection, auth redirects). Single import for all API operations.
+
+**Client value:** Indirect — fewer bugs, more consistent error handling.
+
+**Mutual:** Developer productivity × reliability.
+
+---
+
+### 106. Shared Types
+**What it does:** `shared/types/` with 10 modules shared between client and server: `workspace.ts`, `analytics.ts`, `content.ts`, `payments.ts`, `approvals.ts`, `requests.ts`, `recommendations.ts`, `users.ts`, `roadmap.ts`, `index.ts` (barrel).
+
+**Agency value:** Single source of truth for interfaces eliminates type drift between frontend and backend. Refactoring touches one file instead of two.
+
+**Client value:** Indirect — fewer type-mismatch bugs.
+
+**Mutual:** Codebase consistency that scales with feature count.
+
+---
+
+### 107. E2E Test Suite (Playwright)
+**What it does:** `tests/e2e/` with Playwright tests: `smoke.spec.ts` (server health + page load), `approval-workflow.spec.ts` (propose → review → apply), `client-login.spec.ts` (auth flow + JWT). Runs in CI via `.github/workflows/e2e.yml`.
+
+**Agency value:** Critical-path flows verified on every deploy. Catches regressions in payment, approval, and auth flows before they reach clients.
+
+**Client value:** Indirect — approval workflow and login always work.
+
+**Mutual:** Confidence to ship fast without breaking revenue-critical flows.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
@@ -1280,12 +1390,13 @@ When the user asks to update this document with recent features, follow this pro
 | Client Self-Service | 14 | 24/7 data access, onboarding, plans, cart, order tracking, glossary, questionnaire, ROI upgrade prompts, shareable report permalinks |
 | AI & Intelligence | 7 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine + context completeness + usage dashboard + AEO page review |
 | Auth & Access Control | 3 | Internal user accounts, workspace ACL, client user accounts |
-| Security | 1 | Helmet, HTTPS, rate limiting, input sanitization |
+| Security | 2 | Helmet, HTTPS, rate limiting, input sanitization, Turnstile CAPTCHA, credential stuffing protection |
 | Monetization | 2 | Stripe Checkout + Subscriptions, admin settings, payment tracking, trials, encrypted config, billing portal |
 | Platform & UX | 17 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home, page state model, work orders, request linkage, admin UX overhaul, landing page, mobile guard, Recharts, portal OG/favicon, sidebar color accents, AI Usage standalone page |
 | Data Architecture | 3 | PageEditState model, cross-store writes, activity feed for client actions |
-| Architecture | 2 | Server refactor (46 route modules + 3 shared modules), frontend component decomposition |
+| Architecture | 5 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types |
+| Infrastructure | 5 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3), E2E tests |
 
-**97 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**107 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **97**. Last updated: March 2026 (audit completion email, shareable reports, content decay engine, not-yet-ranking action plan).
+Current feature count: **107**. Last updated: March 2026 (Devin infrastructure sprint: structured logging, Sentry, CI/CD, graceful shutdown, S3 backups, API hardening, React Router, typed API client, shared types, E2E tests).
