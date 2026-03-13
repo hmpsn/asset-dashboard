@@ -66,23 +66,19 @@ export interface FixContext {
   issueMessage?: string;
 }
 
-/** Backward-compat redirect: /client/:id?tab=X → /client/:id/X */
-function ClientTabRedirect() {
-  const { workspaceId } = useParams<{ workspaceId: string }>();
+/** Client routes with backward-compat redirect: /client/:id?tab=X → /client/:id/X */
+function ClientRoutes({ betaMode = false }: { betaMode?: boolean }) {
+  const params = useParams<{ workspaceId: string; '*': string }>();
   const [searchParams] = useSearchParams();
-  const tab = searchParams.get('tab');
-  if (tab && workspaceId) {
+  const workspaceId = params.workspaceId!;
+  // Backward-compat: redirect old ?tab=X URLs to path-based
+  const queryTab = searchParams.get('tab');
+  if (queryTab && workspaceId) {
     const remaining = new URLSearchParams(searchParams);
     remaining.delete('tab');
     const qs = remaining.toString();
-    return <Navigate to={clientPath(workspaceId, tab) + (qs ? '?' + qs : '')} replace />;
+    return <Navigate to={clientPath(workspaceId, queryTab) + (qs ? '?' + qs : '')} replace />;
   }
-  return null;
-}
-
-function ClientRoutes({ betaMode = false }: { betaMode?: boolean }) {
-  const params = useParams<{ workspaceId: string; '*': string }>();
-  const workspaceId = params.workspaceId!;
   const splatTab = params['*'] || undefined;
   return <ClientDashboard workspaceId={workspaceId} initialTab={splatTab} betaMode={betaMode} />;
 }
@@ -94,7 +90,7 @@ function App() {
         <Route path="/welcome" element={<Suspense fallback={<ChunkFallback />}><LandingPage /></Suspense>} />
         <Route path="/styleguide" element={<Suspense fallback={<ChunkFallback />}><Styleguide /></Suspense>} />
         <Route path="/client/beta/:workspaceId/*" element={<MobileGuard><Suspense fallback={<ChunkFallback />}><ClientRoutes betaMode /></Suspense></MobileGuard>} />
-        <Route path="/client/:workspaceId/*" element={<MobileGuard><Suspense fallback={<ChunkFallback />}><ClientTabRedirect /><ClientRoutes /></Suspense></MobileGuard>} />
+        <Route path="/client/:workspaceId/*" element={<MobileGuard><Suspense fallback={<ChunkFallback />}><ClientRoutes /></Suspense></MobileGuard>} />
         <Route path="/*" element={<ToastProvider><BackgroundTaskProvider><AdminApp /></BackgroundTaskProvider></ToastProvider>} />
       </Routes>
     </BrowserRouter>
