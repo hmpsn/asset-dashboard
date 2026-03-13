@@ -56,6 +56,7 @@ services:
       - fromGroup: shared-api-keys
       - fromGroup: shared-google
       - fromGroup: shared-smtp
+      - fromGroup: shared-sentry
     disk:
       name: asset-dashboard-data
       mountPath: /var/data/asset-dashboard
@@ -101,6 +102,7 @@ services:
       - fromGroup: shared-api-keys
       - fromGroup: shared-google
       - fromGroup: shared-smtp
+      - fromGroup: shared-sentry
     disk:
       name: asset-dashboard-staging-data
       mountPath: /var/data/asset-dashboard
@@ -139,4 +141,16 @@ envVarGroups:
       - key: SMTP_FROM
         sync: false
       - key: SMTP_FROM_NAME
+        sync: false
+  - name: shared-sentry
+    envVars:
+      - key: SENTRY_DSN
+        sync: false
+      - key: VITE_SENTRY_DSN
+        sync: false
+      - key: SENTRY_AUTH_TOKEN
+        sync: false
+      - key: SENTRY_ORG
+        sync: false
+      - key: SENTRY_PROJECT
         sync: false

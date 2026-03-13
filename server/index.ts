@@ -1,4 +1,9 @@
 import 'dotenv/config';
+import { initSentry } from './sentry.js';
+
+// Initialize Sentry before anything else so it can capture startup errors
+initSentry();
+
 import { createServer } from 'http';
 import path from 'path';
 import fs from 'fs';

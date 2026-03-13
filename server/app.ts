@@ -17,6 +17,7 @@ import {
   verifyClientSession,
 } from './middleware.js';
 import { getPresence } from './websocket.js';
+import { setupSentryErrorHandler } from './sentry.js';
 
 // ─── Route modules ───
 import authRoutes from './routes/auth.js';
@@ -266,6 +267,9 @@ export function createApp(): express.Express {
   app.use(aeoReviewRoutes);
   app.use(seoChangeTrackerRoutes);
   app.use(contentDecayRoutes);
+
+  // --- Sentry error handler (must be after all route mounts, before frontend catch-all) ---
+  setupSentryErrorHandler(app);
 
   // --- Serve frontend in production (MUST be after all API routes) ---
   if (IS_PROD) {
