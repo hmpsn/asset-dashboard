@@ -7,53 +7,9 @@ import {
   Loader2, XCircle, ArrowUpRight, Shield,
 } from 'lucide-react';
 import { useCart } from './useCart';
-import type { ProductType } from '../../../server/payments';
+import type { ProductType } from '../../../shared/types/payments.ts';
+import type { RecPriority, RecType, RecStatus, Recommendation, RecommendationSet } from '../../../shared/types/recommendations.ts';
 import { STUDIO_NAME } from '../../constants';
-
-// ─── Types (mirrors server/recommendations.ts) ───────────────────
-
-type RecPriority = 'fix_now' | 'fix_soon' | 'fix_later' | 'ongoing';
-type RecType = 'technical' | 'content' | 'schema' | 'metadata' | 'performance' | 'accessibility' | 'strategy';
-type RecStatus = 'pending' | 'in_progress' | 'completed' | 'dismissed';
-
-interface Recommendation {
-  id: string;
-  workspaceId: string;
-  priority: RecPriority;
-  type: RecType;
-  title: string;
-  description: string;
-  insight: string;
-  impact: 'high' | 'medium' | 'low';
-  effort: 'low' | 'medium' | 'high';
-  impactScore: number;
-  source: string;
-  affectedPages: string[];
-  trafficAtRisk: number;
-  impressionsAtRisk: number;
-  estimatedGain: string;
-  actionType: 'automated' | 'manual' | 'content_creation' | 'purchase';
-  productType?: string;
-  productPrice?: number;
-  status: RecStatus;
-  assignedTo?: 'team' | 'client';
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface RecommendationSet {
-  workspaceId: string;
-  generatedAt: string;
-  recommendations: Recommendation[];
-  summary: {
-    fixNow: number;
-    fixSoon: number;
-    fixLater: number;
-    ongoing: number;
-    totalImpactScore: number;
-    trafficAtRisk: number;
-  };
-}
 
 // ─── Props ────────────────────────────────────────────────────────
 

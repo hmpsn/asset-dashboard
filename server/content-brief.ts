@@ -5,42 +5,8 @@ import { callOpenAI } from './openai-helpers.js';
 import { buildReferenceContext, buildSerpContext, buildStyleExampleContext } from './web-scraper.js';
 import type { ScrapedPage } from './web-scraper.js';
 
-export interface ContentBrief {
-  id: string;
-  workspaceId: string;
-  targetKeyword: string;
-  secondaryKeywords: string[];
-  suggestedTitle: string;
-  suggestedMetaDesc: string;
-  outline: { heading: string; subheadings?: string[]; notes: string; wordCount?: number; keywords?: string[] }[];
-  wordCountTarget: number;
-  intent: string;
-  audience: string;
-  competitorInsights: string;
-  internalLinkSuggestions: string[];
-  createdAt: string;
-  // Enhanced fields (v2)
-  executiveSummary?: string;
-  contentFormat?: string;
-  toneAndStyle?: string;
-  peopleAlsoAsk?: string[];
-  topicalEntities?: string[];
-  serpAnalysis?: { contentType: string; avgWordCount: number; commonElements: string[]; gaps: string[] };
-  difficultyScore?: number;
-  trafficPotential?: string;
-  ctaRecommendations?: string[];
-  // Enhanced fields (v3)
-  eeatGuidance?: { experience: string; expertise: string; authority: string; trust: string };
-  contentChecklist?: string[];
-  schemaRecommendations?: { type: string; notes: string }[];
-  // Page type (v4)
-  pageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource';
-  // Reference URLs (v5) — competitor/inspiration URLs scraped for context
-  referenceUrls?: string[];
-  // Real SERP data (v5) — actual PAA questions and top results from Google
-  realPeopleAlsoAsk?: string[];
-  realTopResults?: { position: number; title: string; url: string }[];
-}
+export type { ContentBrief } from '../shared/types/content.ts';
+import type { ContentBrief } from '../shared/types/content.ts';
 
 // ── SQLite row shape ──
 

@@ -6,22 +6,8 @@
 import bcrypt from 'bcryptjs';
 import db from './db/index.js';
 
-export type UserRole = 'owner' | 'admin' | 'member';
-
-export interface User {
-  id: string;
-  email: string;
-  name: string;
-  passwordHash: string;
-  role: UserRole;
-  workspaceIds: string[];       // workspaces this user can access
-  avatarUrl?: string;
-  lastLoginAt?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export type SafeUser = Omit<User, 'passwordHash'>;
+export type { UserRole, InternalUser as User, SafeInternalUser as SafeUser } from '../shared/types/users.ts';
+import type { UserRole, InternalUser as User, SafeInternalUser as SafeUser } from '../shared/types/users.ts';
 
 const SALT_ROUNDS = 12;
 

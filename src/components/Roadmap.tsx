@@ -7,25 +7,8 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { PageHeader, SectionCard, Badge, StatCard } from './ui';
 
-/* ── Roadmap data types (matches server JSON shape) ── */
-interface RoadmapItem {
-  id: number;
-  title: string;
-  source: string;
-  est: string;
-  priority: 'P0' | 'P1' | 'P2' | 'P3' | 'P4';
-  notes: string;
-  status: 'done' | 'in_progress' | 'pending';
-  shippedAt?: string;
-}
-
-interface SprintData {
-  id: string;
-  name: string;
-  rationale: string;
-  hours: string;
-  items: RoadmapItem[];
-}
+/* ── Roadmap data types (from shared types) ── */
+import type { RoadmapItem, SprintData } from '../../shared/types/roadmap.ts';
 
 /* ── Sprint icon mapping (client-side only) ── */
 const SPRINT_ICONS: Record<string, LucideIcon> = {

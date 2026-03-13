@@ -2,29 +2,8 @@ import db from './db/index.js';
 
 // --- Types ---
 
-export type ProductType =
-  | 'brief_blog' | 'brief_landing' | 'brief_service' | 'brief_location'
-  | 'brief_product' | 'brief_pillar' | 'brief_resource'
-  | 'post_draft' | 'post_polished' | 'post_premium'
-  | 'schema_page' | 'schema_10'
-  | 'strategy' | 'strategy_refresh'
-  | 'fix_meta' | 'fix_alt' | 'fix_redirect' | 'fix_meta_10'
-  | 'plan_growth' | 'plan_premium';
-
-export interface PaymentRecord {
-  id: string;
-  workspaceId: string;
-  stripeSessionId: string;
-  stripePaymentIntentId?: string;
-  productType: ProductType;
-  amount: number;           // cents
-  currency: string;
-  status: 'pending' | 'paid' | 'failed' | 'refunded';
-  contentRequestId?: string;
-  metadata?: Record<string, string>;
-  createdAt: string;
-  paidAt?: string;
-}
+export type { ProductType, PaymentRecord } from '../shared/types/payments.ts';
+import type { ProductType, PaymentRecord } from '../shared/types/payments.ts';
 
 // --- SQLite row shape ---
 
