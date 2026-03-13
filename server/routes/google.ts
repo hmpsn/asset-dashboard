@@ -31,6 +31,9 @@ import {
 } from '../search-console.js';
 import { buildSeoContext, buildKeywordMapContext, RICH_BLOCKS_PROMPT } from '../seo-context.js';
 import { listWorkspaces } from '../workspaces.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('google-auth');
 
 // --- Google Search Console / GA4 ---
 router.get('/api/google/status/:siteId', (req, res) => {
@@ -80,12 +83,12 @@ router.get('/api/google/callback', async (req, res) => {
   // Google may redirect back with an error instead of a code
   const error = req.query.error as string;
   if (error) {
-    console.error(`[google-auth] OAuth error from Google: ${error}`);
+    log.error(`OAuth error from Google: ${error}`);
     return res.status(400).send(`Google auth error: ${error}. Check your OAuth consent screen and API settings in Google Cloud Console.`);
   }
   const code = req.query.code as string;
   const siteId = req.query.state as string;
-  console.log(`[google-auth] Callback received, code=${code ? 'present' : 'missing'}, siteId=${siteId || 'missing'}`);
+  log.info(`Callback received, code=${code ? 'present' : 'missing'}, siteId=${siteId || 'missing'}`);
   if (!code || !siteId) return res.status(400).send('Missing code or state');
   const result = await exchangeCode(code, siteId);
   if (result.success) {

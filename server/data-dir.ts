@@ -8,11 +8,14 @@
  */
 import fs from 'fs';
 import path from 'path';
+import { createLogger } from './logger.js';
+
+const log = createLogger('data-dir');
 
 const IS_PROD = process.env.NODE_ENV === 'production';
 
 if (IS_PROD && !process.env.DATA_DIR) {
-  console.warn('[data-dir] ⚠️  DATA_DIR is not set in production — falling back to /tmp/asset-dashboard which is EPHEMERAL and will be wiped on deploy.');
+  log.warn('⚠️  DATA_DIR is not set in production — falling back to /tmp/asset-dashboard which is EPHEMERAL and will be wiped on deploy.');
 }
 
 /** Resolved root data directory */

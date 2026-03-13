@@ -5,6 +5,9 @@
 import fs from 'fs';
 import path from 'path';
 import { getDataDir } from './data-dir.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('openai');
 
 // --- Token / Cost Tracking (persisted to disk) ---
 
@@ -266,7 +269,7 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
 
         // Quota exceeded — never retryable, fail fast
         if (res.status === 429 && errText.includes('insufficient_quota')) {
-          console.error(`[${feature}] OpenAI quota exceeded — add credits at platform.openai.com/account/billing`);
+          log.error(`[${feature}] OpenAI quota exceeded — add credits at platform.openai.com/account/billing`);
           throw new Error(`OpenAI quota exceeded. Add credits at https://platform.openai.com/account/billing`);
         }
 
@@ -276,7 +279,7 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
           const retryAfterMs = res.headers.get('retry-after-ms');
           let waitMs = Math.min(2000 * Math.pow(2, attempt), 30_000);
           if (retryAfterMs) waitMs = Math.max(parseInt(retryAfterMs, 10) + 500, waitMs);
-          console.log(`[${feature}] OpenAI ${res.status}, retrying in ${(waitMs / 1000).toFixed(1)}s (attempt ${attempt + 1}/${maxRetries})`);
+          log.info(`[${feature}] OpenAI ${res.status}, retrying in ${(waitMs / 1000).toFixed(1)}s (attempt ${attempt + 1}/${maxRetries})`);
           await new Promise(r => setTimeout(r, waitMs));
           continue;
         }
@@ -300,13 +303,13 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
       return { text, promptTokens, completionTokens, totalTokens };
     } catch (err) {
       if (err instanceof Error && err.name === 'TimeoutError' && attempt < maxRetries) {
-        console.log(`[${feature}] OpenAI timeout, retrying (attempt ${attempt + 1}/${maxRetries})`);
+        log.info(`[${feature}] OpenAI timeout, retrying (attempt ${attempt + 1}/${maxRetries})`);
         await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
         continue;
       }
       if (attempt === maxRetries) throw err;
       // Generic retry for network errors
-      console.log(`[${feature}] OpenAI error: ${err instanceof Error ? err.message : err}, retrying (attempt ${attempt + 1}/${maxRetries})`);
+      log.info(`[${feature}] OpenAI error: ${err instanceof Error ? err.message : err}, retrying (attempt ${attempt + 1}/${maxRetries})`);
       await new Promise(r => setTimeout(r, 2000 * Math.pow(2, attempt)));
     }
   }

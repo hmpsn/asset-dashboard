@@ -26,6 +26,9 @@ import { getGA4TopPages } from './google-analytics.js';
 
 export type { RecPriority, RecType, RecStatus, RecActionType, Recommendation, RecommendationSet } from '../shared/types/recommendations.ts';
 import type { RecPriority, RecType, RecStatus, RecActionType, Recommendation, RecommendationSet } from '../shared/types/recommendations.ts';
+import { createLogger } from './logger.js';
+
+const log = createLogger('recommendations');
 
 interface TrafficMap {
   [path: string]: { clicks: number; impressions: number; sessions: number; pageviews: number };
@@ -655,7 +658,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   };
 
   saveRecommendations(set);
-  console.log(`[recommendations] Generated ${recs.length} recommendations for ${workspaceId}: ${summary.fixNow} fix-now, ${summary.fixSoon} fix-soon, ${summary.fixLater} fix-later, ${summary.ongoing} ongoing${autoResolved > 0 ? `, ${autoResolved} auto-resolved` : ''}`);
+  log.info(`Generated ${recs.length} recommendations for ${workspaceId}: ${summary.fixNow} fix-now, ${summary.fixSoon} fix-soon, ${summary.fixLater} fix-later, ${summary.ongoing} ongoing${autoResolved > 0 ? `, ${autoResolved} auto-resolved` : ''}`);
 
   return set;
 }

@@ -1,4 +1,7 @@
 import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from './webflow.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('pagespeed');
 
 const WEBFLOW_API = 'https://api.webflow.com/v2';
 const PSI_API = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed';
@@ -77,12 +80,12 @@ async function runPageSpeed(url: string, strategy: 'mobile' | 'desktop'): Promis
 
     if (!res.ok) {
       const body = await res.text().catch(() => '');
-      console.error(`PageSpeed API error for ${url}: ${res.status} ${res.statusText}`, body.slice(0, 200));
+      log.error({ detail: body.slice(0, 200) }, `PageSpeed API error for ${url}: ${res.status} ${res.statusText}`);
       return null;
     }
     return await res.json() as Record<string, unknown>;
   } catch (err) {
-    console.error(`PageSpeed fetch error for ${url}:`, err);
+    log.error({ err: err }, `PageSpeed fetch error for ${url}:`);
     return null;
   }
 }
@@ -191,7 +194,7 @@ export async function runSinglePageSpeed(
   strategy: 'mobile' | 'desktop' = 'mobile',
   pageTitle: string = '',
 ): Promise<PageSpeedResult | null> {
-  console.log(`PageSpeed: testing single page ${url} (${strategy})`);
+  log.info(`PageSpeed: testing single page ${url} (${strategy})`);
   const data = await runPageSpeed(url, strategy);
   if (!data) return null;
 
@@ -239,7 +242,7 @@ export async function runSiteSpeed(
   // Discover CMS pages and add a sample
   const staticPaths = buildStaticPathSet(published);
   const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, cmsSlots);
-  console.log(`PageSpeed: testing ${pagesToTest.length} static + ${cmsUrls.length} CMS pages on ${baseUrl} (${strategy})`);
+  log.info(`PageSpeed: testing ${pagesToTest.length} static + ${cmsUrls.length} CMS pages on ${baseUrl} (${strategy})`);
 
   const results: PageSpeedResult[] = [];
 
@@ -248,7 +251,7 @@ export async function runSiteSpeed(
     // Use publishedPath for full URL (handles nested pages like /about/team)
     const pagePath = page.publishedPath || (page.slug ? `/${page.slug}` : '');
     const url = pagePath ? `${baseUrl}${pagePath}` : baseUrl;
-    console.log(`PageSpeed: testing ${url}...`);
+    log.info(`PageSpeed: testing ${url}...`);
 
     const data = await runPageSpeed(url, strategy);
     if (!data) continue;
@@ -267,7 +270,7 @@ export async function runSiteSpeed(
 
   // Run CMS pages sequentially too
   for (const cmsPage of cmsUrls) {
-    console.log(`PageSpeed: testing CMS page ${cmsPage.url}...`);
+    log.info(`PageSpeed: testing CMS page ${cmsPage.url}...`);
     const data = await runPageSpeed(cmsPage.url, strategy);
     if (!data) continue;
     results.push({

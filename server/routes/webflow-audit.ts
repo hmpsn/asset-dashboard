@@ -8,6 +8,9 @@ import {
   scanAssetUsage,
 } from '../webflow.js';
 import { getTokenForSite } from '../workspaces.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('webflow-audit');
 
 const router = Router();
 
@@ -134,7 +137,7 @@ router.get('/api/webflow/audit/:siteId', async (req, res) => {
       issues,
     });
   } catch (e) {
-    console.error('Audit error:', e);
+    log.error({ err: e }, 'Audit error');
     res.status(500).json({ error: 'Audit failed' });
   }
 });

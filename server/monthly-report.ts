@@ -13,6 +13,9 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { getDataDir } from './data-dir.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('auto-report');
 
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // check every 6 hours
 let reportInterval: ReturnType<typeof setInterval> | null = null;
@@ -215,7 +218,7 @@ async function checkAndSendReports() {
     if (sent[ws.id] === period) continue;
 
     const data = await gatherMonthlyData(ws);
-    console.log(`[Auto Report] Generating ${freq} report for ${ws.name} (${period})`);
+    log.info(`Generating ${freq} report for ${ws.name} (${period})`);
 
     try {
       const html = generateReportHTML(data);
@@ -223,9 +226,9 @@ async function checkAndSendReports() {
       await sendMonthlyReportEmail(ws, data);
       sent[ws.id] = period;
       changed = true;
-      console.log(`[Auto Report] Sent to ${ws.clientEmail}`);
+      log.info(`Sent to ${ws.clientEmail}`);
     } catch (err) {
-      console.error(`[Auto Report] Failed for ${ws.name}:`, err);
+      log.error({ err: err }, `Failed for ${ws.name}:`);
     }
   }
 
@@ -237,14 +240,14 @@ export function startMonthlyReports() {
 
   // Check after 5 min on startup (avoids re-send during rapid restart cycles), then every 6 hours
   setTimeout(() => {
-    checkAndSendReports().catch(err => console.error('[Auto Report] Error:', err));
+    checkAndSendReports().catch(err => log.error({ err }, 'Error'));
   }, 5 * 60 * 1000);
 
   reportInterval = setInterval(() => {
-    checkAndSendReports().catch(err => console.error('[Auto Report] Error:', err));
+    checkAndSendReports().catch(err => log.error({ err }, 'Error'));
   }, CHECK_INTERVAL_MS);
 
-  console.log('[Auto Report] Report scheduler started (checks every 6 hours)');
+  log.info('Report scheduler started (checks every 6 hours)');
 }
 
 export function stopMonthlyReports() {

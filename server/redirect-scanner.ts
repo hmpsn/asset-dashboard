@@ -4,6 +4,9 @@
  */
 
 import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from './webflow.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('redirect-scanner');
 
 const WEBFLOW_API = 'https://api.webflow.com/v2';
 
@@ -207,7 +210,7 @@ export async function scanRedirects(siteId: string, tokenOverride?: string, live
   const baseUrl = liveDomain
     ? (liveDomain.startsWith('http') ? liveDomain : `https://${liveDomain}`)
     : subdomain ? `https://${subdomain}.webflow.io` : '';
-  console.log(`[redirect-scanner] Using baseUrl: ${baseUrl} (liveDomain=${liveDomain || '(none)'})`);
+  log.info(`Using baseUrl: ${baseUrl} (liveDomain=${liveDomain || '(none)'})`);
   if (!baseUrl) {
     return {
       chains: [],
@@ -220,7 +223,7 @@ export async function scanRedirects(siteId: string, tokenOverride?: string, live
   // 1. Gather all known pages
   const allPages = await listPages(siteId, tokenOverride);
   const published = filterPublishedPages(allPages);
-  console.log(`Redirect scanner: checking ${published.length} static pages on ${baseUrl}`);
+  log.info(`Redirect scanner: checking ${published.length} static pages on ${baseUrl}`);
 
   const pageUrls: Array<{ url: string; path: string; title: string; source: 'static' | 'cms' | 'gsc' }> = published.map(p => {
     // Use publishedPath for full URL (handles nested pages like /about/team)
@@ -246,10 +249,10 @@ export async function scanRedirects(siteId: string, tokenOverride?: string, live
       });
     }
     if (cmsUrls.length > 0) {
-      console.log(`Redirect scanner: also checking ${cmsUrls.length} CMS pages`);
+      log.info(`Redirect scanner: also checking ${cmsUrls.length} CMS pages`);
     }
   } catch {
-    console.log('Redirect scanner: CMS discovery skipped');
+    log.info('Redirect scanner: CMS discovery skipped');
   }
 
   // Also add GSC ghost URLs — pages Google knows about that aren't in our page list
@@ -271,7 +274,7 @@ export async function scanRedirects(siteId: string, tokenOverride?: string, live
       }
     }
     if (added > 0) {
-      console.log(`Redirect scanner: added ${added} GSC ghost URLs (pages Google indexes that aren't on the site)`);
+      log.info(`Redirect scanner: added ${added} GSC ghost URLs (pages Google indexes that aren't on the site)`);
     }
   }
 
@@ -385,7 +388,7 @@ export async function scanRedirects(siteId: string, tokenOverride?: string, live
     }
   }
 
-  console.log(`Redirect scanner: ${healthy} healthy, ${redirecting} redirecting, ${notFound} not found, ${chains.length} chains`);
+  log.info(`Redirect scanner: ${healthy} healthy, ${redirecting} redirecting, ${notFound} not found, ${chains.length} chains`);
 
   return {
     chains,

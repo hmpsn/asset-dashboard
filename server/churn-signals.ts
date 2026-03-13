@@ -22,6 +22,9 @@ import { listWorkspaces } from './workspaces.js';
 import { listActivity } from './activity-log.js';
 import { listClientUsers } from './client-users.js';
 import { notifyTeamChurnSignal } from './email.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('churn-signals');
 
 const UPLOAD_ROOT = getUploadRoot();
 const MAX_SIGNALS = 200;
@@ -309,21 +312,21 @@ async function runChurnCheck() {
     });
   }
 
-  console.log('[churn-signals] Check completed at', new Date().toISOString());
+  log.info({ detail: new Date().toISOString() }, 'Check completed at');
 }
 
 let interval: ReturnType<typeof setInterval> | null = null;
 
 export function startChurnSignalScheduler() {
   // Run immediately on startup
-  runChurnCheck().catch(err => console.error('[churn-signals] Error:', err));
+  runChurnCheck().catch(err => log.error({ err }, 'Error'));
 
   // Then every 6 hours
   interval = setInterval(() => {
-    runChurnCheck().catch(err => console.error('[churn-signals] Error:', err));
+    runChurnCheck().catch(err => log.error({ err }, 'Error'));
   }, CHECK_INTERVAL_MS);
 
-  console.log('[churn-signals] Scheduler started (every 6h)');
+  log.info('Scheduler started (every 6h)');
 }
 
 export function stopChurnSignalScheduler() {

@@ -14,6 +14,9 @@ import type { ContentBrief } from './content-brief.js';
 
 export type { PostSection, GeneratedPost } from '../shared/types/content.ts';
 import type { PostSection, GeneratedPost } from '../shared/types/content.ts';
+import { createLogger } from './logger.js';
+
+const log = createLogger('content-posts');
 
 // ── SQLite row shape ──
 
@@ -200,10 +203,10 @@ async function callCreativeAI(opts: {
         maxRetries: 3,      // patient retries — quality over speed
         timeoutMs: 90_000,
       });
-      console.log(`[${feature}] Generated with Claude`);
+      log.info(`[${feature}] Generated with Claude`);
       return result.text.trim();
     } catch (err) {
-      console.log(`[${feature}] Claude failed (${err instanceof Error ? err.message : err}), falling back to GPT`);
+      log.info(`[${feature}] Claude failed (${err instanceof Error ? err.message : err}), falling back to GPT`);
     }
   }
 
@@ -216,7 +219,7 @@ async function callCreativeAI(opts: {
     feature,
     workspaceId,
   });
-  console.log(`[${feature}] Generated with GPT`);
+  log.info(`[${feature}] Generated with GPT`);
   return result.text.trim();
 }
 
@@ -715,7 +718,7 @@ Return valid JSON only:
     if (parsed.seoTitle && parsed.seoMetaDescription) return parsed;
     return null;
   } catch (err) {
-    console.warn('[content-posts] SEO meta generation failed:', err);
+    log.warn({ err: err }, 'SEO meta generation failed');
     return null;
   }
 }
@@ -798,7 +801,7 @@ Return ONLY valid JSON, no markdown fences, no comments.`;
   const estimatedOutputTokens = Math.ceil(targetTotal * 1.5);
   const maxTokens = Math.max(8000, Math.min(estimatedOutputTokens, 16000));
 
-  console.log(`[content-posts] Unification pass: ${currentWords} words → target ${targetTotal}, overBudget=${overBudget}, maxTokens=${maxTokens}`);
+  log.info(`Unification pass: ${currentWords} words → target ${targetTotal}, overBudget=${overBudget}, maxTokens=${maxTokens}`);
 
   const result = await callOpenAI({
     model: CONTENT_MODEL,
@@ -815,18 +818,18 @@ Return ONLY valid JSON, no markdown fences, no comments.`;
   try {
     const jsonMatch = result.text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      console.warn('[content-posts] Unification: no JSON object found in response');
+      log.warn('Unification: no JSON object found in response');
       return null;
     }
     const parsed = JSON.parse(jsonMatch[0]) as { introduction?: string; sections?: string[]; conclusion?: string };
     // Validate sections count matches
     if (parsed.sections && parsed.sections.length !== post.sections.length) {
-      console.warn(`[content-posts] Unification returned ${parsed.sections.length} sections but expected ${post.sections.length} — skipping section updates`);
+      log.warn(`Unification returned ${parsed.sections.length} sections but expected ${post.sections.length} — skipping section updates`);
       parsed.sections = undefined;
     }
     return parsed;
   } catch (err) {
-    console.warn('[content-posts] Failed to parse unification JSON:', err);
+    log.warn({ err: err }, 'Failed to parse unification JSON');
     return null;
   }
 }
@@ -944,18 +947,18 @@ export async function generatePost(
       const postUnifyWords = countWords(post.introduction) + post.sections.reduce((s, sec) => s + sec.wordCount, 0) + countWords(post.conclusion);
       post.unificationStatus = 'success';
       post.unificationNote = `Unified: ${preUnifyWords} → ${postUnifyWords} words (target: ${post.targetWordCount})`;
-      console.log(`[content-posts] ${post.unificationNote}`);
+      log.info(`${post.unificationNote}`);
       post.updatedAt = new Date().toISOString();
       savePost(workspaceId, post);
     } else {
       post.unificationStatus = 'skipped';
       post.unificationNote = 'Unification returned null — post too short or JSON parse failed';
-      console.warn(`[content-posts] Unification skipped for ${postId}`);
+      log.warn(`Unification skipped for ${postId}`);
     }
   } catch (err) {
     post.unificationStatus = 'failed';
     post.unificationNote = `Unification error: ${err instanceof Error ? err.message : 'Unknown'}`;
-    console.error(`[content-posts] Unification pass failed (non-critical):`, err);
+    log.error({ err: err }, `Unification pass failed (non-critical):`);
     // Non-critical — the post is still usable without unification
   }
 
@@ -965,10 +968,10 @@ export async function generatePost(
     if (seoMeta) {
       post.seoTitle = seoMeta.seoTitle;
       post.seoMetaDescription = seoMeta.seoMetaDescription;
-      console.log(`[content-posts] SEO meta generated: "${seoMeta.seoTitle}" (${seoMeta.seoTitle.length} chars)`);
+      log.info(`SEO meta generated: "${seoMeta.seoTitle}" (${seoMeta.seoTitle.length} chars)`);
     }
   } catch (err) {
-    console.warn('[content-posts] SEO meta generation failed (non-critical):', err);
+    log.warn({ err: err }, 'SEO meta generation failed (non-critical)');
   }
 
   // Finalize

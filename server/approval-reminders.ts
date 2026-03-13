@@ -2,6 +2,9 @@ import { listWorkspaces, getClientPortalUrl } from './workspaces.js';
 import { listBatches } from './approvals.js';
 import { isEmailConfigured, sendEmail } from './email.js';
 import { renderApprovalReminder } from './email-templates.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('approval-reminder');
 
 const STALE_DAYS = 3; // remind if pending > 3 days
 const CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000; // every 12 hours
@@ -46,12 +49,12 @@ async function checkStaleApprovals() {
 
       const dashUrl = getClientPortalUrl(ws);
 
-      console.log(`[Approval Reminder] Sending reminder for batch "${batch.name}" to ${ws.clientEmail} (${staleDays} days stale)`);
+      log.info(`Sending reminder for batch "${batch.name}" to ${ws.clientEmail} (${staleDays} days stale)`);
       try {
         await sendApprovalReminderEmail(ws.clientEmail, ws.name, batch.name, pendingItems.length, staleDays, dashUrl);
         sentReminders.set(batch.id, now);
       } catch (err) {
-        console.error(`[Approval Reminder] Failed to send:`, err);
+        log.error({ err: err }, `Failed to send:`);
       }
     }
   }
@@ -62,14 +65,14 @@ export function startApprovalReminders() {
 
   // Check after 60s on startup, then every 12 hours
   setTimeout(() => {
-    checkStaleApprovals().catch(err => console.error('[Approval Reminder] Error:', err));
+    checkStaleApprovals().catch(err => log.error({ err }, 'Error'));
   }, 60000);
 
   reminderInterval = setInterval(() => {
-    checkStaleApprovals().catch(err => console.error('[Approval Reminder] Error:', err));
+    checkStaleApprovals().catch(err => log.error({ err }, 'Error'));
   }, CHECK_INTERVAL_MS);
 
-  console.log('[Approval Reminder] Stale approval checker started (checks every 12 hours)');
+  log.info('Stale approval checker started (checks every 12 hours)');
 }
 
 export function stopApprovalReminders() {

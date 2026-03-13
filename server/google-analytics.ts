@@ -5,6 +5,9 @@
  */
 
 import { getGlobalToken } from './google-auth.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('ga4');
 
 const GA4_API = 'https://analyticsdata.googleapis.com/v1beta';
 const GA4_ADMIN_API = 'https://analyticsadmin.googleapis.com/v1beta';
@@ -72,7 +75,7 @@ export async function listGA4Properties(): Promise<GA4Property[]> {
 
   if (!res.ok) {
     const err = await res.text();
-    console.error('[ga4] Failed to list properties:', err);
+    log.error({ err: err }, 'Failed to list properties');
     throw new Error(`Failed to list GA4 properties: ${res.status}`);
   }
 
@@ -117,7 +120,7 @@ async function runReport(propertyId: string, body: Record<string, unknown>): Pro
 
   if (!res.ok) {
     const err = await res.text();
-    console.error('[ga4] Report failed:', err);
+    log.error({ err: err }, 'Report failed');
     throw new Error(`GA4 report failed: ${res.status}`);
   }
 

@@ -11,6 +11,9 @@ import fs from 'fs';
 import path from 'path';
 import { getDataDir } from './data-dir.js';
 import { renderDigest, type EmailEvent, type EmailEventType } from './email-templates.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('email-queue');
 
 // ── Config ──
 
@@ -47,7 +50,7 @@ function persistQueue() {
     }
     fs.writeFileSync(QUEUE_FILE, JSON.stringify(data, null, 2));
   } catch (err) {
-    console.error('[email-queue] Failed to persist queue:', err);
+    log.error({ err: err }, 'Failed to persist queue');
   }
 }
 
@@ -90,24 +93,24 @@ async function flushBucket(key: string) {
   persistQueue();
 
   if (!sendFn) {
-    console.warn('[email-queue] No send function registered, dropping', events.length, 'events');
+    log.warn({ droppedCount: events.length }, `No send function registered, dropping ${events.length} events`);
     return;
   }
 
   try {
     const { subject, html } = renderDigest(type, events);
     if (!html) {
-      console.warn('[email-queue] Empty template for type:', type);
+      log.warn({ detail: type }, 'Empty template for type');
       return;
     }
     const ok = await sendFn(recipient, subject, html);
     if (ok) {
-      console.log(`[email-queue] Sent batched ${type} email to ${recipient} (${events.length} event${events.length !== 1 ? 's' : ''})`);
+      log.info(`Sent batched ${type} email to ${recipient} (${events.length} event${events.length !== 1 ? 's' : ''})`);
     } else {
-      console.error(`[email-queue] Failed to send ${type} email to ${recipient}`);
+      log.error(`Failed to send ${type} email to ${recipient}`);
     }
   } catch (err) {
-    console.error('[email-queue] Error sending digest:', err);
+    log.error({ err: err }, 'Error sending digest');
   }
 }
 
@@ -131,7 +134,7 @@ export function queueEmail(event: EmailEvent) {
   if (bucket.timer) clearTimeout(bucket.timer);
   bucket.timer = setTimeout(() => flushBucket(key), BATCH_WINDOW_MS);
 
-  console.log(`[email-queue] Queued ${event.type} for ${event.recipient} (${bucket.events.length} in batch, flushing in ${BATCH_WINDOW_MS / 1000}s)`);
+  log.info(`Queued ${event.type} for ${event.recipient} (${bucket.events.length} in batch, flushing in ${BATCH_WINDOW_MS / 1000}s)`);
 }
 
 /**
@@ -155,7 +158,7 @@ export function restoreQueue() {
   const events = loadQueue();
   if (events.length === 0) return;
 
-  console.log(`[email-queue] Restoring ${events.length} persisted event(s)`);
+  log.info(`Restoring ${events.length} persisted event(s)`);
   for (const event of events) {
     queueEmail(event);
   }

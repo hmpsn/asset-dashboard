@@ -4,6 +4,9 @@
  */
 import type { SchemaPageSuggestion } from './schema-suggester.js';
 import db from './db/index.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('schema-store');
 
 export interface SchemaSnapshot {
   id: string;
@@ -73,7 +76,7 @@ export function saveSchemaSnapshot(siteId: string, workspaceId: string, results:
     results: JSON.stringify(results),
     page_count: results.length,
   });
-  console.log(`[schema-store] Saved ${results.length} page schemas for site ${siteId}`);
+  log.info(`Saved ${results.length} page schemas for site ${siteId}`);
   return snapshot;
 }
 

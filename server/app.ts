@@ -17,6 +17,10 @@ import {
   verifyClientSession,
 } from './middleware.js';
 import { getPresence } from './websocket.js';
+import { requestLogger } from './middleware/request-logger.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('app');
 
 // ─── Route modules ───
 import authRoutes from './routes/auth.js';
@@ -114,11 +118,14 @@ export function createApp(): express.Express {
     origin: (origin, cb) => {
       // No origin = same-origin request (always allow)
       if (!origin || ALLOWED_ORIGINS.includes(origin)) cb(null, true);
-      else { console.warn(`[CORS] Blocked origin: ${origin}`); cb(null, false); }
+      else { log.warn({ origin }, 'Blocked CORS origin'); cb(null, false); }
     },
     credentials: true,
   } : undefined));
   app.use(cookieParser());
+
+  // --- Request logging (safe before Stripe webhook — only logs method/path/status, does not consume body) ---
+  app.use(requestLogger);
 
   // Stripe webhook must receive raw body (before express.json parses it)
   app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
@@ -129,7 +136,7 @@ export function createApp(): express.Express {
       await handleWebhookEvent(event);
       res.json({ received: true });
     } catch (err) {
-      console.error('[stripe] Webhook error:', err instanceof Error ? err.message : err);
+      log.error({ err }, 'Stripe webhook error');
       res.status(400).json({ error: 'Webhook verification failed' });
     }
   });

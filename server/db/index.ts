@@ -9,6 +9,9 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { DATA_BASE } from '../data-dir.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('db');
 
 const dbDir = DATA_BASE || path.join(process.env.HOME || '', '.asset-dashboard');
 fs.mkdirSync(dbDir, { recursive: true });
@@ -41,7 +44,7 @@ export function runMigrations(): void {
   );
 
   if (!fs.existsSync(migrationsDir)) {
-    console.log('[db] No migrations directory found — skipping.');
+    log.info('No migrations directory found — skipping.');
     return;
   }
 
@@ -57,7 +60,7 @@ export function runMigrations(): void {
 
   const applyMigration = db.transaction((file: string) => {
     const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf-8');
-    console.log(`[db] Applying migration: ${file}`);
+    log.info(`Applying migration: ${file}`);
     db.exec(sql);
     insert.run(file, new Date().toISOString());
   });
