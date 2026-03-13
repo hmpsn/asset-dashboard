@@ -12,6 +12,7 @@
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
+import Database from 'better-sqlite3';
 import { DATA_BASE, getUploadRoot } from './data-dir.js';
 import db from './db/index.js';
 import { createLogger } from './logger.js';
@@ -68,11 +69,35 @@ export async function runBackup(): Promise<{ backupDir: string; files: number; b
   }
 
   // 2. Back up SQLite database (synchronous via VACUUM INTO)
+  let verified = false;
+  let tableCounts: Record<string, number> = {};
   try {
     const dbBackupPath = path.join(backupDir, 'dashboard.db');
     db.exec(`VACUUM INTO '${dbBackupPath.replace(/'/g, "''")}'`);
     stats.files++;
     stats.bytes += fs.statSync(dbBackupPath).size;
+
+    // 2b. Verify backup integrity
+    try {
+      const verifyDb = new Database(dbBackupPath, { readonly: true });
+      const result = verifyDb.pragma('integrity_check') as Array<{ integrity_check: string }>;
+      if (result[0]?.integrity_check !== 'ok') {
+        log.error({ result }, 'SQLite backup integrity check FAILED');
+      } else {
+        // Verify the backup has data (not an empty database)
+        const tables = verifyDb.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '_%'").all() as Array<{ name: string }>;
+        for (const t of tables) {
+          const row = verifyDb.prepare(`SELECT COUNT(*) as c FROM "${t.name}"`).get() as { c: number };
+          tableCounts[t.name] = row.c;
+        }
+        verified = true;
+        const totalRows = Object.values(tableCounts).reduce((a, b) => a + b, 0);
+        log.info({ tableCount: tables.length, totalRows }, 'Backup verified');
+      }
+      verifyDb.close();
+    } catch (err) {
+      log.error({ err }, 'SQLite backup verification failed');
+    }
   } catch (err) {
     log.error({ err: err }, 'SQLite backup failed');
   }
@@ -83,6 +108,8 @@ export async function runBackup(): Promise<{ backupDir: string; files: number; b
     files: stats.files,
     bytes: stats.bytes,
     dataBase: DATA_BASE || '~/.asset-dashboard',
+    verified,
+    tableCounts,
   };
   fs.writeFileSync(path.join(backupDir, '_manifest.json'), JSON.stringify(manifest, null, 2));
 
