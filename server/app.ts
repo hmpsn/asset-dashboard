@@ -95,6 +95,10 @@ export function createApp(): express.Express {
     app.set('trust proxy', 1);
     app.use((req, res, next) => {
       if (req.secure || req.headers['x-forwarded-proto'] === 'https') return next();
+      // Only redirect when behind a reverse proxy (Render, Heroku, etc.).
+      // Direct connections (CI, local) have no x-forwarded-proto header —
+      // redirecting those to HTTPS would break health-check polling.
+      if (!req.headers['x-forwarded-proto']) return next();
       res.redirect(301, `https://${req.headers.host}${req.url}`);
     });
   }

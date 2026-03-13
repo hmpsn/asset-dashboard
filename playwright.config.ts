@@ -22,6 +22,8 @@ export default defineConfig({
     command: process.env.CI ? 'npm start' : 'npm run dev:all',
     url: 'http://localhost:3001/api/health',
     reuseExistingServer: !process.env.CI,
-    timeout: 30_000,
+    timeout: 60_000,
+    stdout: 'pipe',
+    stderr: 'pipe',
   },
 });
