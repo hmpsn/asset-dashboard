@@ -69,7 +69,7 @@ interface ContentTopicRequest {
   updatedAt: string;
 }
 
-export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, onNavigate }: { workspaceId: string; onRequestCountChange?: (pending: number) => void; fixContext?: FixContext | null; onNavigate?: (tab: string) => void }) {
+export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }: { workspaceId: string; onRequestCountChange?: (pending: number) => void; fixContext?: FixContext | null }) {
   const [briefs, setBriefs] = useState<ContentBrief[]>([]);
   const [clientRequests, setClientRequests] = useState<ContentTopicRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -966,7 +966,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, o
           </div>
         )}
 
-        <AIContextIndicator workspaceId={workspaceId} feature="briefs" onNavigate={onNavigate} />
+        <AIContextIndicator workspaceId={workspaceId} feature="briefs" />
 
         {error && <p className="text-xs text-red-400">{error}</p>}
         <div className="flex items-center gap-3">

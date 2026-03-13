@@ -1,5 +1,7 @@
 import { TrendingUp, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { SectionCard } from '../ui';
+import { adminPath } from '../../routes';
 
 interface RankEntry {
   query: string;
@@ -11,16 +13,17 @@ interface RankEntry {
 interface RankingsSnapshotProps {
   ranks: RankEntry[];
   gscPropertyUrl?: string;
-  onNavigate: (tab: string) => void;
+  workspaceId: string;
   className?: string;
 }
 
-export function RankingsSnapshot({ ranks, gscPropertyUrl, onNavigate, className }: RankingsSnapshotProps) {
+export function RankingsSnapshot({ ranks, gscPropertyUrl, workspaceId, className }: RankingsSnapshotProps) {
+  const navigate = useNavigate();
   return (
     <SectionCard
       title="Top Rankings"
       titleIcon={<TrendingUp className="w-4 h-4 text-teal-400" />}
-      action={ranks.length > 0 ? <button onClick={() => onNavigate('seo-ranks')} className="text-[11px] text-teal-400 hover:text-teal-300 transition-colors">View All →</button> : undefined}
+      action={ranks.length > 0 ? <button onClick={() => navigate(adminPath(workspaceId, 'seo-ranks'))} className="text-[11px] text-teal-400 hover:text-teal-300 transition-colors">View All →</button> : undefined}
       className={className}
       noPadding
     >

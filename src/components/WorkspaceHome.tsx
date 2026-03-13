@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Shield, Search, BarChart3, TrendingUp, TrendingDown, ArrowUpRight,
   Loader2, Bell, FileText, AlertTriangle,
@@ -12,6 +13,7 @@ import { useAuditSummary } from '../hooks/useAuditSummary';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { AnomalyAlerts } from './AnomalyAlerts';
 import { SeoWorkStatus, ActivityFeed, RankingsSnapshot, ActiveRequestsAnnotations, SeoChangeImpact } from './workspace-home';
+import { type Page, adminPath } from '../routes';
 
 interface WorkspaceHomeProps {
   workspaceId: string;
@@ -20,7 +22,6 @@ interface WorkspaceHomeProps {
   webflowSiteName?: string;
   gscPropertyUrl?: string;
   ga4PropertyId?: string;
-  onNavigate: (tab: string) => void;
 }
 
 interface ActivityEntry {
@@ -37,7 +38,8 @@ function fmt(n: number): string {
   return String(n);
 }
 
-export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webflowSiteName, gscPropertyUrl, ga4PropertyId, onNavigate }: WorkspaceHomeProps) {
+export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webflowSiteName, gscPropertyUrl, ga4PropertyId }: WorkspaceHomeProps) {
+  const navigate = useNavigate();
   const { summary: seoStatus } = usePageEditStates(workspaceId);
   const { audit } = useAuditSummary(workspaceId);
   const [loading, setLoading] = useState(true);
@@ -185,7 +187,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
         icon={<Globe className="w-5 h-5 text-teal-400" />}
         actions={
           <button
-            onClick={() => onNavigate('workspace-settings')}
+            onClick={() => navigate(adminPath(workspaceId, 'workspace-settings'))}
             className="text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
           >
             Settings →
@@ -204,10 +206,10 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             delta={scoreDelta ?? undefined}
             deltaLabel=" pts"
             sub={`${audit.errors} errors · ${audit.warnings} warnings`}
-            onClick={() => onNavigate('seo-audit')}
+            onClick={() => navigate(adminPath(workspaceId, 'seo-audit'))}
           />
         ) : (
-          <StatCard label="Site Health" value="—" icon={Shield} iconColor="#71717a" sub="No audit yet" onClick={webflowSiteId ? () => onNavigate('seo-audit') : undefined} />
+          <StatCard label="Site Health" value="—" icon={Shield} iconColor="#71717a" sub="No audit yet" onClick={webflowSiteId ? () => navigate(adminPath(workspaceId, 'seo-audit')) : undefined} />
         )}
 
         {searchData ? (
@@ -217,7 +219,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             icon={Search}
             iconColor="#22d3ee"
             sub={`${fmt(searchData.totalImpressions)} impr · ${(searchData.avgCtr * 100).toFixed(1)}% CTR`}
-            onClick={() => onNavigate('search')}
+            onClick={() => navigate(adminPath(workspaceId, 'search'))}
           />
         ) : (
           <StatCard label="Search Clicks" value="—" icon={Search} iconColor="#71717a" sub={gscPropertyUrl ? 'Loading...' : 'Connect GSC'} />
@@ -232,7 +234,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             delta={usersDelta ?? undefined}
             deltaLabel="%"
             sub={`${fmt(ga4Data.totalSessions)} sessions · ${ga4Data.newUserPercentage}% new`}
-            onClick={() => onNavigate('analytics')}
+            onClick={() => navigate(adminPath(workspaceId, 'analytics'))}
           />
         ) : (
           <StatCard label="Users" value="—" icon={BarChart3} iconColor="#71717a" sub={ga4PropertyId ? 'Loading...' : 'Connect GA4'} />
@@ -244,7 +246,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
           icon={TrendingUp}
           iconColor={rankUp > rankDown ? '#4ade80' : rankDown > rankUp ? '#f87171' : '#71717a'}
           sub={ranks.length > 0 ? `${rankUp} ↑ · ${rankDown} ↓ · ${ranks.length - rankUp - rankDown} =` : 'No keywords tracked'}
-          onClick={ranks.length > 0 ? () => onNavigate('seo-ranks') : undefined}
+          onClick={ranks.length > 0 ? () => navigate(adminPath(workspaceId, 'seo-ranks')) : undefined}
         />
       </div>
 
@@ -252,7 +254,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       <AnomalyAlerts workspaceId={workspaceId} isAdmin={true} />
 
       {/* ── SEO Work Status ── */}
-      <SeoWorkStatus seoStatus={seoStatus} onNavigate={onNavigate} />
+      <SeoWorkStatus seoStatus={seoStatus} workspaceId={workspaceId} />
 
       {/* ── SEO Change Impact Tracker ── */}
       <SeoChangeImpact workspaceId={workspaceId} hasGsc={!!gscPropertyUrl} />
@@ -267,7 +269,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
               return (
                 <button
                   key={i}
-                  onClick={() => onNavigate(item.tab)}
+                  onClick={() => navigate(adminPath(workspaceId, item.tab))}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/30 transition-colors text-left"
                 >
                   <Icon className={`w-4 h-4 flex-shrink-0 ${colorMap[item.color]}`} />
@@ -286,18 +288,18 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       {/* ── Action Plan (InsightsEngine) ── */}
       {workspaceId && (
         <ErrorBoundary label="Action Plan">
-          <InsightsEngine workspaceId={workspaceId} tier="premium" compact onNavigate={(tab) => onNavigate(tab)} />
+          <InsightsEngine workspaceId={workspaceId} tier="premium" compact onNavigate={(tab) => navigate(adminPath(workspaceId, tab as Page))} />
         </ErrorBoundary>
       )}
 
       {/* ── Two-column: Activity + Rankings ── */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         <ActivityFeed activity={activity} className="lg:col-span-3" />
-        <RankingsSnapshot ranks={ranks} gscPropertyUrl={gscPropertyUrl} onNavigate={onNavigate} className="lg:col-span-2" />
+        <RankingsSnapshot ranks={ranks} gscPropertyUrl={gscPropertyUrl} workspaceId={workspaceId} className="lg:col-span-2" />
       </div>
 
       {/* ── Active Requests + Annotations ── */}
-      <ActiveRequestsAnnotations requests={activeRequests} annotations={annotations} onNavigate={onNavigate} />
+      <ActiveRequestsAnnotations requests={activeRequests} annotations={annotations} workspaceId={workspaceId} />
 
     </div>
   );

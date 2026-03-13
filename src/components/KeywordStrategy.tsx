@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Loader2, Target, ChevronDown, ChevronRight, RefreshCw,
   TrendingUp, AlertCircle, Sparkles, Pencil, Check, X, Briefcase,
@@ -9,7 +10,7 @@ import {
 import { KeywordAnalysis } from './KeywordAnalysis';
 import { StatCard, AIContextIndicator } from './ui';
 import { SeoCopyPanel } from './strategy/SeoCopyPanel';
-import type { FixContext } from '../App';
+import { adminPath } from '../routes';
 
 interface PageKeywordMap {
   pagePath: string;
@@ -75,12 +76,12 @@ interface SeoCopy {
 interface Props {
   workspaceId: string;
   siteId?: string;
-  onNavigate?: (tab: string, ctx?: FixContext) => void;
 }
 
 type StrategyTab = 'strategy' | 'analysis';
 
-export function KeywordStrategyPanel({ workspaceId, siteId, onNavigate }: Props) {
+export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<StrategyTab>('strategy');
   const [strategy, setStrategy] = useState<KeywordStrategy | null>(null);
   const [loading, setLoading] = useState(false);
@@ -462,7 +463,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId, onNavigate }: Props)
       </div>
 
       {!strategy && !generating && (
-        <AIContextIndicator workspaceId={workspaceId} feature="strategy" onNavigate={onNavigate} />
+        <AIContextIndicator workspaceId={workspaceId} feature="strategy" />
       )}
 
       {/* Progress Indicator */}
@@ -767,9 +768,9 @@ export function KeywordStrategyPanel({ workspaceId, siteId, onNavigate }: Props)
                       </div>
                       <div className="flex items-center justify-between mt-1">
                         <div className="text-[11px] text-teal-400">Target keyword: &ldquo;{gap.targetKeyword}&rdquo;</div>
-                        {onNavigate && (
+                        {workspaceId && (
                           <button
-                            onClick={() => onNavigate('seo-briefs', { pageName: gap.targetKeyword })}
+                            onClick={() => navigate(adminPath(workspaceId, 'seo-briefs'), { state: { fixContext: { pageName: gap.targetKeyword } } })}
                             className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 font-medium hover:bg-teal-600/40 transition-all flex-shrink-0"
                           >
                             <Sparkles className="w-3 h-3" /> Generate Brief

@@ -7,9 +7,11 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': 'http://localhost:3001',
-      '/ws': {
+      // Only proxy the exact /ws path (WebSocket endpoint), not /ws/:id/:tab admin routes
+      '^/ws$': {
         target: 'ws://localhost:3001',
         ws: true,
+        rewrite: () => '/ws',
       },
     },
   },

@@ -1,10 +1,13 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Plus, FileText, Sparkles, Send, ChevronDown, ChevronUp,
   Check, Edit3, X, TrendingUp, Download, ExternalLink,
 } from 'lucide-react';
 import { TierGate, type Tier } from '../ui';
 import type { ClientContentRequest, ClientTab } from './types';
+import { clientPath } from '../../routes';
+import { useBetaMode } from './BetaContext';
 import type { PricingModalState } from './StrategyTab';
 import { STUDIO_NAME } from '../../constants';
 import { useContentRequests } from '../../hooks/useContentRequests';
@@ -19,15 +22,16 @@ interface ContentTabProps {
   setPricingModal: (modal: PricingModalState | null) => void;
   pricingConfirming: boolean;
   workspaceId: string;
-  setTab: (t: ClientTab) => void;
   setToast: (t: { message: string; type: 'success' | 'error' } | null) => void;
 }
 
 export function ContentTab({
   contentRequests, setContentRequests, effectiveTier,
   briefPrice, fullPostPrice, fmtPrice, setPricingModal, pricingConfirming,
-  workspaceId, setTab, setToast,
+  workspaceId, setToast,
 }: ContentTabProps) {
+  const navigate = useNavigate();
+  const betaMode = useBetaMode();
   // Topic form state
   const [showTopicForm, setShowTopicForm] = useState(false);
   const [newTopicName, setNewTopicName] = useState('');
@@ -120,7 +124,7 @@ export function ContentTab({
         <FileText className="w-10 h-10 text-zinc-700 mx-auto mb-3" />
         <p className="text-sm font-medium text-zinc-400">Your content pipeline is empty</p>
         <p className="text-xs text-zinc-500 mt-1.5 max-w-sm mx-auto leading-relaxed">
-          Ready to grow your traffic? Browse content ideas on the <button onClick={() => setTab('strategy')} className="text-teal-400 hover:text-teal-300 underline underline-offset-2 transition-colors">SEO Strategy</button> tab, or click <strong className="text-zinc-400">Suggest a Topic</strong> above to kick things off.
+          Ready to grow your traffic? Browse content ideas on the <button onClick={() => navigate(clientPath(workspaceId, 'strategy', betaMode))} className="text-teal-400 hover:text-teal-300 underline underline-offset-2 transition-colors">SEO Strategy</button> tab, or click <strong className="text-zinc-400">Suggest a Topic</strong> above to kick things off.
         </p>
       </div>
     )}
