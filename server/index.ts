@@ -44,7 +44,10 @@ startSchedulers();
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
+let isShuttingDown = false;
 function gracefulShutdown(signal: string) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
   log.info({ signal }, 'Shutdown signal received, draining...');
 
   // 1. Mark health endpoint as 503 so load balancer stops routing traffic
@@ -57,16 +60,18 @@ function gracefulShutdown(signal: string) {
       'In-progress jobs will be lost');
   }
 
-  // 3. Stop accepting new connections and drain existing ones
+  // 3. Close WebSocket connections gracefully (must happen before server.close()
+  //    because server.close() waits for all connections including upgraded WS sockets)
+  for (const ws of wss.clients) {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.close(1001, 'Server shutting down');
+    }
+  }
+  wss.close();
+
+  // 4. Stop accepting new connections and drain existing ones
   server.close(async () => {
     log.info('HTTP server closed');
-
-    // 4. Close WebSocket connections gracefully
-    for (const ws of wss.clients) {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.close(1001, 'Server shutting down');
-      }
-    }
 
     // 5. Flush pending data to disk
     flushOpenAIUsage();

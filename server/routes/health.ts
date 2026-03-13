@@ -2,13 +2,6 @@
  * health routes — extracted from server/index.ts
  */
 import { Router } from 'express';
-
-const router = Router();
-
-/** Set to true during graceful shutdown so /api/health returns 503. */
-let shuttingDown = false;
-export function setShuttingDown(): void { shuttingDown = true; }
-
 import fs from 'fs';
 import path from 'path';
 import { DATA_BASE, getUploadRoot } from '../data-dir.js';
@@ -18,6 +11,12 @@ import { getGoogleCredentials } from '../google-auth.js';
 import { isStripeConfigured } from '../stripe.js';
 import { listWorkspaces, getTokenForSite } from '../workspaces.js';
 import { getStorageReport, pruneChatSessions, pruneBackups, pruneReportSnapshots, pruneActivityLogs } from '../storage-stats.js';
+
+const router = Router();
+
+/** Set to true during graceful shutdown so /api/health returns 503. */
+let shuttingDown = false;
+export function setShuttingDown(): void { shuttingDown = true; }
 
 const DATA_ROOT = DATA_BASE || path.join(process.env.HOME || '', '.asset-dashboard');
 
