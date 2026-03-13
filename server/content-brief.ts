@@ -1,21 +1,9 @@
-import fs from 'fs';
-import path from 'path';
+import db from './db/index.js';
 import { buildSeoContext, buildKeywordMapContext, buildKnowledgeBase, buildPersonasContext } from './seo-context.js';
-import { getUploadRoot, getDataDir } from './data-dir.js';
 import type { KeywordMetrics, RelatedKeyword } from './semrush.js';
 import { callOpenAI } from './openai-helpers.js';
 import { buildReferenceContext, buildSerpContext, buildStyleExampleContext } from './web-scraper.js';
 import type { ScrapedPage } from './web-scraper.js';
-
-const UPLOAD_ROOT = getUploadRoot();
-const BRIEFS_DIR = getDataDir('content-briefs');
-
-fs.mkdirSync(BRIEFS_DIR, { recursive: true });
-
-// Old storage path: ~/toUpload/<wsId>/.content-briefs/briefs.json
-function getOldBriefFile(workspaceId: string): string {
-  return path.join(UPLOAD_ROOT, workspaceId, '.content-briefs', 'briefs.json');
-}
 
 export interface ContentBrief {
   id: string;
@@ -54,59 +42,189 @@ export interface ContentBrief {
   realTopResults?: { position: number; title: string; url: string }[];
 }
 
-function getBriefFile(workspaceId: string): string {
-  return path.join(BRIEFS_DIR, `${workspaceId}.json`);
+// ── SQLite row shape ──
+
+interface BriefRow {
+  id: string;
+  workspace_id: string;
+  target_keyword: string;
+  secondary_keywords: string;
+  suggested_title: string;
+  suggested_meta_desc: string;
+  outline: string;
+  word_count_target: number;
+  intent: string;
+  audience: string;
+  competitor_insights: string;
+  internal_link_suggestions: string;
+  created_at: string;
+  executive_summary: string | null;
+  content_format: string | null;
+  tone_and_style: string | null;
+  people_also_ask: string | null;
+  topical_entities: string | null;
+  serp_analysis: string | null;
+  difficulty_score: number | null;
+  traffic_potential: string | null;
+  cta_recommendations: string | null;
+  eeat_guidance: string | null;
+  content_checklist: string | null;
+  schema_recommendations: string | null;
+  page_type: string | null;
+  reference_urls: string | null;
+  real_people_also_ask: string | null;
+  real_top_results: string | null;
 }
 
-function readBriefs(workspaceId: string): ContentBrief[] {
-  // Try new path first
-  try {
-    const f = getBriefFile(workspaceId);
-    if (fs.existsSync(f)) return JSON.parse(fs.readFileSync(f, 'utf-8'));
-  } catch { /* fresh */ }
-  // Fall back to old path
-  try {
-    const old = getOldBriefFile(workspaceId);
-    if (fs.existsSync(old)) {
-      const data = JSON.parse(fs.readFileSync(old, 'utf-8'));
-      if (Array.isArray(data) && data.length > 0) {
-        writeBriefs(workspaceId, data);
-        console.log(`[Migration] Moved ${data.length} content briefs for ${workspaceId} to new path`);
-        return data;
-      }
-    }
-  } catch { /* skip */ }
-  return [];
+interface BriefStmts {
+  insert: ReturnType<typeof db.prepare>;
+  selectByWorkspace: ReturnType<typeof db.prepare>;
+  selectById: ReturnType<typeof db.prepare>;
+  update: ReturnType<typeof db.prepare>;
+  deleteById: ReturnType<typeof db.prepare>;
 }
 
-function writeBriefs(workspaceId: string, briefs: ContentBrief[]) {
-  fs.writeFileSync(getBriefFile(workspaceId), JSON.stringify(briefs, null, 2));
+let _stmts: BriefStmts | null = null;
+function stmts(): BriefStmts {
+  if (!_stmts) {
+    _stmts = {
+      insert: db.prepare(
+        `INSERT INTO content_briefs
+           (id, workspace_id, target_keyword, secondary_keywords, suggested_title,
+            suggested_meta_desc, outline, word_count_target, intent, audience,
+            competitor_insights, internal_link_suggestions, created_at,
+            executive_summary, content_format, tone_and_style, people_also_ask,
+            topical_entities, serp_analysis, difficulty_score, traffic_potential,
+            cta_recommendations, eeat_guidance, content_checklist, schema_recommendations,
+            page_type, reference_urls, real_people_also_ask, real_top_results)
+         VALUES
+           (@id, @workspace_id, @target_keyword, @secondary_keywords, @suggested_title,
+            @suggested_meta_desc, @outline, @word_count_target, @intent, @audience,
+            @competitor_insights, @internal_link_suggestions, @created_at,
+            @executive_summary, @content_format, @tone_and_style, @people_also_ask,
+            @topical_entities, @serp_analysis, @difficulty_score, @traffic_potential,
+            @cta_recommendations, @eeat_guidance, @content_checklist, @schema_recommendations,
+            @page_type, @reference_urls, @real_people_also_ask, @real_top_results)`,
+      ),
+      selectByWorkspace: db.prepare(
+        `SELECT * FROM content_briefs WHERE workspace_id = ? ORDER BY created_at DESC`,
+      ),
+      selectById: db.prepare(
+        `SELECT * FROM content_briefs WHERE id = ? AND workspace_id = ?`,
+      ),
+      update: db.prepare(
+        `UPDATE content_briefs SET
+           target_keyword = @target_keyword, secondary_keywords = @secondary_keywords,
+           suggested_title = @suggested_title, suggested_meta_desc = @suggested_meta_desc,
+           outline = @outline, word_count_target = @word_count_target, intent = @intent,
+           audience = @audience, competitor_insights = @competitor_insights,
+           internal_link_suggestions = @internal_link_suggestions,
+           executive_summary = @executive_summary, content_format = @content_format,
+           tone_and_style = @tone_and_style, people_also_ask = @people_also_ask,
+           topical_entities = @topical_entities, serp_analysis = @serp_analysis,
+           difficulty_score = @difficulty_score, traffic_potential = @traffic_potential,
+           cta_recommendations = @cta_recommendations, eeat_guidance = @eeat_guidance,
+           content_checklist = @content_checklist, schema_recommendations = @schema_recommendations,
+           page_type = @page_type, reference_urls = @reference_urls,
+           real_people_also_ask = @real_people_also_ask, real_top_results = @real_top_results
+         WHERE id = @id`,
+      ),
+      deleteById: db.prepare(
+        `DELETE FROM content_briefs WHERE id = ? AND workspace_id = ?`,
+      ),
+    };
+  }
+  return _stmts;
+}
+
+function rowToBrief(row: BriefRow): ContentBrief {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    targetKeyword: row.target_keyword,
+    secondaryKeywords: JSON.parse(row.secondary_keywords),
+    suggestedTitle: row.suggested_title,
+    suggestedMetaDesc: row.suggested_meta_desc,
+    outline: JSON.parse(row.outline),
+    wordCountTarget: row.word_count_target,
+    intent: row.intent,
+    audience: row.audience,
+    competitorInsights: row.competitor_insights,
+    internalLinkSuggestions: JSON.parse(row.internal_link_suggestions),
+    createdAt: row.created_at,
+    executiveSummary: row.executive_summary ?? undefined,
+    contentFormat: row.content_format ?? undefined,
+    toneAndStyle: row.tone_and_style ?? undefined,
+    peopleAlsoAsk: row.people_also_ask ? JSON.parse(row.people_also_ask) : undefined,
+    topicalEntities: row.topical_entities ? JSON.parse(row.topical_entities) : undefined,
+    serpAnalysis: row.serp_analysis ? JSON.parse(row.serp_analysis) : undefined,
+    difficultyScore: row.difficulty_score ?? undefined,
+    trafficPotential: row.traffic_potential ?? undefined,
+    ctaRecommendations: row.cta_recommendations ? JSON.parse(row.cta_recommendations) : undefined,
+    eeatGuidance: row.eeat_guidance ? JSON.parse(row.eeat_guidance) : undefined,
+    contentChecklist: row.content_checklist ? JSON.parse(row.content_checklist) : undefined,
+    schemaRecommendations: row.schema_recommendations ? JSON.parse(row.schema_recommendations) : undefined,
+    pageType: row.page_type as ContentBrief['pageType'] ?? undefined,
+    referenceUrls: row.reference_urls ? JSON.parse(row.reference_urls) : undefined,
+    realPeopleAlsoAsk: row.real_people_also_ask ? JSON.parse(row.real_people_also_ask) : undefined,
+    realTopResults: row.real_top_results ? JSON.parse(row.real_top_results) : undefined,
+  };
+}
+
+function briefToParams(brief: ContentBrief): Record<string, unknown> {
+  return {
+    id: brief.id,
+    workspace_id: brief.workspaceId,
+    target_keyword: brief.targetKeyword,
+    secondary_keywords: JSON.stringify(brief.secondaryKeywords),
+    suggested_title: brief.suggestedTitle,
+    suggested_meta_desc: brief.suggestedMetaDesc,
+    outline: JSON.stringify(brief.outline),
+    word_count_target: brief.wordCountTarget,
+    intent: brief.intent,
+    audience: brief.audience,
+    competitor_insights: brief.competitorInsights,
+    internal_link_suggestions: JSON.stringify(brief.internalLinkSuggestions),
+    executive_summary: brief.executiveSummary ?? null,
+    content_format: brief.contentFormat ?? null,
+    tone_and_style: brief.toneAndStyle ?? null,
+    people_also_ask: brief.peopleAlsoAsk ? JSON.stringify(brief.peopleAlsoAsk) : null,
+    topical_entities: brief.topicalEntities ? JSON.stringify(brief.topicalEntities) : null,
+    serp_analysis: brief.serpAnalysis ? JSON.stringify(brief.serpAnalysis) : null,
+    difficulty_score: brief.difficultyScore ?? null,
+    traffic_potential: brief.trafficPotential ?? null,
+    cta_recommendations: brief.ctaRecommendations ? JSON.stringify(brief.ctaRecommendations) : null,
+    eeat_guidance: brief.eeatGuidance ? JSON.stringify(brief.eeatGuidance) : null,
+    content_checklist: brief.contentChecklist ? JSON.stringify(brief.contentChecklist) : null,
+    schema_recommendations: brief.schemaRecommendations ? JSON.stringify(brief.schemaRecommendations) : null,
+    page_type: brief.pageType ?? null,
+    reference_urls: brief.referenceUrls ? JSON.stringify(brief.referenceUrls) : null,
+    real_people_also_ask: brief.realPeopleAlsoAsk ? JSON.stringify(brief.realPeopleAlsoAsk) : null,
+    real_top_results: brief.realTopResults ? JSON.stringify(brief.realTopResults) : null,
+  };
 }
 
 export function listBriefs(workspaceId: string): ContentBrief[] {
-  return readBriefs(workspaceId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const rows = stmts().selectByWorkspace.all(workspaceId) as BriefRow[];
+  return rows.map(rowToBrief);
 }
 
 export function getBrief(workspaceId: string, briefId: string): ContentBrief | undefined {
-  return readBriefs(workspaceId).find(b => b.id === briefId);
+  const row = stmts().selectById.get(briefId, workspaceId) as BriefRow | undefined;
+  return row ? rowToBrief(row) : undefined;
 }
 
 export function updateBrief(workspaceId: string, briefId: string, updates: Partial<Omit<ContentBrief, 'id' | 'workspaceId' | 'createdAt'>>): ContentBrief | null {
-  const briefs = readBriefs(workspaceId);
-  const idx = briefs.findIndex(b => b.id === briefId);
-  if (idx === -1) return null;
-  Object.assign(briefs[idx], updates);
-  writeBriefs(workspaceId, briefs);
-  return briefs[idx];
+  const existing = getBrief(workspaceId, briefId);
+  if (!existing) return null;
+  Object.assign(existing, updates);
+  stmts().update.run(briefToParams(existing));
+  return existing;
 }
 
 export function deleteBrief(workspaceId: string, briefId: string): boolean {
-  const briefs = readBriefs(workspaceId);
-  const idx = briefs.findIndex(b => b.id === briefId);
-  if (idx === -1) return false;
-  briefs.splice(idx, 1);
-  writeBriefs(workspaceId, briefs);
-  return true;
+  const info = stmts().deleteById.run(briefId, workspaceId);
+  return info.changes > 0;
 }
 
 // Page-type-specific configuration: word counts, section counts, content style, and prompt instructions
@@ -519,9 +637,37 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     referenceUrls: context.referenceUrls,
   };
 
-  const briefs = readBriefs(workspaceId);
-  briefs.push(brief);
-  writeBriefs(workspaceId, briefs);
+  stmts().insert.run({
+    id: brief.id,
+    workspace_id: workspaceId,
+    target_keyword: brief.targetKeyword,
+    secondary_keywords: JSON.stringify(brief.secondaryKeywords),
+    suggested_title: brief.suggestedTitle,
+    suggested_meta_desc: brief.suggestedMetaDesc,
+    outline: JSON.stringify(brief.outline),
+    word_count_target: brief.wordCountTarget,
+    intent: brief.intent,
+    audience: brief.audience,
+    competitor_insights: brief.competitorInsights,
+    internal_link_suggestions: JSON.stringify(brief.internalLinkSuggestions),
+    created_at: brief.createdAt,
+    executive_summary: brief.executiveSummary ?? null,
+    content_format: brief.contentFormat ?? null,
+    tone_and_style: brief.toneAndStyle ?? null,
+    people_also_ask: brief.peopleAlsoAsk ? JSON.stringify(brief.peopleAlsoAsk) : null,
+    topical_entities: brief.topicalEntities ? JSON.stringify(brief.topicalEntities) : null,
+    serp_analysis: brief.serpAnalysis ? JSON.stringify(brief.serpAnalysis) : null,
+    difficulty_score: brief.difficultyScore ?? null,
+    traffic_potential: brief.trafficPotential ?? null,
+    cta_recommendations: brief.ctaRecommendations ? JSON.stringify(brief.ctaRecommendations) : null,
+    eeat_guidance: brief.eeatGuidance ? JSON.stringify(brief.eeatGuidance) : null,
+    content_checklist: brief.contentChecklist ? JSON.stringify(brief.contentChecklist) : null,
+    schema_recommendations: brief.schemaRecommendations ? JSON.stringify(brief.schemaRecommendations) : null,
+    page_type: brief.pageType ?? null,
+    reference_urls: brief.referenceUrls ? JSON.stringify(brief.referenceUrls) : null,
+    real_people_also_ask: brief.realPeopleAlsoAsk ? JSON.stringify(brief.realPeopleAlsoAsk) : null,
+    real_top_results: brief.realTopResults ? JSON.stringify(brief.realTopResults) : null,
+  });
 
   return brief;
 }

@@ -1,14 +1,4 @@
-import fs from 'fs';
-import path from 'path';
-import { getUploadRoot } from './data-dir.js';
-
-const UPLOAD_ROOT = getUploadRoot();
-
-function getTrackingDir(workspaceId: string): string {
-  const dir = path.join(UPLOAD_ROOT, workspaceId, '.rank-tracking');
-  fs.mkdirSync(dir, { recursive: true });
-  return dir;
-}
+import db from './db/index.js';
 
 export interface RankSnapshot {
   date: string; // YYYY-MM-DD
@@ -21,40 +11,73 @@ export interface TrackedKeyword {
   addedAt: string;
 }
 
-interface TrackingConfig {
-  trackedKeywords: TrackedKeyword[];
+// ── SQLite row shapes ──
+
+interface ConfigRow {
+  workspace_id: string;
+  tracked_keywords: string;
 }
 
-function getConfigPath(workspaceId: string): string {
-  return path.join(getTrackingDir(workspaceId), 'config.json');
+interface SnapshotRow {
+  id: number;
+  workspace_id: string;
+  date: string;
+  queries: string;
 }
 
-function getSnapshotsPath(workspaceId: string): string {
-  return path.join(getTrackingDir(workspaceId), 'snapshots.json');
+interface Stmts {
+  getConfig: ReturnType<typeof db.prepare>;
+  upsertConfig: ReturnType<typeof db.prepare>;
+  getSnapshots: ReturnType<typeof db.prepare>;
+  upsertSnapshot: ReturnType<typeof db.prepare>;
+  deleteOldSnapshots: ReturnType<typeof db.prepare>;
 }
 
-function readConfig(workspaceId: string): TrackingConfig {
-  try {
-    const p = getConfigPath(workspaceId);
-    if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf-8'));
-  } catch { /* fresh */ }
-  return { trackedKeywords: [] };
+let _stmts: Stmts | null = null;
+function stmts(): Stmts {
+  if (!_stmts) {
+    _stmts = {
+      getConfig: db.prepare(
+        `SELECT * FROM rank_tracking_config WHERE workspace_id = ?`,
+      ),
+      upsertConfig: db.prepare(
+        `INSERT INTO rank_tracking_config (workspace_id, tracked_keywords)
+         VALUES (@workspace_id, @tracked_keywords)
+         ON CONFLICT(workspace_id) DO UPDATE SET tracked_keywords = @tracked_keywords`,
+      ),
+      getSnapshots: db.prepare(
+        `SELECT * FROM rank_snapshots WHERE workspace_id = ? ORDER BY date ASC`,
+      ),
+      upsertSnapshot: db.prepare(
+        `INSERT INTO rank_snapshots (workspace_id, date, queries)
+         VALUES (@workspace_id, @date, @queries)
+         ON CONFLICT(workspace_id, date) DO UPDATE SET queries = @queries`,
+      ),
+      deleteOldSnapshots: db.prepare(
+        `DELETE FROM rank_snapshots WHERE workspace_id = ? AND date NOT IN (
+           SELECT date FROM rank_snapshots WHERE workspace_id = ? ORDER BY date DESC LIMIT 180
+         )`,
+      ),
+    };
+  }
+  return _stmts;
 }
 
-function writeConfig(workspaceId: string, config: TrackingConfig) {
-  fs.writeFileSync(getConfigPath(workspaceId), JSON.stringify(config, null, 2));
+function readConfig(workspaceId: string): { trackedKeywords: TrackedKeyword[] } {
+  const row = stmts().getConfig.get(workspaceId) as ConfigRow | undefined;
+  return row ? { trackedKeywords: JSON.parse(row.tracked_keywords) } : { trackedKeywords: [] };
+}
+
+function writeConfig(workspaceId: string, config: { trackedKeywords: TrackedKeyword[] }) {
+  stmts().upsertConfig.run({
+    workspace_id: workspaceId,
+    tracked_keywords: JSON.stringify(config.trackedKeywords),
+  });
 }
 
 function readSnapshots(workspaceId: string): RankSnapshot[] {
-  try {
-    const p = getSnapshotsPath(workspaceId);
-    if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf-8'));
-  } catch { /* fresh */ }
-  return [];
-}
-
-function writeSnapshots(workspaceId: string, snapshots: RankSnapshot[]) {
-  fs.writeFileSync(getSnapshotsPath(workspaceId), JSON.stringify(snapshots, null, 2));
+  const rows = stmts().getSnapshots.all(workspaceId) as SnapshotRow[];
+  return rows.map(r => ({ date: r.date, queries: JSON.parse(r.queries) }));
 }
 
 // --- Public API ---
@@ -91,18 +114,13 @@ export function storeRankSnapshot(
   date: string,
   queries: { query: string; position: number; clicks: number; impressions: number; ctr: number }[]
 ): void {
-  const snapshots = readSnapshots(workspaceId);
-  // Replace if same date exists
-  const idx = snapshots.findIndex(s => s.date === date);
-  if (idx >= 0) {
-    snapshots[idx] = { date, queries };
-  } else {
-    snapshots.push({ date, queries });
-  }
+  stmts().upsertSnapshot.run({
+    workspace_id: workspaceId,
+    date,
+    queries: JSON.stringify(queries),
+  });
   // Keep max 180 days of snapshots
-  snapshots.sort((a, b) => a.date.localeCompare(b.date));
-  if (snapshots.length > 180) snapshots.splice(0, snapshots.length - 180);
-  writeSnapshots(workspaceId, snapshots);
+  stmts().deleteOldSnapshots.run(workspaceId, workspaceId);
 }
 
 export function getRankHistory(

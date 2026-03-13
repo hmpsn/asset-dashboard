@@ -4,15 +4,11 @@
  * over 60 days), generates AI refresh recommendations.
  */
 
-import fs from 'fs';
-import path from 'path';
-import { getDataDir } from './data-dir.js';
+import db from './db/index.js';
 import { getAllGscPages } from './search-console.js';
 import { callOpenAI } from './openai-helpers.js';
 import { buildSeoContext } from './seo-context.js';
 import type { Workspace } from './workspaces.js';
-
-const DECAY_DIR = getDataDir('content-decay');
 
 // ── Types ──
 
@@ -46,22 +42,62 @@ export interface DecayAnalysis {
   };
 }
 
-// ── Storage ──
+// ── SQLite row shape ──
 
-function getFile(workspaceId: string): string {
-  return path.join(DECAY_DIR, `${workspaceId}.json`);
+interface DecayRow {
+  workspace_id: string;
+  analyzed_at: string;
+  total_pages: number;
+  decaying_pages: string;
+  summary: string;
 }
 
+interface Stmts {
+  select: ReturnType<typeof db.prepare>;
+  upsert: ReturnType<typeof db.prepare>;
+}
+
+let _stmts: Stmts | null = null;
+function stmts(): Stmts {
+  if (!_stmts) {
+    _stmts = {
+      select: db.prepare(
+        `SELECT * FROM decay_analyses WHERE workspace_id = ?`,
+      ),
+      upsert: db.prepare(
+        `INSERT INTO decay_analyses (workspace_id, analyzed_at, total_pages, decaying_pages, summary)
+         VALUES (@workspace_id, @analyzed_at, @total_pages, @decaying_pages, @summary)
+         ON CONFLICT(workspace_id) DO UPDATE SET
+           analyzed_at = @analyzed_at, total_pages = @total_pages,
+           decaying_pages = @decaying_pages, summary = @summary`,
+      ),
+    };
+  }
+  return _stmts;
+}
+
+// ── Storage ──
+
 export function loadDecayAnalysis(workspaceId: string): DecayAnalysis | null {
-  try {
-    const f = getFile(workspaceId);
-    if (fs.existsSync(f)) return JSON.parse(fs.readFileSync(f, 'utf-8'));
-  } catch { /* fresh */ }
-  return null;
+  const row = stmts().select.get(workspaceId) as DecayRow | undefined;
+  if (!row) return null;
+  return {
+    workspaceId: row.workspace_id,
+    analyzedAt: row.analyzed_at,
+    totalPages: row.total_pages,
+    decayingPages: JSON.parse(row.decaying_pages),
+    summary: JSON.parse(row.summary),
+  };
 }
 
 function saveDecayAnalysis(analysis: DecayAnalysis): void {
-  fs.writeFileSync(getFile(analysis.workspaceId), JSON.stringify(analysis, null, 2));
+  stmts().upsert.run({
+    workspace_id: analysis.workspaceId,
+    analyzed_at: analysis.analyzedAt,
+    total_pages: analysis.totalPages,
+    decaying_pages: JSON.stringify(analysis.decayingPages),
+    summary: JSON.stringify(analysis.summary),
+  });
 }
 
 // ── Analysis Engine ──

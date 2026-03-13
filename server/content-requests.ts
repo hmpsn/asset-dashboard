@@ -1,16 +1,4 @@
-import fs from 'fs';
-import path from 'path';
-import { getUploadRoot, getDataDir } from './data-dir.js';
-
-const UPLOAD_ROOT = getUploadRoot();
-const CONTENT_REQUESTS_DIR = getDataDir('content-requests');
-
-fs.mkdirSync(CONTENT_REQUESTS_DIR, { recursive: true });
-
-// Old storage path: ~/toUpload/<wsId>/.content-requests.json
-function getOldFile(workspaceId: string): string {
-  return path.join(UPLOAD_ROOT, workspaceId, '.content-requests.json');
-}
+import db from './db/index.js';
 
 export interface ContentRequestComment {
   id: string;
@@ -46,53 +34,132 @@ export interface ContentTopicRequest {
   updatedAt: string;
 }
 
-function getFile(workspaceId: string): string {
-  return path.join(CONTENT_REQUESTS_DIR, `${workspaceId}.json`);
+// ── SQLite row shape ──
+
+interface RequestRow {
+  id: string;
+  workspace_id: string;
+  topic: string;
+  target_keyword: string;
+  intent: string;
+  priority: string;
+  rationale: string;
+  status: string;
+  brief_id: string | null;
+  client_note: string | null;
+  internal_note: string | null;
+  decline_reason: string | null;
+  client_feedback: string | null;
+  source: string | null;
+  service_type: string | null;
+  page_type: string | null;
+  upgraded_at: string | null;
+  delivery_url: string | null;
+  delivery_notes: string | null;
+  target_page_id: string | null;
+  target_page_slug: string | null;
+  comments: string;
+  requested_at: string;
+  updated_at: string;
 }
 
-function read(workspaceId: string): ContentTopicRequest[] {
-  // Try new path first
-  try {
-    const f = getFile(workspaceId);
-    if (fs.existsSync(f)) return JSON.parse(fs.readFileSync(f, 'utf-8'));
-  } catch { /* fresh */ }
-  // Fall back to old path
-  try {
-    const old = getOldFile(workspaceId);
-    if (fs.existsSync(old)) {
-      const data = JSON.parse(fs.readFileSync(old, 'utf-8'));
-      if (Array.isArray(data) && data.length > 0) {
-        // Migrate forward: write to new path so future reads are fast
-        write(workspaceId, data);
-        console.log(`[Migration] Moved ${data.length} content requests for ${workspaceId} to new path`);
-        return data;
-      }
-    }
-  } catch { /* skip */ }
-  return [];
+interface Stmts {
+  insert: ReturnType<typeof db.prepare>;
+  selectByWorkspace: ReturnType<typeof db.prepare>;
+  selectById: ReturnType<typeof db.prepare>;
+  selectByKeyword: ReturnType<typeof db.prepare>;
+  update: ReturnType<typeof db.prepare>;
+  deleteById: ReturnType<typeof db.prepare>;
 }
 
-function write(workspaceId: string, items: ContentTopicRequest[]) {
-  fs.writeFileSync(getFile(workspaceId), JSON.stringify(items, null, 2));
+let _stmts: Stmts | null = null;
+function stmts(): Stmts {
+  if (!_stmts) {
+    _stmts = {
+      insert: db.prepare(
+        `INSERT INTO content_topic_requests
+           (id, workspace_id, topic, target_keyword, intent, priority, rationale, status,
+            brief_id, client_note, internal_note, decline_reason, client_feedback,
+            source, service_type, page_type, upgraded_at, delivery_url, delivery_notes,
+            target_page_id, target_page_slug, comments, requested_at, updated_at)
+         VALUES
+           (@id, @workspace_id, @topic, @target_keyword, @intent, @priority, @rationale, @status,
+            @brief_id, @client_note, @internal_note, @decline_reason, @client_feedback,
+            @source, @service_type, @page_type, @upgraded_at, @delivery_url, @delivery_notes,
+            @target_page_id, @target_page_slug, @comments, @requested_at, @updated_at)`,
+      ),
+      selectByWorkspace: db.prepare(
+        `SELECT * FROM content_topic_requests WHERE workspace_id = ? ORDER BY requested_at DESC`,
+      ),
+      selectById: db.prepare(
+        `SELECT * FROM content_topic_requests WHERE id = ? AND workspace_id = ?`,
+      ),
+      selectByKeyword: db.prepare(
+        `SELECT * FROM content_topic_requests WHERE workspace_id = ? AND target_keyword = ? AND status != 'declined'`,
+      ),
+      update: db.prepare(
+        `UPDATE content_topic_requests SET
+           status = @status, brief_id = @brief_id, client_note = @client_note,
+           internal_note = @internal_note, decline_reason = @decline_reason,
+           client_feedback = @client_feedback, service_type = @service_type,
+           upgraded_at = @upgraded_at, delivery_url = @delivery_url,
+           delivery_notes = @delivery_notes, comments = @comments, updated_at = @updated_at
+         WHERE id = @id`,
+      ),
+      deleteById: db.prepare(
+        `DELETE FROM content_topic_requests WHERE id = ? AND workspace_id = ?`,
+      ),
+    };
+  }
+  return _stmts;
+}
+
+function rowToRequest(row: RequestRow): ContentTopicRequest {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    topic: row.topic,
+    targetKeyword: row.target_keyword,
+    intent: row.intent,
+    priority: row.priority,
+    rationale: row.rationale,
+    status: row.status as ContentTopicRequest['status'],
+    briefId: row.brief_id ?? undefined,
+    clientNote: row.client_note ?? undefined,
+    internalNote: row.internal_note ?? undefined,
+    declineReason: row.decline_reason ?? undefined,
+    clientFeedback: row.client_feedback ?? undefined,
+    source: (row.source as ContentTopicRequest['source']) ?? undefined,
+    serviceType: (row.service_type as ContentTopicRequest['serviceType']) ?? undefined,
+    pageType: (row.page_type as ContentTopicRequest['pageType']) ?? undefined,
+    upgradedAt: row.upgraded_at ?? undefined,
+    deliveryUrl: row.delivery_url ?? undefined,
+    deliveryNotes: row.delivery_notes ?? undefined,
+    targetPageId: row.target_page_id ?? undefined,
+    targetPageSlug: row.target_page_slug ?? undefined,
+    comments: JSON.parse(row.comments),
+    requestedAt: row.requested_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 export function listContentRequests(workspaceId: string): ContentTopicRequest[] {
-  return read(workspaceId).sort((a, b) => b.requestedAt.localeCompare(a.requestedAt));
+  const rows = stmts().selectByWorkspace.all(workspaceId) as RequestRow[];
+  return rows.map(rowToRequest);
 }
 
 export function getContentRequest(workspaceId: string, id: string): ContentTopicRequest | undefined {
-  return read(workspaceId).find(r => r.id === id);
+  const row = stmts().selectById.get(id, workspaceId) as RequestRow | undefined;
+  return row ? rowToRequest(row) : undefined;
 }
 
 export function createContentRequest(
   workspaceId: string,
   data: { topic: string; targetKeyword: string; intent: string; priority: string; rationale: string; clientNote?: string; source?: 'strategy' | 'client'; serviceType?: 'brief_only' | 'full_post'; pageType?: ContentTopicRequest['pageType']; initialStatus?: 'pending_payment' | 'requested'; targetPageId?: string; targetPageSlug?: string }
 ): ContentTopicRequest {
-  const items = read(workspaceId);
-
   // Prevent duplicate requests for the same keyword
-  const existing = items.find(r => r.targetKeyword === data.targetKeyword && r.status !== 'declined');
-  if (existing) return existing;
+  const existing = stmts().selectByKeyword.get(workspaceId, data.targetKeyword) as RequestRow | undefined;
+  if (existing) return rowToRequest(existing);
 
   const request: ContentTopicRequest = {
     id: `creq_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -114,8 +181,33 @@ export function createContentRequest(
     updatedAt: new Date().toISOString(),
   };
 
-  items.push(request);
-  write(workspaceId, items);
+  stmts().insert.run({
+    id: request.id,
+    workspace_id: workspaceId,
+    topic: request.topic,
+    target_keyword: request.targetKeyword,
+    intent: request.intent,
+    priority: request.priority,
+    rationale: request.rationale,
+    status: request.status,
+    brief_id: request.briefId ?? null,
+    client_note: request.clientNote ?? null,
+    internal_note: request.internalNote ?? null,
+    decline_reason: request.declineReason ?? null,
+    client_feedback: request.clientFeedback ?? null,
+    source: request.source ?? null,
+    service_type: request.serviceType ?? null,
+    page_type: request.pageType ?? null,
+    upgraded_at: request.upgradedAt ?? null,
+    delivery_url: request.deliveryUrl ?? null,
+    delivery_notes: request.deliveryNotes ?? null,
+    target_page_id: request.targetPageId ?? null,
+    target_page_slug: request.targetPageSlug ?? null,
+    comments: JSON.stringify(request.comments || []),
+    requested_at: request.requestedAt,
+    updated_at: request.updatedAt,
+  });
+
   return request;
 }
 
@@ -124,21 +216,37 @@ export function updateContentRequest(
   id: string,
   updates: Partial<Pick<ContentTopicRequest, 'status' | 'briefId' | 'internalNote' | 'declineReason' | 'clientFeedback' | 'serviceType' | 'upgradedAt' | 'deliveryUrl' | 'deliveryNotes'>>
 ): ContentTopicRequest | null {
-  const items = read(workspaceId);
-  const idx = items.findIndex(r => r.id === id);
-  if (idx === -1) return null;
-  Object.assign(items[idx], updates, { updatedAt: new Date().toISOString() });
-  write(workspaceId, items);
-  return items[idx];
+  const existing = getContentRequest(workspaceId, id);
+  if (!existing) return null;
+
+  // Filter undefined values to avoid overwriting existing fields
+  const cleanUpdates: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(updates)) {
+    if (v !== undefined) cleanUpdates[k] = v;
+  }
+  Object.assign(existing, cleanUpdates, { updatedAt: new Date().toISOString() });
+
+  stmts().update.run({
+    id: existing.id,
+    status: existing.status,
+    brief_id: existing.briefId ?? null,
+    client_note: existing.clientNote ?? null,
+    internal_note: existing.internalNote ?? null,
+    decline_reason: existing.declineReason ?? null,
+    client_feedback: existing.clientFeedback ?? null,
+    service_type: existing.serviceType ?? null,
+    upgraded_at: existing.upgradedAt ?? null,
+    delivery_url: existing.deliveryUrl ?? null,
+    delivery_notes: existing.deliveryNotes ?? null,
+    comments: JSON.stringify(existing.comments || []),
+    updated_at: existing.updatedAt,
+  });
+  return existing;
 }
 
 export function deleteContentRequest(workspaceId: string, id: string): boolean {
-  const items = read(workspaceId);
-  const idx = items.findIndex(r => r.id === id);
-  if (idx === -1) return false;
-  items.splice(idx, 1);
-  write(workspaceId, items);
-  return true;
+  const info = stmts().deleteById.run(id, workspaceId);
+  return info.changes > 0;
 }
 
 export function addComment(
@@ -147,17 +255,31 @@ export function addComment(
   author: 'client' | 'team',
   content: string
 ): ContentTopicRequest | null {
-  const items = read(workspaceId);
-  const idx = items.findIndex(r => r.id === requestId);
-  if (idx === -1) return null;
-  if (!items[idx].comments) items[idx].comments = [];
-  items[idx].comments!.push({
+  const existing = getContentRequest(workspaceId, requestId);
+  if (!existing) return null;
+  if (!existing.comments) existing.comments = [];
+  existing.comments.push({
     id: `cmt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     author,
     content,
     createdAt: new Date().toISOString(),
   });
-  items[idx].updatedAt = new Date().toISOString();
-  write(workspaceId, items);
-  return items[idx];
+  existing.updatedAt = new Date().toISOString();
+
+  stmts().update.run({
+    id: existing.id,
+    status: existing.status,
+    brief_id: existing.briefId ?? null,
+    client_note: existing.clientNote ?? null,
+    internal_note: existing.internalNote ?? null,
+    decline_reason: existing.declineReason ?? null,
+    client_feedback: existing.clientFeedback ?? null,
+    service_type: existing.serviceType ?? null,
+    upgraded_at: existing.upgradedAt ?? null,
+    delivery_url: existing.deliveryUrl ?? null,
+    delivery_notes: existing.deliveryNotes ?? null,
+    comments: JSON.stringify(existing.comments),
+    updated_at: existing.updatedAt,
+  });
+  return existing;
 }

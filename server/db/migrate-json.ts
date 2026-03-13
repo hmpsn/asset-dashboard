@@ -535,11 +535,578 @@ function migrateAuditSchedules(): number {
   return total;
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+// Tier 2 — Per-workspace modules
+// ═══════════════════════════════════════════════════════════════════
+
+// ── Approvals ──
+
+function migrateApprovals(): number {
+  const dir = getDataDir('approvals');
+  if (!fs.existsSync(dir)) { console.log('[migrate] No approvals directory — skipping.'); return 0; }
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
+  if (files.length === 0) return 0;
+
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO approval_batches
+      (id, workspace_id, name, items, status, created_at, updated_at)
+    VALUES (@id, @workspace_id, @name, @items, @status, @created_at, @updated_at)
+  `);
+
+  let total = 0;
+  const run = db.transaction(() => {
+    for (const file of files) {
+      const wsId = path.basename(file, '.json');
+      let records: any[];
+      try { records = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch { continue; }
+      if (!Array.isArray(records)) continue;
+      for (const r of records) {
+        const info = insert.run({
+          id: r.id, workspace_id: r.workspaceId || wsId,
+          name: r.name || '', items: JSON.stringify(r.items || []),
+          status: r.status || 'pending',
+          created_at: r.createdAt || new Date().toISOString(),
+          updated_at: r.updatedAt || r.createdAt || new Date().toISOString(),
+        });
+        total += info.changes;
+      }
+      console.log(`[migrate] approvals/${file}: ${records.length} batch(es)`);
+    }
+  });
+  run();
+  return total;
+}
+
+// ── Content Briefs ──
+
+function migrateContentBriefs(): number {
+  const dir = getDataDir('content-briefs');
+  if (!fs.existsSync(dir)) { console.log('[migrate] No content-briefs directory — skipping.'); return 0; }
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
+  if (files.length === 0) return 0;
+
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO content_briefs
+      (id, workspace_id, target_keyword, secondary_keywords, suggested_title,
+       suggested_meta_desc, outline, word_count_target, intent, audience,
+       competitor_insights, internal_link_suggestions, created_at,
+       executive_summary, content_format, tone_and_style, people_also_ask,
+       topical_entities, serp_analysis, difficulty_score, traffic_potential,
+       cta_recommendations, eeat_guidance, content_checklist, schema_recommendations,
+       page_type, reference_urls, real_people_also_ask, real_top_results)
+    VALUES
+      (@id, @workspace_id, @target_keyword, @secondary_keywords, @suggested_title,
+       @suggested_meta_desc, @outline, @word_count_target, @intent, @audience,
+       @competitor_insights, @internal_link_suggestions, @created_at,
+       @executive_summary, @content_format, @tone_and_style, @people_also_ask,
+       @topical_entities, @serp_analysis, @difficulty_score, @traffic_potential,
+       @cta_recommendations, @eeat_guidance, @content_checklist, @schema_recommendations,
+       @page_type, @reference_urls, @real_people_also_ask, @real_top_results)
+  `);
+
+  let total = 0;
+  const run = db.transaction(() => {
+    for (const file of files) {
+      const wsId = path.basename(file, '.json');
+      let records: any[];
+      try { records = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch { continue; }
+      if (!Array.isArray(records)) continue;
+      for (const r of records) {
+        const info = insert.run({
+          id: r.id, workspace_id: r.workspaceId || wsId,
+          target_keyword: r.targetKeyword || '',
+          secondary_keywords: JSON.stringify(r.secondaryKeywords || []),
+          suggested_title: r.suggestedTitle || '',
+          suggested_meta_desc: r.suggestedMetaDesc || '',
+          outline: JSON.stringify(r.outline || []),
+          word_count_target: r.wordCountTarget || 1500,
+          intent: r.intent || 'informational',
+          audience: r.audience || '',
+          competitor_insights: r.competitorInsights || '',
+          internal_link_suggestions: JSON.stringify(r.internalLinkSuggestions || []),
+          created_at: r.createdAt || new Date().toISOString(),
+          executive_summary: r.executiveSummary ?? null,
+          content_format: r.contentFormat ?? null,
+          tone_and_style: r.toneAndStyle ?? null,
+          people_also_ask: r.peopleAlsoAsk ? JSON.stringify(r.peopleAlsoAsk) : null,
+          topical_entities: r.topicalEntities ? JSON.stringify(r.topicalEntities) : null,
+          serp_analysis: r.serpAnalysis ? JSON.stringify(r.serpAnalysis) : null,
+          difficulty_score: r.difficultyScore ?? null,
+          traffic_potential: r.trafficPotential ?? null,
+          cta_recommendations: r.ctaRecommendations ? JSON.stringify(r.ctaRecommendations) : null,
+          eeat_guidance: r.eeatGuidance ? JSON.stringify(r.eeatGuidance) : null,
+          content_checklist: r.contentChecklist ? JSON.stringify(r.contentChecklist) : null,
+          schema_recommendations: r.schemaRecommendations ? JSON.stringify(r.schemaRecommendations) : null,
+          page_type: r.pageType ?? null,
+          reference_urls: r.referenceUrls ? JSON.stringify(r.referenceUrls) : null,
+          real_people_also_ask: r.realPeopleAlsoAsk ? JSON.stringify(r.realPeopleAlsoAsk) : null,
+          real_top_results: r.realTopResults ? JSON.stringify(r.realTopResults) : null,
+        });
+        total += info.changes;
+      }
+      console.log(`[migrate] content-briefs/${file}: ${records.length} brief(s)`);
+    }
+  });
+  run();
+  return total;
+}
+
+// ── Content Requests ──
+
+function migrateContentRequests(): number {
+  const dir = getDataDir('content-requests');
+  if (!fs.existsSync(dir)) { console.log('[migrate] No content-requests directory — skipping.'); return 0; }
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
+  if (files.length === 0) return 0;
+
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO content_topic_requests
+      (id, workspace_id, topic, target_keyword, intent, priority, rationale, status,
+       brief_id, client_note, internal_note, decline_reason, client_feedback,
+       source, service_type, page_type, upgraded_at, delivery_url, delivery_notes,
+       target_page_id, target_page_slug, comments, requested_at, updated_at)
+    VALUES
+      (@id, @workspace_id, @topic, @target_keyword, @intent, @priority, @rationale, @status,
+       @brief_id, @client_note, @internal_note, @decline_reason, @client_feedback,
+       @source, @service_type, @page_type, @upgraded_at, @delivery_url, @delivery_notes,
+       @target_page_id, @target_page_slug, @comments, @requested_at, @updated_at)
+  `);
+
+  let total = 0;
+  const run = db.transaction(() => {
+    for (const file of files) {
+      const wsId = path.basename(file, '.json');
+      let records: any[];
+      try { records = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch { continue; }
+      if (!Array.isArray(records)) continue;
+      for (const r of records) {
+        const info = insert.run({
+          id: r.id, workspace_id: r.workspaceId || wsId,
+          topic: r.topic || '', target_keyword: r.targetKeyword || '',
+          intent: r.intent || '', priority: r.priority || 'medium',
+          rationale: r.rationale || '', status: r.status || 'requested',
+          brief_id: r.briefId ?? null, client_note: r.clientNote ?? null,
+          internal_note: r.internalNote ?? null, decline_reason: r.declineReason ?? null,
+          client_feedback: r.clientFeedback ?? null,
+          source: r.source ?? null, service_type: r.serviceType ?? null,
+          page_type: r.pageType ?? null, upgraded_at: r.upgradedAt ?? null,
+          delivery_url: r.deliveryUrl ?? null, delivery_notes: r.deliveryNotes ?? null,
+          target_page_id: r.targetPageId ?? null, target_page_slug: r.targetPageSlug ?? null,
+          comments: JSON.stringify(r.comments || []),
+          requested_at: r.requestedAt || new Date().toISOString(),
+          updated_at: r.updatedAt || r.requestedAt || new Date().toISOString(),
+        });
+        total += info.changes;
+      }
+      console.log(`[migrate] content-requests/${file}: ${records.length} request(s)`);
+    }
+  });
+  run();
+  return total;
+}
+
+// ── Content Posts ──
+
+function migrateContentPosts(): number {
+  const dir = getDataDir('content-posts');
+  if (!fs.existsSync(dir)) { console.log('[migrate] No content-posts directory — skipping.'); return 0; }
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
+  if (files.length === 0) return 0;
+
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO content_posts
+      (id, workspace_id, brief_id, target_keyword, title, meta_description,
+       introduction, sections, conclusion, seo_title, seo_meta_description,
+       total_word_count, target_word_count, status, unification_status,
+       unification_note, created_at, updated_at)
+    VALUES
+      (@id, @workspace_id, @brief_id, @target_keyword, @title, @meta_description,
+       @introduction, @sections, @conclusion, @seo_title, @seo_meta_description,
+       @total_word_count, @target_word_count, @status, @unification_status,
+       @unification_note, @created_at, @updated_at)
+  `);
+
+  let total = 0;
+  const run = db.transaction(() => {
+    for (const file of files) {
+      const wsId = path.basename(file, '.json');
+      let records: any[];
+      try { records = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch { continue; }
+      if (!Array.isArray(records)) continue;
+      for (const r of records) {
+        const info = insert.run({
+          id: r.id, workspace_id: r.workspaceId || wsId,
+          brief_id: r.briefId || '', target_keyword: r.targetKeyword || '',
+          title: r.title || '', meta_description: r.metaDescription || '',
+          introduction: r.introduction || '', sections: JSON.stringify(r.sections || []),
+          conclusion: r.conclusion || '',
+          seo_title: r.seoTitle ?? null, seo_meta_description: r.seoMetaDescription ?? null,
+          total_word_count: r.totalWordCount || 0, target_word_count: r.targetWordCount || 0,
+          status: r.status || 'draft',
+          unification_status: r.unificationStatus ?? null,
+          unification_note: r.unificationNote ?? null,
+          created_at: r.createdAt || new Date().toISOString(),
+          updated_at: r.updatedAt || r.createdAt || new Date().toISOString(),
+        });
+        total += info.changes;
+      }
+      console.log(`[migrate] content-posts/${file}: ${records.length} post(s)`);
+    }
+  });
+  run();
+  return total;
+}
+
+// ── Work Orders ──
+
+function migrateWorkOrders(): number {
+  const dir = getDataDir('work-orders');
+  if (!fs.existsSync(dir)) { console.log('[migrate] No work-orders directory — skipping.'); return 0; }
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
+  if (files.length === 0) return 0;
+
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO work_orders
+      (id, workspace_id, title, description, type, status, page_ids,
+       issue_checks, assignee, due_date, created_at, updated_at)
+    VALUES
+      (@id, @workspace_id, @title, @description, @type, @status, @page_ids,
+       @issue_checks, @assignee, @due_date, @created_at, @updated_at)
+  `);
+
+  let total = 0;
+  const run = db.transaction(() => {
+    for (const file of files) {
+      const wsId = path.basename(file, '.json');
+      let records: any[];
+      try { records = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch { continue; }
+      if (!Array.isArray(records)) continue;
+      for (const r of records) {
+        const info = insert.run({
+          id: r.id, workspace_id: r.workspaceId || wsId,
+          title: r.title || '', description: r.description || '',
+          type: r.type || 'general', status: r.status || 'open',
+          page_ids: JSON.stringify(r.pageIds || []),
+          issue_checks: r.issueChecks ? JSON.stringify(r.issueChecks) : null,
+          assignee: r.assignee ?? null, due_date: r.dueDate ?? null,
+          created_at: r.createdAt || new Date().toISOString(),
+          updated_at: r.updatedAt || r.createdAt || new Date().toISOString(),
+        });
+        total += info.changes;
+      }
+      console.log(`[migrate] work-orders/${file}: ${records.length} order(s)`);
+    }
+  });
+  run();
+  return total;
+}
+
+// ── Recommendations ──
+
+function migrateRecommendations(): number {
+  const dir = getDataDir('recommendations');
+  if (!fs.existsSync(dir)) { console.log('[migrate] No recommendations directory — skipping.'); return 0; }
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
+  if (files.length === 0) return 0;
+
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO recommendation_sets
+      (workspace_id, generated_at, recommendations, summary)
+    VALUES (@workspace_id, @generated_at, @recommendations, @summary)
+  `);
+
+  let total = 0;
+  const run = db.transaction(() => {
+    for (const file of files) {
+      const wsId = path.basename(file, '.json');
+      let record: any;
+      try { record = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch { continue; }
+      if (!record || typeof record !== 'object') continue;
+      const info = insert.run({
+        workspace_id: record.workspaceId || wsId,
+        generated_at: record.generatedAt || new Date().toISOString(),
+        recommendations: JSON.stringify(record.recommendations || []),
+        summary: JSON.stringify(record.summary || {}),
+      });
+      total += info.changes;
+      console.log(`[migrate] recommendations/${file}: 1 set`);
+    }
+  });
+  run();
+  return total;
+}
+
+// ── Annotations ──
+
+function migrateAnnotations(): number {
+  const uploadRoot = getUploadRoot();
+  let total = 0;
+  // Annotations are stored at UPLOAD_ROOT/<wsId>/.annotations.json
+  let dirs: string[];
+  try { dirs = fs.readdirSync(uploadRoot); } catch { return 0; }
+
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO annotations
+      (id, workspace_id, date, label, color, created_at)
+    VALUES (@id, @workspace_id, @date, @label, @color, @created_at)
+  `);
+
+  const run = db.transaction(() => {
+    for (const wsId of dirs) {
+      const annoFile = path.join(uploadRoot, wsId, '.annotations.json');
+      if (!fs.existsSync(annoFile)) continue;
+      let records: any[];
+      try { records = JSON.parse(fs.readFileSync(annoFile, 'utf-8')); } catch { continue; }
+      if (!Array.isArray(records)) continue;
+      for (const r of records) {
+        const info = insert.run({
+          id: r.id, workspace_id: r.workspaceId || wsId,
+          date: r.date || '', label: r.label || '',
+          color: r.color ?? null,
+          created_at: r.createdAt || new Date().toISOString(),
+        });
+        total += info.changes;
+      }
+      console.log(`[migrate] annotations for ${wsId}: ${records.length} annotation(s)`);
+    }
+  });
+  run();
+  return total;
+}
+
+// ── SEO Changes ──
+
+function migrateSeoChanges(): number {
+  const dir = getDataDir('seo-changes');
+  if (!fs.existsSync(dir)) { console.log('[migrate] No seo-changes directory — skipping.'); return 0; }
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
+  if (files.length === 0) return 0;
+
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO seo_changes
+      (id, workspace_id, page_id, page_slug, page_title, fields, source, changed_at)
+    VALUES (@id, @workspace_id, @page_id, @page_slug, @page_title, @fields, @source, @changed_at)
+  `);
+
+  let total = 0;
+  const run = db.transaction(() => {
+    for (const file of files) {
+      const wsId = path.basename(file, '.json');
+      let records: any[];
+      try { records = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch { continue; }
+      if (!Array.isArray(records)) continue;
+      for (const r of records) {
+        const info = insert.run({
+          id: r.id, workspace_id: r.workspaceId || wsId,
+          page_id: r.pageId || '', page_slug: r.pageSlug || '',
+          page_title: r.pageTitle || '',
+          fields: JSON.stringify(r.fields || []),
+          source: r.source || '',
+          changed_at: r.changedAt || new Date().toISOString(),
+        });
+        total += info.changes;
+      }
+      console.log(`[migrate] seo-changes/${file}: ${records.length} change(s)`);
+    }
+  });
+  run();
+  return total;
+}
+
+// ── Content Decay ──
+
+function migrateContentDecay(): number {
+  const dir = getDataDir('content-decay');
+  if (!fs.existsSync(dir)) { console.log('[migrate] No content-decay directory — skipping.'); return 0; }
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
+  if (files.length === 0) return 0;
+
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO decay_analyses
+      (workspace_id, analyzed_at, total_pages, decaying_pages, summary)
+    VALUES (@workspace_id, @analyzed_at, @total_pages, @decaying_pages, @summary)
+  `);
+
+  let total = 0;
+  const run = db.transaction(() => {
+    for (const file of files) {
+      const wsId = path.basename(file, '.json');
+      let record: any;
+      try { record = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch { continue; }
+      if (!record || typeof record !== 'object') continue;
+      const info = insert.run({
+        workspace_id: record.workspaceId || wsId,
+        analyzed_at: record.analyzedAt || new Date().toISOString(),
+        total_pages: record.totalPages || 0,
+        decaying_pages: JSON.stringify(record.decayingPages || []),
+        summary: JSON.stringify(record.summary || {}),
+      });
+      total += info.changes;
+      console.log(`[migrate] content-decay/${file}: 1 analysis`);
+    }
+  });
+  run();
+  return total;
+}
+
+// ── ROI History ──
+
+function migrateRoiHistory(): number {
+  const dir = getDataDir('roi-history');
+  if (!fs.existsSync(dir)) { console.log('[migrate] No roi-history directory — skipping.'); return 0; }
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
+  if (files.length === 0) return 0;
+
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO roi_snapshots
+      (id, workspace_id, value, recorded_at)
+    VALUES (@id, @workspace_id, @value, @recorded_at)
+  `);
+
+  let total = 0;
+  const run = db.transaction(() => {
+    for (const file of files) {
+      const wsId = path.basename(file, '.json');
+      let records: any[];
+      try { records = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch { continue; }
+      if (!Array.isArray(records)) continue;
+      for (const r of records) {
+        const info = insert.run({
+          id: r.id || `roi_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          workspace_id: wsId,
+          value: typeof r.value === 'number' ? r.value : (typeof r === 'number' ? r : 0),
+          recorded_at: r.recordedAt || r.date || new Date().toISOString(),
+        });
+        total += info.changes;
+      }
+      console.log(`[migrate] roi-history/${file}: ${records.length} snapshot(s)`);
+    }
+  });
+  run();
+  return total;
+}
+
+// ── Feedback ──
+
+function migrateFeedback(): number {
+  const dir = getDataDir('feedback');
+  if (!fs.existsSync(dir)) { console.log('[migrate] No feedback directory — skipping.'); return 0; }
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
+  if (files.length === 0) return 0;
+
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO feedback
+      (id, workspace_id, page_id, page_url, page_title, type, status,
+       content, author_name, author_email, author_role, replies, context,
+       created_at, updated_at)
+    VALUES
+      (@id, @workspace_id, @page_id, @page_url, @page_title, @type, @status,
+       @content, @author_name, @author_email, @author_role, @replies, @context,
+       @created_at, @updated_at)
+  `);
+
+  let total = 0;
+  const run = db.transaction(() => {
+    for (const file of files) {
+      const wsId = path.basename(file, '.json');
+      let records: any[];
+      try { records = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch { continue; }
+      if (!Array.isArray(records)) continue;
+      for (const r of records) {
+        const info = insert.run({
+          id: r.id, workspace_id: r.workspaceId || wsId,
+          page_id: r.pageId ?? null, page_url: r.pageUrl ?? null,
+          page_title: r.pageTitle ?? null, type: r.type || 'general',
+          status: r.status || 'open', content: r.content || '',
+          author_name: r.authorName ?? null, author_email: r.authorEmail ?? null,
+          author_role: r.authorRole ?? null,
+          replies: JSON.stringify(r.replies || []),
+          context: r.context ? JSON.stringify(r.context) : null,
+          created_at: r.createdAt || new Date().toISOString(),
+          updated_at: r.updatedAt || r.createdAt || new Date().toISOString(),
+        });
+        total += info.changes;
+      }
+      console.log(`[migrate] feedback/${file}: ${records.length} item(s)`);
+    }
+  });
+  run();
+  return total;
+}
+
+// ── Rank Tracking Config ──
+
+function migrateRankTracking(): number {
+  const uploadRoot = getUploadRoot();
+  let total = 0;
+  let dirs: string[];
+  try { dirs = fs.readdirSync(uploadRoot); } catch { return 0; }
+
+  const insertConfig = db.prepare(`
+    INSERT OR IGNORE INTO rank_tracking_config
+      (workspace_id, tracked_keywords, updated_at)
+    VALUES (@workspace_id, @tracked_keywords, @updated_at)
+  `);
+
+  const insertSnapshot = db.prepare(`
+    INSERT OR IGNORE INTO rank_snapshots
+      (id, workspace_id, queries, captured_at)
+    VALUES (@id, @workspace_id, @queries, @captured_at)
+  `);
+
+  const run = db.transaction(() => {
+    for (const wsId of dirs) {
+      const rtDir = path.join(uploadRoot, wsId, '.rank-tracking');
+      if (!fs.existsSync(rtDir)) continue;
+
+      // Migrate config
+      const configFile = path.join(rtDir, 'config.json');
+      if (fs.existsSync(configFile)) {
+        try {
+          const config = JSON.parse(fs.readFileSync(configFile, 'utf-8'));
+          const info = insertConfig.run({
+            workspace_id: wsId,
+            tracked_keywords: JSON.stringify(config.trackedKeywords || config.keywords || []),
+            updated_at: config.updatedAt || new Date().toISOString(),
+          });
+          total += info.changes;
+          console.log(`[migrate] rank-tracking config for ${wsId}`);
+        } catch { /* skip */ }
+      }
+
+      // Migrate snapshots
+      const snapshotsFile = path.join(rtDir, 'snapshots.json');
+      if (fs.existsSync(snapshotsFile)) {
+        try {
+          const snapshots = JSON.parse(fs.readFileSync(snapshotsFile, 'utf-8'));
+          if (Array.isArray(snapshots)) {
+            for (const s of snapshots) {
+              const info = insertSnapshot.run({
+                id: s.id || `rs_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                workspace_id: wsId,
+                queries: JSON.stringify(s.queries || []),
+                captured_at: s.capturedAt || s.date || new Date().toISOString(),
+              });
+              total += info.changes;
+            }
+            console.log(`[migrate] rank-tracking snapshots for ${wsId}: ${snapshots.length}`);
+          }
+        } catch { /* skip */ }
+      }
+    }
+  });
+  run();
+  return total;
+}
+
 // --- Run all migrations ---
-console.log('[migrate] Starting JSON \u2192 SQLite data migration...');
+console.log('[migrate] Starting JSON → SQLite data migration...');
 
 const results = {
+  // Tier 1 — Foundation
   payments: migratePayments(),
+  // Tier 1 — Global singletons
   users: migrateUsers(),
   clientUsers: migrateClientUsers(),
   resetTokens: migrateResetTokens(),
@@ -548,6 +1115,19 @@ const results = {
   churnSignals: migrateChurnSignals(),
   anomalies: migrateAnomalies(),
   auditSchedules: migrateAuditSchedules(),
+  // Tier 2 — Per-workspace modules
+  approvals: migrateApprovals(),
+  contentBriefs: migrateContentBriefs(),
+  contentRequests: migrateContentRequests(),
+  contentPosts: migrateContentPosts(),
+  workOrders: migrateWorkOrders(),
+  recommendations: migrateRecommendations(),
+  annotations: migrateAnnotations(),
+  seoChanges: migrateSeoChanges(),
+  contentDecay: migrateContentDecay(),
+  roiHistory: migrateRoiHistory(),
+  feedback: migrateFeedback(),
+  rankTracking: migrateRankTracking(),
 };
 
 const totalInserted = Object.values(results).reduce((a, b) => a + b, 0);

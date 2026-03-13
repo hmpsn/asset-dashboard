@@ -1,9 +1,5 @@
-import fs from 'fs';
-import { getDataDir } from './data-dir.js';
+import db from './db/index.js';
 import type { ProductType } from './payments.js';
-
-const WORK_ORDERS_DIR = getDataDir('work-orders');
-fs.mkdirSync(WORK_ORDERS_DIR, { recursive: true });
 
 // --- Types ---
 
@@ -23,32 +19,81 @@ export interface WorkOrder {
   updatedAt: string;
 }
 
-// --- Storage helpers ---
+// ── SQLite row shape ──
 
-function getFile(workspaceId: string): string {
-  return `${WORK_ORDERS_DIR}/${workspaceId}.json`;
+interface OrderRow {
+  id: string;
+  workspace_id: string;
+  payment_id: string;
+  product_type: string;
+  status: string;
+  page_ids: string;
+  issue_checks: string | null;
+  quantity: number;
+  assigned_to: string | null;
+  completed_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
-function read(workspaceId: string): WorkOrder[] {
-  try {
-    const f = getFile(workspaceId);
-    if (fs.existsSync(f)) return JSON.parse(fs.readFileSync(f, 'utf-8'));
-  } catch { /* fresh */ }
-  return [];
+interface Stmts {
+  insert: ReturnType<typeof db.prepare>;
+  selectByWorkspace: ReturnType<typeof db.prepare>;
+  selectById: ReturnType<typeof db.prepare>;
+  update: ReturnType<typeof db.prepare>;
 }
 
-function write(workspaceId: string, items: WorkOrder[]) {
-  fs.writeFileSync(getFile(workspaceId), JSON.stringify(items, null, 2));
+let _stmts: Stmts | null = null;
+function stmts(): Stmts {
+  if (!_stmts) {
+    _stmts = {
+      insert: db.prepare(
+        `INSERT INTO work_orders (id, workspace_id, payment_id, product_type, status, page_ids, issue_checks, quantity, assigned_to, completed_at, notes, created_at, updated_at)
+         VALUES (@id, @workspace_id, @payment_id, @product_type, @status, @page_ids, @issue_checks, @quantity, @assigned_to, @completed_at, @notes, @created_at, @updated_at)`,
+      ),
+      selectByWorkspace: db.prepare(
+        `SELECT * FROM work_orders WHERE workspace_id = ? ORDER BY created_at DESC`,
+      ),
+      selectById: db.prepare(
+        `SELECT * FROM work_orders WHERE id = ? AND workspace_id = ?`,
+      ),
+      update: db.prepare(
+        `UPDATE work_orders SET status = @status, assigned_to = @assigned_to, notes = @notes, completed_at = @completed_at, updated_at = @updated_at WHERE id = @id`,
+      ),
+    };
+  }
+  return _stmts;
+}
+
+function rowToOrder(row: OrderRow): WorkOrder {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    paymentId: row.payment_id,
+    productType: row.product_type as ProductType,
+    status: row.status as WorkOrder['status'],
+    pageIds: JSON.parse(row.page_ids),
+    issueChecks: row.issue_checks ? JSON.parse(row.issue_checks) : undefined,
+    quantity: row.quantity,
+    assignedTo: row.assigned_to ?? undefined,
+    completedAt: row.completed_at ?? undefined,
+    notes: row.notes ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 // --- CRUD ---
 
 export function listWorkOrders(workspaceId: string): WorkOrder[] {
-  return read(workspaceId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const rows = stmts().selectByWorkspace.all(workspaceId) as OrderRow[];
+  return rows.map(rowToOrder);
 }
 
 export function getWorkOrder(workspaceId: string, orderId: string): WorkOrder | undefined {
-  return read(workspaceId).find(o => o.id === orderId);
+  const row = stmts().selectById.get(orderId, workspaceId) as OrderRow | undefined;
+  return row ? rowToOrder(row) : undefined;
 }
 
 export function createWorkOrder(
@@ -62,7 +107,6 @@ export function createWorkOrder(
     quantity?: number;
   },
 ): WorkOrder {
-  const items = read(workspaceId);
   const now = new Date().toISOString();
 
   const order: WorkOrder = {
@@ -78,8 +122,22 @@ export function createWorkOrder(
     updatedAt: now,
   };
 
-  items.push(order);
-  write(workspaceId, items);
+  stmts().insert.run({
+    id: order.id,
+    workspace_id: workspaceId,
+    payment_id: order.paymentId,
+    product_type: order.productType,
+    status: order.status,
+    page_ids: JSON.stringify(order.pageIds),
+    issue_checks: order.issueChecks ? JSON.stringify(order.issueChecks) : null,
+    quantity: order.quantity,
+    assigned_to: null,
+    completed_at: null,
+    notes: null,
+    created_at: now,
+    updated_at: now,
+  });
+
   return order;
 }
 
@@ -88,8 +146,7 @@ export function updateWorkOrder(
   orderId: string,
   updates: Partial<Pick<WorkOrder, 'status' | 'assignedTo' | 'notes' | 'completedAt'>>,
 ): WorkOrder | null {
-  const items = read(workspaceId);
-  const order = items.find(o => o.id === orderId);
+  const order = getWorkOrder(workspaceId, orderId);
   if (!order) return null;
 
   if (updates.status !== undefined) order.status = updates.status;
@@ -98,6 +155,13 @@ export function updateWorkOrder(
   if (updates.completedAt !== undefined) order.completedAt = updates.completedAt;
   order.updatedAt = new Date().toISOString();
 
-  write(workspaceId, items);
+  stmts().update.run({
+    id: order.id,
+    status: order.status,
+    assigned_to: order.assignedTo ?? null,
+    notes: order.notes ?? null,
+    completed_at: order.completedAt ?? null,
+    updated_at: order.updatedAt,
+  });
   return order;
 }

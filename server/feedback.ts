@@ -1,6 +1,4 @@
-import fs from 'fs';
-import path from 'path';
-import { getDataDir } from './data-dir.js';
+import db from './db/index.js';
 import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
 
@@ -38,42 +36,85 @@ export interface FeedbackReply {
   createdAt: string;
 }
 
-// ── Storage ──
+// ── SQLite row shape ──
 
-function getFeedbackDir(): string {
-  return getDataDir('feedback');
+interface FeedbackRow {
+  id: string;
+  workspace_id: string;
+  type: string;
+  title: string;
+  description: string;
+  status: string;
+  context: string | null;
+  submitted_by: string | null;
+  replies: string;
+  created_at: string;
+  updated_at: string;
 }
 
-function getFilePath(workspaceId: string): string {
-  return path.join(getFeedbackDir(), `${workspaceId}.json`);
+interface Stmts {
+  insert: ReturnType<typeof db.prepare>;
+  selectByWorkspace: ReturnType<typeof db.prepare>;
+  selectById: ReturnType<typeof db.prepare>;
+  update: ReturnType<typeof db.prepare>;
+  deleteById: ReturnType<typeof db.prepare>;
+  selectAll: ReturnType<typeof db.prepare>;
 }
 
-function readFeedback(workspaceId: string): FeedbackItem[] {
-  const fp = getFilePath(workspaceId);
-  try {
-    if (fs.existsSync(fp)) {
-      return JSON.parse(fs.readFileSync(fp, 'utf-8'));
-    }
-  } catch { /* corrupt or missing */ }
-  return [];
+let _stmts: Stmts | null = null;
+function stmts(): Stmts {
+  if (!_stmts) {
+    _stmts = {
+      insert: db.prepare(
+        `INSERT INTO feedback (id, workspace_id, type, title, description, status, context, submitted_by, replies, created_at, updated_at)
+         VALUES (@id, @workspace_id, @type, @title, @description, @status, @context, @submitted_by, @replies, @created_at, @updated_at)`,
+      ),
+      selectByWorkspace: db.prepare(
+        `SELECT * FROM feedback WHERE workspace_id = ? ORDER BY created_at DESC`,
+      ),
+      selectById: db.prepare(
+        `SELECT * FROM feedback WHERE id = ? AND workspace_id = ?`,
+      ),
+      update: db.prepare(
+        `UPDATE feedback SET status = @status, replies = @replies, updated_at = @updated_at WHERE id = @id`,
+      ),
+      deleteById: db.prepare(
+        `DELETE FROM feedback WHERE id = ? AND workspace_id = ?`,
+      ),
+      selectAll: db.prepare(
+        `SELECT * FROM feedback ORDER BY created_at DESC`,
+      ),
+    };
+  }
+  return _stmts;
 }
 
-function writeFeedback(workspaceId: string, items: FeedbackItem[]): void {
-  const fp = getFilePath(workspaceId);
-  fs.mkdirSync(path.dirname(fp), { recursive: true });
-  fs.writeFileSync(fp, JSON.stringify(items, null, 2));
+function rowToFeedback(row: FeedbackRow): FeedbackItem {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    type: row.type as FeedbackType,
+    title: row.title,
+    description: row.description,
+    status: row.status as FeedbackStatus,
+    context: row.context ? JSON.parse(row.context) : undefined,
+    submittedBy: row.submitted_by ?? undefined,
+    replies: JSON.parse(row.replies),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 // ── CRUD ──
 
 export function listFeedback(workspaceId: string): FeedbackItem[] {
-  return readFeedback(workspaceId).sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+  const rows = stmts().selectByWorkspace.all(workspaceId) as FeedbackRow[];
+  return rows.map(rowToFeedback);
 }
 
 export function getFeedbackItem(workspaceId: string, id: string): FeedbackItem | undefined {
-  return readFeedback(workspaceId).find(f => f.id === id);
+  const row = stmts().selectById.get(id, workspaceId) as FeedbackRow | undefined;
+  return row ? rowToFeedback(row) : undefined;
 }
 
 export function createFeedback(workspaceId: string, data: {
@@ -83,7 +124,6 @@ export function createFeedback(workspaceId: string, data: {
   context?: FeedbackItem['context'];
   submittedBy?: string;
 }): FeedbackItem {
-  const items = readFeedback(workspaceId);
   const item: FeedbackItem = {
     id: `fb_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     workspaceId,
@@ -97,8 +137,19 @@ export function createFeedback(workspaceId: string, data: {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
-  items.push(item);
-  writeFeedback(workspaceId, items);
+  stmts().insert.run({
+    id: item.id,
+    workspace_id: workspaceId,
+    type: item.type,
+    title: item.title,
+    description: item.description,
+    status: item.status,
+    context: item.context ? JSON.stringify(item.context) : null,
+    submitted_by: item.submittedBy ?? null,
+    replies: JSON.stringify(item.replies),
+    created_at: item.createdAt,
+    updated_at: item.updatedAt,
+  });
 
   // Activity log
   addActivity(workspaceId, 'note', `Feedback: ${data.title}`, `${data.type} — ${data.description.slice(0, 120)}`, {
@@ -113,19 +164,22 @@ export function createFeedback(workspaceId: string, data: {
 }
 
 export function updateFeedbackStatus(workspaceId: string, id: string, status: FeedbackStatus): FeedbackItem | null {
-  const items = readFeedback(workspaceId);
-  const item = items.find(f => f.id === id);
+  const item = getFeedbackItem(workspaceId, id);
   if (!item) return null;
   item.status = status;
   item.updatedAt = new Date().toISOString();
-  writeFeedback(workspaceId, items);
+  stmts().update.run({
+    id: item.id,
+    status: item.status,
+    replies: JSON.stringify(item.replies),
+    updated_at: item.updatedAt,
+  });
   broadcastToWorkspace(workspaceId, 'feedback:update', item);
   return item;
 }
 
 export function addFeedbackReply(workspaceId: string, id: string, author: 'team' | 'client', content: string): FeedbackItem | null {
-  const items = readFeedback(workspaceId);
-  const item = items.find(f => f.id === id);
+  const item = getFeedbackItem(workspaceId, id);
   if (!item) return null;
   const reply: FeedbackReply = {
     id: `fbr_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -135,32 +189,23 @@ export function addFeedbackReply(workspaceId: string, id: string, author: 'team'
   };
   item.replies.push(reply);
   item.updatedAt = new Date().toISOString();
-  writeFeedback(workspaceId, items);
+  stmts().update.run({
+    id: item.id,
+    status: item.status,
+    replies: JSON.stringify(item.replies),
+    updated_at: item.updatedAt,
+  });
   broadcastToWorkspace(workspaceId, 'feedback:update', item);
   return item;
 }
 
 export function deleteFeedback(workspaceId: string, id: string): boolean {
-  const items = readFeedback(workspaceId);
-  const idx = items.findIndex(f => f.id === id);
-  if (idx === -1) return false;
-  items.splice(idx, 1);
-  writeFeedback(workspaceId, items);
-  return true;
+  const info = stmts().deleteById.run(id, workspaceId);
+  return info.changes > 0;
 }
 
 /** List feedback across ALL workspaces (for admin command center) */
 export function listAllFeedback(): FeedbackItem[] {
-  const dir = getFeedbackDir();
-  const all: FeedbackItem[] = [];
-  try {
-    const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
-    for (const file of files) {
-      try {
-        const items: FeedbackItem[] = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8'));
-        all.push(...items);
-      } catch { /* skip corrupt files */ }
-    }
-  } catch { /* dir doesn't exist yet */ }
-  return all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const rows = stmts().selectAll.all() as FeedbackRow[];
+  return rows.map(rowToFeedback);
 }

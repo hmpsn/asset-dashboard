@@ -14,15 +14,13 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { getDataDir } from './data-dir.js';
+import db from './db/index.js';
 import { getWorkspace } from './workspaces.js';
 import type { Workspace, QuickWin, ContentGap } from './workspaces.js';
 import { getLatestSnapshot } from './reports.js';
 import type { AuditSnapshot } from './reports.js';
 import { getAllGscPages } from './search-console.js';
 import { getGA4TopPages } from './google-analytics.js';
-
-const REC_DIR = getDataDir('recommendations');
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -76,20 +74,54 @@ interface TrafficMap {
 
 // ─── Storage ──────────────────────────────────────────────────────
 
-function recFile(workspaceId: string): string {
-  return path.join(REC_DIR, `${workspaceId}.json`);
+interface RecSetRow {
+  workspace_id: string;
+  generated_at: string;
+  recommendations: string;
+  summary: string;
+}
+
+interface RecStmts {
+  select: ReturnType<typeof db.prepare>;
+  upsert: ReturnType<typeof db.prepare>;
+}
+
+let _recStmts: RecStmts | null = null;
+function recStmts(): RecStmts {
+  if (!_recStmts) {
+    _recStmts = {
+      select: db.prepare(
+        `SELECT * FROM recommendation_sets WHERE workspace_id = ?`,
+      ),
+      upsert: db.prepare(
+        `INSERT INTO recommendation_sets (workspace_id, generated_at, recommendations, summary)
+         VALUES (@workspace_id, @generated_at, @recommendations, @summary)
+         ON CONFLICT(workspace_id) DO UPDATE SET
+           generated_at = @generated_at, recommendations = @recommendations, summary = @summary`,
+      ),
+    };
+  }
+  return _recStmts;
 }
 
 export function loadRecommendations(workspaceId: string): RecommendationSet | null {
-  const file = recFile(workspaceId);
-  if (!fs.existsSync(file)) return null;
-  try {
-    return JSON.parse(fs.readFileSync(file, 'utf-8'));
-  } catch { return null; }
+  const row = recStmts().select.get(workspaceId) as RecSetRow | undefined;
+  if (!row) return null;
+  return {
+    workspaceId: row.workspace_id,
+    generatedAt: row.generated_at,
+    recommendations: JSON.parse(row.recommendations),
+    summary: JSON.parse(row.summary),
+  };
 }
 
 export function saveRecommendations(set: RecommendationSet): void {
-  fs.writeFileSync(recFile(set.workspaceId), JSON.stringify(set, null, 2));
+  recStmts().upsert.run({
+    workspace_id: set.workspaceId,
+    generated_at: set.generatedAt,
+    recommendations: JSON.stringify(set.recommendations),
+    summary: JSON.stringify(set.summary),
+  });
 }
 
 export function updateRecommendationStatus(
