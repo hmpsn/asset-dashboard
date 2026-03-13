@@ -17,24 +17,27 @@ import { getSearchOverview } from '../search-console.js';
 import { isSemrushConfigured, getKeywordOverview, getRelatedKeywords } from '../semrush.js';
 import { getWorkspace } from '../workspaces.js';
 import { getAllSitePages } from './content-requests.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('content-briefs');
 
 // --- Content Briefs ---
 // List all briefs for a workspace
 router.get('/api/content-briefs/:workspaceId', (req, res) => {
   const briefs = listBriefs(req.params.workspaceId);
-  console.log(`[Briefs] LIST ${req.params.workspaceId}: ${briefs.length} briefs found`);
+  log.info(`LIST ${req.params.workspaceId}: ${briefs.length} briefs found`);
   res.json(briefs);
 });
 
 // Get a specific brief
 router.get('/api/content-briefs/:workspaceId/:briefId', (req, res) => {
-  console.log(`[Briefs] GET ${req.params.workspaceId}/${req.params.briefId}`);
+  log.info(`GET ${req.params.workspaceId}/${req.params.briefId}`);
   const brief = getBrief(req.params.workspaceId, req.params.briefId);
   if (!brief) {
-    console.log(`[Briefs] NOT FOUND: ${req.params.briefId} in workspace ${req.params.workspaceId}`);
+    log.info(`NOT FOUND: ${req.params.briefId} in workspace ${req.params.workspaceId}`);
     return res.status(404).json({ error: 'Brief not found' });
   }
-  console.log(`[Briefs] FOUND: "${brief.targetKeyword}"`);
+  log.info(`FOUND: "${brief.targetKeyword}"`);
   res.json(brief);
 });
 
@@ -80,7 +83,7 @@ router.post('/api/content-briefs/:workspaceId/generate', async (req, res) => {
         ]);
         if (metrics.length > 0) semrushMetrics = metrics[0];
         if (related.length > 0) semrushRelated = related;
-      } catch (e) { console.error('SEMRush brief enrichment error:', e); }
+      } catch (e) { log.error('SEMRush brief enrichment error:', e); }
     }
 
     // --- Parallel enrichment: reference URLs, SERP data, GA4 style examples ---

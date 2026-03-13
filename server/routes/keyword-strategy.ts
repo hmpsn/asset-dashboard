@@ -36,6 +36,9 @@ import {
 } from '../webflow.js';
 import { buildKnowledgeBase } from '../seo-context.js';
 import { updateWorkspace, getWorkspace, getTokenForSite } from '../workspaces.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('keyword-strategy');
 
 // --- Keyword Strategy Generation (SSE progress) ---
 router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
@@ -79,7 +82,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     });
   }
   const sendProgress = (step: string, detail: string, progress: number) => {
-    console.log(`[Strategy][${step}] ${detail} (${Math.round(progress * 100)}%)`);
+    log.info(`[${step}] ${detail} (${Math.round(progress * 100)}%)`);
     if (wantsStream) {
       try { res.write(`data: ${JSON.stringify({ step, detail, progress })}\n\n`); } catch { /* connection dropped */ }
     }
@@ -102,7 +105,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
             liveDomain = d.startsWith('http') ? d : `https://${d}`;
             // Persist so we don't re-resolve every time
             updateWorkspace(ws.id, { liveDomain });
-            console.log(`[Strategy] Auto-resolved liveDomain: ${liveDomain}`);
+            log.info(`Auto-resolved liveDomain: ${liveDomain}`);
           }
         }
       } catch { /* best-effort */ }
@@ -111,7 +114,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     const baseUrl = liveDomain
       ? (liveDomain.startsWith('http') ? liveDomain : `https://${liveDomain}`)
       : subdomain ? `https://${subdomain}.webflow.io` : '';
-    console.log(`[Strategy] Using baseUrl: ${baseUrl}`);
+    log.info(`Using baseUrl: ${baseUrl}`);
 
     // 2. Discover pages: sitemap is the SOURCE OF TRUTH for live pages.
     //    Webflow API is only used for metadata enrichment (SEO title, meta desc).
@@ -130,9 +133,9 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
           seoDesc: p.seo?.description || '',
         });
       }
-      console.log(`[Strategy] Webflow API: ${wfMetaByPath.size} pages with metadata`);
+      log.info(`Webflow API: ${wfMetaByPath.size} pages with metadata`);
     } catch (err) {
-      console.log('[Strategy] Webflow API metadata fetch failed, continuing without it:', err);
+      log.info('Webflow API metadata fetch failed, continuing without it:', err);
     }
 
     // Sitemap = authoritative list of live pages
@@ -146,7 +149,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     if (baseUrl) {
       try {
         const sitemapUrls = await discoverSitemapUrls(baseUrl);
-        console.log(`[Strategy] Sitemap discovered ${sitemapUrls.length} URLs from ${baseUrl}`);
+        log.info(`Sitemap discovered ${sitemapUrls.length} URLs from ${baseUrl}`);
         let skippedUtility = 0;
         for (const url of sitemapUrls) {
           try {
@@ -163,18 +166,18 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
             allPaths.add(path);
           } catch { /* skip invalid URLs */ }
         }
-        if (skippedUtility > 0) console.log(`[Strategy] Skipped ${skippedUtility} utility/index pages`);
+        if (skippedUtility > 0) log.info(`Skipped ${skippedUtility} utility/index pages`);
       } catch (err) {
-        console.log('[Strategy] Sitemap discovery failed:', err);
+        log.info('Sitemap discovery failed:', err);
       }
     }
     // Fallback: if sitemap found nothing, use Webflow API pages
     if (allPaths.size === 0 && wfMetaByPath.size > 0) {
-      console.log('[Strategy] Sitemap empty — falling back to Webflow API pages');
+      log.info('Sitemap empty — falling back to Webflow API pages');
       for (const path of wfMetaByPath.keys()) allPaths.add(path);
     }
     sendProgress('discovery', `Found ${allPaths.size} live pages`, 0.12);
-    console.log(`[Strategy] Total live pages: ${allPaths.size}`);
+    log.info(`Total live pages: ${allPaths.size}`);
 
     // --- Page cap: prevent OOM on large sites ---
     // maxPagesParam: 0 = no cap, otherwise cap at user-chosen limit (200/500/1000)
@@ -192,7 +195,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
       };
       pathArray.sort((a, b) => scorePath(a) - scorePath(b));
       pathArray = pathArray.slice(0, maxPagesParam);
-      console.log(`[Strategy] Capped from ${cappedFromTotal} → ${maxPagesParam} pages (prioritized by depth + metadata)`);
+      log.info(`Capped from ${cappedFromTotal} → ${maxPagesParam} pages (prioritized by depth + metadata)`);
       sendProgress('discovery', `Large site — prioritized top ${maxPagesParam} of ${cappedFromTotal} pages`, 0.13);
     }
 
@@ -275,19 +278,19 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
       pageInfo.push(...contents.filter((c): c is NonNullable<typeof c> => c !== null));
     }
     const skipped = pathArray.length - pageInfo.length;
-    if (skipped > 0) console.log(`[Strategy] Filtered out ${skipped} non-live pages (404/unreachable)`);
+    if (skipped > 0) log.info(`Filtered out ${skipped} non-live pages (404/unreachable)`);
 
     // Post-fetch: filter out pages with very thin content (utility/legal pages with < 50 chars)
     const beforeThinFilter = pageInfo.length;
     const thinPages = pageInfo.filter(p => p.contentSnippet.length < 50 && p.path !== '/');
     if (thinPages.length > 0) {
-      console.log(`[Strategy] Thin content pages (< 50 chars): ${thinPages.map(p => p.path).join(', ')}`);
+      log.info(`Thin content pages (< 50 chars): ${thinPages.map(p => p.path).join(', ')}`);
       // Remove thin pages from the array
       for (const thin of thinPages) {
         const idx = pageInfo.indexOf(thin);
         if (idx >= 0) pageInfo.splice(idx, 1);
       }
-      console.log(`[Strategy] Removed ${thinPages.length} thin content pages`);
+      log.info(`Removed ${thinPages.length} thin content pages`);
     }
 
     const capNote = cappedFromTotal > 0 ? ` of ${cappedFromTotal} total` : '';
@@ -315,7 +318,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         sendProgress('search_data', `Got ${gscData.length} query rows, ${devices.length} devices, ${countries.length} countries from GSC`, 0.50);
       } catch {
         sendProgress('search_data', 'GSC unavailable — continuing without it', 0.50);
-        console.log('Keyword strategy: GSC data unavailable, proceeding without it');
+        log.info('Keyword strategy: GSC data unavailable, proceeding without it');
       }
     } else {
       sendProgress('search_data', 'No GSC connected — skipping', 0.50);
@@ -359,9 +362,9 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
       if (siteDomain) {
         // Both quick and full: get domain organic keywords
         try {
-          console.log(`[SEMRush] Fetching domain organic keywords for ${siteDomain}...`);
+          log.info(`Fetching domain organic keywords for ${siteDomain}...`);
           semrushDomainData = await getDomainOrganicKeywords(siteDomain, ws.id, semrushMode === 'full' ? 200 : 100);
-          console.log(`[SEMRush] Got ${semrushDomainData.length} domain keywords`);
+          log.info(`Got ${semrushDomainData.length} domain keywords`);
 
           if (semrushDomainData.length > 0) {
             semrushContext += `\n\nSEMRush Domain Organic Keywords (real search volume + difficulty data):\n`;
@@ -370,16 +373,16 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
             ).join('\n');
           }
         } catch (err) {
-          console.error('[SEMRush] Domain organic error:', err);
+          log.error('Domain organic error:', err);
         }
 
         // Full mode: competitor gap analysis + related keywords
         if (semrushMode === 'full' && competitorDomains.length > 0) {
           try {
             sendProgress('semrush', `Running competitor gap analysis vs ${competitorDomains.length} competitors...`, 0.60);
-            console.log(`[SEMRush] Running keyword gap analysis vs ${competitorDomains.join(', ')}...`);
+            log.info(`Running keyword gap analysis vs ${competitorDomains.join(', ')}...`);
             keywordGaps = await getKeywordGap(siteDomain, competitorDomains, ws.id, 50);
-            console.log(`[SEMRush] Found ${keywordGaps.length} keyword gaps`);
+            log.info(`Found ${keywordGaps.length} keyword gaps`);
 
             if (keywordGaps.length > 0) {
               semrushContext += `\n\nCOMPETITOR KEYWORD GAPS (keywords competitors rank for but YOU don't — high-priority opportunities):\n`;
@@ -388,7 +391,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
               ).join('\n');
             }
           } catch (err) {
-            console.error('[SEMRush] Keyword gap error:', err);
+            log.error('Keyword gap error:', err);
           }
 
           // Get related keywords for top 5 seed terms
@@ -407,7 +410,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
               ).join('\n');
             }
           } catch (err) {
-            console.error('[SEMRush] Related keywords error:', err);
+            log.error('Related keywords error:', err);
           }
         }
       }
@@ -447,7 +450,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     for (let i = 0; i < pageInfo.length; i += BATCH_SIZE) {
       batches.push(pageInfo.slice(i, i + BATCH_SIZE));
     }
-    console.log(`[Strategy] Splitting ${pageInfo.length} pages into ${batches.length} batches of ~${BATCH_SIZE}`);
+    log.info(`Splitting ${pageInfo.length} pages into ${batches.length} batches of ~${BATCH_SIZE}`);
     sendProgress('ai', `Analyzing pages in ${batches.length} parallel batches...`, 0.55);
 
     let businessSection = '';
@@ -509,7 +512,7 @@ Rules:
 - Cover ALL ${batch.length} pages — do not skip any
 - Return ONLY valid JSON array, no markdown, no explanation`;
 
-      console.log(`[Strategy] Batch ${batchIdx + 1}/${batches.length}: ${batch.length} pages, ${batchPrompt.length} chars`);
+      log.info(`Batch ${batchIdx + 1}/${batches.length}: ${batch.length} pages, ${batchPrompt.length} chars`);
       const raw = await callStrategyAI([
         { role: 'system', content: 'You are an expert SEO strategist. Return valid JSON only.' },
         { role: 'user', content: batchPrompt },
@@ -517,11 +520,11 @@ Rules:
 
       try {
         const parsed = JSON.parse(raw);
-        console.log(`[Strategy] Batch ${batchIdx + 1} returned ${Array.isArray(parsed) ? parsed.length : 0} page mappings`);
+        log.info(`Batch ${batchIdx + 1} returned ${Array.isArray(parsed) ? parsed.length : 0} page mappings`);
         sendProgress('ai', `Batch ${batchIdx + 1}/${batches.length} complete (${Array.isArray(parsed) ? parsed.length : 0} pages)`, 0.55 + ((batchIdx + 1) / batches.length) * 0.20);
         return Array.isArray(parsed) ? parsed : [];
       } catch {
-        console.error(`[Strategy] Batch ${batchIdx + 1} returned invalid JSON:`, raw.slice(0, 200));
+        log.error(`Batch ${batchIdx + 1} returned invalid JSON:`, raw.slice(0, 200));
         return batch.map(p => ({
           pagePath: p.path,
           pageTitle: p.title,
@@ -540,7 +543,7 @@ Rules:
       const results = await Promise.all(chunk.map((batch, ci) => runBatch(batch, i + ci)));
       allPageMappings.push(...results.flat());
     }
-    console.log(`[Strategy] All batches complete: ${allPageMappings.length} total page mappings`);
+    log.info(`All batches complete: ${allPageMappings.length} total page mappings`);
 
     // --- STEP 2: Master synthesis — site-level strategy only ---
     // The batch results ARE the pageMap. Master only generates siteKeywords, contentGaps, quickWins, opportunities.
@@ -556,7 +559,7 @@ Rules:
     }
     const conflicts = [...kwCount.entries()].filter(([, pages]) => pages.length > 1);
     if (conflicts.length > 0) {
-      console.log(`[Strategy] Found ${conflicts.length} keyword conflicts to resolve`);
+      log.info(`Found ${conflicts.length} keyword conflicts to resolve`);
     }
 
     // Compact summary: just keywords per page (no secondary details — keep prompt small)
@@ -728,7 +731,7 @@ Rules:
 ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.' : ''}
 - Return ONLY valid JSON, no markdown`;
 
-    console.log(`[Strategy] Master prompt: ${masterPrompt.length} chars (~${Math.ceil(masterPrompt.length / 4)} tokens)`);
+    log.info(`Master prompt: ${masterPrompt.length} chars (~${Math.ceil(masterPrompt.length / 4)} tokens)`);
 
     const masterRaw = await callStrategyAI([
       { role: 'system', content: 'You are an expert SEO strategist. Return valid JSON only.' },
@@ -739,7 +742,7 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
     try {
       masterData = JSON.parse(masterRaw);
     } catch {
-      console.error('[Strategy] Master returned invalid JSON:', masterRaw.slice(0, 300));
+      log.error('Master returned invalid JSON:', masterRaw.slice(0, 300));
       const errMsg = 'AI returned invalid JSON in master synthesis';
       if (wantsStream) { try { res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`); res.end(); } catch { /* closed */ } return; }
       return res.status(500).json({ error: errMsg, raw: masterRaw.slice(0, 500) });
@@ -752,7 +755,7 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
         const fix = fixMap.get(pm.pagePath);
         if (fix) pm.primaryKeyword = fix as string;
       }
-      console.log(`[Strategy] Applied ${masterData.keywordFixes.length} keyword conflict fixes`);
+      log.info(`Applied ${masterData.keywordFixes.length} keyword conflict fixes`);
     }
 
     // Assemble final strategy: batch pageMap + master site-level data
@@ -763,7 +766,7 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
       contentGaps: masterData.contentGaps || [],
       quickWins: masterData.quickWins || [],
     };
-    console.log(`[Strategy] Final strategy: ${strategy.pageMap.length} pages, ${strategy.siteKeywords.length} site keywords, ${strategy.contentGaps.length} content gaps, ${strategy.quickWins.length} quick wins`);
+    log.info(`Final strategy: ${strategy.pageMap.length} pages, ${strategy.siteKeywords.length} site keywords, ${strategy.contentGaps.length} content gaps, ${strategy.quickWins.length} quick wins`);
 
     } finally {
       if (keepalive) clearInterval(keepalive);
@@ -846,7 +849,7 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
             }
           }
         } catch (err) {
-          console.error('[SEMRush] Keyword overview enrichment error:', err);
+          log.error('Keyword overview enrichment error:', err);
         }
       }
     }
@@ -905,7 +908,7 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error ? err.stack : '';
-    console.error('Keyword strategy error:', msg, stack);
+    log.error('Keyword strategy error:', msg, stack);
     if (wantsStream) {
       try { res.write(`data: ${JSON.stringify({ error: msg })}\n\n`); res.end(); } catch { /* already closed */ }
       return;

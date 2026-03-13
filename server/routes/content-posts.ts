@@ -19,6 +19,9 @@ import {
   exportPostHTML,
 } from '../content-posts.js';
 import { getWorkspace } from '../workspaces.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('content-posts');
 
 // --- Content Post Generator (#194) ---
 
@@ -80,7 +83,7 @@ router.post('/api/content-posts/:workspaceId/generate', async (req, res) => {
     generatePost(req.params.workspaceId, brief, postId).then(() => {
       addActivity(req.params.workspaceId, 'post_generated', `Content generated for "${brief.targetKeyword}"`, `Title: ${brief.suggestedTitle}`);
     }).catch(err => {
-      console.error(`[content-posts] Generation failed for ${req.params.workspaceId}:`, err);
+      log.error(`Generation failed for ${req.params.workspaceId}:`, err);
     });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to start generation' });

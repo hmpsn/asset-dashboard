@@ -29,13 +29,16 @@ import { runSalesAudit } from '../sales-audit.js';
 import { renderSalesReportHTML } from '../sales-report-html.js';
 import { runSeoAudit } from '../seo-audit.js';
 import { listWorkspaces, getTokenForSite } from '../workspaces.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('reports');
 
 // --- Sales Report (URL-based, no Webflow API needed) ---
 router.post('/api/sales-report', async (req, res) => {
   try {
     const { url, maxPages } = req.body;
     if (!url) return res.status(400).json({ error: 'URL is required' });
-    console.log(`[sales-report] Starting audit for ${url}`);
+    log.info(`Starting audit for ${url}`);
     const result = await runSalesAudit(url, maxPages || 25);
 
     // Save to disk
@@ -47,7 +50,7 @@ router.post('/api/sales-report', async (req, res) => {
     res.json(report);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('Sales report error:', msg);
+    log.error('Sales report error:', msg);
     res.status(500).json({ error: `Sales report failed: ${msg}` });
   }
 });
@@ -126,7 +129,7 @@ router.post('/api/reports/:siteId/save', async (req, res) => {
     }
     res.json({ id: snapshot.id, createdAt: snapshot.createdAt, siteScore: audit.siteScore, previousScore: snapshot.previousScore });
   } catch (err) {
-    console.error('Report save error:', err);
+    log.error('Report save error:', err);
     res.status(500).json({ error: 'Failed to save report' });
   }
 });
@@ -140,7 +143,7 @@ router.post('/api/reports/:siteId/snapshot', (req, res) => {
     const snapshot = saveSnapshot(siteId, siteName || siteId, audit);
     res.json({ id: snapshot.id, createdAt: snapshot.createdAt, siteScore: audit.siteScore });
   } catch (err) {
-    console.error('Snapshot save error:', err);
+    log.error('Snapshot save error:', err);
     res.status(500).json({ error: 'Failed to save snapshot' });
   }
 });

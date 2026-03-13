@@ -4,6 +4,9 @@
  */
 import type { RedirectScanResult } from './redirect-scanner.js';
 import db from './db/index.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('redirect-store');
 
 export interface RedirectSnapshot {
   id: string;
@@ -63,7 +66,7 @@ export function saveRedirectSnapshot(siteId: string, result: RedirectScanResult)
     created_at: snapshot.createdAt,
     result: JSON.stringify(result),
   });
-  console.log(`[redirect-store] Saved redirect scan for site ${siteId} (${result.summary.totalPages} pages)`);
+  log.info(`Saved redirect scan for site ${siteId} (${result.summary.totalPages} pages)`);
   return snapshot;
 }
 

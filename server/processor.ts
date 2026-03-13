@@ -7,6 +7,9 @@ import { generateAltText } from './alttext.js';
 import { uploadAsset } from './webflow.js';
 
 import { getDataDir } from './data-dir.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('processor');
 
 // --- Persistent metadata ---
 const METADATA_DIR = getDataDir('metadata');
@@ -132,7 +135,7 @@ async function handleOriginalFile(
     if (altText) {
       altTextCache.set(key, altText);
       updateQueueItem(id, { altText, status: 'optimizing' }, broadcast);
-      console.log(`Alt text for ${fileName}: "${altText}"`);
+      log.info(`Alt text for ${fileName}: "${altText}"`);
       saveMetadataEntry(key, { fileName, workspace: workspaceFolder, type, altText, originalPath: filePath });
     } else {
       updateQueueItem(id, { status: 'optimizing' }, broadcast);
@@ -140,7 +143,7 @@ async function handleOriginalFile(
     }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`Alt text failed for ${fileName}:`, msg);
+    log.error(`Alt text failed for ${fileName}:`, msg);
     updateQueueItem(id, { status: 'optimizing' }, broadcast);
   }
 }
@@ -194,7 +197,7 @@ async function handleOptimizedFile(
   if (altText) {
     altTextCache.delete(key);
   } else if (queueIdCache.has(key)) {
-    console.log(`[optimized] Waiting for alt text for ${fileName}...`);
+    log.info(`Waiting for alt text for ${fileName}...`);
     altText = (await waitForAltText(key)) ?? undefined;
   }
   if (altText) {
@@ -223,12 +226,12 @@ async function handleOptimizedFile(
         });
       } else {
         updateQueueItem(id, { status: 'error', error: result.error }, broadcast);
-        console.error(`Webflow upload failed for ${fileName}:`, result.error);
+        log.error(`Webflow upload failed for ${fileName}:`, result.error);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       updateQueueItem(id, { status: 'error', error: msg }, broadcast);
-      console.error(`Webflow upload error for ${fileName}:`, msg);
+      log.error(`Webflow upload error for ${fileName}:`, msg);
     }
   } else {
     updateQueueItem(id, { status: 'done' }, broadcast);
@@ -261,7 +264,7 @@ export function startWatcher(broadcast: BroadcastFn) {
     const isMeta = parts.length >= 3 && parts[1] === 'meta';
     const type = isMeta ? 'meta' : 'asset';
     const key = cacheKey(workspaceFolder, path.basename(filePath));
-    console.log(`[upload] Detected original: ${rel} (key: ${key})`);
+    log.info(`Detected original: ${rel} (key: ${key})`);
 
     handleOriginalFile(filePath, workspaceFolder, type, broadcast);
   });
@@ -284,15 +287,15 @@ export function startWatcher(broadcast: BroadcastFn) {
     const isMeta = parts.length >= 3 && parts[1] === 'meta';
     const type = isMeta ? 'meta' : 'asset';
     const key = cacheKey(workspaceFolder, path.basename(filePath));
-    console.log(`[optimized] Detected: ${rel} (key: ${key}, cached alt: ${altTextCache.has(key)})`);
+    log.info(`Detected: ${rel} (key: ${key}, cached alt: ${altTextCache.has(key)})`);
 
     handleOptimizedFile(filePath, workspaceFolder, type, broadcast);
   });
 
   _broadcast = broadcast;
 
-  console.log(`Watching ${uploadRoot} for originals (alt text)...`);
-  console.log(`Watching ${optRoot} for optimized files (upload)...`);
+  log.info(`Watching ${uploadRoot} for originals (alt text)...`);
+  log.info(`Watching ${optRoot} for optimized files (upload)...`);
   return { uploadWatcher, optWatcher };
 }
 
@@ -300,8 +303,8 @@ export function triggerOptimize(filePath: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = execFile(PROCESSOR, [filePath], { timeout: 120000 }, (err, _stdout, stderr) => {
       if (err) {
-        console.error(`[optimize] Script failed for ${path.basename(filePath)}:`, err.message);
-        if (stderr) console.error(`[optimize] stderr:`, stderr);
+        log.error(`Script failed for ${path.basename(filePath)}:`, err.message);
+        if (stderr) log.error(`stderr:`, stderr);
         // Update queue item status to 'error' so it doesn't stay stuck
         const workspaceFolder = path.relative(getUploadRoot(), path.dirname(filePath)).split(path.sep)[0];
         const key = cacheKey(workspaceFolder, path.basename(filePath));
@@ -316,7 +319,7 @@ export function triggerOptimize(filePath: string): Promise<void> {
       }
     });
     child.on('error', (err) => {
-      console.error(`[optimize] Failed to start script:`, err.message);
+      log.error(`Failed to start script:`, err.message);
       reject(err);
     });
   });

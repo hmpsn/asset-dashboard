@@ -1,5 +1,8 @@
 import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet, getCollectionSchema, listCollections } from './webflow.js';
 import { callOpenAI } from './openai-helpers.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('schema');
 
 const WEBFLOW_API = 'https://api.webflow.com/v2';
 
@@ -346,7 +349,7 @@ Return ONLY the JSON-LD object. No markdown, no explanation, no wrapping.`;
     const types = graph?.map(n => n['@type']).filter(Boolean) || [];
     return { schema, reason: `Unified @graph schema with ${types.join(', ')}`, errors };
   } catch (err: unknown) {
-    console.error('[schema] AI unified generation error:', err);
+    log.error('AI unified generation error:', err);
     return null;
   }
 }
@@ -496,9 +499,9 @@ export async function generateSchemaSuggestions(
   const baseUrl = liveDomain
     ? (liveDomain.startsWith('http') ? liveDomain : `https://${liveDomain}`)
     : subdomain ? `https://${subdomain}.webflow.io` : '';
-  console.log(`[schema] baseUrl=${baseUrl}, liveDomain=${liveDomain || '(none)'}`);
+  log.info(`baseUrl=${baseUrl}, liveDomain=${liveDomain || '(none)'}`);
   if (!baseUrl) {
-    console.error('[schema] No subdomain or liveDomain found for site', siteId);
+    log.error('No subdomain or liveDomain found for site', siteId);
     return [];
   }
 
@@ -506,7 +509,7 @@ export async function generateSchemaSuggestions(
   const pages = filterPublishedPages(allPages).filter(
     (p: { title: string; slug: string }) => !(p.title || '').toLowerCase().includes('password') && !(p.slug || '').toLowerCase().includes('password')
   );
-  console.log(`[schema] ${pages.length} published pages to analyze`);
+  log.info(`${pages.length} published pages to analyze`);
 
   const results: SchemaPageSuggestion[] = [];
   const hasAI = !!process.env.OPENAI_API_KEY;
@@ -530,10 +533,10 @@ export async function generateSchemaSuggestions(
   };
 
   for (let i = 0; i < pages.length; i += batch) {
-    if (isCancelled?.()) { console.log('[schema] Cancelled by user'); return results; }
+    if (isCancelled?.()) { log.info('Cancelled by user'); return results; }
     if (i > 0 && hasAI) await new Promise(r => setTimeout(r, 1500));
     const chunk = pages.slice(i, i + batch);
-    console.log(`[schema] Processing static pages ${i + 1}-${Math.min(i + batch, pages.length)} of ${pages.length}`);
+    log.info(`Processing static pages ${i + 1}-${Math.min(i + batch, pages.length)} of ${pages.length}`);
     const chunkResults = await Promise.all(
       chunk.map(async (page) => {
         // Use publishedPath for full URL (handles nested pages like /about/team)
@@ -617,12 +620,12 @@ export async function generateSchemaSuggestions(
   const staticPaths = buildStaticPathSet(pages);
   const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, 1000);
   if (cmsUrls.length > 0) {
-    console.log(`[schema] Also analyzing ${cmsUrls.length} CMS pages`);
+    log.info(`Also analyzing ${cmsUrls.length} CMS pages`);
     for (let i = 0; i < cmsUrls.length; i += batch) {
-      if (isCancelled?.()) { console.log('[schema] Cancelled by user'); return results; }
+      if (isCancelled?.()) { log.info('Cancelled by user'); return results; }
       if (i > 0 && hasAI) await new Promise(r => setTimeout(r, 1500));
       const chunk = cmsUrls.slice(i, i + batch);
-      console.log(`[schema] Processing CMS pages ${i + 1}-${Math.min(i + batch, cmsUrls.length)} of ${cmsUrls.length}`);
+      log.info(`Processing CMS pages ${i + 1}-${Math.min(i + batch, cmsUrls.length)} of ${cmsUrls.length}`);
       const chunkResults = await Promise.all(
         chunk.map(async (item) => {
           const slug = item.path.replace(/^\//, '');
@@ -818,7 +821,7 @@ Return ONLY the raw JSON-LD. No markdown, no explanation.`;
 
     // Validate it's parseable JSON (with placeholders as strings)
     try { JSON.parse(jsonStr); } catch {
-      console.error('[cms-template] AI returned invalid JSON');
+      log.error('AI returned invalid JSON');
       return null;
     }
 
@@ -842,7 +845,7 @@ Return ONLY the raw JSON-LD. No markdown, no explanation.`;
       collectionSlug: collection.slug,
     };
   } catch (err) {
-    console.error('[cms-template] AI generation failed:', err);
+    log.error('AI generation failed:', err);
     return null;
   }
 }

@@ -2,6 +2,9 @@ import fs from 'fs';
 import path from 'path';
 
 import { getUploadRoot, getDataDir } from './data-dir.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('semrush');
 
 const SEMRUSH_API_BASE = 'https://api.semrush.com/';
 const UPLOAD_ROOT = getUploadRoot();
@@ -205,13 +208,13 @@ export async function getKeywordOverview(
       const res = await fetch(`${SEMRUSH_API_BASE}?${params}`);
       if (!res.ok) {
         const errText = await res.text();
-        console.error(`SEMRush keyword overview error for "${kw}":`, errText);
+        log.error(`SEMRush keyword overview error for "${kw}":`, errText);
         continue;
       }
 
       const csv = await res.text();
       if (csv.startsWith('ERROR')) {
-        console.error(`SEMRush error for "${kw}":`, csv);
+        log.error(`SEMRush error for "${kw}":`, csv);
         continue;
       }
 
@@ -237,7 +240,7 @@ export async function getKeywordOverview(
         logCreditUsage({ credits: 10, endpoint: 'keyword_overview', query: kw, rowsReturned: rows.length, workspaceId, cached: false });
       }
     } catch (err) {
-      console.error(`SEMRush fetch error for "${kw}":`, err);
+      log.error(`SEMRush fetch error for "${kw}":`, err);
     }
   }
 
@@ -285,16 +288,16 @@ export async function getDomainOrganicKeywords(
   const res = await fetch(`${SEMRUSH_API_BASE}?${params}`);
   if (!res.ok) {
     const errText = await res.text();
-    console.warn(`[SEMRush] Domain organic error for "${cleanDomain}": ${errText.slice(0, 200)}`);
+    log.warn(`Domain organic error for "${cleanDomain}": ${errText.slice(0, 200)}`);
     return [];
   }
 
   const csv = await res.text();
   if (csv.startsWith('ERROR')) {
     if (csv.includes('NOTHING FOUND')) {
-      console.log(`[SEMRush] No organic data found for "${cleanDomain}"`);
+      log.info(`No organic data found for "${cleanDomain}"`);
     } else {
-      console.warn(`[SEMRush] Domain organic error for "${cleanDomain}": ${csv}`);
+      log.warn(`Domain organic error for "${cleanDomain}": ${csv}`);
     }
     return [];
   }
@@ -374,7 +377,7 @@ export async function getKeywordGap(
       writeCache(workspaceId, cacheKey, gaps);
       allGaps.push(...gaps);
     } catch (err) {
-      console.error(`SEMRush gap analysis error for ${cleanComp}:`, err);
+      log.error(`SEMRush gap analysis error for ${cleanComp}:`, err);
     }
   }
 
@@ -421,7 +424,7 @@ export async function getRelatedKeywords(
   const res = await fetch(`${SEMRUSH_API_BASE}?${params}`);
   if (!res.ok) {
     const errText = await res.text();
-    console.warn(`[SEMRush] Related keywords error for "${keyword}": ${errText.slice(0, 200)}`);
+    log.warn(`Related keywords error for "${keyword}": ${errText.slice(0, 200)}`);
     return [];
   }
 
@@ -429,9 +432,9 @@ export async function getRelatedKeywords(
   if (csv.startsWith('ERROR')) {
     // NOTHING FOUND is normal for obscure/made-up keywords — not a real error
     if (csv.includes('NOTHING FOUND')) {
-      console.log(`[SEMRush] No related keywords found for "${keyword}"`);
+      log.info(`No related keywords found for "${keyword}"`);
     } else {
-      console.warn(`[SEMRush] Related keywords error for "${keyword}": ${csv}`);
+      log.warn(`Related keywords error for "${keyword}": ${csv}`);
     }
     return [];
   }

@@ -1,5 +1,8 @@
 import fs from 'fs';
 import path from 'path';
+import { createLogger } from './logger.js';
+
+const log = createLogger('webflow');
 
 const WEBFLOW_API = 'https://api.webflow.com/v2';
 
@@ -92,22 +95,22 @@ export async function updateAsset(
       body.altText = current.altText;
     }
 
-    console.log(`PATCH /assets/${assetId}:`, JSON.stringify(body));
+    log.info(`PATCH /assets/${assetId}:`, JSON.stringify(body));
     const res = await webflowFetch(`/assets/${assetId}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
     }, tokenOverride);
     if (!res.ok) {
       const err = await res.text();
-      console.error(`Asset PATCH failed (${res.status}):`, err);
+      log.error(`Asset PATCH failed (${res.status}):`, err);
       return { success: false, error: `${res.status}: ${err}` };
     }
     const result = await res.json();
-    console.log(`Asset PATCH success:`, JSON.stringify(result));
+    log.info(`Asset PATCH success:`, JSON.stringify(result));
     return { success: true };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('Asset update error:', msg);
+    log.error('Asset update error:', msg);
     return { success: false, error: msg };
   }
 }
@@ -395,7 +398,7 @@ export async function scanAssetUsage(siteId: string, tokenOverride?: string): Pr
       } catch { /* skip */ }
     }
 
-    console.log(`[asset-usage] Scanning ${pageUrls.length} page URLs for asset references (${assetIds.size} assets)`);
+    log.info(`Scanning ${pageUrls.length} page URLs for asset references (${assetIds.size} assets)`);
 
     // Also scan the site's CSS files for background-image asset references
     try {
@@ -597,7 +600,7 @@ async function registerInlineScript(
   }, tokenOverride);
   if (!res.ok) {
     const text = await res.text();
-    console.error(`[schema-publish] Failed to register inline script: ${res.status} ${text}`);
+    log.error(`Failed to register inline script: ${res.status} ${text}`);
     return null;
   }
   return await res.json() as RegisteredScript;
@@ -631,7 +634,7 @@ async function upsertPageCustomCode(
   }, tokenOverride);
   if (!res.ok) {
     const text = await res.text();
-    console.error(`[schema-publish] Failed to upsert page custom code: ${res.status} ${text}`);
+    log.error(`Failed to upsert page custom code: ${res.status} ${text}`);
     return false;
   }
   return true;
@@ -692,7 +695,7 @@ export async function publishSchemaToPage(
     return { success: false, error: 'Failed to apply schema to page custom code' };
   }
 
-  console.log(`[schema-publish] Published schema to page ${pageId}: ${preserved.length} existing scripts preserved, 1 schema added`);
+  log.info(`Published schema to page ${pageId}: ${preserved.length} existing scripts preserved, 1 schema added`);
   return { success: true };
 }
 
@@ -734,7 +737,7 @@ export async function publishRawSchemaToPage(
     return { success: false, error: 'Failed to apply CMS template schema to page custom code' };
   }
 
-  console.log(`[schema-publish] Published CMS template schema to page ${pageId}`);
+  log.info(`Published CMS template schema to page ${pageId}`);
   return { success: true };
 }
 
@@ -806,7 +809,7 @@ export async function uploadAsset(
     const assetId = createData.asset?.id || createData.id;
 
     if (!uploadUrl || !uploadDetails) {
-      console.error('Webflow create response:', JSON.stringify(createData, null, 2));
+      log.error('Webflow create response:', JSON.stringify(createData, null, 2));
       return { success: false, error: 'No uploadUrl or uploadDetails in response' };
     }
 
@@ -837,18 +840,18 @@ export async function uploadAsset(
           body: JSON.stringify(patchBody),
         }, token);
         if (patchRes.ok) {
-          console.log(`Set alt text for ${fileName}: "${altText}"`);
+          log.info(`Set alt text for ${fileName}: "${altText}"`);
         } else {
           const errText = await patchRes.text();
-          console.error(`Failed to set alt text for ${fileName} (${patchRes.status}):`, errText);
+          log.error(`Failed to set alt text for ${fileName} (${patchRes.status}):`, errText);
         }
       } catch (e) {
-        console.error(`Alt text PATCH error for ${fileName}:`, e);
+        log.error(`Alt text PATCH error for ${fileName}:`, e);
       }
     }
 
     const hostedUrl = (createData as Record<string, unknown>).hostedUrl as string | undefined;
-    console.log(`Uploaded ${fileName} to Webflow (asset: ${assetId})`);
+    log.info(`Uploaded ${fileName} to Webflow (asset: ${assetId})`);
     return { success: true, assetId, hostedUrl };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -906,10 +909,10 @@ export async function discoverCmsUrls(
       } catch { /* skip malformed URLs */ }
     }
 
-    console.log(`[cms-discovery] sitemap: ${allUrls.length} URLs total, ${cmsAll.length} are CMS pages`);
+    log.info(`sitemap: ${allUrls.length} URLs total, ${cmsAll.length} are CMS pages`);
     return { cmsUrls: cmsAll.slice(0, limit), totalFound: cmsAll.length };
   } catch (err) {
-    console.error('[cms-discovery] sitemap fetch failed:', err);
+    log.error('sitemap fetch failed:', err);
     return { cmsUrls: [], totalFound: 0 };
   }
 }

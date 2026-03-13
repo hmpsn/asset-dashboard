@@ -6,6 +6,9 @@
 
 import db from './db/index.js';
 import { getValidToken } from './google-auth.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('seo-change-tracker');
 
 // ── Data Model ──
 
@@ -281,7 +284,7 @@ export async function getSeoChangeImpact(
         tooRecent: false,
       });
     } catch (err) {
-      console.error(`[SEO Change Tracker] GSC fetch error for ${change.pageSlug}:`, err);
+      log.error(`GSC fetch error for ${change.pageSlug}:`, err);
       results.push({ change, before: null, after: null, daysSinceChange, tooRecent: false });
     }
   }

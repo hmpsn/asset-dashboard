@@ -9,6 +9,9 @@
 import { listWorkspaces, getClientPortalUrl } from './workspaces.js';
 import { isEmailConfigured, sendEmail } from './email.js';
 import { renderDigest, type EmailEvent } from './email-templates.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('trial-reminder');
 
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // every 6 hours
 const REMINDER_DAYS = [4, 1]; // days before expiry to send reminders
@@ -55,9 +58,9 @@ async function checkTrialExpiry() {
       try {
         await sendEmail(ws.clientEmail, subject, html);
         sentReminders.add(key);
-        console.log(`[Trial Reminder] Sent ${daysRemaining}-day warning to ${ws.clientEmail} for "${ws.name}"`);
+        log.info(`Sent ${daysRemaining}-day warning to ${ws.clientEmail} for "${ws.name}"`);
       } catch (err) {
-        console.error(`[Trial Reminder] Failed to send:`, err);
+        log.error(`Failed to send:`, err);
       }
 
       break; // only send the most urgent reminder per workspace per check
@@ -70,14 +73,14 @@ export function startTrialReminders() {
 
   // Check 90s after startup, then every 6 hours
   setTimeout(() => {
-    checkTrialExpiry().catch(err => console.error('[Trial Reminder] Error:', err));
+    checkTrialExpiry().catch(err => log.error('Error:', err));
   }, 90_000);
 
   interval = setInterval(() => {
-    checkTrialExpiry().catch(err => console.error('[Trial Reminder] Error:', err));
+    checkTrialExpiry().catch(err => log.error('Error:', err));
   }, CHECK_INTERVAL_MS);
 
-  console.log('[Trial Reminder] Trial expiry checker started (checks every 6 hours)');
+  log.info('Trial expiry checker started (checks every 6 hours)');
 }
 
 export function stopTrialReminders() {

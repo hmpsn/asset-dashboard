@@ -5,6 +5,9 @@
  */
 
 import { logTokenUsage } from './openai-helpers.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('anthropic');
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -85,7 +88,7 @@ export async function callAnthropic(opts: AnthropicChatOptions): Promise<Anthrop
           const retryAfter = res.headers.get('retry-after');
           let waitMs = Math.min(2000 * Math.pow(2, attempt), 30_000);
           if (retryAfter) waitMs = Math.max(parseInt(retryAfter, 10) * 1000 + 500, waitMs);
-          console.log(`[${feature}] Anthropic ${res.status}, retrying in ${(waitMs / 1000).toFixed(1)}s (attempt ${attempt + 1}/${maxRetries})`);
+          log.info(`[${feature}] Anthropic ${res.status}, retrying in ${(waitMs / 1000).toFixed(1)}s (attempt ${attempt + 1}/${maxRetries})`);
           await new Promise(r => setTimeout(r, waitMs));
           continue;
         }
@@ -108,12 +111,12 @@ export async function callAnthropic(opts: AnthropicChatOptions): Promise<Anthrop
       return { text, promptTokens, completionTokens, totalTokens };
     } catch (err) {
       if (err instanceof Error && err.name === 'TimeoutError' && attempt < maxRetries) {
-        console.log(`[${feature}] Anthropic timeout, retrying (attempt ${attempt + 1}/${maxRetries})`);
+        log.info(`[${feature}] Anthropic timeout, retrying (attempt ${attempt + 1}/${maxRetries})`);
         await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
         continue;
       }
       if (attempt === maxRetries) throw err;
-      console.log(`[${feature}] Anthropic error: ${err instanceof Error ? err.message : err}, retrying (attempt ${attempt + 1}/${maxRetries})`);
+      log.info(`[${feature}] Anthropic error: ${err instanceof Error ? err.message : err}, retrying (attempt ${attempt + 1}/${maxRetries})`);
       await new Promise(r => setTimeout(r, 2000 * Math.pow(2, attempt)));
     }
   }

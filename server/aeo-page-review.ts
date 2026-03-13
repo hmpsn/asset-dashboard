@@ -12,6 +12,9 @@
 import { callOpenAI } from './openai-helpers.js';
 import { buildSeoContext, buildKnowledgeBase, buildPersonasContext } from './seo-context.js';
 import type { SeoIssue } from './seo-audit.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('aeo-review');
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -221,7 +224,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '');
     parsed = JSON.parse(cleaned);
   } catch {
-    console.error('[aeo-review] Failed to parse AI response:', raw.slice(0, 200));
+    log.error('Failed to parse AI response:', raw.slice(0, 200));
     throw new Error('Failed to parse AEO review response');
   }
 
@@ -259,7 +262,7 @@ export async function reviewSitePages(
       results.push(review);
       onProgress?.(i + 1, pages.length, review);
     } catch (err) {
-      console.error(`[aeo-review] Failed to review ${page.url}:`, err);
+      log.error(`Failed to review ${page.url}:`, err);
       // Push a minimal error result so we don't lose progress
       results.push({
         pageUrl: page.url,

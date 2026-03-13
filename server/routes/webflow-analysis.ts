@@ -22,6 +22,9 @@ import { saveRedirectSnapshot, getRedirectSnapshot } from '../redirect-store.js'
 import { runSalesAudit } from '../sales-audit.js';
 import { getAllGscPages } from '../search-console.js';
 import { listWorkspaces, getTokenForSite } from '../workspaces.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('webflow-analysis');
 
 // --- Competitor SEO Comparison ---
 router.post('/api/competitor-compare', async (req, res) => {
@@ -29,7 +32,7 @@ router.post('/api/competitor-compare', async (req, res) => {
   if (!myUrl || !competitorUrl) return res.status(400).json({ error: 'myUrl and competitorUrl required' });
   const limit = Math.min(maxPages || 20, 30);
   try {
-    console.log(`[competitor] Comparing ${myUrl} vs ${competitorUrl} (max ${limit} pages each)`);
+    log.info(`Comparing ${myUrl} vs ${competitorUrl} (max ${limit} pages each)`);
     const [myAudit, theirAudit] = await Promise.all([
       runSalesAudit(myUrl, limit),
       runSalesAudit(competitorUrl, limit),
@@ -126,7 +129,7 @@ router.post('/api/competitor-compare', async (req, res) => {
     saveCompetitorCompare(myUrl, competitorUrl, compareResult);
     res.json(compareResult);
   } catch (err) {
-    console.error('Competitor compare error:', err);
+    log.error('Competitor compare error:', err);
     res.status(500).json({ error: 'Comparison failed' });
   }
 });
@@ -158,7 +161,7 @@ router.get('/api/webflow/link-check-domains/:siteId', async (req, res) => {
     if (!domains) return res.json({ staging: '', customDomains: [], defaultDomain: '' });
     res.json(domains);
   } catch (err) {
-    console.error('Domain fetch error:', err);
+    log.error('Domain fetch error:', err);
     res.json({ staging: '', customDomains: [], defaultDomain: '' });
   }
 });
@@ -171,7 +174,7 @@ router.get('/api/webflow/link-check/:siteId', async (req, res) => {
     saveLinkCheck(req.params.siteId, result);
     res.json(result);
   } catch (err) {
-    console.error('Link check error:', err);
+    log.error('Link check error:', err);
     res.status(500).json({ error: 'Link check failed' });
   }
 });
@@ -202,10 +205,10 @@ router.get('/api/webflow/redirect-scan/:siteId', async (req, res) => {
               return { url: p.page, path: parsed.pathname, clicks: p.clicks, impressions: p.impressions };
             } catch { return null; }
           }).filter(Boolean) as typeof gscGhostUrls;
-          console.log(`[redirect-scan] Found ${gscPages.length} GSC pages to cross-check`);
+          log.info(`Found ${gscPages.length} GSC pages to cross-check`);
         }
       } catch (err) {
-        console.log('[redirect-scan] GSC ghost URL fetch skipped:', err instanceof Error ? err.message : String(err));
+        log.info('GSC ghost URL fetch skipped:', err instanceof Error ? err.message : String(err));
       }
     }
 
@@ -220,7 +223,7 @@ router.get('/api/webflow/redirect-scan/:siteId', async (req, res) => {
 
     res.json(result);
   } catch (err) {
-    console.error('Redirect scan error:', err);
+    log.error('Redirect scan error:', err);
     res.status(500).json({ error: 'Redirect scan failed' });
   }
 });
@@ -241,7 +244,7 @@ router.get('/api/webflow/internal-links/:siteId', async (req, res) => {
     saveInternalLinks(req.params.siteId, result);
     res.json(result);
   } catch (err) {
-    console.error('Internal links error:', err);
+    log.error('Internal links error:', err);
     res.status(500).json({ error: 'Internal link analysis failed' });
   }
 });

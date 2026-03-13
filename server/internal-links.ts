@@ -10,6 +10,9 @@ import {
 import { getWorkspace } from './workspaces.js';
 import { callOpenAI } from './openai-helpers.js';
 import { buildSeoContext, buildKnowledgeBase } from './seo-context.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('internal-links');
 
 export interface PageContent {
   path: string;
@@ -120,7 +123,7 @@ export async function analyzeInternalLinks(
     }
   } catch { /* skip */ }
 
-  console.log(`Internal links: fetching content for ${pageUrls.length} pages`);
+  log.info(`Internal links: fetching content for ${pageUrls.length} pages`);
 
   // Fetch content for all pages
   const pages: PageContent[] = [];
@@ -142,7 +145,7 @@ export async function analyzeInternalLinks(
   }
 
   const existingLinkCount = pages.reduce((sum, p) => sum + p.existingInternalLinks.length, 0);
-  console.log(`Internal links: ${pages.length} pages loaded, ${existingLinkCount} existing internal links`);
+  log.info(`Internal links: ${pages.length} pages loaded, ${existingLinkCount} existing internal links`);
 
   if (!openaiKey || pages.length < 2) {
     return { suggestions: [], pageCount: pages.length, existingLinkCount, analyzedAt: new Date().toISOString() };
@@ -232,7 +235,7 @@ Return ONLY valid JSON array, no markdown fences, no explanation.`;
     try {
       suggestions = JSON.parse(raw);
     } catch {
-      console.error('Internal links: AI returned invalid JSON');
+      log.error('Internal links: AI returned invalid JSON');
       suggestions = [];
     }
 
@@ -247,7 +250,7 @@ Return ONLY valid JSON array, no markdown fences, no explanation.`;
     const priorityOrder = { high: 0, medium: 1, low: 2 };
     suggestions.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
 
-    console.log(`Internal links: generated ${suggestions.length} suggestions`);
+    log.info(`Internal links: generated ${suggestions.length} suggestions`);
 
     return {
       suggestions,
@@ -256,7 +259,7 @@ Return ONLY valid JSON array, no markdown fences, no explanation.`;
       analyzedAt: new Date().toISOString(),
     };
   } catch (err) {
-    console.error('Internal links analysis error:', err);
+    log.error('Internal links analysis error:', err);
     return { suggestions: [], pageCount: pages.length, existingLinkCount, analyzedAt: new Date().toISOString() };
   }
 }

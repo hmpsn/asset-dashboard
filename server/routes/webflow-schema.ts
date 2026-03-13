@@ -18,6 +18,9 @@ import {
 } from '../webflow.js';
 import { listWorkspaces, getTokenForSite, updatePageState } from '../workspaces.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('webflow-schema');
 
 router.get('/api/webflow/schema-suggestions/:siteId', async (req, res) => {
   try {
@@ -27,7 +30,7 @@ router.get('/api/webflow/schema-suggestions/:siteId', async (req, res) => {
     res.json(result);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('Schema suggester error:', msg, err);
+    log.error('Schema suggester error:', msg, err);
     res.status(500).json({ error: `Schema suggestion failed: ${msg}` });
   }
 });
@@ -50,7 +53,7 @@ router.post('/api/webflow/schema-suggestions/:siteId/page', async (req, res) => 
     res.json(result);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('Single-page schema error:', msg, err);
+    log.error('Single-page schema error:', msg, err);
     res.status(500).json({ error: `Schema generation failed: ${msg}` });
   }
 });
@@ -70,7 +73,7 @@ router.post('/api/webflow/schema-publish/:siteId', async (req, res) => {
       const pubResult = await publishSite(req.params.siteId, token);
       published = pubResult.success;
       if (!pubResult.success) {
-        console.error('[schema-publish] Site publish failed:', pubResult.error);
+        log.error('Site publish failed:', pubResult.error);
       }
     }
 
@@ -85,7 +88,7 @@ router.post('/api/webflow/schema-publish/:siteId', async (req, res) => {
     res.json({ success: true, published });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('Schema publish error:', msg, err);
+    log.error('Schema publish error:', msg, err);
     res.status(500).json({ error: `Schema publish failed: ${msg}` });
   }
 });
@@ -102,7 +105,7 @@ router.post('/api/webflow/schema-cms-template/:siteId', async (req, res) => {
     res.json(result);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('CMS template schema error:', msg, err);
+    log.error('CMS template schema error:', msg, err);
     res.status(500).json({ error: `CMS template schema failed: ${msg}` });
   }
 });
@@ -131,7 +134,7 @@ router.post('/api/webflow/schema-cms-template/:siteId/publish', async (req, res)
     res.json({ success: true, published });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('CMS template publish error:', msg, err);
+    log.error('CMS template publish error:', msg, err);
     res.status(500).json({ error: `CMS template publish failed: ${msg}` });
   }
 });
@@ -157,7 +160,7 @@ router.get('/api/webflow/cms-template-pages/:siteId', async (req, res) => {
 
     res.json(templatePages);
   } catch (err) {
-    console.error('CMS template pages error:', err);
+    log.error('CMS template pages error:', err);
     res.json([]);
   }
 });

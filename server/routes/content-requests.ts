@@ -25,6 +25,9 @@ import {
   discoverSitemapUrls,
 } from '../webflow.js';
 import { getWorkspace, getTokenForSite, updatePageState } from '../workspaces.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('content-requests');
 
 // --- Internal Content Request Management ---
 router.get('/api/content-requests/:workspaceId', (req, res) => {
@@ -170,7 +173,7 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', async (req,
         ]);
         if (metrics.length > 0) semrushMetrics = metrics[0];
         if (related.length > 0) semrushRelated = related;
-      } catch (e) { console.error('SEMRush brief enrichment error:', e); }
+      } catch (e) { log.error('SEMRush brief enrichment error:', e); }
     }
 
     // Gather GA4 landing page performance if connected

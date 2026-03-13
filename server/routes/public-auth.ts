@@ -20,6 +20,9 @@ import { sendEmail } from '../email.js';
 import { sanitizeString } from '../helpers.js';
 import { signClientSession, clientLoginLimiter, IS_PROD } from '../middleware.js';
 import { updateWorkspace, getWorkspace } from '../workspaces.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('public-auth');
 
 router.post('/api/public/auth/:id', clientLoginLimiter, async (req, res) => {
   const ws = getWorkspace(req.params.id);
@@ -129,7 +132,7 @@ router.post('/api/public/forgot-password/:id', clientLoginLimiter, async (req, r
       createdAt: new Date().toISOString(),
     };
     const { subject, html } = renderDigest('password_reset', [event]);
-    sendEmail(email, subject, html).catch(err => console.error('[password-reset] Email failed:', err));
+    sendEmail(email, subject, html).catch(err => log.error('Email failed:', err));
   }
 
   res.json({ ok: true, message: 'If an account with that email exists, a reset link has been sent.' });

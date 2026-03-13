@@ -6,6 +6,9 @@
 import { Router } from 'express';
 import { getWorkspace } from '../workspaces.js';
 import { getSeoChanges, getSeoChangeImpact } from '../seo-change-tracker.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('seo-change-tracker');
 
 const router = Router();
 
@@ -35,7 +38,7 @@ router.get('/api/seo-change-impact/:workspaceId', async (req, res) => {
     );
     res.json({ impact });
   } catch (err) {
-    console.error('[SEO Change Impact] Error:', err);
+    log.error('Error:', err);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to fetch impact data' });
   }
 });

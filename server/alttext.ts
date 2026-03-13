@@ -1,6 +1,9 @@
 import OpenAI from 'openai';
 import fs from 'fs';
 import path from 'path';
+import { createLogger } from './logger.js';
+
+const log = createLogger('alt-text');
 
 let client: OpenAI | null = null;
 
@@ -37,14 +40,14 @@ async function callWithRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T
 
       // Quota exceeded — never retryable
       if (status === 429 && errMsg.includes('insufficient_quota')) {
-        console.error('[alt-text] OpenAI quota exceeded — add credits at platform.openai.com/account/billing');
+        log.error('OpenAI quota exceeded — add credits at platform.openai.com/account/billing');
         throw err;
       }
 
       if (status !== 429 || attempt === maxRetries) throw err;
 
       const backoffMs = Math.min(60000, 5000 * Math.pow(2, attempt));
-      console.log(`[alt-text] Rate limited (429). Retrying in ${Math.round(backoffMs / 1000)}s (attempt ${attempt + 1}/${maxRetries})...`);
+      log.info(`Rate limited (429). Retrying in ${Math.round(backoffMs / 1000)}s (attempt ${attempt + 1}/${maxRetries})...`);
       await new Promise(r => setTimeout(r, backoffMs));
     }
   }
@@ -103,7 +106,7 @@ export async function generateAltText(filePath: string, context?: string): Promi
   try {
     tmpFile = await prepareImageForApi(filePath);
   } catch (err) {
-    console.error(`Failed to prepare image for alt text:`, err);
+    log.error(`Failed to prepare image for alt text:`, err);
     return null;
   }
 

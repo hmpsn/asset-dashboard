@@ -1,3 +1,6 @@
+import { createLogger } from './logger.js';
+const log = createLogger('sales-audit');
+
 /**
  * Sales Audit Engine — URL-based SEO audit that works on ANY website.
  * No Webflow API needed. Discovers pages via sitemap/crawl, fetches HTML, runs checks.
@@ -549,11 +552,11 @@ export async function runSalesAudit(inputUrl: string, maxPages: number = 50): Pr
   if (!baseUrl.startsWith('http')) baseUrl = `https://${baseUrl}`;
   baseUrl = baseUrl.replace(/\/+$/, '');
 
-  console.log(`[sales-audit] Starting audit for ${baseUrl}`);
+  log.info(`Starting audit for ${baseUrl}`);
 
   // Discover pages
   const pageUrls = await discoverPages(baseUrl, maxPages);
-  console.log(`[sales-audit] Discovered ${pageUrls.length} pages`);
+  log.info(`Discovered ${pageUrls.length} pages`);
 
   // Fetch and audit each page in batches
   const results: SalesPageResult[] = [];

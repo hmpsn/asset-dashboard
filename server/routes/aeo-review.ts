@@ -10,6 +10,9 @@ import { getWorkspace } from '../workspaces.js';
 import { getLatestSnapshot } from '../reports.js';
 import { addActivity } from '../activity-log.js';
 import type { SeoIssue } from '../seo-audit.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('aeo-review');
 
 const router = Router();
 const REVIEW_DIR = getDataDir('aeo-reviews');
@@ -73,7 +76,7 @@ router.post('/api/aeo-review/:workspaceId/page', async (req, res) => {
     res.json(review);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[aeo-review] Single page error:', msg);
+    log.error('Single page error:', msg);
     res.status(500).json({ error: msg });
   }
 });
@@ -144,7 +147,7 @@ router.post('/api/aeo-review/:workspaceId/site', async (req, res) => {
     res.json(result);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[aeo-review] Site review error:', msg);
+    log.error('Site review error:', msg);
     res.status(500).json({ error: msg });
   }
 });

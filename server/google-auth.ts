@@ -5,6 +5,9 @@
  */
 
 import db from './db/index.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('google-auth');
 
 interface GoogleTokens {
   access_token: string;
@@ -102,7 +105,7 @@ export function getAuthUrl(siteId: string): string | null {
   });
 
   const url = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
-  console.log(`[google-auth] Auth URL generated, redirect_uri=${creds.redirectUri}`);
+  log.info(`Auth URL generated, redirect_uri=${creds.redirectUri}`);
   return url;
 }
 
@@ -129,7 +132,7 @@ export async function exchangeCode(code: string, siteId: string): Promise<{ succ
 
     if (!res.ok) {
       const err = await res.text();
-      console.error('Google token exchange failed:', err);
+      log.error('Google token exchange failed:', err);
       return { success: false, error: `Token exchange failed: ${res.status}` };
     }
 
@@ -149,7 +152,7 @@ export async function exchangeCode(code: string, siteId: string): Promise<{ succ
 
     return { success: true };
   } catch (err) {
-    console.error('Google token exchange error:', err);
+    log.error('Google token exchange error:', err);
     return { success: false, error: String(err) };
   }
 }

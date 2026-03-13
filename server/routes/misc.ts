@@ -20,6 +20,9 @@ import {
   getTokenForSite,
   getAllPageStates,
 } from '../workspaces.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('misc');
 
 // Public GET for client portal
 router.get('/api/public/seo-edit-tracking/:workspaceId', (req, res) => {
@@ -48,7 +51,7 @@ router.post('/api/upload/:workspaceId', upload.array('files'), (req, res) => {
   });
 
   for (const fp of filePaths) {
-    triggerOptimize(fp).catch(err => console.error('Optimize error:', err));
+    triggerOptimize(fp).catch(err => log.error('Optimize error:', err));
   }
 
   res.json({ uploaded: files.length });
@@ -66,7 +69,7 @@ router.post('/api/upload/:workspaceId/meta', upload.array('files'), (req, res) =
   });
 
   for (const fp of filePaths) {
-    triggerOptimize(fp).catch(err => console.error('Optimize error:', err));
+    triggerOptimize(fp).catch(err => log.error('Optimize error:', err));
   }
 
   res.json({ uploaded: files.length });
@@ -211,7 +214,7 @@ Just output the filename slug, nothing else.`;
           suggestion = visionRes.choices[0]?.message?.content?.trim() || null;
         }
       } catch (vErr) {
-        console.log('Vision naming fallback to text-only:', vErr instanceof Error ? vErr.message : vErr);
+        log.info('Vision naming fallback to text-only:', vErr instanceof Error ? vErr.message : vErr);
       }
     }
 
@@ -230,7 +233,7 @@ Just output the filename slug, nothing else.`;
     suggestion = raw.replace(/['"]/g, '').replace(/\.[a-z]+$/i, '').replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
     res.json({ suggestion, extension: ext, fullName: `${suggestion}.${ext}` });
   } catch (e) {
-    console.error('Smart name error:', e);
+    log.error('Smart name error:', e);
     res.status(500).json({ error: 'Failed to generate name' });
   }
 });
@@ -278,7 +281,7 @@ router.post('/api/upload/:workspaceId/clipboard', upload.single('file'), async (
     names: [originalName],
   });
 
-  triggerOptimize(targetPath).catch(err => console.error('Optimize error:', err));
+  triggerOptimize(targetPath).catch(err => log.error('Optimize error:', err));
   res.json({ uploaded: 1, fileName: originalName });
 });
 

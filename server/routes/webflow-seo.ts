@@ -17,13 +17,16 @@ import {
   updatePageState,
 } from '../workspaces.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('webflow-seo');
 
 // --- SEO Audit ---
 router.get('/api/webflow/seo-audit/:siteId', async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
     if (!token) {
-      console.error('SEO audit: No token available for site', req.params.siteId);
+      log.error('SEO audit: No token available for site', req.params.siteId);
       return res.status(500).json({ error: 'No Webflow API token configured. Please link a workspace to this site in Settings, or set WEBFLOW_API_TOKEN environment variable.' });
     }
     const result = await runSeoAudit(req.params.siteId, token, req.query.workspaceId as string | undefined);
@@ -40,7 +43,7 @@ router.get('/api/webflow/seo-audit/:siteId', async (req, res) => {
     res.json(result);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('SEO audit error:', msg);
+    log.error('SEO audit error:', msg);
     res.status(500).json({ error: `SEO audit failed: ${msg}` });
   }
 });
@@ -102,7 +105,7 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
       }
       if (baseUrl) {
         const slug = pagePath.replace(/^\//, '');
-        console.log(`[seo-rewrite] Fetching page content from ${baseUrl}/${slug}`);
+        log.info(`Fetching page content from ${baseUrl}/${slug}`);
         const htmlRes = await fetch(`${baseUrl}/${slug}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
         if (htmlRes.ok) {
           const html = await htmlRes.text();
@@ -208,7 +211,7 @@ Return ONLY a JSON array of 3 strings, e.g. ["title1","title2","title3"]. No exp
     // Always return at least the first as `text` for backward compatibility + all as `variations`
     res.json({ text: variations[0] || '', field, variations: variations.filter(Boolean) });
   } catch (err) {
-    console.error('SEO rewrite error:', err);
+    log.error('SEO rewrite error:', err);
     res.status(500).json({ error: 'AI rewrite failed' });
   }
 });
@@ -338,7 +341,7 @@ router.get('/api/webflow/page-html/:siteId', async (req, res) => {
       .slice(0, 8000);
     res.json({ text });
   } catch (e) {
-    console.error('Page HTML fetch error:', e);
+    log.error('Page HTML fetch error:', e);
     res.status(500).json({ error: 'Failed to fetch page content' });
   }
 });
@@ -371,7 +374,7 @@ router.post('/api/webflow/seo-copy', async (req, res) => {
     if (baseUrl) {
       try {
         const url = `${baseUrl}${pagePath === '/' ? '' : pagePath}`;
-        console.log(`[seo-copy] Fetching page content from ${url}`);
+        log.info(`Fetching page content from ${url}`);
         const r = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(10000) });
         if (r.ok) {
           const html = await r.text();
@@ -475,7 +478,7 @@ Return ONLY valid JSON, no markdown fences.`;
 
     res.json(parsed);
   } catch (err) {
-    console.error('SEO copy generator error:', err);
+    log.error('SEO copy generator error:', err);
     res.status(500).json({ error: 'SEO copy generation failed' });
   }
 });

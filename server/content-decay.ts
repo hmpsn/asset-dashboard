@@ -9,6 +9,9 @@ import { getAllGscPages } from './search-console.js';
 import { callOpenAI } from './openai-helpers.js';
 import { buildSeoContext } from './seo-context.js';
 import type { Workspace } from './workspaces.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('content-decay');
 
 // ── Types ──
 
@@ -252,7 +255,7 @@ export async function generateBatchRecommendations(
       try {
         page.refreshRecommendation = await generateRefreshRecommendation(ws, page);
       } catch (err) {
-        console.error(`[content-decay] Failed to generate recommendation for ${page.page}:`, err);
+        log.error(`Failed to generate recommendation for ${page.page}:`, err);
         page.refreshRecommendation = 'Unable to generate recommendation. Please review this page manually.';
       }
     }

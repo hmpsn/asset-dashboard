@@ -5,6 +5,9 @@ import { Router } from 'express';
 import { callOpenAI } from '../openai-helpers.js';
 import { isSemrushConfigured, getKeywordOverview, getRelatedKeywords } from '../semrush.js';
 import { buildSeoContext, buildKeywordMapContext } from '../seo-context.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('webflow-keywords');
 
 const router = Router();
 
@@ -43,7 +46,7 @@ router.post('/api/webflow/keyword-analysis', async (req, res) => {
           ).join('\n');
         }
       }
-    } catch (e) { console.error('[keyword-analysis] SEMRush enrichment error:', e); }
+    } catch (e) { log.error('SEMRush enrichment error:', e); }
   }
 
   try {
@@ -98,7 +101,7 @@ Return ONLY valid JSON, no markdown, no explanation.`;
       res.json({ error: 'Failed to parse AI response', raw: aiResult.text.slice(0, 500) });
     }
   } catch (err) {
-    console.error('Keyword analysis error:', err);
+    log.error('Keyword analysis error:', err);
     res.status(500).json({ error: 'Keyword analysis failed' });
   }
 });
@@ -159,7 +162,7 @@ router.post('/api/webflow/content-score', async (req, res) => {
       descOk: descLength >= 120 && descLength <= 160,
     });
   } catch (err) {
-    console.error('Content score error:', err);
+    log.error('Content score error:', err);
     res.status(500).json({ error: 'Content scoring failed' });
   }
 });

@@ -8,6 +8,9 @@ import { extractMetaContent, extractLinks } from './seo-audit-html.js';
 import { auditPage, isExcludedPage, CHECK_CATEGORY } from './audit-page.js';
 export type { Severity, CheckCategory, SeoIssue, PageSeoResult } from './audit-page.js';
 import type { SeoIssue, PageSeoResult } from './audit-page.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('seo-audit');
 
 const WEBFLOW_API = 'https://api.webflow.com/v2';
 
@@ -99,13 +102,13 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
   const siteWideUrl = siteInfo.customDomain
     ? (siteInfo.customDomain.startsWith('http') ? siteInfo.customDomain : `https://${siteInfo.customDomain}`)
     : baseUrl;
-  console.log(`SEO audit: subdomain=${siteInfo.subdomain}, baseUrl=${baseUrl}, siteWideUrl=${siteWideUrl}`);
+  log.info(`SEO audit: subdomain=${siteInfo.subdomain}, baseUrl=${baseUrl}, siteWideUrl=${siteWideUrl}`);
   const allPages = await listPages(siteId, tokenOverride);
   // Filter published pages and exclude utility / legal / error pages
   const pages = filterPublishedPages(allPages).filter(
     (p: { title: string; slug: string }) => !isExcludedPage(p.slug, p.title)
   );
-  console.log(`SEO audit: ${allPages.length} total pages, ${pages.length} published (excluded utility/legal/password/draft pages)`);
+  log.info(`SEO audit: ${allPages.length} total pages, ${pages.length} published (excluded utility/legal/password/draft pages)`);
 
   // Fetch metadata and HTML in parallel (batch of 5), cache meta for site-wide checks
   const results: PageSeoResult[] = [];
@@ -154,7 +157,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
     // Filter out utility/legal CMS pages the same way we filter static pages
     const filteredCmsUrls = cmsUrls.filter(item => !isExcludedPage(item.path, item.pageName));
     if (filteredCmsUrls.length > 0) {
-      console.log(`SEO audit: auditing ${filteredCmsUrls.length} CMS pages (${totalFound} total in sitemap, ${cmsUrls.length - filteredCmsUrls.length} excluded)`);
+      log.info(`SEO audit: auditing ${filteredCmsUrls.length} CMS pages (${totalFound} total in sitemap, ${cmsUrls.length - filteredCmsUrls.length} excluded)`);
       for (let i = 0; i < filteredCmsUrls.length; i += batch) {
         const chunk = filteredCmsUrls.slice(i, i + batch);
         const chunkResults = await Promise.all(
@@ -273,7 +276,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
 
   // --- Redirect health check (runs inline, fast HEAD requests) ---
   try {
-    console.log('[seo-audit] Running redirect scan...');
+    log.info('Running redirect scan...');
     const redirectResult = await scanRedirects(siteId, tokenOverride);
     const { summary, chains } = redirectResult;
 
@@ -310,14 +313,14 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
       });
     }
   } catch (err) {
-    console.error('[seo-audit] Redirect scan failed (non-fatal):', err);
+    log.error('Redirect scan failed (non-fatal):', err);
   }
 
   // --- Homepage Core Web Vitals (quick single-page PSI check) ---
   const homepageUrl = siteWideUrl || baseUrl;
   if (homepageUrl && process.env.GOOGLE_PSI_KEY) {
     try {
-      console.log('[seo-audit] Running homepage PageSpeed check...');
+      log.info('Running homepage PageSpeed check...');
       const psi = await runSinglePageSpeed(homepageUrl, 'mobile', 'Homepage');
       if (psi) {
         const scoreLabel = psi.score >= 90 ? 'good' : psi.score >= 50 ? 'needs improvement' : 'poor';
@@ -347,7 +350,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
         }
       }
     } catch (err) {
-      console.error('[seo-audit] PageSpeed check failed (non-fatal):', err);
+      log.error('PageSpeed check failed (non-fatal):', err);
     }
   }
 
@@ -469,7 +472,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
     const pagesNeedingFixes = results.filter(r =>
       r.issues.some(i => ['title', 'meta-description', 'og-tags'].includes(i.check))
     );
-    console.log(`[seo-audit] Generating AI recommendations for ${pagesNeedingFixes.length} pages (workspace: ${wsId || 'unknown'})...`);
+    log.info(`Generating AI recommendations for ${pagesNeedingFixes.length} pages (workspace: ${wsId || 'unknown'})...`);
 
     // Resolve brand name so AI uses correct name in suggestions
     const auditWs = wsId ? listWorkspaces().find(w => w.id === wsId) : undefined;
@@ -577,7 +580,7 @@ Respond in this exact JSON format (only include fields that need fixing):
             ogDescIssue.suggestedFix = suggestions.metaDescription;
           }
         } catch (err) {
-          console.error(`[seo-audit] AI recommendation failed for ${pageResult.page}:`, err);
+          log.error(`AI recommendation failed for ${pageResult.page}:`, err);
         }
       }));
     }

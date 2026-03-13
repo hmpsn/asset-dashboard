@@ -28,6 +28,9 @@ import {
   listProducts,
 } from '../stripe.js';
 import { getWorkspace } from '../workspaces.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('stripe');
 
 // NOTE: Stripe webhook is in server/index.ts — it must be registered before
 // express.json() middleware to receive the raw body needed for signature verification.
@@ -85,7 +88,7 @@ router.post('/api/stripe/create-payment-intent', checkoutLimiter, async (req, re
     });
     res.json(result);
   } catch (err) {
-    console.error('[stripe] PaymentIntent error:', err);
+    log.error('PaymentIntent error:', err);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to create payment intent' });
   }
 });
@@ -119,7 +122,7 @@ router.post('/api/stripe/create-checkout', checkoutLimiter, async (req, res) => 
     });
     res.json({ sessionId, url });
   } catch (err) {
-    console.error('[stripe] Checkout error:', err);
+    log.error('Checkout error:', err);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to create checkout session' });
   }
 });
@@ -149,7 +152,7 @@ router.post('/api/stripe/cart-checkout', checkoutLimiter, async (req, res) => {
     });
     res.json({ sessionId, url });
   } catch (err) {
-    console.error('[stripe] Cart checkout error:', err);
+    log.error('Cart checkout error:', err);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to create cart checkout session' });
   }
 });
@@ -181,7 +184,7 @@ router.post('/api/public/upgrade-checkout/:workspaceId', checkoutLimiter, async 
     });
     res.json({ sessionId, url });
   } catch (err) {
-    console.error('[stripe] Tier upgrade checkout error:', err);
+    log.error('Tier upgrade checkout error:', err);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to create checkout session' });
   }
 });
@@ -234,7 +237,7 @@ router.post('/api/public/billing-portal/:workspaceId', checkoutLimiter, async (r
     const { url } = await createBillingPortalSession(wsId, returnUrl);
     res.json({ url });
   } catch (err) {
-    console.error('[stripe] Billing portal error:', err);
+    log.error('Billing portal error:', err);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to create billing portal session' });
   }
 });
@@ -250,7 +253,7 @@ router.post('/api/public/cancel-subscription/:workspaceId', checkoutLimiter, asy
     const result = await cancelSubscription(wsId);
     res.json(result);
   } catch (err) {
-    console.error('[stripe] Cancel subscription error:', err);
+    log.error('Cancel subscription error:', err);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to cancel subscription' });
   }
 });

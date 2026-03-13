@@ -193,6 +193,9 @@ router.delete('/api/workspaces/:id', requireWorkspaceAccess(), (req, res) => {
 // --- Shared: scrape website pages for AI analysis ---
 import type { Workspace } from '../workspaces.js';
 import type { ScrapedPage } from '../web-scraper.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('workspaces');
 
 async function scrapeWorkspaceSite(ws: Workspace): Promise<{ scraped: ScrapedPage[]; pagesSummary: string }> {
   const { scrapeUrls } = await import('../web-scraper.js');
@@ -318,7 +321,7 @@ Be concise but specific. Use bullet points. Only include information actually fo
 
     res.json({ knowledgeBase: aiResult.text, pagesScraped: scraped.length });
   } catch (err) {
-    console.error('[generate-knowledge-base]', err);
+    log.error('', err);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate knowledge base' });
   }
 });
@@ -385,7 +388,7 @@ Be specific and actionable. An AI writer should be able to follow this guide to 
 
     res.json({ brandVoice: aiResult.text, pagesScraped: scraped.length });
   } catch (err) {
-    console.error('[generate-brand-voice]', err);
+    log.error('', err);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate brand voice' });
   }
 });
@@ -470,7 +473,7 @@ Rules:
 
     res.json({ personas: normalized, pagesScraped: scraped.length });
   } catch (err) {
-    console.error('[generate-personas]', err);
+    log.error('', err);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate personas' });
   }
 });
