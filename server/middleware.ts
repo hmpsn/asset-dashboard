@@ -16,10 +16,10 @@ import { verifyClientToken, getSafeClientUser } from './client-users.js';
  *  Adds standard rate-limit headers to every response. */
 const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
 
-export function rateLimit(windowMs: number, maxRequests: number) {
+export function rateLimit(windowMs: number, maxRequests: number, keyMode: 'per-path' | 'global' = 'per-path') {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
-    const key = `${ip}:${req.path}`;
+    const key = keyMode === 'global' ? `global:${ip}` : `${ip}:${req.path}`;
     const now = Date.now();
     let bucket = rateLimitBuckets.get(key);
     if (!bucket || now > bucket.resetAt) {
@@ -55,7 +55,7 @@ export const publicWriteLimiter = rateLimit(60 * 1000, 10);
 export const checkoutLimiter = rateLimit(60 * 1000, 5);
 export const clientLoginLimiter = rateLimit(60 * 1000, 5); // 5 attempts per minute per IP
 export const aiLimiter = rateLimit(60 * 1000, 3); // 3 AI requests per minute per IP
-export const globalPublicLimiter = rateLimit(60 * 1000, 200); // 200 requests per minute per IP across all public routes
+export const globalPublicLimiter = rateLimit(60 * 1000, 200, 'global'); // 200 requests per minute per IP across all public routes
 
 // ── Credential Stuffing Protection ──
 

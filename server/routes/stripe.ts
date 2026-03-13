@@ -7,7 +7,6 @@ const router = Router();
 
 import { sanitizeString } from '../helpers.js';
 import { checkoutLimiter } from '../middleware.js';
-import { verifyTurnstile } from '../middleware/turnstile.js';
 import { listPayments, getPayment } from '../payments.js';
 import { computeROI } from '../roi.js';
 import {
@@ -159,7 +158,7 @@ router.post('/api/stripe/cart-checkout', checkoutLimiter, async (req, res) => {
 });
 
 // Public: tier upgrade checkout (client-facing)
-router.post('/api/public/upgrade-checkout/:workspaceId', checkoutLimiter, verifyTurnstile, async (req, res) => {
+router.post('/api/public/upgrade-checkout/:workspaceId', checkoutLimiter, async (req, res) => {
   if (!isStripeConfigured()) return res.status(503).json({ error: 'Stripe is not configured' });
   const wsId = req.params.workspaceId;
   const ws = getWorkspace(wsId);

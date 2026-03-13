@@ -419,7 +419,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                     if (!forgotEmail.trim()) return;
                     setAuthLoading(true); setAuthError('');
                     try {
-                      await post(`/api/public/forgot-password/${workspaceId}`, { email: forgotEmail.trim() });
+                      await post(`/api/public/forgot-password/${workspaceId}`, { email: forgotEmail.trim(), turnstileToken: turnstileTokenRef.current });
                       setForgotSent(true);
                     } catch (err) { setAuthError(err instanceof Error ? err.message : 'Something went wrong'); }
                     setAuthLoading(false);
@@ -428,6 +428,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                     <input type="email" value={forgotEmail} onChange={e => { setForgotEmail(e.target.value); setAuthError(''); }}
                       placeholder="Email address" autoFocus
                       className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors" />
+                    <TurnstileWidget onToken={(t) => { turnstileTokenRef.current = t; }} />
                     {authError && <p className="text-xs text-red-400">{authError}</p>}
                     <button type="submit" disabled={authLoading || !forgotEmail.trim()}
                       className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white text-sm font-medium transition-all flex items-center justify-center gap-2">
