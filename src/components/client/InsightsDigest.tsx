@@ -42,7 +42,6 @@ interface InsightsDigestProps {
   searchInsights: { lowHanging: SearchQuery[]; topPerformers: SearchQuery[] } | null;
   eventDisplayName: (name: string) => string;
   isEventPinned: (name: string) => boolean;
-  onNavigate: (tab: ClientTab) => void;
   workspaceId: string;
 }
 

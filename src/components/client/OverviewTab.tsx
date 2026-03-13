@@ -192,7 +192,6 @@ export function OverviewTab({
             searchInsights={insights ? { lowHanging: insights.lowHanging, topPerformers: insights.topPerformers } : null}
             eventDisplayName={eventDisplayName}
             isEventPinned={isEventPinned}
-            onNavigate={(t) => navigate(clientPath(workspaceId, t, betaMode))}
             workspaceId={workspaceId}
           />
         </ErrorBoundary>
