@@ -100,7 +100,7 @@ export function createApp(): express.Express {
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'", "'unsafe-inline'", 'https://js.stripe.com'],
         frameSrc: ["'self'", 'https://js.stripe.com', 'https://hooks.stripe.com'],
-        connectSrc: ["'self'", 'https://api.stripe.com', 'wss:', 'ws:'],
+        connectSrc: ["'self'", 'https://api.stripe.com', 'https://*.ingest.sentry.io', 'wss:', 'ws:'],
         imgSrc: ["'self'", 'data:', 'https:'],
         styleSrc: ["'self'", "'unsafe-inline'"],
       },

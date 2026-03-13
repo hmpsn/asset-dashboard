@@ -1,4 +1,4 @@
-import { StrictMode } from 'react';
+import React, { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import * as Sentry from '@sentry/react';
 import './index.css';
@@ -32,7 +32,7 @@ window.fetch = function (input: RequestInfo | URL, init?: RequestInit) {
   return _fetch.call(window, input, init);
 };
 
-const SentryErrorBoundary = SENTRY_DSN ? Sentry.ErrorBoundary : StrictMode;
+const SentryErrorBoundary = SENTRY_DSN ? Sentry.ErrorBoundary : ({ children }: { children: React.ReactNode }) => <>{children}</>;
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

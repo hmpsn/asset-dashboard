@@ -5,7 +5,7 @@ import { sentryVitePlugin } from '@sentry/vite-plugin'
 
 export default defineConfig({
   build: {
-    sourcemap: true, // Required for Sentry source map upload
+    sourcemap: !!process.env.SENTRY_AUTH_TOKEN, // Only generate source maps when Sentry is configured
   },
   plugins: [
     react(),
@@ -16,6 +16,9 @@ export default defineConfig({
           org: process.env.SENTRY_ORG,
           project: process.env.SENTRY_PROJECT,
           authToken: process.env.SENTRY_AUTH_TOKEN,
+          sourcemaps: {
+            filesToDeleteAfterUpload: ['./dist/**/*.map'],
+          },
         })]
       : []),
   ],
