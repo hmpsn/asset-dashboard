@@ -109,7 +109,7 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
         ga4.landingPages(workspaceId, numDays),
         ga4.conversions(workspaceId, numDays),
       ]);
-      setOverview(ov);
+      if (ov) setOverview(ov);
       setTrend(tr);
       setTopPages(tp);
       setSources(sr);

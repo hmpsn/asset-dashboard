@@ -1,5 +1,5 @@
 // ── Analytics API (GA4 + GSC) ──────────────────────────────────────
-import { get, post, getSafe } from './client';
+import { get, post, getSafe, getOptional } from './client';
 import type {
   SearchOverview, PerformanceTrend, SearchComparison,
   GA4Overview, GA4DailyTrend, GA4TopPage, GA4TopSource,
@@ -17,22 +17,22 @@ function qs(days: number, dateRange?: { startDate: string; endDate: string }): s
 // ── Search Console (GSC) ───────────────────────────────────────────
 export const gsc = {
   overview: (wsId: string, days: number, dateRange?: { startDate: string; endDate: string }) =>
-    get<SearchOverview>(`/api/public/search-overview/${wsId}${qs(days, dateRange)}`),
+    getOptional<SearchOverview>(`/api/public/search-overview/${wsId}${qs(days, dateRange)}`),
 
   trend: (wsId: string, days: number, dateRange?: { startDate: string; endDate: string }) =>
-    get<PerformanceTrend[]>(`/api/public/performance-trend/${wsId}${qs(days, dateRange)}`),
+    getSafe<PerformanceTrend[]>(`/api/public/performance-trend/${wsId}${qs(days, dateRange)}`, []),
 
   comparison: (wsId: string, days: number, dateRange?: { startDate: string; endDate: string }) =>
     getSafe<SearchComparison | null>(`/api/public/search-comparison/${wsId}${qs(days, dateRange)}`, null),
 
   devices: (wsId: string, days: number, dateRange?: { startDate: string; endDate: string }) =>
-    get<unknown>(`/api/public/search-devices/${wsId}${qs(days, dateRange)}`),
+    getSafe<unknown[]>(`/api/public/search-devices/${wsId}${qs(days, dateRange)}`, []),
 };
 
 // ── Google Analytics 4 (GA4) ───────────────────────────────────────
 export const ga4 = {
   overview: (wsId: string, days: number, dateRange?: { startDate: string; endDate: string }) =>
-    get<GA4Overview>(`/api/public/analytics-overview/${wsId}${qs(days, dateRange)}`),
+    getOptional<GA4Overview>(`/api/public/analytics-overview/${wsId}${qs(days, dateRange)}`),
 
   trend: (wsId: string, days: number, dateRange?: { startDate: string; endDate: string }) =>
     getSafe<GA4DailyTrend[]>(`/api/public/analytics-trend/${wsId}${qs(days, dateRange)}`, []),
@@ -85,10 +85,10 @@ function gscQs(gscSiteUrl: string, days: number): string {
 
 export const gscAdmin = {
   overview: (siteId: string, gscSiteUrl: string, days: number) =>
-    get<SearchOverview>(`/api/google/search-overview/${siteId}?${gscQs(gscSiteUrl, days)}`),
+    getOptional<SearchOverview>(`/api/google/search-overview/${siteId}?${gscQs(gscSiteUrl, days)}`),
 
   trend: (siteId: string, gscSiteUrl: string, days: number) =>
-    get<PerformanceTrend[]>(`/api/google/performance-trend/${siteId}?${gscQs(gscSiteUrl, days)}`),
+    getSafe<PerformanceTrend[]>(`/api/google/performance-trend/${siteId}?${gscQs(gscSiteUrl, days)}`, []),
 
   devices: (siteId: string, gscSiteUrl: string, days: number) =>
     getSafe<unknown[]>(`/api/google/search-devices/${siteId}?${gscQs(gscSiteUrl, days)}`, []),

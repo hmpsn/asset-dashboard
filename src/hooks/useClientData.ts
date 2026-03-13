@@ -83,7 +83,7 @@ export function useClientData(_workspaceId: string) {
         gsc.comparison(wsId, numDays, dateRange),
         gsc.devices(wsId, numDays, dateRange),
       ]);
-      setOverview(ovData as SearchOverview);
+      if (ovData) setOverview(ovData as SearchOverview);
       setTrend(Array.isArray(trData) ? trData : []);
       if (cmpData) setSearchComparison(cmpData);
     } catch (err) {
