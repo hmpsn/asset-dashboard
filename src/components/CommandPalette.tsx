@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Search, Globe, BarChart3, Shield, Gauge, Pencil, Link2,
   Target, Code2, Clipboard, Image, Flag, TrendingUp, Sparkles, FileText,
@@ -6,22 +7,7 @@ import {
   Zap, FileSearch, MessageSquare,
 } from 'lucide-react';
 import { type Workspace } from './WorkspaceSelector';
-
-type Page =
-  | 'home'
-  | 'media'
-  | 'seo-audit' | 'seo-editor'
-  | 'links'
-  | 'seo-strategy' | 'seo-schema' | 'seo-briefs' | 'seo-ranks'
-  | 'content' | 'brand'
-  | 'search' | 'analytics' | 'annotations'
-  | 'performance'
-  | 'content-perf'
-  | 'workspace-settings'
-  | 'prospect'
-  | 'roadmap'
-  | 'requests'
-  | 'settings';
+import { type Page, adminPath } from '../routes';
 
 interface PaletteItem {
   id: string;
@@ -36,7 +22,6 @@ interface CommandPaletteProps {
   workspaces: Workspace[];
   selectedWorkspace: Workspace | null;
   onSelectWorkspace: (ws: Workspace) => void;
-  onNavigate: (tab: Page) => void;
 }
 
 const NAV_ITEMS: Array<{ id: Page; label: string; icon: typeof Search; group: string; needsSite?: boolean }> = [
@@ -90,7 +75,8 @@ function fuzzyMatch(text: string, query: string): boolean {
   return qi === q.length;
 }
 
-export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspace, onNavigate }: CommandPaletteProps) {
+export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspace }: CommandPaletteProps) {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -133,7 +119,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
         sub: nav.group || undefined,
         icon: nav.icon,
         type: 'nav',
-        action: () => { onNavigate(nav.id); addRecent(`nav:${nav.id}`); },
+        action: () => { navigate(adminPath(selectedWorkspace?.id || '', nav.id)); addRecent(`nav:${nav.id}`); },
       });
     }
 
@@ -145,7 +131,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
         sub: ws.webflowSiteName || 'Workspace',
         icon: Globe,
         type: 'workspace',
-        action: () => { onSelectWorkspace(ws); onNavigate('home'); addRecent(`ws:${ws.id}`); },
+        action: () => { onSelectWorkspace(ws); navigate(adminPath(ws.id)); addRecent(`ws:${ws.id}`); },
       });
     }
 
@@ -162,7 +148,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
     }
 
     return result;
-  }, [workspaces, selectedWorkspace, onSelectWorkspace, onNavigate]);
+  }, [workspaces, selectedWorkspace, onSelectWorkspace, navigate]);
 
   // Filter items by query
   const filtered = useMemo(() => {

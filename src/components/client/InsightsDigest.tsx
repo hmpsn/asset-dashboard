@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   TrendingUp, TrendingDown, Users, MousePointer, Shield, Zap,
   Target, FileText, Globe, Sparkles, CheckCircle2,
   ArrowRight, ChevronDown, type LucideIcon,
 } from 'lucide-react';
+import { clientPath } from '../../routes';
 import type {
   SearchOverview, SearchQuery, AuditSummary, AuditDetail,
   GA4Overview, GA4ConversionSummary, GA4NewVsReturning, GA4OrganicOverview,
@@ -40,6 +42,7 @@ interface InsightsDigestProps {
   eventDisplayName: (name: string) => string;
   isEventPinned: (name: string) => boolean;
   onNavigate: (tab: ClientTab) => void;
+  workspaceId: string;
 }
 
 // ─── Helpers ───
@@ -314,6 +317,7 @@ const SENTIMENT_LABELS: Record<string, string> = {
 // ─── Component ───
 
 export function InsightsDigest(props: InsightsDigestProps) {
+  const navigate = useNavigate();
   const insights = generateInsights(props);
   const [expanded, setExpanded] = useState(false);
 
@@ -341,7 +345,7 @@ export function InsightsDigest(props: InsightsDigestProps) {
           return (
             <button
               key={insight.id}
-              onClick={() => insight.action && props.onNavigate(insight.action.tab)}
+              onClick={() => insight.action && navigate(clientPath(props.workspaceId, insight.action.tab))}
               className="w-full bg-zinc-900 rounded-xl border border-zinc-800 p-4 text-left hover:border-zinc-700 transition-colors cursor-pointer group"
             >
               {/* Header */}

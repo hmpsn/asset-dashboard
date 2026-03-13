@@ -2,12 +2,14 @@ import {
   AlertTriangle, Users, MousePointerClick, Eye, BarChart3, Shield, Target,
   Sparkles, Activity, FileText,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { StatCard } from '../ui';
 import { Explainer } from './SeoGlossary';
 import { useBetaMode } from './BetaContext';
 import { InsightsDigest } from './InsightsDigest';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { QUICK_QUESTIONS, LEARN_SEO_QUESTIONS } from './types';
+import { clientPath } from '../../routes';
 import type {
   SearchOverview, PerformanceTrend, WorkspaceInfo, AuditSummary, AuditDetail,
   GA4Overview, GA4DailyTrend, GA4ConversionSummary, GA4NewVsReturning,
@@ -53,7 +55,7 @@ interface OverviewTabProps {
   eventDisplayName: (eventName: string) => string;
   isEventPinned: (eventName: string) => boolean;
   // Actions
-  setTab: (t: ClientTab) => void;
+  workspaceId: string;
   onAskAi: (q: string) => void;
   onOpenChat: () => void;
   // Auth
@@ -71,9 +73,10 @@ export function OverviewTab({
   contentRequests, activityLog,
   pendingApprovals, unreadTeamNotes,
   eventDisplayName, isEventPinned,
-  setTab, onAskAi, onOpenChat,
+  workspaceId, onAskAi, onOpenChat,
   clientUser,
 }: OverviewTabProps) {
+  const navigate = useNavigate();
   const betaMode = useBetaMode();
   // Derive a dynamic subtitle from the most significant data signal
   const dynamicSubtitle = (() => {
@@ -159,7 +162,7 @@ export function OverviewTab({
           </div>
           <div className="flex flex-wrap gap-1.5">
             {actions.map((a, i) => (
-              <button key={i} onClick={() => setTab(a.tab)} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/50 transition-colors text-left">
+              <button key={i} onClick={() => navigate(clientPath(workspaceId, a.tab))} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/50 transition-colors text-left">
                 <span className={`text-[11px] font-semibold ${a.color}`}>{a.count}</span>
                 <span className="text-[11px] text-zinc-400">{a.label.replace(/^\d+\s*/, '')}</span>
               </button>
@@ -189,7 +192,8 @@ export function OverviewTab({
             searchInsights={insights ? { lowHanging: insights.lowHanging, topPerformers: insights.topPerformers } : null}
             eventDisplayName={eventDisplayName}
             isEventPinned={isEventPinned}
-            onNavigate={setTab}
+            onNavigate={(t) => navigate(clientPath(workspaceId, t))}
+            workspaceId={workspaceId}
           />
         </ErrorBoundary>
 
@@ -263,7 +267,7 @@ export function OverviewTab({
                 ))}
               </div>
               <button
-                onClick={() => setTab('strategy')}
+                onClick={() => navigate(clientPath(workspaceId, 'strategy'))}
                 className="mt-2 w-full text-center px-3 py-1.5 rounded-lg bg-teal-600/15 border border-teal-500/20 text-[11px] text-teal-300 font-medium hover:bg-teal-600/25 transition-colors"
               >
                 View all {strategyData?.contentGaps?.length ?? 0} opportunities

@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { adminPath, type Page } from '../routes';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import {
   Loader2, Search as SearchIcon, ChevronDown, ChevronRight, Download,
@@ -30,12 +32,12 @@ interface Props {
   siteId: string;
   workspaceId?: string;
   siteName?: string;
-  onNavigate?: (tab: string, context?: FixContext) => void;
 }
 
 type AuditSubTab = 'audit' | 'links' | 'history' | 'aeo-review' | 'content-decay';
 
-function SeoAudit({ siteId, workspaceId, siteName, onNavigate }: Props) {
+function SeoAudit({ siteId, workspaceId, siteName }: Props) {
+  const navigate = useNavigate();
   const { startJob, jobs } = useBackgroundTasks();
   const auditJobId = useRef<string | null>(null);
   const [data, setData] = useState<SeoAuditResult | null>(null);
@@ -1274,12 +1276,12 @@ function SeoAudit({ siteId, workspaceId, siteName, onNavigate }: Props) {
                             {/* Compact action bar: Fix + overflow menu */}
                             <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
                               {/* Fix → (primary) */}
-                              {onNavigate && (() => {
+                              {workspaceId && (() => {
                                 const fixTab = getFixTab(issue);
                                 if (!fixTab) return null;
                                 return (
                                   <button
-                                    onClick={() => onNavigate(fixTab, { pageId: page.pageId, pageSlug: page.slug, pageName: page.page, issueCheck: issue.check, issueMessage: issue.message })}
+                                    onClick={() => navigate(adminPath(workspaceId, fixTab as Page), { state: { fixContext: { pageId: page.pageId, pageSlug: page.slug, pageName: page.page, issueCheck: issue.check, issueMessage: issue.message } } })}
                                     className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 flex items-center gap-0.5 transition-colors"
                                     title={`Open ${FIX_TAB_LABELS[fixTab] || fixTab}`}
                                   >

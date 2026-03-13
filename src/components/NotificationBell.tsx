@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Bell, TrendingDown, Flag, MessageSquare, ClipboardCheck, Clipboard,
   AlertTriangle, X,
 } from 'lucide-react';
+import { adminPath, type Page } from '../routes';
 
 interface NotificationItem {
   id: string;
@@ -38,12 +40,13 @@ interface ChurnSignal {
 }
 
 interface NotificationBellProps {
-  onSelectWorkspace: (workspaceId: string, tab: string) => void;
+  onSelectWorkspace: (workspaceId: string) => void;
 }
 
 const POLL_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
 export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>([]);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -242,7 +245,10 @@ export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
                     <button
                       key={item.id}
                       onClick={() => {
-                        if (item.workspaceId) onSelectWorkspace(item.workspaceId, item.tab);
+                        if (item.workspaceId) {
+                          onSelectWorkspace(item.workspaceId);
+                          navigate(adminPath(item.workspaceId, item.tab as Page));
+                        }
                         setOpen(false);
                       }}
                       className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-zinc-800/30 transition-colors text-left"

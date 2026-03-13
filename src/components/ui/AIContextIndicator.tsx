@@ -4,6 +4,8 @@
  * with score, connected count, and expandable details with fix links.
  */
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { adminPath } from '../../routes';
 import {
   Brain,
   CheckCircle2,
@@ -55,11 +57,10 @@ interface Props {
   feature?: 'strategy' | 'briefs' | 'posts' | 'chat' | 'internal-links' | 'all';
   /** Compact mode: just the score pill, no expand */
   compact?: boolean;
-  /** Called when user clicks a fix action */
-  onNavigate?: (target: string) => void;
 }
 
-export function AIContextIndicator({ workspaceId, feature = 'all', compact = false, onNavigate }: Props) {
+export function AIContextIndicator({ workspaceId, feature = 'all', compact = false }: Props) {
+  const navigate = useNavigate();
   const [data, setData] = useState<ContextCompleteness | null>(null);
   const [expanded, setExpanded] = useState(false);
 
@@ -164,9 +165,9 @@ export function AIContextIndicator({ workspaceId, feature = 'all', compact = fal
                   </div>
                   <p className="text-[11px] text-zinc-500 mt-0.5">{source.detail}</p>
                 </div>
-                {!isConnected && source.fixAction && onNavigate && (
+                {!isConnected && source.fixAction && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); onNavigate(source.fixAction!); }}
+                    onClick={(e) => { e.stopPropagation(); navigate(adminPath(workspaceId, source.fixAction! as import('../../routes').Page)); }}
                     className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 transition-colors flex-shrink-0"
                   >
                     Set up <ExternalLink className="w-2.5 h-2.5" />

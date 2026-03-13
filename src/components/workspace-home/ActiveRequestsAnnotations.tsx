@@ -1,5 +1,7 @@
 import { Clipboard, Flag } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { SectionCard, Badge } from '../ui';
+import { adminPath } from '../../routes';
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -30,10 +32,11 @@ interface AnnotationEntry {
 interface ActiveRequestsAnnotationsProps {
   requests: RequestEntry[];
   annotations: AnnotationEntry[];
-  onNavigate: (tab: string) => void;
+  workspaceId: string;
 }
 
-export function ActiveRequestsAnnotations({ requests, annotations, onNavigate }: ActiveRequestsAnnotationsProps) {
+export function ActiveRequestsAnnotations({ requests, annotations, workspaceId }: ActiveRequestsAnnotationsProps) {
+  const navigate = useNavigate();
   if (requests.length === 0 && annotations.length === 0) return null;
 
   return (
@@ -42,7 +45,7 @@ export function ActiveRequestsAnnotations({ requests, annotations, onNavigate }:
         <SectionCard
           title="Active Requests"
           titleIcon={<Clipboard className="w-4 h-4 text-amber-400" />}
-          action={<button onClick={() => onNavigate('requests')} className="text-[11px] text-teal-400 hover:text-teal-300 transition-colors">View All →</button>}
+          action={<button onClick={() => navigate(adminPath(workspaceId, 'requests'))} className="text-[11px] text-teal-400 hover:text-teal-300 transition-colors">View All →</button>}
           noPadding
         >
           <div className="divide-y divide-zinc-800/50">
@@ -66,7 +69,7 @@ export function ActiveRequestsAnnotations({ requests, annotations, onNavigate }:
         <SectionCard
           title="Recent Annotations"
           titleIcon={<Flag className="w-4 h-4 text-zinc-500" />}
-          action={<button onClick={() => onNavigate('annotations')} className="text-[11px] text-teal-400 hover:text-teal-300 transition-colors">View All →</button>}
+          action={<button onClick={() => navigate(adminPath(workspaceId, 'annotations'))} className="text-[11px] text-teal-400 hover:text-teal-300 transition-colors">View All →</button>}
           noPadding
         >
           <div className="divide-y divide-zinc-800/50">

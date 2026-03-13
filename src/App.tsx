@@ -1,4 +1,6 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, useSearchParams, useParams } from 'react-router-dom';
+import { type Page, adminPath, clientPath } from './routes';
 import { WorkspaceSelector, type Workspace } from './components/WorkspaceSelector';
 import { type QueueItem } from './components/ProcessingQueue';
 import { StatusBar } from './components/StatusBar';
@@ -56,23 +58,6 @@ function ChunkFallback() {
   return <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>;
 }
 
-type Page =
-  | 'home'
-  | 'media'
-  | 'seo-audit' | 'seo-editor'
-  | 'links'
-  | 'seo-strategy' | 'seo-schema' | 'seo-briefs' | 'seo-ranks'
-  | 'content' | 'brand'
-  | 'search' | 'analytics' | 'annotations'
-  | 'performance'
-  | 'content-perf'
-  | 'workspace-settings'
-  | 'prospect'
-  | 'roadmap'
-  | 'ai-usage'
-  | 'requests'
-  | 'settings';
-
 export interface FixContext {
   pageId?: string;
   pageSlug?: string;
@@ -81,38 +66,39 @@ export interface FixContext {
   issueMessage?: string;
 }
 
+/** Backward-compat redirect: /client/:id?tab=X → /client/:id/X */
+function ClientTabRedirect() {
+  const { workspaceId } = useParams<{ workspaceId: string }>();
+  const [searchParams] = useSearchParams();
+  const tab = searchParams.get('tab');
+  if (tab && workspaceId) {
+    const remaining = new URLSearchParams(searchParams);
+    remaining.delete('tab');
+    const qs = remaining.toString();
+    return <Navigate to={clientPath(workspaceId, tab) + (qs ? '?' + qs : '')} replace />;
+  }
+  return null;
+}
+
+function ClientRoutes({ betaMode = false }: { betaMode?: boolean }) {
+  const params = useParams<{ workspaceId: string; '*': string }>();
+  const workspaceId = params.workspaceId!;
+  const splatTab = params['*'] || undefined;
+  return <ClientDashboard workspaceId={workspaceId} initialTab={splatTab} betaMode={betaMode} />;
+}
+
 function App() {
-  // Landing page route: /welcome (public, no auth)
-  if (window.location.pathname === '/welcome') {
-    return <Suspense fallback={<ChunkFallback />}><LandingPage /></Suspense>;
-  }
-  // Styleguide route: /styleguide (no auth)
-  if (window.location.pathname === '/styleguide') {
-    return <Suspense fallback={<ChunkFallback />}><Styleguide /></Suspense>;
-  }
-  // Beta client dashboard: /client/beta/:workspaceId (no monetization / briefs / blog)
-  const betaMatch = window.location.pathname.match(/^\/client\/beta\/([\w_]+)/);
-  if (betaMatch) {
-    return <MobileGuard><Suspense fallback={<ChunkFallback />}><ClientDashboard workspaceId={betaMatch[1]} betaMode /></Suspense></MobileGuard>;
-  }
-  // Client dashboard route: /client/:workspaceId/:tab? (public, no auth)
-  const clientMatch = window.location.pathname.match(/^\/client\/([\w_]+)(?:\/(\w+))?/);
-  if (clientMatch) {
-    const workspaceId = clientMatch[1];
-    const pathTab = clientMatch[2] || undefined;
-    // Backward compat: redirect old ?tab=X URLs to /client/:workspaceId/:tab
-    const searchParams = new URLSearchParams(window.location.search);
-    const queryTab = searchParams.get('tab');
-    if (queryTab) {
-      searchParams.delete('tab');
-      const remaining = searchParams.toString();
-      const newPath = `/client/${workspaceId}/${queryTab}${remaining ? '?' + remaining : ''}`;
-      window.location.replace(newPath);
-      return null;
-    }
-    return <MobileGuard><Suspense fallback={<ChunkFallback />}><ClientDashboard workspaceId={workspaceId} initialTab={pathTab} /></Suspense></MobileGuard>;
-  }
-  return <ToastProvider><BackgroundTaskProvider><AdminApp /></BackgroundTaskProvider></ToastProvider>;
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/welcome" element={<Suspense fallback={<ChunkFallback />}><LandingPage /></Suspense>} />
+        <Route path="/styleguide" element={<Suspense fallback={<ChunkFallback />}><Styleguide /></Suspense>} />
+        <Route path="/client/beta/:workspaceId/*" element={<MobileGuard><Suspense fallback={<ChunkFallback />}><ClientRoutes betaMode /></Suspense></MobileGuard>} />
+        <Route path="/client/:workspaceId/*" element={<MobileGuard><Suspense fallback={<ChunkFallback />}><ClientTabRedirect /><ClientRoutes /></Suspense></MobileGuard>} />
+        <Route path="/*" element={<ToastProvider><BackgroundTaskProvider><AdminApp /></BackgroundTaskProvider></ToastProvider>} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
 function AdminApp() {
@@ -137,15 +123,43 @@ function AdminApp() {
 }
 
 function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; theme: 'dark' | 'light'; toggleTheme: () => void }) {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [selected, setSelected] = useState<Workspace | null>(null);
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [health, setHealth] = useState({ hasOpenAIKey: false, hasWebflowToken: false });
   const [connected, setConnected] = useState(false);
-  const [tab, setTab] = useState<Page>('home');
+
+  // Derive tab and workspace ID from URL path
+  const GLOBAL_TABS = useMemo(() => new Set(['settings', 'roadmap', 'prospect', 'ai-usage']), []);
+  const { tab, urlWorkspaceId } = useMemo(() => {
+    const p = location.pathname;
+    const wsTabMatch = p.match(/^\/ws\/([^/]+)\/(.+)$/);
+    if (wsTabMatch) return { tab: wsTabMatch[2] as Page, urlWorkspaceId: wsTabMatch[1] };
+    const wsMatch = p.match(/^\/ws\/([^/]+)\/?$/);
+    if (wsMatch) return { tab: 'home' as Page, urlWorkspaceId: wsMatch[1] };
+    const globalMatch = p.match(/^\/([^/]+)\/?$/);
+    if (globalMatch && GLOBAL_TABS.has(globalMatch[1])) return { tab: globalMatch[1] as Page, urlWorkspaceId: undefined as string | undefined };
+    return { tab: 'home' as Page, urlWorkspaceId: undefined as string | undefined };
+  }, [location.pathname, GLOBAL_TABS]);
+
   const [fixContext, setFixContext] = useState<FixContext | null>(null);
   const [clipboardStatus, setClipboardStatus] = useState<string | null>(null);
   const [pendingContentRequests, setPendingContentRequests] = useState(0);
+
+  // Sync selected workspace from URL
+  useEffect(() => {
+    if (urlWorkspaceId && workspaces.length > 0) {
+      if (!selected || selected.id !== urlWorkspaceId) {
+        const ws = workspaces.find(w => w.id === urlWorkspaceId);
+        if (ws) setSelected(ws);
+      }
+    } else if (!urlWorkspaceId && !GLOBAL_TABS.has(tab)) {
+      if (selected) setSelected(null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlWorkspaceId, workspaces, GLOBAL_TABS]);
 
   // ── Collapsible sidebar groups (#160) ──
   const ALL_GROUP_LABELS = ['ANALYTICS', 'SITE HEALTH', 'SEO', 'CONTENT'];
@@ -197,8 +211,8 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
       if (!e.metaKey && !e.ctrlKey) return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
       const tabMap: Record<string, Page> = { '1': 'home', '2': 'seo-audit', '3': 'search', '4': 'analytics' };
-      if (tabMap[e.key] && selected) { e.preventDefault(); setTab(tabMap[e.key]); }
-      if (e.key === ',') { e.preventDefault(); setTab('settings'); }
+      if (tabMap[e.key] && selected) { e.preventDefault(); navigate(adminPath(selected.id, tabMap[e.key])); }
+      if (e.key === ',') { e.preventDefault(); navigate('/settings'); }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -387,7 +401,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   // ── Content renderer ──
   const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'links', 'seo-strategy', 'seo-schema', 'seo-briefs', 'seo-ranks', 'content-perf', 'content', 'brand']);
   const needsSite = !!(SEO_TABS.has(tab) || tab === 'search' || tab === 'analytics' || tab === 'annotations' || tab === 'performance');
-  const seoNavigate = (t: string, ctx?: FixContext) => { setFixContext(ctx || null); setTab(t as Page); };
+  const seoNavigate = (t: string, ctx?: FixContext) => { setFixContext(ctx || null); if (selected) navigate(adminPath(selected.id, t as Page)); };
 
   const renderContent = () => {
     if (tab === 'settings') return <SettingsPanel />;
@@ -403,8 +417,8 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (!selected) {
       return <WorkspaceOverview onSelectWorkspace={(id) => {
         const ws = workspaces.find(w => w.id === id);
-        if (ws) { setSelected(ws); setTab('home'); }
-      }} onNavigate={(t) => setTab(t as Page)} />;
+        if (ws) { setSelected(ws); navigate(adminPath(ws.id)); }
+      }} />;
     }
 
     if (needsSite && !selected.webflowSiteId) {
@@ -414,19 +428,19 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
             <Globe className="w-5 h-5 text-zinc-500" />
           </div>
           <p className="text-sm text-zinc-500">Link a Webflow site to use this tool</p>
-          <button onClick={() => setTab('settings')} className="mt-3 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors bg-teal-500/10 text-teal-400">Go to Settings</button>
+          <button onClick={() => navigate('/settings')} className="mt-3 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors bg-teal-500/10 text-teal-400">Go to Settings</button>
         </div>
       );
     }
 
-    if (tab === 'home') return <WorkspaceHome key={`home-${selected.id}`} workspaceId={selected.id} workspaceName={selected.webflowSiteName || selected.name} webflowSiteId={selected.webflowSiteId} webflowSiteName={selected.webflowSiteName} gscPropertyUrl={selected.gscPropertyUrl} ga4PropertyId={selected.ga4PropertyId} onNavigate={(t) => setTab(t as Page)} />;
+    if (tab === 'home') return <WorkspaceHome key={`home-${selected.id}`} workspaceId={selected.id} workspaceName={selected.webflowSiteName || selected.name} webflowSiteId={selected.webflowSiteId} webflowSiteName={selected.webflowSiteName} gscPropertyUrl={selected.gscPropertyUrl} ga4PropertyId={selected.ga4PropertyId} />;
     if (tab === 'media') return <MediaTab key={selected.folder} siteId={selected.webflowSiteId} workspaceFolder={selected.folder} queue={workspaceQueue} />;
-    if (tab === 'seo-audit') return <SeoAudit key={`seo-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} siteName={selected.webflowSiteName || selected.name} onNavigate={seoNavigate} />;
+    if (tab === 'seo-audit') return <SeoAudit key={`seo-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} siteName={selected.webflowSiteName || selected.name} />;
     if (tab === 'seo-editor') return <SeoEditorWrapper key={`editor-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} />;
-    if (tab === 'seo-strategy') return <KeywordStrategyPanel key={`strategy-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId!} onNavigate={seoNavigate} />;
+    if (tab === 'seo-strategy') return <KeywordStrategyPanel key={`strategy-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId!} />;
     if (tab === 'links') return <LinksPanel key={`links-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} />;
     if (tab === 'seo-schema') return <SchemaSuggester key={`schema-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} />;
-    if (tab === 'seo-briefs') return <ContentBriefs key={`briefs-${selected.id}`} workspaceId={selected.id} onRequestCountChange={setPendingContentRequests} fixContext={fixContext} onNavigate={(t) => setTab(t as Page)} />;
+    if (tab === 'seo-briefs') return <ContentBriefs key={`briefs-${selected.id}`} workspaceId={selected.id} onRequestCountChange={setPendingContentRequests} fixContext={fixContext} />;
     if (tab === 'content') return <ContentManager key={`content-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'brand') return <BrandHub key={`brand-${selected.id}`} workspaceId={selected.id} webflowSiteId={selected.webflowSiteId} />;
     if (tab === 'seo-ranks') return <RankTracker key={`ranks-${selected.id}`} workspaceId={selected.id} hasGsc={!!selected.gscPropertyUrl} />;
@@ -446,7 +460,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
       <aside className="w-[200px] flex-shrink-0 flex flex-col border-r border-zinc-800">
         {/* Logo → Command Center */}
         <button
-          onClick={() => { setSelected(null); setTab('home'); }}
+          onClick={() => { setSelected(null); navigate('/'); }}
           className="px-4 pt-4 pb-3 block hover:opacity-80 transition-opacity"
           title="Command Center"
         >
@@ -458,7 +472,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
           <WorkspaceSelector
             workspaces={workspaces}
             selected={selected}
-            onSelect={(ws) => { setSelected(ws); if (tab === 'prospect' || tab === 'settings' || tab === 'roadmap') setTab('home'); }}
+            onSelect={(ws) => { setSelected(ws); if (GLOBAL_TABS.has(tab)) navigate(adminPath(ws.id)); else navigate(adminPath(ws.id, tab)); }}
             onCreate={handleCreate}
             onDelete={handleDelete}
             onLinkSite={handleLinkSite}
@@ -500,7 +514,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
                   return (
                     <button
                       key={item.id}
-                      onClick={() => !disabled && setTab(item.id)}
+                      onClick={() => !disabled && selected && navigate(adminPath(selected.id, item.id))}
                       className={`w-full flex items-center gap-2.5 px-2.5 py-[5px] rounded-lg text-[12px] font-medium transition-all ${
                         active
                           ? `${group.activeBg || 'bg-teal-500/10'} ${group.activeText || 'text-teal-300'}`
@@ -527,7 +541,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
         {/* Bottom: icon-only utility bar */}
         <div className="px-3 py-2.5 border-t border-zinc-800 flex items-center justify-center gap-1">
           <button
-            onClick={() => setTab('settings')}
+            onClick={() => navigate('/settings')}
             title="Settings"
             className={`p-2 rounded-lg transition-all ${tab === 'settings' ? 'text-teal-400 bg-teal-500/10' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'}`}
           >
@@ -557,7 +571,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
         {/* Breadcrumb bar (#165) + header widgets */}
         <div className="flex items-center gap-1.5 px-5 py-2 border-b border-zinc-800 text-[11px] min-h-[36px]">
           <button
-            onClick={() => { setSelected(null); setTab('home'); }}
+            onClick={() => { setSelected(null); navigate('/'); }}
             className={`font-medium transition-colors ${!selected ? 'text-teal-400' : 'text-zinc-500 hover:text-zinc-300'}`}
           >
             Command Center
@@ -574,7 +588,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
                   {workspaces.map(ws => (
                     <button
                       key={ws.id}
-                      onClick={() => { setSelected(ws); setTab('home'); }}
+                      onClick={() => { setSelected(ws); navigate(adminPath(ws.id)); }}
                       className={`w-full text-left px-3 py-1.5 text-[11px] transition-colors ${
                         ws.id === selected.id ? 'text-teal-400 bg-teal-500/5' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
                       }`}
@@ -608,7 +622,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
             {/* Requests widget */}
             {selected && (
               <button
-                onClick={() => setTab('requests')}
+                onClick={() => selected && navigate(adminPath(selected.id, 'requests'))}
                 title="Client Requests"
                 className={`relative p-1.5 rounded-lg transition-all ${tab === 'requests' ? 'text-teal-400 bg-teal-500/10' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'}`}
               >
@@ -621,9 +635,9 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
               </button>
             )}
             {/* Notification bell */}
-            <NotificationBell onSelectWorkspace={(wsId, wsTab) => {
+            <NotificationBell onSelectWorkspace={(wsId) => {
               const ws = workspaces.find(w => w.id === wsId);
-              if (ws) { setSelected(ws); setTab(wsTab as Page); }
+              if (ws) setSelected(ws);
             }} />
           </div>
         </div>
@@ -637,7 +651,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
           <div className="max-w-5xl mx-auto">
             {pendingContentRequests > 0 && selected && tab !== 'seo-briefs' && (
               <button
-                onClick={() => setTab('seo-briefs')}
+                onClick={() => selected && navigate(adminPath(selected.id, 'seo-briefs'))}
                 className="w-full mb-4 flex items-center gap-3 px-4 py-3 rounded-xl border transition-all hover:border-amber-400/40"
                 style={{ backgroundColor: 'rgba(245,158,11,0.06)', borderColor: 'rgba(245,158,11,0.2)' }}
               >
@@ -668,8 +682,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
       <CommandPalette
         workspaces={workspaces}
         selectedWorkspace={selected}
-        onSelectWorkspace={(ws) => { setSelected(ws); setTab('home'); }}
-        onNavigate={(t) => setTab(t)}
+        onSelectWorkspace={(ws) => { setSelected(ws); navigate(adminPath(ws.id)); }}
       />
       {selected && health.hasOpenAIKey && (
         <ErrorBoundary label="Admin Chat">

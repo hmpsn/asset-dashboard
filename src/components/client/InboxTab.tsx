@@ -44,7 +44,6 @@ interface InboxTabProps {
     pageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource';
   } | null) => void;
   pricingConfirming: boolean;
-  setTab: (t: ClientTab) => void;
   // Shared
   setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
   // Which section to show initially (for deep-linking from Overview actions)
@@ -55,7 +54,7 @@ export function InboxTab({
   workspaceId, effectiveTier,
   approvalBatches, approvalsLoading, pendingApprovals, setApprovalBatches, loadApprovals,
   requests, requestsLoading, clientUser, loadRequests,
-  contentRequests, setContentRequests, briefPrice, fullPostPrice, fmtPrice, setPricingModal, pricingConfirming, setTab,
+  contentRequests, setContentRequests, briefPrice, fullPostPrice, fmtPrice, setPricingModal, pricingConfirming,
   setToast,
   initialFilter,
 }: InboxTabProps) {
@@ -183,7 +182,6 @@ export function InboxTab({
             setPricingModal={setPricingModal}
             pricingConfirming={pricingConfirming}
             workspaceId={workspaceId}
-            setTab={setTab}
             setToast={setToast}
           />
         </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Sparkles, Target, Shield, LineChart, FileText,
   Zap, ChevronRight, ChevronLeft, Check, BarChart3, Trophy,
@@ -6,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useBetaMode } from './BetaContext';
 import { STUDIO_NAME } from '../../constants';
+import { clientPath } from '../../routes';
 
 interface OnboardingWizardProps {
   workspaceName: string;
@@ -17,7 +19,7 @@ interface OnboardingWizardProps {
   hasStrategy: boolean;
   hasAudit: boolean;
   onDismiss: () => void;
-  onNavigate: (tab: string) => void;
+  workspaceId: string;
 }
 
 const STEPS = ['welcome', 'tour', 'actions'] as const;
@@ -26,8 +28,9 @@ type Step = typeof STEPS[number];
 export function OnboardingWizard({
   workspaceName, tier, isTrial, trialDaysRemaining,
   hasGSC, hasStrategy, hasAudit,
-  onDismiss, onNavigate,
+  onDismiss, workspaceId,
 }: OnboardingWizardProps) {
+  const navigate = useNavigate();
   const betaMode = useBetaMode();
   const [step, setStep] = useState<Step>('welcome');
   const stepIdx = STEPS.indexOf(step);
@@ -153,7 +156,7 @@ export function OnboardingWizard({
               {suggestedActions.map((a, i) => (
                 <button
                   key={i}
-                  onClick={() => { onDismiss(); onNavigate(a.tab); }}
+                  onClick={() => { onDismiss(); navigate(clientPath(workspaceId, a.tab)); }}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border ${a.bg} hover:scale-[1.01] transition-all text-left group`}
                 >
                   <div className={`w-8 h-8 rounded-lg bg-zinc-900/50 flex items-center justify-center flex-shrink-0`}>
@@ -188,7 +191,7 @@ export function OnboardingWizard({
             </button>
           ) : (
             <button
-              onClick={() => { onDismiss(); onNavigate('overview'); }}
+              onClick={() => { onDismiss(); navigate(clientPath(workspaceId, 'overview')); }}
               className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-sm text-white font-semibold hover:from-teal-500 hover:to-emerald-500 transition-all"
             >
               <Check className="w-3.5 h-3.5" /> Explore Dashboard

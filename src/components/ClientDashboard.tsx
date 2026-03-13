@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { clientPath } from '../routes';
 import {
   Loader2,
   Sparkles, Send, AlertTriangle,
@@ -127,19 +129,15 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   } = useChat(chatDeps);
 
   // ── UI-only state ──
-  const [tab, setTabRaw] = useState<ClientTab>(() => {
-    // Prefer path-based tab from /client/:workspaceId/:tab
+  const clientNavigate = useNavigate();
+  const tab: ClientTab = (() => {
     const t = initialTab;
     if (t === 'search' || t === 'analytics') return 'performance' as ClientTab;
     if (t && ['overview','performance','health','strategy','inbox','approvals','requests','content','plans','roi'].includes(t)) return t as ClientTab;
     return 'overview';
-  });
+  })();
   const setTab = (t: ClientTab) => {
-    setTabRaw(t);
-    const params = new URLSearchParams(window.location.search);
-    const basePath = t === 'overview' ? `/client/${workspaceId}` : `/client/${workspaceId}/${t}`;
-    const qs = params.toString();
-    window.history.replaceState({}, '', qs ? `${basePath}?${qs}` : basePath);
+    clientNavigate(clientPath(workspaceId, t));
   };
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
@@ -824,7 +822,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
         {/* ════════════ OVERVIEW TAB ════════════ */}
         {tab === 'overview' && (
-          <OverviewTab ws={ws!} overview={overview} searchComparison={searchComparison} trend={trend} ga4Overview={ga4Overview} ga4Trend={ga4Trend} ga4Comparison={ga4Comparison} ga4Organic={ga4Organic} ga4Conversions={ga4Conversions} ga4NewVsReturning={ga4NewVsReturning} audit={audit} auditDetail={auditDetail} strategyData={strategyData} insights={insights} contentRequests={contentRequests} requests={requests} approvalBatches={approvalBatches} activityLog={activityLog} pendingApprovals={pendingApprovals} unreadTeamNotes={unreadTeamNotes} eventDisplayName={eventDisplayName} isEventPinned={isEventPinned} setTab={setTab} onAskAi={askAi} onOpenChat={() => setChatOpen(true)} clientUser={clientUser} proactiveInsight={proactiveInsight} proactiveInsightLoading={proactiveInsightLoading} />
+          <OverviewTab ws={ws!} overview={overview} searchComparison={searchComparison} trend={trend} ga4Overview={ga4Overview} ga4Trend={ga4Trend} ga4Comparison={ga4Comparison} ga4Organic={ga4Organic} ga4Conversions={ga4Conversions} ga4NewVsReturning={ga4NewVsReturning} audit={audit} auditDetail={auditDetail} strategyData={strategyData} insights={insights} contentRequests={contentRequests} requests={requests} approvalBatches={approvalBatches} activityLog={activityLog} pendingApprovals={pendingApprovals} unreadTeamNotes={unreadTeamNotes} eventDisplayName={eventDisplayName} isEventPinned={isEventPinned} workspaceId={workspaceId} onAskAi={askAi} onOpenChat={() => setChatOpen(true)} clientUser={clientUser} proactiveInsight={proactiveInsight} proactiveInsightLoading={proactiveInsightLoading} />
         )}
 
         {/* ════════════ PERFORMANCE TAB (Search + Analytics) ════════════ */}
@@ -854,7 +852,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
         {/* ════════════ INBOX TAB (Approvals + Requests + Content) ════════════ */}
         {tab === 'inbox' && (
-          <InboxTab workspaceId={workspaceId} effectiveTier={effectiveTier} approvalBatches={approvalBatches} approvalsLoading={approvalsLoading} pendingApprovals={pendingApprovals} setApprovalBatches={setApprovalBatches} loadApprovals={loadApprovals} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} contentRequests={contentRequests} setContentRequests={setContentRequests} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} pricingConfirming={pricingConfirming} setTab={setTab} setToast={setToast} />
+          <InboxTab workspaceId={workspaceId} effectiveTier={effectiveTier} approvalBatches={approvalBatches} approvalsLoading={approvalsLoading} pendingApprovals={pendingApprovals} setApprovalBatches={setApprovalBatches} loadApprovals={loadApprovals} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} contentRequests={contentRequests} setContentRequests={setContentRequests} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} pricingConfirming={pricingConfirming} setToast={setToast} />
         )}
 
 
@@ -992,7 +990,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
         {/* ════════════ PLANS TAB ════════════ */}
         {tab === 'plans' && (
-          <PlansTab workspaceId={workspaceId} ws={ws} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setTab={setTab} setToast={setToast} onOpenChat={() => setChatOpen(true)} />
+          <PlansTab workspaceId={workspaceId} ws={ws} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setToast={setToast} onOpenChat={() => setChatOpen(true)} />
         )}
 
         {/* ════════════ ROI TAB ════════════ */}
@@ -1240,7 +1238,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
             localStorage.setItem(key, 'true');
             setShowWelcome(false);
           }}
-          onNavigate={(t) => setTab(t as ClientTab)}
+          workspaceId={workspaceId}
         />
       )}
 

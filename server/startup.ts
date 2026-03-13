@@ -1,0 +1,22 @@
+import { initEmailQueue } from './email.js';
+import { startScheduler } from './scheduled-audits.js';
+import { startApprovalReminders } from './approval-reminders.js';
+import { startMonthlyReports } from './monthly-report.js';
+import { startBackupScheduler } from './backup.js';
+import { clearTestModeCustomerIds } from './stripe.js';
+import { startTrialReminders } from './trial-reminders.js';
+import { startChurnSignalScheduler } from './churn-signals.js';
+import { startAnomalyDetection } from './anomaly-detection.js';
+
+/** Start all background schedulers and queues. */
+export function startSchedulers() {
+  initEmailQueue();
+  startScheduler();
+  startApprovalReminders();
+  startMonthlyReports();
+  startBackupScheduler();
+  clearTestModeCustomerIds();
+  startTrialReminders();
+  startChurnSignalScheduler();
+  startAnomalyDetection();
+}
