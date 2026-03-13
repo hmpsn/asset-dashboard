@@ -104,8 +104,8 @@ router.post('/api/stripe/create-checkout', checkoutLimiter, async (req, res) => 
 
   // Build redirect URLs
   const baseUrl = `${req.protocol}://${req.get('host')}`;
-  const successUrl = `${baseUrl}/client/${workspaceId}?tab=content&payment=success&session_id={CHECKOUT_SESSION_ID}`;
-  const cancelUrl = `${baseUrl}/client/${workspaceId}?tab=content&payment=cancelled`;
+  const successUrl = `${baseUrl}/client/${workspaceId}/content?payment=success&session_id={CHECKOUT_SESSION_ID}`;
+  const cancelUrl = `${baseUrl}/client/${workspaceId}/content?payment=cancelled`;
 
   try {
     const { sessionId, url } = await createCheckoutSession({
@@ -133,8 +133,8 @@ router.post('/api/stripe/cart-checkout', checkoutLimiter, async (req, res) => {
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
   const baseUrl = `${req.protocol}://${req.get('host')}`;
-  const successUrl = `${baseUrl}/client/${workspaceId}?tab=health&payment=success&session_id={CHECKOUT_SESSION_ID}`;
-  const cancelUrl = `${baseUrl}/client/${workspaceId}?tab=health&payment=cancelled`;
+  const successUrl = `${baseUrl}/client/${workspaceId}/health?payment=success&session_id={CHECKOUT_SESSION_ID}`;
+  const cancelUrl = `${baseUrl}/client/${workspaceId}/health?payment=cancelled`;
 
   try {
     const { sessionId, url } = await createCartCheckoutSession({
@@ -169,8 +169,8 @@ router.post('/api/public/upgrade-checkout/:workspaceId', checkoutLimiter, async 
   if (!config) return res.status(400).json({ error: `Product not configured: ${productType}` });
 
   const baseUrl = `${req.protocol}://${req.get('host')}`;
-  const successUrl = `${baseUrl}/client/${wsId}?tab=plans&payment=success&session_id={CHECKOUT_SESSION_ID}`;
-  const cancelUrl = `${baseUrl}/client/${wsId}?tab=plans&payment=cancelled`;
+  const successUrl = `${baseUrl}/client/${wsId}/plans?payment=success&session_id={CHECKOUT_SESSION_ID}`;
+  const cancelUrl = `${baseUrl}/client/${wsId}/plans?payment=cancelled`;
 
   try {
     const { sessionId, url } = await createCheckoutSession({
@@ -228,7 +228,7 @@ router.post('/api/public/billing-portal/:workspaceId', checkoutLimiter, async (r
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
   const baseUrl = `${req.protocol}://${req.get('host')}`;
-  const returnUrl = `${baseUrl}/client/${wsId}?tab=plans`;
+  const returnUrl = `${baseUrl}/client/${wsId}/plans`;
 
   try {
     const { url } = await createBillingPortalSession(wsId, returnUrl);

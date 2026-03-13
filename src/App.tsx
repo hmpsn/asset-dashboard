@@ -95,10 +95,22 @@ function App() {
   if (betaMatch) {
     return <MobileGuard><Suspense fallback={<ChunkFallback />}><ClientDashboard workspaceId={betaMatch[1]} betaMode /></Suspense></MobileGuard>;
   }
-  // Client dashboard route: /client/:workspaceId (public, no auth)
-  const clientMatch = window.location.pathname.match(/^\/client\/([\w_]+)/);
+  // Client dashboard route: /client/:workspaceId/:tab? (public, no auth)
+  const clientMatch = window.location.pathname.match(/^\/client\/([\w_]+)(?:\/(\w+))?/);
   if (clientMatch) {
-    return <MobileGuard><Suspense fallback={<ChunkFallback />}><ClientDashboard workspaceId={clientMatch[1]} /></Suspense></MobileGuard>;
+    const workspaceId = clientMatch[1];
+    const pathTab = clientMatch[2] || undefined;
+    // Backward compat: redirect old ?tab=X URLs to /client/:workspaceId/:tab
+    const searchParams = new URLSearchParams(window.location.search);
+    const queryTab = searchParams.get('tab');
+    if (queryTab) {
+      searchParams.delete('tab');
+      const remaining = searchParams.toString();
+      const newPath = `/client/${workspaceId}/${queryTab}${remaining ? '?' + remaining : ''}`;
+      window.location.replace(newPath);
+      return null;
+    }
+    return <MobileGuard><Suspense fallback={<ChunkFallback />}><ClientDashboard workspaceId={workspaceId} initialTab={pathTab} /></Suspense></MobileGuard>;
   }
   return <ToastProvider><BackgroundTaskProvider><AdminApp /></BackgroundTaskProvider></ToastProvider>;
 }

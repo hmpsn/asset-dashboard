@@ -38,7 +38,7 @@ import {
   type ClientTab,
 } from './client/types';
 
-export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId: string; betaMode?: boolean }) {
+export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: { workspaceId: string; betaMode?: boolean; initialTab?: string }) {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     try { return (localStorage.getItem('dashboard-theme') as 'dark' | 'light') || 'dark'; } catch { return 'dark'; }
   });
@@ -128,17 +128,18 @@ export function ClientDashboard({ workspaceId, betaMode = false }: { workspaceId
 
   // ── UI-only state ──
   const [tab, setTabRaw] = useState<ClientTab>(() => {
-    const params = new URLSearchParams(window.location.search);
-    const t = params.get('tab');
+    // Prefer path-based tab from /client/:workspaceId/:tab
+    const t = initialTab;
     if (t === 'search' || t === 'analytics') return 'performance' as ClientTab;
     if (t && ['overview','performance','health','strategy','inbox','approvals','requests','content','plans','roi'].includes(t)) return t as ClientTab;
     return 'overview';
   });
   const setTab = (t: ClientTab) => {
     setTabRaw(t);
-    const url = new URL(window.location.href);
-    if (t === 'overview') url.searchParams.delete('tab'); else url.searchParams.set('tab', t);
-    window.history.replaceState({}, '', url.toString());
+    const params = new URLSearchParams(window.location.search);
+    const basePath = t === 'overview' ? `/client/${workspaceId}` : `/client/${workspaceId}/${t}`;
+    const qs = params.toString();
+    window.history.replaceState({}, '', qs ? `${basePath}?${qs}` : basePath);
   };
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
