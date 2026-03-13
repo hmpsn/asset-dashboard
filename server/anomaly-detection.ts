@@ -14,10 +14,8 @@
  * - conversion_drop: Conversions or key events dropped
  */
 
-import fs from 'fs';
-import path from 'path';
 import crypto from 'crypto';
-import { getUploadRoot } from './data-dir.js';
+import db from './db/index.js';
 import { listWorkspaces, type Workspace } from './workspaces.js';
 import { getSearchPeriodComparison } from './search-console.js';
 import { getGA4PeriodComparison, getGA4Conversions } from './google-analytics.js';
@@ -26,15 +24,13 @@ import { addActivity } from './activity-log.js';
 import { callOpenAI } from './openai-helpers.js';
 import { notifyAnomalyAlert } from './email.js';
 
-const UPLOAD_ROOT = getUploadRoot();
-
 // --- WebSocket broadcast callback ---
 let _broadcast: ((workspaceId: string, event: string, data: unknown) => void) | null = null;
 
 export function initAnomalyBroadcast(fn: (workspaceId: string, event: string, data: unknown) => void) {
   _broadcast = fn;
 }
-const ANOMALIES_FILE = path.join(UPLOAD_ROOT, '.anomalies.json');
+
 const CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000; // Every 12 hours
 const COMPARISON_DAYS = 28;
 
@@ -83,56 +79,121 @@ export interface Anomaly {
   source: 'gsc' | 'ga4' | 'audit';
 }
 
-// --- File I/O ---
+// --- SQLite row shape ---
 
-function readAnomalies(): Anomaly[] {
-  try {
-    if (fs.existsSync(ANOMALIES_FILE)) {
-      return JSON.parse(fs.readFileSync(ANOMALIES_FILE, 'utf-8'));
-    }
-  } catch { /* no file yet */ }
-  return [];
+interface AnomalyRow {
+  id: string;
+  workspace_id: string;
+  workspace_name: string;
+  type: string;
+  severity: string;
+  title: string;
+  description: string;
+  metric: string;
+  current_value: number;
+  previous_value: number;
+  change_pct: number;
+  ai_summary: string | null;
+  detected_at: string;
+  dismissed_at: string | null;
+  acknowledged_at: string | null;
+  source: string;
 }
 
-function writeAnomalies(anomalies: Anomaly[]) {
-  fs.mkdirSync(path.dirname(ANOMALIES_FILE), { recursive: true });
-  fs.writeFileSync(ANOMALIES_FILE, JSON.stringify(anomalies, null, 2));
+function rowToAnomaly(row: AnomalyRow): Anomaly {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    workspaceName: row.workspace_name,
+    type: row.type as AnomalyType,
+    severity: row.severity as AnomalySeverity,
+    title: row.title,
+    description: row.description,
+    metric: row.metric,
+    currentValue: row.current_value,
+    previousValue: row.previous_value,
+    changePct: row.change_pct,
+    aiSummary: row.ai_summary ?? undefined,
+    detectedAt: row.detected_at,
+    dismissedAt: row.dismissed_at ?? undefined,
+    acknowledgedAt: row.acknowledged_at ?? undefined,
+    source: row.source as Anomaly['source'],
+  };
+}
+
+// --- Prepared statements (lazily initialized after migrations run) ---
+
+interface Stmts {
+  selectAll: ReturnType<typeof db.prepare>;
+  selectByWorkspace: ReturnType<typeof db.prepare>;
+  selectActiveByWorkspace: ReturnType<typeof db.prepare>;
+  selectById: ReturnType<typeof db.prepare>;
+  insert: ReturnType<typeof db.prepare>;
+  dismiss: ReturnType<typeof db.prepare>;
+  acknowledge: ReturnType<typeof db.prepare>;
+  deleteOlderThan: ReturnType<typeof db.prepare>;
+  recentUndismissed: ReturnType<typeof db.prepare>;
+}
+
+let _stmts: Stmts | null = null;
+
+function stmts(): Stmts {
+  if (!_stmts) {
+    _stmts = {
+      selectAll: db.prepare('SELECT * FROM anomalies ORDER BY detected_at DESC'),
+      selectByWorkspace: db.prepare('SELECT * FROM anomalies WHERE workspace_id = ? ORDER BY detected_at DESC'),
+      selectActiveByWorkspace: db.prepare('SELECT * FROM anomalies WHERE workspace_id = ? AND dismissed_at IS NULL ORDER BY detected_at DESC'),
+      selectById: db.prepare('SELECT * FROM anomalies WHERE id = ?'),
+      insert: db.prepare(`
+        INSERT INTO anomalies (id, workspace_id, workspace_name, type, severity,
+          title, description, metric, current_value, previous_value, change_pct,
+          ai_summary, detected_at, dismissed_at, acknowledged_at, source)
+        VALUES (@id, @workspace_id, @workspace_name, @type, @severity,
+          @title, @description, @metric, @current_value, @previous_value, @change_pct,
+          @ai_summary, @detected_at, @dismissed_at, @acknowledged_at, @source)
+      `),
+      dismiss: db.prepare('UPDATE anomalies SET dismissed_at = ? WHERE id = ?'),
+      acknowledge: db.prepare('UPDATE anomalies SET acknowledged_at = ? WHERE id = ?'),
+      deleteOlderThan: db.prepare('DELETE FROM anomalies WHERE detected_at < ?'),
+      recentUndismissed: db.prepare(`
+        SELECT * FROM anomalies
+        WHERE workspace_id = ? AND type = ? AND dismissed_at IS NULL AND detected_at > ?
+        LIMIT 1
+      `),
+    };
+  }
+  return _stmts;
 }
 
 // --- Public API ---
 
 export function listAnomalies(workspaceId?: string, includeDismissed = false): Anomaly[] {
-  let anomalies = readAnomalies();
-  if (workspaceId) anomalies = anomalies.filter(a => a.workspaceId === workspaceId);
-  if (!includeDismissed) anomalies = anomalies.filter(a => !a.dismissedAt);
-  return anomalies.sort((a, b) => b.detectedAt.localeCompare(a.detectedAt));
+  let rows: AnomalyRow[];
+  if (workspaceId) {
+    rows = includeDismissed
+      ? stmts().selectByWorkspace.all(workspaceId) as AnomalyRow[]
+      : stmts().selectActiveByWorkspace.all(workspaceId) as AnomalyRow[];
+  } else {
+    rows = stmts().selectAll.all() as AnomalyRow[];
+    if (!includeDismissed) rows = rows.filter(r => !r.dismissed_at);
+  }
+  return rows.map(rowToAnomaly);
 }
 
 export function dismissAnomaly(id: string): boolean {
-  const anomalies = readAnomalies();
-  const anomaly = anomalies.find(a => a.id === id);
-  if (!anomaly) return false;
-  anomaly.dismissedAt = new Date().toISOString();
-  writeAnomalies(anomalies);
-  return true;
+  const info = stmts().dismiss.run(new Date().toISOString(), id);
+  return info.changes > 0;
 }
 
 export function acknowledgeAnomaly(id: string): boolean {
-  const anomalies = readAnomalies();
-  const anomaly = anomalies.find(a => a.id === id);
-  if (!anomaly) return false;
-  anomaly.acknowledgedAt = new Date().toISOString();
-  writeAnomalies(anomalies);
-  return true;
+  const info = stmts().acknowledge.run(new Date().toISOString(), id);
+  return info.changes > 0;
 }
 
 export function clearOldAnomalies(daysOld = 60): number {
-  const anomalies = readAnomalies();
-  const cutoff = Date.now() - daysOld * 24 * 60 * 60 * 1000;
-  const filtered = anomalies.filter(a => new Date(a.detectedAt).getTime() > cutoff);
-  const removed = anomalies.length - filtered.length;
-  if (removed > 0) writeAnomalies(filtered);
-  return removed;
+  const cutoff = new Date(Date.now() - daysOld * 24 * 60 * 60 * 1000).toISOString();
+  const info = stmts().deleteOlderThan.run(cutoff);
+  return info.changes;
 }
 
 // --- Detection helpers ---
@@ -148,11 +209,10 @@ function severityFor(type: AnomalyType): AnomalySeverity {
   return 'warning';
 }
 
-function alreadyDetected(anomalies: Anomaly[], workspaceId: string, type: AnomalyType, withinHours = 48): boolean {
-  const cutoff = Date.now() - withinHours * 60 * 60 * 1000;
-  return anomalies.some(
-    a => a.workspaceId === workspaceId && a.type === type && new Date(a.detectedAt).getTime() > cutoff && !a.dismissedAt
-  );
+function alreadyDetected(workspaceId: string, type: AnomalyType, withinHours = 48): boolean {
+  const cutoff = new Date(Date.now() - withinHours * 60 * 60 * 1000).toISOString();
+  const row = stmts().recentUndismissed.get(workspaceId, type, cutoff) as AnomalyRow | undefined;
+  return !!row;
 }
 
 function createAnomaly(
@@ -185,7 +245,7 @@ function createAnomaly(
 
 // --- Core detection for a single workspace ---
 
-async function detectForWorkspace(ws: Workspace, existing: Anomaly[]): Promise<Anomaly[]> {
+async function detectForWorkspace(ws: Workspace): Promise<Anomaly[]> {
   const detected: Anomaly[] = [];
 
   // --- GSC anomalies ---
@@ -195,7 +255,7 @@ async function detectForWorkspace(ws: Workspace, existing: Anomaly[]): Promise<A
       const { current, previous, changePercent } = cmp;
 
       // Traffic drop (clicks)
-      if (changePercent.clicks <= THRESHOLDS.traffic_drop && !alreadyDetected(existing, ws.id, 'traffic_drop')) {
+      if (changePercent.clicks <= THRESHOLDS.traffic_drop && !alreadyDetected(ws.id, 'traffic_drop')) {
         detected.push(createAnomaly(ws, 'traffic_drop', 'clicks', current.clicks, previous.clicks, changePercent.clicks, 'gsc',
           `Search clicks dropped ${Math.abs(changePercent.clicks)}%`,
           `Clicks fell from ${previous.clicks.toLocaleString()} to ${current.clicks.toLocaleString()} (${changePercent.clicks}%) over the last ${COMPARISON_DAYS} days vs the prior period.`,
@@ -203,7 +263,7 @@ async function detectForWorkspace(ws: Workspace, existing: Anomaly[]): Promise<A
       }
 
       // Traffic spike (clicks)
-      if (changePercent.clicks >= THRESHOLDS.traffic_spike && !alreadyDetected(existing, ws.id, 'traffic_spike')) {
+      if (changePercent.clicks >= THRESHOLDS.traffic_spike && !alreadyDetected(ws.id, 'traffic_spike')) {
         detected.push(createAnomaly(ws, 'traffic_spike', 'clicks', current.clicks, previous.clicks, changePercent.clicks, 'gsc',
           `Search clicks surged ${changePercent.clicks}%`,
           `Clicks rose from ${previous.clicks.toLocaleString()} to ${current.clicks.toLocaleString()} (+${changePercent.clicks}%) over the last ${COMPARISON_DAYS} days.`,
@@ -211,7 +271,7 @@ async function detectForWorkspace(ws: Workspace, existing: Anomaly[]): Promise<A
       }
 
       // Impressions drop
-      if (changePercent.impressions <= THRESHOLDS.impressions_drop && !alreadyDetected(existing, ws.id, 'impressions_drop')) {
+      if (changePercent.impressions <= THRESHOLDS.impressions_drop && !alreadyDetected(ws.id, 'impressions_drop')) {
         detected.push(createAnomaly(ws, 'impressions_drop', 'impressions', current.impressions, previous.impressions, changePercent.impressions, 'gsc',
           `Search impressions dropped ${Math.abs(changePercent.impressions)}%`,
           `Impressions fell from ${previous.impressions.toLocaleString()} to ${current.impressions.toLocaleString()} — potential visibility loss.`,
@@ -219,7 +279,7 @@ async function detectForWorkspace(ws: Workspace, existing: Anomaly[]): Promise<A
       }
 
       // CTR drop
-      if (changePercent.ctr <= THRESHOLDS.ctr_drop && !alreadyDetected(existing, ws.id, 'ctr_drop')) {
+      if (changePercent.ctr <= THRESHOLDS.ctr_drop && !alreadyDetected(ws.id, 'ctr_drop')) {
         detected.push(createAnomaly(ws, 'ctr_drop', 'ctr', current.ctr, previous.ctr, changePercent.ctr, 'gsc',
           `Click-through rate dropped to ${current.ctr}%`,
           `CTR declined from ${previous.ctr}% to ${current.ctr}% (${changePercent.ctr}%). May indicate meta title/description issues or SERP changes.`,
@@ -227,7 +287,7 @@ async function detectForWorkspace(ws: Workspace, existing: Anomaly[]): Promise<A
       }
 
       // Position decline (higher number = worse)
-      if (changePercent.position >= THRESHOLDS.position_decline && current.position > previous.position && !alreadyDetected(existing, ws.id, 'position_decline')) {
+      if (changePercent.position >= THRESHOLDS.position_decline && current.position > previous.position && !alreadyDetected(ws.id, 'position_decline')) {
         detected.push(createAnomaly(ws, 'position_decline', 'position', current.position, previous.position, changePercent.position, 'gsc',
           `Average position worsened to ${current.position}`,
           `Position moved from ${previous.position} to ${current.position} — rankings are slipping.`,
@@ -246,7 +306,7 @@ async function detectForWorkspace(ws: Workspace, existing: Anomaly[]): Promise<A
 
       // User traffic drop
       const userChangePct = changePercent.users;
-      if (userChangePct <= THRESHOLDS.traffic_drop && !alreadyDetected(existing, ws.id, 'traffic_drop')) {
+      if (userChangePct <= THRESHOLDS.traffic_drop && !alreadyDetected(ws.id, 'traffic_drop')) {
         // Only add if not already detected from GSC
         if (!detected.some(d => d.type === 'traffic_drop')) {
           detected.push(createAnomaly(ws, 'traffic_drop', 'users', current.totalUsers, previous.totalUsers, userChangePct, 'ga4',
@@ -257,7 +317,7 @@ async function detectForWorkspace(ws: Workspace, existing: Anomaly[]): Promise<A
       }
 
       // User traffic spike
-      if (userChangePct >= THRESHOLDS.traffic_spike && !alreadyDetected(existing, ws.id, 'traffic_spike')) {
+      if (userChangePct >= THRESHOLDS.traffic_spike && !alreadyDetected(ws.id, 'traffic_spike')) {
         if (!detected.some(d => d.type === 'traffic_spike')) {
           detected.push(createAnomaly(ws, 'traffic_spike', 'users', current.totalUsers, previous.totalUsers, userChangePct, 'ga4',
             `Website users surged ${userChangePct}%`,
@@ -269,7 +329,7 @@ async function detectForWorkspace(ws: Workspace, existing: Anomaly[]): Promise<A
       // Bounce rate spike
       const bounceChange = current.bounceRate - previous.bounceRate;
       const bouncePct = previous.bounceRate > 0 ? pctChange(current.bounceRate, previous.bounceRate) : 0;
-      if (bounceChange > 5 && bouncePct >= THRESHOLDS.bounce_spike && !alreadyDetected(existing, ws.id, 'bounce_spike')) {
+      if (bounceChange > 5 && bouncePct >= THRESHOLDS.bounce_spike && !alreadyDetected(ws.id, 'bounce_spike')) {
         detected.push(createAnomaly(ws, 'bounce_spike', 'bounceRate', current.bounceRate, previous.bounceRate, bouncePct, 'ga4',
           `Bounce rate spiked to ${current.bounceRate}%`,
           `Bounce rate increased from ${previous.bounceRate}% to ${current.bounceRate}% (+${bounceChange.toFixed(1)}pp). May indicate content or UX issues.`,
@@ -297,7 +357,7 @@ async function detectForWorkspace(ws: Workspace, existing: Anomaly[]): Promise<A
         const totalPrev = prevConvs.reduce((s, c) => s + c.conversions, 0);
         if (totalPrev > 5) { // Only flag if there were meaningful conversions before
           const convChangePct = pctChange(totalCurrent, totalPrev);
-          if (convChangePct <= THRESHOLDS.conversion_drop && !alreadyDetected(existing, ws.id, 'conversion_drop')) {
+          if (convChangePct <= THRESHOLDS.conversion_drop && !alreadyDetected(ws.id, 'conversion_drop')) {
             detected.push(createAnomaly(ws, 'conversion_drop', 'conversions', totalCurrent, totalPrev, convChangePct, 'ga4',
               `Conversions dropped ${Math.abs(convChangePct)}%`,
               `Key events fell from ${totalPrev} to ${totalCurrent} (${convChangePct}%). Check if tracking is intact and landing pages are performing.`,
@@ -319,14 +379,14 @@ async function detectForWorkspace(ws: Workspace, existing: Anomaly[]): Promise<A
         const prev = snapshots[1];
         const scoreDiff = latest.siteScore - prev.siteScore;
 
-        if (scoreDiff <= THRESHOLDS.audit_score_drop && !alreadyDetected(existing, ws.id, 'audit_score_drop')) {
+        if (scoreDiff <= THRESHOLDS.audit_score_drop && !alreadyDetected(ws.id, 'audit_score_drop')) {
           detected.push(createAnomaly(ws, 'audit_score_drop', 'siteScore', latest.siteScore, prev.siteScore, scoreDiff, 'audit',
             `Site health score dropped ${Math.abs(scoreDiff)} points`,
             `Score went from ${prev.siteScore} to ${latest.siteScore}. Errors: ${latest.errors}, warnings: ${latest.warnings}.`,
           ));
         }
 
-        if (scoreDiff >= THRESHOLDS.audit_score_improvement && !alreadyDetected(existing, ws.id, 'audit_score_improvement')) {
+        if (scoreDiff >= THRESHOLDS.audit_score_improvement && !alreadyDetected(ws.id, 'audit_score_improvement')) {
           detected.push(createAnomaly(ws, 'audit_score_improvement', 'siteScore', latest.siteScore, prev.siteScore, scoreDiff, 'audit',
             `Site health score improved ${scoreDiff} points!`,
             `Score went from ${prev.siteScore} to ${latest.siteScore}. Great progress!`,
@@ -377,7 +437,7 @@ async function generateAiSummary(anomalies: Anomaly[], workspaceName: string): P
 export async function runAnomalyDetection(): Promise<{ total: number; newAnomalies: number }> {
   console.log('[Anomaly] Starting anomaly detection scan...');
   const workspaces = listWorkspaces();
-  const existing = readAnomalies();
+  const existingCount = (stmts().selectAll.all() as AnomalyRow[]).length;
   const allNew: Anomaly[] = [];
 
   for (const ws of workspaces) {
@@ -385,7 +445,7 @@ export async function runAnomalyDetection(): Promise<{ total: number; newAnomali
     if (!ws.gscPropertyUrl && !ws.ga4PropertyId && !ws.webflowSiteId) continue;
 
     try {
-      const detected = await detectForWorkspace(ws, existing);
+      const detected = await detectForWorkspace(ws);
       if (detected.length > 0) {
         // Generate AI summary for this workspace's anomalies
         const summary = await generateAiSummary(detected, ws.name);
@@ -424,6 +484,28 @@ export async function runAnomalyDetection(): Promise<{ total: number; newAnomali
           );
         }
 
+        // Insert new anomalies into DB
+        for (const a of detected) {
+          stmts().insert.run({
+            id: a.id,
+            workspace_id: a.workspaceId,
+            workspace_name: a.workspaceName,
+            type: a.type,
+            severity: a.severity,
+            title: a.title,
+            description: a.description,
+            metric: a.metric,
+            current_value: a.currentValue,
+            previous_value: a.previousValue,
+            change_pct: a.changePct,
+            ai_summary: a.aiSummary ?? null,
+            detected_at: a.detectedAt,
+            dismissed_at: a.dismissedAt ?? null,
+            acknowledged_at: a.acknowledgedAt ?? null,
+            source: a.source,
+          });
+        }
+
         allNew.push(...detected);
 
         // Broadcast to connected clients
@@ -441,10 +523,7 @@ export async function runAnomalyDetection(): Promise<{ total: number; newAnomali
     }
   }
 
-  // Merge new anomalies with existing
   if (allNew.length > 0) {
-    const merged = [...allNew, ...existing];
-    writeAnomalies(merged);
     console.log(`[Anomaly] Detected ${allNew.length} new anomalies across ${workspaces.length} workspaces`);
   } else {
     console.log(`[Anomaly] No new anomalies detected`);
@@ -453,7 +532,7 @@ export async function runAnomalyDetection(): Promise<{ total: number; newAnomali
   // Prune old anomalies (older than 60 days)
   clearOldAnomalies(60);
 
-  return { total: existing.length + allNew.length, newAnomalies: allNew.length };
+  return { total: existingCount + allNew.length, newAnomalies: allNew.length };
 }
 
 // --- Scheduler ---
