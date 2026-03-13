@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Loader2, CheckCircle, Plus, ListChecks, Trash2, Circle,
 } from 'lucide-react';
+import { get, post, patch, del } from '../../api/client';
 
 interface ActionItem {
   id: string;
@@ -38,8 +39,7 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
   const [newPriority, setNewPriority] = useState<'high' | 'medium' | 'low'>('medium');
 
   const load = useCallback(() => {
-    fetch(`/api/reports/snapshot/${snapshotId}/actions`)
-      .then(r => r.json())
+    get<ActionItem[]>(`/api/reports/snapshot/${snapshotId}/actions`)
       .then(d => { if (Array.isArray(d)) setItems(d); })
       .catch(() => {});
   }, [snapshotId]);
@@ -48,11 +48,7 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
 
   const addItem = async () => {
     if (!newTitle.trim()) return;
-    await fetch(`/api/reports/snapshot/${snapshotId}/actions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: newTitle.trim(), description: newDesc.trim(), priority: newPriority }),
-    });
+    await post(`/api/reports/snapshot/${snapshotId}/actions`, { title: newTitle.trim(), description: newDesc.trim(), priority: newPriority });
     setNewTitle('');
     setNewDesc('');
     setAdding(false);
@@ -61,16 +57,12 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
 
   const cycleStatus = async (item: ActionItem) => {
     const next = item.status === 'planned' ? 'in-progress' : item.status === 'in-progress' ? 'completed' : 'planned';
-    await fetch(`/api/reports/snapshot/${snapshotId}/actions/${item.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: next }),
-    });
+    await patch(`/api/reports/snapshot/${snapshotId}/actions/${item.id}`, { status: next });
     load();
   };
 
   const deleteItem = async (id: string) => {
-    await fetch(`/api/reports/snapshot/${snapshotId}/actions/${id}`, { method: 'DELETE' });
+    await del(`/api/reports/snapshot/${snapshotId}/actions/${id}`);
     load();
   };
 

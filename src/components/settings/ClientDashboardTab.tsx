@@ -5,6 +5,7 @@ import {
   Pin, PinOff, ArrowUp, ArrowDown, Palette, RefreshCw, DollarSign, Shield,
 } from 'lucide-react';
 import SearchableSelect from '../SearchableSelect';
+import { get, post, patch, del, getSafe } from '../../api/client';
 
 import type { SafeClientUser as ClientUserSafe } from '../../../shared/types/users.ts';
 import type { EventGroup, EventDisplayConfig } from '../../../shared/types/workspace.ts';
@@ -98,8 +99,8 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
   const loadClientUsers = async () => {
     setClientUsersLoading(true);
     try {
-      const res = await fetch(`/api/workspaces/${workspaceId}/client-users`);
-      if (res.ok) setClientUsers(await res.json());
+      const data = await get<ClientUserSafe[]>(`/api/workspaces/${workspaceId}/client-users`);
+      setClientUsers(data);
     } catch { /* ignore */ }
     finally { setClientUsersLoading(false); }
   };
@@ -108,11 +109,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
     if (!newUserEmail.trim() || !newUserName.trim() || !newUserPassword.trim()) return;
     setAddingUser(true);
     try {
-      const res = await fetch(`/api/workspaces/${workspaceId}/client-users`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: newUserEmail.trim(), name: newUserName.trim(), password: newUserPassword.trim(), role: newUserRole }),
-      });
-      if (!res.ok) { const err = await res.json(); toast(err.error || 'Failed to add user', 'error'); return; }
+      await post(`/api/workspaces/${workspaceId}/client-users`, { email: newUserEmail.trim(), name: newUserName.trim(), password: newUserPassword.trim(), role: newUserRole });
       toast(`${newUserName.trim()} added`);
       setNewUserName(''); setNewUserEmail(''); setNewUserPassword(''); setNewUserRole('client_member'); setShowAddUser(false);
       loadClientUsers();
@@ -122,11 +119,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
 
   const saveEditUser = async (userId: string) => {
     try {
-      const res = await fetch(`/api/workspaces/${workspaceId}/client-users/${userId}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: editUserName.trim(), email: editUserEmail.trim() }),
-      });
-      if (!res.ok) { const err = await res.json(); toast(err.error || 'Failed to update', 'error'); return; }
+      await patch(`/api/workspaces/${workspaceId}/client-users/${userId}`, { name: editUserName.trim(), email: editUserEmail.trim() });
       toast('User updated');
       setEditingUserId(null);
       loadClientUsers();
@@ -136,8 +129,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
   const deleteClientUser = async (userId: string, userName: string) => {
     if (!confirm(`Remove ${userName} from this workspace?`)) return;
     try {
-      const res = await fetch(`/api/workspaces/${workspaceId}/client-users/${userId}`, { method: 'DELETE' });
-      if (!res.ok) { toast('Failed to remove user', 'error'); return; }
+      await del(`/api/workspaces/${workspaceId}/client-users/${userId}`);
       toast(`${userName} removed`);
       loadClientUsers();
     } catch { toast('Failed to remove user', 'error'); }
@@ -146,11 +138,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
   const resetClientPassword = async (userId: string) => {
     if (!resetPasswordValue.trim()) return;
     try {
-      const res = await fetch(`/api/workspaces/${workspaceId}/client-users/${userId}/password`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: resetPasswordValue.trim() }),
-      });
-      if (!res.ok) { toast('Failed to reset password', 'error'); return; }
+      await post(`/api/workspaces/${workspaceId}/client-users/${userId}/password`, { password: resetPasswordValue.trim() });
       toast('Password reset');
       setResetPasswordUserId(null); setResetPasswordValue('');
     } catch { toast('Failed to reset password', 'error'); }
@@ -160,11 +148,10 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
   const loadEvents = async () => {
     setShowEventConfig(true); setLoadingEvents(true);
     try {
-      const [evRes, pgRes] = await Promise.all([
-        fetch(`/api/public/analytics-events/${workspaceId}?days=28`),
-        fetch(`/api/public/analytics-top-pages/${workspaceId}?days=28`),
+      const [events, pages] = await Promise.all([
+        getSafe<{eventName: string; eventCount: number; users: number}[]>(`/api/public/analytics-events/${workspaceId}?days=28`, []),
+        getSafe<{path: string}[]>(`/api/public/analytics-top-pages/${workspaceId}?days=28`, []),
       ]);
-      const [events, pages] = await Promise.all([evRes.json(), pgRes.json()]);
       if (Array.isArray(events)) setAvailableEvents(events);
       if (Array.isArray(pages)) setGa4Pages(pages);
       setLocalEventConfig(ws?.eventConfig || []);

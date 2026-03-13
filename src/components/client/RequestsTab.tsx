@@ -6,6 +6,7 @@ import {
 import type { ClientRequest, RequestCategory } from './types';
 import { STUDIO_NAME } from '../../constants';
 import { RenderMarkdown } from './helpers';
+import { post, postForm } from '../../api/client';
 
 interface RequestsTabProps {
   workspaceId: string;
@@ -36,21 +37,15 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
     if (!newReqTitle.trim() || !newReqDesc.trim()) return;
     setSubmittingReq(true);
     try {
-      const res = await fetch(`/api/public/requests/${workspaceId}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: newReqTitle.trim(), description: newReqDesc.trim(), category: newReqCategory, pageUrl: newReqPage.trim() || undefined, submittedBy: clientUser?.name || newReqName.trim() || undefined }),
-      });
-      if (res.ok) {
-        const created = await res.json();
-        // Upload attachments if any
-        if (newReqFiles.length > 0) {
-          const fd = new FormData();
-          newReqFiles.forEach(f => fd.append('files', f));
-          await fetch(`/api/public/requests/${workspaceId}/${created.id}/attachments`, { method: 'POST', body: fd });
-        }
-        setNewReqTitle(''); setNewReqDesc(''); setNewReqCategory('other'); setNewReqPage(''); setNewReqName(''); setNewReqFiles([]); setShowNewRequest(false);
-        loadRequests(workspaceId);
+      const created = await post<ClientRequest>(`/api/public/requests/${workspaceId}`, { title: newReqTitle.trim(), description: newReqDesc.trim(), category: newReqCategory, pageUrl: newReqPage.trim() || undefined, submittedBy: clientUser?.name || newReqName.trim() || undefined });
+      // Upload attachments if any
+      if (newReqFiles.length > 0) {
+        const fd = new FormData();
+        newReqFiles.forEach(f => fd.append('files', f));
+        await postForm(`/api/public/requests/${workspaceId}/${created.id}/attachments`, fd);
       }
+      setNewReqTitle(''); setNewReqDesc(''); setNewReqCategory('other'); setNewReqPage(''); setNewReqName(''); setNewReqFiles([]); setShowNewRequest(false);
+      loadRequests(workspaceId);
     } catch { setToast({ message: 'Failed to submit request. Please try again.', type: 'error' }); }
     finally { setSubmittingReq(false); }
   };
@@ -63,12 +58,9 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
         const fd = new FormData();
         fd.append('content', reqNoteInput.trim());
         noteFiles.forEach(f => fd.append('files', f));
-        await fetch(`/api/public/requests/${workspaceId}/${requestId}/notes-with-files`, { method: 'POST', body: fd });
+        await postForm(`/api/public/requests/${workspaceId}/${requestId}/notes-with-files`, fd);
       } else {
-        await fetch(`/api/public/requests/${workspaceId}/${requestId}/notes`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: reqNoteInput.trim() }),
-        });
+        await post(`/api/public/requests/${workspaceId}/${requestId}/notes`, { content: reqNoteInput.trim() });
       }
       setReqNoteInput(''); setNoteFiles([]);
       loadRequests(workspaceId);
