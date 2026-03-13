@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { get, post, patch, del, getSafe } from '../api/client';
 import {
   Loader2, Clipboard, Trash2, ChevronDown, ChevronUp, Sparkles, FileText,
   Inbox, CheckCircle2, XCircle, Clock, Zap, Download, Copy, Search,
@@ -109,15 +110,8 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
 
   const saveBriefField = async (briefId: string, updates: Partial<ContentBrief>) => {
     try {
-      const res = await fetch(`/api/content-briefs/${workspaceId}/${briefId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates),
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setBriefs(prev => prev.map(b => b.id === briefId ? updated : b));
-      }
+      const updated = await patch<ContentBrief>(`/api/content-briefs/${workspaceId}/${briefId}`, updates);
+      setBriefs(prev => prev.map(b => b.id === briefId ? updated : b));
     } catch { /* skip */ }
   };
 
@@ -132,28 +126,16 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
     setLoadingBrief(reqId);
     try {
       const url = `/api/content-briefs/${workspaceId}/${briefId}`;
-      const res = await fetch(url);
-      const text = await res.text();
-      if (res.ok) {
+      try {
+        const brief = await get<ContentBrief>(url);
+        setBriefs(prev => [brief, ...prev.filter(b => b.id !== brief.id)]);
+        setLoadingBrief(null);
+        setExpandedRequest(reqId);
+        return;
+      } catch {
+        // Individual fetch failed — try refetching the full list as fallback
         try {
-          const brief = JSON.parse(text);
-          setBriefs(prev => [brief, ...prev.filter(b => b.id !== brief.id)]);
-          setLoadingBrief(null);
-          setExpandedRequest(reqId);
-          return;
-        } catch {
-          setBriefError(`Response was not valid JSON. Status: ${res.status}. Body starts with: ${text.slice(0, 120)}`);
-          setExpandedRequest(reqId);
-          setLoadingBrief(null);
-          return;
-        }
-      }
-      // Individual fetch failed — try refetching the full list as fallback
-      const listRes = await fetch(`/api/content-briefs/${workspaceId}`);
-      if (listRes.ok) {
-        const listText = await listRes.text();
-        try {
-          const allBriefs = JSON.parse(listText);
+          const allBriefs = await getSafe<ContentBrief[]>(`/api/content-briefs/${workspaceId}`, []);
           if (Array.isArray(allBriefs)) {
             setBriefs(allBriefs);
             const found = allBriefs.find((b: ContentBrief) => b.id === briefId);
@@ -163,9 +145,9 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
               return;
             }
           }
-        } catch { /* list parse failed */ }
+        } catch { /* list fetch failed */ }
       }
-      setBriefError(`Brief "${briefId}" not found. Single fetch: ${res.status}. The brief may have been lost after a server restart. Try regenerating.`);
+      setBriefError(`Brief "${briefId}" not found. The brief may have been lost after a server restart. Try regenerating.`);
       setExpandedRequest(reqId);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -177,15 +159,13 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
 
   const handleDeleteRequest = async (reqId: string) => {
     try {
-      const res = await fetch(`/api/content-requests/${workspaceId}/${reqId}`, { method: 'DELETE' });
-      if (res.ok) {
-        setClientRequests(prev => {
-          const next = prev.filter(r => r.id !== reqId);
-          onRequestCountChange?.(next.filter(r => r.status === 'requested').length);
-          return next;
-        });
-        if (expandedRequest === reqId) setExpandedRequest(null);
-      }
+      await del(`/api/content-requests/${workspaceId}/${reqId}`);
+      setClientRequests(prev => {
+        const next = prev.filter(r => r.id !== reqId);
+        onRequestCountChange?.(next.filter(r => r.status === 'requested').length);
+        return next;
+      });
+      if (expandedRequest === reqId) setExpandedRequest(null);
     } catch { /* skip */ }
   };
 
@@ -232,8 +212,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
   };
 
   const fetchPosts = () => {
-    fetch(`/api/content-posts/${workspaceId}`)
-      .then(r => r.json())
+    getSafe<PostSummary[]>(`/api/content-posts/${workspaceId}`, [])
       .then(r => { if (Array.isArray(r)) setPosts(r); })
       .catch(() => {});
   };
@@ -242,25 +221,19 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
     let done = 0;
     const checkDone = () => { if (++done >= 2) setLoading(false); };
 
-    fetch(`/api/content-briefs/${workspaceId}`)
-      .then(async r => {
-        const text = await r.text();
-        console.log(`[ContentBriefs] briefs status=${r.status} len=${text.length}`);
-        try { const parsed = JSON.parse(text); if (Array.isArray(parsed)) { console.log(`[ContentBriefs] ${parsed.length} briefs loaded`); setBriefs(parsed); } else { console.warn('[ContentBriefs] briefs response is not array:', typeof parsed); } } catch { console.error('[ContentBriefs] briefs JSON parse failed, starts with:', text.slice(0, 200)); }
-      })
-      .catch(err => console.error('[ContentBriefs] briefs fetch error:', err))
+    getSafe<ContentBrief[]>(`/api/content-briefs/${workspaceId}`, [])
+      .then(parsed => { if (Array.isArray(parsed)) setBriefs(parsed); })
+      .catch(() => {})
       .finally(checkDone);
 
-    fetch(`/api/content-requests/${workspaceId}`)
-      .then(r => { console.log('[ContentBriefs] requests response status:', r.status); return r.json(); })
+    getSafe<ContentTopicRequest[]>(`/api/content-requests/${workspaceId}`, [])
       .then(r => {
-        console.log('[ContentBriefs] requests data:', r);
         if (Array.isArray(r)) {
           setClientRequests(r);
           onRequestCountChange?.(r.filter((req: ContentTopicRequest) => req.status === 'requested').length);
         }
       })
-      .catch(err => console.error('[ContentBriefs] requests fetch error:', err))
+      .catch(() => {})
       .finally(checkDone);
 
     fetchPosts();
@@ -269,9 +242,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
   const handleGenerateBriefForRequest = async (req: ContentTopicRequest) => {
     setGeneratingBriefFor(req.id);
     try {
-      const res = await fetch(`/api/content-requests/${workspaceId}/${req.id}/generate-brief`, { method: 'POST' });
-      if (!res.ok) throw new Error('Failed');
-      const brief = await res.json();
+      const brief = await post<ContentBrief>(`/api/content-requests/${workspaceId}/${req.id}/generate-brief`);
       setBriefs(prev => [brief, ...prev]);
       setClientRequests(prev => {
         const next = prev.map(r => r.id === req.id ? { ...r, status: 'brief_generated' as const, briefId: brief.id } : r);
@@ -286,17 +257,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
   const handleGeneratePost = async (briefId: string) => {
     setGeneratingPostFor(briefId);
     try {
-      const res = await fetch(`/api/content-posts/${workspaceId}/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ briefId }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        alert(err.message || err.error || 'Failed to generate post');
-        return;
-      }
-      const skeleton = await res.json();
+      const skeleton = await post<PostSummary>(`/api/content-posts/${workspaceId}/generate`, { briefId });
       setPosts(prev => [skeleton, ...prev]);
       setActivePostId(skeleton.id);
     } catch { /* skip */ }
@@ -305,19 +266,12 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
 
   const handleUpdateRequestStatus = async (reqId: string, status: ContentTopicRequest['status'], extra?: { deliveryUrl?: string; deliveryNotes?: string }) => {
     try {
-      const res = await fetch(`/api/content-requests/${workspaceId}/${reqId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, ...extra }),
+      const updated = await patch<ContentTopicRequest>(`/api/content-requests/${workspaceId}/${reqId}`, { status, ...extra });
+      setClientRequests(prev => {
+        const next = prev.map(r => r.id === reqId ? updated : r);
+        onRequestCountChange?.(next.filter(r => r.status === 'requested').length);
+        return next;
       });
-      if (res.ok) {
-        const updated = await res.json();
-        setClientRequests(prev => {
-          const next = prev.map(r => r.id === reqId ? updated : r);
-          onRequestCountChange?.(next.filter(r => r.status === 'requested').length);
-          return next;
-        });
-      }
     } catch { /* skip */ }
   };
 
@@ -326,23 +280,14 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
     setGenerating(true);
     setError('');
     try {
-      const res = await fetch(`/api/content-briefs/${workspaceId}/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          targetKeyword: keyword.trim(),
-          businessContext: businessCtx.trim() || undefined,
-          targetPageId: fixContext?.pageId,
-          targetPageSlug: fixContext?.pageSlug,
-          pageType: pageType || undefined,
-          referenceUrls: refUrls.trim() ? refUrls.split('\n').map(u => u.trim()).filter(u => u.startsWith('http')) : undefined,
-        }),
+      const brief = await post<ContentBrief>(`/api/content-briefs/${workspaceId}/generate`, {
+        targetKeyword: keyword.trim(),
+        businessContext: businessCtx.trim() || undefined,
+        targetPageId: fixContext?.pageId,
+        targetPageSlug: fixContext?.pageSlug,
+        pageType: pageType || undefined,
+        referenceUrls: refUrls.trim() ? refUrls.split('\n').map(u => u.trim()).filter(u => u.startsWith('http')) : undefined,
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to generate');
-      }
-      const brief = await res.json();
       setBriefs(prev => [brief, ...prev]);
       setKeyword('');
       setExpanded(brief.id);
@@ -354,7 +299,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
   };
 
   const handleDelete = async (briefId: string) => {
-    await fetch(`/api/content-briefs/${workspaceId}/${briefId}`, { method: 'DELETE' });
+    await del(`/api/content-briefs/${workspaceId}/${briefId}`);
     setBriefs(prev => prev.filter(b => b.id !== briefId));
     if (expanded === briefId) setExpanded(null);
     setDeleteConfirm(null);

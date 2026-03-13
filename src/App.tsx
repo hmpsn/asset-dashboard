@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
+import { get, post, patch, del, postForm } from './api/client';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, useSearchParams, useParams } from 'react-router-dom';
 import { type Page, adminPath, clientPath } from './routes';
 import { WorkspaceSelector, type Workspace } from './components/WorkspaceSelector';
@@ -186,7 +187,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   }, []);
 
   const refreshHealth = useCallback(() => {
-    fetch('/api/health').then(r => r.json()).then(h => {
+    get<{ hasOpenAIKey: boolean; hasWebflowToken: boolean }>('/api/health').then(h => {
       setHealth({ hasOpenAIKey: h.hasOpenAIKey, hasWebflowToken: h.hasWebflowToken });
       setConnected(true);
     }).catch(() => setConnected(false));
@@ -194,8 +195,8 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
 
   // Fetch initial data
   useEffect(() => {
-    fetch('/api/workspaces').then(r => r.json()).then(setWorkspaces).catch(() => {});
-    fetch('/api/queue').then(r => r.json()).then(setQueue).catch(() => {});
+    get<Workspace[]>('/api/workspaces').then(setWorkspaces).catch(() => {});
+    get<QueueItem[]>('/api/queue').then(setQueue).catch(() => {});
     refreshHealth();
   }, [refreshHealth]);
 
@@ -203,9 +204,8 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   useEffect(() => {
     if (!selected) return;
     let cancelled = false;
-    fetch(`/api/content-requests/${selected.id}`)
-      .then(r => r.ok ? r.json() : [])
-      .then((reqs: Array<{ status: string }>) => {
+    get<Array<{ status: string }>>(`/api/content-requests/${selected.id}`)
+      .then((reqs) => {
         if (!cancelled) setPendingContentRequests(Array.isArray(reqs) ? reqs.filter(r => r.status === 'requested').length : 0);
       })
       .catch(() => { if (!cancelled) setPendingContentRequests(0); });
@@ -248,11 +248,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
           formData.append('fileName', fileName);
 
           try {
-            const res = await fetch(`/api/upload/${selected.folder}/clipboard`, {
-              method: 'POST',
-              body: formData,
-            });
-            const data = await res.json();
+            const data = await postForm<{ fileName: string }>(`/api/upload/${selected.folder}/clipboard`, formData);
             setClipboardStatus(`Pasted: ${data.fileName} (resized 2x for HDPI)`);
             setTimeout(() => setClipboardStatus(null), 3000);
           } catch {
@@ -300,40 +296,25 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
 
   // Actions
   const handleCreate = async (name: string, siteId?: string, siteName?: string) => {
-    const res = await fetch('/api/workspaces', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, webflowSiteId: siteId, webflowSiteName: siteName }),
-    });
-    const ws = await res.json();
+    const ws = await post<Workspace>('/api/workspaces', { name, webflowSiteId: siteId, webflowSiteName: siteName });
     // WebSocket 'workspace:created' handler adds it to state; just select it here
     setSelected(ws);
   };
 
   const handleDelete = async (id: string) => {
-    await fetch(`/api/workspaces/${id}`, { method: 'DELETE' });
+    await del(`/api/workspaces/${id}`);
     setWorkspaces(prev => prev.filter(w => w.id !== id));
     if (selected?.id === id) setSelected(null);
   };
 
   const handleLinkSite = async (workspaceId: string, siteId: string, siteName: string, token?: string) => {
-    const res = await fetch(`/api/workspaces/${workspaceId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ webflowSiteId: siteId, webflowSiteName: siteName, webflowToken: token }),
-    });
-    const updated = await res.json();
+    const updated = await patch<Workspace>(`/api/workspaces/${workspaceId}`, { webflowSiteId: siteId, webflowSiteName: siteName, webflowToken: token });
     setWorkspaces(prev => prev.map(w => w.id === workspaceId ? updated : w));
     if (selected?.id === workspaceId) setSelected(updated);
   };
 
   const handleUnlinkSite = async (workspaceId: string) => {
-    const res = await fetch(`/api/workspaces/${workspaceId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ webflowSiteId: '', webflowSiteName: '' }),
-    });
-    const updated = await res.json();
+    const updated = await patch<Workspace>(`/api/workspaces/${workspaceId}`, { webflowSiteId: '', webflowSiteName: '' });
     setWorkspaces(prev => prev.map(w => w.id === workspaceId ? updated : w));
     if (selected?.id === workspaceId) setSelected(updated);
   };

@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { get, post, getOptional, getSafe } from '../api/client';
+import { ApiError } from '../api/client';
 import { useNavigate } from 'react-router-dom';
 import { clientPath } from '../routes';
 import {
@@ -169,11 +171,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     if (!captureEmail.trim() || captureSubmitting) return;
     setCaptureSubmitting(true);
     try {
-      await fetch(`/api/public/capture-email/${workspaceId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: captureEmail.trim(), name: captureName.trim() || undefined }),
-      });
+      await post(`/api/public/capture-email/${workspaceId}`, { email: captureEmail.trim(), name: captureName.trim() || undefined });
       localStorage.setItem(`portal_email_${workspaceId}`, captureEmail.trim());
     } catch { /* best-effort */ }
     setCaptureSubmitting(false);
@@ -197,22 +195,18 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     'content-request:created': () => refetchClient('content', `/api/public/content-requests/${workspaceId}`),
     'content-request:update': () => refetchClient('content', `/api/public/content-requests/${workspaceId}`),
     'audit:complete': () => {
-      fetch(`/api/public/audit-summary/${workspaceId}`).then(r => r.json()).then(a => { if (a?.id) setAudit(a); }).catch(() => {});
+      getOptional<{ id?: string }>(`/api/public/audit-summary/${workspaceId}`).then(a => { if (a?.id) setAudit(a); }).catch(() => {});
       refetchClient('activity', `/api/public/activity/${workspaceId}?limit=20`);
     },
     'workspace:updated': () => {
-      fetch(`/api/public/workspace/${workspaceId}`).then(r => r.ok ? r.json() : null).then(data => { if (data?.id) setWs(data); }).catch(() => {});
+      getOptional<WorkspaceInfo>(`/api/public/workspace/${workspaceId}`).then(data => { if (data?.id) setWs(data); }).catch(() => {});
     },
   }, wsIdentity);
 
   // ── Load workspace info first (includes requiresPassword flag) ──
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/public/workspace/${workspaceId}`)
-      .then(r => {
-        if (r.status === 403) { setError('This dashboard is currently unavailable. Please contact hmpsn studio for access.'); setLoading(false); throw new Error('portal_disabled'); }
-        return r.json();
-      })
+    get<WorkspaceInfo>(`/api/public/workspace/${workspaceId}`)
       .then(async (data: WorkspaceInfo) => {
         if (!data.id) { setError('Workspace not found'); setLoading(false); return; }
         setWs(data);
@@ -247,9 +241,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
         // Fetch auth mode (shared password vs individual accounts)
         try {
-          const amRes = await fetch(`/api/public/auth-mode/${workspaceId}`);
-          if (amRes.ok) {
-            const am = await amRes.json();
+          const am = await getOptional<{ hasClientUsers?: boolean }>(`/api/public/auth-mode/${workspaceId}`);
+          if (am) {
             setAuthMode(am);
             setLoginTab(am.hasClientUsers ? 'user' : 'password');
           }
@@ -259,16 +252,13 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         let autoAuthed = false;
         let resolvedUserId: string | undefined;
         try {
-          const meRes = await fetch(`/api/public/client-me/${workspaceId}`);
-          if (meRes.ok) {
-            const meData = await meRes.json();
-            if (meData.user) {
-              setClientUser(meData.user);
-              resolvedUserId = meData.user.id;
-              setAuthenticated(true);
-              autoAuthed = true;
-              loadDashboardData(data, setPricingData);
-            }
+          const meData = await getOptional<{ user?: { id: string; email: string; name: string } }>(`/api/public/client-me/${workspaceId}`);
+          if (meData?.user) {
+            setClientUser(meData.user);
+            resolvedUserId = meData.user.id;
+            setAuthenticated(true);
+            autoAuthed = true;
+            loadDashboardData(data, setPricingData);
           }
         } catch { /* ignore */ }
 
@@ -325,7 +315,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
           window.history.replaceState({}, '', url.toString());
         }
       })
-      .catch(() => { setError('Failed to load dashboard'); setLoading(false); });
+      .catch((err) => { setError(err instanceof ApiError && err.status === 403 ? 'This dashboard is currently unavailable. Please contact hmpsn studio for access.' : 'Failed to load dashboard'); setLoading(false); });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId]);
 
@@ -427,11 +417,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                     if (!forgotEmail.trim()) return;
                     setAuthLoading(true); setAuthError('');
                     try {
-                      const res = await fetch(`/api/public/forgot-password/${workspaceId}`, {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email: forgotEmail.trim() }),
-                      });
-                      if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Failed'); }
+                      await post(`/api/public/forgot-password/${workspaceId}`, { email: forgotEmail.trim() });
                       setForgotSent(true);
                     } catch (err) { setAuthError(err instanceof Error ? err.message : 'Something went wrong'); }
                     setAuthLoading(false);
@@ -473,12 +459,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                     if (resetPassword.length < 8) { setAuthError('Password must be at least 8 characters'); return; }
                     setAuthLoading(true); setAuthError('');
                     try {
-                      const res = await fetch('/api/public/reset-password', {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ token: resetToken, newPassword: resetPassword }),
-                      });
-                      const d = await res.json();
-                      if (!res.ok) throw new Error(d.error || 'Failed');
+                      await post('/api/public/reset-password', { token: resetToken, newPassword: resetPassword });
                       setResetDone(true);
                     } catch (err) { setAuthError(err instanceof Error ? err.message : 'Something went wrong'); }
                     setAuthLoading(false);
@@ -882,7 +863,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                   <button onClick={() => { setChatSessionId(`cs-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`); setChatMessages([]); setShowChatHistory(false); }}
                     title="New conversation" className="text-zinc-500 hover:text-zinc-300 p-1"><Plus className="w-3.5 h-3.5" /></button>
                 )}
-                <button onClick={() => { setShowChatHistory(!showChatHistory); if (!showChatHistory && ws) { fetch(`/api/public/chat-sessions/${ws.id}?channel=client`).then(r => r.json()).then(d => { if (Array.isArray(d)) setChatSessions(d); }).catch(() => {}); } }}
+                <button onClick={() => { setShowChatHistory(!showChatHistory); if (!showChatHistory && ws) { getSafe<Array<{ id: string; title: string; messageCount: number; updatedAt: string }>>(`/api/public/chat-sessions/${ws.id}?channel=client`, []).then(d => { if (Array.isArray(d)) setChatSessions(d); }).catch(() => {}); } }}
                   title="Chat history" className={`p-1 ${showChatHistory ? 'text-teal-400' : 'text-zinc-500 hover:text-zinc-300'}`}><MessageSquare className="w-3.5 h-3.5" /></button>
                 <button onClick={() => setChatExpanded(!chatExpanded)} title={chatExpanded ? 'Minimize' : 'Maximize'} className="text-zinc-500 hover:text-zinc-300 p-1">
                   {chatExpanded ? <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg> : <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>}
@@ -898,7 +879,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                   {chatSessions.map(s => (
                     <button key={s.id} onClick={() => {
                       setChatSessionId(s.id); setShowChatHistory(false);
-                      if (ws) fetch(`/api/public/chat-sessions/${ws.id}/${s.id}`).then(r => r.json()).then(d => {
+                      if (ws) getOptional<{ messages?: Array<{ role: string; content: string }> }>(`/api/public/chat-sessions/${ws.id}/${s.id}`).then(d => {
                         if (d?.messages) setChatMessages(d.messages.map((m: { role: string; content: string }) => ({ role: m.role as 'user' | 'assistant', content: m.content })));
                       }).catch(() => {});
                     }} className={`w-full text-left px-3 py-2 rounded-lg border transition-colors ${s.id === chatSessionId ? 'bg-teal-500/10 border-teal-500/30 text-teal-300' : 'bg-zinc-800/50 border-zinc-800 text-zinc-300 hover:bg-zinc-800'}`}>
@@ -1023,12 +1004,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
             </div>
             <button onClick={async () => {
               try {
-                const res = await fetch(`/api/public/upgrade-checkout/${workspaceId}`, {
-                  method: 'POST', headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ planId: 'premium' }),
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Failed to start checkout');
+                const data = await post<{ url?: string }>(`/api/public/upgrade-checkout/${workspaceId}`, { planId: 'premium' });
                 if (data.url) window.location.href = data.url;
               } catch (err) {
                 setToast({ message: err instanceof Error ? err.message : 'Upgrade failed. Please try again.', type: 'error' });
@@ -1179,7 +1155,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
             setStripePayment(null);
             setToast({ message: `Payment successful! Your ${stripePayment.productName.toLowerCase()} is being prepared.`, type: 'success' });
             // Refresh content requests
-            fetch(`/api/public/content-requests/${workspaceId}`).then(r => r.json()).then(setContentRequests).catch(() => {});
+            getSafe<unknown[]>(`/api/public/content-requests/${workspaceId}`, []).then(setContentRequests).catch(() => {});
           }}
           onClose={() => setStripePayment(null)}
         />
@@ -1193,21 +1169,13 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
           onComplete={async (data: OnboardingData) => {
             setOnboardingSaving(true);
             try {
-              const res = await fetch(`/api/public/onboarding/${workspaceId}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
-              });
-              if (res.ok) {
-                setShowOnboarding(false);
-                setWs(prev => prev ? { ...prev, onboardingCompleted: true } : prev);
-                setToast({ message: 'Thanks! Your responses will help us create better content.', type: 'success' });
-                // Show welcome wizard after onboarding
-                const welcomeKey = clientUser ? `welcome_seen_${workspaceId}_${clientUser.id}` : `welcome_seen_${workspaceId}`;
-                if (!localStorage.getItem(welcomeKey)) setShowWelcome(true);
-              } else {
-                setToast({ message: 'Failed to save responses. Please try again.', type: 'error' });
-              }
+              await post(`/api/public/onboarding/${workspaceId}`, data);
+              setShowOnboarding(false);
+              setWs(prev => prev ? { ...prev, onboardingCompleted: true } : prev);
+              setToast({ message: 'Thanks! Your responses will help us create better content.', type: 'success' });
+              // Show welcome wizard after onboarding
+              const welcomeKey = clientUser ? `welcome_seen_${workspaceId}_${clientUser.id}` : `welcome_seen_${workspaceId}`;
+              if (!localStorage.getItem(welcomeKey)) setShowWelcome(true);
             } catch {
               setToast({ message: 'Failed to save responses. Please try again.', type: 'error' });
             }
