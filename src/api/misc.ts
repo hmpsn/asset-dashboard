@@ -186,6 +186,18 @@ export const salesReport = {
   refresh: () => post<unknown>('/api/sales-report/refresh'),
 };
 
+// ── Rank tracking ──────────────────────────────────────────────
+export const rankTracking = {
+  latest: (wsId: string) =>
+    getOptional<unknown>(`/api/rank-tracking/${wsId}/latest`),
+};
+
+// ── Work orders ────────────────────────────────────────────────
+export const workOrders = {
+  list: (wsId: string) =>
+    getSafe<unknown[]>(`/api/work-orders/${wsId}`, []),
+};
+
 // ── Redirect manager ────────────────────────────────────────────
 export const redirects = {
   list: (siteId: string) =>
