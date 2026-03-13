@@ -470,6 +470,17 @@ A brief value assessment of every feature in the platform, covering what it does
 
 ---
 
+### 42b. Public API Hardening (Bot Protection & Credential Stuffing)
+**What it does:** Five-layer hardening of all `/api/public/*` endpoints for marketplace readiness. **(1) Rate limit headers** — every rate-limited response includes `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, and `Retry-After` on 429s. **(2) New rate limiters** — `aiLimiter` (3/min per IP) on `/api/admin-chat`, `globalPublicLimiter` (200/min per IP, global key mode) across all public routes. **(3) Credential stuffing protection** — per-email failed login tracking with 15-minute lockout after 5 failures, structured logging of lockout events. **(4) Cloudflare Turnstile CAPTCHA** — optional bot protection on client-login and forgot-password forms. `TurnstileWidget` React component with automatic single-use token reset on failed attempts. Skips verification if `TURNSTILE_SECRET_KEY` not set. CSP updated for `challenges.cloudflare.com`. **(5) Request fingerprinting** — SHA-256 hash of IP + User-Agent + Accept-Language attached as `req.fingerprint` for abuse detection logging.
+
+**Agency value:** Marketplace-ready security posture. Credential stuffing protection prevents automated account takeover. Turnstile blocks bots without degrading UX. Rate limit headers enable client-side backoff.
+
+**Client value:** Login protected against automated attacks with clear feedback on lockout duration. CAPTCHA is invisible when Turnstile scores high confidence.
+
+**Mutual:** All features backward compatible — activate via env vars. No breaking changes for existing deployments.
+
+---
+
 ### 43. Automated Monthly Reports
 **What it does:** Auto-generated monthly report emails sent to clients on a configurable schedule. `gatherMonthlyData` aggregates site health audit (score, delta, errors, warnings), requests completed/open, approvals applied/pending, activity log, and now **traffic trends**: GSC period comparison (clicks, impressions with % change vs previous 28 days) and GA4 period comparison (users, sessions, pageviews with % change). **Chat topic summaries**: `listSessions` fetches recent client chat sessions with AI-generated summaries from the current month; up to 5 displayed in a "Topics You Asked About" section with green-tinted cards showing conversation title + summary. **Trial status banner**: when the workspace is on a Growth trial, an amber banner appears at the top of the email showing "Growth Trial · X days remaining" with an upgrade CTA — `isTrial` and `trialDaysRemaining` computed from `ws.trialEndsAt` and threaded through `monthly-report.ts` → `email-templates.ts`. `renderMonthlyReport` in `email-templates.ts` generates a branded HTML email with trial banner (when applicable), health score ring, traffic trends grid (each metric shows current value + arrow + % change vs previous period), metrics grid (requests, approvals, activities), recent activity feed, chat topics section, and pending approval alerts. Manual trigger via `triggerMonthlyReport()` or automatic via `startMonthlyReports()` scheduler.
 

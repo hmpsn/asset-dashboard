@@ -22,14 +22,16 @@ function mockReq(overrides: Record<string, unknown> = {}): Request {
   } as unknown as Request;
 }
 
-function mockRes(): Response & { _status: number; _json: unknown } {
+function mockRes(): Response & { _status: number; _json: unknown; _headers: Record<string, string> } {
   const res = {
     _status: 0,
     _json: null as unknown,
+    _headers: {} as Record<string, string>,
     status(code: number) { res._status = code; return res; },
     json(data: unknown) { res._json = data; return res; },
+    setHeader(name: string, value: string) { res._headers[name] = value; return res; },
   };
-  return res as unknown as Response & { _status: number; _json: unknown };
+  return res as unknown as Response & { _status: number; _json: unknown; _headers: Record<string, string> };
 }
 
 // ── Rate Limiting ──

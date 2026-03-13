@@ -57,6 +57,8 @@ services:
       - fromGroup: shared-google
       - fromGroup: shared-smtp
       - fromGroup: shared-sentry
+      - fromGroup: shared-turnstile
+      - fromGroup: shared-s3-backups
     disk:
       name: asset-dashboard-data
       mountPath: /var/data/asset-dashboard
@@ -103,6 +105,8 @@ services:
       - fromGroup: shared-google
       - fromGroup: shared-smtp
       - fromGroup: shared-sentry
+      - fromGroup: shared-turnstile
+      - fromGroup: shared-s3-backups
     disk:
       name: asset-dashboard-staging-data
       mountPath: /var/data/asset-dashboard
@@ -153,4 +157,20 @@ envVarGroups:
       - key: SENTRY_ORG
         sync: false
       - key: SENTRY_PROJECT
+        sync: false
+  - name: shared-turnstile
+    envVars:
+      - key: VITE_TURNSTILE_SITE_KEY
+        sync: false
+      - key: TURNSTILE_SECRET_KEY
+        sync: false
+  - name: shared-s3-backups
+    envVars:
+      - key: BACKUP_S3_BUCKET
+        sync: false
+      - key: BACKUP_S3_REGION
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
         sync: false

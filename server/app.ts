@@ -13,9 +13,11 @@ import { verifyClientToken } from './client-users.js';
 import {
   publicApiLimiter,
   publicWriteLimiter,
+  globalPublicLimiter,
   verifyAdminToken,
   verifyClientSession,
 } from './middleware.js';
+import { fingerprintMiddleware } from './middleware/fingerprint.js';
 import { getPresence } from './websocket.js';
 import { setupSentryErrorHandler } from './sentry.js';
 import { requestLogger } from './middleware/request-logger.js';
@@ -102,8 +104,8 @@ export function createApp(): express.Express {
     contentSecurityPolicy: IS_PROD ? {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", 'https://js.stripe.com'],
-        frameSrc: ["'self'", 'https://js.stripe.com', 'https://hooks.stripe.com'],
+        scriptSrc: ["'self'", "'unsafe-inline'", 'https://js.stripe.com', 'https://challenges.cloudflare.com'],
+        frameSrc: ["'self'", 'https://js.stripe.com', 'https://hooks.stripe.com', 'https://challenges.cloudflare.com'],
         connectSrc: ["'self'", 'https://api.stripe.com', 'https://*.ingest.sentry.io', 'wss:', 'ws:'],
         imgSrc: ["'self'", 'data:', 'https:'],
         styleSrc: ["'self'", "'unsafe-inline'"],
@@ -144,7 +146,11 @@ export function createApp(): express.Express {
 
   app.use(express.json({ limit: '10mb' }));
 
+  // --- Request fingerprinting (attaches req.fingerprint for abuse detection) ---
+  app.use(fingerprintMiddleware);
+
   // --- Rate limiting for public API routes ---
+  app.use('/api/public/', globalPublicLimiter);
   app.use('/api/public/', publicApiLimiter);
   app.use((req, res, next) => {
     if (req.path.startsWith('/api/public/') && (req.method === 'POST' || req.method === 'PATCH' || req.method === 'DELETE')) {
@@ -195,7 +201,7 @@ export function createApp(): express.Express {
   app.use((req, res, next) => {
     if (!req.path.startsWith('/api/public/')) return next();
     const parts = req.path.split('/');
-    if (parts[3] === 'auth' || parts[3] === 'workspace' || parts[3] === 'client-login' || parts[3] === 'client-logout' || parts[3] === 'client-me' || parts[3] === 'auth-mode') return next();
+    if (parts[3] === 'auth' || parts[3] === 'workspace' || parts[3] === 'client-login' || parts[3] === 'client-logout' || parts[3] === 'client-me' || parts[3] === 'auth-mode' || parts[3] === 'forgot-password' || parts[3] === 'reset-password') return next();
     const workspaceId = parts[4];
     if (!workspaceId) return next();
     const ws = getWorkspace(workspaceId);

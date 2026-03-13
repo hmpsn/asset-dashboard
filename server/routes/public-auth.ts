@@ -18,7 +18,8 @@ import {
 } from '../client-users.js';
 import { sendEmail } from '../email.js';
 import { sanitizeString } from '../helpers.js';
-import { signClientSession, clientLoginLimiter, IS_PROD } from '../middleware.js';
+import { signClientSession, clientLoginLimiter, IS_PROD, checkLoginLockout, recordLoginFailure, clearLoginFailures } from '../middleware.js';
+import { verifyTurnstile } from '../middleware/turnstile.js';
 import { updateWorkspace, getWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 
@@ -55,14 +56,32 @@ router.post('/api/public/auth/:id', clientLoginLimiter, async (req, res) => {
 // --- Client User Auth (individual logins) ---
 
 // Client user login (email + password, per workspace)
-router.post('/api/public/client-login/:id', clientLoginLimiter, async (req, res) => {
+router.post('/api/public/client-login/:id', clientLoginLimiter, verifyTurnstile, async (req, res) => {
   try {
     const ws = getWorkspace(req.params.id);
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'email and password are required' });
+
+    // Credential stuffing protection: check if email is locked out
+    const lockout = checkLoginLockout(email);
+    if (lockout.locked) {
+      const retryMinutes = Math.ceil((lockout.retryAfterMs || 0) / 60_000);
+      log.warn({ email, ip: req.ip, fingerprint: req.fingerprint }, 'Login attempt on locked account');
+      return res.status(429).json({ error: `Too many failed attempts. Please try again in ${retryMinutes} minute${retryMinutes !== 1 ? 's' : ''}.` });
+    }
+
     const user = await verifyClientUserPassword(email, req.params.id, password);
-    if (!user) return res.status(401).json({ error: 'Invalid email or password' });
+    if (!user) {
+      const locked = recordLoginFailure(email);
+      if (locked) {
+        log.warn({ email, ip: req.ip, fingerprint: req.fingerprint }, 'Account locked after repeated failures');
+      }
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // Successful login — clear failure tracking
+    clearLoginFailures(email);
     recordClientLogin(user.id);
     const { passwordHash: _pw, ...safe } = user;
     void _pw;
@@ -111,7 +130,7 @@ router.get('/api/public/auth-mode/:id', (req, res) => {
 // --- Password Reset ---
 
 // Request password reset (sends email with reset link)
-router.post('/api/public/forgot-password/:id', clientLoginLimiter, async (req, res) => {
+router.post('/api/public/forgot-password/:id', clientLoginLimiter, verifyTurnstile, async (req, res) => {
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const email = sanitizeString(req.body.email, 200)?.toLowerCase().trim();

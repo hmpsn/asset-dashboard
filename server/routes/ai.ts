@@ -30,9 +30,10 @@ import {
 } from '../seo-context.js';
 import { getWorkspace } from '../workspaces.js';
 import { checkAIContext } from '../ai-context-check.js';
+import { aiLimiter } from '../middleware.js';
 
 // ── Admin AI Chat (auth-gated, internal analyst persona) ──
-router.post('/api/admin-chat', async (req, res) => {
+router.post('/api/admin-chat', aiLimiter, async (req, res) => {
   const { workspaceId, question, context, sessionId } = req.body;
   if (!question) return res.status(400).json({ error: 'question required' });
   if (!workspaceId) return res.status(400).json({ error: 'workspaceId required' });

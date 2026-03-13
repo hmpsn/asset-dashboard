@@ -12,21 +12,28 @@ import { verifyClientToken, getSafeClientUser } from './client-users.js';
 
 // ── Rate Limiting ──
 
-/** In-memory rate limiter (per IP). Returns Express middleware. */
+/** In-memory rate limiter (per IP). Returns Express middleware.
+ *  Adds standard rate-limit headers to every response. */
 const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
 
-export function rateLimit(windowMs: number, maxRequests: number) {
+export function rateLimit(windowMs: number, maxRequests: number, keyMode: 'per-path' | 'global' = 'per-path') {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
-    const key = `${ip}:${req.path}`;
+    const key = keyMode === 'global' ? `global:${ip}` : `${ip}:${req.path}`;
     const now = Date.now();
-    const bucket = rateLimitBuckets.get(key);
+    let bucket = rateLimitBuckets.get(key);
     if (!bucket || now > bucket.resetAt) {
-      rateLimitBuckets.set(key, { count: 1, resetAt: now + windowMs });
-      return next();
+      bucket = { count: 1, resetAt: now + windowMs };
+      rateLimitBuckets.set(key, bucket);
+    } else {
+      bucket.count++;
     }
-    bucket.count++;
+    // Set standard rate-limit headers
+    res.setHeader('X-RateLimit-Limit', String(maxRequests));
+    res.setHeader('X-RateLimit-Remaining', String(Math.max(0, maxRequests - bucket.count)));
+    res.setHeader('X-RateLimit-Reset', String(Math.ceil(bucket.resetAt / 1000)));
     if (bucket.count > maxRequests) {
+      res.setHeader('Retry-After', String(Math.ceil((bucket.resetAt - now) / 1000)));
       return res.status(429).json({ error: 'Too many requests. Please try again later.' });
     }
     next();
@@ -47,6 +54,65 @@ export const publicApiLimiter = rateLimit(60 * 1000, 60);
 export const publicWriteLimiter = rateLimit(60 * 1000, 10);
 export const checkoutLimiter = rateLimit(60 * 1000, 5);
 export const clientLoginLimiter = rateLimit(60 * 1000, 5); // 5 attempts per minute per IP
+export const aiLimiter = rateLimit(60 * 1000, 3); // 3 AI requests per minute per IP
+export const globalPublicLimiter = rateLimit(60 * 1000, 200, 'global'); // 200 requests per minute per IP across all public routes
+
+// ── Credential Stuffing Protection ──
+
+interface LoginAttempt {
+  failures: number;
+  lastFailure: number;
+  lockedUntil: number;
+}
+
+const loginAttemptsByEmail = new Map<string, LoginAttempt>();
+
+const LOGIN_MAX_FAILURES = 5;
+const LOGIN_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes
+
+/** Check if an email is currently locked out due to too many failed login attempts. */
+export function checkLoginLockout(email: string): { locked: boolean; retryAfterMs?: number } {
+  const key = email.toLowerCase().trim();
+  const attempt = loginAttemptsByEmail.get(key);
+  if (!attempt) return { locked: false };
+  const now = Date.now();
+  if (attempt.lockedUntil > now) {
+    return { locked: true, retryAfterMs: attempt.lockedUntil - now };
+  }
+  // Cooldown expired — reset
+  if (attempt.failures >= LOGIN_MAX_FAILURES && attempt.lockedUntil <= now) {
+    loginAttemptsByEmail.delete(key);
+  }
+  return { locked: false };
+}
+
+/** Record a failed login attempt for an email. Returns true if the account is now locked. */
+export function recordLoginFailure(email: string): boolean {
+  const key = email.toLowerCase().trim();
+  const now = Date.now();
+  const attempt = loginAttemptsByEmail.get(key) || { failures: 0, lastFailure: 0, lockedUntil: 0 };
+  attempt.failures++;
+  attempt.lastFailure = now;
+  if (attempt.failures >= LOGIN_MAX_FAILURES) {
+    attempt.lockedUntil = now + LOGIN_COOLDOWN_MS;
+  }
+  loginAttemptsByEmail.set(key, attempt);
+  return attempt.failures >= LOGIN_MAX_FAILURES;
+}
+
+/** Clear login failure tracking for an email (on successful login). */
+export function clearLoginFailures(email: string): void {
+  loginAttemptsByEmail.delete(email.toLowerCase().trim());
+}
+
+// Clean up expired login lockouts every 10 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, attempt] of loginAttemptsByEmail) {
+    if (attempt.lockedUntil > 0 && attempt.lockedUntil <= now) loginAttemptsByEmail.delete(key);
+    else if (now - attempt.lastFailure > LOGIN_COOLDOWN_MS) loginAttemptsByEmail.delete(key);
+  }
+}, 10 * 60 * 1000);
 
 // ── Session Signing ──
 
