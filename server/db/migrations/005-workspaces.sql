@@ -20,10 +20,10 @@ CREATE TABLE IF NOT EXISTS workspaces (
   competitor_domains TEXT,  -- JSON array of strings
   personas TEXT,            -- JSON array of AudiencePersona
   -- Feature toggles
-  client_portal_enabled INTEGER DEFAULT 0,
-  seo_client_view INTEGER DEFAULT 0,
-  analytics_client_view INTEGER DEFAULT 0,
-  auto_reports INTEGER DEFAULT 0,
+  client_portal_enabled INTEGER,
+  seo_client_view INTEGER,
+  analytics_client_view INTEGER,
+  auto_reports INTEGER,
   auto_report_frequency TEXT,
   -- Branding
   brand_voice TEXT,
@@ -36,8 +36,8 @@ CREATE TABLE IF NOT EXISTS workspaces (
   stripe_customer_id TEXT,
   stripe_subscription_id TEXT,
   -- Client onboarding
-  onboarding_enabled INTEGER DEFAULT 0,
-  onboarding_completed INTEGER DEFAULT 0,
+  onboarding_enabled INTEGER,
+  onboarding_completed INTEGER,
   -- Content pricing (JSON)
   content_pricing TEXT,
   -- Portal contacts (JSON array)

@@ -247,10 +247,10 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   if (row.keyword_strategy) ws.keywordStrategy = JSON.parse(row.keyword_strategy);
   if (row.competitor_domains) ws.competitorDomains = JSON.parse(row.competitor_domains);
   if (row.personas) ws.personas = JSON.parse(row.personas);
-  if (row.client_portal_enabled) ws.clientPortalEnabled = true;
-  if (row.seo_client_view) ws.seoClientView = true;
-  if (row.analytics_client_view) ws.analyticsClientView = true;
-  if (row.auto_reports) ws.autoReports = true;
+  if (row.client_portal_enabled !== null) ws.clientPortalEnabled = !!row.client_portal_enabled;
+  if (row.seo_client_view !== null) ws.seoClientView = !!row.seo_client_view;
+  if (row.analytics_client_view !== null) ws.analyticsClientView = !!row.analytics_client_view;
+  if (row.auto_reports !== null) ws.autoReports = !!row.auto_reports;
   if (row.auto_report_frequency) ws.autoReportFrequency = row.auto_report_frequency as 'weekly' | 'monthly';
   if (row.brand_voice) ws.brandVoice = row.brand_voice;
   if (row.knowledge_base) ws.knowledgeBase = row.knowledge_base;
@@ -260,8 +260,8 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   if (row.trial_ends_at) ws.trialEndsAt = row.trial_ends_at;
   if (row.stripe_customer_id) ws.stripeCustomerId = row.stripe_customer_id;
   if (row.stripe_subscription_id) ws.stripeSubscriptionId = row.stripe_subscription_id;
-  if (row.onboarding_enabled) ws.onboardingEnabled = true;
-  if (row.onboarding_completed) ws.onboardingCompleted = true;
+  if (row.onboarding_enabled !== null) ws.onboardingEnabled = !!row.onboarding_enabled;
+  if (row.onboarding_completed !== null) ws.onboardingCompleted = !!row.onboarding_completed;
   if (row.content_pricing) ws.contentPricing = JSON.parse(row.content_pricing);
   if (row.portal_contacts) ws.portalContacts = JSON.parse(row.portal_contacts);
   if (row.audit_suppressions) ws.auditSuppressions = JSON.parse(row.audit_suppressions);
@@ -459,10 +459,10 @@ function workspaceToParams(ws: Workspace) {
     keyword_strategy: ws.keywordStrategy ? JSON.stringify(ws.keywordStrategy) : null,
     competitor_domains: ws.competitorDomains ? JSON.stringify(ws.competitorDomains) : null,
     personas: ws.personas ? JSON.stringify(ws.personas) : null,
-    client_portal_enabled: ws.clientPortalEnabled ? 1 : 0,
-    seo_client_view: ws.seoClientView ? 1 : 0,
-    analytics_client_view: ws.analyticsClientView ? 1 : 0,
-    auto_reports: ws.autoReports ? 1 : 0,
+    client_portal_enabled: ws.clientPortalEnabled === undefined ? null : (ws.clientPortalEnabled ? 1 : 0),
+    seo_client_view: ws.seoClientView === undefined ? null : (ws.seoClientView ? 1 : 0),
+    analytics_client_view: ws.analyticsClientView === undefined ? null : (ws.analyticsClientView ? 1 : 0),
+    auto_reports: ws.autoReports === undefined ? null : (ws.autoReports ? 1 : 0),
     auto_report_frequency: ws.autoReportFrequency ?? null,
     brand_voice: ws.brandVoice ?? null,
     knowledge_base: ws.knowledgeBase ?? null,
@@ -472,8 +472,8 @@ function workspaceToParams(ws: Workspace) {
     trial_ends_at: ws.trialEndsAt ?? null,
     stripe_customer_id: ws.stripeCustomerId ?? null,
     stripe_subscription_id: ws.stripeSubscriptionId ?? null,
-    onboarding_enabled: ws.onboardingEnabled ? 1 : 0,
-    onboarding_completed: ws.onboardingCompleted ? 1 : 0,
+    onboarding_enabled: ws.onboardingEnabled === undefined ? null : (ws.onboardingEnabled ? 1 : 0),
+    onboarding_completed: ws.onboardingCompleted === undefined ? null : (ws.onboardingCompleted ? 1 : 0),
     content_pricing: ws.contentPricing ? JSON.stringify(ws.contentPricing) : null,
     portal_contacts: ws.portalContacts ? JSON.stringify(ws.portalContacts) : null,
     audit_suppressions: ws.auditSuppressions ? JSON.stringify(ws.auditSuppressions) : null,
