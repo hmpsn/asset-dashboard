@@ -73,7 +73,7 @@ function migratePayments(): number {
       }
 
       for (const r of records) {
-        insert.run({
+        const info = insert.run({
           id: r.id,
           workspace_id: r.workspaceId || workspaceId,
           stripe_session_id: r.stripeSessionId,
@@ -87,7 +87,7 @@ function migratePayments(): number {
           created_at: r.createdAt,
           paid_at: r.paidAt ?? null,
         });
-        total++;
+        total += info.changes;
       }
       console.log(`[migrate] ${file}: ${records.length} payment record(s)`);
     }

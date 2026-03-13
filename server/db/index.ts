@@ -7,6 +7,7 @@
 import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { DATA_BASE } from '../data-dir.js';
 
 const dbDir = DATA_BASE || path.join(process.env.HOME || '', '.asset-dashboard');
@@ -35,7 +36,7 @@ export function runMigrations(): void {
   `);
 
   const migrationsDir = path.join(
-    path.dirname(new URL(import.meta.url).pathname),
+    path.dirname(fileURLToPath(import.meta.url)),
     'migrations',
   );
 
