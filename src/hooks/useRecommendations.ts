@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getOptional } from '../api/client';
 
 export interface Recommendation {
   id: string;
@@ -38,10 +39,8 @@ export function useRecommendations(workspaceId?: string) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/public/recommendations/${workspaceId}?status=pending`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!cancelled && Array.isArray(data.recommendations)) {
+        const data = await getOptional<{ recommendations?: Recommendation[] }>(`/api/public/recommendations/${workspaceId}?status=pending`);
+        if (!cancelled && data && Array.isArray(data.recommendations)) {
           setRecs(data.recommendations);
         }
       } catch { /* non-critical */ }

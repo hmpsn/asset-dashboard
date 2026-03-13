@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { getOptional } from '../api/client';
 import type { PageEditStatus } from '../components/ui/statusConfig';
 
 export interface PageEditState {
@@ -60,8 +61,7 @@ export function usePageEditStates(workspaceId: string | undefined, isPublic = fa
     const url = isPublic
       ? `/api/public/page-states/${workspaceId}`
       : `/api/workspaces/${workspaceId}/page-states`;
-    fetch(url)
-      .then(r => r.ok ? r.json() : null)
+    getOptional<Record<string, PageEditState>>(url)
       .then(data => {
         if (id !== fetchRef.current || !data) return;
         cache.set(workspaceId, { data, fetchedAt: Date.now() });
@@ -79,8 +79,7 @@ export function usePageEditStates(workspaceId: string | undefined, isPublic = fa
     const url = isPublic
       ? `/api/public/page-states/${workspaceId}`
       : `/api/workspaces/${workspaceId}/page-states`;
-    fetch(url)
-      .then(r => r.ok ? r.json() : null)
+    getOptional<Record<string, PageEditState>>(url)
       .then(data => {
         if (id !== fetchRef.current || !data) return;
         cache.set(workspaceId, { data, fetchedAt: Date.now() });

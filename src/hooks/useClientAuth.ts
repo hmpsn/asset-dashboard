@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { post } from '../api/client';
 import type { WorkspaceInfo } from '../components/client/types';
 
 export interface ClientUser {
@@ -77,19 +78,12 @@ export function useClientAuth(
     setAuthLoading(true);
     setAuthError('');
     try {
-      const res = await fetch(`/api/public/auth/${workspaceId}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: passwordInput }),
-      });
-      if (res.ok) {
-        setAuthenticated(true);
-        sessionStorage.setItem(`dash_auth_${workspaceId}`, 'true');
-        if (ws) loadDashboardData(ws);
-      } else {
-        setAuthError('Incorrect password');
-      }
+      await post(`/api/public/auth/${workspaceId}`, { password: passwordInput });
+      setAuthenticated(true);
+      sessionStorage.setItem(`dash_auth_${workspaceId}`, 'true');
+      if (ws) loadDashboardData(ws);
     } catch {
-      setAuthError('Authentication failed');
+      setAuthError('Incorrect password');
     } finally { setAuthLoading(false); }
   }, [workspaceId, ws, passwordInput, loadDashboardData]);
 
@@ -99,28 +93,20 @@ export function useClientAuth(
     setAuthLoading(true);
     setAuthError('');
     try {
-      const res = await fetch(`/api/public/client-login/${workspaceId}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: loginEmail.trim(), password: loginPassword.trim() }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setClientUser(data.user);
-        setAuthenticated(true);
-        sessionStorage.setItem(`dash_auth_${workspaceId}`, 'true');
-        if (ws) loadDashboardData(ws);
-      } else {
-        const err = await res.json();
-        setAuthError(err.error || 'Invalid email or password');
-      }
-    } catch {
-      setAuthError('Authentication failed');
+      const data = await post<{ user: ClientUser }>(`/api/public/client-login/${workspaceId}`, { email: loginEmail.trim(), password: loginPassword.trim() });
+      setClientUser(data.user);
+      setAuthenticated(true);
+      sessionStorage.setItem(`dash_auth_${workspaceId}`, 'true');
+      if (ws) loadDashboardData(ws);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Invalid email or password';
+      setAuthError(msg);
     } finally { setAuthLoading(false); }
   }, [workspaceId, ws, loginEmail, loginPassword, loadDashboardData]);
 
   const handleClientLogout = useCallback(async () => {
     try {
-      await fetch(`/api/public/client-logout/${workspaceId}`, { method: 'POST' });
+      await post(`/api/public/client-logout/${workspaceId}`);
     } catch { /* ignore */ }
     setClientUser(null);
     setAuthenticated(false);

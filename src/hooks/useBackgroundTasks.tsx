@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, useRef, useEffect, type ReactNode } from 'react';
+import { get, post, del } from '../api/client';
 
 export interface BackgroundJob {
   id: string;
@@ -88,12 +89,8 @@ export function BackgroundTaskProvider({ children }: { children: ReactNode }) {
 
   // Load existing jobs on mount
   useEffect(() => {
-    const token = localStorage.getItem('auth_token');
-    const headers: Record<string, string> = {};
-    if (token) headers['x-auth-token'] = token;
-    fetch('/api/jobs', { headers })
-      .then(r => r.json())
-      .then((data: BackgroundJob[]) => {
+    get<BackgroundJob[]>('/api/jobs')
+      .then((data) => {
         if (Array.isArray(data)) setJobs(data);
       })
       .catch(() => {});
@@ -101,15 +98,7 @@ export function BackgroundTaskProvider({ children }: { children: ReactNode }) {
 
   const startJob = useCallback(async (type: string, params: Record<string, unknown>): Promise<string | null> => {
     try {
-      const token = localStorage.getItem('auth_token');
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['x-auth-token'] = token;
-      const res = await fetch('/api/jobs', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ type, params }),
-      });
-      const data = await res.json();
+      const data = await post<{ jobId?: string; error?: string }>('/api/jobs', { type, params });
       if (data.jobId) return data.jobId;
       console.error('Failed to start job:', data.error);
       return null;
@@ -129,10 +118,7 @@ export function BackgroundTaskProvider({ children }: { children: ReactNode }) {
 
   const cancelJobFn = useCallback(async (jobId: string) => {
     try {
-      const token = localStorage.getItem('auth_token');
-      const headers: Record<string, string> = {};
-      if (token) headers['x-auth-token'] = token;
-      await fetch(`/api/jobs/${jobId}`, { method: 'DELETE', headers });
+      await del(`/api/jobs/${jobId}`);
     } catch (err) {
       console.error('Failed to cancel job:', err);
     }

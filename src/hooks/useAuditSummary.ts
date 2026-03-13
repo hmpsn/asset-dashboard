@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { getOptional } from '../api/client';
 
 export interface AuditSummaryData {
   id: string;
@@ -37,8 +38,7 @@ export function useAuditSummary(workspaceId: string | undefined) {
     if (getCached(workspaceId)) return;
 
     const id = ++fetchRef.current;
-    fetch(`/api/public/audit-summary/${workspaceId}`)
-      .then(r => r.ok ? r.json() : null)
+    getOptional<AuditSummaryData>(`/api/public/audit-summary/${workspaceId}`)
       .then(d => {
         if (id !== fetchRef.current) return;
         if (d?.id) {
@@ -56,8 +56,7 @@ export function useAuditSummary(workspaceId: string | undefined) {
     cache.delete(workspaceId);
     const id = ++fetchRef.current;
     setLoading(true);
-    fetch(`/api/public/audit-summary/${workspaceId}`)
-      .then(r => r.ok ? r.json() : null)
+    getOptional<AuditSummaryData>(`/api/public/audit-summary/${workspaceId}`)
       .then(d => {
         if (id !== fetchRef.current) return;
         if (d?.id) {
