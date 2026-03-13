@@ -74,7 +74,7 @@ function broadcastPresenceUpdate() {
  * Create the WebSocket server, wire up broadcast singleton, and
  * initialise subsystems that depend on broadcast (jobs, activity, anomalies, stripe, processor).
  */
-export function initWebSocket(server: Server) {
+export function initWebSocket(server: Server): WebSocketServer {
   const wss = new WebSocketServer({ server, path: '/ws' });
 
   wss.on('connection', (ws) => {
@@ -125,4 +125,6 @@ export function initWebSocket(server: Server) {
   initAnomalyBroadcast(_broadcastToWorkspace);
   initStripeBroadcast(_broadcastToWorkspace);
   startWatcher(_broadcast);
+
+  return wss;
 }
