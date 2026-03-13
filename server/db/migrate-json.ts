@@ -1399,6 +1399,150 @@ function migrateUsageTracking(): number {
   return total;
 }
 
+// ── Tier 5 — Workspaces ──
+
+function migrateWorkspaces(): number {
+  const configFile = path.join(getUploadRoot(), '.workspaces.json');
+  if (!fs.existsSync(configFile)) {
+    console.log('[migrate] No .workspaces.json found — skipping workspaces.');
+    return 0;
+  }
+
+  let workspaces: Array<Record<string, unknown>>;
+  try {
+    workspaces = JSON.parse(fs.readFileSync(configFile, 'utf-8'));
+  } catch (err) {
+    console.warn('[migrate] Failed to parse .workspaces.json:', err);
+    return 0;
+  }
+  if (!Array.isArray(workspaces)) return 0;
+
+  const insertWs = db.prepare(`
+    INSERT OR IGNORE INTO workspaces
+      (id, name, folder, webflow_site_id, webflow_site_name, webflow_token,
+       gsc_property_url, ga4_property_id, client_password, client_email,
+       live_domain, event_config, event_groups, keyword_strategy,
+       competitor_domains, personas, client_portal_enabled, seo_client_view,
+       analytics_client_view, auto_reports, auto_report_frequency,
+       brand_voice, knowledge_base, brand_logo_url, brand_accent_color,
+       tier, trial_ends_at, stripe_customer_id, stripe_subscription_id,
+       onboarding_enabled, onboarding_completed, content_pricing,
+       portal_contacts, audit_suppressions, created_at)
+    VALUES
+      (@id, @name, @folder, @webflow_site_id, @webflow_site_name, @webflow_token,
+       @gsc_property_url, @ga4_property_id, @client_password, @client_email,
+       @live_domain, @event_config, @event_groups, @keyword_strategy,
+       @competitor_domains, @personas, @client_portal_enabled, @seo_client_view,
+       @analytics_client_view, @auto_reports, @auto_report_frequency,
+       @brand_voice, @knowledge_base, @brand_logo_url, @brand_accent_color,
+       @tier, @trial_ends_at, @stripe_customer_id, @stripe_subscription_id,
+       @onboarding_enabled, @onboarding_completed, @content_pricing,
+       @portal_contacts, @audit_suppressions, @created_at)
+  `);
+
+  const insertPageState = db.prepare(`
+    INSERT OR IGNORE INTO page_edit_states
+      (workspace_id, page_id, slug, status, audit_issues, fields, source,
+       approval_batch_id, content_request_id, work_order_id, recommendation_id,
+       rejection_note, updated_at, updated_by)
+    VALUES
+      (@workspace_id, @page_id, @slug, @status, @audit_issues, @fields, @source,
+       @approval_batch_id, @content_request_id, @work_order_id, @recommendation_id,
+       @rejection_note, @updated_at, @updated_by)
+  `);
+
+  const insertSeoEdit = db.prepare(`
+    INSERT OR IGNORE INTO seo_edit_tracking
+      (workspace_id, page_id, status, updated_at, fields)
+    VALUES (@workspace_id, @page_id, @status, @updated_at, @fields)
+  `);
+
+  let total = 0;
+  const insertAll = db.transaction(() => {
+    for (const ws of workspaces) {
+      const info = insertWs.run({
+        id: ws.id as string,
+        name: ws.name as string,
+        folder: ws.folder as string,
+        webflow_site_id: (ws.webflowSiteId as string) ?? null,
+        webflow_site_name: (ws.webflowSiteName as string) ?? null,
+        webflow_token: (ws.webflowToken as string) ?? null,
+        gsc_property_url: (ws.gscPropertyUrl as string) ?? null,
+        ga4_property_id: (ws.ga4PropertyId as string) ?? null,
+        client_password: (ws.clientPassword as string) ?? null,
+        client_email: (ws.clientEmail as string) ?? null,
+        live_domain: (ws.liveDomain as string) ?? null,
+        event_config: ws.eventConfig ? JSON.stringify(ws.eventConfig) : null,
+        event_groups: ws.eventGroups ? JSON.stringify(ws.eventGroups) : null,
+        keyword_strategy: ws.keywordStrategy ? JSON.stringify(ws.keywordStrategy) : null,
+        competitor_domains: ws.competitorDomains ? JSON.stringify(ws.competitorDomains) : null,
+        personas: ws.personas ? JSON.stringify(ws.personas) : null,
+        client_portal_enabled: ws.clientPortalEnabled === undefined ? null : (ws.clientPortalEnabled ? 1 : 0),
+        seo_client_view: ws.seoClientView === undefined ? null : (ws.seoClientView ? 1 : 0),
+        analytics_client_view: ws.analyticsClientView === undefined ? null : (ws.analyticsClientView ? 1 : 0),
+        auto_reports: ws.autoReports === undefined ? null : (ws.autoReports ? 1 : 0),
+        auto_report_frequency: (ws.autoReportFrequency as string) ?? null,
+        brand_voice: (ws.brandVoice as string) ?? null,
+        knowledge_base: (ws.knowledgeBase as string) ?? null,
+        brand_logo_url: (ws.brandLogoUrl as string) ?? null,
+        brand_accent_color: (ws.brandAccentColor as string) ?? null,
+        tier: (ws.tier as string) ?? 'free',
+        trial_ends_at: (ws.trialEndsAt as string) ?? null,
+        stripe_customer_id: (ws.stripeCustomerId as string) ?? null,
+        stripe_subscription_id: (ws.stripeSubscriptionId as string) ?? null,
+        onboarding_enabled: ws.onboardingEnabled === undefined ? null : (ws.onboardingEnabled ? 1 : 0),
+        onboarding_completed: ws.onboardingCompleted === undefined ? null : (ws.onboardingCompleted ? 1 : 0),
+        content_pricing: ws.contentPricing ? JSON.stringify(ws.contentPricing) : null,
+        portal_contacts: ws.portalContacts ? JSON.stringify(ws.portalContacts) : null,
+        audit_suppressions: ws.auditSuppressions ? JSON.stringify(ws.auditSuppressions) : null,
+        created_at: (ws.createdAt as string) || new Date().toISOString(),
+      });
+      total += info.changes;
+
+      // Migrate pageEditStates
+      const pageEditStates = ws.pageEditStates as Record<string, Record<string, unknown>> | undefined;
+      if (pageEditStates) {
+        for (const [pageId, state] of Object.entries(pageEditStates)) {
+          insertPageState.run({
+            workspace_id: ws.id as string,
+            page_id: pageId,
+            slug: (state.slug as string) ?? null,
+            status: (state.status as string) || 'clean',
+            audit_issues: state.auditIssues ? JSON.stringify(state.auditIssues) : null,
+            fields: state.fields ? JSON.stringify(state.fields) : null,
+            source: (state.source as string) ?? null,
+            approval_batch_id: (state.approvalBatchId as string) ?? null,
+            content_request_id: (state.contentRequestId as string) ?? null,
+            work_order_id: (state.workOrderId as string) ?? null,
+            recommendation_id: (state.recommendationId as string) ?? null,
+            rejection_note: (state.rejectionNote as string) ?? null,
+            updated_at: (state.updatedAt as string) || new Date().toISOString(),
+            updated_by: (state.updatedBy as string) ?? null,
+          });
+        }
+      }
+
+      // Migrate seoEditTracking
+      const seoEditTracking = ws.seoEditTracking as Record<string, Record<string, unknown>> | undefined;
+      if (seoEditTracking) {
+        for (const [pageId, t] of Object.entries(seoEditTracking)) {
+          insertSeoEdit.run({
+            workspace_id: ws.id as string,
+            page_id: pageId,
+            status: (t.status as string) || 'flagged',
+            updated_at: (t.updatedAt as string) || new Date().toISOString(),
+            fields: t.fields ? JSON.stringify(t.fields) : null,
+          });
+        }
+      }
+    }
+  });
+
+  insertAll();
+  console.log(`[migrate] Workspaces: ${workspaces.length} workspace(s), inserted ${total}`);
+  return total;
+}
+
 // --- Run all migrations ---
 console.log('[migrate] Starting JSON → SQLite data migration...');
 
@@ -1435,6 +1579,8 @@ const results = {
   chatSessions: migrateChatSessions(),
   googleTokens: migrateGoogleTokens(),
   usageTracking: migrateUsageTracking(),
+  // Tier 5 — Workspaces
+  workspaces: migrateWorkspaces(),
 };
 
 const totalInserted = Object.values(results).reduce((a, b) => a + b, 0);
