@@ -58,7 +58,7 @@ function gracefulShutdown(signal: string) {
   }
 
   // 3. Stop accepting new connections and drain existing ones
-  server.close(() => {
+  server.close(async () => {
     log.info('HTTP server closed');
 
     // 4. Close WebSocket connections gracefully
@@ -71,9 +71,11 @@ function gracefulShutdown(signal: string) {
     // 5. Flush pending data to disk
     flushOpenAIUsage();
     flushSemrushCredits();
-    flushEmailQueue().catch((err) => {
+    try {
+      await flushEmailQueue();
+    } catch (err) {
       log.error({ err }, 'Failed to flush email queue during shutdown');
-    });
+    }
 
     // 6. Close SQLite database (flushes WAL)
     try {
