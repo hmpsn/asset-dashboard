@@ -29,7 +29,7 @@ function upsertStmt() {
 let _getBySite: ReturnType<typeof db.prepare> | null = null;
 function getBySiteStmt() {
   if (!_getBySite) {
-    _getBySite = db.prepare(`SELECT * FROM redirect_snapshots WHERE site_id = ?`);
+    _getBySite = db.prepare(`SELECT * FROM redirect_snapshots WHERE site_id = ? ORDER BY created_at DESC LIMIT 1`);
   }
   return _getBySite;
 }
