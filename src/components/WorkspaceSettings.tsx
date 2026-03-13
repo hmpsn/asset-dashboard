@@ -3,6 +3,7 @@ import { useToast } from './Toast';
 import { ConnectionsTab } from './settings/ConnectionsTab';
 import { FeaturesTab } from './settings/FeaturesTab';
 import { ClientDashboardTab } from './settings/ClientDashboardTab';
+import { get, patch, post } from '../api/client';
 
 interface GscSite { siteUrl: string; permissionLevel: string; }
 interface GA4Property { name: string; displayName: string; propertyId: string; }
@@ -50,38 +51,33 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
   const [loadingGoogle, setLoadingGoogle] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/workspaces/${workspaceId}`).then(r => r.json()).then((d: WorkspaceData) => { setWs(d); }).catch(() => {});
-    fetch('/api/google/status').then(r => r.json()).then((s: { connected: boolean; configured: boolean }) => {
+    get<WorkspaceData>(`/api/workspaces/${workspaceId}`).then(d => { setWs(d); }).catch(() => {});
+    get<{ connected: boolean; configured: boolean }>('/api/google/status').then(s => {
       setGoogleStatus(s);
       if (s.connected) {
         setLoadingGoogle(true);
         Promise.all([
-          fetch('/api/google/gsc-sites').then(r => r.json()).then(d => { if (Array.isArray(d)) setGscSites(d); }),
-          fetch('/api/google/ga4-properties').then(r => r.json()).then(d => { if (Array.isArray(d)) setGa4Properties(d); }),
+          get<GscSite[]>('/api/google/gsc-sites').then(d => { if (Array.isArray(d)) setGscSites(d); }).catch(() => {}),
+          get<GA4Property[]>('/api/google/ga4-properties').then(d => { if (Array.isArray(d)) setGa4Properties(d); }).catch(() => {}),
         ]).finally(() => setLoadingGoogle(false));
       }
     }).catch(() => {});
   }, [workspaceId]);
 
-  const patchWorkspace = async (patch: Record<string, unknown>) => {
-    const res = await fetch(`/api/workspaces/${workspaceId}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(patch),
-    });
-    const updated = await res.json();
+  const patchWorkspace = async (fields: Record<string, unknown>) => {
+    const updated = await patch<WorkspaceData>(`/api/workspaces/${workspaceId}`, fields);
     setWs(updated);
-    onUpdate?.(patch);
+    onUpdate?.(fields);
     return updated;
   };
 
   const connectGoogle = async () => {
-    const res = await fetch('/api/google/auth-url');
-    const data = await res.json();
+    const data = await get<{ url?: string }>('/api/google/auth-url');
     if (data.url) window.location.href = data.url;
   };
 
   const disconnectGoogle = async () => {
-    await fetch('/api/google/disconnect', { method: 'POST' });
+    await post('/api/google/disconnect');
     setGoogleStatus({ connected: false, configured: true });
     setGscSites([]); setGa4Properties([]);
   };

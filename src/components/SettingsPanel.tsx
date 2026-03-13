@@ -5,6 +5,7 @@ import {
   Shield, Key, Mail, CreditCard, Wifi, WifiOff, HardDrive, Trash2, RefreshCw,
 } from 'lucide-react';
 import { StripeSettings } from './StripeSettings';
+import { get, post, getOptional, getSafe } from '../api/client';
 
 interface Workspace {
   id: string;
@@ -64,8 +65,8 @@ export function SettingsPanel() {
   const loadStorage = async () => {
     setStorageLoading(true);
     try {
-      const res = await fetch('/api/admin/storage-stats');
-      if (res.ok) setStorage(await res.json());
+      const data = await getOptional<StorageReport>('/api/admin/storage-stats');
+      if (data) setStorage(data);
     } catch { /* ignore */ }
     finally { setStorageLoading(false); }
   };
@@ -79,8 +80,7 @@ export function SettingsPanel() {
     };
     setPruning(type);
     try {
-      const res = await fetch(endpoints[type], { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-      const data = await res.json();
+      const data = await post<{ bytesFreed?: number }>(endpoints[type], {});
       toast(`Pruned ${type}: ${formatBytes(data.bytesFreed || 0)} freed`);
       loadStorage();
     } catch { toast('Prune failed'); }
@@ -88,33 +88,31 @@ export function SettingsPanel() {
   };
 
   useEffect(() => {
-    fetch('/api/workspaces').then(r => r.json()).then(setWorkspaces).catch(() => {});
-    fetch('/api/google/status').then(r => r.json()).then((s: { connected: boolean; configured: boolean }) => {
+    getSafe<Workspace[]>('/api/workspaces', []).then(setWorkspaces).catch(() => {});
+    get<{ connected: boolean; configured: boolean }>('/api/google/status').then(s => {
       setGoogleStatus(s);
       if (s.connected) loadGscSites();
     }).catch(() => {});
-    fetch('/api/health').then(r => r.json()).then((h: HealthStatus) => setHealth(h)).catch(() => {});
+    get<HealthStatus>('/api/health').then(h => setHealth(h)).catch(() => {});
     loadStorage();
   }, []);
 
   const loadGscSites = async () => {
     setLoadingGsc(true);
     try {
-      const res = await fetch('/api/google/gsc-sites');
-      const sites = await res.json();
+      const sites = await get<GscSite[]>('/api/google/gsc-sites');
       if (Array.isArray(sites)) setGscSites(sites);
     } catch { /* ignore */ }
     finally { setLoadingGsc(false); }
   };
 
   const connectGoogle = async () => {
-    const res = await fetch('/api/google/auth-url');
-    const data = await res.json();
+    const data = await get<{ url?: string }>('/api/google/auth-url');
     if (data.url) window.location.href = data.url;
   };
 
   const disconnectGoogle = async () => {
-    await fetch('/api/google/disconnect', { method: 'POST' });
+    await post('/api/google/disconnect');
     setGoogleStatus({ connected: false, configured: true });
     setGscSites([]);
     toast('Google account disconnected');

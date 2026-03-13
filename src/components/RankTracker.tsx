@@ -3,6 +3,7 @@ import {
   Loader2, TrendingUp, Minus, Plus, Trash2, Pin, RefreshCw,
   Target, ArrowUp, ArrowDown,
 } from 'lucide-react';
+import { get, post, patch, del } from '../api/client';
 
 interface TrackedKeyword {
   query: string;
@@ -38,8 +39,8 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
   const load = async () => {
     try {
       const [kw, ranks] = await Promise.all([
-        fetch(`/api/rank-tracking/${workspaceId}/keywords`).then(r => r.json()),
-        fetch(`/api/rank-tracking/${workspaceId}/latest`).then(r => r.json()),
+        get<TrackedKeyword[]>(`/api/rank-tracking/${workspaceId}/keywords`),
+        get<LatestRank[]>(`/api/rank-tracking/${workspaceId}/latest`),
       ]);
       if (Array.isArray(kw)) setKeywords(kw);
       if (Array.isArray(ranks)) setLatestRanks(ranks);
@@ -54,27 +55,21 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
     setAdding(true);
     setError('');
     try {
-      const res = await fetch(`/api/rank-tracking/${workspaceId}/keywords`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: newKeyword.trim() }),
-      });
-      if (res.ok) {
-        setNewKeyword('');
-        await load();
-      }
+      await post(`/api/rank-tracking/${workspaceId}/keywords`, { query: newKeyword.trim() });
+      setNewKeyword('');
+      await load();
     } catch { setError('Failed to add keyword'); }
     setAdding(false);
   };
 
   const removeKeyword = async (query: string) => {
-    await fetch(`/api/rank-tracking/${workspaceId}/keywords/${encodeURIComponent(query)}`, { method: 'DELETE' });
+    await del(`/api/rank-tracking/${workspaceId}/keywords/${encodeURIComponent(query)}`);
     setKeywords(prev => prev.filter(k => k.query !== query));
     setLatestRanks(prev => prev.filter(r => r.query !== query));
   };
 
   const togglePin = async (query: string) => {
-    await fetch(`/api/rank-tracking/${workspaceId}/keywords/${encodeURIComponent(query)}/pin`, { method: 'PATCH' });
+    await patch(`/api/rank-tracking/${workspaceId}/keywords/${encodeURIComponent(query)}/pin`, {});
     setKeywords(prev => prev.map(k => k.query === query ? { ...k, pinned: !k.pinned } : k));
     setLatestRanks(prev => prev.map(r => r.query === query ? { ...r, pinned: !r.pinned } : r));
   };
@@ -83,11 +78,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
     setSnapshotting(true);
     setError('');
     try {
-      const res = await fetch(`/api/rank-tracking/${workspaceId}/snapshot`, { method: 'POST' });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Snapshot failed');
-      }
+      await post(`/api/rank-tracking/${workspaceId}/snapshot`);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Snapshot failed');

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AlertTriangle, TrendingUp, TrendingDown, Activity, X, Check, RefreshCw, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
+import { get, post } from '../api/client';
 
 interface Anomaly {
   id: string;
@@ -82,11 +83,8 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
       const endpoint = isAdmin
         ? `/api/anomalies/${workspaceId}`
         : `/api/public/anomalies/${workspaceId}`;
-      const res = await fetch(endpoint);
-      if (res.ok) {
-        const data = await res.json();
-        setAnomalies(Array.isArray(data) ? data : []);
-      }
+      const data = await get<Anomaly[]>(endpoint);
+      setAnomalies(Array.isArray(data) ? data : []);
     } catch { /* silent */ }
     finally { setLoading(false); }
   }, [workspaceId, isAdmin]);
@@ -99,14 +97,14 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
 
   const handleDismiss = async (id: string) => {
     try {
-      await fetch(`/api/anomalies/${id}/dismiss`, { method: 'POST' });
+      await post(`/api/anomalies/${id}/dismiss`);
       setAnomalies(prev => prev.filter(a => a.id !== id));
     } catch { /* silent */ }
   };
 
   const handleAcknowledge = async (id: string) => {
     try {
-      await fetch(`/api/anomalies/${id}/acknowledge`, { method: 'POST' });
+      await post(`/api/anomalies/${id}/acknowledge`);
       setAnomalies(prev => prev.map(a => a.id === id ? { ...a, acknowledgedAt: new Date().toISOString() } : a));
     } catch { /* silent */ }
   };
@@ -114,7 +112,7 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
   const handleScan = async () => {
     setLoading(true);
     try {
-      await fetch('/api/anomalies/scan', { method: 'POST' });
+      await post('/api/anomalies/scan');
       await fetchAnomalies();
     } catch { /* silent */ }
     finally { setLoading(false); }
