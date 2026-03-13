@@ -58,7 +58,7 @@ function gracefulShutdown(signal: string) {
   if (activeJobs.length > 0) {
     log.warn({ count: activeJobs.length, jobs: activeJobs.map(j => ({ id: j.id, type: j.type, status: j.status })) },
       'Marking in-progress jobs as interrupted');
-    markRunningJobsInterrupted();
+    try { markRunningJobsInterrupted(); } catch (err) { log.error({ err }, 'Failed to mark jobs as interrupted'); }
   }
 
   // 3. Close WebSocket connections gracefully (must happen before server.close()
