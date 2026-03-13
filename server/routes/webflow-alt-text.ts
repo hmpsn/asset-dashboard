@@ -250,7 +250,7 @@ router.post('/api/webflow/compress/:assetId', async (req, res) => {
         } as Parameters<typeof svgo.optimize>[1]);
         compressedSvg = Buffer.from(result.data, 'utf-8');
       } catch (svgoErr) {
-        log.error({ detail: svgoErr }, 'SVGO error');
+        log.error({ err: svgoErr }, 'SVGO error');
         return res.json({ skipped: true, reason: 'SVGO optimization failed: ' + (svgoErr instanceof Error ? svgoErr.message : String(svgoErr)) });
       }
 
