@@ -54,12 +54,16 @@ export function runMigrations(): void {
 
   const insert = db.prepare('INSERT INTO _migrations (name, applied_at) VALUES (?, ?)');
 
-  for (const file of files) {
-    if (applied.has(file)) continue;
+  const applyMigration = db.transaction((file: string) => {
     const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf-8');
     console.log(`[db] Applying migration: ${file}`);
     db.exec(sql);
     insert.run(file, new Date().toISOString());
+  });
+
+  for (const file of files) {
+    if (applied.has(file)) continue;
+    applyMigration(file);
   }
 }
 
