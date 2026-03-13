@@ -145,6 +145,17 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   }, [location.pathname, GLOBAL_TABS]);
 
   const [fixContext, setFixContext] = useState<FixContext | null>(null);
+
+  // Read fixContext from router state (set by SeoAudit / KeywordStrategy navigate calls)
+  useEffect(() => {
+    const state = location.state as { fixContext?: FixContext } | null;
+    if (state?.fixContext) {
+      setFixContext(state.fixContext);
+      // Clear the state so it doesn't re-trigger on back/forward
+      window.history.replaceState({}, '');
+    }
+  }, [location.state]);
+
   const [clipboardStatus, setClipboardStatus] = useState<string | null>(null);
   const [pendingContentRequests, setPendingContentRequests] = useState(0);
 
