@@ -115,22 +115,24 @@ async function uploadToS3(backupDir: string, timestamp: string): Promise<void> {
   const archivePath = path.join(path.dirname(backupDir), archiveName);
   execSync(`tar -czf "${archivePath}" -C "${path.dirname(backupDir)}" "${path.basename(backupDir)}"`);
 
-  const archiveData = fs.readFileSync(archivePath);
-  const key = `${prefix}/${archiveName}`;
+  try {
+    const archiveData = fs.readFileSync(archivePath);
+    const key = `${prefix}/${archiveName}`;
 
-  log.info({ bucket, key, sizeBytes: archiveData.length }, 'Uploading backup to S3');
+    log.info({ bucket, key, sizeBytes: archiveData.length }, 'Uploading backup to S3');
 
-  await client.send(new PutObjectCommand({
-    Bucket: bucket,
-    Key: key,
-    Body: archiveData,
-    ContentType: 'application/gzip',
-  }));
+    await client.send(new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: archiveData,
+      ContentType: 'application/gzip',
+    }));
 
-  log.info({ bucket, key }, 'S3 backup upload complete');
-
-  // Clean up local archive (the uncompressed backup dir remains)
-  fs.unlinkSync(archivePath);
+    log.info({ bucket, key }, 'S3 backup upload complete');
+  } finally {
+    // Clean up local archive regardless of success/failure
+    try { fs.unlinkSync(archivePath); } catch { /* already gone */ }
+  }
 
   // Prune old S3 backups beyond retention period
   await pruneS3Backups(client, bucket, prefix, ListObjectsV2Command, DeleteObjectsCommand);
