@@ -201,7 +201,7 @@ export function createApp(): express.Express {
   app.use((req, res, next) => {
     if (!req.path.startsWith('/api/public/')) return next();
     const parts = req.path.split('/');
-    if (parts[3] === 'auth' || parts[3] === 'workspace' || parts[3] === 'client-login' || parts[3] === 'client-logout' || parts[3] === 'client-me' || parts[3] === 'auth-mode') return next();
+    if (parts[3] === 'auth' || parts[3] === 'workspace' || parts[3] === 'client-login' || parts[3] === 'client-logout' || parts[3] === 'client-me' || parts[3] === 'auth-mode' || parts[3] === 'forgot-password' || parts[3] === 'reset-password') return next();
     const workspaceId = parts[4];
     if (!workspaceId) return next();
     const ws = getWorkspace(workspaceId);

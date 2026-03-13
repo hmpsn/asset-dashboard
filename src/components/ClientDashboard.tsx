@@ -90,7 +90,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   // ── Auth hook ──
   const {
     authenticated, setAuthenticated,
-    authLoading, authError, setAuthError,
+    authLoading, setAuthLoading, authError, setAuthError,
     authMode, setAuthMode,
     clientUser, setClientUser,
     loginTab, setLoginTab,
