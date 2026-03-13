@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { get, patch, post, getSafe, getOptional } from '../api/client';
 import { useNavigate } from 'react-router-dom';
 import { useWebSocket } from '../hooks/useWebSocket';
 import {
@@ -106,12 +107,12 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/workspace-overview').then(r => r.json()),
-      fetch('/api/activity?limit=15').then(r => r.json()).catch(() => []),
-      fetch('/api/anomalies').then(r => r.ok ? r.json() : []).catch(() => []),
-      fetch('/api/presence').then(r => r.ok ? r.json() : {}).catch(() => ({})),
-      fetch('/api/feedback').then(r => r.ok ? r.json() : []).catch(() => []),
-      fetch(`/api/ai/time-saved?since=${new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()}`).then(r => r.ok ? r.json() : null).catch(() => null),
+      get<WorkspaceSummary[]>('/api/workspace-overview'),
+      getSafe<ActivityEntry[]>('/api/activity?limit=15', []),
+      getSafe<AnomalySummary[]>('/api/anomalies', []),
+      getOptional<PresenceMap>('/api/presence').then(v => v ?? {}).catch(() => ({})),
+      getSafe<FeedbackItem[]>('/api/feedback', []),
+      getOptional<{ totalHoursSaved: number; operationCount: number }>(`/api/ai/time-saved?since=${new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()}`).catch(() => null),
     ]).then(([d, act, anom, pres, fb, ts]) => {
       if (Array.isArray(d)) setData(d);
       if (Array.isArray(act)) setRecentActivity(act);
@@ -453,28 +454,16 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
         const newCount = feedback.filter(f => f.status === 'new').length;
 
         const handleStatusChange = async (wsId: string, id: string, status: string) => {
-          const res = await fetch(`/api/feedback/${wsId}/${id}`, {
-            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status }),
-          });
-          if (res.ok) {
-            const updated = await res.json();
-            setFeedback(prev => prev.map(f => f.id === updated.id ? updated : f));
-          }
+          const updated = await patch<FeedbackItem>(`/api/feedback/${wsId}/${id}`, { status });
+          setFeedback(prev => prev.map(f => f.id === updated.id ? updated : f));
         };
 
         const handleReply = async (wsId: string, id: string) => {
           const content = feedbackReply[id]?.trim();
           if (!content) return;
-          const res = await fetch(`/api/feedback/${wsId}/${id}/reply`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content }),
-          });
-          if (res.ok) {
-            const updated = await res.json();
-            setFeedback(prev => prev.map(f => f.id === updated.id ? updated : f));
-            setFeedbackReply(prev => ({ ...prev, [id]: '' }));
-          }
+          const updated = await post<FeedbackItem>(`/api/feedback/${wsId}/${id}/reply`, { content });
+          setFeedback(prev => prev.map(f => f.id === updated.id ? updated : f));
+          setFeedbackReply(prev => ({ ...prev, [id]: '' }));
         };
 
         return (
@@ -649,8 +638,7 @@ export function AIUsageSection() {
   const [days, setDays] = useState(14);
 
   useEffect(() => {
-    fetch(`/api/ai/usage?days=${days}`)
-      .then(r => r.ok ? r.json() : null)
+    getOptional<AIUsageData>(`/api/ai/usage?days=${days}`)
       .then(d => { if (d) setData(d); })
       .catch(() => {});
   }, [days]);
