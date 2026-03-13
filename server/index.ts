@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { initSentry } from './sentry.js';
 import { createServer } from 'http';
 import path from 'path';
 import fs from 'fs';
@@ -15,6 +16,9 @@ const log = createLogger('startup');
 
 const DATA_ROOT = DATA_BASE || path.join(process.env.HOME || '', '.asset-dashboard');
 const IS_PROD = process.env.NODE_ENV === 'production';
+
+// Initialize Sentry early so it can capture errors from migrations onward
+initSentry();
 
 // Run pending SQLite migrations before anything touches the database
 runMigrations();

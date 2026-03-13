@@ -1,9 +1,27 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { sentryVitePlugin } from '@sentry/vite-plugin'
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  build: {
+    sourcemap: !!process.env.SENTRY_AUTH_TOKEN, // Only generate source maps when Sentry is configured
+  },
+  plugins: [
+    react(),
+    tailwindcss(),
+    // Upload source maps to Sentry during production builds (requires SENTRY_AUTH_TOKEN)
+    ...(process.env.SENTRY_AUTH_TOKEN
+      ? [sentryVitePlugin({
+          org: process.env.SENTRY_ORG,
+          project: process.env.SENTRY_PROJECT,
+          authToken: process.env.SENTRY_AUTH_TOKEN,
+          sourcemaps: {
+            filesToDeleteAfterUpload: ['./dist/**/*.map'],
+          },
+        })]
+      : []),
+  ],
   server: {
     proxy: {
       '/api': 'http://localhost:3001',

@@ -17,6 +17,7 @@ import {
   verifyClientSession,
 } from './middleware.js';
 import { getPresence } from './websocket.js';
+import { setupSentryErrorHandler } from './sentry.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { createLogger } from './logger.js';
 
@@ -103,7 +104,7 @@ export function createApp(): express.Express {
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'", "'unsafe-inline'", 'https://js.stripe.com'],
         frameSrc: ["'self'", 'https://js.stripe.com', 'https://hooks.stripe.com'],
-        connectSrc: ["'self'", 'https://api.stripe.com', 'wss:', 'ws:'],
+        connectSrc: ["'self'", 'https://api.stripe.com', 'https://*.ingest.sentry.io', 'wss:', 'ws:'],
         imgSrc: ["'self'", 'data:', 'https:'],
         styleSrc: ["'self'", "'unsafe-inline'"],
       },
@@ -273,6 +274,9 @@ export function createApp(): express.Express {
   app.use(aeoReviewRoutes);
   app.use(seoChangeTrackerRoutes);
   app.use(contentDecayRoutes);
+
+  // --- Sentry error handler (must be after all route mounts, before frontend catch-all) ---
+  setupSentryErrorHandler(app);
 
   // --- Serve frontend in production (MUST be after all API routes) ---
   if (IS_PROD) {
