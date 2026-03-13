@@ -49,9 +49,12 @@ export default function TurnstileWidget({ onToken, resetTrigger }: TurnstileWidg
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
 
+  const onTokenRef = useRef(onToken);
+  onTokenRef.current = onToken;
+
   const stableOnToken = useCallback((token: string) => {
-    onToken(token);
-  }, [onToken]);
+    onTokenRef.current(token);
+  }, []);
 
   useEffect(() => {
     if (!SITE_KEY || !containerRef.current) return;
