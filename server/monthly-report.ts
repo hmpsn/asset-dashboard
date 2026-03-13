@@ -1,4 +1,5 @@
 import { listWorkspaces, getUploadRoot, type Workspace } from './workspaces.js';
+import { applySuppressionsToAudit } from './helpers.js';
 import { getLatestSnapshot } from './reports.js';
 import { listActivity } from './activity-log.js';
 import { listRequests } from './requests.js';
@@ -74,7 +75,10 @@ interface MonthlyData {
 }
 
 async function gatherMonthlyData(ws: Workspace): Promise<MonthlyData> {
-  const snapshot = ws.webflowSiteId ? getLatestSnapshot(ws.webflowSiteId) : null;
+  const rawSnapshot = ws.webflowSiteId ? getLatestSnapshot(ws.webflowSiteId) : null;
+  const snapshot = rawSnapshot && ws.auditSuppressions?.length
+    ? { ...rawSnapshot, audit: applySuppressionsToAudit(rawSnapshot.audit, ws.auditSuppressions) }
+    : rawSnapshot;
   const requests = listRequests(ws.id);
   const batches = listBatches(ws.id);
   const activities = listActivity(ws.id, 30);
