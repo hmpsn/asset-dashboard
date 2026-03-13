@@ -194,7 +194,12 @@ export function updateRequest(id: string, updates: Partial<Pick<ClientRequest, '
   const existing = getRequest(id);
   if (!existing) return null;
 
-  const merged = { ...existing, ...updates, updatedAt: new Date().toISOString() };
+  // Filter out undefined values so we don't overwrite existing fields with NULL
+  const cleanUpdates: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(updates)) {
+    if (v !== undefined) cleanUpdates[k] = v;
+  }
+  const merged = { ...existing, ...cleanUpdates, updatedAt: new Date().toISOString() };
 
   stmts().update.run({
     id: merged.id,
