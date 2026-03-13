@@ -12,37 +12,8 @@ import type { ContentBrief } from './content-brief.js';
 
 // --- Types ---
 
-export interface PostSection {
-  index: number;
-  heading: string;
-  content: string;         // HTML
-  wordCount: number;
-  targetWordCount: number;
-  keywords: string[];
-  status: 'pending' | 'generating' | 'done' | 'error';
-  error?: string;
-}
-
-export interface GeneratedPost {
-  id: string;
-  workspaceId: string;
-  briefId: string;
-  targetKeyword: string;
-  title: string;
-  metaDescription: string;
-  introduction: string;    // HTML
-  sections: PostSection[];
-  conclusion: string;      // HTML
-  seoTitle?: string;       // SEO-optimized title tag (50-60 chars)
-  seoMetaDescription?: string; // SEO meta description (150-160 chars)
-  totalWordCount: number;
-  targetWordCount: number;
-  status: 'generating' | 'draft' | 'review' | 'approved';
-  unificationStatus?: 'pending' | 'success' | 'failed' | 'skipped';
-  unificationNote?: string;
-  createdAt: string;
-  updatedAt: string;
-}
+export type { PostSection, GeneratedPost } from '../shared/types/content.ts';
+import type { PostSection, GeneratedPost } from '../shared/types/content.ts';
 
 // ── SQLite row shape ──
 

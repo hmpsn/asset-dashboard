@@ -8,23 +8,8 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import db from './db/index.js';
 
-export type ClientRole = 'client_owner' | 'client_member';
-
-export interface ClientUser {
-  id: string;
-  email: string;
-  name: string;
-  passwordHash: string;
-  role: ClientRole;
-  workspaceId: string;
-  avatarUrl?: string;
-  invitedBy?: string;          // internal user ID who invited this client
-  lastLoginAt?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export type SafeClientUser = Omit<ClientUser, 'passwordHash'>;
+export type { ClientRole, ClientUser, SafeClientUser } from '../shared/types/users.ts';
+import type { ClientRole, ClientUser, SafeClientUser } from '../shared/types/users.ts';
 
 const SALT_ROUNDS = 12;
 const JWT_SECRET = process.env.JWT_SECRET || 'hmpsn-studio-dev-secret-change-in-prod';

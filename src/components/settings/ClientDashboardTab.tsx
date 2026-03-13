@@ -6,9 +6,8 @@ import {
 } from 'lucide-react';
 import SearchableSelect from '../SearchableSelect';
 
-interface ClientUserSafe { id: string; email: string; name: string; role: 'client_owner' | 'client_member'; workspaceId: string; avatarUrl?: string; lastLoginAt?: string; createdAt: string; updatedAt: string; }
-interface EventGroup { id: string; name: string; order: number; color: string; defaultPageFilter?: string; allowedPages?: string[]; }
-interface EventDisplayConfig { eventName: string; displayName: string; pinned: boolean; group?: string; }
+import type { SafeClientUser as ClientUserSafe } from '../../../shared/types/users.ts';
+import type { EventGroup, EventDisplayConfig } from '../../../shared/types/workspace.ts';
 
 interface WorkspaceData {
   hasPassword?: boolean;

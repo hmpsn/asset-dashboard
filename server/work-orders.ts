@@ -1,23 +1,9 @@
 import db from './db/index.js';
-import type { ProductType } from './payments.js';
 
 // --- Types ---
 
-export interface WorkOrder {
-  id: string;
-  workspaceId: string;
-  paymentId: string;
-  productType: ProductType;
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  pageIds: string[];
-  issueChecks?: string[];
-  quantity: number;
-  assignedTo?: string;
-  completedAt?: string;
-  notes?: string;
-  createdAt: string;
-  updatedAt: string;
-}
+export type { WorkOrder } from '../shared/types/payments.ts';
+import type { ProductType, WorkOrder } from '../shared/types/payments.ts';
 
 // ── SQLite row shape ──
 

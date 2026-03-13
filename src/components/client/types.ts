@@ -1,13 +1,29 @@
-export interface SearchQuery { query: string; clicks: number; impressions: number; ctr: number; position: number; }
-export interface SearchPage { page: string; clicks: number; impressions: number; ctr: number; position: number; }
-export interface SearchOverview {
-  totalClicks: number; totalImpressions: number; avgCtr: number; avgPosition: number;
-  topQueries: SearchQuery[]; topPages: SearchPage[];
-  dateRange: { start: string; end: string };
-}
-export interface PerformanceTrend { date: string; clicks: number; impressions: number; ctr: number; position: number; }
-export interface EventGroup { id: string; name: string; order: number; color: string; defaultPageFilter?: string; allowedPages?: string[]; }
-export interface EventDisplayConfig { eventName: string; displayName: string; pinned: boolean; group?: string; }
+// ── Re-exported shared types ─────────────────────────────────────
+export type {
+  SearchQuery, SearchPage, SearchOverview, PerformanceTrend,
+  SearchComparison, GA4Overview, GA4DailyTrend, GA4TopPage, GA4TopSource,
+  GA4DeviceBreakdown, GA4CountryBreakdown, GA4Event, GA4EventTrend,
+  GA4ConversionSummary, GA4EventPageBreakdown, GA4Comparison,
+  GA4NewVsReturning, GA4OrganicOverview, GA4LandingPage,
+} from '../../../shared/types/analytics.ts';
+
+export type {
+  EventGroup, EventDisplayConfig,
+} from '../../../shared/types/workspace.ts';
+
+export type {
+  RequestCategory, RequestStatus, RequestAttachment, RequestNote, ClientRequest,
+} from '../../../shared/types/requests.ts';
+
+export type {
+  ApprovalItem, ApprovalBatch,
+} from '../../../shared/types/approvals.ts';
+
+// ── Client-specific types (not shared with server) ──────────────
+
+import type { EventDisplayConfig } from '../../../shared/types/workspace.ts';
+import type { GA4Overview } from '../../../shared/types/analytics.ts';
+
 export interface ContentPricing { briefPrice: number; fullPostPrice: number; currency: string; briefLabel?: string; fullPostLabel?: string; briefDescription?: string; fullPostDescription?: string; }
 export interface WorkspaceInfo { id: string; name: string; webflowSiteId?: string; webflowSiteName?: string; gscPropertyUrl?: string; ga4PropertyId?: string; liveDomain?: string; eventConfig?: EventDisplayConfig[]; eventGroups?: EventGroup[]; requiresPassword?: boolean; clientPortalEnabled?: boolean; seoClientView?: boolean; analyticsClientView?: boolean; contentPricing?: ContentPricing | null; tier?: 'free' | 'growth' | 'premium'; baseTier?: 'free' | 'growth' | 'premium'; isTrial?: boolean; trialDaysRemaining?: number; trialEndsAt?: string | null; stripeEnabled?: boolean; onboardingEnabled?: boolean; onboardingCompleted?: boolean; brandLogoUrl?: string; brandAccentColor?: string; }
 export interface AuditSummary { id: string; createdAt: string; siteScore: number; totalPages: number; errors: number; warnings: number; previousScore?: number; }
@@ -19,20 +35,6 @@ export interface AuditDetail {
   scoreHistory: Array<{ id: string; createdAt: string; siteScore: number }>;
 }
 export interface ChatMessage { role: 'user' | 'assistant'; content: string; }
-export interface GA4Overview {
-  totalUsers: number; totalSessions: number; totalPageviews: number;
-  avgSessionDuration: number; bounceRate: number; newUserPercentage: number;
-  dateRange: { start: string; end: string };
-}
-export interface GA4DailyTrend { date: string; users: number; sessions: number; pageviews: number; }
-export interface GA4TopPage { path: string; pageviews: number; users: number; avgEngagementTime: number; }
-export interface GA4TopSource { source: string; medium: string; users: number; sessions: number; }
-export interface GA4DeviceBreakdown { device: string; users: number; sessions: number; percentage: number; }
-export interface GA4CountryBreakdown { country: string; users: number; sessions: number; }
-export interface GA4Event { eventName: string; eventCount: number; users: number; }
-export interface GA4EventTrend { date: string; eventCount: number; }
-export interface GA4ConversionSummary { eventName: string; conversions: number; users: number; rate: number; }
-export interface GA4EventPageBreakdown { eventName: string; pagePath: string; eventCount: number; users: number; }
 
 export interface ClientContentRequest {
   id: string; topic: string; targetKeyword: string; intent: string; priority: string;
@@ -62,50 +64,6 @@ export interface ClientBriefPreview {
   schemaRecommendations?: { type: string; notes: string }[];
 }
 
-export interface SearchComparison {
-  current: { clicks: number; impressions: number; ctr: number; position: number };
-  previous: { clicks: number; impressions: number; ctr: number; position: number };
-  change: { clicks: number; impressions: number; ctr: number; position: number };
-  changePercent: { clicks: number; impressions: number; ctr: number; position: number };
-}
-
-export interface GA4Comparison {
-  current: GA4Overview;
-  previous: GA4Overview;
-  change: { users: number; sessions: number; pageviews: number; bounceRate: number; avgSessionDuration: number };
-  changePercent: { users: number; sessions: number; pageviews: number };
-}
-
-export interface GA4NewVsReturning {
-  segment: string;
-  users: number;
-  sessions: number;
-  bounceRate: number;
-  engagementRate: number;
-  avgEngagementTime: number;
-  percentage: number;
-}
-
-export interface GA4OrganicOverview {
-  organicUsers: number;
-  organicSessions: number;
-  organicPageviews: number;
-  organicBounceRate: number;
-  engagementRate: number;
-  avgEngagementTime: number;
-  shareOfTotalUsers: number;
-  dateRange: { start: string; end: string };
-}
-
-export interface GA4LandingPage {
-  landingPage: string;
-  sessions: number;
-  users: number;
-  bounceRate: number;
-  avgEngagementTime: number;
-  conversions: number;
-}
-
 export type SortKey = 'clicks' | 'impressions' | 'ctr' | 'position';
 export type ClientTab = 'overview' | 'performance' | 'search' | 'health' | 'strategy' | 'analytics' | 'inbox' | 'approvals' | 'requests' | 'content' | 'plans' | 'roi';
 
@@ -119,27 +77,6 @@ export interface ClientKeywordStrategy {
   keywordGaps?: { keyword: string; volume?: number; difficulty?: number }[];
   businessContext?: string;
   generatedAt: string;
-}
-
-export type RequestCategory = 'bug' | 'content' | 'design' | 'seo' | 'feature' | 'other';
-export type RequestStatus = 'new' | 'in_review' | 'in_progress' | 'on_hold' | 'completed' | 'closed';
-export interface RequestAttachment { id: string; filename: string; originalName: string; mimeType: string; size: number; }
-export interface RequestNote { id: string; author: 'client' | 'team'; content: string; attachments?: RequestAttachment[]; createdAt: string; }
-export interface ClientRequest {
-  id: string; workspaceId: string; title: string; description: string;
-  category: RequestCategory; priority: string; status: RequestStatus;
-  submittedBy?: string; pageUrl?: string; attachments?: RequestAttachment[]; notes: RequestNote[]; createdAt: string; updatedAt: string;
-}
-
-export interface ApprovalItem {
-  id: string; pageId: string; pageTitle: string; pageSlug: string;
-  field: string; collectionId?: string; currentValue: string; proposedValue: string;
-  clientValue?: string; status: 'pending' | 'approved' | 'rejected' | 'applied'; clientNote?: string;
-  reason?: string; createdAt: string; updatedAt: string;
-}
-export interface ApprovalBatch {
-  id: string; workspaceId: string; siteId: string; name: string;
-  items: ApprovalItem[]; status: string; createdAt: string; updatedAt: string;
 }
 
 export const SEV = {

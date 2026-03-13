@@ -1,38 +1,7 @@
 import db from './db/index.js';
 
-export interface ContentRequestComment {
-  id: string;
-  author: 'client' | 'team';
-  content: string;
-  createdAt: string;
-}
-
-export interface ContentTopicRequest {
-  id: string;
-  workspaceId: string;
-  topic: string;
-  targetKeyword: string;
-  intent: string;
-  priority: string;
-  rationale: string;
-  status: 'pending_payment' | 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'delivered' | 'published' | 'declined';
-  briefId?: string;
-  clientNote?: string;
-  internalNote?: string;
-  declineReason?: string;
-  clientFeedback?: string;
-  source?: 'strategy' | 'client';
-  serviceType?: 'brief_only' | 'full_post';
-  pageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource';
-  upgradedAt?: string;
-  deliveryUrl?: string;
-  deliveryNotes?: string;
-  targetPageId?: string;
-  targetPageSlug?: string;
-  comments?: ContentRequestComment[];
-  requestedAt: string;
-  updatedAt: string;
-}
+export type { ContentRequestComment, ContentTopicRequest } from '../shared/types/content.ts';
+import type { ContentRequestComment, ContentTopicRequest } from '../shared/types/content.ts';
 
 // ── SQLite row shape ──
 
