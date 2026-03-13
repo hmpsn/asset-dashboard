@@ -80,21 +80,24 @@ export async function runBackup(): Promise<{ backupDir: string; files: number; b
     // 2b. Verify backup integrity
     try {
       const verifyDb = new Database(dbBackupPath, { readonly: true });
-      const result = verifyDb.pragma('integrity_check') as Array<{ integrity_check: string }>;
-      if (result[0]?.integrity_check !== 'ok') {
-        log.error({ result }, 'SQLite backup integrity check FAILED');
-      } else {
-        // Verify the backup has data (not an empty database)
-        const tables = verifyDb.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '_%'").all() as Array<{ name: string }>;
-        for (const t of tables) {
-          const row = verifyDb.prepare(`SELECT COUNT(*) as c FROM "${t.name}"`).get() as { c: number };
-          tableCounts[t.name] = row.c;
+      try {
+        const result = verifyDb.pragma('integrity_check') as Array<{ integrity_check: string }>;
+        if (result[0]?.integrity_check !== 'ok') {
+          log.error({ result }, 'SQLite backup integrity check FAILED');
+        } else {
+          // Verify the backup has data (not an empty database)
+          const tables = verifyDb.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '\_%' ESCAPE '\\'").all() as Array<{ name: string }>;
+          for (const t of tables) {
+            const row = verifyDb.prepare(`SELECT COUNT(*) as c FROM "${t.name}"`).get() as { c: number };
+            tableCounts[t.name] = row.c;
+          }
+          verified = true;
+          const totalRows = Object.values(tableCounts).reduce((a, b) => a + b, 0);
+          log.info({ tableCount: tables.length, totalRows }, 'Backup verified');
         }
-        verified = true;
-        const totalRows = Object.values(tableCounts).reduce((a, b) => a + b, 0);
-        log.info({ tableCount: tables.length, totalRows }, 'Backup verified');
+      } finally {
+        verifyDb.close();
       }
-      verifyDb.close();
     } catch (err) {
       log.error({ err }, 'SQLite backup verification failed');
     }
