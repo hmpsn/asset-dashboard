@@ -1,22 +1,53 @@
 /**
  * Persistent storage for performance tool results.
- * Saves per-site snapshots so results survive navigation and deploys.
+ * Saves per-site snapshots to SQLite.
  * Covers: PageWeight, PageSpeed, LinkChecker, InternalLinks, CompetitorCompare.
  */
-import fs from 'fs';
-import path from 'path';
-import { getDataDir } from './data-dir.js';
+import db from './db/index.js';
 
-const PERF_DIR = getDataDir('performance');
+// ── Prepared statements (lazy) ──
 
-function ensureDir(sub: string) {
-  const dir = path.join(PERF_DIR, sub);
-  fs.mkdirSync(dir, { recursive: true });
-  return dir;
+let _upsert: ReturnType<typeof db.prepare> | null = null;
+function upsertStmt() {
+  if (!_upsert) {
+    _upsert = db.prepare(`
+      INSERT OR REPLACE INTO performance_snapshots
+        (sub, site_id, created_at, result)
+      VALUES (@sub, @site_id, @created_at, @result)
+    `);
+  }
+  return _upsert;
 }
 
-function filePath(sub: string, siteId: string): string {
-  return path.join(ensureDir(sub), `${siteId}.json`);
+let _get: ReturnType<typeof db.prepare> | null = null;
+function getStmt() {
+  if (!_get) {
+    _get = db.prepare(`SELECT * FROM performance_snapshots WHERE sub = ? AND site_id = ?`);
+  }
+  return _get;
+}
+
+let _listBySub: ReturnType<typeof db.prepare> | null = null;
+function listBySubStmt() {
+  if (!_listBySub) {
+    _listBySub = db.prepare(`SELECT * FROM performance_snapshots WHERE sub = ? ORDER BY created_at DESC`);
+  }
+  return _listBySub;
+}
+
+let _listBySubPrefix: ReturnType<typeof db.prepare> | null = null;
+function listBySubPrefixStmt() {
+  if (!_listBySubPrefix) {
+    _listBySubPrefix = db.prepare(`SELECT * FROM performance_snapshots WHERE sub = ? ORDER BY created_at DESC`);
+  }
+  return _listBySubPrefix;
+}
+
+interface PerfRow {
+  sub: string;
+  site_id: string;
+  created_at: string;
+  result: string;
 }
 
 interface Snapshot<T> {
@@ -31,18 +62,23 @@ function save<T>(sub: string, siteId: string, result: T): Snapshot<T> {
     createdAt: new Date().toISOString(),
     result,
   };
-  fs.writeFileSync(filePath(sub, siteId), JSON.stringify(snapshot, null, 2));
+  upsertStmt().run({
+    sub,
+    site_id: siteId,
+    created_at: snapshot.createdAt,
+    result: JSON.stringify(result),
+  });
   return snapshot;
 }
 
 function load<T>(sub: string, siteId: string): Snapshot<T> | null {
-  const fp = filePath(sub, siteId);
-  if (!fs.existsSync(fp)) return null;
-  try {
-    return JSON.parse(fs.readFileSync(fp, 'utf-8'));
-  } catch {
-    return null;
-  }
+  const row = getStmt().get(sub, siteId) as PerfRow | undefined;
+  if (!row) return null;
+  return {
+    siteId: row.site_id,
+    createdAt: row.created_at,
+    result: JSON.parse(row.result),
+  };
 }
 
 // ── Page Weight ──
@@ -96,10 +132,8 @@ export function getInternalLinks(siteId: string) {
 }
 
 // ── Competitor Comparison ──
-// Key by both URLs since it's not site-specific
 
 function competitorKey(myUrl: string, competitorUrl: string): string {
-  // Normalize URLs to create a stable key
   const normalize = (u: string) => u.replace(/^https?:\/\//, '').replace(/\/$/, '').replace(/[^a-z0-9]/gi, '_');
   return `${normalize(myUrl)}_vs_${normalize(competitorUrl)}`;
 }
@@ -114,45 +148,39 @@ export function getCompetitorCompare(myUrl: string, competitorUrl: string) {
 
 // Get latest comparison for a given myUrl (any competitor)
 export function getLatestCompetitorCompareForSite(myUrl: string): { createdAt: string; result: unknown } | null {
-  const dir = path.join(PERF_DIR, 'competitor');
-  if (!fs.existsSync(dir)) return null;
-  try {
-    const normalize = (u: string) => u.replace(/^https?:\/\//, '').replace(/\/$/, '').toLowerCase();
-    const myNorm = normalize(myUrl);
-    let latest: { createdAt: string; result: unknown } | null = null;
-    for (const f of fs.readdirSync(dir).filter(f => f.endsWith('.json'))) {
-      try {
-        const data = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8'));
-        const snapMyUrl = normalize(data.result?.mySite?.url || '');
-        if (snapMyUrl === myNorm || myNorm.includes(snapMyUrl) || snapMyUrl.includes(myNorm)) {
-          if (!latest || data.createdAt > latest.createdAt) {
-            latest = { createdAt: data.createdAt, result: data.result };
-          }
+  const rows = listBySubStmt().all('competitor') as PerfRow[];
+  if (rows.length === 0) return null;
+
+  const normalize = (u: string) => u.replace(/^https?:\/\//, '').replace(/\/$/, '').toLowerCase();
+  const myNorm = normalize(myUrl);
+  let latest: { createdAt: string; result: unknown } | null = null;
+
+  for (const row of rows) {
+    try {
+      const data = JSON.parse(row.result);
+      const snapMyUrl = normalize(data?.mySite?.url || '');
+      if (snapMyUrl === myNorm || myNorm.includes(snapMyUrl) || snapMyUrl.includes(myNorm)) {
+        if (!latest || row.created_at > latest.createdAt) {
+          latest = { createdAt: row.created_at, result: data };
         }
-      } catch { /* skip corrupt files */ }
-    }
-    return latest;
-  } catch { return null; }
+      }
+    } catch { /* skip corrupt rows */ }
+  }
+  return latest;
 }
 
 // List all saved competitor comparisons
 export function listCompetitorCompares(): Array<{ key: string; createdAt: string; myUrl?: string; competitorUrl?: string }> {
-  const dir = path.join(PERF_DIR, 'competitor');
-  if (!fs.existsSync(dir)) return [];
-  try {
-    return fs.readdirSync(dir)
-      .filter(f => f.endsWith('.json'))
-      .map(f => {
-        try {
-          const data = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8'));
-          return {
-            key: f.replace('.json', ''),
-            createdAt: data.createdAt,
-            myUrl: data.result?.mySite?.url,
-            competitorUrl: data.result?.competitor?.url,
-          };
-        } catch { return null; }
-      })
-      .filter(Boolean) as Array<{ key: string; createdAt: string; myUrl?: string; competitorUrl?: string }>;
-  } catch { return []; }
+  const rows = listBySubStmt().all('competitor') as PerfRow[];
+  return rows.map(row => {
+    try {
+      const data = JSON.parse(row.result);
+      return {
+        key: row.site_id,
+        createdAt: row.created_at,
+        myUrl: data?.mySite?.url,
+        competitorUrl: data?.competitor?.url,
+      };
+    } catch { return null; }
+  }).filter(Boolean) as Array<{ key: string; createdAt: string; myUrl?: string; competitorUrl?: string }>;
 }

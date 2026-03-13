@@ -8,11 +8,7 @@
  * paid add-ons purchased via Stripe. Activity logging tracks generation events.
  */
 
-import fs from 'fs';
-import path from 'path';
-
-const DATA_DIR = path.join(process.cwd(), 'data', 'usage');
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+import db from './db/index.js';
 
 // ── Feature keys ──
 export type UsageFeature = 'ai_chats' | 'strategy_generations';
@@ -28,14 +24,29 @@ export function getLimit(tier: string, feature: UsageFeature): number {
   return LIMITS[tier]?.[feature] ?? LIMITS.free[feature];
 }
 
-// ── Storage helpers ──
-interface MonthlyUsage {
-  month: string; // YYYY-MM
-  counts: Partial<Record<UsageFeature, number>>;
+// ── Prepared statements (lazy) ──
+
+let _getCount: ReturnType<typeof db.prepare> | null = null;
+function getCountStmt() {
+  if (!_getCount) {
+    _getCount = db.prepare(`
+      SELECT count FROM usage_tracking
+      WHERE workspace_id = ? AND month = ? AND feature = ?
+    `);
+  }
+  return _getCount;
 }
 
-function filePath(workspaceId: string): string {
-  return path.join(DATA_DIR, `${workspaceId}.json`);
+let _upsert: ReturnType<typeof db.prepare> | null = null;
+function upsertStmt() {
+  if (!_upsert) {
+    _upsert = db.prepare(`
+      INSERT INTO usage_tracking (workspace_id, month, feature, count)
+      VALUES (@workspace_id, @month, @feature, @count)
+      ON CONFLICT(workspace_id, month, feature) DO UPDATE SET count = @count
+    `);
+  }
+  return _upsert;
 }
 
 function currentMonth(): string {
@@ -43,36 +54,27 @@ function currentMonth(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function readUsage(workspaceId: string): MonthlyUsage {
-  const fp = filePath(workspaceId);
-  const month = currentMonth();
-  try {
-    if (fs.existsSync(fp)) {
-      const data: MonthlyUsage = JSON.parse(fs.readFileSync(fp, 'utf-8'));
-      if (data.month === month) return data;
-    }
-  } catch { /* corrupted — reset */ }
-  return { month, counts: {} };
-}
-
-function writeUsage(workspaceId: string, usage: MonthlyUsage): void {
-  fs.writeFileSync(filePath(workspaceId), JSON.stringify(usage, null, 2));
-}
-
 // ── Public API ──
 
 /** Get current month's count for a feature. */
 export function getUsageCount(workspaceId: string, feature: UsageFeature): number {
-  const usage = readUsage(workspaceId);
-  return usage.counts[feature] || 0;
+  const month = currentMonth();
+  const row = getCountStmt().get(workspaceId, month, feature) as { count: number } | undefined;
+  return row?.count || 0;
 }
 
 /** Increment the count. Call AFTER a successful action. */
 export function incrementUsage(workspaceId: string, feature: UsageFeature): number {
-  const usage = readUsage(workspaceId);
-  usage.counts[feature] = (usage.counts[feature] || 0) + 1;
-  writeUsage(workspaceId, usage);
-  return usage.counts[feature]!;
+  const month = currentMonth();
+  const current = getUsageCount(workspaceId, feature);
+  const newCount = current + 1;
+  upsertStmt().run({
+    workspace_id: workspaceId,
+    month,
+    feature,
+    count: newCount,
+  });
+  return newCount;
 }
 
 /** Check if a workspace can use a feature. Returns { allowed, used, limit, remaining }. */

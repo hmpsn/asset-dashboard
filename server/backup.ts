@@ -1,8 +1,8 @@
 /**
- * Daily data backup — copies critical JSON data files to a timestamped backup directory.
+ * Daily data backup — copies uploaded files and SQLite database to a timestamped backup directory.
  * 
- * Backs up: workspace config, client users, auth data, reports, schemas, payments,
- * content requests, chat sessions, activity logs, rank tracking, annotations, etc.
+ * Backs up: uploaded assets (images, brand docs) and the SQLite database.
+ * JSON file backup is no longer needed since all data now lives in SQLite.
  * 
  * Retention: keeps last 3 daily backups (configurable via BACKUP_RETENTION_DAYS).
  * Storage: local disk by default (DATA_DIR/backups/). Set BACKUP_DIR to override.
@@ -12,7 +12,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { DATA_BASE, getDataDir, getUploadRoot } from './data-dir.js';
+import { DATA_BASE, getUploadRoot } from './data-dir.js';
 import db from './db/index.js';
 
 const BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -24,20 +24,19 @@ function getBackupRoot(): string {
   return dir;
 }
 
-/** Recursively copy JSON files from src to dest, preserving directory structure. */
-function copyJsonFiles(src: string, dest: string, stats: { files: number; bytes: number }): void {
+/** Recursively copy upload files (images, brand docs, etc.) from src to dest. */
+function copyUploadFiles(src: string, dest: string, stats: { files: number; bytes: number }): void {
   if (!fs.existsSync(src)) return;
   const entries = fs.readdirSync(src, { withFileTypes: true });
   for (const entry of entries) {
     const srcPath = path.join(src, entry.name);
     const destPath = path.join(dest, entry.name);
     if (entry.isDirectory()) {
-      // Skip optimized images — only back up config/data files
-      if (entry.name === 'optimized' || entry.name === 'meta') continue;
+      // Skip optimized images — only back up originals and meta
+      if (entry.name === 'optimized') continue;
       fs.mkdirSync(destPath, { recursive: true });
-      copyJsonFiles(srcPath, destPath, stats);
-    } else if (entry.name.endsWith('.json') || entry.name.startsWith('.')) {
-      // Copy JSON data files and dot-files (like .workspaces.json)
+      copyUploadFiles(srcPath, destPath, stats);
+    } else {
       try {
         fs.copyFileSync(srcPath, destPath);
         stats.files++;
@@ -57,28 +56,15 @@ export function runBackup(): { backupDir: string; files: number; bytes: number }
 
   const stats = { files: 0, bytes: 0 };
 
-  // 1. Back up uploads root (workspace configs, dot-files)
+  // 1. Back up uploads root (workspace images, brand docs, etc.)
   const uploadRoot = getUploadRoot();
   if (fs.existsSync(uploadRoot)) {
     const uploadDest = path.join(backupDir, 'uploads');
     fs.mkdirSync(uploadDest, { recursive: true });
-    copyJsonFiles(uploadRoot, uploadDest, stats);
+    copyUploadFiles(uploadRoot, uploadDest, stats);
   }
 
-  // 2. Back up named data directories
-  const dataDirs = ['auth', 'reports', 'schemas', 'payments', 'content-requests', 'chat', 'activity', 'rank-tracking', 'annotations', 'redirects', 'sales-reports', 'stripe', 'email-queue', 'jobs'];
-  for (const sub of dataDirs) {
-    try {
-      const srcDir = getDataDir(sub);
-      if (fs.existsSync(srcDir) && fs.readdirSync(srcDir).length > 0) {
-        const destDir = path.join(backupDir, sub);
-        fs.mkdirSync(destDir, { recursive: true });
-        copyJsonFiles(srcDir, destDir, stats);
-      }
-    } catch { /* directory doesn't exist yet */ }
-  }
-
-  // 3. Back up SQLite database (synchronous via VACUUM INTO)
+  // 2. Back up SQLite database (synchronous via VACUUM INTO)
   try {
     const dbBackupPath = path.join(backupDir, 'dashboard.db');
     db.exec(`VACUUM INTO '${dbBackupPath.replace(/'/g, "''")}'`);
@@ -88,7 +74,7 @@ export function runBackup(): { backupDir: string; files: number; bytes: number }
     console.error('[backup] SQLite backup failed:', err);
   }
 
-  // 4. Write backup manifest
+  // 3. Write backup manifest
   const manifest = {
     timestamp: new Date().toISOString(),
     files: stats.files,

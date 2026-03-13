@@ -1,14 +1,9 @@
 /**
  * Persistent storage for redirect scan results.
- * Saves per-site redirect snapshots to DATA_DIR/redirects/ so they survive deploys.
+ * Saves per-site redirect snapshots to SQLite.
  */
-import fs from 'fs';
-import path from 'path';
 import type { RedirectScanResult } from './redirect-scanner.js';
-
-import { getDataDir } from './data-dir.js';
-
-const REDIRECTS_DIR = getDataDir('redirects');
+import db from './db/index.js';
 
 export interface RedirectSnapshot {
   id: string;
@@ -17,33 +12,62 @@ export interface RedirectSnapshot {
   result: RedirectScanResult;
 }
 
-function ensureDir() {
-  fs.mkdirSync(REDIRECTS_DIR, { recursive: true });
+// ── Prepared statements (lazy) ──
+
+let _upsert: ReturnType<typeof db.prepare> | null = null;
+function upsertStmt() {
+  if (!_upsert) {
+    _upsert = db.prepare(`
+      INSERT OR REPLACE INTO redirect_snapshots
+        (id, site_id, created_at, result)
+      VALUES (@id, @site_id, @created_at, @result)
+    `);
+  }
+  return _upsert;
 }
 
-function snapshotPath(siteId: string): string {
-  return path.join(REDIRECTS_DIR, `${siteId}.json`);
+let _getBySite: ReturnType<typeof db.prepare> | null = null;
+function getBySiteStmt() {
+  if (!_getBySite) {
+    _getBySite = db.prepare(`SELECT * FROM redirect_snapshots WHERE site_id = ? ORDER BY created_at DESC LIMIT 1`);
+  }
+  return _getBySite;
+}
+
+interface RedirectRow {
+  id: string;
+  site_id: string;
+  created_at: string;
+  result: string;
+}
+
+function rowToSnapshot(row: RedirectRow): RedirectSnapshot {
+  return {
+    id: row.id,
+    siteId: row.site_id,
+    createdAt: row.created_at,
+    result: JSON.parse(row.result),
+  };
 }
 
 export function saveRedirectSnapshot(siteId: string, result: RedirectScanResult): RedirectSnapshot {
-  ensureDir();
   const snapshot: RedirectSnapshot = {
     id: `redirect-${siteId}-${Date.now()}`,
     siteId,
     createdAt: new Date().toISOString(),
     result,
   };
-  fs.writeFileSync(snapshotPath(siteId), JSON.stringify(snapshot, null, 2));
+  upsertStmt().run({
+    id: snapshot.id,
+    site_id: siteId,
+    created_at: snapshot.createdAt,
+    result: JSON.stringify(result),
+  });
   console.log(`[redirect-store] Saved redirect scan for site ${siteId} (${result.summary.totalPages} pages)`);
   return snapshot;
 }
 
 export function getRedirectSnapshot(siteId: string): RedirectSnapshot | null {
-  const fp = snapshotPath(siteId);
-  if (!fs.existsSync(fp)) return null;
-  try {
-    return JSON.parse(fs.readFileSync(fp, 'utf-8'));
-  } catch {
-    return null;
-  }
+  const row = getBySiteStmt().get(siteId) as RedirectRow | undefined;
+  return row ? rowToSnapshot(row) : null;
 }

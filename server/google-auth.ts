@@ -1,14 +1,10 @@
 /**
  * Google OAuth2 authentication for Search Console & GA4.
  * Requires GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI env vars.
- * Tokens are stored per-workspace in a JSON file.
+ * Tokens are stored per-site in SQLite.
  */
 
-import fs from 'fs';
-import path from 'path';
-import { getDataDir } from './data-dir.js';
-
-const TOKEN_FILE = path.join(getDataDir(''), 'google-tokens.json');
+import db from './db/index.js';
 
 interface GoogleTokens {
   access_token: string;
@@ -17,22 +13,63 @@ interface GoogleTokens {
   scope: string;
 }
 
-interface TokenStore {
-  [siteId: string]: GoogleTokens;
+// ── Prepared statements (lazy) ──
+
+let _upsert: ReturnType<typeof db.prepare> | null = null;
+function upsertStmt() {
+  if (!_upsert) {
+    _upsert = db.prepare(`
+      INSERT OR REPLACE INTO google_tokens
+        (site_id, access_token, refresh_token, expires_at, scope)
+      VALUES (@site_id, @access_token, @refresh_token, @expires_at, @scope)
+    `);
+  }
+  return _upsert;
 }
 
-function loadTokens(): TokenStore {
-  try {
-    if (fs.existsSync(TOKEN_FILE)) {
-      return JSON.parse(fs.readFileSync(TOKEN_FILE, 'utf-8'));
-    }
-  } catch { /* ignore */ }
-  return {};
+let _get: ReturnType<typeof db.prepare> | null = null;
+function getStmt() {
+  if (!_get) {
+    _get = db.prepare(`SELECT * FROM google_tokens WHERE site_id = ?`);
+  }
+  return _get;
 }
 
-function saveTokens(store: TokenStore): void {
-  fs.mkdirSync(path.dirname(TOKEN_FILE), { recursive: true });
-  fs.writeFileSync(TOKEN_FILE, JSON.stringify(store, null, 2));
+let _del: ReturnType<typeof db.prepare> | null = null;
+function deleteStmt() {
+  if (!_del) {
+    _del = db.prepare(`DELETE FROM google_tokens WHERE site_id = ?`);
+  }
+  return _del;
+}
+
+interface TokenRow {
+  site_id: string;
+  access_token: string;
+  refresh_token: string | null;
+  expires_at: number;
+  scope: string;
+}
+
+function loadTokenForSite(siteId: string): GoogleTokens | null {
+  const row = getStmt().get(siteId) as TokenRow | undefined;
+  if (!row) return null;
+  return {
+    access_token: row.access_token,
+    refresh_token: row.refresh_token ?? undefined,
+    expires_at: row.expires_at,
+    scope: row.scope,
+  };
+}
+
+function saveTokenForSite(siteId: string, tokens: GoogleTokens): void {
+  upsertStmt().run({
+    site_id: siteId,
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token ?? null,
+    expires_at: tokens.expires_at,
+    scope: tokens.scope,
+  });
 }
 
 export function getGoogleCredentials(): { clientId: string; clientSecret: string; redirectUri: string } | null {
@@ -103,14 +140,12 @@ export async function exchangeCode(code: string, siteId: string): Promise<{ succ
       scope: string;
     };
 
-    const store = loadTokens();
-    store[siteId] = {
+    saveTokenForSite(siteId, {
       access_token: data.access_token,
       refresh_token: data.refresh_token,
       expires_at: Date.now() + (data.expires_in * 1000),
       scope: data.scope,
-    };
-    saveTokens(store);
+    });
 
     return { success: true };
   } catch (err) {
@@ -120,9 +155,8 @@ export async function exchangeCode(code: string, siteId: string): Promise<{ succ
 }
 
 export async function getValidToken(siteId: string): Promise<string | null> {
-  const store = loadTokens();
   // Try per-site token first, fall back to global token
-  const tokens = store[siteId] || (siteId !== GLOBAL_KEY ? store[GLOBAL_KEY] : undefined);
+  const tokens = loadTokenForSite(siteId) || (siteId !== GLOBAL_KEY ? loadTokenForSite(GLOBAL_KEY) : null);
   if (!tokens) return null;
 
   // If token is still valid (with 5 min buffer)
@@ -154,12 +188,11 @@ export async function getValidToken(siteId: string): Promise<string | null> {
       expires_in: number;
     };
 
-    store[siteId] = {
+    saveTokenForSite(siteId, {
       ...tokens,
       access_token: data.access_token,
       expires_at: Date.now() + (data.expires_in * 1000),
-    };
-    saveTokens(store);
+    });
 
     return data.access_token;
   } catch {
@@ -168,14 +201,11 @@ export async function getValidToken(siteId: string): Promise<string | null> {
 }
 
 export function isConnected(siteId: string): boolean {
-  const store = loadTokens();
-  return !!store[siteId];
+  return !!loadTokenForSite(siteId);
 }
 
 export function disconnect(siteId: string): void {
-  const store = loadTokens();
-  delete store[siteId];
-  saveTokens(store);
+  deleteStmt().run(siteId);
 }
 
 export function isGlobalConnected(): boolean {

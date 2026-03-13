@@ -1,11 +1,9 @@
 /**
  * Chat Memory — persistent conversation history for AI chatbots.
- * Stores sessions to disk as JSON, supports cross-session summaries.
+ * Stores sessions in SQLite, supports cross-session summaries.
  */
 
-import fs from 'fs';
-import path from 'path';
-import { getDataDir } from './data-dir.js';
+import db from './db/index.js';
 import { callOpenAI } from './openai-helpers.js';
 
 export interface ChatMessage {
@@ -35,61 +33,122 @@ export interface SessionSummary {
   updatedAt: string;
 }
 
-function sessionsDir(workspaceId: string): string {
-  return getDataDir(path.join('chat-sessions', workspaceId));
+// ── Prepared statements (lazy) ──
+
+let _upsert: ReturnType<typeof db.prepare> | null = null;
+function upsertStmt() {
+  if (!_upsert) {
+    _upsert = db.prepare(`
+      INSERT OR REPLACE INTO chat_sessions
+        (id, workspace_id, channel, title, messages, summary, created_at, updated_at)
+      VALUES (@id, @workspace_id, @channel, @title, @messages, @summary, @created_at, @updated_at)
+    `);
+  }
+  return _upsert;
 }
 
-function sessionPath(workspaceId: string, sessionId: string): string {
-  return path.join(sessionsDir(workspaceId), `${sessionId}.json`);
+let _getSession: ReturnType<typeof db.prepare> | null = null;
+function getSessionStmt() {
+  if (!_getSession) {
+    _getSession = db.prepare(`SELECT * FROM chat_sessions WHERE id = ? AND workspace_id = ?`);
+  }
+  return _getSession;
+}
+
+let _deleteSession: ReturnType<typeof db.prepare> | null = null;
+function deleteSessionStmt() {
+  if (!_deleteSession) {
+    _deleteSession = db.prepare(`DELETE FROM chat_sessions WHERE id = ? AND workspace_id = ?`);
+  }
+  return _deleteSession;
+}
+
+let _listSessions: ReturnType<typeof db.prepare> | null = null;
+function listSessionsStmt() {
+  if (!_listSessions) {
+    _listSessions = db.prepare(`
+      SELECT * FROM chat_sessions WHERE workspace_id = ? ORDER BY updated_at DESC
+    `);
+  }
+  return _listSessions;
+}
+
+let _listSessionsByChannel: ReturnType<typeof db.prepare> | null = null;
+function listSessionsByChannelStmt() {
+  if (!_listSessionsByChannel) {
+    _listSessionsByChannel = db.prepare(`
+      SELECT * FROM chat_sessions WHERE workspace_id = ? AND channel = ? ORDER BY updated_at DESC
+    `);
+  }
+  return _listSessionsByChannel;
+}
+
+interface ChatRow {
+  id: string;
+  workspace_id: string;
+  channel: 'client' | 'admin' | 'search';
+  title: string;
+  messages: string;
+  summary: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function rowToSession(row: ChatRow): ChatSession {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    channel: row.channel,
+    title: row.title,
+    messages: JSON.parse(row.messages),
+    summary: row.summary ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 // ── CRUD ──
 
 export function getSession(workspaceId: string, sessionId: string): ChatSession | null {
-  const fp = sessionPath(workspaceId, sessionId);
-  try {
-    if (!fs.existsSync(fp)) return null;
-    return JSON.parse(fs.readFileSync(fp, 'utf-8'));
-  } catch { return null; }
+  const row = getSessionStmt().get(sessionId, workspaceId) as ChatRow | undefined;
+  return row ? rowToSession(row) : null;
 }
 
 export function saveSession(session: ChatSession): void {
-  const dir = sessionsDir(session.workspaceId);
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(sessionPath(session.workspaceId, session.id), JSON.stringify(session, null, 2));
+  upsertStmt().run({
+    id: session.id,
+    workspace_id: session.workspaceId,
+    channel: session.channel,
+    title: session.title,
+    messages: JSON.stringify(session.messages),
+    summary: session.summary ?? null,
+    created_at: session.createdAt,
+    updated_at: session.updatedAt,
+  });
 }
 
 export function deleteSession(workspaceId: string, sessionId: string): boolean {
-  const fp = sessionPath(workspaceId, sessionId);
-  try {
-    if (fs.existsSync(fp)) { fs.unlinkSync(fp); return true; }
-  } catch { /* ignore */ }
-  return false;
+  const info = deleteSessionStmt().run(sessionId, workspaceId);
+  return info.changes > 0;
 }
 
 export function listSessions(workspaceId: string, channel?: string): SessionSummary[] {
-  const dir = sessionsDir(workspaceId);
-  if (!fs.existsSync(dir)) return [];
-  try {
-    const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
-    const sessions: SessionSummary[] = [];
-    for (const file of files) {
-      try {
-        const data: ChatSession = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8'));
-        if (channel && data.channel !== channel) continue;
-        sessions.push({
-          id: data.id,
-          title: data.title,
-          channel: data.channel,
-          messageCount: data.messages.length,
-          summary: data.summary,
-          createdAt: data.createdAt,
-          updatedAt: data.updatedAt,
-        });
-      } catch { /* skip corrupt files */ }
-    }
-    return sessions.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  } catch { return []; }
+  const rows = channel
+    ? listSessionsByChannelStmt().all(workspaceId, channel) as ChatRow[]
+    : listSessionsStmt().all(workspaceId) as ChatRow[];
+
+  return rows.map(row => {
+    const messages: ChatMessage[] = JSON.parse(row.messages);
+    return {
+      id: row.id,
+      title: row.title,
+      channel: row.channel,
+      messageCount: messages.length,
+      summary: row.summary ?? undefined,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  });
 }
 
 // ── Message helpers ──
@@ -129,7 +188,7 @@ export function addMessage(
 export const FREE_CHAT_LIMIT = 3; // conversations per calendar month on free tier
 
 /**
- * Count the number of unique conversations (sessions with ≥1 user message)
+ * Count the number of unique conversations (sessions with >=1 user message)
  * in the current calendar month for a workspace on a given channel.
  */
 export function getMonthlyConversationCount(workspaceId: string, channel: 'client' | 'admin' | 'search' = 'client'): number {
@@ -137,7 +196,6 @@ export function getMonthlyConversationCount(workspaceId: string, channel: 'clien
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
   const sessions = listSessions(workspaceId, channel);
   return sessions.filter(s => {
-    // Session must have been created this month and have at least 1 message (from user)
     return s.createdAt >= monthStart && s.messageCount >= 1;
   }).length;
 }

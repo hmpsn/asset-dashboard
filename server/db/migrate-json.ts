@@ -1100,6 +1100,449 @@ function migrateRankTracking(): number {
   return total;
 }
 
+// ── Tier 3 — Per-site snapshots + config/admin ──
+
+function migrateAuditSnapshots(): number {
+  const reportsDir = getDataDir('reports');
+  if (!fs.existsSync(reportsDir)) {
+    console.log('[migrate] No reports directory found — skipping audit snapshots.');
+    return 0;
+  }
+
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO audit_snapshots
+      (id, site_id, site_name, created_at, audit, logo_url, action_items, previous_score)
+    VALUES (@id, @site_id, @site_name, @created_at, @audit, @logo_url, @action_items, @previous_score)
+  `);
+
+  let total = 0;
+  const sites = fs.readdirSync(reportsDir).filter(f => {
+    try { return fs.statSync(path.join(reportsDir, f)).isDirectory(); } catch { return false; }
+  });
+
+  const insertAll = db.transaction(() => {
+    for (const siteId of sites) {
+      const siteDir = path.join(reportsDir, siteId);
+      const files = fs.readdirSync(siteDir).filter(f => f.endsWith('.json'));
+      for (const file of files) {
+        try {
+          const data = JSON.parse(fs.readFileSync(path.join(siteDir, file), 'utf-8'));
+          const info = insert.run({
+            id: data.id || file.replace('.json', ''),
+            site_id: data.siteId || siteId,
+            site_name: data.siteName || siteId,
+            created_at: data.createdAt || new Date().toISOString(),
+            audit: JSON.stringify(data.audit || {}),
+            logo_url: data.logoUrl ?? null,
+            action_items: JSON.stringify(data.actionItems || []),
+            previous_score: data.previousScore ?? null,
+          });
+          total += info.changes;
+        } catch (err) {
+          console.warn(`[migrate] Failed to migrate audit snapshot ${file}:`, err);
+        }
+      }
+    }
+  });
+
+  insertAll();
+  console.log(`[migrate] Audit snapshots: inserted ${total} record(s)`);
+  return total;
+}
+
+function migrateSchemaSnapshots(): number {
+  const schemasDir = getDataDir('schemas');
+  if (!fs.existsSync(schemasDir)) {
+    console.log('[migrate] No schemas directory found — skipping.');
+    return 0;
+  }
+
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO schema_snapshots
+      (id, site_id, workspace_id, created_at, results, page_count)
+    VALUES (@id, @site_id, @workspace_id, @created_at, @results, @page_count)
+  `);
+
+  let total = 0;
+  const insertAll = db.transaction(() => {
+    const files = fs.readdirSync(schemasDir).filter(f => f.endsWith('.json'));
+    for (const file of files) {
+      try {
+        const data = JSON.parse(fs.readFileSync(path.join(schemasDir, file), 'utf-8'));
+        const info = insert.run({
+          id: data.id || `schema-${file.replace('.json', '')}-${Date.now()}`,
+          site_id: data.siteId || file.replace('.json', ''),
+          workspace_id: data.workspaceId || '',
+          created_at: data.createdAt || new Date().toISOString(),
+          results: JSON.stringify(data.results || []),
+          page_count: data.pageCount || (data.results || []).length,
+        });
+        total += info.changes;
+      } catch (err) {
+        console.warn(`[migrate] Failed to migrate schema snapshot ${file}:`, err);
+      }
+    }
+  });
+
+  insertAll();
+  console.log(`[migrate] Schema snapshots: inserted ${total} record(s)`);
+  return total;
+}
+
+function migrateRedirectSnapshots(): number {
+  const redirectsDir = getDataDir('redirects');
+  if (!fs.existsSync(redirectsDir)) {
+    console.log('[migrate] No redirects directory found — skipping.');
+    return 0;
+  }
+
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO redirect_snapshots
+      (id, site_id, created_at, result)
+    VALUES (@id, @site_id, @created_at, @result)
+  `);
+
+  let total = 0;
+  const insertAll = db.transaction(() => {
+    const files = fs.readdirSync(redirectsDir).filter(f => f.endsWith('.json'));
+    for (const file of files) {
+      try {
+        const data = JSON.parse(fs.readFileSync(path.join(redirectsDir, file), 'utf-8'));
+        const info = insert.run({
+          id: data.id || `redirect-${file.replace('.json', '')}-${Date.now()}`,
+          site_id: data.siteId || file.replace('.json', ''),
+          created_at: data.createdAt || new Date().toISOString(),
+          result: JSON.stringify(data.result || {}),
+        });
+        total += info.changes;
+      } catch (err) {
+        console.warn(`[migrate] Failed to migrate redirect snapshot ${file}:`, err);
+      }
+    }
+  });
+
+  insertAll();
+  console.log(`[migrate] Redirect snapshots: inserted ${total} record(s)`);
+  return total;
+}
+
+function migratePerformanceSnapshots(): number {
+  const perfDir = getDataDir('performance');
+  if (!fs.existsSync(perfDir)) {
+    console.log('[migrate] No performance directory found — skipping.');
+    return 0;
+  }
+
+  const insert = db.prepare(`
+    INSERT OR REPLACE INTO performance_snapshots
+      (sub, site_id, created_at, result)
+    VALUES (@sub, @site_id, @created_at, @result)
+  `);
+
+  let total = 0;
+  const insertAll = db.transaction(() => {
+    // Scan subdirectories (page-weight, pagespeed, pagespeed-single, link-check, internal-links, competitor)
+    const subs = fs.readdirSync(perfDir).filter(f => {
+      try { return fs.statSync(path.join(perfDir, f)).isDirectory(); } catch { return false; }
+    });
+
+    for (const sub of subs) {
+      const subDir = path.join(perfDir, sub);
+      const files = fs.readdirSync(subDir).filter(f => f.endsWith('.json'));
+      for (const file of files) {
+        try {
+          const data = JSON.parse(fs.readFileSync(path.join(subDir, file), 'utf-8'));
+          const info = insert.run({
+            sub,
+            site_id: data.siteId || file.replace('.json', ''),
+            created_at: data.createdAt || new Date().toISOString(),
+            result: JSON.stringify(data.result ?? data),
+          });
+          total += info.changes;
+        } catch (err) {
+          console.warn(`[migrate] Failed to migrate performance snapshot ${sub}/${file}:`, err);
+        }
+      }
+    }
+  });
+
+  insertAll();
+  console.log(`[migrate] Performance snapshots: inserted ${total} record(s)`);
+  return total;
+}
+
+function migrateChatSessions(): number {
+  const chatDir = getDataDir('chat-sessions');
+  if (!fs.existsSync(chatDir)) {
+    console.log('[migrate] No chat-sessions directory found — skipping.');
+    return 0;
+  }
+
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO chat_sessions
+      (id, workspace_id, channel, title, messages, summary, created_at, updated_at)
+    VALUES (@id, @workspace_id, @channel, @title, @messages, @summary, @created_at, @updated_at)
+  `);
+
+  let total = 0;
+  const insertAll = db.transaction(() => {
+    const workspaces = fs.readdirSync(chatDir).filter(f => {
+      try { return fs.statSync(path.join(chatDir, f)).isDirectory(); } catch { return false; }
+    });
+
+    for (const wsId of workspaces) {
+      const wsDir = path.join(chatDir, wsId);
+      const files = fs.readdirSync(wsDir).filter(f => f.endsWith('.json'));
+      for (const file of files) {
+        try {
+          const data = JSON.parse(fs.readFileSync(path.join(wsDir, file), 'utf-8'));
+          const info = insert.run({
+            id: data.id || file.replace('.json', ''),
+            workspace_id: data.workspaceId || wsId,
+            channel: data.channel || 'client',
+            title: data.title || 'Untitled',
+            messages: JSON.stringify(data.messages || []),
+            summary: data.summary ?? null,
+            created_at: data.createdAt || new Date().toISOString(),
+            updated_at: data.updatedAt || data.createdAt || new Date().toISOString(),
+          });
+          total += info.changes;
+        } catch (err) {
+          console.warn(`[migrate] Failed to migrate chat session ${wsId}/${file}:`, err);
+        }
+      }
+    }
+  });
+
+  insertAll();
+  console.log(`[migrate] Chat sessions: inserted ${total} record(s)`);
+  return total;
+}
+
+function migrateGoogleTokens(): number {
+  const tokenFile = path.join(getDataDir(''), 'google-tokens.json');
+  if (!fs.existsSync(tokenFile)) {
+    console.log('[migrate] No google-tokens.json found — skipping.');
+    return 0;
+  }
+
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO google_tokens
+      (site_id, access_token, refresh_token, expires_at, scope)
+    VALUES (@site_id, @access_token, @refresh_token, @expires_at, @scope)
+  `);
+
+  let total = 0;
+  try {
+    const store = JSON.parse(fs.readFileSync(tokenFile, 'utf-8'));
+    const insertAll = db.transaction(() => {
+      for (const [siteId, tokens] of Object.entries(store)) {
+        const t = tokens as { access_token: string; refresh_token?: string; expires_at: number; scope: string };
+        const info = insert.run({
+          site_id: siteId,
+          access_token: t.access_token,
+          refresh_token: t.refresh_token ?? null,
+          expires_at: t.expires_at,
+          scope: t.scope || '',
+        });
+        total += info.changes;
+      }
+    });
+    insertAll();
+  } catch (err) {
+    console.warn('[migrate] Failed to migrate google tokens:', err);
+  }
+
+  console.log(`[migrate] Google tokens: inserted ${total} record(s)`);
+  return total;
+}
+
+function migrateUsageTracking(): number {
+  const usageDir = path.join(process.cwd(), 'data', 'usage');
+  if (!fs.existsSync(usageDir)) {
+    console.log('[migrate] No usage directory found — skipping.');
+    return 0;
+  }
+
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO usage_tracking
+      (workspace_id, month, feature, count)
+    VALUES (@workspace_id, @month, @feature, @count)
+  `);
+
+  let total = 0;
+  const insertAll = db.transaction(() => {
+    const files = fs.readdirSync(usageDir).filter(f => f.endsWith('.json'));
+    for (const file of files) {
+      try {
+        const workspaceId = file.replace('.json', '');
+        const data = JSON.parse(fs.readFileSync(path.join(usageDir, file), 'utf-8'));
+        if (data.month && data.counts) {
+          for (const [feature, count] of Object.entries(data.counts)) {
+            const info = insert.run({
+              workspace_id: workspaceId,
+              month: data.month,
+              feature,
+              count: count as number,
+            });
+            total += info.changes;
+          }
+        }
+      } catch (err) {
+        console.warn(`[migrate] Failed to migrate usage tracking ${file}:`, err);
+      }
+    }
+  });
+
+  insertAll();
+  console.log(`[migrate] Usage tracking: inserted ${total} record(s)`);
+  return total;
+}
+
+// ── Tier 5 — Workspaces ──
+
+function migrateWorkspaces(): number {
+  const configFile = path.join(getUploadRoot(), '.workspaces.json');
+  if (!fs.existsSync(configFile)) {
+    console.log('[migrate] No .workspaces.json found — skipping workspaces.');
+    return 0;
+  }
+
+  let workspaces: Array<Record<string, unknown>>;
+  try {
+    workspaces = JSON.parse(fs.readFileSync(configFile, 'utf-8'));
+  } catch (err) {
+    console.warn('[migrate] Failed to parse .workspaces.json:', err);
+    return 0;
+  }
+  if (!Array.isArray(workspaces)) return 0;
+
+  const insertWs = db.prepare(`
+    INSERT OR IGNORE INTO workspaces
+      (id, name, folder, webflow_site_id, webflow_site_name, webflow_token,
+       gsc_property_url, ga4_property_id, client_password, client_email,
+       live_domain, event_config, event_groups, keyword_strategy,
+       competitor_domains, personas, client_portal_enabled, seo_client_view,
+       analytics_client_view, auto_reports, auto_report_frequency,
+       brand_voice, knowledge_base, brand_logo_url, brand_accent_color,
+       tier, trial_ends_at, stripe_customer_id, stripe_subscription_id,
+       onboarding_enabled, onboarding_completed, content_pricing,
+       portal_contacts, audit_suppressions, created_at)
+    VALUES
+      (@id, @name, @folder, @webflow_site_id, @webflow_site_name, @webflow_token,
+       @gsc_property_url, @ga4_property_id, @client_password, @client_email,
+       @live_domain, @event_config, @event_groups, @keyword_strategy,
+       @competitor_domains, @personas, @client_portal_enabled, @seo_client_view,
+       @analytics_client_view, @auto_reports, @auto_report_frequency,
+       @brand_voice, @knowledge_base, @brand_logo_url, @brand_accent_color,
+       @tier, @trial_ends_at, @stripe_customer_id, @stripe_subscription_id,
+       @onboarding_enabled, @onboarding_completed, @content_pricing,
+       @portal_contacts, @audit_suppressions, @created_at)
+  `);
+
+  const insertPageState = db.prepare(`
+    INSERT OR IGNORE INTO page_edit_states
+      (workspace_id, page_id, slug, status, audit_issues, fields, source,
+       approval_batch_id, content_request_id, work_order_id, recommendation_id,
+       rejection_note, updated_at, updated_by)
+    VALUES
+      (@workspace_id, @page_id, @slug, @status, @audit_issues, @fields, @source,
+       @approval_batch_id, @content_request_id, @work_order_id, @recommendation_id,
+       @rejection_note, @updated_at, @updated_by)
+  `);
+
+  const insertSeoEdit = db.prepare(`
+    INSERT OR IGNORE INTO seo_edit_tracking
+      (workspace_id, page_id, status, updated_at, fields)
+    VALUES (@workspace_id, @page_id, @status, @updated_at, @fields)
+  `);
+
+  let total = 0;
+  const insertAll = db.transaction(() => {
+    for (const ws of workspaces) {
+      const info = insertWs.run({
+        id: ws.id as string,
+        name: ws.name as string,
+        folder: ws.folder as string,
+        webflow_site_id: (ws.webflowSiteId as string) ?? null,
+        webflow_site_name: (ws.webflowSiteName as string) ?? null,
+        webflow_token: (ws.webflowToken as string) ?? null,
+        gsc_property_url: (ws.gscPropertyUrl as string) ?? null,
+        ga4_property_id: (ws.ga4PropertyId as string) ?? null,
+        client_password: (ws.clientPassword as string) ?? null,
+        client_email: (ws.clientEmail as string) ?? null,
+        live_domain: (ws.liveDomain as string) ?? null,
+        event_config: ws.eventConfig ? JSON.stringify(ws.eventConfig) : null,
+        event_groups: ws.eventGroups ? JSON.stringify(ws.eventGroups) : null,
+        keyword_strategy: ws.keywordStrategy ? JSON.stringify(ws.keywordStrategy) : null,
+        competitor_domains: ws.competitorDomains ? JSON.stringify(ws.competitorDomains) : null,
+        personas: ws.personas ? JSON.stringify(ws.personas) : null,
+        client_portal_enabled: ws.clientPortalEnabled === undefined ? null : (ws.clientPortalEnabled ? 1 : 0),
+        seo_client_view: ws.seoClientView === undefined ? null : (ws.seoClientView ? 1 : 0),
+        analytics_client_view: ws.analyticsClientView === undefined ? null : (ws.analyticsClientView ? 1 : 0),
+        auto_reports: ws.autoReports === undefined ? null : (ws.autoReports ? 1 : 0),
+        auto_report_frequency: (ws.autoReportFrequency as string) ?? null,
+        brand_voice: (ws.brandVoice as string) ?? null,
+        knowledge_base: (ws.knowledgeBase as string) ?? null,
+        brand_logo_url: (ws.brandLogoUrl as string) ?? null,
+        brand_accent_color: (ws.brandAccentColor as string) ?? null,
+        tier: (ws.tier as string) ?? 'free',
+        trial_ends_at: (ws.trialEndsAt as string) ?? null,
+        stripe_customer_id: (ws.stripeCustomerId as string) ?? null,
+        stripe_subscription_id: (ws.stripeSubscriptionId as string) ?? null,
+        onboarding_enabled: ws.onboardingEnabled === undefined ? null : (ws.onboardingEnabled ? 1 : 0),
+        onboarding_completed: ws.onboardingCompleted === undefined ? null : (ws.onboardingCompleted ? 1 : 0),
+        content_pricing: ws.contentPricing ? JSON.stringify(ws.contentPricing) : null,
+        portal_contacts: ws.portalContacts ? JSON.stringify(ws.portalContacts) : null,
+        audit_suppressions: ws.auditSuppressions ? JSON.stringify(ws.auditSuppressions) : null,
+        created_at: (ws.createdAt as string) || new Date().toISOString(),
+      });
+      total += info.changes;
+
+      // Migrate pageEditStates
+      const pageEditStates = ws.pageEditStates as Record<string, Record<string, unknown>> | undefined;
+      if (pageEditStates) {
+        for (const [pageId, state] of Object.entries(pageEditStates)) {
+          insertPageState.run({
+            workspace_id: ws.id as string,
+            page_id: pageId,
+            slug: (state.slug as string) ?? null,
+            status: (state.status as string) || 'clean',
+            audit_issues: state.auditIssues ? JSON.stringify(state.auditIssues) : null,
+            fields: state.fields ? JSON.stringify(state.fields) : null,
+            source: (state.source as string) ?? null,
+            approval_batch_id: (state.approvalBatchId as string) ?? null,
+            content_request_id: (state.contentRequestId as string) ?? null,
+            work_order_id: (state.workOrderId as string) ?? null,
+            recommendation_id: (state.recommendationId as string) ?? null,
+            rejection_note: (state.rejectionNote as string) ?? null,
+            updated_at: (state.updatedAt as string) || new Date().toISOString(),
+            updated_by: (state.updatedBy as string) ?? null,
+          });
+        }
+      }
+
+      // Migrate seoEditTracking
+      const seoEditTracking = ws.seoEditTracking as Record<string, Record<string, unknown>> | undefined;
+      if (seoEditTracking) {
+        for (const [pageId, t] of Object.entries(seoEditTracking)) {
+          insertSeoEdit.run({
+            workspace_id: ws.id as string,
+            page_id: pageId,
+            status: (t.status as string) || 'flagged',
+            updated_at: (t.updatedAt as string) || new Date().toISOString(),
+            fields: t.fields ? JSON.stringify(t.fields) : null,
+          });
+        }
+      }
+    }
+  });
+
+  insertAll();
+  console.log(`[migrate] Workspaces: ${workspaces.length} workspace(s), inserted ${total}`);
+  return total;
+}
+
 // --- Run all migrations ---
 console.log('[migrate] Starting JSON → SQLite data migration...');
 
@@ -1128,6 +1571,16 @@ const results = {
   roiHistory: migrateRoiHistory(),
   feedback: migrateFeedback(),
   rankTracking: migrateRankTracking(),
+  // Tier 3 — Per-site snapshots + config/admin
+  auditSnapshots: migrateAuditSnapshots(),
+  schemaSnapshots: migrateSchemaSnapshots(),
+  redirectSnapshots: migrateRedirectSnapshots(),
+  performanceSnapshots: migratePerformanceSnapshots(),
+  chatSessions: migrateChatSessions(),
+  googleTokens: migrateGoogleTokens(),
+  usageTracking: migrateUsageTracking(),
+  // Tier 5 — Workspaces
+  workspaces: migrateWorkspaces(),
 };
 
 const totalInserted = Object.values(results).reduce((a, b) => a + b, 0);

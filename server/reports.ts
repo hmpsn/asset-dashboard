@@ -1,10 +1,6 @@
-import fs from 'fs';
-import path from 'path';
 import crypto from 'crypto';
 import type { SeoAuditResult } from './seo-audit.js';
-import { getDataDir } from './data-dir.js';
-
-const REPORTS_DIR = getDataDir('reports');
+import db from './db/index.js';
 
 export type ActionStatus = 'planned' | 'in-progress' | 'completed';
 export type ActionPriority = 'high' | 'medium' | 'low';
@@ -42,10 +38,71 @@ export interface SnapshotSummary {
   infos: number;
 }
 
-function siteDir(siteId: string): string {
-  const dir = path.join(REPORTS_DIR, siteId);
-  fs.mkdirSync(dir, { recursive: true });
-  return dir;
+// ── Prepared statements (lazy) ──
+
+let _insertSnapshot: ReturnType<typeof db.prepare> | null = null;
+function insertSnapshotStmt() {
+  if (!_insertSnapshot) {
+    _insertSnapshot = db.prepare(`
+      INSERT INTO audit_snapshots
+        (id, site_id, site_name, created_at, audit, logo_url, action_items, previous_score)
+      VALUES (@id, @site_id, @site_name, @created_at, @audit, @logo_url, @action_items, @previous_score)
+    `);
+  }
+  return _insertSnapshot;
+}
+
+let _updateSnapshot: ReturnType<typeof db.prepare> | null = null;
+function updateSnapshotStmt() {
+  if (!_updateSnapshot) {
+    _updateSnapshot = db.prepare(`
+      UPDATE audit_snapshots SET action_items = @action_items WHERE id = @id
+    `);
+  }
+  return _updateSnapshot;
+}
+
+let _getSnapshot: ReturnType<typeof db.prepare> | null = null;
+function getSnapshotStmt() {
+  if (!_getSnapshot) {
+    _getSnapshot = db.prepare(`SELECT * FROM audit_snapshots WHERE id = ?`);
+  }
+  return _getSnapshot;
+}
+
+let _listSnapshots: ReturnType<typeof db.prepare> | null = null;
+function listSnapshotsStmt() {
+  if (!_listSnapshots) {
+    _listSnapshots = db.prepare(`
+      SELECT id, site_id, site_name, created_at, audit, logo_url, action_items, previous_score
+      FROM audit_snapshots WHERE site_id = ? ORDER BY created_at DESC
+    `);
+  }
+  return _listSnapshots;
+}
+
+interface SnapshotRow {
+  id: string;
+  site_id: string;
+  site_name: string;
+  created_at: string;
+  audit: string;
+  logo_url: string | null;
+  action_items: string | null;
+  previous_score: number | null;
+}
+
+function rowToSnapshot(row: SnapshotRow): AuditSnapshot {
+  return {
+    id: row.id,
+    siteId: row.site_id,
+    siteName: row.site_name,
+    createdAt: row.created_at,
+    audit: JSON.parse(row.audit),
+    logoUrl: row.logo_url ?? undefined,
+    actionItems: row.action_items ? JSON.parse(row.action_items) : [],
+    previousScore: row.previous_score ?? undefined,
+  };
 }
 
 export function saveSnapshot(siteId: string, siteName: string, audit: SeoAuditResult, logoUrl?: string): AuditSnapshot {
@@ -65,22 +122,26 @@ export function saveSnapshot(siteId: string, siteName: string, audit: SeoAuditRe
     actionItems: [],
     previousScore,
   };
-  const filePath = path.join(siteDir(siteId), `${id}.json`);
-  fs.writeFileSync(filePath, JSON.stringify(snapshot, null, 2));
+
+  insertSnapshotStmt().run({
+    id,
+    site_id: siteId,
+    site_name: siteName,
+    created_at: snapshot.createdAt,
+    audit: JSON.stringify(audit),
+    logo_url: logoUrl ?? null,
+    action_items: JSON.stringify([]),
+    previous_score: previousScore ?? null,
+  });
+
   return snapshot;
 }
 
 function updateSnapshotFile(snapshot: AuditSnapshot): void {
-  // Find the snapshot file across all site dirs
-  if (!fs.existsSync(REPORTS_DIR)) return;
-  const sites = fs.readdirSync(REPORTS_DIR);
-  for (const site of sites) {
-    const filePath = path.join(REPORTS_DIR, site, `${snapshot.id}.json`);
-    if (fs.existsSync(filePath)) {
-      fs.writeFileSync(filePath, JSON.stringify(snapshot, null, 2));
-      return;
-    }
-  }
+  updateSnapshotStmt().run({
+    id: snapshot.id,
+    action_items: JSON.stringify(snapshot.actionItems || []),
+  });
 }
 
 // --- Action Items CRUD ---
@@ -167,7 +228,7 @@ export async function extractSiteLogo(baseUrl: string): Promise<string | null> {
       return null;
     };
 
-    // Strategy 1: Webflow navbar brand (w-nav-brand class) — most Webflow sites use this
+    // Strategy 1: Webflow navbar brand (w-nav-brand class)
     const navBrandRegex = /<a[^>]*class=["'][^"']*w-nav-brand[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi;
     while ((match = navBrandRegex.exec(html)) !== null) {
       const inner = match[1];
@@ -184,7 +245,6 @@ export async function extractSiteLogo(baseUrl: string): Promise<string | null> {
       const inner = match[1];
       const src = extractSrc(inner);
       if (src) return resolveUrl(baseUrl, src);
-      // Also check for SVG with an image/src
       const svgImg = inner.match(/<image[^>]*href=["']([^"']+)["']/i);
       if (svgImg && svgImg[1]) return resolveUrl(baseUrl, svgImg[1]);
     }
@@ -194,7 +254,6 @@ export async function extractSiteLogo(baseUrl: string): Promise<string | null> {
     while ((match = logoClassRegex.exec(html)) !== null) {
       const src = extractSrc(match[0]);
       if (src) return resolveUrl(baseUrl, src);
-      // Check for nested img
       const nestedImg = match[0].match(/<img[^>]*/i);
       if (nestedImg) {
         const nestedSrc = extractSrc(nestedImg[0]);
@@ -209,7 +268,7 @@ export async function extractSiteLogo(baseUrl: string): Promise<string | null> {
       if (src) return resolveUrl(baseUrl, src);
     }
 
-    // Strategy 5: OG image — many sites use their logo or branded image
+    // Strategy 5: OG image
     const ogImage = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i)
       || html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
     if (ogImage && ogImage[1]) return resolveUrl(baseUrl, ogImage[1]);
@@ -237,41 +296,24 @@ function resolveUrl(base: string, relative: string): string {
 }
 
 export function getSnapshot(id: string): AuditSnapshot | null {
-  // Search all site directories for this snapshot
-  if (!fs.existsSync(REPORTS_DIR)) return null;
-  const sites = fs.readdirSync(REPORTS_DIR);
-  for (const site of sites) {
-    const filePath = path.join(REPORTS_DIR, site, `${id}.json`);
-    if (fs.existsSync(filePath)) {
-      return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-    }
-  }
-  return null;
+  const row = getSnapshotStmt().get(id) as SnapshotRow | undefined;
+  return row ? rowToSnapshot(row) : null;
 }
 
 export function listSnapshots(siteId: string): SnapshotSummary[] {
-  const dir = path.join(REPORTS_DIR, siteId);
-  if (!fs.existsSync(dir)) return [];
-
-  const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
-  const summaries: SnapshotSummary[] = [];
-
-  for (const file of files) {
-    try {
-      const data: AuditSnapshot = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8'));
-      summaries.push({
-        id: data.id,
-        createdAt: data.createdAt,
-        siteScore: data.audit.siteScore,
-        totalPages: data.audit.totalPages,
-        errors: data.audit.errors,
-        warnings: data.audit.warnings,
-        infos: data.audit.infos,
-      });
-    } catch { /* skip corrupt files */ }
-  }
-
-  return summaries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const rows = listSnapshotsStmt().all(siteId) as SnapshotRow[];
+  return rows.map(row => {
+    const audit = JSON.parse(row.audit);
+    return {
+      id: row.id,
+      createdAt: row.created_at,
+      siteScore: audit.siteScore,
+      totalPages: audit.totalPages,
+      errors: audit.errors,
+      warnings: audit.warnings,
+      infos: audit.infos,
+    };
+  });
 }
 
 export function getLatestSnapshot(siteId: string): AuditSnapshot | null {
