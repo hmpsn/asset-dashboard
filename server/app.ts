@@ -174,7 +174,7 @@ export function createApp(): express.Express {
       if (req.path.startsWith('/report/') || req.path.startsWith('/client/')) return next();
       if (req.path.startsWith('/api/public/')) return next();
       // In production, serve the frontend without auth (it handles login UI)
-      if (IS_PROD && !req.path.startsWith('/api') && !req.path.startsWith('/ws')) return next();
+      if (IS_PROD && !req.path.startsWith('/api') && !req.path.startsWith('/ws/') && req.path !== '/ws') return next();
       // Reject API calls without auth
       if (req.path.startsWith('/api')) {
         return res.status(401).json({ error: 'Unauthorized' });
