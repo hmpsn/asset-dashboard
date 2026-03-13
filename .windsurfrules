@@ -52,7 +52,7 @@ Every completed task — no matter how small — must include these steps:
 
 **hmpsn.studio** is an SEO/web analytics platform built with **React 19 + Vite 8 + TailwindCSS 4** (frontend) and **Express + TypeScript** (backend). It manages client websites via Webflow, Google Search Console, GA4, and SEMRush integrations.
 
-- **Storage** — **SQLite** via `better-sqlite3` (WAL mode, foreign keys ON) at `DATA_BASE/dashboard.db`. PRs 1–4 merged to `main` — 28+ modules now use SQLite. PR 5 (workspaces table + page_edit_states + seo_edit_tracking) still on branch `origin/devin/1773377934-sqlite-workspaces`. See § 2a below.
+- **Storage** — **SQLite** via `better-sqlite3` (WAL mode, foreign keys ON) at `DATA_BASE/dashboard.db`. All 5 migration PRs merged to `main` — 30+ modules now use SQLite. See § 2a below.
 - **AI** — OpenAI GPT-4.1/4.1-mini/4.1-nano via `server/openai-helpers.ts` (`callOpenAI`), Anthropic Claude via `server/anthropic-helpers.ts` (`callAnthropic`) for creative prose
 - **Payments** — Stripe Checkout (not Payment Intents). Config encrypted on disk (AES-256-GCM). Admin UI for keys + products.
 - **Auth** — Dual system: internal JWT (7-day, admin) + client JWT (24h, per-workspace). Legacy shared-password still supported.
@@ -72,7 +72,7 @@ Every completed task — no matter how small — must include these steps:
 | `helpers.ts` | Shared pure functions | `sanitizeString`, `validateEnum`, `parseDateRange`, `applySuppressionsToAudit`, `buildSchemaContext`, `getAuditTrafficForWorkspace`, `readEnvFile`, `writeEnvFile` |
 | `middleware.ts` | Shared middleware + auth (single source of truth) | Rate limiters, `signClientSession`/`verifyClientSession`, `signAdminToken`/`verifyAdminToken`, `upload` (multer), `moveUploadedFiles`, `IS_PROD`, `APP_PASSWORD` |
 | `broadcast.ts` | WebSocket broadcast singleton | `setBroadcast()` called in index.ts, `broadcast()`/`broadcastToWorkspace()` imported by route files |
-| `workspaces.ts` | Workspace CRUD, `Workspace` interface, `PageEditState` model, `KeywordStrategy` types | Core data model. `updatePageState()`, `getPageState()`, `getAllPageStates()` manage the unified page lifecycle. |
+| `workspaces.ts` | Workspace CRUD (SQLite), `Workspace` interface, `PageEditState` model, `KeywordStrategy` types | Core data model. `WorkspaceRow`→`rowToWorkspace()` mapper. `page_edit_states` + `seo_edit_tracking` in separate DB tables with FK→workspaces. |
 | `seo-context.ts` | `buildSeoContext()`, `buildKeywordMapContext()`, `buildKnowledgeBase()` | Shared AI prompt builders — used by chat, briefs, schema |
 | `chat-memory.ts` | Chat session persistence | `addMessage`, `buildConversationContext`, `generateSessionSummary` |
 | `content-brief.ts` | AI content brief generation | 7 page-type-specific prompts, SEMRush/GSC enrichment, H3 subheadings in outline, full sitemap for internal links, language/quality rules (buzzword bans, case study anonymity, FAQ formatting, industry diversity, section count). Uses GPT-4.1 (structured JSON output). |
@@ -128,7 +128,7 @@ Every completed task — no matter how small — must include these steps:
 
 ### § 2a. SQLite Database (`server/db/`)
 
-**28+ server modules** now use SQLite via `better-sqlite3` (PRs 1–4 merged). Workspaces module still JSON-based (PR 5 pending).
+**All 30+ server modules** now use SQLite via `better-sqlite3` (all 5 migration PRs merged).
 
 | File | Purpose |
 |------|---------|
@@ -137,10 +137,8 @@ Every completed task — no matter how small — must include these steps:
 | `db/migrations/001-payments.sql` | `payments` table |
 | `db/migrations/002-global-singletons.sql` | `users`, `client_users`, `reset_tokens`, `activity_log`, `requests`, `churn_signals`, `anomalies`, `audit_schedules` |
 | `db/migrations/003-per-workspace.sql` | `approval_batches`, `content_briefs`, `content_topic_requests`, `content_posts`, `work_orders`, `recommendation_sets`, `annotations`, `seo_changes`, `decay_analyses`, `roi_snapshots`, `feedback`, `rank_tracking_config`, `rank_snapshots` |
-
-**Still on branch** `origin/devin/1773377934-sqlite-workspaces` (PR 5):
-- `db/migrations/004-per-site-and-config.sql` — `audit_snapshots`, `schema_snapshots`, `redirect_snapshots`, `performance_snapshots`, `chat_sessions`, `google_tokens`, `usage_tracking`
-- `db/migrations/005-workspaces.sql` — `workspaces` (30+ columns), `page_edit_states`, `seo_edit_tracking`
+| `db/migrations/004-per-site-and-config.sql` | `audit_snapshots`, `schema_snapshots`, `redirect_snapshots`, `performance_snapshots`, `chat_sessions`, `google_tokens`, `usage_tracking` |
+| `db/migrations/005-workspaces.sql` | `workspaces` (30+ columns), `page_edit_states`, `seo_edit_tracking` |
 
 **Key patterns (follow these when writing new DB code):**
 - **Lazy prepared statements:** `let _stmt: ... | null = null;` cached at module level
