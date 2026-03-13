@@ -3,39 +3,63 @@
  * Uses GSC clicks × CPC from keyword strategy pageMap.
  */
 
-import fs from 'fs';
-import path from 'path';
+import db from './db/index.js';
 import { getWorkspace } from './workspaces.js';
 import { listContentRequests } from './content-requests.js';
-import { getDataDir } from './data-dir.js';
 
-const ROI_HISTORY_DIR = getDataDir('roi-history');
-fs.mkdirSync(ROI_HISTORY_DIR, { recursive: true });
+// ── SQLite row shape ──
+
+interface SnapshotRow {
+  id: number;
+  workspace_id: string;
+  organic_traffic_value: number;
+  computed_at: string;
+}
+
+interface Stmts {
+  insert: ReturnType<typeof db.prepare>;
+  selectByWorkspace: ReturnType<typeof db.prepare>;
+  pruneOld: ReturnType<typeof db.prepare>;
+}
+
+let _stmts: Stmts | null = null;
+function stmts(): Stmts {
+  if (!_stmts) {
+    _stmts = {
+      insert: db.prepare(
+        `INSERT INTO roi_snapshots (workspace_id, organic_traffic_value, computed_at)
+         VALUES (@workspace_id, @organic_traffic_value, @computed_at)`,
+      ),
+      selectByWorkspace: db.prepare(
+        `SELECT * FROM roi_snapshots WHERE workspace_id = ? ORDER BY computed_at ASC`,
+      ),
+      pruneOld: db.prepare(
+        `DELETE FROM roi_snapshots WHERE workspace_id = ? AND computed_at < ?`,
+      ),
+    };
+  }
+  return _stmts;
+}
 
 interface ROISnapshot {
   organicTrafficValue: number;
   computedAt: string;
 }
 
-function getHistoryFile(workspaceId: string): string {
-  return path.join(ROI_HISTORY_DIR, `${workspaceId}.json`);
-}
-
 function loadHistory(workspaceId: string): ROISnapshot[] {
-  try {
-    const f = getHistoryFile(workspaceId);
-    if (fs.existsSync(f)) return JSON.parse(fs.readFileSync(f, 'utf-8'));
-  } catch { /* fresh */ }
-  return [];
+  const rows = stmts().selectByWorkspace.all(workspaceId) as SnapshotRow[];
+  return rows.map(r => ({ organicTrafficValue: r.organic_traffic_value, computedAt: r.computed_at }));
 }
 
 function saveSnapshot(workspaceId: string, value: number): void {
-  const history = loadHistory(workspaceId);
-  history.push({ organicTrafficValue: value, computedAt: new Date().toISOString() });
-  // Keep last 90 days of daily snapshots (max ~90 entries)
-  const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
-  const trimmed = history.filter(s => new Date(s.computedAt).getTime() > cutoff);
-  fs.writeFileSync(getHistoryFile(workspaceId), JSON.stringify(trimmed, null, 2));
+  stmts().insert.run({
+    workspace_id: workspaceId,
+    organic_traffic_value: value,
+    computed_at: new Date().toISOString(),
+  });
+  // Keep last 90 days of daily snapshots
+  const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+  stmts().pruneOld.run(workspaceId, cutoff);
 }
 
 function computeGrowthPercent(workspaceId: string, currentValue: number): number | null {

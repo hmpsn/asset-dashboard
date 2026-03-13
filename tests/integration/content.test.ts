@@ -18,9 +18,7 @@
  * - DELETE /api/content-posts/:workspaceId/:postId
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import fs from 'fs';
-import path from 'path';
-import { getDataDir } from '../../server/data-dir.js';
+import db from '../../server/db/index.js';
 import { createTestContext } from './helpers.js';
 
 const ctx = createTestContext(13203);
@@ -36,66 +34,68 @@ afterAll(() => {
 
 const testWsId = 'ws_integ_content_' + Date.now();
 
-// Seed a brief directly (since generateBrief requires OpenAI)
+// Seed a brief directly via SQLite (since generateBrief requires OpenAI)
 function seedBrief(id: string): void {
-  const briefsDir = getDataDir('content-briefs');
-  const fp = path.join(briefsDir, `${testWsId}.json`);
-  let briefs: unknown[] = [];
-  try {
-    if (fs.existsSync(fp)) briefs = JSON.parse(fs.readFileSync(fp, 'utf-8'));
-  } catch { /* fresh */ }
-  briefs.push({
+  db.prepare(
+    `INSERT OR IGNORE INTO content_briefs
+       (id, workspace_id, target_keyword, secondary_keywords, suggested_title,
+        suggested_meta_desc, outline, word_count_target, intent, audience,
+        competitor_insights, internal_link_suggestions, created_at)
+     VALUES
+       (@id, @workspace_id, @target_keyword, @secondary_keywords, @suggested_title,
+        @suggested_meta_desc, @outline, @word_count_target, @intent, @audience,
+        @competitor_insights, @internal_link_suggestions, @created_at)`,
+  ).run({
     id,
-    workspaceId: testWsId,
-    targetKeyword: 'integration test keyword',
-    secondaryKeywords: ['test'],
-    suggestedTitle: 'Integration Test Brief',
-    suggestedMetaDesc: 'Meta description',
-    outline: [{ heading: 'Section 1', notes: 'Notes', wordCount: 300, keywords: ['test'] }],
-    wordCountTarget: 1500,
+    workspace_id: testWsId,
+    target_keyword: 'integration test keyword',
+    secondary_keywords: JSON.stringify(['test']),
+    suggested_title: 'Integration Test Brief',
+    suggested_meta_desc: 'Meta description',
+    outline: JSON.stringify([{ heading: 'Section 1', notes: 'Notes', wordCount: 300, keywords: ['test'] }]),
+    word_count_target: 1500,
     intent: 'informational',
     audience: 'general',
-    competitorInsights: '',
-    internalLinkSuggestions: ['/about'],
-    createdAt: new Date().toISOString(),
+    competitor_insights: '',
+    internal_link_suggestions: JSON.stringify(['/about']),
+    created_at: new Date().toISOString(),
   });
-  fs.writeFileSync(fp, JSON.stringify(briefs, null, 2));
 }
 
-// Seed a post directly
+// Seed a post directly via SQLite
 function seedPost(id: string, briefId: string): void {
-  const postsDir = getDataDir('content-posts');
-  const fp = path.join(postsDir, `${testWsId}.json`);
-  let posts: unknown[] = [];
-  try {
-    if (fs.existsSync(fp)) posts = JSON.parse(fs.readFileSync(fp, 'utf-8'));
-  } catch { /* fresh */ }
-  posts.push({
+  db.prepare(
+    `INSERT OR IGNORE INTO content_posts
+       (id, workspace_id, brief_id, target_keyword, title, meta_description,
+        introduction, sections, conclusion, total_word_count, target_word_count,
+        status, created_at, updated_at)
+     VALUES
+       (@id, @workspace_id, @brief_id, @target_keyword, @title, @meta_description,
+        @introduction, @sections, @conclusion, @total_word_count, @target_word_count,
+        @status, @created_at, @updated_at)`,
+  ).run({
     id,
-    workspaceId: testWsId,
-    briefId,
-    targetKeyword: 'integration test keyword',
+    workspace_id: testWsId,
+    brief_id: briefId,
+    target_keyword: 'integration test keyword',
     title: 'Integration Test Post',
-    metaDescription: 'Post meta description',
+    meta_description: 'Post meta description',
     introduction: '<p>Test introduction</p>',
-    sections: [
+    sections: JSON.stringify([
       { index: 0, heading: 'Section 1', content: '<p>Section 1 content</p>', wordCount: 150, targetWordCount: 300, keywords: ['test'], status: 'done' },
-    ],
+    ]),
     conclusion: '<p>Test conclusion</p>',
-    totalWordCount: 300,
-    targetWordCount: 1500,
+    total_word_count: 300,
+    target_word_count: 1500,
     status: 'draft',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
   });
-  fs.writeFileSync(fp, JSON.stringify(posts, null, 2));
 }
 
 function cleanup(): void {
-  for (const dir of ['content-briefs', 'content-posts']) {
-    const fp = path.join(getDataDir(dir), `${testWsId}.json`);
-    try { fs.unlinkSync(fp); } catch { /* skip */ }
-  }
+  db.prepare('DELETE FROM content_briefs WHERE workspace_id = ?').run(testWsId);
+  db.prepare('DELETE FROM content_posts WHERE workspace_id = ?').run(testWsId);
 }
 
 afterAll(() => {

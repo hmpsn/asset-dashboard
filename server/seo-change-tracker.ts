@@ -4,12 +4,8 @@
  * then compares GSC metrics before/after to show impact over time.
  */
 
-import fs from 'fs';
-import path from 'path';
-import { getDataDir } from './data-dir.js';
+import db from './db/index.js';
 import { getValidToken } from './google-auth.js';
-
-const CHANGE_DIR = getDataDir('seo-changes');
 
 // ── Data Model ──
 
@@ -32,22 +28,69 @@ export interface PageImpact {
   tooRecent: boolean;          // < 7 days, not enough data
 }
 
-// ── Persistence ──
+// ── SQLite row shape ──
 
-function getChangesPath(workspaceId: string): string {
-  return path.join(CHANGE_DIR, `${workspaceId}.json`);
+interface ChangeRow {
+  id: string;
+  workspace_id: string;
+  page_id: string;
+  page_slug: string;
+  page_title: string;
+  fields: string;
+  source: string;
+  changed_at: string;
 }
 
-function readChanges(workspaceId: string): SeoChangeEvent[] {
-  try {
-    const fp = getChangesPath(workspaceId);
-    if (!fs.existsSync(fp)) return [];
-    return JSON.parse(fs.readFileSync(fp, 'utf-8'));
-  } catch { return []; }
+interface Stmts {
+  insert: ReturnType<typeof db.prepare>;
+  selectByWorkspace: ReturnType<typeof db.prepare>;
+  selectRecentByPage: ReturnType<typeof db.prepare>;
+  updateById: ReturnType<typeof db.prepare>;
+  countByWorkspace: ReturnType<typeof db.prepare>;
+  pruneOldest: ReturnType<typeof db.prepare>;
 }
 
-function writeChanges(workspaceId: string, changes: SeoChangeEvent[]): void {
-  fs.writeFileSync(getChangesPath(workspaceId), JSON.stringify(changes, null, 2));
+let _stmts: Stmts | null = null;
+function stmts(): Stmts {
+  if (!_stmts) {
+    _stmts = {
+      insert: db.prepare(
+        `INSERT INTO seo_changes (id, workspace_id, page_id, page_slug, page_title, fields, source, changed_at)
+         VALUES (@id, @workspace_id, @page_id, @page_slug, @page_title, @fields, @source, @changed_at)`,
+      ),
+      selectByWorkspace: db.prepare(
+        `SELECT * FROM seo_changes WHERE workspace_id = ? ORDER BY changed_at ASC`,
+      ),
+      selectRecentByPage: db.prepare(
+        `SELECT * FROM seo_changes WHERE workspace_id = ? AND page_id = ? AND changed_at > ? ORDER BY changed_at DESC LIMIT 1`,
+      ),
+      updateById: db.prepare(
+        `UPDATE seo_changes SET fields = @fields, changed_at = @changed_at WHERE id = @id`,
+      ),
+      countByWorkspace: db.prepare(
+        `SELECT COUNT(*) as cnt FROM seo_changes WHERE workspace_id = ?`,
+      ),
+      pruneOldest: db.prepare(
+        `DELETE FROM seo_changes WHERE workspace_id = ? AND id NOT IN (
+           SELECT id FROM seo_changes WHERE workspace_id = ? ORDER BY changed_at DESC LIMIT 500
+         )`,
+      ),
+    };
+  }
+  return _stmts;
+}
+
+function rowToEvent(row: ChangeRow): SeoChangeEvent {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    pageId: row.page_id,
+    pageSlug: row.page_slug,
+    pageTitle: row.page_title,
+    fields: JSON.parse(row.fields),
+    source: row.source,
+    changedAt: row.changed_at,
+  };
 }
 
 // ── Public API ──
@@ -60,13 +103,9 @@ export function recordSeoChange(
   fields: string[],
   source: string,
 ): SeoChangeEvent {
-  const changes = readChanges(workspaceId);
-
   // Deduplicate: if same page changed in the last hour, update the existing entry
-  const recentIdx = changes.findIndex(c =>
-    c.pageId === pageId &&
-    Date.now() - new Date(c.changedAt).getTime() < 3600_000
-  );
+  const oneHourAgo = new Date(Date.now() - 3600_000).toISOString();
+  const recent = stmts().selectRecentByPage.get(workspaceId, pageId, oneHourAgo) as ChangeRow | undefined;
 
   const event: SeoChangeEvent = {
     id: `sc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -79,26 +118,38 @@ export function recordSeoChange(
     changedAt: new Date().toISOString(),
   };
 
-  if (recentIdx >= 0) {
+  if (recent) {
     // Merge fields and update
-    const existing = changes[recentIdx];
-    event.fields = [...new Set([...existing.fields, ...fields])];
-    event.id = existing.id; // keep original id
-    changes[recentIdx] = event;
+    const existingFields: string[] = JSON.parse(recent.fields);
+    event.fields = [...new Set([...existingFields, ...fields])];
+    event.id = recent.id; // keep original id
+    stmts().updateById.run({
+      id: event.id,
+      fields: JSON.stringify(event.fields),
+      changed_at: event.changedAt,
+    });
   } else {
-    changes.push(event);
+    stmts().insert.run({
+      id: event.id,
+      workspace_id: workspaceId,
+      page_id: pageId,
+      page_slug: pageSlug,
+      page_title: pageTitle,
+      fields: JSON.stringify(event.fields),
+      source,
+      changed_at: event.changedAt,
+    });
   }
 
   // Keep max 500 events per workspace
-  if (changes.length > 500) changes.splice(0, changes.length - 500);
+  stmts().pruneOldest.run(workspaceId, workspaceId);
 
-  writeChanges(workspaceId, changes);
   return event;
 }
 
 export function getSeoChanges(workspaceId: string, limit = 100): SeoChangeEvent[] {
-  const changes = readChanges(workspaceId);
-  return changes.slice(-limit).reverse(); // newest first
+  const rows = stmts().selectByWorkspace.all(workspaceId) as ChangeRow[];
+  return rows.slice(-limit).reverse().map(rowToEvent); // newest first
 }
 
 // ── GSC Impact Comparison ──
@@ -165,8 +216,8 @@ export async function getSeoChangeImpact(
   siteId: string,
   limit = 50,
 ): Promise<PageImpact[]> {
-  const changes = readChanges(workspaceId);
-  if (changes.length === 0) return [];
+  const allChanges = stmts().selectByWorkspace.all(workspaceId) as ChangeRow[];
+  if (allChanges.length === 0) return [];
 
   const token = await getValidToken(siteId);
   if (!token) throw new Error('Not connected to Google');
@@ -175,20 +226,12 @@ export async function getSeoChangeImpact(
   const dataDelay = 3; // GSC data has ~3 day delay
 
   // Get the date range we need: from 28 days before the oldest change to now minus delay
-  const recentChanges = changes.slice(-limit);
-  const oldestChange = new Date(recentChanges[0].changedAt);
+  const recentChanges = allChanges.slice(-limit);
 
-  // Before period: 28 days ending at the change date (minus delay)
-  const globalBeforeStart = new Date(oldestChange);
-  globalBeforeStart.setDate(globalBeforeStart.getDate() - 28 - dataDelay);
-  const globalAfterEnd = new Date(now);
-  globalAfterEnd.setDate(globalAfterEnd.getDate() - dataDelay);
-
-  // Fetch all page data for the full range in 2 calls: before window and after window
-  // We'll use per-change date ranges for comparison
   const results: PageImpact[] = [];
 
-  for (const change of recentChanges.slice().reverse()) { // newest first
+  for (const row of [...recentChanges].reverse()) { // newest first
+    const change = rowToEvent(row);
     const changeDate = new Date(change.changedAt);
     const daysSinceChange = Math.floor((now.getTime() - changeDate.getTime()) / (1000 * 60 * 60 * 24));
     const tooRecent = daysSinceChange < 7;

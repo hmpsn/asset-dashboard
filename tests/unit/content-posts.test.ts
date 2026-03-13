@@ -6,9 +6,7 @@
  * export operations.
  */
 import { describe, it, expect, afterAll } from 'vitest';
-import fs from 'fs';
-import path from 'path';
-import { getDataDir } from '../../server/data-dir.js';
+import db from '../../server/db/index.js';
 import {
   listPosts,
   getPost,
@@ -21,11 +19,8 @@ import {
   type PostSection,
 } from '../../server/content-posts.js';
 
-const POSTS_DIR = getDataDir('content-posts');
-
 function cleanupWorkspace(workspaceId: string): void {
-  const fp = path.join(POSTS_DIR, `${workspaceId}.json`);
-  try { fs.unlinkSync(fp); } catch { /* skip */ }
+  db.prepare('DELETE FROM content_posts WHERE workspace_id = ?').run(workspaceId);
 }
 
 function makeSection(index: number, heading: string): PostSection {

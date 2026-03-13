@@ -5,9 +5,7 @@
  * This file tests the synchronous CRUD operations.
  */
 import { describe, it, expect, afterAll } from 'vitest';
-import fs from 'fs';
-import path from 'path';
-import { getDataDir } from '../../server/data-dir.js';
+import db from '../../server/db/index.js';
 import {
   listBriefs,
   getBrief,
@@ -16,22 +14,60 @@ import {
   type ContentBrief,
 } from '../../server/content-brief.js';
 
-const BRIEFS_DIR = getDataDir('content-briefs');
-
-// Helper to create a brief directly via file I/O (since createBrief requires OpenAI)
+// Helper to create a brief directly via SQLite (since createBrief requires OpenAI)
 function seedBrief(workspaceId: string, brief: ContentBrief): void {
-  const fp = path.join(BRIEFS_DIR, `${workspaceId}.json`);
-  let briefs: ContentBrief[] = [];
-  try {
-    if (fs.existsSync(fp)) briefs = JSON.parse(fs.readFileSync(fp, 'utf-8'));
-  } catch { /* fresh */ }
-  briefs.push(brief);
-  fs.writeFileSync(fp, JSON.stringify(briefs, null, 2));
+  db.prepare(
+    `INSERT OR IGNORE INTO content_briefs
+       (id, workspace_id, target_keyword, secondary_keywords, suggested_title,
+        suggested_meta_desc, outline, word_count_target, intent, audience,
+        competitor_insights, internal_link_suggestions, created_at,
+        executive_summary, content_format, tone_and_style, people_also_ask,
+        topical_entities, serp_analysis, difficulty_score, traffic_potential,
+        cta_recommendations, eeat_guidance, content_checklist, schema_recommendations,
+        page_type, reference_urls, real_people_also_ask, real_top_results)
+     VALUES
+       (@id, @workspace_id, @target_keyword, @secondary_keywords, @suggested_title,
+        @suggested_meta_desc, @outline, @word_count_target, @intent, @audience,
+        @competitor_insights, @internal_link_suggestions, @created_at,
+        @executive_summary, @content_format, @tone_and_style, @people_also_ask,
+        @topical_entities, @serp_analysis, @difficulty_score, @traffic_potential,
+        @cta_recommendations, @eeat_guidance, @content_checklist, @schema_recommendations,
+        @page_type, @reference_urls, @real_people_also_ask, @real_top_results)`,
+  ).run({
+    id: brief.id,
+    workspace_id: workspaceId,
+    target_keyword: brief.targetKeyword,
+    secondary_keywords: JSON.stringify(brief.secondaryKeywords),
+    suggested_title: brief.suggestedTitle,
+    suggested_meta_desc: brief.suggestedMetaDesc,
+    outline: JSON.stringify(brief.outline),
+    word_count_target: brief.wordCountTarget,
+    intent: brief.intent,
+    audience: brief.audience,
+    competitor_insights: brief.competitorInsights,
+    internal_link_suggestions: JSON.stringify(brief.internalLinkSuggestions),
+    created_at: brief.createdAt,
+    executive_summary: brief.executiveSummary ?? null,
+    content_format: brief.contentFormat ?? null,
+    tone_and_style: brief.toneAndStyle ?? null,
+    people_also_ask: brief.peopleAlsoAsk ? JSON.stringify(brief.peopleAlsoAsk) : null,
+    topical_entities: brief.topicalEntities ? JSON.stringify(brief.topicalEntities) : null,
+    serp_analysis: brief.serpAnalysis ? JSON.stringify(brief.serpAnalysis) : null,
+    difficulty_score: brief.difficultyScore ?? null,
+    traffic_potential: brief.trafficPotential ?? null,
+    cta_recommendations: brief.ctaRecommendations ? JSON.stringify(brief.ctaRecommendations) : null,
+    eeat_guidance: brief.eeatGuidance ? JSON.stringify(brief.eeatGuidance) : null,
+    content_checklist: brief.contentChecklist ? JSON.stringify(brief.contentChecklist) : null,
+    schema_recommendations: brief.schemaRecommendations ? JSON.stringify(brief.schemaRecommendations) : null,
+    page_type: brief.pageType ?? null,
+    reference_urls: brief.referenceUrls ? JSON.stringify(brief.referenceUrls) : null,
+    real_people_also_ask: brief.realPeopleAlsoAsk ? JSON.stringify(brief.realPeopleAlsoAsk) : null,
+    real_top_results: brief.realTopResults ? JSON.stringify(brief.realTopResults) : null,
+  });
 }
 
 function cleanupWorkspace(workspaceId: string): void {
-  const fp = path.join(BRIEFS_DIR, `${workspaceId}.json`);
-  try { fs.unlinkSync(fp); } catch { /* skip */ }
+  db.prepare('DELETE FROM content_briefs WHERE workspace_id = ?').run(workspaceId);
 }
 
 function makeBrief(id: string, workspaceId: string, overrides: Partial<ContentBrief> = {}): ContentBrief {

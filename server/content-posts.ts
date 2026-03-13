@@ -3,17 +3,12 @@
  * Adapts prompts per page type (blog, landing, service, location, product, pillar, resource).
  * Each section is generated independently using the brief's outline as the writing spec.
  */
-import fs from 'fs';
-import path from 'path';
-import { getDataDir } from './data-dir.js';
+import db from './db/index.js';
 import { buildSeoContext, buildKnowledgeBase, buildKeywordMapContext, buildPersonasContext } from './seo-context.js';
 import { callOpenAI } from './openai-helpers.js';
 import { callAnthropic, isAnthropicConfigured } from './anthropic-helpers.js';
 import { getWorkspace } from './workspaces.js';
 import type { ContentBrief } from './content-brief.js';
-
-const POSTS_DIR = getDataDir('content-posts');
-fs.mkdirSync(POSTS_DIR, { recursive: true });
 
 // --- Types ---
 
@@ -49,56 +44,153 @@ export interface GeneratedPost {
   updatedAt: string;
 }
 
-// --- Storage ---
+// ── SQLite row shape ──
 
-function getPostFile(workspaceId: string): string {
-  return path.join(POSTS_DIR, `${workspaceId}.json`);
+interface PostRow {
+  id: string;
+  workspace_id: string;
+  brief_id: string;
+  target_keyword: string;
+  title: string;
+  meta_description: string;
+  introduction: string;
+  sections: string;
+  conclusion: string;
+  seo_title: string | null;
+  seo_meta_description: string | null;
+  total_word_count: number;
+  target_word_count: number;
+  status: string;
+  unification_status: string | null;
+  unification_note: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
-function readPosts(workspaceId: string): GeneratedPost[] {
-  try {
-    const f = getPostFile(workspaceId);
-    if (fs.existsSync(f)) return JSON.parse(fs.readFileSync(f, 'utf-8'));
-  } catch { /* fresh */ }
-  return [];
+interface PostStmts {
+  insert: ReturnType<typeof db.prepare>;
+  selectByWorkspace: ReturnType<typeof db.prepare>;
+  selectById: ReturnType<typeof db.prepare>;
+  update: ReturnType<typeof db.prepare>;
+  deleteById: ReturnType<typeof db.prepare>;
 }
 
-function writePosts(workspaceId: string, posts: GeneratedPost[]) {
-  fs.writeFileSync(getPostFile(workspaceId), JSON.stringify(posts, null, 2));
+let _stmts: PostStmts | null = null;
+function stmts(): PostStmts {
+  if (!_stmts) {
+    _stmts = {
+      insert: db.prepare(
+        `INSERT OR REPLACE INTO content_posts
+           (id, workspace_id, brief_id, target_keyword, title, meta_description,
+            introduction, sections, conclusion, seo_title, seo_meta_description,
+            total_word_count, target_word_count, status, unification_status,
+            unification_note, created_at, updated_at)
+         VALUES
+           (@id, @workspace_id, @brief_id, @target_keyword, @title, @meta_description,
+            @introduction, @sections, @conclusion, @seo_title, @seo_meta_description,
+            @total_word_count, @target_word_count, @status, @unification_status,
+            @unification_note, @created_at, @updated_at)`,
+      ),
+      selectByWorkspace: db.prepare(
+        `SELECT * FROM content_posts WHERE workspace_id = ? ORDER BY created_at DESC`,
+      ),
+      selectById: db.prepare(
+        `SELECT * FROM content_posts WHERE id = ? AND workspace_id = ?`,
+      ),
+      update: db.prepare(
+        `UPDATE content_posts SET
+           title = @title, meta_description = @meta_description,
+           introduction = @introduction, sections = @sections, conclusion = @conclusion,
+           seo_title = @seo_title, seo_meta_description = @seo_meta_description,
+           total_word_count = @total_word_count, target_word_count = @target_word_count,
+           status = @status, unification_status = @unification_status,
+           unification_note = @unification_note, updated_at = @updated_at
+         WHERE id = @id`,
+      ),
+      deleteById: db.prepare(
+        `DELETE FROM content_posts WHERE id = ? AND workspace_id = ?`,
+      ),
+    };
+  }
+  return _stmts;
+}
+
+function rowToPost(row: PostRow): GeneratedPost {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    briefId: row.brief_id,
+    targetKeyword: row.target_keyword,
+    title: row.title,
+    metaDescription: row.meta_description,
+    introduction: row.introduction,
+    sections: JSON.parse(row.sections),
+    conclusion: row.conclusion,
+    seoTitle: row.seo_title ?? undefined,
+    seoMetaDescription: row.seo_meta_description ?? undefined,
+    totalWordCount: row.total_word_count,
+    targetWordCount: row.target_word_count,
+    status: row.status as GeneratedPost['status'],
+    unificationStatus: row.unification_status as GeneratedPost['unificationStatus'] ?? undefined,
+    unificationNote: row.unification_note ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function postToParams(post: GeneratedPost): Record<string, unknown> {
+  return {
+    id: post.id,
+    workspace_id: post.workspaceId,
+    brief_id: post.briefId,
+    target_keyword: post.targetKeyword,
+    title: post.title,
+    meta_description: post.metaDescription,
+    introduction: post.introduction,
+    sections: JSON.stringify(post.sections),
+    conclusion: post.conclusion,
+    seo_title: post.seoTitle ?? null,
+    seo_meta_description: post.seoMetaDescription ?? null,
+    total_word_count: post.totalWordCount,
+    target_word_count: post.targetWordCount,
+    status: post.status,
+    unification_status: post.unificationStatus ?? null,
+    unification_note: post.unificationNote ?? null,
+    created_at: post.createdAt,
+    updated_at: post.updatedAt,
+  };
 }
 
 export function listPosts(workspaceId: string): GeneratedPost[] {
-  return readPosts(workspaceId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const rows = stmts().selectByWorkspace.all(workspaceId) as PostRow[];
+  return rows.map(rowToPost);
 }
 
 export function getPost(workspaceId: string, postId: string): GeneratedPost | undefined {
-  return readPosts(workspaceId).find(p => p.id === postId);
+  const row = stmts().selectById.get(postId, workspaceId) as PostRow | undefined;
+  return row ? rowToPost(row) : undefined;
 }
 
 export function savePost(workspaceId: string, post: GeneratedPost): void {
-  const posts = readPosts(workspaceId);
-  const idx = posts.findIndex(p => p.id === post.id);
-  if (idx >= 0) posts[idx] = post;
-  else posts.push(post);
-  writePosts(workspaceId, posts);
+  const existing = stmts().selectById.get(post.id, workspaceId) as PostRow | undefined;
+  if (existing) {
+    stmts().update.run(postToParams(post));
+  } else {
+    stmts().insert.run(postToParams(post));
+  }
 }
 
 export function updatePostField(workspaceId: string, postId: string, updates: Partial<Omit<GeneratedPost, 'id' | 'workspaceId' | 'createdAt'>>): GeneratedPost | null {
-  const posts = readPosts(workspaceId);
-  const idx = posts.findIndex(p => p.id === postId);
-  if (idx === -1) return null;
-  Object.assign(posts[idx], updates, { updatedAt: new Date().toISOString() });
-  writePosts(workspaceId, posts);
-  return posts[idx];
+  const post = getPost(workspaceId, postId);
+  if (!post) return null;
+  Object.assign(post, updates, { updatedAt: new Date().toISOString() });
+  stmts().update.run(postToParams(post));
+  return post;
 }
 
 export function deletePost(workspaceId: string, postId: string): boolean {
-  const posts = readPosts(workspaceId);
-  const idx = posts.findIndex(p => p.id === postId);
-  if (idx === -1) return false;
-  posts.splice(idx, 1);
-  writePosts(workspaceId, posts);
-  return true;
+  const info = stmts().deleteById.run(postId, workspaceId);
+  return info.changes > 0;
 }
 
 // --- Generation ---

@@ -1,14 +1,4 @@
-import fs from 'fs';
-import path from 'path';
-import { getUploadRoot } from './data-dir.js';
-
-const UPLOAD_ROOT = getUploadRoot();
-
-function getAnnotationsFile(workspaceId: string): string {
-  const dir = path.join(UPLOAD_ROOT, workspaceId);
-  fs.mkdirSync(dir, { recursive: true });
-  return path.join(dir, '.annotations.json');
-}
+import db from './db/index.js';
 
 export interface Annotation {
   id: string;
@@ -19,24 +9,60 @@ export interface Annotation {
   createdAt: string;
 }
 
-function readAnnotations(workspaceId: string): Annotation[] {
-  try {
-    const f = getAnnotationsFile(workspaceId);
-    if (fs.existsSync(f)) return JSON.parse(fs.readFileSync(f, 'utf-8'));
-  } catch { /* fresh */ }
-  return [];
+// ── SQLite row shape ──
+
+interface AnnotationRow {
+  id: string;
+  workspace_id: string;
+  date: string;
+  label: string;
+  description: string | null;
+  color: string | null;
+  created_at: string;
 }
 
-function writeAnnotations(workspaceId: string, annotations: Annotation[]) {
-  fs.writeFileSync(getAnnotationsFile(workspaceId), JSON.stringify(annotations, null, 2));
+interface Stmts {
+  insert: ReturnType<typeof db.prepare>;
+  selectByWorkspace: ReturnType<typeof db.prepare>;
+  deleteById: ReturnType<typeof db.prepare>;
+}
+
+let _stmts: Stmts | null = null;
+function stmts(): Stmts {
+  if (!_stmts) {
+    _stmts = {
+      insert: db.prepare(
+        `INSERT INTO annotations (id, workspace_id, date, label, description, color, created_at)
+         VALUES (@id, @workspace_id, @date, @label, @description, @color, @created_at)`,
+      ),
+      selectByWorkspace: db.prepare(
+        `SELECT * FROM annotations WHERE workspace_id = ? ORDER BY date ASC`,
+      ),
+      deleteById: db.prepare(
+        `DELETE FROM annotations WHERE id = ? AND workspace_id = ?`,
+      ),
+    };
+  }
+  return _stmts;
+}
+
+function rowToAnnotation(row: AnnotationRow): Annotation {
+  return {
+    id: row.id,
+    date: row.date,
+    label: row.label,
+    description: row.description ?? undefined,
+    color: row.color ?? undefined,
+    createdAt: row.created_at,
+  };
 }
 
 export function listAnnotations(workspaceId: string): Annotation[] {
-  return readAnnotations(workspaceId).sort((a, b) => a.date.localeCompare(b.date));
+  const rows = stmts().selectByWorkspace.all(workspaceId) as AnnotationRow[];
+  return rows.map(rowToAnnotation);
 }
 
 export function addAnnotation(workspaceId: string, date: string, label: string, description?: string, color?: string): Annotation {
-  const annotations = readAnnotations(workspaceId);
   const entry: Annotation = {
     id: `ann_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     date,
@@ -45,16 +71,19 @@ export function addAnnotation(workspaceId: string, date: string, label: string, 
     color: color || '#2dd4bf',
     createdAt: new Date().toISOString(),
   };
-  annotations.push(entry);
-  writeAnnotations(workspaceId, annotations);
+  stmts().insert.run({
+    id: entry.id,
+    workspace_id: workspaceId,
+    date: entry.date,
+    label: entry.label,
+    description: entry.description ?? null,
+    color: entry.color ?? null,
+    created_at: entry.createdAt,
+  });
   return entry;
 }
 
 export function deleteAnnotation(workspaceId: string, annotationId: string): boolean {
-  const annotations = readAnnotations(workspaceId);
-  const idx = annotations.findIndex(a => a.id === annotationId);
-  if (idx === -1) return false;
-  annotations.splice(idx, 1);
-  writeAnnotations(workspaceId, annotations);
-  return true;
+  const info = stmts().deleteById.run(annotationId, workspaceId);
+  return info.changes > 0;
 }

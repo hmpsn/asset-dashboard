@@ -1,11 +1,5 @@
-import fs from 'fs';
-import path from 'path';
 import { randomUUID } from 'crypto';
-import { getDataDir } from './data-dir.js';
-
-const APPROVALS_DIR = getDataDir('approvals');
-
-fs.mkdirSync(APPROVALS_DIR, { recursive: true });
+import db from './db/index.js';
 
 export interface ApprovalItem {
   id: string;
@@ -35,22 +29,63 @@ export interface ApprovalBatch {
   updatedAt: string;
 }
 
-function batchFile(workspaceId: string): string {
-  return path.join(APPROVALS_DIR, `${workspaceId}.json`);
+// ── SQLite row shape ──
+
+interface BatchRow {
+  id: string;
+  workspace_id: string;
+  site_id: string;
+  name: string;
+  items: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
 }
 
-function readBatches(workspaceId: string): ApprovalBatch[] {
-  try {
-    const file = batchFile(workspaceId);
-    if (fs.existsSync(file)) {
-      return JSON.parse(fs.readFileSync(file, 'utf-8'));
-    }
-  } catch { /* ignore */ }
-  return [];
+interface Stmts {
+  insert: ReturnType<typeof db.prepare>;
+  selectByWorkspace: ReturnType<typeof db.prepare>;
+  selectById: ReturnType<typeof db.prepare>;
+  update: ReturnType<typeof db.prepare>;
+  deleteById: ReturnType<typeof db.prepare>;
 }
 
-function writeBatches(workspaceId: string, batches: ApprovalBatch[]) {
-  fs.writeFileSync(batchFile(workspaceId), JSON.stringify(batches, null, 2));
+let _stmts: Stmts | null = null;
+function stmts(): Stmts {
+  if (!_stmts) {
+    _stmts = {
+      insert: db.prepare(
+        `INSERT INTO approval_batches (id, workspace_id, site_id, name, items, status, created_at, updated_at)
+         VALUES (@id, @workspace_id, @site_id, @name, @items, @status, @created_at, @updated_at)`,
+      ),
+      selectByWorkspace: db.prepare(
+        `SELECT * FROM approval_batches WHERE workspace_id = ?`,
+      ),
+      selectById: db.prepare(
+        `SELECT * FROM approval_batches WHERE id = ? AND workspace_id = ?`,
+      ),
+      update: db.prepare(
+        `UPDATE approval_batches SET items = @items, status = @status, updated_at = @updated_at WHERE id = @id`,
+      ),
+      deleteById: db.prepare(
+        `DELETE FROM approval_batches WHERE id = ? AND workspace_id = ?`,
+      ),
+    };
+  }
+  return _stmts;
+}
+
+function rowToBatch(row: BatchRow): ApprovalBatch {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    siteId: row.site_id,
+    name: row.name,
+    items: JSON.parse(row.items),
+    status: row.status as ApprovalBatch['status'],
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 export function createBatch(
@@ -59,7 +94,6 @@ export function createBatch(
   name: string,
   items: Omit<ApprovalItem, 'id' | 'status' | 'createdAt' | 'updatedAt'>[]
 ): ApprovalBatch {
-  const batches = readBatches(workspaceId);
   const now = new Date().toISOString();
   const batch: ApprovalBatch = {
     id: `ab_${randomUUID().slice(0, 8)}`,
@@ -77,17 +111,27 @@ export function createBatch(
     createdAt: now,
     updatedAt: now,
   };
-  batches.unshift(batch);
-  writeBatches(workspaceId, batches);
+  stmts().insert.run({
+    id: batch.id,
+    workspace_id: workspaceId,
+    site_id: siteId,
+    name,
+    items: JSON.stringify(batch.items),
+    status: batch.status,
+    created_at: now,
+    updated_at: now,
+  });
   return batch;
 }
 
 export function listBatches(workspaceId: string): ApprovalBatch[] {
-  return readBatches(workspaceId);
+  const rows = stmts().selectByWorkspace.all(workspaceId) as BatchRow[];
+  return rows.map(rowToBatch);
 }
 
 export function getBatch(workspaceId: string, batchId: string): ApprovalBatch | undefined {
-  return readBatches(workspaceId).find(b => b.id === batchId);
+  const row = stmts().selectById.get(batchId, workspaceId) as BatchRow | undefined;
+  return row ? rowToBatch(row) : undefined;
 }
 
 export function updateItem(
@@ -96,8 +140,7 @@ export function updateItem(
   itemId: string,
   update: Partial<Pick<ApprovalItem, 'status' | 'clientValue' | 'clientNote'>>
 ): ApprovalBatch | null {
-  const batches = readBatches(workspaceId);
-  const batch = batches.find(b => b.id === batchId);
+  const batch = getBatch(workspaceId, batchId);
   if (!batch) return null;
   const item = batch.items.find(i => i.id === itemId);
   if (!item) return null;
@@ -112,13 +155,17 @@ export function updateItem(
   else batch.status = 'pending';
 
   batch.updatedAt = new Date().toISOString();
-  writeBatches(workspaceId, batches);
+  stmts().update.run({
+    id: batch.id,
+    items: JSON.stringify(batch.items),
+    status: batch.status,
+    updated_at: batch.updatedAt,
+  });
   return batch;
 }
 
 export function markBatchApplied(workspaceId: string, batchId: string, itemIds: string[]): ApprovalBatch | null {
-  const batches = readBatches(workspaceId);
-  const batch = batches.find(b => b.id === batchId);
+  const batch = getBatch(workspaceId, batchId);
   if (!batch) return null;
 
   for (const item of batch.items) {
@@ -131,15 +178,16 @@ export function markBatchApplied(workspaceId: string, batchId: string, itemIds: 
   const statuses = batch.items.map(i => i.status);
   if (statuses.every(s => s === 'applied')) batch.status = 'applied';
   batch.updatedAt = new Date().toISOString();
-  writeBatches(workspaceId, batches);
+  stmts().update.run({
+    id: batch.id,
+    items: JSON.stringify(batch.items),
+    status: batch.status,
+    updated_at: batch.updatedAt,
+  });
   return batch;
 }
 
 export function deleteBatch(workspaceId: string, batchId: string): boolean {
-  const batches = readBatches(workspaceId);
-  const idx = batches.findIndex(b => b.id === batchId);
-  if (idx === -1) return false;
-  batches.splice(idx, 1);
-  writeBatches(workspaceId, batches);
-  return true;
+  const info = stmts().deleteById.run(batchId, workspaceId);
+  return info.changes > 0;
 }
