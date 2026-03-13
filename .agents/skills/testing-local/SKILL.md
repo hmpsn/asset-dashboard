@@ -1,71 +1,81 @@
-# Testing asset-dashboard Locally
+# Local Testing — Asset Dashboard
 
 ## Quick Start
 
 ```bash
 cd ~/repos/asset-dashboard
-npm run dev:all   # Starts both Vite (port 5173) and Express (port 3001)
+
+# Create minimal .env (PORT is the only required var for local dev)
+echo "PORT=3001" > .env
+
+# Start both servers
+npm run dev:all
+# Or separately:
+npm run dev:server  # Backend on :3001
+npm run dev         # Frontend on :5173 (Vite, proxies /api to :3001)
 ```
 
-- **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:3001
-- **Tests**: `npx vitest run`
-- **Typecheck**: `npx tsc --noEmit --skipLibCheck`
-- **Build**: `npx vite build`
+Frontend: http://localhost:5173  
+Backend: http://localhost:3001  
+Vite proxies `/api` requests to the backend automatically.
 
-## Authentication
+## Environment
 
-- Without `APP_PASSWORD` in `.env`, the admin dashboard is accessible without login
-- The `useAuth` hook checks `/api/auth/check` — if the server reports auth is not required, the app auto-authenticates
-- For testing navigation/routing, running without `.env` is sufficient
-- Client portal (`/client/:id`) may require a workspace password depending on workspace config — newly created workspaces don't have one
+- **No APP_PASSWORD**: Admin dashboard loads without login gate
+- **No API keys**: Most features show "not configured" empty states — this is expected
+- **No Webflow token**: Site Audit, SEO Editor, Search Console, Analytics tabs show "Link a Webflow site" prompt
+- **SQLite DB**: Auto-created on first server start at `~/.asset-dashboard/`
 
-## Workspace Setup for Testing
-
-- On first run with no data, the admin dashboard shows an empty state
-- Create a workspace via the workspace selector dropdown (top-left) → "New workspace"
-- Workspace IDs follow the pattern `ws_{timestamp}_{index}`
-- Many sidebar tabs (Site Audit, Strategy, SEO Editor, etc.) require a linked Webflow site — they show a "Link a Webflow site" placeholder when no site is linked
-- Tabs that work without a Webflow site: Home, Assets (media), Brand & AI
-- Global tabs (Settings, Roadmap, Prospect, AI Usage) work without any workspace
-
-## URL Routing Structure
+## Navigation Patterns
 
 ### Admin Dashboard
-- Home: `/ws/{workspaceId}`
-- Workspace tab: `/ws/{workspaceId}/{tab}` (e.g., `/ws/abc/media`, `/ws/abc/brand`)
-- Global tabs: `/{tab}` (e.g., `/settings`, `/roadmap`)
+- URL pattern: `/ws/{workspaceId}/{tab}`
+- Tabs: `home`, `seo-audit`, `search`, `analytics`, `content-briefs`, `workspace-settings`, etc.
+- Global pages: `/settings`, `/roadmap`
+- Workspace selector: Top-left dropdown in sidebar
+- Create workspace: Dropdown → "New workspace" → type name → click "Add"
 
-### Client Portal
-- Overview: `/client/{workspaceId}`
-- Tab: `/client/{workspaceId}/{tab}` (e.g., `/client/abc/health`)
-- Beta mode: `/client/beta/{workspaceId}` and `/client/beta/{workspaceId}/{tab}`
+### Client Dashboard
+- URL pattern: `/client/{workspaceId}/{tab}`
+- Tabs: insights, performance, health, strategy, inbox, plans, roi
+- Requires client user setup (won't load without configured workspace)
 
-## Vite Proxy Configuration
+## Key API Calls on Page Load
 
-- `/api` proxies to Express backend at `http://localhost:3001`
-- `/ws` (exact match, regex `^/ws$`) proxies WebSocket to `ws://localhost:3001`
-- Important: The proxy uses a regex key `^/ws$` to avoid intercepting `/ws/{id}/{tab}` admin routes. If the proxy key is changed back to a simple `/ws` prefix, page refresh on admin workspace URLs will break in dev mode.
+These fire on every admin dashboard load (good for smoke testing API changes):
+- `GET /api/auth/check` — auth state
+- `GET /api/health` — connection status (shown in status bar)
+- `GET /api/workspaces` — workspace list
+- `GET /api/queue` — processing queue
 
-## Common Testing Scenarios
+## Smoke Test Checklist
 
-### Navigation/Routing
-1. Create a workspace → verify URL updates to `/ws/{id}`
-2. Click sidebar tabs → verify URL updates for each tab
-3. Click Settings gear → verify URL is `/settings` (no workspace ID)
-4. Browser back/forward → verify correct tab loads
-5. Deep-link: paste a URL like `/ws/{id}/media` → verify correct tab loads directly
-6. Beta mode: navigate to `/client/beta/{id}` → click tabs → verify `/client/beta/` prefix preserved
+1. App loads without crash, status bar shows "Connected"
+2. Create a workspace (tests `POST /api/workspaces`)
+3. Navigate Home tab — dashboard cards render
+4. Navigate Site Audit, Search Console, Analytics — empty states load
+5. Navigate Settings — connections and health status render
+6. Check browser console — only WebSocket warnings expected (Vite proxy timing), no red errors
 
-### Client Portal
-- Access via `/client/{workspaceId}` — shows onboarding wizard on first visit (click "Skip for now")
-- Beta mode at `/client/beta/{workspaceId}` hides Plans and ROI tabs, shows premium features
+## Known Issues
+
+- WebSocket warnings in console (`WebSocket is closed before the connection is established`) are normal with Vite dev proxy — they resolve after initial connection
+- `GET /api/public/audit-summary/{wsId}` returns 400 for workspaces without Webflow site — expected
+- Sidebar navigation may require clicking precisely on the text; alternatively use URL bar to navigate directly
+
+## Build & Type Check
+
+```bash
+npx tsc --noEmit          # Type check
+npx vite build            # Production build
+npx vitest run            # Run all tests (465 tests across 38 files)
+```
 
 ## Devin Secrets Needed
 
-None required for basic navigation/routing testing. For full feature testing:
-- `APP_PASSWORD` — enables admin auth gate
-- `OPENAI_API_KEY` — for AI features (content briefs, chat)
-- `WEBFLOW_API_TOKEN` — for Webflow integration features
-- `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` — for GSC/GA4 data
-- `STRIPE_SECRET_KEY` — for payment features
+None required for basic local smoke testing. Optional secrets for deeper testing:
+- `OPENAI_API_KEY` — enables AI features (content generation, chat)
+- `ANTHROPIC_API_KEY` — enables Claude-based features
+- `WEBFLOW_API_TOKEN` — enables Webflow integration testing
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — enables GSC/GA4 testing
+- `STRIPE_SECRET_KEY` — enables payment flow testing
