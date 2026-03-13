@@ -103,8 +103,9 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     resetConfirm, setResetConfirm, resetDone, setResetDone,
     passwordInput, setPasswordInput,
     handlePasswordSubmit, handleClientUserLogin, handleClientLogout,
-  } = useClientAuth(workspaceId, ws, (data: WorkspaceInfo) => loadDashboardData(data, setPricingData), () => turnstileTokenRef.current);
+  } = useClientAuth(workspaceId, ws, (data: WorkspaceInfo) => loadDashboardData(data, setPricingData), () => turnstileTokenRef.current, () => setTurnstileReset(r => r + 1));
   const turnstileTokenRef = useRef<string | undefined>(undefined);
+  const [turnstileReset, setTurnstileReset] = useState(0);
 
   // ── Chat hook ──
   const chatDeps = useMemo(() => ({
@@ -421,14 +422,14 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                     try {
                       await post(`/api/public/forgot-password/${workspaceId}`, { email: forgotEmail.trim(), turnstileToken: turnstileTokenRef.current });
                       setForgotSent(true);
-                    } catch (err) { setAuthError(err instanceof Error ? err.message : 'Something went wrong'); }
+                    } catch (err) { setAuthError(err instanceof Error ? err.message : 'Something went wrong'); setTurnstileReset(r => r + 1); }
                     setAuthLoading(false);
                   }} className="space-y-3">
                     <p className="text-xs text-zinc-400 text-center">Enter your email and we'll send you a link to reset your password.</p>
                     <input type="email" value={forgotEmail} onChange={e => { setForgotEmail(e.target.value); setAuthError(''); }}
                       placeholder="Email address" autoFocus
                       className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors" />
-                    <TurnstileWidget onToken={(t) => { turnstileTokenRef.current = t; }} />
+                    <TurnstileWidget onToken={(t) => { turnstileTokenRef.current = t; }} resetTrigger={turnstileReset} />
                     {authError && <p className="text-xs text-red-400">{authError}</p>}
                     <button type="submit" disabled={authLoading || !forgotEmail.trim()}
                       className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white text-sm font-medium transition-all flex items-center justify-center gap-2">
@@ -504,7 +505,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                   className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors"
                 />
               </div>
-              <TurnstileWidget onToken={(t) => { turnstileTokenRef.current = t; }} />
+              <TurnstileWidget onToken={(t) => { turnstileTokenRef.current = t; }} resetTrigger={turnstileReset} />
               {authError && <p className="text-xs text-red-400">{authError}</p>}
               <button
                 type="submit"

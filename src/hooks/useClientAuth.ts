@@ -55,6 +55,7 @@ export function useClientAuth(
   ws: WorkspaceInfo | null,
   loadDashboardData: (data: WorkspaceInfo) => void,
   getTurnstileToken?: () => string | undefined,
+  onTurnstileReset?: () => void,
 ): ClientAuthState & ClientAuthActions {
   const [authenticated, setAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
@@ -103,8 +104,9 @@ export function useClientAuth(
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Invalid email or password';
       setAuthError(msg);
+      onTurnstileReset?.();
     } finally { setAuthLoading(false); }
-  }, [workspaceId, ws, loginEmail, loginPassword, loadDashboardData]);
+  }, [workspaceId, ws, loginEmail, loginPassword, loadDashboardData, getTurnstileToken, onTurnstileReset]);
 
   const handleClientLogout = useCallback(async () => {
     try {

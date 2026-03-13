@@ -300,8 +300,8 @@
           "source": "Roadmap review Mar 2026",
           "est": "2-3h",
           "priority": "P0",
-          "notes": "Harden /api/public/* endpoints before marketplace launch (#119). Per-IP rate limiting (express-rate-limit tiers: 100/min general, 10/min auth, 5/min AI endpoints), bot fingerprinting, credential stuffing protection on client login. Add Cloudflare Turnstile or similar on public forms. Prerequisite for self-service distribution at scale.",
-          "status": "pending"
+          "notes": "Shipped — 5-layer public API hardening: (1) Rate limit headers (X-RateLimit-Limit/Remaining/Reset, Retry-After) on all limiters. (2) New limiters: aiLimiter 3/min on /api/admin-chat, globalPublicLimiter 200/min per IP (global key) on all /api/public/*. (3) Credential stuffing protection: per-email failed login tracking with 15-min lockout after 5 failures. (4) Cloudflare Turnstile CAPTCHA on client-login and forgot-password (optional, skips if env vars unset). TurnstileWidget component with single-use token reset. (5) Request fingerprinting: SHA-256(IP+UA+Accept-Language) logged for abuse detection. CSP updated for challenges.cloudflare.com. All backward compatible.",
+          "status": "done"
         }
       ]
     },

@@ -10,6 +10,7 @@ const SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
 
 interface TurnstileWidgetProps {
   onToken: (token: string) => void;
+  resetTrigger?: number;
 }
 
 declare global {
@@ -44,7 +45,7 @@ function loadTurnstileScript(): Promise<void> {
   });
 }
 
-export default function TurnstileWidget({ onToken }: TurnstileWidgetProps) {
+export default function TurnstileWidget({ onToken, resetTrigger }: TurnstileWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
 
@@ -76,6 +77,13 @@ export default function TurnstileWidget({ onToken }: TurnstileWidgetProps) {
       }
     };
   }, [stableOnToken]);
+
+  // Reset widget when parent increments resetTrigger (e.g. after form submission)
+  useEffect(() => {
+    if (widgetIdRef.current && window.turnstile) {
+      window.turnstile.reset(widgetIdRef.current);
+    }
+  }, [resetTrigger]);
 
   if (!SITE_KEY) return null;
 
