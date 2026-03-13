@@ -15,10 +15,10 @@ export function initSentry(): void {
     environment: process.env.NODE_ENV || 'development',
     tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.2 : 1.0,
     beforeSend(event) {
-      // Try to attach workspaceId from the request URL
+      // Try to attach workspaceId from the request URL (only match UUID-like IDs)
       const url = event.request?.url;
       if (url) {
-        const match = url.match(/\/api\/(?:public\/)?[^/]+\/([^/?]+)/);
+        const match = url.match(/\/api\/(?:public\/)?[^/]+\/([0-9a-f-]{8,})/);
         if (match) {
           event.tags = { ...event.tags, workspaceId: match[1] };
         }
