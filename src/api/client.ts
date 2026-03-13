@@ -68,9 +68,13 @@ export async function put<T>(url: string, body: unknown, signal?: AbortSignal): 
   return handleResponse<T>(res);
 }
 
-/** DELETE */
-export async function del<T = void>(url: string, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(url, { method: 'DELETE', signal });
+/** DELETE (with optional JSON body) */
+export async function del<T = void>(url: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+  const res = await fetch(url, {
+    method: 'DELETE',
+    ...(body !== undefined ? { headers: JSON_HEADERS, body: JSON.stringify(body) } : {}),
+    signal,
+  });
   return handleResponse<T>(res);
 }
 

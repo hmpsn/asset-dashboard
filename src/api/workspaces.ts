@@ -21,8 +21,8 @@ export const workspaces = {
   addSuppression: (wsId: string, check: string) =>
     post<unknown>(`/api/workspaces/${wsId}/audit-suppressions`, { check }),
 
-  removeSuppression: (wsId: string, check: string) =>
-    del(`/api/workspaces/${wsId}/audit-suppressions`, undefined),
+  removeSuppression: (wsId: string, check: string, pageSlug?: string) =>
+    del(`/api/workspaces/${wsId}/audit-suppressions`, { check, pageSlug }),
 
   // ── Client users ──────────────────────────────────────────────
   updateClientUser: (wsId: string, userId: string, body: Record<string, unknown>) =>

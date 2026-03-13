@@ -101,7 +101,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   const unsuppressIssue = async (check: string, pageSlug: string) => {
     if (!workspaceId) return;
     try {
-      const { suppressions: updated } = await del<{ suppressions: { check: string; pageSlug: string }[] }>(`/api/workspaces/${workspaceId}/audit-suppressions`);
+      const { suppressions: updated } = await del<{ suppressions: { check: string; pageSlug: string }[] }>(`/api/workspaces/${workspaceId}/audit-suppressions`, { check, pageSlug });
       setSuppressions(updated);
     } catch {}
   };

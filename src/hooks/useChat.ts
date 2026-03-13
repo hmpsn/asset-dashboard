@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { post, getOptional } from '../api/client';
+import { post, getOptional, ApiError } from '../api/client';
 import type {
   SearchOverview, PerformanceTrend, AuditSummary, AuditDetail,
   GA4Overview, GA4ConversionSummary,
@@ -176,7 +176,7 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
       try {
         data = await post<{ answer?: string; error?: string }>(`/api/public/search-chat/${ws.id}`, { question: question.trim(), context, sessionId: chatSessionId, betaMode });
       } catch (err) {
-        if (err instanceof Error && err.message.includes('429')) {
+        if (err instanceof ApiError && err.status === 429) {
           const roiMsg = roiValue && roiValue > 0
             ? ` You've already identified **$${Math.round(roiValue).toLocaleString()}** in organic traffic value this month — Growth ($249/mo) pays for itself.`
             : ' Upgrade to Growth ($249/mo) for unlimited chat access.';
