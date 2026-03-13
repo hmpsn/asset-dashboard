@@ -6,6 +6,7 @@ import {
   ArrowRight, ChevronDown, type LucideIcon,
 } from 'lucide-react';
 import { clientPath } from '../../routes';
+import { useBetaMode } from './BetaContext';
 import type {
   SearchOverview, SearchQuery, AuditSummary, AuditDetail,
   GA4Overview, GA4ConversionSummary, GA4NewVsReturning, GA4OrganicOverview,
@@ -318,6 +319,7 @@ const SENTIMENT_LABELS: Record<string, string> = {
 
 export function InsightsDigest(props: InsightsDigestProps) {
   const navigate = useNavigate();
+  const betaMode = useBetaMode();
   const insights = generateInsights(props);
   const [expanded, setExpanded] = useState(false);
 
@@ -345,7 +347,7 @@ export function InsightsDigest(props: InsightsDigestProps) {
           return (
             <button
               key={insight.id}
-              onClick={() => insight.action && navigate(clientPath(props.workspaceId, insight.action.tab))}
+              onClick={() => insight.action && navigate(clientPath(props.workspaceId, insight.action.tab, betaMode))}
               className="w-full bg-zinc-900 rounded-xl border border-zinc-800 p-4 text-left hover:border-zinc-700 transition-colors cursor-pointer group"
             >
               {/* Header */}

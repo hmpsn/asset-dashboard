@@ -5,6 +5,7 @@ import { STUDIO_NAME } from '../../constants';
 import type { Tier } from '../ui';
 import type { WorkspaceInfo, ClientTab } from './types';
 import { clientPath } from '../../routes';
+import { useBetaMode } from './BetaContext';
 
 interface PlansTabProps {
   workspaceId: string;
@@ -19,6 +20,7 @@ interface PlansTabProps {
 
 export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setToast, onOpenChat }: PlansTabProps) {
   const navigate = useNavigate();
+  const betaMode = useBetaMode();
   const tier = effectiveTier;
   const isTrial = ws.isTrial && ws.trialDaysRemaining != null && ws.trialDaysRemaining > 0;
   const [billingLoading, setBillingLoading] = useState(false);
@@ -240,7 +242,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
 
           {tier !== 'free' && (
             <div className="mt-5 text-center">
-              <button onClick={() => navigate(clientPath(workspaceId, 'content'))} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-xs text-white font-medium transition-colors">
+              <button onClick={() => navigate(clientPath(workspaceId, 'content', betaMode))} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-xs text-white font-medium transition-colors">
                 <FileText className="w-3.5 h-3.5" /> Browse Content Opportunities
               </button>
             </div>

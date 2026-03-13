@@ -156,7 +156,7 @@ export function OnboardingWizard({
               {suggestedActions.map((a, i) => (
                 <button
                   key={i}
-                  onClick={() => { onDismiss(); navigate(clientPath(workspaceId, a.tab)); }}
+                  onClick={() => { onDismiss(); navigate(clientPath(workspaceId, a.tab, betaMode)); }}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border ${a.bg} hover:scale-[1.01] transition-all text-left group`}
                 >
                   <div className={`w-8 h-8 rounded-lg bg-zinc-900/50 flex items-center justify-center flex-shrink-0`}>
@@ -191,7 +191,7 @@ export function OnboardingWizard({
             </button>
           ) : (
             <button
-              onClick={() => { onDismiss(); navigate(clientPath(workspaceId, 'overview')); }}
+              onClick={() => { onDismiss(); navigate(clientPath(workspaceId, 'overview', betaMode)); }}
               className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-sm text-white font-semibold hover:from-teal-500 hover:to-emerald-500 transition-all"
             >
               <Check className="w-3.5 h-3.5" /> Explore Dashboard

@@ -28,7 +28,8 @@ export function adminPath(workspaceId: string, tab: Page = 'home'): string {
 }
 
 /** Build a client dashboard path */
-export function clientPath(workspaceId: string, tab?: string): string {
-  if (!tab || tab === 'overview') return `/client/${workspaceId}`;
-  return `/client/${workspaceId}/${tab}`;
+export function clientPath(workspaceId: string, tab?: string, betaMode?: boolean): string {
+  const prefix = betaMode ? '/client/beta' : '/client';
+  if (!tab || tab === 'overview') return `${prefix}/${workspaceId}`;
+  return `${prefix}/${workspaceId}/${tab}`;
 }

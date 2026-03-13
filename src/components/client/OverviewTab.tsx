@@ -162,7 +162,7 @@ export function OverviewTab({
           </div>
           <div className="flex flex-wrap gap-1.5">
             {actions.map((a, i) => (
-              <button key={i} onClick={() => navigate(clientPath(workspaceId, a.tab))} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/50 transition-colors text-left">
+              <button key={i} onClick={() => navigate(clientPath(workspaceId, a.tab, betaMode))} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/50 transition-colors text-left">
                 <span className={`text-[11px] font-semibold ${a.color}`}>{a.count}</span>
                 <span className="text-[11px] text-zinc-400">{a.label.replace(/^\d+\s*/, '')}</span>
               </button>
@@ -192,7 +192,7 @@ export function OverviewTab({
             searchInsights={insights ? { lowHanging: insights.lowHanging, topPerformers: insights.topPerformers } : null}
             eventDisplayName={eventDisplayName}
             isEventPinned={isEventPinned}
-            onNavigate={(t) => navigate(clientPath(workspaceId, t))}
+            onNavigate={(t) => navigate(clientPath(workspaceId, t, betaMode))}
             workspaceId={workspaceId}
           />
         </ErrorBoundary>
@@ -267,7 +267,7 @@ export function OverviewTab({
                 ))}
               </div>
               <button
-                onClick={() => navigate(clientPath(workspaceId, 'strategy'))}
+                onClick={() => navigate(clientPath(workspaceId, 'strategy', betaMode))}
                 className="mt-2 w-full text-center px-3 py-1.5 rounded-lg bg-teal-600/15 border border-teal-500/20 text-[11px] text-teal-300 font-medium hover:bg-teal-600/25 transition-colors"
               >
                 View all {strategyData?.contentGaps?.length ?? 0} opportunities

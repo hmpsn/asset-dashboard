@@ -77,7 +77,7 @@ function ClientRoutes({ betaMode = false }: { betaMode?: boolean }) {
     const remaining = new URLSearchParams(searchParams);
     remaining.delete('tab');
     const qs = remaining.toString();
-    return <Navigate to={clientPath(workspaceId, queryTab) + (qs ? '?' + qs : '')} replace />;
+    return <Navigate to={clientPath(workspaceId, queryTab, betaMode) + (qs ? '?' + qs : '')} replace />;
   }
   const splatTab = params['*'] || undefined;
   return <ClientDashboard workspaceId={workspaceId} initialTab={splatTab} betaMode={betaMode} />;

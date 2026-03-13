@@ -137,7 +137,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     return 'overview';
   })();
   const setTab = (t: ClientTab) => {
-    clientNavigate(clientPath(workspaceId, t));
+    clientNavigate(clientPath(workspaceId, t, betaMode));
   };
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
