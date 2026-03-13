@@ -10,7 +10,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "start": "NODE_ENV=production node --import tsx server/index.ts",
-    "db:migrate": "tsx server/db/migrate-json.ts"
+    "db:migrate": "tsx server/db/migrate-json.ts",
+    "test": "vitest run",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",

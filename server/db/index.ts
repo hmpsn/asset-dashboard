@@ -56,7 +56,7 @@ export function runMigrations(): void {
     .filter(f => f.endsWith('.sql'))
     .sort(); // lexicographic order ensures 001 < 002 < ...
 
-  const insert = db.prepare('INSERT INTO _migrations (name, applied_at) VALUES (?, ?)');
+  const insert = db.prepare('INSERT OR IGNORE INTO _migrations (name, applied_at) VALUES (?, ?)');
 
   const applyMigration = db.transaction((file: string) => {
     const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf-8');

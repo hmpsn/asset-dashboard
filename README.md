@@ -1,3 +1,6 @@
+[![CI](https://github.com/hmpsn/asset-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/hmpsn/asset-dashboard/actions/workflows/ci.yml)
+[![E2E](https://github.com/hmpsn/asset-dashboard/actions/workflows/e2e.yml/badge.svg)](https://github.com/hmpsn/asset-dashboard/actions/workflows/e2e.yml)
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
