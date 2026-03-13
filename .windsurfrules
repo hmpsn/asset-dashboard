@@ -28,7 +28,7 @@ Before writing any code, orient yourself:
 Every completed task — no matter how small — must include these steps:
 
 1. **`FEATURE_AUDIT.md`** — if a new feature was added or an existing one enhanced, update it. Add new numbered entries; update "What it does" for enhancements; mark Future Additions as shipped.
-2. **`data/roadmap.json`** — change any completed items from `"pending"` → `"done"`. Add `"notes": "Shipped — [description]"`. If the work wasn't on the roadmap, add it as a done item.
+2. **`data/roadmap.json`** — change any completed items from `"pending"` → `"done"`. Add `"notes": "Shipped — [description]"`. If the work wasn't on the roadmap, add it as a done item. Then run `npx tsx scripts/sort-roadmap.ts` to auto-archive completed sprints.
 3. **`BRAND_DESIGN_LANGUAGE.md`** — if any UI colors, components, or design patterns changed, update the Per-Component Color Map (§ 4).
 4. **Build verify** — run `npx tsc --noEmit --skipLibCheck && npx vite build`.
 5. **Summarize** — tell the user what was done, what docs were updated, and what's next on the roadmap.

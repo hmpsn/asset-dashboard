@@ -1,74 +1,6 @@
 {
   "sprints": [
     {
-      "id": "sprint-launch",
-      "name": "Launch Readiness",
-      "hours": "18-26",
-      "rationale": "PRIORITY 0 — LAUNCH BLOCKER: Items that must ship before go-to-market. Stripe recurring billing is a hard blocker (can’t charge monthly without subscriptions). Email capture unlocks the growth loop. Easy wins are high-impact, low-effort polish items that improve first impressions and conversion.",
-      "items": [
-        {
-          "id": 214,
-          "title": "Stripe recurring billing for tier subscriptions",
-          "source": "Market prep analysis Mar 2026",
-          "est": "4-6h",
-          "priority": "P0",
-          "notes": "Shipped — createCheckoutSession in server/stripe.ts now detects plan_growth/plan_premium and uses mode:'subscription' with subscription_data metadata. Added webhook handlers for customer.subscription.created/updated/deleted, invoice.paid, invoice.payment_failed. Subscription lifecycle: active → sets tier + stores stripeSubscriptionId; deleted → downgrades to free; past_due → activity log warning. Added createBillingPortalSession() for Stripe Customer Portal self-service. New routes: POST /api/public/billing-portal/:wsId, POST /api/public/cancel-subscription/:wsId. PlansTab shows 'Manage Billing' button for paid subscribers. cancelSubscription() uses cancel_at_period_end for graceful cancellation.",
-          "status": "done",
-          "shippedAt": "2026-03-12"
-        },
-        {
-          "id": 215,
-          "title": "Client email capture on free tier",
-          "source": "Market prep analysis Mar 2026",
-          "est": "2-3h",
-          "priority": "P0",
-          "notes": "Shipped — After shared-password auth succeeds, ClientDashboard shows email capture gate (name + email form) before loading dashboard. Email stored via POST /api/public/capture-email/:id to workspace.portalContacts array (deduped by email). localStorage tracks captured email to skip on return visits. Skip button available (stores __skipped__ marker). Backend: portalContacts added to Workspace interface + updateWorkspace type. Captures feed into email marketing funnel for reports, trial nudges, upgrade prompts.",
-          "status": "done",
-          "shippedAt": "2026-03-12"
-        },
-        {
-          "id": 216,
-          "title": "AI chatbot upgrade prompts with ROI dollar values",
-          "source": "Market prep analysis Mar 2026",
-          "est": "1-2h",
-          "priority": "P1",
-          "notes": "Shipped — useChat hook fetches ROI data (organicTrafficValue) when chat opens. 429 rate-limit message shows '$X in organic traffic value — Growth pays for itself.' Chat-exhausted bar shows ROI-backed copy with emerald highlight. TierGate accepts optional roiValue prop and displays organic traffic value in upgrade overlays. All best-effort with silent fail if ROI data unavailable.",
-          "status": "done",
-          "shippedAt": "2026-03-12"
-        },
-        {
-          "id": 217,
-          "title": "\"Time saved\" metric on admin dashboard",
-          "source": "Market prep analysis Mar 2026",
-          "est": "2-3h",
-          "priority": "P1",
-          "notes": "Shipped — Added durationMs to TokenUsage interface, tracked in callOpenAI(). getTimeSaved() in openai-helpers.ts uses per-feature human-equivalent minute multipliers (e.g. content-brief=150min, keyword-strategy=240min, schema=60min). GET /api/ai/time-saved?workspaceId=&since= returns totalHoursSaved, operationCount, byFeature breakdown. WorkspaceOverview Command Center shows 'Hours Saved' StatCard (purple Clock icon) with monthly AI ops count. Fetches current month data on load.",
-          "status": "done",
-          "shippedAt": "2026-03-12"
-        },
-        {
-          "id": 218,
-          "title": "Pre-populate content requests from audit issues",
-          "source": "Market prep analysis Mar 2026",
-          "est": "1-2h",
-          "priority": "P1",
-          "notes": "Shipped — POST /api/public/content-request/:wsId/from-audit endpoint in public-content.ts. Accepts pageSlug, pageName, issues, wordCount. Auto-enriches with top 5 GSC keywords for the page + keyword strategy target keyword. Creates content request with rich rationale (issues, word count, keywords). HealthTab.tsx shows 'Request Content Improvement' button on expanded pages with content-related issues (thin content, heading, h1). Button → creates request → toast → WebSocket auto-refreshes Content tab.",
-          "status": "done",
-          "shippedAt": "2026-03-12"
-        },
-        {
-          "id": 219,
-          "title": "Client portal favicon + OG meta tags",
-          "source": "Market prep analysis Mar 2026",
-          "est": "30m",
-          "priority": "P1",
-          "notes": "Shipped — ClientDashboard.tsx dynamically updates document head when workspace loads: og:title, og:description, og:type, og:url, twitter:title, twitter:description, twitter:card, meta description. brandLogoUrl sets og:image, twitter:image, and dynamic favicon (SVG or PNG). Added brandLogoUrl and brandAccentColor to WorkspaceInfo type.",
-          "status": "done",
-          "shippedAt": "2026-03-12"
-        }
-      ]
-    },
-    {
       "id": "sprint-infra",
       "name": "Infrastructure & Reliability",
       "hours": "22-32",
@@ -159,263 +91,6 @@
           "notes": "Shipped — Path traversal fix in moveUploadedFiles (middleware.ts). Removed duplicate Stripe webhook route that could bypass signature verification.",
           "status": "done",
           "shippedAt": "2026-03-11"
-        }
-      ]
-    },
-    {
-      "id": "sprint-B",
-      "name": "Client Impact & Retention",
-      "hours": "21-27",
-      "rationale": "PRIORITY 2 — COMPETITIVE MOAT: Make existing clients see undeniable value. SEO change impact tracking is the hardest thing for competitors to replicate. Shareable reports reduce churn by reaching budget-holders. Content refresh engine justifies ongoing subscriptions.",
-      "items": [
-        {
-          "id": 74,
-          "title": "ROI dashboard (Growth+)",
-          "source": "MONETIZATION.md ROI Spec",
-          "est": "3-4h",
-          "priority": "P0",
-          "notes": "Shipped — Organic traffic value (GSC clicks × CPC), ad spend equivalent, page breakdown table. GET /api/public/roi/:wsId. Growth+ only tab.",
-          "status": "done",
-          "shippedAt": "2026-03"
-        },
-        {
-          "id": 88,
-          "title": "Self-service tier upgrade via Stripe",
-          "source": "MONETIZATION.md Phase 3",
-          "est": "3-4h",
-          "priority": "P0",
-          "notes": "Shipped — plan_growth/plan_premium product types, Stripe Checkout for tier upgrades, webhook auto-upgrades tier, all mailto links replaced. Fixed: tier changes now broadcast workspace:updated via WebSocket so client dashboards update in real-time without page refresh.",
-          "status": "done",
-          "shippedAt": "2026-03"
-        },
-        {
-          "id": 75,
-          "title": "Churn prevention signals",
-          "source": "MONETIZATION.md Churn Spec",
-          "est": "2-3h",
-          "priority": "P0",
-          "notes": "Shipped — 6h scheduler: no-login-14d, chat-dropoff, no-requests-30d, health-drop, trial-ending, payment-failed, high-engagement. Admin API: list, per-ws, dismiss.",
-          "status": "done",
-          "shippedAt": "2026-03"
-        },
-        {
-          "id": 77,
-          "title": "Usage tracking + limits",
-          "source": "MONETIZATION.md Phase 4",
-          "est": "2-3h",
-          "priority": "P1",
-          "notes": "Shipped — server/usage-tracking.ts: per-workspace monthly counters for ai_chats, content_briefs, strategy_generations. Per-tier limits (free: 3/1/0, growth: 50/10/3, premium: unlimited). checkUsageLimit + incrementUsage wired into strategy gen, brief gen (both endpoints), and client chat. Unified GET /api/public/usage/:wsId endpoint. 429 responses with upgrade prompts.",
-          "status": "done",
-          "shippedAt": "2026-03"
-        },
-        {
-          "id": 104,
-          "title": "Production Stripe keys (live payments)",
-          "source": "PRODUCT_ROADMAP Month 1",
-          "est": "1-2h",
-          "priority": "P0",
-          "notes": "Shipped — stripe-config.ts: AES-256-GCM encrypted on-disk persistence for Stripe keys + product Price IDs. StripeSettings.tsx admin UI for key management. clearTestModeCustomerIds() auto-cleans on startup when using live keys. Webhook handler production-ready.",
-          "status": "done",
-          "shippedAt": "2026-03"
-        },
-        {
-          "id": 173,
-          "title": "Real-time tier sync to client dashboard",
-          "source": "BUG_FIX",
-          "est": "1h",
-          "priority": "P0",
-          "notes": "Shipped — Admin workspace updates and Stripe tier upgrades were not propagating to client dashboards in real-time. Fix: broadcastToWorkspace for admin update + initStripeBroadcast for Stripe webhooks + workspace:updated handler in ClientDashboard.tsx.",
-          "status": "done",
-          "shippedAt": "2026-03"
-        },
-        {
-          "id": 174,
-          "title": "ROI month-over-month growth tracking",
-          "source": "Platform Audit Mar 2026",
-          "est": "2h",
-          "priority": "P0",
-          "notes": "Shipped — roi.ts: ROI history snapshots saved to data/roi-history/, loadHistory/saveSnapshot/computeGrowthPercent compares current value to ~30-day-old snapshot (15-45 day window). ROIDashboard.tsx: third hero card now shows MoM growth % (teal for positive, amber for negative) with fallback to Pages Tracked when no history exists yet.",
-          "status": "done",
-          "shippedAt": "2026-03"
-        },
-        {
-          "id": 115,
-          "title": "SEO change impact tracking",
-          "source": "FEATURE_VISION #10",
-          "est": "6-8h",
-          "priority": "P0",
-          "notes": "Shipped — Implemented as SEO Change Performance Tracker (roadmap #231). server/seo-change-tracker.ts records every SEO/schema change with timestamp, compares GSC before/after (28-day windows with 3-day delay). SeoChangeImpact.tsx on Workspace Home shows changes + 'Compare GSC Impact' button with delta badges (clicks, impressions, CTR, position). Hooked into all update flows: editor, bulk-fix, approvals, jobs, schema publish, CMS template publish.",
-          "status": "done",
-          "shippedAt": "2026-03-12"
-        },
-        {
-          "id": 113,
-          "title": "Shareable client reports",
-          "source": "FEATURE_VISION #8",
-          "est": "4-6h",
-          "priority": "P0",
-          "notes": "Shipped — Monthly report persistence (saveMonthlyReport/listSavedReports/getSavedReport in monthly-report.ts). Public permalink route /report/monthly/:id. Unified report listing API /api/public/reports/:workspaceId (audit + monthly combined). Share Report dropdown in HealthTab with copy-link and open-in-new-tab per report. Reports saved on both manual trigger and auto-send.",
-          "status": "done",
-          "shippedAt": "2026-03-12"
-        },
-        {
-          "id": 175,
-          "title": "Content published email notification",
-          "source": "Platform Audit Mar 2026",
-          "est": "1h",
-          "priority": "P0",
-          "notes": "Shipped — content_published EmailEventType + renderContentPublished template in email-templates.ts. notifyClientContentPublished in email.ts. Wired into PATCH /api/content-requests/:wsId/:id when status='published'. Branded email with topic, target keyword, and dashboard CTA.",
-          "status": "done",
-          "shippedAt": "2026-03"
-        },
-        {
-          "id": 114,
-          "title": "Content refresh / decay engine",
-          "source": "FEATURE_VISION #9",
-          "est": "4-5h",
-          "priority": "P1",
-          "notes": "Shipped — content-decay.ts: analyzeContentDecay compares current 30d vs previous 30d GSC data, flags pages with >10% click decline. Severity tiers: critical (>50%), warning (>30%), watch (>10%). AI refresh recommendations via GPT-4.1-mini per decaying page. Admin UI: ContentDecay.tsx lazy-loaded sub-tab in SeoAudit with summary cards, severity filters, expandable page details, AI recommendation display. Routes: POST /api/content-decay/:wsId/analyze, GET cached, POST recommendations. Public endpoint for client dashboard.",
-          "status": "done",
-          "shippedAt": "2026-03-12"
-        },
-        {
-          "id": 176,
-          "title": "Work order real-time broadcast",
-          "source": "Platform Audit Mar 2026",
-          "est": "30m",
-          "priority": "P0",
-          "notes": "Shipped — broadcastToWorkspace(wsId, 'work-order:update', ...) added to PATCH /api/work-orders/:wsId/:orderId. WORK_ORDER_UPDATE added to ws-events.ts registry. Client dashboard now receives real-time work order status updates.",
-          "status": "done",
-          "shippedAt": "2026-03"
-        },
-        {
-          "id": 196,
-          "title": "Server refactor: index.ts → 48 route modules",
-          "source": "Architecture debt",
-          "est": "4-6h",
-          "priority": "P0",
-          "notes": "Shipped — Split server/index.ts from ~8,300 lines into ~450 lines + 48 Express Router files in server/routes/ + 3 shared modules (broadcast.ts, helpers.ts, middleware.ts). Each route file owns one domain. Zero endpoint changes — pure refactor. Initial split was 38 files; decompose-monoliths PR added 10 more (webflow-alt-text, webflow-audit, webflow-cms, webflow-keywords, webflow-organize, webflow-analysis, webflow-pagespeed, webflow-schema, webflow-seo, content-decay).",
-          "status": "done",
-          "shippedAt": "2026-03-11"
-        },
-        {
-          "id": 198,
-          "title": "AI Context Completeness Indicator",
-          "source": "AI audit Mar 2026",
-          "est": "1-2h",
-          "priority": "P1",
-          "notes": "Shipped — server/ai-context-check.ts checks 8 AI data sources (Webflow, GSC, GA4, Knowledge Base, Brand Voice, Personas, Keyword Strategy, SEMRush) per workspace. GET /api/ai/context/:workspaceId returns score, connected/total, per-source status + detail + fix actions. AIContextIndicator.tsx reusable UI component with expandable detail, feature filtering, navigation links. Wired into ContentBriefs + KeywordStrategy.",
-          "status": "done",
-          "shippedAt": "2026-03-11"
-        },
-        {
-          "id": 197,
-          "title": "AI context enrichment audit",
-          "source": "AI audit Mar 2026",
-          "est": "1-2h",
-          "priority": "P1",
-          "notes": "Shipped — Full audit of all AI-powered features for context completeness. Fixes: (1) content-brief.ts persists real SERP data (PAA + top results) on briefs. (2) keyword-strategy.ts master synthesis receives knowledge base for better content gap alignment. (3) Client chat receives structured SEO context (keyword strategy + brand voice + keyword map) matching admin chat. (4) internal-links.ts receives knowledge base for better anchor text.",
-          "status": "done",
-          "shippedAt": "2026-03-11"
-        },
-        {
-          "id": 190,
-          "title": "Beta client feedback & bug submission",
-          "source": "Product idea Mar 2026",
-          "est": "2-3h",
-          "priority": "P1",
-          "notes": "Shipped — Floating feedback widget (bottom-left, client portal). Bug/feature/general types with auto-context capture. Per-workspace disk storage. Admin Command Center feed with status workflow + threaded replies. Email notification + activity log on submission. WebSocket broadcast for real-time updates.",
-          "status": "done"
-        },
-        {
-          "id": 191,
-          "title": "Contextual SEO explainers (tooltips + glossary)",
-          "source": "Product idea Mar 2026",
-          "est": "2-3h",
-          "priority": "P1",
-          "notes": "Shipped — SeoGlossary.tsx: 25-term glossary map (CTR, impressions, clicks, position, bounce rate, engagement rate, site health, meta title/description, keyword difficulty, search volume, organic traffic, backlinks, indexing, schema, canonical, redirect, crawling, content gap, quick win, ROI, sessions, pageviews, conversions). Reusable <Explainer term='ctr' /> component: click-to-expand popover with definition, why it matters, benchmarks. Wired into OverviewTab stat cards (Search Clicks, Impressions, Site Health, Avg Position) and SearchTab (Search Health Summary CTR label, all data table column headers). Phase 2 TODO: contextual tips using actual workspace data.",
-          "status": "done",
-          "shippedAt": "2026-03-10"
-        },
-        {
-          "id": 192,
-          "title": "AI chatbot SEO tutor mode",
-          "source": "Product idea Mar 2026",
-          "est": "1-2h",
-          "priority": "P1",
-          "notes": "Shipped — SEO EDUCATOR MODE section added to client chatbot system prompt in server/index.ts: plain-English explanations first, then connect to client's actual data with benchmarks, use simple analogies, never condescending. LEARN_SEO_QUESTIONS array in types.ts: 5 educational quick questions ('Explain my site health score', 'What is CTR and why does it matter', 'What are impressions vs clicks', 'How does SEO help my business', 'What is a keyword strategy'). Wired into: OverviewTab sidebar 'New to SEO?' section, ClientDashboard chat empty state, and chat follow-up suggestions after proactive greeting. Emerald-colored 💡 buttons distinguish educational questions from data questions.",
-          "status": "done",
-          "shippedAt": "2026-03-10"
-        },
-        {
-          "id": 194,
-          "title": "AI blog post generator (brief → full post)",
-          "source": "Product idea Mar 2026",
-          "est": "3-5h",
-          "priority": "P0",
-          "notes": "Shipped — content-posts.ts: section-by-section generation with page-type-specific writer roles (blog, landing, service, location, product, pillar, resource). Full context per section: brand voice, keyword strategy, E-E-A-T, SERP analysis, internal link suggestions. Post-generation unification pass (unifyPost) smooths transitions, removes cross-section repetition, ensures consistent voice, and trims word count to brief target when over budget. GPT-4.1 at temp 0.4 for editorial refinement. Admin Content Manager tab (ContentManager.tsx) for reviewing/managing all generated posts with status workflow (draft→review→approved), search/sort, and inline PostEditor. SEMRush graceful error handling: getRelatedKeywords/getDomainOrganic return [] instead of throwing on NOTHING FOUND. Audit fixes (Mar 10): fixed duplicate post bug, word count budgets, maxTokens tuning, SERP override, unification trimming, dynamic maxTokens, unificationStatus tracking, previous section context 600→1200 chars. HTML output (Mar 10): clean HTML generation, SEO meta generation step, PostEditor HTML rendering. Content quality engine v5 (Mar 10): WRITING_QUALITY_RULES — forbidden phrases (AI clichés, corporate buzzwords, hollow intensifiers, vague attribution, Let's+verb, Ready to+verb), structural anti-patterns, fabrication rules (no invented stats, directional case study outcomes), anchor text accuracy, mandatory H3 subheadings for 200+ word sections. Brief-level rules: H3 subheadings in outline schema, case study anonymity, FAQ word budget (150+ words), industry diversity (max 2 sections per industry), section count (5-7 for blogs), buzzword bans, reader-perspective executive summary, single-slash internal link paths. Full sitemap via getAllSitePages helper (Webflow API + CMS sitemap pages) for comprehensive internal link suggestions. Internal links use workspace liveDomain for correct URLs.",
-          "status": "done",
-          "shippedAt": "2026-03-10"
-        },
-        {
-          "id": 200,
-          "title": "Admin sidebar restructure + request widget",
-          "source": "UX cleanup Mar 2026",
-          "est": "3-4h",
-          "priority": "P0",
-          "notes": "Shipped — Reorganized admin sidebar from 4 groups/18 items to 4 groups/14 items. New structure: ANALYTICS (Search Console, GA, Rank Tracker, Annotations), SITE HEALTH (Site Audit, Performance, Links [merged Redirects+Internal Links], Assets), SEO (Brand & AI [moved to top], Strategy, Editor, Schema), CONTENT (Content Briefs, Content, Content Performance). Removed Competitors tab from sidebar (component retained, future competitive intelligence will live in Strategy per #199). Moved Requests to header bar as badge widget alongside NotificationBell. Merged Redirects + Internal Links into single Links tab with sub-tabs.",
-          "status": "done",
-          "shippedAt": "2026-03-11"
-        },
-        {
-          "id": 205,
-          "title": "Sidebar group colored icons + visual polish",
-          "source": "UX polish Mar 2026",
-          "est": "30m",
-          "priority": "P1",
-          "notes": "Shipped — Added colored lucide icons to sidebar group headers: Activity (blue) for ANALYTICS, Shield (emerald) for SITE HEALTH, Zap (teal) for SEO, BookOpen (amber) for CONTENT. Hover opacity transition, moved chevron to right side, increased padding for visual weight.",
-          "status": "done",
-          "shippedAt": "2026-03-11"
-        },
-        {
-          "id": 206,
-          "title": "Roadmap shipping velocity chart + sprint restructure",
-          "source": "Product management Mar 2026",
-          "est": "2-3h",
-          "priority": "P1",
-          "notes": "Shipped — (1) SVG shipping velocity chart in Roadmap.tsx showing cumulative features shipped per month with teal gradient area chart. (2) Full roadmap restructure: renamed Sprint B → Client Impact & Retention, Sprint C → Content Pipeline Completion, Sprint D → Self-Service & Distribution. Created 3 new sprints: Sprint E (Admin Polish & DX), Sprint F (SEO Intelligence Expansion), Sprint G (Team & Collaboration). Added 4 new items: #201 brief regeneration, #202 client brief export, #203 brand docs upload UI, #204 bulk SEO editor operations. Trimmed backlog from 30+ unsorted items to 24 organized items.",
-          "status": "done",
-          "shippedAt": "2026-03-11"
-        },
-        {
-          "id": 179,
-          "title": "Not Yet Ranking action plan in Strategy tab",
-          "source": "UX Narrative Audit Mar 2026",
-          "est": "4-6h",
-          "priority": "P1",
-          "notes": "Shipped — Expandable 'Not Yet Ranking' section in StrategyTab between Content Opportunities and Quick Wins. Per-page breakdown of unranked pages (no currentPosition in pageMap). Diagnosis engine: near-ranking (has impressions), high KD, moderate KD, or likely not indexed/thin content. Priority sorting: commercial/transactional intent first, pages with impressions above zero-impression, lower KD more fixable. Each page expandable with: diagnosis reasons, GSC metrics (impressions, clicks), keyword metrics (volume, KD%), recommended action with icon, 'Get Content Brief' CTA with pricing. Red gradient card with AlertTriangle icon, collapsible by default.",
-          "status": "done",
-          "shippedAt": "2026-03-12"
-        },
-        {
-          "id": 207,
-          "title": "Client audit completion email notification",
-          "source": "Roadmap review Mar 2026",
-          "est": "1-2h",
-          "priority": "P1",
-          "notes": "Shipped — audit_complete EmailEventType + renderAuditComplete template in email-templates.ts. Shows site health score, score delta (improved/declined), top 3 remaining issues by severity, fixed issues count (compared to previous snapshot via getLatestSnapshotBefore). notifyClientAuditComplete in email.ts. Wired into both manual audit (jobs.ts) and scheduled audit (scheduled-audits.ts) completion flows. CTA links to Health tab.",
-          "status": "done",
-          "shippedAt": "2026-03-12"
-        },
-        {
-          "id": 260,
-          "title": "Client path-based routing migration (Devin)",
-          "source": "Devin PR #17",
-          "est": "2-3h",
-          "priority": "P1",
-          "notes": "Shipped — Migrated client portal from query-param routing (?tab=X) to path-based routing (/client/:workspaceId/:tab?). Backward-compatible redirect from old ?tab=X URLs. Cleaner URLs, better analytics tracking, SEO-friendly.",
-          "status": "done",
-          "shippedAt": "2026-03-13"
         }
       ]
     },
@@ -916,8 +591,559 @@
       ]
     },
     {
+      "id": "backlog",
+      "name": "Backlog",
+      "hours": "80+",
+      "rationale": "Revisit quarterly. Prioritize when a specific client need, revenue opportunity, or scale threshold justifies it.",
+      "items": [
+        {
+          "id": 76,
+          "title": "Strategy & implementation hours system",
+          "source": "Tier audit discussion",
+          "est": "4-6h",
+          "priority": "P3",
+          "notes": "Premium includes 3 strategy & implementation hrs/mo. Defer until premium tier has more subscribers.",
+          "status": "pending"
+        },
+        {
+          "id": 26,
+          "title": "Webhook / Zapier triggers",
+          "source": "ACTION_PLAN",
+          "est": "3-4h",
+          "priority": "P3",
+          "notes": "Fire webhooks on key events. Enables automation integrations.",
+          "status": "pending"
+        },
+        {
+          "id": 52,
+          "title": "Responsive mobile layout",
+          "source": "FEATURE_AUDIT",
+          "est": "4-6h",
+          "priority": "P3",
+          "notes": "Sidebar → bottom nav, stacked cards on small screens.",
+          "status": "pending"
+        },
+        {
+          "id": 32,
+          "title": "Shared notes / wiki per workspace",
+          "source": "ACTION_PLAN",
+          "est": "2-3h",
+          "priority": "P3",
+          "notes": "Team-internal notes about a client.",
+          "status": "pending"
+        },
+        {
+          "id": 34,
+          "title": "Client NPS survey",
+          "source": "ACTION_PLAN",
+          "est": "2h",
+          "priority": "P3",
+          "notes": "Periodic in-dashboard satisfaction survey.",
+          "status": "pending"
+        },
+        {
+          "id": 38,
+          "title": "Schema auto-schedule",
+          "source": "FEATURE_AUDIT",
+          "est": "2-3h",
+          "priority": "P3",
+          "notes": "Re-generate schemas on cadence, flag stale pages.",
+          "status": "pending"
+        },
+        {
+          "id": 41,
+          "title": "Historical redirect comparison",
+          "source": "FEATURE_AUDIT",
+          "est": "2-3h",
+          "priority": "P3",
+          "notes": "Track redirect status over time, detect new 404s.",
+          "status": "pending"
+        },
+        {
+          "id": 42,
+          "title": "Full-site PageSpeed scan",
+          "source": "FEATURE_AUDIT",
+          "est": "3-4h",
+          "priority": "P3",
+          "notes": "Multi-page PSI scan as background job.",
+          "status": "pending"
+        },
+        {
+          "id": 43,
+          "title": "Accessibility audit expansion",
+          "source": "FEATURE_AUDIT",
+          "est": "3-4h",
+          "priority": "P3",
+          "notes": "WCAG contrast, ARIA, heading order, form labels.",
+          "status": "pending"
+        },
+        {
+          "id": 44,
+          "title": "WCAG AA full compliance",
+          "source": "FEATURE_AUDIT",
+          "est": "3-4h",
+          "priority": "P3",
+          "notes": "Focus indicators, keyboard nav for all interactive elements.",
+          "status": "pending"
+        },
+        {
+          "id": 90,
+          "title": "Schema generator → gpt-4o upgrade",
+          "source": "FEATURE_AUDIT",
+          "est": "15m",
+          "priority": "P3",
+          "notes": "CONDITIONAL: Blocked by 30K TPM limit.",
+          "status": "pending"
+        },
+        {
+          "id": 45,
+          "title": "GSC: URL Inspection API",
+          "source": "Memory/Roadmap",
+          "est": "3-4h",
+          "priority": "P4",
+          "notes": "Per-URL indexing status, crawl info.",
+          "status": "pending"
+        },
+        {
+          "id": 46,
+          "title": "GA4: Exit pages + attribution",
+          "source": "Memory/Roadmap",
+          "est": "3-4h",
+          "priority": "P4",
+          "notes": "Advanced analytics.",
+          "status": "pending"
+        },
+        {
+          "id": 47,
+          "title": "Webflow Enterprise API: 301 redirects",
+          "source": "FEATURE_AUDIT",
+          "est": "1-2h",
+          "priority": "P4",
+          "notes": "Push rules via API (Enterprise-only).",
+          "status": "pending"
+        },
+        {
+          "id": 48,
+          "title": "Sales report: branded PDF export",
+          "source": "FEATURE_AUDIT",
+          "est": "3-4h",
+          "priority": "P4",
+          "notes": "Downloadable prospect reports with agency branding.",
+          "status": "pending"
+        },
+        {
+          "id": 49,
+          "title": "Sales report: email delivery",
+          "source": "FEATURE_AUDIT",
+          "est": "2h",
+          "priority": "P4",
+          "notes": "Send reports directly to prospects.",
+          "status": "pending"
+        },
+        {
+          "id": 89,
+          "title": "Sales report: CRM integration",
+          "source": "FEATURE_AUDIT",
+          "est": "3-4h",
+          "priority": "P4",
+          "notes": "Push prospect data to HubSpot/Pipedrive.",
+          "status": "pending"
+        },
+        {
+          "id": 108,
+          "title": "Predictive SEO & trend forecasting",
+          "source": "FEATURE_VISION #3",
+          "est": "8-12h",
+          "priority": "P4",
+          "notes": "Historical GSC data + Google Trends API + seasonal patterns → predict growing keywords 30-90 days out.",
+          "status": "pending"
+        },
+        {
+          "id": 109,
+          "title": "Cross-client benchmarking network",
+          "source": "FEATURE_VISION #4",
+          "est": "6-8h",
+          "priority": "P4",
+          "notes": "Anonymized benchmarks across all clients. Needs 20+ active clients.",
+          "status": "pending"
+        },
+        {
+          "id": 110,
+          "title": "Backlink intelligence & outreach",
+          "source": "FEATURE_VISION #5",
+          "est": "10-15h",
+          "priority": "P2",
+          "notes": "Ahrefs/Moz API → backlink profile → link gaps → AI outreach templates. Elevated from P3 — backlinks are a top-3 ranking factor and this capability justifies premium pricing. Lightweight overview (#213) ships first in Sprint F; this is the full-featured follow-up.",
+          "status": "pending"
+        },
+        {
+          "id": 112,
+          "title": "Local SEO module",
+          "source": "FEATURE_VISION #7",
+          "est": "15-20h",
+          "priority": "P4",
+          "notes": "GBP integration, local keyword tracking, citation monitoring. Add-on $99-149/mo.",
+          "status": "pending"
+        },
+        {
+          "id": 116,
+          "title": "AI strategy memory & learning",
+          "source": "FEATURE_VISION #11",
+          "est": "8-12h",
+          "priority": "P3",
+          "notes": "AI learns from conversations, approved changes, rejected suggestions. Proprietary knowledge asset.",
+          "status": "pending"
+        },
+        {
+          "id": 118,
+          "title": "WordPress / Shopify support",
+          "source": "FEATURE_VISION #13",
+          "est": "15-20h",
+          "priority": "P4",
+          "notes": "Abstract CMS integration layer. Only after Webflow PMF proven.",
+          "status": "pending"
+        },
+        {
+          "id": 120,
+          "title": "Embeddable SEO widgets",
+          "source": "FEATURE_VISION #15",
+          "est": "4-6h",
+          "priority": "P4",
+          "notes": "Embeddable site health badge, traffic counter. Passive referral generation.",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "sprint-B",
+      "name": "✅ SHIPPED — Client Impact & Retention",
+      "hours": "21-27",
+      "rationale": "PRIORITY 2 — COMPETITIVE MOAT: Make existing clients see undeniable value. SEO change impact tracking is the hardest thing for competitors to replicate. Shareable reports reduce churn by reaching budget-holders. Content refresh engine justifies ongoing subscriptions.",
+      "items": [
+        {
+          "id": 74,
+          "title": "ROI dashboard (Growth+)",
+          "source": "MONETIZATION.md ROI Spec",
+          "est": "3-4h",
+          "priority": "P0",
+          "notes": "Shipped — Organic traffic value (GSC clicks × CPC), ad spend equivalent, page breakdown table. GET /api/public/roi/:wsId. Growth+ only tab.",
+          "status": "done",
+          "shippedAt": "2026-03"
+        },
+        {
+          "id": 88,
+          "title": "Self-service tier upgrade via Stripe",
+          "source": "MONETIZATION.md Phase 3",
+          "est": "3-4h",
+          "priority": "P0",
+          "notes": "Shipped — plan_growth/plan_premium product types, Stripe Checkout for tier upgrades, webhook auto-upgrades tier, all mailto links replaced. Fixed: tier changes now broadcast workspace:updated via WebSocket so client dashboards update in real-time without page refresh.",
+          "status": "done",
+          "shippedAt": "2026-03"
+        },
+        {
+          "id": 75,
+          "title": "Churn prevention signals",
+          "source": "MONETIZATION.md Churn Spec",
+          "est": "2-3h",
+          "priority": "P0",
+          "notes": "Shipped — 6h scheduler: no-login-14d, chat-dropoff, no-requests-30d, health-drop, trial-ending, payment-failed, high-engagement. Admin API: list, per-ws, dismiss.",
+          "status": "done",
+          "shippedAt": "2026-03"
+        },
+        {
+          "id": 77,
+          "title": "Usage tracking + limits",
+          "source": "MONETIZATION.md Phase 4",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — server/usage-tracking.ts: per-workspace monthly counters for ai_chats, content_briefs, strategy_generations. Per-tier limits (free: 3/1/0, growth: 50/10/3, premium: unlimited). checkUsageLimit + incrementUsage wired into strategy gen, brief gen (both endpoints), and client chat. Unified GET /api/public/usage/:wsId endpoint. 429 responses with upgrade prompts.",
+          "status": "done",
+          "shippedAt": "2026-03"
+        },
+        {
+          "id": 104,
+          "title": "Production Stripe keys (live payments)",
+          "source": "PRODUCT_ROADMAP Month 1",
+          "est": "1-2h",
+          "priority": "P0",
+          "notes": "Shipped — stripe-config.ts: AES-256-GCM encrypted on-disk persistence for Stripe keys + product Price IDs. StripeSettings.tsx admin UI for key management. clearTestModeCustomerIds() auto-cleans on startup when using live keys. Webhook handler production-ready.",
+          "status": "done",
+          "shippedAt": "2026-03"
+        },
+        {
+          "id": 173,
+          "title": "Real-time tier sync to client dashboard",
+          "source": "BUG_FIX",
+          "est": "1h",
+          "priority": "P0",
+          "notes": "Shipped — Admin workspace updates and Stripe tier upgrades were not propagating to client dashboards in real-time. Fix: broadcastToWorkspace for admin update + initStripeBroadcast for Stripe webhooks + workspace:updated handler in ClientDashboard.tsx.",
+          "status": "done",
+          "shippedAt": "2026-03"
+        },
+        {
+          "id": 174,
+          "title": "ROI month-over-month growth tracking",
+          "source": "Platform Audit Mar 2026",
+          "est": "2h",
+          "priority": "P0",
+          "notes": "Shipped — roi.ts: ROI history snapshots saved to data/roi-history/, loadHistory/saveSnapshot/computeGrowthPercent compares current value to ~30-day-old snapshot (15-45 day window). ROIDashboard.tsx: third hero card now shows MoM growth % (teal for positive, amber for negative) with fallback to Pages Tracked when no history exists yet.",
+          "status": "done",
+          "shippedAt": "2026-03"
+        },
+        {
+          "id": 115,
+          "title": "SEO change impact tracking",
+          "source": "FEATURE_VISION #10",
+          "est": "6-8h",
+          "priority": "P0",
+          "notes": "Shipped — Implemented as SEO Change Performance Tracker (roadmap #231). server/seo-change-tracker.ts records every SEO/schema change with timestamp, compares GSC before/after (28-day windows with 3-day delay). SeoChangeImpact.tsx on Workspace Home shows changes + 'Compare GSC Impact' button with delta badges (clicks, impressions, CTR, position). Hooked into all update flows: editor, bulk-fix, approvals, jobs, schema publish, CMS template publish.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 113,
+          "title": "Shareable client reports",
+          "source": "FEATURE_VISION #8",
+          "est": "4-6h",
+          "priority": "P0",
+          "notes": "Shipped — Monthly report persistence (saveMonthlyReport/listSavedReports/getSavedReport in monthly-report.ts). Public permalink route /report/monthly/:id. Unified report listing API /api/public/reports/:workspaceId (audit + monthly combined). Share Report dropdown in HealthTab with copy-link and open-in-new-tab per report. Reports saved on both manual trigger and auto-send.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 175,
+          "title": "Content published email notification",
+          "source": "Platform Audit Mar 2026",
+          "est": "1h",
+          "priority": "P0",
+          "notes": "Shipped — content_published EmailEventType + renderContentPublished template in email-templates.ts. notifyClientContentPublished in email.ts. Wired into PATCH /api/content-requests/:wsId/:id when status='published'. Branded email with topic, target keyword, and dashboard CTA.",
+          "status": "done",
+          "shippedAt": "2026-03"
+        },
+        {
+          "id": 114,
+          "title": "Content refresh / decay engine",
+          "source": "FEATURE_VISION #9",
+          "est": "4-5h",
+          "priority": "P1",
+          "notes": "Shipped — content-decay.ts: analyzeContentDecay compares current 30d vs previous 30d GSC data, flags pages with >10% click decline. Severity tiers: critical (>50%), warning (>30%), watch (>10%). AI refresh recommendations via GPT-4.1-mini per decaying page. Admin UI: ContentDecay.tsx lazy-loaded sub-tab in SeoAudit with summary cards, severity filters, expandable page details, AI recommendation display. Routes: POST /api/content-decay/:wsId/analyze, GET cached, POST recommendations. Public endpoint for client dashboard.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 176,
+          "title": "Work order real-time broadcast",
+          "source": "Platform Audit Mar 2026",
+          "est": "30m",
+          "priority": "P0",
+          "notes": "Shipped — broadcastToWorkspace(wsId, 'work-order:update', ...) added to PATCH /api/work-orders/:wsId/:orderId. WORK_ORDER_UPDATE added to ws-events.ts registry. Client dashboard now receives real-time work order status updates.",
+          "status": "done",
+          "shippedAt": "2026-03"
+        },
+        {
+          "id": 196,
+          "title": "Server refactor: index.ts → 48 route modules",
+          "source": "Architecture debt",
+          "est": "4-6h",
+          "priority": "P0",
+          "notes": "Shipped — Split server/index.ts from ~8,300 lines into ~450 lines + 48 Express Router files in server/routes/ + 3 shared modules (broadcast.ts, helpers.ts, middleware.ts). Each route file owns one domain. Zero endpoint changes — pure refactor. Initial split was 38 files; decompose-monoliths PR added 10 more (webflow-alt-text, webflow-audit, webflow-cms, webflow-keywords, webflow-organize, webflow-analysis, webflow-pagespeed, webflow-schema, webflow-seo, content-decay).",
+          "status": "done",
+          "shippedAt": "2026-03-11"
+        },
+        {
+          "id": 198,
+          "title": "AI Context Completeness Indicator",
+          "source": "AI audit Mar 2026",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped — server/ai-context-check.ts checks 8 AI data sources (Webflow, GSC, GA4, Knowledge Base, Brand Voice, Personas, Keyword Strategy, SEMRush) per workspace. GET /api/ai/context/:workspaceId returns score, connected/total, per-source status + detail + fix actions. AIContextIndicator.tsx reusable UI component with expandable detail, feature filtering, navigation links. Wired into ContentBriefs + KeywordStrategy.",
+          "status": "done",
+          "shippedAt": "2026-03-11"
+        },
+        {
+          "id": 197,
+          "title": "AI context enrichment audit",
+          "source": "AI audit Mar 2026",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped — Full audit of all AI-powered features for context completeness. Fixes: (1) content-brief.ts persists real SERP data (PAA + top results) on briefs. (2) keyword-strategy.ts master synthesis receives knowledge base for better content gap alignment. (3) Client chat receives structured SEO context (keyword strategy + brand voice + keyword map) matching admin chat. (4) internal-links.ts receives knowledge base for better anchor text.",
+          "status": "done",
+          "shippedAt": "2026-03-11"
+        },
+        {
+          "id": 190,
+          "title": "Beta client feedback & bug submission",
+          "source": "Product idea Mar 2026",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — Floating feedback widget (bottom-left, client portal). Bug/feature/general types with auto-context capture. Per-workspace disk storage. Admin Command Center feed with status workflow + threaded replies. Email notification + activity log on submission. WebSocket broadcast for real-time updates.",
+          "status": "done"
+        },
+        {
+          "id": 191,
+          "title": "Contextual SEO explainers (tooltips + glossary)",
+          "source": "Product idea Mar 2026",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — SeoGlossary.tsx: 25-term glossary map (CTR, impressions, clicks, position, bounce rate, engagement rate, site health, meta title/description, keyword difficulty, search volume, organic traffic, backlinks, indexing, schema, canonical, redirect, crawling, content gap, quick win, ROI, sessions, pageviews, conversions). Reusable <Explainer term='ctr' /> component: click-to-expand popover with definition, why it matters, benchmarks. Wired into OverviewTab stat cards (Search Clicks, Impressions, Site Health, Avg Position) and SearchTab (Search Health Summary CTR label, all data table column headers). Phase 2 TODO: contextual tips using actual workspace data.",
+          "status": "done",
+          "shippedAt": "2026-03-10"
+        },
+        {
+          "id": 192,
+          "title": "AI chatbot SEO tutor mode",
+          "source": "Product idea Mar 2026",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped — SEO EDUCATOR MODE section added to client chatbot system prompt in server/index.ts: plain-English explanations first, then connect to client's actual data with benchmarks, use simple analogies, never condescending. LEARN_SEO_QUESTIONS array in types.ts: 5 educational quick questions ('Explain my site health score', 'What is CTR and why does it matter', 'What are impressions vs clicks', 'How does SEO help my business', 'What is a keyword strategy'). Wired into: OverviewTab sidebar 'New to SEO?' section, ClientDashboard chat empty state, and chat follow-up suggestions after proactive greeting. Emerald-colored 💡 buttons distinguish educational questions from data questions.",
+          "status": "done",
+          "shippedAt": "2026-03-10"
+        },
+        {
+          "id": 194,
+          "title": "AI blog post generator (brief → full post)",
+          "source": "Product idea Mar 2026",
+          "est": "3-5h",
+          "priority": "P0",
+          "notes": "Shipped — content-posts.ts: section-by-section generation with page-type-specific writer roles (blog, landing, service, location, product, pillar, resource). Full context per section: brand voice, keyword strategy, E-E-A-T, SERP analysis, internal link suggestions. Post-generation unification pass (unifyPost) smooths transitions, removes cross-section repetition, ensures consistent voice, and trims word count to brief target when over budget. GPT-4.1 at temp 0.4 for editorial refinement. Admin Content Manager tab (ContentManager.tsx) for reviewing/managing all generated posts with status workflow (draft→review→approved), search/sort, and inline PostEditor. SEMRush graceful error handling: getRelatedKeywords/getDomainOrganic return [] instead of throwing on NOTHING FOUND. Audit fixes (Mar 10): fixed duplicate post bug, word count budgets, maxTokens tuning, SERP override, unification trimming, dynamic maxTokens, unificationStatus tracking, previous section context 600→1200 chars. HTML output (Mar 10): clean HTML generation, SEO meta generation step, PostEditor HTML rendering. Content quality engine v5 (Mar 10): WRITING_QUALITY_RULES — forbidden phrases (AI clichés, corporate buzzwords, hollow intensifiers, vague attribution, Let's+verb, Ready to+verb), structural anti-patterns, fabrication rules (no invented stats, directional case study outcomes), anchor text accuracy, mandatory H3 subheadings for 200+ word sections. Brief-level rules: H3 subheadings in outline schema, case study anonymity, FAQ word budget (150+ words), industry diversity (max 2 sections per industry), section count (5-7 for blogs), buzzword bans, reader-perspective executive summary, single-slash internal link paths. Full sitemap via getAllSitePages helper (Webflow API + CMS sitemap pages) for comprehensive internal link suggestions. Internal links use workspace liveDomain for correct URLs.",
+          "status": "done",
+          "shippedAt": "2026-03-10"
+        },
+        {
+          "id": 200,
+          "title": "Admin sidebar restructure + request widget",
+          "source": "UX cleanup Mar 2026",
+          "est": "3-4h",
+          "priority": "P0",
+          "notes": "Shipped — Reorganized admin sidebar from 4 groups/18 items to 4 groups/14 items. New structure: ANALYTICS (Search Console, GA, Rank Tracker, Annotations), SITE HEALTH (Site Audit, Performance, Links [merged Redirects+Internal Links], Assets), SEO (Brand & AI [moved to top], Strategy, Editor, Schema), CONTENT (Content Briefs, Content, Content Performance). Removed Competitors tab from sidebar (component retained, future competitive intelligence will live in Strategy per #199). Moved Requests to header bar as badge widget alongside NotificationBell. Merged Redirects + Internal Links into single Links tab with sub-tabs.",
+          "status": "done",
+          "shippedAt": "2026-03-11"
+        },
+        {
+          "id": 205,
+          "title": "Sidebar group colored icons + visual polish",
+          "source": "UX polish Mar 2026",
+          "est": "30m",
+          "priority": "P1",
+          "notes": "Shipped — Added colored lucide icons to sidebar group headers: Activity (blue) for ANALYTICS, Shield (emerald) for SITE HEALTH, Zap (teal) for SEO, BookOpen (amber) for CONTENT. Hover opacity transition, moved chevron to right side, increased padding for visual weight.",
+          "status": "done",
+          "shippedAt": "2026-03-11"
+        },
+        {
+          "id": 206,
+          "title": "Roadmap shipping velocity chart + sprint restructure",
+          "source": "Product management Mar 2026",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — (1) SVG shipping velocity chart in Roadmap.tsx showing cumulative features shipped per month with teal gradient area chart. (2) Full roadmap restructure: renamed Sprint B → Client Impact & Retention, Sprint C → Content Pipeline Completion, Sprint D → Self-Service & Distribution. Created 3 new sprints: Sprint E (Admin Polish & DX), Sprint F (SEO Intelligence Expansion), Sprint G (Team & Collaboration). Added 4 new items: #201 brief regeneration, #202 client brief export, #203 brand docs upload UI, #204 bulk SEO editor operations. Trimmed backlog from 30+ unsorted items to 24 organized items.",
+          "status": "done",
+          "shippedAt": "2026-03-11"
+        },
+        {
+          "id": 179,
+          "title": "Not Yet Ranking action plan in Strategy tab",
+          "source": "UX Narrative Audit Mar 2026",
+          "est": "4-6h",
+          "priority": "P1",
+          "notes": "Shipped — Expandable 'Not Yet Ranking' section in StrategyTab between Content Opportunities and Quick Wins. Per-page breakdown of unranked pages (no currentPosition in pageMap). Diagnosis engine: near-ranking (has impressions), high KD, moderate KD, or likely not indexed/thin content. Priority sorting: commercial/transactional intent first, pages with impressions above zero-impression, lower KD more fixable. Each page expandable with: diagnosis reasons, GSC metrics (impressions, clicks), keyword metrics (volume, KD%), recommended action with icon, 'Get Content Brief' CTA with pricing. Red gradient card with AlertTriangle icon, collapsible by default.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 207,
+          "title": "Client audit completion email notification",
+          "source": "Roadmap review Mar 2026",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped — audit_complete EmailEventType + renderAuditComplete template in email-templates.ts. Shows site health score, score delta (improved/declined), top 3 remaining issues by severity, fixed issues count (compared to previous snapshot via getLatestSnapshotBefore). notifyClientAuditComplete in email.ts. Wired into both manual audit (jobs.ts) and scheduled audit (scheduled-audits.ts) completion flows. CTA links to Health tab.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 260,
+          "title": "Client path-based routing migration (Devin)",
+          "source": "Devin PR #17",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — Migrated client portal from query-param routing (?tab=X) to path-based routing (/client/:workspaceId/:tab?). Backward-compatible redirect from old ?tab=X URLs. Cleaner URLs, better analytics tracking, SEO-friendly.",
+          "status": "done",
+          "shippedAt": "2026-03-13"
+        }
+      ],
+      "shippedAt": "2026-03-13"
+    },
+    {
+      "id": "sprint-launch",
+      "name": "✅ SHIPPED — Launch Readiness",
+      "hours": "18-26",
+      "rationale": "PRIORITY 0 — LAUNCH BLOCKER: Items that must ship before go-to-market. Stripe recurring billing is a hard blocker (can’t charge monthly without subscriptions). Email capture unlocks the growth loop. Easy wins are high-impact, low-effort polish items that improve first impressions and conversion.",
+      "items": [
+        {
+          "id": 214,
+          "title": "Stripe recurring billing for tier subscriptions",
+          "source": "Market prep analysis Mar 2026",
+          "est": "4-6h",
+          "priority": "P0",
+          "notes": "Shipped — createCheckoutSession in server/stripe.ts now detects plan_growth/plan_premium and uses mode:'subscription' with subscription_data metadata. Added webhook handlers for customer.subscription.created/updated/deleted, invoice.paid, invoice.payment_failed. Subscription lifecycle: active → sets tier + stores stripeSubscriptionId; deleted → downgrades to free; past_due → activity log warning. Added createBillingPortalSession() for Stripe Customer Portal self-service. New routes: POST /api/public/billing-portal/:wsId, POST /api/public/cancel-subscription/:wsId. PlansTab shows 'Manage Billing' button for paid subscribers. cancelSubscription() uses cancel_at_period_end for graceful cancellation.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 215,
+          "title": "Client email capture on free tier",
+          "source": "Market prep analysis Mar 2026",
+          "est": "2-3h",
+          "priority": "P0",
+          "notes": "Shipped — After shared-password auth succeeds, ClientDashboard shows email capture gate (name + email form) before loading dashboard. Email stored via POST /api/public/capture-email/:id to workspace.portalContacts array (deduped by email). localStorage tracks captured email to skip on return visits. Skip button available (stores __skipped__ marker). Backend: portalContacts added to Workspace interface + updateWorkspace type. Captures feed into email marketing funnel for reports, trial nudges, upgrade prompts.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 216,
+          "title": "AI chatbot upgrade prompts with ROI dollar values",
+          "source": "Market prep analysis Mar 2026",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped — useChat hook fetches ROI data (organicTrafficValue) when chat opens. 429 rate-limit message shows '$X in organic traffic value — Growth pays for itself.' Chat-exhausted bar shows ROI-backed copy with emerald highlight. TierGate accepts optional roiValue prop and displays organic traffic value in upgrade overlays. All best-effort with silent fail if ROI data unavailable.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 217,
+          "title": "\"Time saved\" metric on admin dashboard",
+          "source": "Market prep analysis Mar 2026",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — Added durationMs to TokenUsage interface, tracked in callOpenAI(). getTimeSaved() in openai-helpers.ts uses per-feature human-equivalent minute multipliers (e.g. content-brief=150min, keyword-strategy=240min, schema=60min). GET /api/ai/time-saved?workspaceId=&since= returns totalHoursSaved, operationCount, byFeature breakdown. WorkspaceOverview Command Center shows 'Hours Saved' StatCard (purple Clock icon) with monthly AI ops count. Fetches current month data on load.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 218,
+          "title": "Pre-populate content requests from audit issues",
+          "source": "Market prep analysis Mar 2026",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped — POST /api/public/content-request/:wsId/from-audit endpoint in public-content.ts. Accepts pageSlug, pageName, issues, wordCount. Auto-enriches with top 5 GSC keywords for the page + keyword strategy target keyword. Creates content request with rich rationale (issues, word count, keywords). HealthTab.tsx shows 'Request Content Improvement' button on expanded pages with content-related issues (thin content, heading, h1). Button → creates request → toast → WebSocket auto-refreshes Content tab.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 219,
+          "title": "Client portal favicon + OG meta tags",
+          "source": "Market prep analysis Mar 2026",
+          "est": "30m",
+          "priority": "P1",
+          "notes": "Shipped — ClientDashboard.tsx dynamically updates document head when workspace loads: og:title, og:description, og:type, og:url, twitter:title, twitter:description, twitter:card, meta description. brandLogoUrl sets og:image, twitter:image, and dynamic favicon (SVG or PNG). Added brandLogoUrl and brandAccentColor to WorkspaceInfo type.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        }
+      ],
+      "shippedAt": "2026-03-12"
+    },
+    {
       "id": "sprint-H",
-      "name": "AEO — Answer Engine Optimization",
+      "name": "✅ SHIPPED — AEO — Answer Engine Optimization",
       "hours": "10-14",
       "rationale": "Beta client feedback: LLMs and AI answer engines cite pages with trust signals, clean structure, and rich schema. Three feature groups: new audit checks, schema expansion, and content brief enhancements.",
       "items": [
@@ -1161,231 +1387,8 @@
           "status": "done",
           "shippedAt": "2026-03-12"
         }
-      ]
-    },
-    {
-      "id": "backlog",
-      "name": "Backlog",
-      "hours": "80+",
-      "rationale": "Revisit quarterly. Prioritize when a specific client need, revenue opportunity, or scale threshold justifies it.",
-      "items": [
-        {
-          "id": 76,
-          "title": "Strategy & implementation hours system",
-          "source": "Tier audit discussion",
-          "est": "4-6h",
-          "priority": "P3",
-          "notes": "Premium includes 3 strategy & implementation hrs/mo. Defer until premium tier has more subscribers.",
-          "status": "pending"
-        },
-        {
-          "id": 26,
-          "title": "Webhook / Zapier triggers",
-          "source": "ACTION_PLAN",
-          "est": "3-4h",
-          "priority": "P3",
-          "notes": "Fire webhooks on key events. Enables automation integrations.",
-          "status": "pending"
-        },
-        {
-          "id": 52,
-          "title": "Responsive mobile layout",
-          "source": "FEATURE_AUDIT",
-          "est": "4-6h",
-          "priority": "P3",
-          "notes": "Sidebar → bottom nav, stacked cards on small screens.",
-          "status": "pending"
-        },
-        {
-          "id": 32,
-          "title": "Shared notes / wiki per workspace",
-          "source": "ACTION_PLAN",
-          "est": "2-3h",
-          "priority": "P3",
-          "notes": "Team-internal notes about a client.",
-          "status": "pending"
-        },
-        {
-          "id": 34,
-          "title": "Client NPS survey",
-          "source": "ACTION_PLAN",
-          "est": "2h",
-          "priority": "P3",
-          "notes": "Periodic in-dashboard satisfaction survey.",
-          "status": "pending"
-        },
-        {
-          "id": 38,
-          "title": "Schema auto-schedule",
-          "source": "FEATURE_AUDIT",
-          "est": "2-3h",
-          "priority": "P3",
-          "notes": "Re-generate schemas on cadence, flag stale pages.",
-          "status": "pending"
-        },
-        {
-          "id": 41,
-          "title": "Historical redirect comparison",
-          "source": "FEATURE_AUDIT",
-          "est": "2-3h",
-          "priority": "P3",
-          "notes": "Track redirect status over time, detect new 404s.",
-          "status": "pending"
-        },
-        {
-          "id": 42,
-          "title": "Full-site PageSpeed scan",
-          "source": "FEATURE_AUDIT",
-          "est": "3-4h",
-          "priority": "P3",
-          "notes": "Multi-page PSI scan as background job.",
-          "status": "pending"
-        },
-        {
-          "id": 43,
-          "title": "Accessibility audit expansion",
-          "source": "FEATURE_AUDIT",
-          "est": "3-4h",
-          "priority": "P3",
-          "notes": "WCAG contrast, ARIA, heading order, form labels.",
-          "status": "pending"
-        },
-        {
-          "id": 44,
-          "title": "WCAG AA full compliance",
-          "source": "FEATURE_AUDIT",
-          "est": "3-4h",
-          "priority": "P3",
-          "notes": "Focus indicators, keyboard nav for all interactive elements.",
-          "status": "pending"
-        },
-        {
-          "id": 90,
-          "title": "Schema generator → gpt-4o upgrade",
-          "source": "FEATURE_AUDIT",
-          "est": "15m",
-          "priority": "P3",
-          "notes": "CONDITIONAL: Blocked by 30K TPM limit.",
-          "status": "pending"
-        },
-        {
-          "id": 45,
-          "title": "GSC: URL Inspection API",
-          "source": "Memory/Roadmap",
-          "est": "3-4h",
-          "priority": "P4",
-          "notes": "Per-URL indexing status, crawl info.",
-          "status": "pending"
-        },
-        {
-          "id": 46,
-          "title": "GA4: Exit pages + attribution",
-          "source": "Memory/Roadmap",
-          "est": "3-4h",
-          "priority": "P4",
-          "notes": "Advanced analytics.",
-          "status": "pending"
-        },
-        {
-          "id": 47,
-          "title": "Webflow Enterprise API: 301 redirects",
-          "source": "FEATURE_AUDIT",
-          "est": "1-2h",
-          "priority": "P4",
-          "notes": "Push rules via API (Enterprise-only).",
-          "status": "pending"
-        },
-        {
-          "id": 48,
-          "title": "Sales report: branded PDF export",
-          "source": "FEATURE_AUDIT",
-          "est": "3-4h",
-          "priority": "P4",
-          "notes": "Downloadable prospect reports with agency branding.",
-          "status": "pending"
-        },
-        {
-          "id": 49,
-          "title": "Sales report: email delivery",
-          "source": "FEATURE_AUDIT",
-          "est": "2h",
-          "priority": "P4",
-          "notes": "Send reports directly to prospects.",
-          "status": "pending"
-        },
-        {
-          "id": 89,
-          "title": "Sales report: CRM integration",
-          "source": "FEATURE_AUDIT",
-          "est": "3-4h",
-          "priority": "P4",
-          "notes": "Push prospect data to HubSpot/Pipedrive.",
-          "status": "pending"
-        },
-        {
-          "id": 108,
-          "title": "Predictive SEO & trend forecasting",
-          "source": "FEATURE_VISION #3",
-          "est": "8-12h",
-          "priority": "P4",
-          "notes": "Historical GSC data + Google Trends API + seasonal patterns → predict growing keywords 30-90 days out.",
-          "status": "pending"
-        },
-        {
-          "id": 109,
-          "title": "Cross-client benchmarking network",
-          "source": "FEATURE_VISION #4",
-          "est": "6-8h",
-          "priority": "P4",
-          "notes": "Anonymized benchmarks across all clients. Needs 20+ active clients.",
-          "status": "pending"
-        },
-        {
-          "id": 110,
-          "title": "Backlink intelligence & outreach",
-          "source": "FEATURE_VISION #5",
-          "est": "10-15h",
-          "priority": "P2",
-          "notes": "Ahrefs/Moz API → backlink profile → link gaps → AI outreach templates. Elevated from P3 — backlinks are a top-3 ranking factor and this capability justifies premium pricing. Lightweight overview (#213) ships first in Sprint F; this is the full-featured follow-up.",
-          "status": "pending"
-        },
-        {
-          "id": 112,
-          "title": "Local SEO module",
-          "source": "FEATURE_VISION #7",
-          "est": "15-20h",
-          "priority": "P4",
-          "notes": "GBP integration, local keyword tracking, citation monitoring. Add-on $99-149/mo.",
-          "status": "pending"
-        },
-        {
-          "id": 116,
-          "title": "AI strategy memory & learning",
-          "source": "FEATURE_VISION #11",
-          "est": "8-12h",
-          "priority": "P3",
-          "notes": "AI learns from conversations, approved changes, rejected suggestions. Proprietary knowledge asset.",
-          "status": "pending"
-        },
-        {
-          "id": 118,
-          "title": "WordPress / Shopify support",
-          "source": "FEATURE_VISION #13",
-          "est": "15-20h",
-          "priority": "P4",
-          "notes": "Abstract CMS integration layer. Only after Webflow PMF proven.",
-          "status": "pending"
-        },
-        {
-          "id": 120,
-          "title": "Embeddable SEO widgets",
-          "source": "FEATURE_VISION #15",
-          "est": "4-6h",
-          "priority": "P4",
-          "notes": "Embeddable site health badge, traffic counter. Passive referral generation.",
-          "status": "pending"
-        }
-      ]
+      ],
+      "shippedAt": "2026-03-12"
     },
     {
       "id": "archive-sprint-11",
