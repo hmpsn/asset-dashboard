@@ -40,7 +40,7 @@ let creditLog: SemrushCreditEntry[] = [];
 let pendingCreditWrites: SemrushCreditEntry[] = [];
 let creditFlushTimer: ReturnType<typeof setTimeout> | null = null;
 
-function flushCreditsToDisk(): void {
+export function flushCreditsToDisk(): void {
   if (pendingCreditWrites.length === 0) return;
   const today = new Date().toISOString().slice(0, 10);
   const filePath = path.join(CREDIT_DIR, `${today}.json`);
@@ -60,9 +60,8 @@ function logCreditUsage(entry: Omit<SemrushCreditEntry, 'timestamp'>): void {
   if (!creditFlushTimer) creditFlushTimer = setTimeout(() => { creditFlushTimer = null; flushCreditsToDisk(); }, 5000);
 }
 
+// Flush on normal process exit (graceful shutdown handles SIGTERM/SIGINT)
 process.on('beforeExit', flushCreditsToDisk);
-process.on('SIGINT', () => { flushCreditsToDisk(); process.exit(0); });
-process.on('SIGTERM', () => { flushCreditsToDisk(); process.exit(0); });
 
 /** Get SEMRush credit usage summary */
 export function getSemrushUsage(workspaceId?: string, since?: string): {

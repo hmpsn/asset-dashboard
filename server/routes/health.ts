@@ -2,9 +2,6 @@
  * health routes — extracted from server/index.ts
  */
 import { Router } from 'express';
-
-const router = Router();
-
 import fs from 'fs';
 import path from 'path';
 import { DATA_BASE, getUploadRoot } from '../data-dir.js';
@@ -14,6 +11,12 @@ import { getGoogleCredentials } from '../google-auth.js';
 import { isStripeConfigured } from '../stripe.js';
 import { listWorkspaces, getTokenForSite } from '../workspaces.js';
 import { getStorageReport, pruneChatSessions, pruneBackups, pruneReportSnapshots, pruneActivityLogs } from '../storage-stats.js';
+
+const router = Router();
+
+/** Set to true during graceful shutdown so /api/health returns 503. */
+let shuttingDown = false;
+export function setShuttingDown(): void { shuttingDown = true; }
 
 const DATA_ROOT = DATA_BASE || path.join(process.env.HOME || '', '.asset-dashboard');
 
@@ -87,6 +90,9 @@ router.get('/api/health/diag', async (_req, res) => {
 // NOTE: /api/presence route stays in index.ts (depends on WebSocket state)
 
 router.get('/api/health', (_req, res) => {
+  if (shuttingDown) {
+    return res.status(503).json({ status: 'shutting_down' });
+  }
   res.json({
     ok: true,
     hasOpenAIKey: !!process.env.OPENAI_API_KEY,
