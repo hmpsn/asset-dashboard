@@ -76,12 +76,13 @@
       "items": [
         {
           "id": 211,
-          "title": "PostgreSQL migration (from JSON-on-disk)",
+          "title": "SQLite migration (from JSON-on-disk)",
           "source": "Roadmap review Mar 2026",
           "est": "8-12h",
           "priority": "P0",
-          "notes": "LAUNCH RISK — Migrate from JSON file persistence to PostgreSQL. Currently noted as 'deferred until 5-10GB' on #195, but concurrent write issues and relational query needs will surface well before that — especially with team management (#16), permissions (#17), and recurring subscriptions (#111). Phased approach: (1) Add Drizzle/Prisma ORM + schema definitions, (2) Migration scripts to import existing JSON data, (3) Swap data layer one domain at a time (workspaces → payments → activity → content), (4) Keep JSON backup scheduler as fallback during transition. Much harder to migrate later with more features built on file I/O.",
-          "status": "pending"
+          "notes": "Shipped (PRs 1-4) — Migrated from JSON file persistence to SQLite via better-sqlite3 (WAL mode, foreign keys ON). Devin implemented as 5 stacked PRs. PRs 1-4 merged to main: (1) DB foundation + payments, (2) 7 global singletons (users, client-users, activity-log, requests, churn-signals, anomaly-detection, scheduled-audits), (3) 14 per-workspace modules (approvals, content-briefs, content-requests, content-posts, work-orders, recommendations, annotations, seo-change-tracker, content-decay, roi, feedback, rank-tracking), (4) 7 per-site/config modules (reports, schema-store, redirect-store, performance-store, chat-memory, google-auth tokens, usage-tracking). PR 5 (workspaces table + page_edit_states + seo_edit_tracking) still on branch origin/devin/1773377934-sqlite-workspaces. Architecture: server/db/index.ts singleton, SQL migrations in server/db/migrations/, migrate-json.ts one-time idempotent JSON→SQLite script, lazy prepared statements, JSON columns for complex data, row→model mappers.",
+          "status": "done",
+          "shippedAt": "2026-03-13"
         },
         {
           "id": 208,
@@ -116,8 +117,48 @@
           "source": "Market prep analysis Mar 2026",
           "est": "3-4h",
           "priority": "P2",
-          "notes": "38+ route files with no formal API docs beyond the code itself. If you bring on another developer or a client asks for API access, this becomes a blocker. Auto-generate OpenAPI spec from route definitions using tsoa or swagger-jsdoc. Host interactive docs at /api/docs. Document auth requirements, request/response schemas, and error codes for all public and admin endpoints.",
+          "notes": "48 route files with no formal API docs beyond the code itself. If you bring on another developer or a client asks for API access, this becomes a blocker. Auto-generate OpenAPI spec from route definitions using tsoa or swagger-jsdoc. Host interactive docs at /api/docs. Document auth requirements, request/response schemas, and error codes for all public and admin endpoints.",
           "status": "pending"
+        },
+        {
+          "id": 256,
+          "title": "Backend unit tests (Devin)",
+          "source": "Devin PR #6",
+          "est": "3-4h",
+          "priority": "P1",
+          "notes": "Shipped — Comprehensive backend unit tests in tests/unit/ covering core modules: activity-log, auth, broadcast, content-brief, helpers, middleware, openai-helpers, payments, seo-audit, stripe-config, usage-tracking, webflow, workspaces. Vitest-based.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 257,
+          "title": "API integration tests (Devin)",
+          "source": "Devin PR #7",
+          "est": "3-4h",
+          "priority": "P1",
+          "notes": "Shipped — API integration tests in tests/integration/ covering: activity, auth, client-auth, content-briefs, health, public-portal, rank-tracking, settings, webflow, workspaces. Supertest-based against Express app.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 258,
+          "title": "Frontend component tests (Devin)",
+          "source": "Devin PR #10",
+          "est": "3-4h",
+          "priority": "P1",
+          "notes": "Shipped — Frontend component tests in tests/component/ covering UI primitives: Badge, DataList, EmptyState, MetricRing, PageHeader, SectionCard, Skeleton, StatCard, StatusBadge, TabBar, TierGate. Plus smoke test. Vitest + Testing Library.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 259,
+          "title": "Security fixes (Devin)",
+          "source": "Devin security review",
+          "est": "1h",
+          "priority": "P0",
+          "notes": "Shipped — Path traversal fix in moveUploadedFiles (middleware.ts). Removed duplicate Stripe webhook route that could bypass signature verification.",
+          "status": "done",
+          "shippedAt": "2026-03-11"
         }
       ]
     },
@@ -249,11 +290,11 @@
         },
         {
           "id": 196,
-          "title": "Server refactor: index.ts → 38 route modules",
+          "title": "Server refactor: index.ts → 48 route modules",
           "source": "Architecture debt",
           "est": "4-6h",
           "priority": "P0",
-          "notes": "Shipped — Split server/index.ts from ~8,300 lines into ~450 lines + 38 Express Router files in server/routes/ + 3 shared modules (broadcast.ts, helpers.ts, middleware.ts). Each route file owns one domain. Zero endpoint changes — pure refactor.",
+          "notes": "Shipped — Split server/index.ts from ~8,300 lines into ~450 lines + 48 Express Router files in server/routes/ + 3 shared modules (broadcast.ts, helpers.ts, middleware.ts). Each route file owns one domain. Zero endpoint changes — pure refactor. Initial split was 38 files; decompose-monoliths PR added 10 more (webflow-alt-text, webflow-audit, webflow-cms, webflow-keywords, webflow-organize, webflow-analysis, webflow-pagespeed, webflow-schema, webflow-seo, content-decay).",
           "status": "done",
           "shippedAt": "2026-03-11"
         },
@@ -365,6 +406,16 @@
           "notes": "Shipped — audit_complete EmailEventType + renderAuditComplete template in email-templates.ts. Shows site health score, score delta (improved/declined), top 3 remaining issues by severity, fixed issues count (compared to previous snapshot via getLatestSnapshotBefore). notifyClientAuditComplete in email.ts. Wired into both manual audit (jobs.ts) and scheduled audit (scheduled-audits.ts) completion flows. CTA links to Health tab.",
           "status": "done",
           "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 260,
+          "title": "Client path-based routing migration (Devin)",
+          "source": "Devin PR #17",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — Migrated client portal from query-param routing (?tab=X) to path-based routing (/client/:workspaceId/:tab?). Backward-compatible redirect from old ?tab=X URLs. Cleaner URLs, better analytics tracking, SEO-friendly.",
+          "status": "done",
+          "shippedAt": "2026-03-13"
         }
       ]
     },
@@ -591,7 +642,7 @@
           "source": "Infrastructure review Mar 2026",
           "est": "2-3h",
           "priority": "P2",
-          "notes": "Shipped — Phase 1+2: server/storage-stats.ts scans all data directories (25 categories + uploads + optimized). GET /api/admin/storage-stats returns per-directory breakdown with bytes, file count, labels. POST endpoints for pruning: /prune-chat (>90 day sessions), /prune-backups (keep 3 days), /prune-activity (>6 month entries). Storage Monitor UI panel in SettingsPanel.tsx: colored stacked bar chart, per-category row breakdown, chat/backup/oldest stats, one-click prune buttons with toast feedback. Phase 3 (PostgreSQL migration) deferred until 5-10GB threshold.",
+          "notes": "Shipped — Phase 1+2: server/storage-stats.ts scans all data directories (25 categories + uploads + optimized). GET /api/admin/storage-stats returns per-directory breakdown with bytes, file count, labels. POST endpoints for pruning: /prune-chat (>90 day sessions), /prune-backups (keep 3 days), /prune-activity (>6 month entries). Storage Monitor UI panel in SettingsPanel.tsx: colored stacked bar chart, per-category row breakdown, chat/backup/oldest stats, one-click prune buttons with toast feedback. Phase 3 (SQLite migration) shipped separately as #211.",
           "status": "done",
           "shippedAt": "2026-03-11"
         },
@@ -716,6 +767,36 @@
           "notes": "Shipped — ClientOnboardingQuestionnaire.tsx: structured multi-step intake form collecting business info, goals, audience, competitors, content preferences. Feeds into workspace AI context.",
           "status": "done",
           "shippedAt": "2026-03"
+        },
+        {
+          "id": 261,
+          "title": "Decompose monolith components (Devin)",
+          "source": "Devin PRs #15, #16",
+          "est": "4-6h",
+          "priority": "P1",
+          "notes": "Shipped — Decomposed 6 large components into extracted module directories: SeoAudit → audit/ (ScoreTrendChart, ActionItemsPanel, AuditHistory), ContentBriefs → briefs/ (BriefDetail), SchemaSuggester → schema/ (CmsTemplatePanel), KeywordStrategy → strategy/ (SeoCopyPanel), AssetBrowser → assets/ (OrganizePreview), WorkspaceSettings → settings/ (ConnectionsTab, FeaturesTab, ClientDashboardTab). Also split server/routes/webflow.ts into 5 domain-specific route files. Fixed useState→useEffect, clientEmail sync, duplicate CMS loader bugs.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 262,
+          "title": "UX improvements batch (Devin)",
+          "source": "Devin PR #13",
+          "est": "4-6h",
+          "priority": "P1",
+          "notes": "Shipped — useToast hook (removed setTimeout auto-dismiss duplication), ARIA roles on TabBar + PerformanceTab, centralized duplicate number formatting utilities, Chat/FeedbackWidget overlap fix on mobile, mobile-friendly date picker popover, extracted ContentTab API logic into useContentRequests hook, reverted batch approve to sequential to avoid race condition.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
+        },
+        {
+          "id": 263,
+          "title": "Medium/low UI/UX audit fixes (Devin)",
+          "source": "Devin PR #11",
+          "est": "3-4h",
+          "priority": "P1",
+          "notes": "Shipped — Implemented all 12 medium/low priority UI/UX audit fixes from CLIENT_DASHBOARD_UX_AUDIT.md and ADMIN_UX_AUDIT.md.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
         }
       ]
     },

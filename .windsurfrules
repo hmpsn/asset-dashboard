@@ -50,13 +50,14 @@ Every completed task — no matter how small — must include these steps:
 
 ## 1. Project Overview
 
-**hmpsn.studio** is an SEO/web analytics platform built with **React 18 + Vite + TailwindCSS** (frontend) and **Express + TypeScript** (backend). It manages client websites via Webflow, Google Search Console, GA4, and SEMRush integrations.
+**hmpsn.studio** is an SEO/web analytics platform built with **React 19 + Vite 8 + TailwindCSS 4** (frontend) and **Express + TypeScript** (backend). It manages client websites via Webflow, Google Search Console, GA4, and SEMRush integrations.
 
-- **No database** — all data is JSON on disk via `~/.asset-dashboard/` and per-workspace folders
-- **AI** — OpenAI GPT-4.1/4.1-mini/4.1-nano via `server/openai-helpers.ts` (`callOpenAI` with retry, timeout, token tracking)
+- **Storage** — **SQLite** via `better-sqlite3` (WAL mode, foreign keys ON) at `DATA_BASE/dashboard.db`. PRs 1–4 merged to `main` — 28+ modules now use SQLite. PR 5 (workspaces table + page_edit_states + seo_edit_tracking) still on branch `origin/devin/1773377934-sqlite-workspaces`. See § 2a below.
+- **AI** — OpenAI GPT-4.1/4.1-mini/4.1-nano via `server/openai-helpers.ts` (`callOpenAI`), Anthropic Claude via `server/anthropic-helpers.ts` (`callAnthropic`) for creative prose
 - **Payments** — Stripe Checkout (not Payment Intents). Config encrypted on disk (AES-256-GCM). Admin UI for keys + products.
 - **Auth** — Dual system: internal JWT (7-day, admin) + client JWT (24h, per-workspace). Legacy shared-password still supported.
 - **Monetization** — 3 tiers (Free/Growth/Premium), per-item content purchases, 14-day Growth trial, UX soft-gating via `<TierGate>`
+- **Client routing** — Path-based: `/client/:workspaceId/:tab?` with backward-compat redirect from `?tab=X`
 
 ---
 
@@ -67,7 +68,7 @@ Every completed task — no matter how small — must include these steps:
 | File | Purpose | Notes |
 |------|---------|-------|
 | `index.ts` | **App setup, middleware, WS, route mounting** (~450 lines) | No route handlers — all moved to `server/routes/`. |
-| `routes/` | 46 Express Router files | One file per domain: `auth.ts`, `webflow.ts`, `webflow-alt-text.ts`, `webflow-audit.ts`, `webflow-cms.ts`, `webflow-keywords.ts`, `webflow-organize.ts`, `aeo-review.ts`, `feedback.ts`, `public-feedback.ts`, etc. |
+| `routes/` | **48 Express Router files** | One file per domain: `auth.ts`, `webflow.ts`, `webflow-alt-text.ts`, `webflow-audit.ts`, `webflow-cms.ts`, `webflow-keywords.ts`, `webflow-organize.ts`, `aeo-review.ts`, `feedback.ts`, `public-feedback.ts`, `content-decay.ts`, `seo-change-tracker.ts`, etc. |
 | `helpers.ts` | Shared pure functions | `sanitizeString`, `validateEnum`, `parseDateRange`, `applySuppressionsToAudit`, `buildSchemaContext`, `getAuditTrafficForWorkspace`, `readEnvFile`, `writeEnvFile` |
 | `middleware.ts` | Shared middleware + auth (single source of truth) | Rate limiters, `signClientSession`/`verifyClientSession`, `signAdminToken`/`verifyAdminToken`, `upload` (multer), `moveUploadedFiles`, `IS_PROD`, `APP_PASSWORD` |
 | `broadcast.ts` | WebSocket broadcast singleton | `setBroadcast()` called in index.ts, `broadcast()`/`broadcastToWorkspace()` imported by route files |
@@ -81,10 +82,10 @@ Every completed task — no matter how small — must include these steps:
 | `content-requests.ts` | Content topic request CRUD | `ContentTopicRequest` interface (includes `pageType`, `serviceType`) |
 | `stripe.ts` | Lazy-init Stripe SDK, 14-product map, checkout, webhooks | Re-creates SDK when keys change |
 | `stripe-config.ts` | Encrypted on-disk Stripe config (AES-256-GCM) | Env vars as fallback |
-| `payments.ts` | Payment record CRUD (JSON on disk) | Per-workspace payment history |
+| `payments.ts` | Payment record CRUD (SQLite) | Per-workspace payment history |
 | `auth.ts` | JWT sign/verify (7-day), Express middleware | `requireAuth`, `requireRole`, `requireWorkspaceAccess`, `optionalAuth` |
 | `client-users.ts` | Client user model, per-workspace accounts | bcrypt, JWT (24h), CRUD |
-| `users.ts` | Internal user model (owner/admin/member) | bcrypt (12 rounds), JSON persistence |
+| `users.ts` | Internal user model (owner/admin/member) | bcrypt (12 rounds), SQLite persistence |
 | `openai-helpers.ts` | `callOpenAI` wrapper | Retry/backoff/timeout, `parseAIJson`, token tracking |
 | `google-analytics.ts` | GA4 API | All functions accept optional `dateRange?: CustomDateRange` |
 | `search-console.ts` | GSC API | All functions accept optional `dateRange?: CustomDateRange` |
@@ -114,6 +115,39 @@ Every completed task — no matter how small — must include these steps:
 | `usage-tracking.ts` | SEMRush credit usage tracking | `checkUsageLimit()`, `incrementUsage()`, daily reset |
 | `email.ts` / `email-queue.ts` | Email transport + batched queue | Nodemailer, 5-min sliding window digest, 7 event types, disk-persisted queue |
 | `google-auth.ts` | Google OAuth2 flow | Global + per-site token management, auto-refresh |
+| `constants.ts` | Shared server constants | Reusable string/config constants |
+| `ws-events.ts` | WebSocket event types | Event name constants for WS communication |
+| `content-decay.ts` | Content decay detection | Identifies declining pages via GSC trends |
+| `seo-change-tracker.ts` | SEO change event tracking | Tracks title/meta/schema changes per page over time |
+| `aeo-page-review.ts` | AI-powered AEO review engine | GPT-4.1, 12 change types per page, saved to `aeo-reviews/` |
+| `link-checker.ts` | Dead link detection | Crawls site for broken internal/external links |
+| `redirect-scanner.ts` | Redirect chain detection | Scans for redirect loops and chains |
+| `processor.ts` | Background job processor | Queue-based processing for long-running tasks |
+| `internal-links.ts` | Internal link suggestions | AI-powered link opportunity detection |
+| `pagespeed.ts` | PageSpeed Insights wrapper | Google PSI API integration |
+
+### § 2a. SQLite Database (`server/db/`)
+
+**28+ server modules** now use SQLite via `better-sqlite3` (PRs 1–4 merged). Workspaces module still JSON-based (PR 5 pending).
+
+| File | Purpose |
+|------|---------|
+| `db/index.ts` | DB singleton, WAL mode, foreign keys ON, migration runner |
+| `db/migrate-json.ts` | One-time JSON→SQLite migration script (`npx tsx server/db/migrate-json.ts`), idempotent via INSERT OR IGNORE |
+| `db/migrations/001-payments.sql` | `payments` table |
+| `db/migrations/002-global-singletons.sql` | `users`, `client_users`, `reset_tokens`, `activity_log`, `requests`, `churn_signals`, `anomalies`, `audit_schedules` |
+| `db/migrations/003-per-workspace.sql` | `approval_batches`, `content_briefs`, `content_topic_requests`, `content_posts`, `work_orders`, `recommendation_sets`, `annotations`, `seo_changes`, `decay_analyses`, `roi_snapshots`, `feedback`, `rank_tracking_config`, `rank_snapshots` |
+
+**Still on branch** `origin/devin/1773377934-sqlite-workspaces` (PR 5):
+- `db/migrations/004-per-site-and-config.sql` — `audit_snapshots`, `schema_snapshots`, `redirect_snapshots`, `performance_snapshots`, `chat_sessions`, `google_tokens`, `usage_tracking`
+- `db/migrations/005-workspaces.sql` — `workspaces` (30+ columns), `page_edit_states`, `seo_edit_tracking`
+
+**Key patterns (follow these when writing new DB code):**
+- **Lazy prepared statements:** `let _stmt: ... | null = null;` cached at module level
+- **JSON columns:** Arrays/objects stored as `TEXT`, parsed at read boundary
+- **Row→Model mappers:** `rowToX()` functions convert snake_case DB rows → camelCase TS interfaces
+- **Three-state booleans:** SQLite `INTEGER` (0/1/NULL) → `boolean | undefined` for workspace toggles
+- **Migration tracking:** `_migrations` table tracks applied `.sql` files; new migrations go in `server/db/migrations/`
 
 ### Frontend (`src/`)
 
@@ -149,9 +183,20 @@ Every completed task — no matter how small — must include these steps:
 | `components/strategy/` | **KeywordStrategy extracted modules** | `SeoCopyPanel.tsx` (SEO copy generation panel) |
 | `components/assets/` | **AssetBrowser extracted modules** | `OrganizePreview.tsx` (asset organize preview) |
 | `components/workspace-home/` | **WorkspaceHome extracted modules** | `ActiveRequestsAnnotations.tsx`, `ActivityFeed.tsx`, `RankingsSnapshot.tsx`, `SeoWorkStatus.tsx`, `index.ts` (barrel) |
+| `components/AeoReview.tsx` | AEO page review | AI-powered per-page content change recommendations (lazy-loaded sub-tab in SeoAudit) |
+| `components/AnomalyAlerts.tsx` | Anomaly alert viewer | Displays traffic/ranking anomalies with severity badges |
+| `components/ContentDecay.tsx` | Content decay dashboard | Identifies declining pages, refresh recommendations |
+| `components/SeoEditorWrapper.tsx` | SeoEditor wrapper | Connects SeoEditor to workspace context |
+| `components/SearchableSelect.tsx` | Searchable dropdown | Reusable filterable select component |
+| `components/StatusBar.tsx` | Status bar | Shows connection/processing status |
+| `components/TaskPanel.tsx` | Task/work order panel | Displays work order queue and status |
+| `components/Toast.tsx` | Toast notification | Fixed bottom-center, auto-dismiss |
+| `components/WorkspaceHome.tsx` | Admin workspace home | Workspace-level overview with extracted sub-components |
+| `components/WorkspaceSelector.tsx` | Workspace picker | Dropdown selector for switching workspaces |
+| `components/SettingsPanel.tsx` | Settings panel | Admin settings interface |
 | `components/LoginScreen.tsx` | Admin login UI | Setup flow + email/password |
 | `components/Styleguide.tsx` | Design system reference page | Color swatches, component demos |
-| `components/ui/` | **17 shared UI primitives** | See § 4 below |
+| `components/ui/` | **16 shared UI primitives** (14 components + 2 config files) | See § 4 below |
 | `components/client/` | **Client tab components** (28 files) | `types.ts`, `helpers.tsx`, `utils.ts`, `index.ts`, `OverviewTab.tsx`, `SearchTab.tsx`, `AnalyticsTab.tsx`, `PerformanceTab.tsx` (merged Search+Analytics), `StrategyTab.tsx`, `ContentTab.tsx`, `ApprovalsTab.tsx`, `RequestsTab.tsx`, `PlansTab.tsx`, `InboxTab.tsx` (composes Approvals+Requests+Content), `HealthTab.tsx`, `InsightsDigest.tsx`, `InsightsEngine.tsx`, `MonthlySummary.tsx`, `DataSnapshots.tsx`, `ROIDashboard.tsx`, `OrderStatus.tsx`, `FixRecommendations.tsx`, `SeoCart.tsx`, `useCart.tsx`, `OnboardingWizard.tsx`, `BetaContext.tsx` (beta mode feature flag), `ClientOnboardingQuestionnaire.tsx`, `FeedbackWidget.tsx`, `SeoGlossary.tsx` |
 | `components/shared/` | **Shared cross-dashboard components** | `RankTable.tsx` (position colors, history chart, rank change indicators) |
 | `hooks/` | **Shared React hooks** (15 files) | `useAuth.ts`, `useWebSocket.ts`, `useBackgroundTasks.tsx`, `useAuditSummary.ts`, `useSearchData.ts`, `useGA4Overview.ts`, `usePageEditStates.ts`, `useRecommendations.ts`, `useWorkspaceEvents.ts`, `useChat.ts`, `useClientAuth.ts`, `useClientData.ts`, `useContentRequests.ts`, `usePayments.ts`, `useToast.ts` |
@@ -187,7 +232,7 @@ Every completed task — no matter how small — must include these steps:
 ### Feature work
 | Priority | Doc | What it tells you |
 |----------|-----|-------------------|
-| 1 | `FEATURE_AUDIT.md` | 82-feature inventory with agency/client/mutual value, Future Additions backlog |
+| 1 | `FEATURE_AUDIT.md` | 82+ feature inventory with agency/client/mutual value, Future Additions backlog |
 | 2 | `.windsurf/workflows/feature-integration.md` | How to connect features (cross-links, client dashboard, approvals) |
 | 3 | `.windsurf/workflows/wiring-patterns.md` | How to wire data into chat, strategy, briefs, reports |
 | 4 | `data/roadmap.json` | Sprint tracking — check what's done/pending before starting work |
