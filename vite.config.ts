@@ -1,26 +1,35 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
-import { sentryVitePlugin } from '@sentry/vite-plugin'
 
-export default defineConfig({
+// Dynamically load @sentry/vite-plugin only when SENTRY_AUTH_TOKEN is set
+// and the package is installed. This avoids build failures when the package
+// is not present (e.g. production builds on Render with --omit=dev).
+async function getSentryPlugin(): Promise<Plugin[]> {
+  if (!process.env.SENTRY_AUTH_TOKEN) return [];
+  try {
+    const { sentryVitePlugin } = await import('@sentry/vite-plugin');
+    return [sentryVitePlugin({
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      sourcemaps: {
+        filesToDeleteAfterUpload: ['./dist/**/*.map'],
+      },
+    })];
+  } catch {
+    return [];
+  }
+}
+
+export default defineConfig(async () => ({
   build: {
     sourcemap: !!process.env.SENTRY_AUTH_TOKEN, // Only generate source maps when Sentry is configured
   },
   plugins: [
     react(),
     tailwindcss(),
-    // Upload source maps to Sentry during production builds (requires SENTRY_AUTH_TOKEN)
-    ...(process.env.SENTRY_AUTH_TOKEN
-      ? [sentryVitePlugin({
-          org: process.env.SENTRY_ORG,
-          project: process.env.SENTRY_PROJECT,
-          authToken: process.env.SENTRY_AUTH_TOKEN,
-          sourcemaps: {
-            filesToDeleteAfterUpload: ['./dist/**/*.map'],
-          },
-        })]
-      : []),
+    ...(await getSentryPlugin()),
   ],
   server: {
     proxy: {
@@ -38,4 +47,4 @@ export default defineConfig({
     setupFiles: ['tests/component/setup.ts'],
     include: ['tests/**/*.test.{ts,tsx}'],
   },
-})
+}))
