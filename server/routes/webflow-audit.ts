@@ -137,7 +137,7 @@ router.get('/api/webflow/audit/:siteId', async (req, res) => {
       issues,
     });
   } catch (e) {
-    log.error('Audit error:', e);
+    log.error({ err: e }, 'Audit error');
     res.status(500).json({ error: 'Audit failed' });
   }
 });

@@ -259,7 +259,7 @@ Return ONLY valid JSON array, no markdown fences, no explanation.`;
       analyzedAt: new Date().toISOString(),
     };
   } catch (err) {
-    log.error('Internal links analysis error:', err);
+    log.error({ err: err }, 'Internal links analysis error');
     return { suggestions: [], pageCount: pages.length, existingLinkCount, analyzedAt: new Date().toISOString() };
   }
 }

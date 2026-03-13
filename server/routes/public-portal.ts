@@ -158,7 +158,7 @@ router.post('/api/public/onboarding/:id', async (req, res) => {
 
     res.json({ ok: true, message: 'Onboarding responses saved successfully' });
   } catch (err) {
-    log.error('Error saving responses:', err);
+    log.error({ err: err }, 'Error saving responses');
     res.status(500).json({ error: 'Failed to save onboarding responses' });
   }
 });

@@ -349,7 +349,7 @@ Return ONLY the JSON-LD object. No markdown, no explanation, no wrapping.`;
     const types = graph?.map(n => n['@type']).filter(Boolean) || [];
     return { schema, reason: `Unified @graph schema with ${types.join(', ')}`, errors };
   } catch (err: unknown) {
-    log.error('AI unified generation error:', err);
+    log.error({ err: err }, 'AI unified generation error');
     return null;
   }
 }
@@ -501,7 +501,7 @@ export async function generateSchemaSuggestions(
     : subdomain ? `https://${subdomain}.webflow.io` : '';
   log.info(`baseUrl=${baseUrl}, liveDomain=${liveDomain || '(none)'}`);
   if (!baseUrl) {
-    log.error('No subdomain or liveDomain found for site', siteId);
+    log.error({ detail: siteId }, 'No subdomain or liveDomain found for site');
     return [];
   }
 
@@ -845,7 +845,7 @@ Return ONLY the raw JSON-LD. No markdown, no explanation.`;
       collectionSlug: collection.slug,
     };
   } catch (err) {
-    log.error('AI generation failed:', err);
+    log.error({ err: err }, 'AI generation failed');
     return null;
   }
 }

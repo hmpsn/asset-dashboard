@@ -67,7 +67,7 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
     await transport.sendMail({ from: cfg.from, to, subject, html });
     return true;
   } catch (err) {
-    log.error('Failed to send:', err);
+    log.error({ err: err }, 'Failed to send');
     return false;
   }
 }

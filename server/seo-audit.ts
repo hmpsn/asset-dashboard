@@ -313,7 +313,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
       });
     }
   } catch (err) {
-    log.error('Redirect scan failed (non-fatal):', err);
+    log.error({ err: err }, 'Redirect scan failed (non-fatal)');
   }
 
   // --- Homepage Core Web Vitals (quick single-page PSI check) ---
@@ -350,7 +350,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
         }
       }
     } catch (err) {
-      log.error('PageSpeed check failed (non-fatal):', err);
+      log.error({ err: err }, 'PageSpeed check failed (non-fatal)');
     }
   }
 
@@ -580,7 +580,7 @@ Respond in this exact JSON format (only include fields that need fixing):
             ogDescIssue.suggestedFix = suggestions.metaDescription;
           }
         } catch (err) {
-          log.error(`AI recommendation failed for ${pageResult.page}:`, err);
+          log.error({ err: err }, `AI recommendation failed for ${pageResult.page}:`);
         }
       }));
     }

@@ -60,7 +60,7 @@ async function checkTrialExpiry() {
         sentReminders.add(key);
         log.info(`Sent ${daysRemaining}-day warning to ${ws.clientEmail} for "${ws.name}"`);
       } catch (err) {
-        log.error(`Failed to send:`, err);
+        log.error({ err: err }, `Failed to send:`);
       }
 
       break; // only send the most urgent reminder per workspace per check
@@ -73,11 +73,11 @@ export function startTrialReminders() {
 
   // Check 90s after startup, then every 6 hours
   setTimeout(() => {
-    checkTrialExpiry().catch(err => log.error('Error:', err));
+    checkTrialExpiry().catch(err => log.error({ err }, 'Error'));
   }, 90_000);
 
   interval = setInterval(() => {
-    checkTrialExpiry().catch(err => log.error('Error:', err));
+    checkTrialExpiry().catch(err => log.error({ err }, 'Error'));
   }, CHECK_INTERVAL_MS);
 
   log.info('Trial expiry checker started (checks every 6 hours)');

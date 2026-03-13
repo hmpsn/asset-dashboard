@@ -124,7 +124,7 @@ export function createApp(): express.Express {
   } : undefined));
   app.use(cookieParser());
 
-  // --- Request logging ---
+  // --- Request logging (safe before Stripe webhook — only logs method/path/status, does not consume body) ---
   app.use(requestLogger);
 
   // Stripe webhook must receive raw body (before express.json parses it)

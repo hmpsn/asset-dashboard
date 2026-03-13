@@ -321,7 +321,7 @@ Be concise but specific. Use bullet points. Only include information actually fo
 
     res.json({ knowledgeBase: aiResult.text, pagesScraped: scraped.length });
   } catch (err) {
-    log.error('', err);
+    log.error({ err: err }, 'Operation failed');
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate knowledge base' });
   }
 });
@@ -388,7 +388,7 @@ Be specific and actionable. An AI writer should be able to follow this guide to 
 
     res.json({ brandVoice: aiResult.text, pagesScraped: scraped.length });
   } catch (err) {
-    log.error('', err);
+    log.error({ err: err }, 'Operation failed');
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate brand voice' });
   }
 });
@@ -473,7 +473,7 @@ Rules:
 
     res.json({ personas: normalized, pagesScraped: scraped.length });
   } catch (err) {
-    log.error('', err);
+    log.error({ err: err }, 'Operation failed');
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate personas' });
   }
 });

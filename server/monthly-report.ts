@@ -228,7 +228,7 @@ async function checkAndSendReports() {
       changed = true;
       log.info(`Sent to ${ws.clientEmail}`);
     } catch (err) {
-      log.error(`Failed for ${ws.name}:`, err);
+      log.error({ err: err }, `Failed for ${ws.name}:`);
     }
   }
 
@@ -240,11 +240,11 @@ export function startMonthlyReports() {
 
   // Check after 5 min on startup (avoids re-send during rapid restart cycles), then every 6 hours
   setTimeout(() => {
-    checkAndSendReports().catch(err => log.error('Error:', err));
+    checkAndSendReports().catch(err => log.error({ err }, 'Error'));
   }, 5 * 60 * 1000);
 
   reportInterval = setInterval(() => {
-    checkAndSendReports().catch(err => log.error('Error:', err));
+    checkAndSendReports().catch(err => log.error({ err }, 'Error'));
   }, CHECK_INTERVAL_MS);
 
   log.info('Report scheduler started (checks every 6 hours)');

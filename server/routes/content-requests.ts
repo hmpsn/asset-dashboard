@@ -173,7 +173,7 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', async (req,
         ]);
         if (metrics.length > 0) semrushMetrics = metrics[0];
         if (related.length > 0) semrushRelated = related;
-      } catch (e) { log.error('SEMRush brief enrichment error:', e); }
+      } catch (e) { log.error({ err: e }, 'SEMRush brief enrichment error'); }
     }
 
     // Gather GA4 landing page performance if connected

@@ -45,7 +45,7 @@ function copyUploadFiles(src: string, dest: string, stats: { files: number; byte
         stats.files++;
         stats.bytes += fs.statSync(destPath).size;
       } catch (err) {
-        log.error(`Failed to copy ${srcPath}:`, err);
+        log.error({ err: err }, `Failed to copy ${srcPath}:`);
       }
     }
   }
@@ -74,7 +74,7 @@ export function runBackup(): { backupDir: string; files: number; bytes: number }
     stats.files++;
     stats.bytes += fs.statSync(dbBackupPath).size;
   } catch (err) {
-    log.error('SQLite backup failed:', err);
+    log.error({ err: err }, 'SQLite backup failed');
   }
 
   // 3. Write backup manifest
@@ -121,7 +121,7 @@ export function startBackupScheduler(): void {
       const pruned = pruneOldBackups();
       log.info(`Daily backup complete: ${result.files} files, ${(result.bytes / 1024).toFixed(1)}KB → ${result.backupDir}${pruned > 0 ? ` (pruned ${pruned} old backup${pruned > 1 ? 's' : ''})` : ''}`);
     } catch (err) {
-      log.error('Backup failed:', err);
+      log.error({ err: err }, 'Backup failed');
     }
   }, 30_000);
 
@@ -132,7 +132,7 @@ export function startBackupScheduler(): void {
       const pruned = pruneOldBackups();
       log.info(`Daily backup complete: ${result.files} files, ${(result.bytes / 1024).toFixed(1)}KB${pruned > 0 ? ` (pruned ${pruned})` : ''}`);
     } catch (err) {
-      log.error('Backup failed:', err);
+      log.error({ err: err }, 'Backup failed');
     }
   }, BACKUP_INTERVAL_MS);
 

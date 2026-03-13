@@ -95,22 +95,22 @@ export async function updateAsset(
       body.altText = current.altText;
     }
 
-    log.info(`PATCH /assets/${assetId}:`, JSON.stringify(body));
+    log.info({ detail: body }, `PATCH /assets/${assetId}:`);
     const res = await webflowFetch(`/assets/${assetId}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
     }, tokenOverride);
     if (!res.ok) {
       const err = await res.text();
-      log.error(`Asset PATCH failed (${res.status}):`, err);
+      log.error({ err: err }, `Asset PATCH failed (${res.status}):`);
       return { success: false, error: `${res.status}: ${err}` };
     }
     const result = await res.json();
-    log.info(`Asset PATCH success:`, JSON.stringify(result));
+    log.info({ detail: result }, `Asset PATCH success:`);
     return { success: true };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    log.error('Asset update error:', msg);
+    log.error({ detail: msg }, 'Asset update error');
     return { success: false, error: msg };
   }
 }
@@ -809,7 +809,7 @@ export async function uploadAsset(
     const assetId = createData.asset?.id || createData.id;
 
     if (!uploadUrl || !uploadDetails) {
-      log.error('Webflow create response:', JSON.stringify(createData, null, 2));
+      log.error({ detail: JSON.stringify(createData, null, 2) }, 'Webflow create response missing uploadUrl/uploadDetails');
       return { success: false, error: 'No uploadUrl or uploadDetails in response' };
     }
 
@@ -843,10 +843,10 @@ export async function uploadAsset(
           log.info(`Set alt text for ${fileName}: "${altText}"`);
         } else {
           const errText = await patchRes.text();
-          log.error(`Failed to set alt text for ${fileName} (${patchRes.status}):`, errText);
+          log.error({ detail: errText }, `Failed to set alt text for ${fileName} (${patchRes.status}):`);
         }
       } catch (e) {
-        log.error(`Alt text PATCH error for ${fileName}:`, e);
+        log.error({ err: e }, `Alt text PATCH error for ${fileName}:`);
       }
     }
 
@@ -912,7 +912,7 @@ export async function discoverCmsUrls(
     log.info(`sitemap: ${allUrls.length} URLs total, ${cmsAll.length} are CMS pages`);
     return { cmsUrls: cmsAll.slice(0, limit), totalFound: cmsAll.length };
   } catch (err) {
-    log.error('sitemap fetch failed:', err);
+    log.error({ err: err }, 'sitemap fetch failed');
     return { cmsUrls: [], totalFound: 0 };
   }
 }

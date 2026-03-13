@@ -38,7 +38,7 @@ router.get('/api/seo-change-impact/:workspaceId', async (req, res) => {
     );
     res.json({ impact });
   } catch (err) {
-    log.error('Error:', err);
+    log.error({ err: err }, 'Error');
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to fetch impact data' });
   }
 });

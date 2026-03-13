@@ -101,7 +101,7 @@ router.get('/api/webflow/pages/:siteId', async (req, res) => {
     log.info(`Pages: ${allPages.length} total, ${published.length} published (filtered out ${allPages.length - published.length} drafts/collections/unpublished)`);
     res.json(published);
   } catch (err) {
-    log.error('Pages list error:', err);
+    log.error({ err: err }, 'Pages list error');
     res.status(500).json({ error: 'Failed to list pages' });
   }
 });
@@ -122,7 +122,7 @@ router.put('/api/webflow/pages/:pageId/seo', async (req, res) => {
     }
     res.json(result);
   } catch (err) {
-    log.error('Page SEO update error:', err);
+    log.error({ err: err }, 'Page SEO update error');
     res.status(500).json({ error: 'Failed to update page SEO' });
   }
 });
@@ -133,7 +133,7 @@ router.post('/api/webflow/publish/:siteId', async (req, res) => {
     const result = await publishSite(req.params.siteId, token);
     res.json(result);
   } catch (err) {
-    log.error('Publish error:', err);
+    log.error({ err: err }, 'Publish error');
     res.status(500).json({ error: 'Failed to publish site' });
   }
 });

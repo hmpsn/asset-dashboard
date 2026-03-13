@@ -76,7 +76,7 @@ router.post('/api/aeo-review/:workspaceId/page', async (req, res) => {
     res.json(review);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    log.error('Single page error:', msg);
+    log.error({ detail: msg }, 'Single page error');
     res.status(500).json({ error: msg });
   }
 });
@@ -147,7 +147,7 @@ router.post('/api/aeo-review/:workspaceId/site', async (req, res) => {
     res.json(result);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    log.error('Site review error:', msg);
+    log.error({ detail: msg }, 'Site review error');
     res.status(500).json({ error: msg });
   }
 });

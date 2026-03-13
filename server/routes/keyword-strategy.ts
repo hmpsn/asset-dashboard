@@ -135,7 +135,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
       }
       log.info(`Webflow API: ${wfMetaByPath.size} pages with metadata`);
     } catch (err) {
-      log.info('Webflow API metadata fetch failed, continuing without it:', err);
+      log.info({ err: err }, 'Webflow API metadata fetch failed, continuing without it');
     }
 
     // Sitemap = authoritative list of live pages
@@ -168,7 +168,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         }
         if (skippedUtility > 0) log.info(`Skipped ${skippedUtility} utility/index pages`);
       } catch (err) {
-        log.info('Sitemap discovery failed:', err);
+        log.info({ err: err }, 'Sitemap discovery failed');
       }
     }
     // Fallback: if sitemap found nothing, use Webflow API pages
@@ -373,7 +373,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
             ).join('\n');
           }
         } catch (err) {
-          log.error('Domain organic error:', err);
+          log.error({ err: err }, 'Domain organic error');
         }
 
         // Full mode: competitor gap analysis + related keywords
@@ -391,7 +391,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
               ).join('\n');
             }
           } catch (err) {
-            log.error('Keyword gap error:', err);
+            log.error({ err: err }, 'Keyword gap error');
           }
 
           // Get related keywords for top 5 seed terms
@@ -410,7 +410,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
               ).join('\n');
             }
           } catch (err) {
-            log.error('Related keywords error:', err);
+            log.error({ err: err }, 'Related keywords error');
           }
         }
       }
@@ -524,7 +524,7 @@ Rules:
         sendProgress('ai', `Batch ${batchIdx + 1}/${batches.length} complete (${Array.isArray(parsed) ? parsed.length : 0} pages)`, 0.55 + ((batchIdx + 1) / batches.length) * 0.20);
         return Array.isArray(parsed) ? parsed : [];
       } catch {
-        log.error(`Batch ${batchIdx + 1} returned invalid JSON:`, raw.slice(0, 200));
+        log.error({ detail: raw.slice(0, 200) }, `Batch ${batchIdx + 1} returned invalid JSON:`);
         return batch.map(p => ({
           pagePath: p.path,
           pageTitle: p.title,
@@ -742,7 +742,7 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
     try {
       masterData = JSON.parse(masterRaw);
     } catch {
-      log.error('Master returned invalid JSON:', masterRaw.slice(0, 300));
+      log.error({ detail: masterRaw.slice(0, 300) }, 'Master returned invalid JSON');
       const errMsg = 'AI returned invalid JSON in master synthesis';
       if (wantsStream) { try { res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`); res.end(); } catch { /* closed */ } return; }
       return res.status(500).json({ error: errMsg, raw: masterRaw.slice(0, 500) });
@@ -849,7 +849,7 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
             }
           }
         } catch (err) {
-          log.error('Keyword overview enrichment error:', err);
+          log.error({ err: err }, 'Keyword overview enrichment error');
         }
       }
     }
@@ -908,7 +908,7 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error ? err.stack : '';
-    log.error('Keyword strategy error:', msg, stack);
+    log.error({ detail: msg, stack }, 'Keyword strategy error');
     if (wantsStream) {
       try { res.write(`data: ${JSON.stringify({ error: msg })}\n\n`); res.end(); } catch { /* already closed */ }
       return;

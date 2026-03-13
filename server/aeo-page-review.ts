@@ -224,7 +224,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '');
     parsed = JSON.parse(cleaned);
   } catch {
-    log.error('Failed to parse AI response:', raw.slice(0, 200));
+    log.error({ detail: raw.slice(0, 200) }, 'Failed to parse AI response');
     throw new Error('Failed to parse AEO review response');
   }
 
@@ -262,7 +262,7 @@ export async function reviewSitePages(
       results.push(review);
       onProgress?.(i + 1, pages.length, review);
     } catch (err) {
-      log.error(`Failed to review ${page.url}:`, err);
+      log.error({ err: err }, `Failed to review ${page.url}:`);
       // Push a minimal error result so we don't lose progress
       results.push({
         pageUrl: page.url,

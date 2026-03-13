@@ -106,7 +106,7 @@ export async function generateAltText(filePath: string, context?: string): Promi
   try {
     tmpFile = await prepareImageForApi(filePath);
   } catch (err) {
-    log.error(`Failed to prepare image for alt text:`, err);
+    log.error({ err: err }, `Failed to prepare image for alt text:`);
     return null;
   }
 

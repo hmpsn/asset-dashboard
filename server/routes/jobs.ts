@@ -116,7 +116,7 @@ router.post('/api/jobs', async (req, res) => {
                   }
                 }
               } catch (recErr) {
-                log.error('Failed to regenerate recommendations:', recErr);
+                log.error({ detail: recErr }, 'Failed to regenerate recommendations');
               }
               // Notify client of audit completion with full details
               if (ws.clientEmail) {

@@ -75,7 +75,7 @@ export async function listGA4Properties(): Promise<GA4Property[]> {
 
   if (!res.ok) {
     const err = await res.text();
-    log.error('Failed to list properties:', err);
+    log.error({ err: err }, 'Failed to list properties');
     throw new Error(`Failed to list GA4 properties: ${res.status}`);
   }
 
@@ -120,7 +120,7 @@ async function runReport(propertyId: string, body: Record<string, unknown>): Pro
 
   if (!res.ok) {
     const err = await res.text();
-    log.error('Report failed:', err);
+    log.error({ err: err }, 'Report failed');
     throw new Error(`GA4 report failed: ${res.status}`);
   }
 

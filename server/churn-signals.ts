@@ -312,18 +312,18 @@ async function runChurnCheck() {
     });
   }
 
-  log.info('Check completed at', new Date().toISOString());
+  log.info({ detail: new Date().toISOString() }, 'Check completed at');
 }
 
 let interval: ReturnType<typeof setInterval> | null = null;
 
 export function startChurnSignalScheduler() {
   // Run immediately on startup
-  runChurnCheck().catch(err => log.error('Error:', err));
+  runChurnCheck().catch(err => log.error({ err }, 'Error'));
 
   // Then every 6 hours
   interval = setInterval(() => {
-    runChurnCheck().catch(err => log.error('Error:', err));
+    runChurnCheck().catch(err => log.error({ err }, 'Error'));
   }, CHECK_INTERVAL_MS);
 
   log.info('Scheduler started (every 6h)');

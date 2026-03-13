@@ -80,12 +80,12 @@ async function runPageSpeed(url: string, strategy: 'mobile' | 'desktop'): Promis
 
     if (!res.ok) {
       const body = await res.text().catch(() => '');
-      log.error(`PageSpeed API error for ${url}: ${res.status} ${res.statusText}`, body.slice(0, 200));
+      log.error({ detail: body.slice(0, 200) }, `PageSpeed API error for ${url}: ${res.status} ${res.statusText}`);
       return null;
     }
     return await res.json() as Record<string, unknown>;
   } catch (err) {
-    log.error(`PageSpeed fetch error for ${url}:`, err);
+    log.error({ err: err }, `PageSpeed fetch error for ${url}:`);
     return null;
   }
 }

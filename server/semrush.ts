@@ -208,13 +208,13 @@ export async function getKeywordOverview(
       const res = await fetch(`${SEMRUSH_API_BASE}?${params}`);
       if (!res.ok) {
         const errText = await res.text();
-        log.error(`SEMRush keyword overview error for "${kw}":`, errText);
+        log.error({ detail: errText }, `SEMRush keyword overview error for "${kw}":`);
         continue;
       }
 
       const csv = await res.text();
       if (csv.startsWith('ERROR')) {
-        log.error(`SEMRush error for "${kw}":`, csv);
+        log.error({ detail: csv }, `SEMRush error for "${kw}":`);
         continue;
       }
 
@@ -240,7 +240,7 @@ export async function getKeywordOverview(
         logCreditUsage({ credits: 10, endpoint: 'keyword_overview', query: kw, rowsReturned: rows.length, workspaceId, cached: false });
       }
     } catch (err) {
-      log.error(`SEMRush fetch error for "${kw}":`, err);
+      log.error({ err: err }, `SEMRush fetch error for "${kw}":`);
     }
   }
 
@@ -377,7 +377,7 @@ export async function getKeywordGap(
       writeCache(workspaceId, cacheKey, gaps);
       allGaps.push(...gaps);
     } catch (err) {
-      log.error(`SEMRush gap analysis error for ${cleanComp}:`, err);
+      log.error({ err: err }, `SEMRush gap analysis error for ${cleanComp}:`);
     }
   }
 

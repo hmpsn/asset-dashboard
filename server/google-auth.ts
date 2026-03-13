@@ -132,7 +132,7 @@ export async function exchangeCode(code: string, siteId: string): Promise<{ succ
 
     if (!res.ok) {
       const err = await res.text();
-      log.error('Google token exchange failed:', err);
+      log.error({ err: err }, 'Google token exchange failed');
       return { success: false, error: `Token exchange failed: ${res.status}` };
     }
 
@@ -152,7 +152,7 @@ export async function exchangeCode(code: string, siteId: string): Promise<{ succ
 
     return { success: true };
   } catch (err) {
-    log.error('Google token exchange error:', err);
+    log.error({ err: err }, 'Google token exchange error');
     return { success: false, error: String(err) };
   }
 }

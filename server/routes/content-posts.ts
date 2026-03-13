@@ -83,7 +83,7 @@ router.post('/api/content-posts/:workspaceId/generate', async (req, res) => {
     generatePost(req.params.workspaceId, brief, postId).then(() => {
       addActivity(req.params.workspaceId, 'post_generated', `Content generated for "${brief.targetKeyword}"`, `Title: ${brief.suggestedTitle}`);
     }).catch(err => {
-      log.error(`Generation failed for ${req.params.workspaceId}:`, err);
+      log.error({ err: err }, `Generation failed for ${req.params.workspaceId}:`);
     });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to start generation' });

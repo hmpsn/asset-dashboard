@@ -46,7 +46,7 @@ router.post('/api/webflow/keyword-analysis', async (req, res) => {
           ).join('\n');
         }
       }
-    } catch (e) { log.error('SEMRush enrichment error:', e); }
+    } catch (e) { log.error({ err: e }, 'SEMRush enrichment error'); }
   }
 
   try {
@@ -101,7 +101,7 @@ Return ONLY valid JSON, no markdown, no explanation.`;
       res.json({ error: 'Failed to parse AI response', raw: aiResult.text.slice(0, 500) });
     }
   } catch (err) {
-    log.error('Keyword analysis error:', err);
+    log.error({ err: err }, 'Keyword analysis error');
     res.status(500).json({ error: 'Keyword analysis failed' });
   }
 });
@@ -162,7 +162,7 @@ router.post('/api/webflow/content-score', async (req, res) => {
       descOk: descLength >= 120 && descLength <= 160,
     });
   } catch (err) {
-    log.error('Content score error:', err);
+    log.error({ err: err }, 'Content score error');
     res.status(500).json({ error: 'Content scoring failed' });
   }
 });

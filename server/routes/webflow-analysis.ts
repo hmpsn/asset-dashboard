@@ -129,7 +129,7 @@ router.post('/api/competitor-compare', async (req, res) => {
     saveCompetitorCompare(myUrl, competitorUrl, compareResult);
     res.json(compareResult);
   } catch (err) {
-    log.error('Competitor compare error:', err);
+    log.error({ err: err }, 'Competitor compare error');
     res.status(500).json({ error: 'Comparison failed' });
   }
 });
@@ -161,7 +161,7 @@ router.get('/api/webflow/link-check-domains/:siteId', async (req, res) => {
     if (!domains) return res.json({ staging: '', customDomains: [], defaultDomain: '' });
     res.json(domains);
   } catch (err) {
-    log.error('Domain fetch error:', err);
+    log.error({ err: err }, 'Domain fetch error');
     res.json({ staging: '', customDomains: [], defaultDomain: '' });
   }
 });
@@ -174,7 +174,7 @@ router.get('/api/webflow/link-check/:siteId', async (req, res) => {
     saveLinkCheck(req.params.siteId, result);
     res.json(result);
   } catch (err) {
-    log.error('Link check error:', err);
+    log.error({ err: err }, 'Link check error');
     res.status(500).json({ error: 'Link check failed' });
   }
 });
@@ -208,7 +208,7 @@ router.get('/api/webflow/redirect-scan/:siteId', async (req, res) => {
           log.info(`Found ${gscPages.length} GSC pages to cross-check`);
         }
       } catch (err) {
-        log.info('GSC ghost URL fetch skipped:', err instanceof Error ? err.message : String(err));
+        log.info({ detail: err instanceof Error ? err.message : String(err) }, 'GSC ghost URL fetch skipped');
       }
     }
 
@@ -223,7 +223,7 @@ router.get('/api/webflow/redirect-scan/:siteId', async (req, res) => {
 
     res.json(result);
   } catch (err) {
-    log.error('Redirect scan error:', err);
+    log.error({ err: err }, 'Redirect scan error');
     res.status(500).json({ error: 'Redirect scan failed' });
   }
 });
@@ -244,7 +244,7 @@ router.get('/api/webflow/internal-links/:siteId', async (req, res) => {
     saveInternalLinks(req.params.siteId, result);
     res.json(result);
   } catch (err) {
-    log.error('Internal links error:', err);
+    log.error({ err: err }, 'Internal links error');
     res.status(500).json({ error: 'Internal link analysis failed' });
   }
 });

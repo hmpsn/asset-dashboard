@@ -26,7 +26,7 @@ router.get('/api/webflow/seo-audit/:siteId', async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
     if (!token) {
-      log.error('SEO audit: No token available for site', req.params.siteId);
+      log.error({ detail: req.params.siteId }, 'SEO audit: No token available for site');
       return res.status(500).json({ error: 'No Webflow API token configured. Please link a workspace to this site in Settings, or set WEBFLOW_API_TOKEN environment variable.' });
     }
     const result = await runSeoAudit(req.params.siteId, token, req.query.workspaceId as string | undefined);
@@ -43,7 +43,7 @@ router.get('/api/webflow/seo-audit/:siteId', async (req, res) => {
     res.json(result);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    log.error('SEO audit error:', msg);
+    log.error({ detail: msg }, 'SEO audit error');
     res.status(500).json({ error: `SEO audit failed: ${msg}` });
   }
 });
@@ -211,7 +211,7 @@ Return ONLY a JSON array of 3 strings, e.g. ["title1","title2","title3"]. No exp
     // Always return at least the first as `text` for backward compatibility + all as `variations`
     res.json({ text: variations[0] || '', field, variations: variations.filter(Boolean) });
   } catch (err) {
-    log.error('SEO rewrite error:', err);
+    log.error({ err: err }, 'SEO rewrite error');
     res.status(500).json({ error: 'AI rewrite failed' });
   }
 });
@@ -341,7 +341,7 @@ router.get('/api/webflow/page-html/:siteId', async (req, res) => {
       .slice(0, 8000);
     res.json({ text });
   } catch (e) {
-    log.error('Page HTML fetch error:', e);
+    log.error({ err: e }, 'Page HTML fetch error');
     res.status(500).json({ error: 'Failed to fetch page content' });
   }
 });
@@ -478,7 +478,7 @@ Return ONLY valid JSON, no markdown fences.`;
 
     res.json(parsed);
   } catch (err) {
-    log.error('SEO copy generator error:', err);
+    log.error({ err: err }, 'SEO copy generator error');
     res.status(500).json({ error: 'SEO copy generation failed' });
   }
 });

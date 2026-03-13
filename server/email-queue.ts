@@ -50,7 +50,7 @@ function persistQueue() {
     }
     fs.writeFileSync(QUEUE_FILE, JSON.stringify(data, null, 2));
   } catch (err) {
-    log.error('Failed to persist queue:', err);
+    log.error({ err: err }, 'Failed to persist queue');
   }
 }
 
@@ -93,14 +93,14 @@ async function flushBucket(key: string) {
   persistQueue();
 
   if (!sendFn) {
-    log.warn('No send function registered, dropping', events.length, 'events');
+    log.warn({ droppedCount: events.length }, `No send function registered, dropping ${events.length} events`);
     return;
   }
 
   try {
     const { subject, html } = renderDigest(type, events);
     if (!html) {
-      log.warn('Empty template for type:', type);
+      log.warn({ detail: type }, 'Empty template for type');
       return;
     }
     const ok = await sendFn(recipient, subject, html);
@@ -110,7 +110,7 @@ async function flushBucket(key: string) {
       log.error(`Failed to send ${type} email to ${recipient}`);
     }
   } catch (err) {
-    log.error('Error sending digest:', err);
+    log.error({ err: err }, 'Error sending digest');
   }
 }
 

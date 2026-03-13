@@ -194,7 +194,7 @@ async function runScheduledAudit(schedule: AuditSchedule) {
       });
     }
   } catch (err) {
-    log.error(`Failed for ${ws.name}:`, err);
+    log.error({ err: err }, `Failed for ${ws.name}:`);
   }
 }
 
@@ -225,11 +225,11 @@ export function startScheduler() {
 
   // Run check on startup after 30s delay, then every hour
   setTimeout(() => {
-    checkDue().catch(err => log.error('Error:', err));
+    checkDue().catch(err => log.error({ err }, 'Error'));
   }, 30000);
 
   checkInterval = setInterval(() => {
-    checkDue().catch(err => log.error('Error:', err));
+    checkDue().catch(err => log.error({ err }, 'Error'));
   }, CHECK_MS);
 
   log.info('Audit scheduler started (checks every hour)');

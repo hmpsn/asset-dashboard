@@ -255,7 +255,7 @@ export async function generateBatchRecommendations(
       try {
         page.refreshRecommendation = await generateRefreshRecommendation(ws, page);
       } catch (err) {
-        log.error(`Failed to generate recommendation for ${page.page}:`, err);
+        log.error({ err: err }, `Failed to generate recommendation for ${page.page}:`);
         page.refreshRecommendation = 'Unable to generate recommendation. Please review this page manually.';
       }
     }

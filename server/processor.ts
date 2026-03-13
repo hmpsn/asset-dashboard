@@ -143,7 +143,7 @@ async function handleOriginalFile(
     }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    log.error(`Alt text failed for ${fileName}:`, msg);
+    log.error({ detail: msg }, `Alt text failed for ${fileName}:`);
     updateQueueItem(id, { status: 'optimizing' }, broadcast);
   }
 }
@@ -226,12 +226,12 @@ async function handleOptimizedFile(
         });
       } else {
         updateQueueItem(id, { status: 'error', error: result.error }, broadcast);
-        log.error(`Webflow upload failed for ${fileName}:`, result.error);
+        log.error({ detail: result.error }, `Webflow upload failed for ${fileName}:`);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       updateQueueItem(id, { status: 'error', error: msg }, broadcast);
-      log.error(`Webflow upload error for ${fileName}:`, msg);
+      log.error({ detail: msg }, `Webflow upload error for ${fileName}:`);
     }
   } else {
     updateQueueItem(id, { status: 'done' }, broadcast);
@@ -303,8 +303,8 @@ export function triggerOptimize(filePath: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = execFile(PROCESSOR, [filePath], { timeout: 120000 }, (err, _stdout, stderr) => {
       if (err) {
-        log.error(`Script failed for ${path.basename(filePath)}:`, err.message);
-        if (stderr) log.error(`stderr:`, stderr);
+        log.error({ detail: err.message }, `Script failed for ${path.basename(filePath)}:`);
+        if (stderr) log.error({ detail: stderr }, `stderr:`);
         // Update queue item status to 'error' so it doesn't stay stuck
         const workspaceFolder = path.relative(getUploadRoot(), path.dirname(filePath)).split(path.sep)[0];
         const key = cacheKey(workspaceFolder, path.basename(filePath));
@@ -319,7 +319,7 @@ export function triggerOptimize(filePath: string): Promise<void> {
       }
     });
     child.on('error', (err) => {
-      log.error(`Failed to start script:`, err.message);
+      log.error({ detail: err.message }, `Failed to start script:`);
       reject(err);
     });
   });

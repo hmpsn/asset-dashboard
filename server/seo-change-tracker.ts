@@ -284,7 +284,7 @@ export async function getSeoChangeImpact(
         tooRecent: false,
       });
     } catch (err) {
-      log.error(`GSC fetch error for ${change.pageSlug}:`, err);
+      log.error({ err: err }, `GSC fetch error for ${change.pageSlug}:`);
       results.push({ change, before: null, after: null, daysSinceChange, tooRecent: false });
     }
   }

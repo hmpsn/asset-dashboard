@@ -83,7 +83,7 @@ router.post('/api/content-briefs/:workspaceId/generate', async (req, res) => {
         ]);
         if (metrics.length > 0) semrushMetrics = metrics[0];
         if (related.length > 0) semrushRelated = related;
-      } catch (e) { log.error('SEMRush brief enrichment error:', e); }
+      } catch (e) { log.error({ err: e }, 'SEMRush brief enrichment error'); }
     }
 
     // --- Parallel enrichment: reference URLs, SERP data, GA4 style examples ---

@@ -94,7 +94,7 @@ router.post('/api/webflow/generate-alt/:assetId', async (req, res) => {
       const altToken = siteId ? (getTokenForSite(siteId) || undefined) : undefined;
       const writeResult = await updateAsset(req.params.assetId, { altText }, altToken);
       if (!writeResult.success) {
-        log.error(`Alt text generated but Webflow write-back failed for ${req.params.assetId}:`, writeResult.error);
+        log.error({ detail: writeResult.error }, `Alt text generated but Webflow write-back failed for ${req.params.assetId}:`);
         res.json({ altText, updated: false, writeError: writeResult.error });
       } else {
         log.info(`Alt text generated and saved for ${req.params.assetId}: "${altText}"`);
@@ -105,7 +105,7 @@ router.post('/api/webflow/generate-alt/:assetId', async (req, res) => {
       res.json({ altText: null, updated: false });
     }
   } catch (e) {
-    log.error('Generate alt error:', e);
+    log.error({ err: e }, 'Generate alt error');
     res.status(500).json({ error: 'Failed to generate alt text' });
   }
 });
@@ -201,7 +201,7 @@ router.post('/api/webflow/bulk-generate-alt', async (req, res) => {
       if (altText) {
         const writeResult = await updateAsset(asset.assetId, { altText }, token);
         if (!writeResult.success) {
-          log.error(`Bulk alt: generated but write-back failed for ${asset.assetId}:`, writeResult.error);
+          log.error({ detail: writeResult.error }, `Bulk alt: generated but write-back failed for ${asset.assetId}:`);
           send({ type: 'result', assetId: asset.assetId, altText, updated: false, error: writeResult.error, done, total: assets.length });
         } else {
           send({ type: 'result', assetId: asset.assetId, altText, updated: true, done, total: assets.length });
@@ -212,7 +212,7 @@ router.post('/api/webflow/bulk-generate-alt', async (req, res) => {
     } catch (err) {
       done++;
       const msg = err instanceof Error ? err.message : String(err);
-      log.error(`Bulk alt error for ${asset.assetId}:`, msg);
+      log.error({ detail: msg }, `Bulk alt error for ${asset.assetId}:`);
       send({ type: 'result', assetId: asset.assetId, altText: null, updated: false, error: msg, done, total: assets.length });
     }
   }
@@ -250,7 +250,7 @@ router.post('/api/webflow/compress/:assetId', async (req, res) => {
         } as Parameters<typeof svgo.optimize>[1]);
         compressedSvg = Buffer.from(result.data, 'utf-8');
       } catch (svgoErr) {
-        log.error('SVGO error:', svgoErr);
+        log.error({ detail: svgoErr }, 'SVGO error');
         return res.json({ skipped: true, reason: 'SVGO optimization failed: ' + (svgoErr instanceof Error ? svgoErr.message : String(svgoErr)) });
       }
 
@@ -326,7 +326,7 @@ router.post('/api/webflow/compress/:assetId', async (req, res) => {
       newFileName,
     });
   } catch (e) {
-    log.error('Compress error:', e);
+    log.error({ err: e }, 'Compress error');
     res.status(500).json({ error: 'Compression failed' });
   }
 });

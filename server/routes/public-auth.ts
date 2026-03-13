@@ -132,7 +132,7 @@ router.post('/api/public/forgot-password/:id', clientLoginLimiter, async (req, r
       createdAt: new Date().toISOString(),
     };
     const { subject, html } = renderDigest('password_reset', [event]);
-    sendEmail(email, subject, html).catch(err => log.error('Email failed:', err));
+    sendEmail(email, subject, html).catch(err => log.error({ err }, 'Email send failed'));
   }
 
   res.json({ ok: true, message: 'If an account with that email exists, a reset link has been sent.' });

@@ -50,7 +50,7 @@ router.post('/api/sales-report', async (req, res) => {
     res.json(report);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    log.error('Sales report error:', msg);
+    log.error({ detail: msg }, 'Sales report error');
     res.status(500).json({ error: `Sales report failed: ${msg}` });
   }
 });
@@ -129,7 +129,7 @@ router.post('/api/reports/:siteId/save', async (req, res) => {
     }
     res.json({ id: snapshot.id, createdAt: snapshot.createdAt, siteScore: audit.siteScore, previousScore: snapshot.previousScore });
   } catch (err) {
-    log.error('Report save error:', err);
+    log.error({ err: err }, 'Report save error');
     res.status(500).json({ error: 'Failed to save report' });
   }
 });
@@ -143,7 +143,7 @@ router.post('/api/reports/:siteId/snapshot', (req, res) => {
     const snapshot = saveSnapshot(siteId, siteName || siteId, audit);
     res.json({ id: snapshot.id, createdAt: snapshot.createdAt, siteScore: audit.siteScore });
   } catch (err) {
-    log.error('Snapshot save error:', err);
+    log.error({ err: err }, 'Snapshot save error');
     res.status(500).json({ error: 'Failed to save snapshot' });
   }
 });

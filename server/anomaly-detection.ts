@@ -522,7 +522,7 @@ export async function runAnomalyDetection(): Promise<{ total: number; newAnomali
         }
       }
     } catch (err) {
-      log.error(`Error scanning ${ws.name}:`, err);
+      log.error({ err: err }, `Error scanning ${ws.name}:`);
     }
   }
 
@@ -547,11 +547,11 @@ export function startAnomalyDetection() {
 
   // Run 2 minutes after startup, then every 12 hours
   setTimeout(() => {
-    runAnomalyDetection().catch(err => log.error('Scan error:', err));
+    runAnomalyDetection().catch(err => log.error({ err }, 'Scan error'));
   }, 2 * 60 * 1000);
 
   anomalyInterval = setInterval(() => {
-    runAnomalyDetection().catch(err => log.error('Scan error:', err));
+    runAnomalyDetection().catch(err => log.error({ err }, 'Scan error'));
   }, CHECK_INTERVAL_MS);
 
   log.info('Detection scheduler started (every 12 hours)');

@@ -718,7 +718,7 @@ Return valid JSON only:
     if (parsed.seoTitle && parsed.seoMetaDescription) return parsed;
     return null;
   } catch (err) {
-    log.warn('SEO meta generation failed:', err);
+    log.warn({ err: err }, 'SEO meta generation failed');
     return null;
   }
 }
@@ -829,7 +829,7 @@ Return ONLY valid JSON, no markdown fences, no comments.`;
     }
     return parsed;
   } catch (err) {
-    log.warn('Failed to parse unification JSON:', err);
+    log.warn({ err: err }, 'Failed to parse unification JSON');
     return null;
   }
 }
@@ -958,7 +958,7 @@ export async function generatePost(
   } catch (err) {
     post.unificationStatus = 'failed';
     post.unificationNote = `Unification error: ${err instanceof Error ? err.message : 'Unknown'}`;
-    log.error(`Unification pass failed (non-critical):`, err);
+    log.error({ err: err }, `Unification pass failed (non-critical):`);
     // Non-critical — the post is still usable without unification
   }
 
@@ -971,7 +971,7 @@ export async function generatePost(
       log.info(`SEO meta generated: "${seoMeta.seoTitle}" (${seoMeta.seoTitle.length} chars)`);
     }
   } catch (err) {
-    log.warn('SEO meta generation failed (non-critical):', err);
+    log.warn({ err: err }, 'SEO meta generation failed (non-critical)');
   }
 
   // Finalize
