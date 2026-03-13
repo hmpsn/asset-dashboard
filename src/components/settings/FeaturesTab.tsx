@@ -3,6 +3,7 @@ import {
   BarChart3, Loader2, Mail, Image as ImageIcon, DollarSign, Sparkles,
   Users, Shield, SlidersHorizontal,
 } from 'lucide-react';
+import { post } from '../../api/client';
 
 interface WorkspaceData {
   tier?: 'free' | 'growth' | 'premium';
@@ -258,9 +259,7 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
                   setSendingReport(true);
                   toast('Generating report...');
                   try {
-                    const res = await fetch(`/api/monthly-report/${workspaceId}`, { method: 'POST' });
-                    if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Failed'); }
-                    const data = await res.json();
+                    const data = await post<{ sent?: boolean }>(`/api/monthly-report/${workspaceId}`);
                     toast(data.sent ? 'Report sent to client!' : 'Report generated (no client email configured)');
                   } catch (err) {
                     toast(err instanceof Error ? err.message : 'Report failed');

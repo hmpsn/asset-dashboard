@@ -6,6 +6,7 @@ import { TierGate, type Tier } from '../ui';
 import { StatusBadge } from '../ui/StatusBadge';
 import { usePageEditStates } from '../../hooks/usePageEditStates';
 import type { ApprovalBatch, ApprovalItem } from './types';
+import { patch, post } from '../../api/client';
 
 interface ApprovalsTabProps {
   workspaceId: string;
@@ -51,12 +52,7 @@ export function ApprovalsTab({
 
   const updateApprovalItem = async (batchId: string, itemId: string, update: { status?: string; clientValue?: string; clientNote?: string }) => {
     try {
-      const res = await fetch(`/api/public/approvals/${workspaceId}/${batchId}/${itemId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(update),
-      });
-      const updated = await res.json();
+      const updated = await patch<ApprovalBatch>(`/api/public/approvals/${workspaceId}/${batchId}/${itemId}`, update);
       if (updated.id) {
         setApprovalBatches(prev => prev.map(b => b.id === batchId ? updated : b));
       }
@@ -69,8 +65,7 @@ export function ApprovalsTab({
     if (!window.confirm('This will update your live website with the approved changes. Continue?')) return;
     setApplyingBatch(batchId);
     try {
-      const res = await fetch(`/api/public/approvals/${workspaceId}/${batchId}/apply`, { method: 'POST' });
-      const data = await res.json();
+      const data = await post<{ applied: number }>(`/api/public/approvals/${workspaceId}/${batchId}/apply`);
       if (data.applied > 0) {
         loadApprovals(workspaceId);
       }

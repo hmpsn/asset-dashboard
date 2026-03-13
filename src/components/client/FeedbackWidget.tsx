@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { MessageSquarePlus, X, Bug, Lightbulb, MessageCircle, Send, ChevronDown, CheckCircle2, Clock, Loader2 } from 'lucide-react';
+import { get, post } from '../../api/client';
 
 type FeedbackType = 'bug' | 'feature' | 'general';
 type FeedbackStatus = 'new' | 'acknowledged' | 'fixed' | 'wontfix';
@@ -62,11 +63,8 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
 
   const loadFeedback = async () => {
     try {
-      const res = await fetch(`/api/public/feedback/${workspaceId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setItems(data);
-      }
+      const data = await get<FeedbackItem[]>(`/api/public/feedback/${workspaceId}`);
+      setItems(data);
     } catch { /* silent */ }
   };
 
@@ -86,17 +84,11 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
         url: window.location.href,
         userAgent: navigator.userAgent,
       };
-      const res = await fetch(`/api/public/feedback/${workspaceId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, title: title.trim(), description: description.trim(), context, submittedBy }),
-      });
-      if (res.ok) {
-        setSubmitted(true);
-        setTitle('');
-        setDescription('');
-        setTimeout(() => { setSubmitted(false); setView('list'); loadFeedback(); }, 1500);
-      }
+      await post(`/api/public/feedback/${workspaceId}`, { type, title: title.trim(), description: description.trim(), context, submittedBy });
+      setSubmitted(true);
+      setTitle('');
+      setDescription('');
+      setTimeout(() => { setSubmitted(false); setView('list'); loadFeedback(); }, 1500);
     } catch { /* silent */ }
     finally { setSubmitting(false); }
   };
@@ -104,16 +96,10 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
   const handleReply = async (itemId: string) => {
     if (!replyText.trim()) return;
     try {
-      const res = await fetch(`/api/public/feedback/${workspaceId}/${itemId}/reply`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: replyText.trim() }),
-      });
-      if (res.ok) {
-        setReplyText('');
-        setReplyingTo(null);
-        loadFeedback();
-      }
+      await post(`/api/public/feedback/${workspaceId}/${itemId}/reply`, { content: replyText.trim() });
+      setReplyText('');
+      setReplyingTo(null);
+      loadFeedback();
     } catch { /* silent */ }
   };
 

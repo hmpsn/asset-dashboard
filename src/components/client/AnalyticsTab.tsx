@@ -10,6 +10,7 @@ import {
 } from 'recharts';
 import SearchableSelect from '../SearchableSelect';
 import { OrganicInsight } from './DataSnapshots';
+import { get, getSafe } from '../../api/client';
 import type {
   GA4Overview, GA4DailyTrend, GA4TopPage, GA4TopSource,
   GA4DeviceBreakdown, GA4Event, GA4ConversionSummary,
@@ -77,8 +78,7 @@ export function AnalyticsTab({
     setModulePageLoading(prev => ({ ...prev, [moduleId]: true }));
     try {
       const params = new URLSearchParams({ days: String(days), page: pagePath });
-      const res = await fetch(`/api/public/analytics-event-explorer/${ws.id}?${params}`);
-      const data = await res.json();
+      const data = await getSafe<GA4EventPageBreakdown[]>(`/api/public/analytics-event-explorer/${ws.id}?${params}`, []);
       if (Array.isArray(data)) {
         const byEvent: Record<string, { conversions: number; users: number }> = {};
         for (const row of data) {
@@ -109,8 +109,7 @@ export function AnalyticsTab({
       const params = new URLSearchParams({ days: String(days) });
       if (event) params.set('event', event);
       if (page) params.set('page', page);
-      const res = await fetch(`/api/public/analytics-event-explorer/${ws.id}?${params}`);
-      const data = await res.json();
+      const data = await getSafe<GA4EventPageBreakdown[]>(`/api/public/analytics-event-explorer/${ws.id}?${params}`, []);
       if (Array.isArray(data)) setExplorerData(data);
     } catch { setExplorerData([]); }
     finally { setExplorerLoading(false); }
@@ -120,8 +119,7 @@ export function AnalyticsTab({
     if (!ws) return;
     setGa4SelectedEvent(eventName);
     try {
-      const res = await fetch(`/api/public/analytics-event-trend/${ws.id}?days=${days}&event=${encodeURIComponent(eventName)}`);
-      const data = await res.json();
+      const data = await getSafe<GA4EventTrend[]>(`/api/public/analytics-event-trend/${ws.id}?days=${days}&event=${encodeURIComponent(eventName)}`, []);
       if (Array.isArray(data)) setGa4EventTrend(data);
     } catch { setGa4EventTrend([]); }
   };

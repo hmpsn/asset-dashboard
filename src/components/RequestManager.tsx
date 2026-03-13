@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { get, patch, post, del, getSafe, postForm } from '../api/client';
 import {
   MessageSquare, Send, Loader2, ChevronDown, ChevronUp,
   Trash2, ExternalLink, Clock, CheckCircle2, AlertTriangle,
@@ -95,14 +96,14 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
   const [bulkUpdating, setBulkUpdating] = useState(false);
 
   useEffect(() => {
-    fetch('/api/workspaces').then(r => r.json()).then(setWorkspaces).catch(() => {});
+    getSafe<Workspace[]>('/api/workspaces', []).then(setWorkspaces).catch(() => {});
   }, []);
 
   const refreshRequests = (filter?: string) => {
     const f = filter ?? wsFilter;
     const url = f && f !== 'all' ? `/api/requests?workspaceId=${f}` : '/api/requests';
     setLoading(true);
-    fetch(url).then(r => r.json()).then(data => { if (Array.isArray(data)) setRequests(data); }).catch(() => {}).finally(() => setLoading(false));
+    getSafe<ClientRequest[]>(url, []).then(data => { if (Array.isArray(data)) setRequests(data); }).catch(() => {}).finally(() => setLoading(false));
   };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -110,15 +111,8 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
 
   const updateRequest = async (id: string, updates: Record<string, string>) => {
     try {
-      const res = await fetch(`/api/requests/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates),
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setRequests(prev => prev.map(r => r.id === id ? updated : r));
-      }
+      const updated = await patch<ClientRequest>(`/api/requests/${id}`, updates);
+      setRequests(prev => prev.map(r => r.id === id ? updated : r));
     } catch { /* skip */ }
   };
 
@@ -127,23 +121,17 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
     setSendingNote(true);
     try {
       let res;
+      let updated: ClientRequest;
       if (noteFiles.length > 0) {
         const fd = new FormData();
         fd.append('content', noteInput.trim());
         noteFiles.forEach(f => fd.append('files', f));
-        res = await fetch(`/api/requests/${requestId}/notes-with-files`, { method: 'POST', body: fd });
+        updated = await postForm<ClientRequest>(`/api/requests/${requestId}/notes-with-files`, fd);
       } else {
-        res = await fetch(`/api/requests/${requestId}/notes`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: noteInput.trim() }),
-        });
+        updated = await post<ClientRequest>(`/api/requests/${requestId}/notes`, { content: noteInput.trim() });
       }
-      if (res.ok) {
-        const updated = await res.json();
-        setRequests(prev => prev.map(r => r.id === requestId ? updated : r));
-        setNoteInput(''); setNoteFiles([]);
-      }
+      setRequests(prev => prev.map(r => r.id === requestId ? updated : r));
+      setNoteInput(''); setNoteFiles([]);
     } catch { /* skip */ }
     setSendingNote(false);
   };
@@ -151,7 +139,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
   const deleteReq = async (id: string) => {
     if (!confirm('Delete this request? This cannot be undone.')) return;
     try {
-      await fetch(`/api/requests/${id}`, { method: 'DELETE' });
+      await del(`/api/requests/${id}`);
       setRequests(prev => prev.filter(r => r.id !== id));
       setSelected(prev => { const n = new Set(prev); n.delete(id); return n; });
       if (expandedId === id) setExpandedId(null);
@@ -163,15 +151,9 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
     if (selected.size === 0) return;
     setBulkUpdating(true);
     try {
-      const res = await fetch('/api/requests/bulk', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: Array.from(selected), status }),
-      });
-      if (res.ok) {
-        setRequests(prev => prev.map(r => selected.has(r.id) ? { ...r, status, updatedAt: new Date().toISOString() } : r));
-        setSelected(new Set());
-      }
+      await patch('/api/requests/bulk', { ids: Array.from(selected), status });
+      setRequests(prev => prev.map(r => selected.has(r.id) ? { ...r, status, updatedAt: new Date().toISOString() } : r));
+      setSelected(new Set());
     } catch { /* skip */ }
     setBulkUpdating(false);
   };
@@ -181,7 +163,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
     if (!confirm(`Delete ${selected.size} selected task${selected.size > 1 ? 's' : ''}? This cannot be undone.`)) return;
     setBulkUpdating(true);
     try {
-      await Promise.all(Array.from(selected).map(id => fetch(`/api/requests/${id}`, { method: 'DELETE' })));
+      await Promise.all(Array.from(selected).map(id => del(`/api/requests/${id}`)));
       setRequests(prev => prev.filter(r => !selected.has(r.id)));
       setSelected(new Set());
     } catch { /* skip */ }

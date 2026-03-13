@@ -3,6 +3,7 @@ import {
   Loader2, ExternalLink, AlertCircle, ArrowRight,
   RefreshCw, Link2Off, Check, Download,
 } from 'lucide-react';
+import { get, getOptional } from '../api/client';
 
 interface DeadLink {
   url: string;
@@ -45,9 +46,8 @@ export function LinkChecker({ siteId }: Props) {
   // Fetch available domains when site changes
   useEffect(() => {
     setDomains(null); setSelectedDomain('');
-    fetch(`/api/webflow/link-check-domains/${siteId}`)
-      .then(r => r.json())
-      .then((d: SiteDomainInfo) => {
+    get<SiteDomainInfo>(`/api/webflow/link-check-domains/${siteId}`)
+      .then(d => {
         setDomains(d);
         setSelectedDomain(d.defaultDomain || d.staging);
       })
@@ -58,8 +58,7 @@ export function LinkChecker({ siteId }: Props) {
     setLoading(true);
     setHasRun(true);
     const domainParam = selectedDomain ? `?domain=${encodeURIComponent(selectedDomain)}` : '';
-    fetch(`/api/webflow/link-check/${siteId}${domainParam}`)
-      .then(r => r.json())
+    get<LinkCheckResult>(`/api/webflow/link-check/${siteId}${domainParam}`)
       .then(d => setData(d))
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -69,8 +68,7 @@ export function LinkChecker({ siteId }: Props) {
   useEffect(() => {
     let cancelled = false;
     setData(null); setHasRun(false);
-    fetch(`/api/webflow/link-check-snapshot/${siteId}`)
-      .then(r => r.json())
+    getOptional<{ result?: LinkCheckResult }>(`/api/webflow/link-check-snapshot/${siteId}`)
       .then(snap => { if (!cancelled && snap?.result) { setData(snap.result); setHasRun(true); } })
       .catch(() => {});
     return () => { cancelled = true; };

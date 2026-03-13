@@ -9,6 +9,7 @@ import type { AuditSummary, AuditDetail } from './types';
 import { FixRecommendations } from './FixRecommendations';
 import { OrderStatus } from './OrderStatus';
 import { STUDIO_NAME } from '../../constants';
+import { post, getSafe } from '../../api/client';
 
 const ScoreRing = MetricRing;
 
@@ -47,20 +48,14 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, tie
       const wordIssue = page.issues.find(i => i.check?.toLowerCase().includes('content-length'));
       const wordMatch = wordIssue?.message?.match(/(\d+)\s*words?/i);
       const wordCount = wordMatch ? parseInt(wordMatch[1], 10) : undefined;
-      const res = await fetch(`/api/public/content-request/${workspaceId}/from-audit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pageSlug: page.slug,
-          pageName: page.page,
-          issues: page.issues.filter(i => hasContentIssues([i])).map(i => i.message),
-          wordCount,
-        }),
+      await post(`/api/public/content-request/${workspaceId}/from-audit`, {
+        pageSlug: page.slug,
+        pageName: page.page,
+        issues: page.issues.filter(i => hasContentIssues([i])).map(i => i.message),
+        wordCount,
       });
-      if (res.ok) {
-        setRequestedPages(prev => new Set(prev).add(page.pageId));
-        onContentRequested?.();
-      }
+      setRequestedPages(prev => new Set(prev).add(page.pageId));
+      onContentRequested?.();
     } catch { /* silent fail */ }
     finally { setRequestingPage(null); }
   };
@@ -91,7 +86,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, tie
 
   useEffect(() => {
     if (shareOpen && workspaceId && reports.length === 0) {
-      fetch(`/api/public/reports/${workspaceId}`).then(r => r.ok ? r.json() : []).then(setReports).catch(() => {});
+      getSafe<Array<{ id: string; type: 'audit' | 'monthly'; title: string; createdAt: string; score?: number; permalink: string }>>(`/api/public/reports/${workspaceId}`, []).then(setReports);
     }
   }, [shareOpen, workspaceId]);
 

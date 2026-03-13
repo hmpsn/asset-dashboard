@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { get, put, post } from '../api/client';
 import {
   Loader2, Save, Sparkles, Upload, ChevronDown, ChevronRight,
   Check, AlertCircle, Wand2, Send, CheckSquare, Square, AlertTriangle,
@@ -53,8 +54,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const fetchPages = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/webflow/pages/${siteId}`);
-      const data = await res.json();
+      const data = await get<PageMeta[]>(`/api/webflow/pages/${siteId}`);
       setPages(data);
       const editMap: Record<string, EditState> = {};
       for (const p of data) {
@@ -107,16 +107,11 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     if (!edit) return;
     setSaving(prev => new Set(prev).add(pageId));
     try {
-      const res = await fetch(`/api/webflow/pages/${pageId}/seo`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          siteId,
-          seo: { title: edit.seoTitle, description: edit.seoDescription },
-          openGraph: { title: edit.seoTitle, description: edit.seoDescription },
-        }),
+      const data = await put<{ success?: boolean; error?: string }>(`/api/webflow/pages/${pageId}/seo`, {
+        siteId,
+        seo: { title: edit.seoTitle, description: edit.seoDescription },
+        openGraph: { title: edit.seoTitle, description: edit.seoDescription },
       });
-      const data = await res.json();
       if (data.success === false) {
         console.error('Save failed:', data.error);
         alert(`Failed to save SEO: ${data.error || 'Unknown error'}`);
@@ -141,19 +136,14 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     const edit = edits[pageId];
     setAiLoading(prev => ({ ...prev, [pageId]: field }));
     try {
-      const res = await fetch('/api/webflow/seo-rewrite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pageTitle: page.title,
-          currentSeoTitle: edit?.seoTitle || page.seo?.title,
-          currentDescription: edit?.seoDescription || page.seo?.description,
-          field,
-          workspaceId,
-          pagePath: `/${page.slug || ''}`,
-        }),
+      const data = await post<{ text?: string; variations?: string[] }>('/api/webflow/seo-rewrite', {
+        pageTitle: page.title,
+        currentSeoTitle: edit?.seoTitle || page.seo?.title,
+        currentDescription: edit?.seoDescription || page.seo?.description,
+        field,
+        workspaceId,
+        pagePath: `/${page.slug || ''}`,
       });
-      const data = await res.json();
       if (data.variations?.length > 1) {
         // Show variation picker — auto-select the first one
         const key = field === 'title' ? 'seoTitle' : 'seoDescription';
@@ -173,8 +163,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const handlePublish = async () => {
     setPublishing(true);
     try {
-      const res = await fetch(`/api/webflow/publish/${siteId}`, { method: 'POST' });
-      const data = await res.json();
+      const data = await post<{ success?: boolean }>(`/api/webflow/publish/${siteId}`);
       if (data.success) {
         setPublished(true);
         setTimeout(() => setPublished(false), 3000);
@@ -199,20 +188,15 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     setBulkFixing(true);
     setBulkResults(null);
     try {
-      const res = await fetch(`/api/webflow/seo-bulk-fix/${siteId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          field,
-          pages: pagesNeedingFix.map(p => ({
-            pageId: p.id,
-            title: p.title,
-            currentSeoTitle: p.seo?.title,
-            currentDescription: p.seo?.description,
-          })),
-        }),
+      const data = await post<{ results?: Array<{ applied: boolean }> }>(`/api/webflow/seo-bulk-fix/${siteId}`, {
+        field,
+        pages: pagesNeedingFix.map(p => ({
+          pageId: p.id,
+          title: p.title,
+          currentSeoTitle: p.seo?.title,
+          currentDescription: p.seo?.description,
+        })),
       });
-      const data = await res.json();
       const applied = data.results?.filter((r: { applied: boolean }) => r.applied).length || 0;
       setBulkResults(`AI generated ${field === 'title' ? 'titles' : 'descriptions'} for ${applied} of ${pagesNeedingFix.length} pages and pushed to Webflow.`);
       fetchPages();
@@ -269,11 +253,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         setSendingApproval(false);
         return;
       }
-      await fetch(`/api/approvals/${workspaceId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ siteId, name: `SEO Changes — ${new Date().toLocaleDateString()}`, items }),
-      });
+      await post(`/api/approvals/${workspaceId}`, { siteId, name: `SEO Changes — ${new Date().toLocaleDateString()}`, items });
       setApprovalSent(true);
       // Refresh page edit states to reflect the new 'in-review' status
       refreshStates();

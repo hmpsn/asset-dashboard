@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { TrendingUp, TrendingDown, Clock, Pencil, Minus } from 'lucide-react';
 import { SectionCard } from '../ui';
+import { getOptional } from '../../api/client';
 
 interface SeoChangeEvent {
   id: string;
@@ -76,8 +77,7 @@ export function SeoChangeImpact({ workspaceId, hasGsc }: SeoChangeImpactProps) {
   const [showImpact, setShowImpact] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/seo-changes/${workspaceId}?limit=20`)
-      .then(r => r.ok ? r.json() : null)
+    getOptional<{ changes?: SeoChangeEvent[] }>(`/api/seo-changes/${workspaceId}?limit=20`)
       .then(d => { if (d?.changes) setChanges(d.changes); })
       .catch(() => {});
   }, [workspaceId]);
@@ -86,8 +86,7 @@ export function SeoChangeImpact({ workspaceId, hasGsc }: SeoChangeImpactProps) {
     if (!hasGsc || loading) return;
     setLoading(true);
     setShowImpact(true);
-    fetch(`/api/seo-change-impact/${workspaceId}?limit=10`)
-      .then(r => r.ok ? r.json() : null)
+    getOptional<{ impact?: PageImpact[] }>(`/api/seo-change-impact/${workspaceId}?limit=10`)
       .then(d => { if (d?.impact) setImpact(d.impact); })
       .catch(() => {})
       .finally(() => setLoading(false));

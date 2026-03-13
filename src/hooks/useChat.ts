@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { post, getOptional, ApiError } from '../api/client';
 import type {
   SearchOverview, PerformanceTrend, AuditSummary, AuditDetail,
   GA4Overview, GA4ConversionSummary,
@@ -171,21 +172,23 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
     setChatLoading(true);
     try {
       const context = buildChatContext();
-      const res = await fetch(`/api/public/search-chat/${ws.id}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: question.trim(), context, sessionId: chatSessionId, betaMode }),
-      });
-      const data = await res.json();
-      if (res.status === 429) {
-        const roiMsg = roiValue && roiValue > 0
-          ? ` You've already identified **$${Math.round(roiValue).toLocaleString()}** in organic traffic value this month — Growth ($249/mo) pays for itself.`
-          : ' Upgrade to Growth ($249/mo) for unlimited chat access.';
-        setChatMessages(prev => [...prev, { role: 'assistant', content: `You've used all your free conversations this month.${roiMsg}` }]);
-        setChatUsage(u => u ? { ...u, allowed: false, remaining: 0 } : u);
-      } else {
-        setChatMessages(prev => [...prev, { role: 'assistant', content: data.error ? `Error: ${data.error}` : data.answer }]);
+      let data: { answer?: string; error?: string };
+      try {
+        data = await post<{ answer?: string; error?: string }>(`/api/public/search-chat/${ws.id}`, { question: question.trim(), context, sessionId: chatSessionId, betaMode });
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 429) {
+          const roiMsg = roiValue && roiValue > 0
+            ? ` You've already identified **$${Math.round(roiValue).toLocaleString()}** in organic traffic value this month — Growth ($249/mo) pays for itself.`
+            : ' Upgrade to Growth ($249/mo) for unlimited chat access.';
+          setChatMessages(prev => [...prev, { role: 'assistant', content: `You've used all your free conversations this month.${roiMsg}` }]);
+          setChatUsage(u => u ? { ...u, allowed: false, remaining: 0 } : u);
+          setChatLoading(false);
+          return;
+        }
+        throw err;
       }
-      if (ws) fetch(`/api/public/chat-usage/${ws.id}`).then(r => r.json()).then(d => setChatUsage(d)).catch(() => {});
+      setChatMessages(prev => [...prev, { role: 'assistant', content: data.error ? `Error: ${data.error}` : (data.answer ?? '') }]);
+      if (ws) getOptional<{ allowed: boolean; used: number; limit: number; remaining: number; tier: string }>(`/api/public/chat-usage/${ws.id}`).then(d => { if (d) setChatUsage(d); }).catch(() => {});
     } catch {
       setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong.' }]);
     } finally { setChatLoading(false); }
@@ -198,11 +201,7 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
     try {
       const context = buildChatContext();
       const proactivePrompt = 'You are proactively greeting me as I open the Insights Engine. In 2-3 concise bullet points, tell me the most important things happening with my site data right now. Be specific with numbers. Highlight anything that needs attention first, then wins, then opportunities. Keep it brief and actionable. Do not ask me questions.';
-      const res = await fetch(`/api/public/search-chat/${ws.id}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: proactivePrompt, context, sessionId: chatSessionId, betaMode }),
-      });
-      const data = await res.json();
+      const data = await post<{ answer?: string; error?: string }>(`/api/public/search-chat/${ws.id}`, { question: proactivePrompt, context, sessionId: chatSessionId, betaMode });
       if (!data.error) {
         setChatMessages([{ role: 'assistant', content: data.answer }]);
       }
@@ -218,11 +217,7 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
     try {
       const context = buildChatContext();
       const prompt = 'Give me a 2-3 sentence executive summary of my site\'s current performance. Lead with the single most important trend (positive or negative), then one actionable next step. Be specific with numbers. Do not use bullet points or headers — write it as a short paragraph. Do not ask me questions.';
-      const res = await fetch(`/api/public/search-chat/${ws.id}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: prompt, context, sessionId: `inline-${ws.id}`, betaMode }),
-      });
-      const data = await res.json();
+      const data = await post<{ answer?: string; error?: string }>(`/api/public/search-chat/${ws.id}`, { question: prompt, context, sessionId: `inline-${ws.id}`, betaMode });
       if (!data.error && data.answer) setProactiveInsight(data.answer);
     } catch { /* silent fail */ }
     finally { setProactiveInsightLoading(false); }
@@ -240,10 +235,10 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
   // Fetch chat usage and ROI data when chat opens
   useEffect(() => {
     if (chatOpen && deps.ws) {
-      fetch(`/api/public/chat-usage/${deps.ws.id}`).then(r => r.json()).then(d => setChatUsage(d)).catch(() => {});
+      getOptional<{ allowed: boolean; used: number; limit: number; remaining: number; tier: string }>(`/api/public/chat-usage/${deps.ws.id}`).then(d => { if (d) setChatUsage(d); }).catch(() => {});
       // Fetch ROI for upgrade prompts (best-effort, silent fail)
       if (roiValue === null) {
-        fetch(`/api/public/roi/${deps.ws.id}`).then(r => r.ok ? r.json() : null).then(d => {
+        getOptional<{ organicTrafficValue?: number }>(`/api/public/roi/${deps.ws.id}`).then(d => {
           if (d?.organicTrafficValue) setRoiValue(d.organicTrafficValue);
         }).catch(() => {});
       }

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { get, getSafe } from '../api/client';
 
 export interface SearchOverview {
   totalClicks: number;
@@ -60,14 +61,12 @@ export function useSearchData(workspaceId: string | undefined, days = 28) {
     setError(null);
     try {
       const drParams = dateRange ? `&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}` : '';
-      const [ovRes, trRes, cmpRes] = await Promise.all([
-        fetch(`/api/public/search-overview/${wsId}?days=${numDays}${drParams}`),
-        fetch(`/api/public/performance-trend/${wsId}?days=${numDays}${drParams}`),
-        fetch(`/api/public/search-comparison/${wsId}?days=${numDays}${drParams}`),
+      const [ovData, trData, cmpData] = await Promise.all([
+        get<SearchOverview>(`/api/public/search-overview/${wsId}?days=${numDays}${drParams}`),
+        getSafe<Array<{ date: string; clicks: number; impressions: number }>>(`/api/public/performance-trend/${wsId}?days=${numDays}${drParams}`, []),
+        getSafe<SearchComparison | null>(`/api/public/search-comparison/${wsId}?days=${numDays}${drParams}`, null),
       ]);
-      const [ovData, trData, cmpData] = await Promise.all([ovRes.json(), trRes.json(), cmpRes.json()]);
       if (id !== fetchRef.current) return;
-      if (ovData.error) throw new Error(ovData.error);
 
       const result: SearchDataResult = {
         overview: ovData,

@@ -4,6 +4,7 @@ import {
   CheckCircle, XCircle, FileWarning, Eye, Search,
   Minimize2, RefreshCw, ChevronDown, Download, X, Copy, CopyCheck, MessageSquareWarning,
 } from 'lucide-react';
+import { get, post, del } from '../api/client';
 
 interface AuditIssue {
   assetId: string;
@@ -67,8 +68,7 @@ function AssetAudit({ siteId }: Props) {
   const runAudit = () => {
     setLoading(true);
     setHasRun(true);
-    fetch(`/api/webflow/audit/${siteId}`)
-      .then(r => r.json())
+    get<AuditResult>(`/api/webflow/audit/${siteId}`)
       .then(data => setAudit(data))
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -83,12 +83,7 @@ function AssetAudit({ siteId }: Props) {
     if (!issue.url) return;
     setGeneratingAlt(prev => new Set(prev).add(issue.assetId));
     try {
-      const res = await fetch(`/api/webflow/generate-alt/${issue.assetId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl: issue.url, siteId }),
-      });
-      const data = await res.json();
+      const data = await post<{ altText?: string }>(`/api/webflow/generate-alt/${issue.assetId}`, { imageUrl: issue.url, siteId });
       if (data.altText && audit) {
         setAudit({
           ...audit,
@@ -123,12 +118,7 @@ function AssetAudit({ siteId }: Props) {
     for (let idx = 0; idx < compressible.length; idx++) {
       const issue = compressible[idx];
       try {
-        const res = await fetch(`/api/webflow/compress/${issue.assetId}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageUrl: issue.url, siteId, fileName: issue.fileName }),
-        });
-        const data = await res.json();
+        const data = await post<{ success?: boolean; savings?: number }>(`/api/webflow/compress/${issue.assetId}`, { imageUrl: issue.url, siteId, fileName: issue.fileName });
         if (data.success) totalSaved += (data.savings || 0);
       } catch { /* ignore */ }
       setBulkCompressProgress({ done: idx + 1, total: compressible.length, saved: totalSaved });
@@ -164,12 +154,7 @@ function AssetAudit({ siteId }: Props) {
     if (!issue.url) return;
     setCompressing(prev => new Set(prev).add(issue.assetId));
     try {
-      const res = await fetch(`/api/webflow/compress/${issue.assetId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl: issue.url, siteId, fileName: issue.fileName }),
-      });
-      const data = await res.json();
+      const data = await post<{ success?: boolean; newAssetId?: string; newSize?: number }>(`/api/webflow/compress/${issue.assetId}`, { imageUrl: issue.url, siteId, fileName: issue.fileName });
       if (data.success && audit) {
         setAudit({
           ...audit,
@@ -188,7 +173,7 @@ function AssetAudit({ siteId }: Props) {
   const handleDeleteAsset = async (issue: AuditIssue) => {
     setDeletingIds(prev => new Set(prev).add(issue.assetId));
     try {
-      await fetch(`/api/webflow/assets/${issue.assetId}?siteId=${siteId}`, { method: 'DELETE' });
+      await del(`/api/webflow/assets/${issue.assetId}?siteId=${siteId}`);
       if (audit) {
         const wasUnused = issue.issues.includes('unused');
         setAudit({
@@ -210,7 +195,7 @@ function AssetAudit({ siteId }: Props) {
     setDeletingUnused(true);
     for (const issue of unused) {
       try {
-        await fetch(`/api/webflow/assets/${issue.assetId}?siteId=${siteId}`, { method: 'DELETE' });
+        await del(`/api/webflow/assets/${issue.assetId}?siteId=${siteId}`);
       } catch { /* ignore */ }
     }
     setAudit({

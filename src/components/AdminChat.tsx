@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Sparkles, X, Send, Loader2, MessageSquare, Bot, Plus } from 'lucide-react';
 import { RenderMarkdown } from './client/helpers';
+import { getSafe, getOptional } from '../api/client';
+import { chat, anomalies as anomaliesApi } from '../api/misc';
+import { ga4, gsc } from '../api/analytics';
+import { audit } from '../api/seo';
 
 interface ChatMessage { role: 'user' | 'assistant'; content: string; }
 
@@ -50,42 +54,42 @@ export function AdminChat({ workspaceId, workspaceName, ga4PropertyId, gscProper
     setContextLoading(true);
     try {
       const days = 28;
-      const qs = `?days=${days}`;
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const f = async (key: string, url: string): Promise<{ key: string; data: any }> => {
-        try { return { key, data: await fetch(url).then(r => r.json()) }; } catch { return { key, data: null }; }
+      const wrap = async (key: string, promise: Promise<any>): Promise<{ key: string; data: any }> => {
+        try { return { key, data: await promise }; } catch { return { key, data: null }; }
       };
 
       const fetches = [];
 
       // GA4 data
       if (ga4PropertyId) {
-        fetches.push(f('ga4Overview', `/api/public/analytics-overview/${workspaceId}${qs}`));
-        fetches.push(f('comparison', `/api/public/analytics-comparison/${workspaceId}${qs}`));
-        fetches.push(f('ga4Pages', `/api/public/analytics-top-pages/${workspaceId}${qs}`));
-        fetches.push(f('ga4Sources', `/api/public/analytics-sources/${workspaceId}${qs}`));
-        fetches.push(f('organic', `/api/public/analytics-organic/${workspaceId}${qs}`));
-        fetches.push(f('newVsReturning', `/api/public/analytics-new-vs-returning/${workspaceId}${qs}`));
-        fetches.push(f('conversions', `/api/public/analytics-conversions/${workspaceId}${qs}`));
-        fetches.push(f('landingPages', `/api/public/analytics-landing-pages/${workspaceId}${qs}`));
+        fetches.push(wrap('ga4Overview', ga4.overview(workspaceId, days)));
+        fetches.push(wrap('comparison', ga4.comparison(workspaceId, days)));
+        fetches.push(wrap('ga4Pages', ga4.topPages(workspaceId, days)));
+        fetches.push(wrap('ga4Sources', ga4.sources(workspaceId, days)));
+        fetches.push(wrap('organic', ga4.organic(workspaceId, days)));
+        fetches.push(wrap('newVsReturning', ga4.newVsReturning(workspaceId, days)));
+        fetches.push(wrap('conversions', ga4.conversions(workspaceId, days)));
+        fetches.push(wrap('landingPages', ga4.landingPages(workspaceId, days)));
       }
 
       // GSC data
       if (gscPropertyUrl) {
-        fetches.push(f('search', `/api/public/search-overview/${workspaceId}${qs}`));
+        fetches.push(wrap('search', gsc.overview(workspaceId, days)));
       }
 
       // Site audit
-      fetches.push(f('siteHealth', `/api/public/audit/${workspaceId}`));
+      fetches.push(wrap('siteHealth', audit.publicAudit(workspaceId)));
 
       // Anomalies
-      fetches.push(f('detectedAnomalies', `/api/anomalies/${workspaceId}`));
+      fetches.push(wrap('detectedAnomalies', anomaliesApi.list(workspaceId)));
 
       const results = await Promise.all(fetches);
       const ctx: Record<string, unknown> = { days };
 
       for (const { key, data: val } of results) {
-        if (val && typeof val === 'object' && !val.error) {
+        if (val && typeof val === 'object' && !(val as Record<string, unknown>).error) {
           if (key === 'ga4Overview') {
             ctx.ga4 = { overview: val };
           } else if (key === 'ga4Pages' && Array.isArray(val)) {
@@ -93,16 +97,18 @@ export function AdminChat({ workspaceId, workspaceName, ga4PropertyId, gscProper
           } else if (key === 'ga4Sources' && Array.isArray(val)) {
             if (ctx.ga4 && typeof ctx.ga4 === 'object') (ctx.ga4 as Record<string, unknown>).sources = val.slice(0, 8);
           } else if (key === 'search') {
+            const sv = val as Record<string, unknown>;
             ctx.search = {
-              dateRange: val.dateRange, totalClicks: val.totalClicks,
-              totalImpressions: val.totalImpressions, avgCtr: val.avgCtr,
-              avgPosition: val.avgPosition,
-              topQueries: Array.isArray(val.topQueries) ? val.topQueries.slice(0, 15) : [],
-              topPages: Array.isArray(val.topPages) ? val.topPages.slice(0, 10) : [],
+              dateRange: sv.dateRange, totalClicks: sv.totalClicks,
+              totalImpressions: sv.totalImpressions, avgCtr: sv.avgCtr,
+              avgPosition: sv.avgPosition,
+              topQueries: Array.isArray(sv.topQueries) ? (sv.topQueries as unknown[]).slice(0, 15) : [],
+              topPages: Array.isArray(sv.topPages) ? (sv.topPages as unknown[]).slice(0, 10) : [],
             };
           } else if (key === 'siteHealth') {
-            if (val.siteScore !== undefined) {
-              ctx.siteHealth = { score: val.siteScore, totalPages: val.totalPages, errors: val.errors, warnings: val.warnings };
+            const sv = val as Record<string, unknown>;
+            if (sv.siteScore !== undefined) {
+              ctx.siteHealth = { score: sv.siteScore, totalPages: sv.totalPages, errors: sv.errors, warnings: sv.warnings };
             }
           } else {
             ctx[key] = Array.isArray(val) ? val.slice(0, 10) : val;
@@ -130,13 +136,8 @@ export function AdminChat({ workspaceId, workspaceName, ga4PropertyId, gscProper
     setInput('');
     setLoading(true);
     try {
-      const res = await fetch('/api/admin-chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workspaceId, question: question.trim(), context: context || { days: 28 }, sessionId }),
-      });
-      const data = await res.json();
-      setMessages(prev => [...prev, { role: 'assistant', content: data.error ? `Error: ${data.error}` : data.answer }]);
+      const data = await chat.adminAsk({ workspaceId, question: question.trim(), context: context || { days: 28 }, sessionId });
+      setMessages(prev => [...prev, { role: 'assistant', content: data.error ? `Error: ${data.error}` : (data.answer ?? '') }]);
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong.' }]);
     } finally {
@@ -165,7 +166,7 @@ export function AdminChat({ workspaceId, workspaceName, ga4PropertyId, gscProper
                 <button onClick={() => { setSessionId(`as-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`); setMessages([]); setShowHistory(false); }}
                   title="New conversation" className="text-zinc-500 hover:text-zinc-300 p-1"><Plus className="w-3.5 h-3.5" /></button>
               )}
-              <button onClick={() => { setShowHistory(!showHistory); if (!showHistory) { fetch(`/api/public/chat-sessions/${workspaceId}?channel=admin`).then(r => r.json()).then(d => { if (Array.isArray(d)) setSessions(d); }).catch(() => {}); } }}
+              <button onClick={() => { setShowHistory(!showHistory); if (!showHistory) { chat.sessions(workspaceId, 'admin').then(d => { if (Array.isArray(d)) setSessions(d as typeof sessions); }).catch(() => {}); } }}
                 title="Chat history" className={`p-1 ${showHistory ? 'text-purple-400' : 'text-zinc-500 hover:text-zinc-300'}`}><MessageSquare className="w-3.5 h-3.5" /></button>
               <button onClick={() => setOpen(false)} className="text-zinc-500 hover:text-zinc-300 p-1"><X className="w-4 h-4" /></button>
             </div>
@@ -179,7 +180,7 @@ export function AdminChat({ workspaceId, workspaceName, ga4PropertyId, gscProper
                 {sessions.map(s => (
                   <button key={s.id} onClick={() => {
                     setSessionId(s.id); setShowHistory(false);
-                    fetch(`/api/public/chat-sessions/${workspaceId}/${s.id}`).then(r => r.json()).then(d => {
+                    chat.session(workspaceId, s.id).then(d => {
                       if (d?.messages) setMessages(d.messages.map((m: { role: string; content: string }) => ({ role: m.role as 'user' | 'assistant', content: m.content })));
                     }).catch(() => {});
                   }} className={`w-full text-left px-3 py-2 rounded-lg border transition-colors ${s.id === sessionId ? 'bg-purple-500/10 border-purple-500/30 text-purple-300' : 'bg-zinc-800/50 border-zinc-800 text-zinc-300 hover:bg-zinc-800'}`}>

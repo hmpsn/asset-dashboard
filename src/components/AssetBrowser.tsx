@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { get, post, patch, getSafe } from '../api/client';
 import {
   Search, Image, AlertTriangle, Trash2, Sparkles, Check, X,
   FileText, ExternalLink, ChevronDown, Loader2, Minimize2, Wand2, FolderOpen,
@@ -68,8 +69,7 @@ function AssetBrowser({ siteId }: Props) {
   const [organizeResult, setOrganizeResult] = useState<{ moved: number; failed: number; total: number } | null>(null);
 
   const loadAssets = useCallback(() => {
-    fetch(`/api/webflow/assets/${siteId}`)
-      .then(r => r.json())
+    getSafe<Asset[]>(`/api/webflow/assets/${siteId}`, [])
       .then(data => setAssets(Array.isArray(data) ? data : []))
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -83,11 +83,10 @@ function AssetBrowser({ siteId }: Props) {
   useEffect(() => {
     if (assets.length === 0 || unusedIds || unusedLoadingRef.current) return;
     unusedLoadingRef.current = true;
-    fetch(`/api/webflow/audit/${siteId}`)
-      .then(r => r.json())
+    get<{ issues?: Array<{ issues: string[]; assetId: string }> }>(`/api/webflow/audit/${siteId}`)
       .then(data => {
         const ids = new Set<string>(
-          (data.issues || []).filter((i: { issues: string[] }) => i.issues.includes('unused')).map((i: { assetId: string }) => i.assetId)
+          (data.issues || []).filter((i) => i.issues.includes('unused')).map((i) => i.assetId)
         );
         setUnusedIds(ids);
       })
@@ -134,12 +133,7 @@ function AssetBrowser({ siteId }: Props) {
   const handleSaveAlt = async (assetId: string) => {
     setAltError(null);
     try {
-      const res = await fetch(`/api/webflow/assets/${assetId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ altText: altDraft, siteId }),
-      });
-      const data = await res.json();
+      const data = await patch<{ success?: boolean; error?: string }>(`/api/webflow/assets/${assetId}`, { altText: altDraft, siteId });
       if (!data.success) {
         setAltError(`Failed to save alt text: ${data.error || 'Unknown error'}`);
         return;
@@ -158,12 +152,7 @@ function AssetBrowser({ siteId }: Props) {
     setAltError(null);
     setGeneratingAlt(prev => new Set(prev).add(asset.id));
     try {
-      const res = await fetch(`/api/webflow/generate-alt/${asset.id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl: url, siteId }),
-      });
-      const data = await res.json();
+      const data = await post<{ error?: string; altText?: string; writeError?: string }>(`/api/webflow/generate-alt/${asset.id}`, { imageUrl: url, siteId });
       if (data.error) {
         setAltError(`Alt text generation failed: ${data.error}`);
       } else if (data.altText) {
@@ -263,17 +252,12 @@ function AssetBrowser({ siteId }: Props) {
     if (!url) return;
     setCompressing(prev => new Set(prev).add(asset.id));
     try {
-      const res = await fetch(`/api/webflow/compress/${asset.id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageUrl: url,
-          siteId,
-          altText: asset.altText,
-          fileName: asset.displayName || asset.originalFileName,
-        }),
+      const data = await post<{ success?: boolean; skipped?: boolean; reason?: string; newAssetId?: string; newSize?: number; newHostedUrl?: string; newFileName?: string; savingsPercent?: number; savings?: number }>(`/api/webflow/compress/${asset.id}`, {
+        imageUrl: url,
+        siteId,
+        altText: asset.altText,
+        fileName: asset.displayName || asset.originalFileName,
       });
-      const data = await res.json();
       if (data.success) {
         // Replace the asset in our list
         setAssets(prev => prev.map(a => a.id === asset.id ? {
@@ -296,19 +280,14 @@ function AssetBrowser({ siteId }: Props) {
   const handleSmartRename = async (asset: Asset) => {
     setRenameLoading(prev => new Set(prev).add(asset.id));
     try {
-      const res = await fetch('/api/smart-name', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          originalName: asset.displayName || asset.originalFileName || '',
-          altText: asset.altText,
-          contentType: asset.contentType,
-          imageUrl: asset.hostedUrl || asset.url,
-          siteId,
-          assetId: asset.id,
-        }),
+      const data = await post<{ fullName?: string }>('/api/smart-name', {
+        originalName: asset.displayName || asset.originalFileName || '',
+        altText: asset.altText,
+        contentType: asset.contentType,
+        imageUrl: asset.hostedUrl || asset.url,
+        siteId,
+        assetId: asset.id,
       });
-      const data = await res.json();
       if (data.fullName) {
         setRenamingId(asset.id);
         setRenameDraft(data.fullName);
@@ -321,12 +300,7 @@ function AssetBrowser({ siteId }: Props) {
     if (!renameDraft.trim()) return;
     setAltError(null);
     try {
-      const res = await fetch(`/api/webflow/rename/${assetId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ displayName: renameDraft.trim(), siteId }),
-      });
-      const data = await res.json();
+      const data = await patch<{ success?: boolean; error?: string }>(`/api/webflow/rename/${assetId}`, { displayName: renameDraft.trim(), siteId });
       if (!data.success) {
         setAltError(`Rename failed: ${data.error || 'Unknown error'}`);
         return;
@@ -346,25 +320,16 @@ function AssetBrowser({ siteId }: Props) {
       const asset = toRename[i];
       setRenameLoading(prev => new Set(prev).add(asset.id));
       try {
-        const res = await fetch('/api/smart-name', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            originalName: asset.displayName || asset.originalFileName || '',
-            altText: asset.altText,
-            contentType: asset.contentType,
-            imageUrl: asset.hostedUrl || asset.url,
-            siteId,
-            assetId: asset.id,
-          }),
+        const data = await post<{ fullName?: string }>('/api/smart-name', {
+          originalName: asset.displayName || asset.originalFileName || '',
+          altText: asset.altText,
+          contentType: asset.contentType,
+          imageUrl: asset.hostedUrl || asset.url,
+          siteId,
+          assetId: asset.id,
         });
-        const data = await res.json();
         if (data.fullName) {
-          await fetch(`/api/webflow/rename/${asset.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ displayName: data.fullName, siteId }),
-          });
+          await patch(`/api/webflow/rename/${asset.id}`, { displayName: data.fullName, siteId });
           setAssets(prev => prev.map(a => a.id === asset.id ? { ...a, displayName: data.fullName } : a));
         }
       } catch { /* ignore */ }
@@ -426,8 +391,7 @@ function AssetBrowser({ siteId }: Props) {
     setOrganizePreview(null);
     setOrganizeResult(null);
     try {
-      const res = await fetch(`/api/webflow/organize-preview/${siteId}`);
-      const data = await res.json();
+      const data = await get<{ error?: string; foldersToCreate?: string[]; moves?: Array<{ assetId: string; assetName: string; targetFolder: string }>; summary?: { totalAssets: number; assetsToMove: number; foldersToCreate: number; alreadyOrganized: number; unused: number; shared: number; ogImages: number } }>(`/api/webflow/organize-preview/${siteId}`);
       if (data.error) {
         setAltError(`Organize failed: ${data.error}`);
       } else {
@@ -443,15 +407,10 @@ function AssetBrowser({ siteId }: Props) {
     if (!organizePreview) return;
     setOrganizeExecuting(true);
     try {
-      const res = await fetch(`/api/webflow/organize-execute/${siteId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          moves: organizePreview.moves,
-          foldersToCreate: organizePreview.foldersToCreate,
-        }),
+      const data = await post<{ error?: string; summary?: { moved: number; failed: number; total: number } }>(`/api/webflow/organize-execute/${siteId}`, {
+        moves: organizePreview.moves,
+        foldersToCreate: organizePreview.foldersToCreate,
       });
-      const data = await res.json();
       if (data.error) {
         setAltError(`Organize failed: ${data.error}`);
       } else {
@@ -466,11 +425,7 @@ function AssetBrowser({ siteId }: Props) {
   const handleBulkDelete = async () => {
     if (!confirm(`Delete ${selected.size} assets permanently from Webflow?`)) return;
     setDeleting(true);
-    await fetch('/api/webflow/assets/bulk-delete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ assetIds: [...selected], siteId }),
-    });
+    await post('/api/webflow/assets/bulk-delete', { assetIds: [...selected], siteId });
     setAssets(prev => prev.filter(a => !selected.has(a.id)));
     setSelected(new Set());
     setDeleting(false);

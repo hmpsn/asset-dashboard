@@ -14,6 +14,11 @@ import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { AnomalyAlerts } from './AnomalyAlerts';
 import { SeoWorkStatus, ActivityFeed, RankingsSnapshot, ActiveRequestsAnnotations, SeoChangeImpact } from './workspace-home';
 import { type Page, adminPath } from '../routes';
+import { getSafe } from '../api/client';
+import { rankTracking, activity as activityApi, annotations as annotationsApi, churnSignals as churnApi, workOrders as workOrdersApi } from '../api/misc';
+import { contentRequests as contentRequestsApi } from '../api/content';
+import { requests as requestsApi } from '../api/misc';
+import { gsc, ga4 } from '../api/analytics';
 
 interface WorkspaceHomeProps {
   workspaceId: string;
@@ -55,32 +60,28 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   const [workOrders, setWorkOrders] = useState<Array<{ id: string; status: string; productType: string }>>([]);
 
   // Refetch a single key when a real-time event arrives
-  const refetch = useCallback(async (key: string, url: string) => {
+  const refetch = useCallback(async (key: string) => {
     try {
-      const r = await fetch(url);
-      if (!r.ok) return;
-      const d = await r.json();
-      if (key === 'activity' && Array.isArray(d)) setActivity(d);
-      if (key === 'requests' && Array.isArray(d)) setRequests(d);
-      if (key === 'content' && Array.isArray(d)) setContentRequests(d);
-      if (key === 'workOrders' && Array.isArray(d)) setWorkOrders(d);
+      if (key === 'activity') { const d = await activityApi.list(workspaceId); if (Array.isArray(d)) setActivity(d as ActivityEntry[]); }
+      if (key === 'requests') { const d = await requestsApi.list({ workspaceId }); if (Array.isArray(d)) setRequests(d as typeof requests); }
+      if (key === 'content') { const d = await contentRequestsApi.list(workspaceId); if (Array.isArray(d)) setContentRequests(d as typeof contentRequests); }
+      if (key === 'workOrders') { const d = await workOrdersApi.list(workspaceId); if (Array.isArray(d)) setWorkOrders(d as typeof workOrders); }
     } catch { /* ignore */ }
-  }, []);
+  }, [workspaceId]);
 
   // Real-time workspace events
   useWorkspaceEvents(workspaceId, {
-    'activity:new': () => refetch('activity', `/api/activity?workspaceId=${workspaceId}&limit=8`),
-    'approval:update': () => refetch('activity', `/api/activity?workspaceId=${workspaceId}&limit=8`),
-    'approval:applied': () => refetch('activity', `/api/activity?workspaceId=${workspaceId}&limit=8`),
-    'request:created': () => refetch('requests', `/api/requests?workspaceId=${workspaceId}`),
-    'request:update': () => refetch('requests', `/api/requests?workspaceId=${workspaceId}`),
-    'content-request:created': () => refetch('content', `/api/content-requests/${workspaceId}`),
-    'content-request:update': () => refetch('content', `/api/content-requests/${workspaceId}`),
+    'activity:new': () => refetch('activity'),
+    'approval:update': () => refetch('activity'),
+    'approval:applied': () => refetch('activity'),
+    'request:created': () => refetch('requests'),
+    'request:update': () => refetch('requests'),
+    'content-request:created': () => refetch('content'),
+    'content-request:update': () => refetch('content'),
     'audit:complete': (data) => {
       const d = data as { score?: number; previousScore?: number };
       if (d?.score != null) {
-        // Audit hook will refresh on next render, just trigger activity refresh
-        refetch('activity', `/api/activity?workspaceId=${workspaceId}&limit=8`);
+        refetch('activity');
       }
     },
   });
@@ -88,49 +89,38 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   useEffect(() => {
     let cancelled = false;
     const days = 28;
-    const qs = `?days=${days}`;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const f = async (url: string): Promise<any> => {
-      try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 15000);
-        const r = await fetch(url, { signal: controller.signal });
-        clearTimeout(timer);
-        if (!r.ok) return null;
-        return r.json();
-      } catch { return null; }
-    };
-
-    const urls: Array<{ key: string; url: string }> = [
-      { key: 'ranks', url: `/api/rank-tracking/${workspaceId}/latest` },
-      { key: 'requests', url: `/api/requests?workspaceId=${workspaceId}` },
-      { key: 'content', url: `/api/content-requests/${workspaceId}` },
-      { key: 'activity', url: `/api/activity?workspaceId=${workspaceId}&limit=8` },
-      { key: 'annotations', url: `/api/annotations/${workspaceId}` },
-      { key: 'churn', url: `/api/churn-signals/${workspaceId}` },
-      { key: 'workOrders', url: `/api/work-orders/${workspaceId}` },
+    // Build fetch promises with string keys
+    const fetches: Array<{ key: string; promise: Promise<unknown> }> = [
+      { key: 'ranks', promise: rankTracking.latest(workspaceId) },
+      { key: 'requests', promise: requestsApi.list({ workspaceId }) },
+      { key: 'content', promise: contentRequestsApi.list(workspaceId) },
+      { key: 'activity', promise: activityApi.list(workspaceId) },
+      { key: 'annotations', promise: annotationsApi.list(workspaceId) },
+      { key: 'churn', promise: churnApi.list(workspaceId) },
+      { key: 'workOrders', promise: workOrdersApi.list(workspaceId) },
     ];
-    if (gscPropertyUrl) urls.push({ key: 'search', url: `/api/public/search-overview/${workspaceId}${qs}` });
+    if (gscPropertyUrl) fetches.push({ key: 'search', promise: gsc.overview(workspaceId, days) });
     if (ga4PropertyId) {
-      urls.push({ key: 'ga4', url: `/api/public/analytics-overview/${workspaceId}${qs}` });
-      urls.push({ key: 'comparison', url: `/api/public/analytics-comparison/${workspaceId}${qs}` });
+      fetches.push({ key: 'ga4', promise: getSafe<unknown>(`/api/public/analytics-overview/${workspaceId}?days=${days}`, null) });
+      fetches.push({ key: 'comparison', promise: ga4.comparison(workspaceId, days) });
     }
 
-    Promise.all(urls.map(({ key, url }) => f(url).then(d => ({ key, d })))).then(results => {
+    Promise.all(fetches.map(({ key, promise }) => promise.then(d => ({ key, d })).catch(() => ({ key, d: null })))).then(results => {
       if (cancelled) return;
       for (const { key, d } of results) {
         if (!d) continue;
-        if (key === 'search' && d.totalClicks !== undefined) setSearchData({ totalClicks: d.totalClicks, totalImpressions: d.totalImpressions, avgCtr: d.avgCtr, avgPosition: d.avgPosition });
-        if (key === 'ga4' && d.totalUsers !== undefined) setGa4Data(d);
-        if (key === 'comparison' && !d.error) setComparison(d);
+        const data = d as Record<string, unknown>;
+        if (key === 'search' && data.totalClicks !== undefined) setSearchData({ totalClicks: data.totalClicks as number, totalImpressions: data.totalImpressions as number, avgCtr: data.avgCtr as number, avgPosition: data.avgPosition as number });
+        if (key === 'ga4' && data.totalUsers !== undefined) setGa4Data(d as typeof ga4Data);
+        if (key === 'comparison') setComparison(d as typeof comparison);
         if (key === 'ranks' && Array.isArray(d)) setRanks(d.slice(0, 10));
-        if (key === 'requests' && Array.isArray(d)) setRequests(d);
-        if (key === 'content' && Array.isArray(d)) setContentRequests(d);
-        if (key === 'activity' && Array.isArray(d)) setActivity(d);
+        if (key === 'requests' && Array.isArray(d)) setRequests(d as typeof requests);
+        if (key === 'content' && Array.isArray(d)) setContentRequests(d as typeof contentRequests);
+        if (key === 'activity' && Array.isArray(d)) setActivity(d as ActivityEntry[]);
         if (key === 'annotations' && Array.isArray(d)) setAnnotations(d.slice(0, 5));
         if (key === 'churn' && Array.isArray(d)) setChurnSignals(d.filter((s: { severity: string }) => s.severity === 'critical' || s.severity === 'warning'));
-        if (key === 'workOrders' && Array.isArray(d)) setWorkOrders(d);
+        if (key === 'workOrders' && Array.isArray(d)) setWorkOrders(d as typeof workOrders);
       }
       setLoading(false);
     }).catch(() => { if (!cancelled) setLoading(false); });

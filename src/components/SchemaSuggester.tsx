@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { get, post, getSafe } from '../api/client';
 import type { FixContext } from '../App';
 import {
   Loader2, ChevronDown, ChevronRight, Copy, CheckCircle,
@@ -120,8 +121,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`/api/webflow/schema-snapshot/${siteId}`);
-        const snapshot = await res.json();
+        const snapshot = await get<{ results?: SchemaPageSuggestion[]; createdAt?: string }>(`/api/webflow/schema-snapshot/${siteId}`);
         if (snapshot && snapshot.results && snapshot.results.length > 0) {
           setData(snapshot.results);
           setSnapshotDate(snapshot.createdAt);
@@ -178,15 +178,9 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
       const token = localStorage.getItem('auth_token');
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['x-auth-token'] = token;
-      const res = await fetch(`/api/approvals/${workspaceId}`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ siteId, name: 'Schema Review', items }),
-      });
-      if (res.ok) {
-        setSentToClient(true);
-        refreshStates();
-      }
+      await post(`/api/approvals/${workspaceId}`, { siteId, name: 'Schema Review', items });
+      setSentToClient(true);
+      refreshStates();
     } catch { /* skip */ }
     setSendingToClient(false);
   };
@@ -210,8 +204,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
     if (availablePages.length > 0) { setShowPagePicker(true); return; }
     setLoadingPages(true);
     try {
-      const res = await fetch(`/api/webflow/pages/${siteId}`);
-      const pages = await res.json();
+      const pages = await getSafe<Array<{ _id?: string; id?: string; title?: string; slug?: string }>>(`/api/webflow/pages/${siteId}`, []);
       if (Array.isArray(pages)) {
         setAvailablePages(pages.map((p: { _id?: string; id?: string; title?: string; slug?: string }) => ({
           id: p._id || p.id || '',
@@ -229,13 +222,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
     setShowPagePicker(false);
     setStarted(true);
     try {
-      const res = await fetch(`/api/webflow/schema-suggestions/${siteId}/page`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pageId }),
-      });
-      if (!res.ok) throw new Error('Failed');
-      const result: SchemaPageSuggestion = await res.json();
+      const result = await post<SchemaPageSuggestion>(`/api/webflow/schema-suggestions/${siteId}/page`, { pageId });
       setData(prev => {
         if (!prev) return [result];
         const exists = prev.findIndex(p => p.pageId === pageId);
@@ -253,13 +240,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
   const regeneratePage = async (pageId: string) => {
     setRegenerating(prev => new Set(prev).add(pageId));
     try {
-      const res = await fetch(`/api/webflow/schema-suggestions/${siteId}/page`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pageId }),
-      });
-      if (!res.ok) throw new Error('Failed');
-      const result: SchemaPageSuggestion = await res.json();
+      const result = await post<SchemaPageSuggestion>(`/api/webflow/schema-suggestions/${siteId}/page`, { pageId });
       setData(prev => {
         if (!prev) return prev;
         return prev.map(p => p.pageId === pageId ? {
@@ -286,15 +267,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
     setPublishError(prev => { const n = { ...prev }; delete n[pageId]; return n; });
     setConfirmPublish(null);
     try {
-      const res = await fetch(`/api/webflow/schema-publish/${siteId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pageId, schema, publishAfter: true }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(err.error || `HTTP ${res.status}`);
-      }
+      await post(`/api/webflow/schema-publish/${siteId}`, { pageId, schema, publishAfter: true });
       setPublished(prev => new Set(prev).add(pageId));
       refreshStates();
     } catch (err) {
@@ -383,12 +356,8 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
       const token = localStorage.getItem('auth_token');
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['x-auth-token'] = token;
-      const res = await fetch(`/api/approvals/${workspaceId}`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ siteId, name: `Schema: ${page.pageTitle}`, items }),
-      });
-      if (res.ok) setSentPages(prev => new Set(prev).add(page.pageId));
+      await post(`/api/approvals/${workspaceId}`, { siteId, name: `Schema: ${page.pageTitle}`, items });
+      setSentPages(prev => new Set(prev).add(page.pageId));
     } catch { /* skip */ }
     setSendingPage(prev => {
       const next = new Set(prev);
@@ -403,8 +372,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
     setLoadingCmsPages(true);
     setCmsError(null);
     try {
-      const res = await fetch(`/api/webflow/cms-template-pages/${siteId}`);
-      const pages = await res.json();
+      const pages = await getSafe<CmsTemplatePage[]>(`/api/webflow/cms-template-pages/${siteId}`, []);
       if (Array.isArray(pages)) setCmsTemplatePages(pages);
       setShowCmsPanel(true);
     } catch { setCmsError('Failed to load CMS collections'); }
@@ -418,13 +386,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
     setCmsPublished(false);
     setCmsError(null);
     try {
-      const res = await fetch(`/api/webflow/schema-cms-template/${siteId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ collectionId: page.collectionId }),
-      });
-      if (!res.ok) throw new Error('Generation failed');
-      const result: CmsTemplateResult = await res.json();
+      const result = await post<CmsTemplateResult>(`/api/webflow/schema-cms-template/${siteId}`, { collectionId: page.collectionId });
       setCmsTemplateResult(result);
     } catch (err) {
       setCmsError(err instanceof Error ? err.message : 'Failed to generate CMS template schema');

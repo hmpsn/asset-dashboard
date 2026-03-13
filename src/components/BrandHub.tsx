@@ -5,6 +5,7 @@ import {
   Plus, Pencil, Trash2, Check,
 } from 'lucide-react';
 import { PageHeader } from './ui';
+import { get, patch, post } from '../api/client';
 
 interface AudiencePersona {
   id: string;
@@ -55,19 +56,14 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
 
   // Load workspace data
   useEffect(() => {
-    fetch(`/api/workspaces/${workspaceId}`).then(r => r.json()).then((d: WorkspaceData) => {
+    get<WorkspaceData>(`/api/workspaces/${workspaceId}`).then(d => {
       setWs(d);
       if (d.brandVoice) setBrandVoice(d.brandVoice);
     }).catch(() => {});
   }, [workspaceId]);
 
-  const patchWorkspace = async (patch: Record<string, unknown>) => {
-    const res = await fetch(`/api/workspaces/${workspaceId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(patch),
-    });
-    const updated = await res.json();
+  const patchWorkspace = async (fields: Record<string, unknown>) => {
+    const updated = await patch<WorkspaceData>(`/api/workspaces/${workspaceId}`, fields);
     setWs(prev => prev ? { ...prev, ...updated } : updated);
     return updated;
   };
@@ -123,9 +119,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
               onClick={async () => {
                 setGeneratingBrandVoice(true);
                 try {
-                  const res = await fetch(`/api/workspaces/${workspaceId}/generate-brand-voice`, { method: 'POST' });
-                  if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || 'Generation failed'); }
-                  const data = await res.json();
+                  const data = await post<{ brandVoice: string; pagesScraped: number }>(`/api/workspaces/${workspaceId}/generate-brand-voice`);
                   setBrandVoice(data.brandVoice);
                   toast(`Brand voice generated from ${data.pagesScraped} pages — review and save`);
                 } catch (err) {
@@ -179,9 +173,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
               onClick={async () => {
                 setGeneratingKB(true);
                 try {
-                  const res = await fetch(`/api/workspaces/${workspaceId}/generate-knowledge-base`, { method: 'POST' });
-                  if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || 'Generation failed'); }
-                  const data = await res.json();
+                  const data = await post<{ knowledgeBase: string; pagesScraped: number }>(`/api/workspaces/${workspaceId}/generate-knowledge-base`);
                   setKbDraft(data.knowledgeBase);
                   toast(`Knowledge base generated from ${data.pagesScraped} pages — review and save`);
                 } catch (err) {
@@ -373,9 +365,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
                 onClick={async () => {
                   setGeneratingPersonas(true);
                   try {
-                    const res = await fetch(`/api/workspaces/${workspaceId}/generate-personas`, { method: 'POST' });
-                    if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || 'Generation failed'); }
-                    const data = await res.json();
+                    const data = await post<{ personas: AudiencePersona[]; pagesScraped: number }>(`/api/workspaces/${workspaceId}/generate-personas`);
                     setLocalPersonas(data.personas);
                     toast(`${data.personas.length} personas generated from ${data.pagesScraped} pages — review and save`);
                   } catch (err) {

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { getOptional } from '../api/client';
 
 export interface GA4OverviewData {
   totalUsers: number;
@@ -39,11 +40,10 @@ export function useGA4Overview(workspaceId: string | undefined, days = 28) {
     if (getCached(workspaceId, days)) return;
 
     const id = ++fetchRef.current;
-    fetch(`/api/public/analytics-overview/${workspaceId}?days=${days}`)
-      .then(r => r.ok ? r.json() : null)
+    getOptional<GA4OverviewData>(`/api/public/analytics-overview/${workspaceId}?days=${days}`)
       .then(d => {
         if (id !== fetchRef.current) return;
-        if (d && !d.error) {
+        if (d) {
           cache.set(cacheKey(workspaceId, days), { data: d, fetchedAt: Date.now() });
           setData(d);
           setError(null);
@@ -58,11 +58,10 @@ export function useGA4Overview(workspaceId: string | undefined, days = 28) {
     cache.delete(cacheKey(workspaceId, days));
     const id = ++fetchRef.current;
     setLoading(true);
-    fetch(`/api/public/analytics-overview/${workspaceId}?days=${days}`)
-      .then(r => r.ok ? r.json() : null)
+    getOptional<GA4OverviewData>(`/api/public/analytics-overview/${workspaceId}?days=${days}`)
       .then(d => {
         if (id !== fetchRef.current) return;
-        if (d && !d.error) {
+        if (d) {
           cache.set(cacheKey(workspaceId, days), { data: d, fetchedAt: Date.now() });
           setData(d);
           setError(null);

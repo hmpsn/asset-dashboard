@@ -8,40 +8,8 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'rec
 import { PageHeader, StatCard, SectionCard, TabBar, DateRangeSelector, EmptyState } from './ui';
 import { DATE_PRESETS_SEARCH } from './ui/constants';
 import { ChatPanel, type ChatMessage } from './ChatPanel';
-
-interface SearchQuery {
-  query: string;
-  clicks: number;
-  impressions: number;
-  ctr: number;
-  position: number;
-}
-
-interface SearchPage {
-  page: string;
-  clicks: number;
-  impressions: number;
-  ctr: number;
-  position: number;
-}
-
-interface SearchOverview {
-  totalClicks: number;
-  totalImpressions: number;
-  avgCtr: number;
-  avgPosition: number;
-  topQueries: SearchQuery[];
-  topPages: SearchPage[];
-  dateRange: { start: string; end: string };
-}
-
-interface PerformanceTrend {
-  date: string;
-  clicks: number;
-  impressions: number;
-  ctr: number;
-  position: number;
-}
+import { gscAdmin } from '../api/analytics';
+import type { SearchOverview, PerformanceTrend, SearchComparison } from '../../shared/types/analytics';
 
 interface DeviceBreakdown {
   device: string;
@@ -65,13 +33,6 @@ interface SearchTypeBreakdown {
   impressions: number;
   ctr: number;
   position: number;
-}
-
-interface PeriodComparison {
-  current: { clicks: number; impressions: number; ctr: number; position: number };
-  previous: { clicks: number; impressions: number; ctr: number; position: number };
-  change: { clicks: number; impressions: number; ctr: number; position: number };
-  changePercent: { clicks: number; impressions: number; ctr: number; position: number };
 }
 
 interface Props {
@@ -142,7 +103,7 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
   const [devices, setDevices] = useState<DeviceBreakdown[]>([]);
   const [countries, setCountries] = useState<CountryBreakdown[]>([]);
   const [searchTypes, setSearchTypes] = useState<SearchTypeBreakdown[]>([]);
-  const [comparison, setComparison] = useState<PeriodComparison | null>(null);
+  const [comparison, setComparison] = useState<SearchComparison | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<DataTab>('queries');
@@ -169,25 +130,22 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
     if (!siteUrl) return;
     setDataLoading(true);
     setError(null);
-    const qs = `gscSiteUrl=${encodeURIComponent(siteUrl)}&days=${numDays}`;
     try {
-      const [overviewRes, trendRes, devicesRes, countriesRes, typesRes, compRes] = await Promise.all([
-        fetch(`/api/google/search-overview/${siteId}?${qs}`),
-        fetch(`/api/google/performance-trend/${siteId}?${qs}`),
-        fetch(`/api/google/search-devices/${siteId}?${qs}`).catch(() => null),
-        fetch(`/api/google/search-countries/${siteId}?${qs}`).catch(() => null),
-        fetch(`/api/google/search-types/${siteId}?${qs}`).catch(() => null),
-        fetch(`/api/google/search-comparison/${siteId}?${qs}`).catch(() => null),
+      const [overviewData, trendData, devicesData, countriesData, typesData, compData] = await Promise.all([
+        gscAdmin.overview(siteId, siteUrl, numDays),
+        gscAdmin.trend(siteId, siteUrl, numDays),
+        gscAdmin.devices(siteId, siteUrl, numDays),
+        gscAdmin.countries(siteId, siteUrl, numDays),
+        gscAdmin.searchTypes(siteId, siteUrl, numDays),
+        gscAdmin.comparison(siteId, siteUrl, numDays),
       ]);
-      const [overviewData, trendData] = await Promise.all([overviewRes.json(), trendRes.json()]);
-      if (overviewData.error) throw new Error(overviewData.error);
-      setOverview(overviewData);
+      if (overviewData) setOverview(overviewData);
+      else if (!overview) setError('Failed to load search overview');
       setTrend(Array.isArray(trendData) ? trendData : []);
-      // Non-critical data — parse if available
-      if (devicesRes) try { const d = await devicesRes.json(); if (Array.isArray(d)) setDevices(d); } catch { /* */ }
-      if (countriesRes) try { const d = await countriesRes.json(); if (Array.isArray(d)) setCountries(d); } catch { /* */ }
-      if (typesRes) try { const d = await typesRes.json(); if (Array.isArray(d)) setSearchTypes(d); } catch { /* */ }
-      if (compRes) try { const d = await compRes.json(); if (d && !d.error) setComparison(d); } catch { /* */ }
+      if (Array.isArray(devicesData)) setDevices(devicesData as DeviceBreakdown[]);
+      if (Array.isArray(countriesData)) setCountries(countriesData as CountryBreakdown[]);
+      if (Array.isArray(typesData)) setSearchTypes(typesData as SearchTypeBreakdown[]);
+      if (compData) setComparison(compData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data');
     } finally {
@@ -221,13 +179,7 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
         searchTypes: searchTypes.length > 0 ? searchTypes : undefined,
         periodComparison: comparison || undefined,
       };
-      const res = await fetch(`/api/google/search-chat/${siteId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: question.trim(), context }),
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
+      const data = await gscAdmin.chat(siteId, { question: question.trim(), context });
       setChatMessages(prev => [...prev, { role: 'assistant', content: data.answer }]);
     } catch {
       setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I couldn\'t process that question. Please try again.' }]);

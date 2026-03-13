@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, ShoppingCart, Minus, Plus, Trash2, Loader2, Lock, Sparkles, Crown } from 'lucide-react';
 import { useCart } from './useCart';
+import { post } from '../../api/client';
 
 const fmt = (usd: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(usd);
@@ -36,12 +37,7 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
     setCheckingOut(true);
     setError(null);
     try {
-      const res = await fetch('/api/stripe/cart-checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workspaceId, items: items.map(i => ({ productType: i.productType, quantity: i.quantity, pageIds: i.pageIds })) }),
-      });
-      const data = await res.json();
+      const data = await post<{ url?: string; error?: string }>('/api/stripe/cart-checkout', { workspaceId, items: items.map(i => ({ productType: i.productType, quantity: i.quantity, pageIds: i.pageIds })) });
       if (data.url) {
         clearCart();
         window.location.href = data.url;

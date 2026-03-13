@@ -1,0 +1,208 @@
+// ── Miscellaneous API endpoints ────────────────────────────────────
+import { get, post, patch, del, getSafe, getOptional, postForm } from './client';
+
+// ── Requests (client requests / support tickets) ────────────────
+export const requests = {
+  list: (params?: { workspaceId?: string }) => {
+    const qs = params?.workspaceId ? `?workspaceId=${params.workspaceId}` : '';
+    return get<unknown[]>(`/api/requests${qs}`);
+  },
+
+  create: (body: Record<string, unknown>) =>
+    post<unknown>('/api/requests', body),
+
+  update: (id: string, body: Record<string, unknown>) =>
+    patch<unknown>(`/api/requests/${id}`, body),
+
+  remove: (id: string) => del(`/api/requests/${id}`),
+
+  bulkRemove: (ids: string[]) =>
+    Promise.all(ids.map(id => del(`/api/requests/${id}`))),
+
+  addNote: (requestId: string, body: Record<string, unknown>) =>
+    post<unknown>(`/api/requests/${requestId}/notes`, body),
+
+  addNoteWithFiles: (requestId: string, formData: FormData) =>
+    postForm<unknown>(`/api/requests/${requestId}/notes-with-files`, formData),
+};
+
+// ── Public requests (client portal) ─────────────────────────────
+export const publicRequests = {
+  list: (wsId: string) =>
+    getSafe<unknown[]>(`/api/public/requests/${wsId}`, []),
+
+  create: (wsId: string, body: Record<string, unknown>) =>
+    post<unknown>(`/api/public/requests/${wsId}`, body),
+
+  addNote: (wsId: string, requestId: string, body: Record<string, unknown>) =>
+    post<unknown>(`/api/public/requests/${wsId}/${requestId}/notes`, body),
+};
+
+// ── Approvals ───────────────────────────────────────────────────
+export const approvals = {
+  create: (wsId: string, body: Record<string, unknown>) =>
+    post<unknown>(`/api/approvals/${wsId}`, body),
+
+  publicList: (wsId: string) =>
+    getSafe<unknown[]>(`/api/public/approvals/${wsId}`, []),
+
+  publicUpdate: (wsId: string, batchId: string, body: Record<string, unknown>) =>
+    patch<unknown>(`/api/public/approvals/${wsId}/${batchId}`, body),
+};
+
+// ── Activity ────────────────────────────────────────────────────
+export const activity = {
+  list: (wsId: string, limit = 8) =>
+    getSafe<unknown[]>(`/api/activity?workspaceId=${wsId}&limit=${limit}`, []),
+
+  publicList: (wsId: string, limit = 20) =>
+    getSafe<unknown[]>(`/api/public/activity/${wsId}?limit=${limit}`, []),
+};
+
+// ── Annotations ─────────────────────────────────────────────────
+export const annotations = {
+  list: (wsId: string) =>
+    getSafe<unknown[]>(`/api/annotations/${wsId}`, []),
+
+  create: (wsId: string, body: Record<string, unknown>) =>
+    post<unknown>(`/api/annotations/${wsId}`, body),
+
+  remove: (wsId: string, id: string) =>
+    del(`/api/annotations/${wsId}/${id}`),
+
+  publicList: (wsId: string) =>
+    getSafe<unknown[]>(`/api/public/annotations/${wsId}`, []),
+};
+
+// ── Anomalies ───────────────────────────────────────────────────
+export const anomalies = {
+  list: (wsId: string) =>
+    getSafe<unknown[]>(`/api/anomalies/${wsId}`, []),
+
+  publicList: (wsId: string) =>
+    getSafe<unknown[]>(`/api/public/anomalies/${wsId}`, []),
+
+  dismiss: (id: string) =>
+    post<unknown>(`/api/anomalies/${id}/dismiss`),
+
+  acknowledge: (id: string) =>
+    post<unknown>(`/api/anomalies/${id}/acknowledge`),
+};
+
+// ── Churn signals ───────────────────────────────────────────────
+export const churnSignals = {
+  list: (wsId: string) =>
+    getSafe<unknown[]>(`/api/churn-signals/${wsId}`, []),
+};
+
+// ── Jobs ────────────────────────────────────────────────────────
+export const jobs = {
+  list: () => get<unknown[]>('/api/jobs'),
+
+  create: (body: Record<string, unknown>) =>
+    post<unknown>('/api/jobs', body),
+
+  cancel: (jobId: string) => del(`/api/jobs/${jobId}`),
+};
+
+// ── Chat (admin + public) ───────────────────────────────────────
+export const chat = {
+  adminAsk: (body: { workspaceId: string; question: string; context: Record<string, unknown>; sessionId: string }) =>
+    post<{ answer?: string; error?: string }>('/api/admin-chat', body),
+
+  publicAsk: (wsId: string, body: { question: string; context: Record<string, unknown>; sessionId: string; betaMode?: boolean }) =>
+    post<{ answer?: string; error?: string }>(`/api/public/search-chat/${wsId}`, body),
+
+  sessions: (wsId: string, channel?: string) => {
+    const qs = channel ? `?channel=${channel}` : '';
+    return getSafe<unknown[]>(`/api/public/chat-sessions/${wsId}${qs}`, []);
+  },
+
+  session: (wsId: string, sessionId: string) =>
+    getOptional<{ messages?: Array<{ role: string; content: string }> }>(`/api/public/chat-sessions/${wsId}/${sessionId}`),
+};
+
+// ── Roadmap ─────────────────────────────────────────────────────
+export const roadmap = {
+  get: () => get<unknown>('/api/roadmap'),
+
+  update: (itemId: number, body: Record<string, unknown>) =>
+    patch<unknown>(`/api/roadmap/${itemId}`, body),
+};
+
+// ── Recommendations ─────────────────────────────────────────────
+export const recommendations = {
+  list: (wsId: string) =>
+    getOptional<unknown>(`/api/recommendations/${wsId}`),
+
+  generate: (wsId: string) =>
+    post<unknown>(`/api/recommendations/${wsId}/generate`),
+
+  update: (wsId: string, recId: string, body: Record<string, unknown>) =>
+    patch<unknown>(`/api/public/recommendations/${wsId}/${recId}`, body),
+
+  remove: (wsId: string, recId: string) =>
+    del(`/api/public/recommendations/${wsId}/${recId}`),
+};
+
+// ── Feedback ────────────────────────────────────────────────────
+export const feedback = {
+  submit: (wsId: string, body: Record<string, unknown>) =>
+    post<unknown>(`/api/public/feedback/${wsId}`, body),
+
+  list: (wsId: string) =>
+    getSafe<unknown[]>(`/api/feedback/${wsId}`, []),
+};
+
+// ── Notifications ───────────────────────────────────────────────
+export const notifications = {
+  list: () => getSafe<unknown[]>('/api/notifications', []),
+
+  markRead: (id: string) =>
+    patch<unknown>(`/api/notifications/${id}/read`, {}),
+
+  markAllRead: () =>
+    post<unknown>('/api/notifications/mark-all-read'),
+};
+
+// ── Upload ──────────────────────────────────────────────────────
+export const upload = {
+  clipboard: (folder: string, formData: FormData) =>
+    postForm<unknown>(`/api/upload/${folder}/clipboard`, formData),
+};
+
+// ── Settings ────────────────────────────────────────────────────
+export const settings = {
+  getFeatures: (wsId: string) =>
+    getOptional<unknown>(`/api/settings/${wsId}/features`),
+
+  updateFeatures: (wsId: string, body: Record<string, unknown>) =>
+    patch<unknown>(`/api/settings/${wsId}/features`, body),
+};
+
+// ── Sales report ────────────────────────────────────────────────
+export const salesReport = {
+  get: () => get<unknown>('/api/sales-report'),
+  refresh: () => post<unknown>('/api/sales-report/refresh'),
+};
+
+// ── Rank tracking ──────────────────────────────────────────────
+export const rankTracking = {
+  latest: (wsId: string) =>
+    getOptional<unknown>(`/api/rank-tracking/${wsId}/latest`),
+};
+
+// ── Work orders ────────────────────────────────────────────────
+export const workOrders = {
+  list: (wsId: string) =>
+    getSafe<unknown[]>(`/api/work-orders/${wsId}`, []),
+};
+
+// ── Redirect manager ────────────────────────────────────────────
+export const redirects = {
+  list: (siteId: string) =>
+    getSafe<unknown[]>(`/api/webflow/redirects/${siteId}`, []),
+
+  save: (siteId: string, body: Record<string, unknown>) =>
+    post<unknown>(`/api/webflow/redirects/${siteId}`, body),
+};

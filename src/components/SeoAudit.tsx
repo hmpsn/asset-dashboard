@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from 'react';
+import { get, post, put, del, patch, getOptional, getSafe } from '../api/client';
 import { useNavigate } from 'react-router-dom';
 import { adminPath, type Page } from '../routes';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
@@ -71,7 +72,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
 
   useEffect(() => {
     if (siteId) {
-      fetch(`/api/audit-traffic/${siteId}`).then(r => r.ok ? r.json() : {}).then((m: Record<string, { clicks: number; impressions: number; sessions: number; pageviews: number }>) => {
+      getOptional<Record<string, { clicks: number; impressions: number; sessions: number; pageviews: number }>>(`/api/audit-traffic/${siteId}`).then(m => {
         if (m && typeof m === 'object') setTrafficMap(m);
       }).catch(() => {});
     }
@@ -82,8 +83,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
 
   useEffect(() => {
     if (workspaceId) {
-      fetch(`/api/workspaces/${workspaceId}/audit-suppressions`)
-        .then(r => r.ok ? r.json() : [])
+      getSafe<{ check: string; pageSlug: string }[]>(`/api/workspaces/${workspaceId}/audit-suppressions`, [])
         .then(s => { if (Array.isArray(s)) setSuppressions(s); })
         .catch(() => {});
     }
@@ -92,15 +92,8 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   const suppressIssue = async (check: string, pageSlug: string) => {
     if (!workspaceId) return;
     try {
-      const res = await fetch(`/api/workspaces/${workspaceId}/audit-suppressions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ check, pageSlug }),
-      });
-      if (res.ok) {
-        const { suppressions: updated } = await res.json();
-        setSuppressions(updated);
-      }
+      const { suppressions: updated } = await post<{ suppressions: { check: string; pageSlug: string }[] }>(`/api/workspaces/${workspaceId}/audit-suppressions`, { check, pageSlug });
+      setSuppressions(updated);
     } catch {}
     setActionMenuKey(null);
   };
@@ -108,15 +101,8 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   const unsuppressIssue = async (check: string, pageSlug: string) => {
     if (!workspaceId) return;
     try {
-      const res = await fetch(`/api/workspaces/${workspaceId}/audit-suppressions`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ check, pageSlug }),
-      });
-      if (res.ok) {
-        const { suppressions: updated } = await res.json();
-        setSuppressions(updated);
-      }
+      const { suppressions: updated } = await del<{ suppressions: { check: string; pageSlug: string }[] }>(`/api/workspaces/${workspaceId}/audit-suppressions`, { check, pageSlug });
+      setSuppressions(updated);
     } catch {}
   };
 
@@ -136,12 +122,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
       } else if (issue.check === 'og-tags' && issue.message.includes('description')) {
         fields.openGraph = { description: text };
       }
-      const res = await fetch(`/api/webflow/pages/${pageId}/seo`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ siteId, ...fields }),
-      });
-      const result = await res.json();
+      const result = await put<{ success?: boolean }>(`/api/webflow/pages/${pageId}/seo`, { siteId, ...fields });
       if (result.success) {
         setAppliedFixes(prev => new Set(prev).add(fixKey));
       }
@@ -163,26 +144,20 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     const field = issue.check === 'title' ? 'seoTitle' : 'seoDescription';
     setSendingReview(fixKey);
     try {
-      const res = await fetch(`/api/approvals/${workspaceId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          siteId,
-          name: `Audit Fix: ${issue.message.slice(0, 60)}`,
-          items: [{
-            pageId: page.pageId,
-            pageTitle: page.page,
-            pageSlug: page.slug,
-            field,
-            currentValue: issue.value || '',
-            proposedValue: text,
-            reason: issue.recommendation || issue.message,
-          }],
-        }),
+      await post(`/api/approvals/${workspaceId}`, {
+        siteId,
+        name: `Audit Fix: ${issue.message.slice(0, 60)}`,
+        items: [{
+          pageId: page.pageId,
+          pageTitle: page.page,
+          pageSlug: page.slug,
+          field,
+          currentValue: issue.value || '',
+          proposedValue: text,
+          reason: issue.recommendation || issue.message,
+        }],
       });
-      if (res.ok) {
-        setSentForReview(prev => new Set(prev).add(fixKey));
-      }
+      setSentForReview(prev => new Set(prev).add(fixKey));
     } catch { /* skip */ }
     finally { setSendingReview(null); }
   };
@@ -207,28 +182,22 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     const field = issue.check === 'title' ? 'seoTitle' : issue.check === 'meta-description' ? 'seoDescription' : 'seoDescription';
     setFlagSending(true);
     try {
-      const res = await fetch(`/api/approvals/${workspaceId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          siteId,
-          name: `[Review] ${issue.message.slice(0, 60)}`,
-          items: [{
-            pageId: page.pageId,
-            pageTitle: page.page,
-            pageSlug: page.slug,
-            field,
-            currentValue: issue.value || '',
-            proposedValue: suggestion || `${issue.recommendation}${note ? `\n\nNote: ${note}` : ''}`,
-            reason: issue.recommendation || issue.message,
-          }],
-        }),
+      await post(`/api/approvals/${workspaceId}`, {
+        siteId,
+        name: `[Review] ${issue.message.slice(0, 60)}`,
+        items: [{
+          pageId: page.pageId,
+          pageTitle: page.page,
+          pageSlug: page.slug,
+          field,
+          currentValue: issue.value || '',
+          proposedValue: suggestion || `${issue.recommendation}${note ? `\n\nNote: ${note}` : ''}`,
+          reason: issue.recommendation || issue.message,
+        }],
       });
-      if (res.ok) {
-        setFlaggedIssues(prev => new Set(prev).add(key));
-        setFlaggingKey(null);
-        setFlagNote('');
-      }
+      setFlaggedIssues(prev => new Set(prev).add(key));
+      setFlaggingKey(null);
+      setFlagNote('');
     } catch { /* skip */ }
     finally { setFlagSending(false); }
   };
@@ -255,12 +224,8 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     setCreatingTask(taskKey);
     try {
       const item = issueToTaskItem(page, issue);
-      const res = await fetch(`/api/requests`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workspaceId, ...item }),
-      });
-      if (res.ok) setCreatedTasks(prev => new Set(prev).add(taskKey));
+      await post('/api/requests', { workspaceId, ...item });
+      setCreatedTasks(prev => new Set(prev).add(taskKey));
     } catch { /* skip */ }
     finally { setCreatingTask(null); }
   };
@@ -289,20 +254,13 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         }
       }
       if (items.length === 0) { setBatchCreating(false); return; }
-      const res = await fetch('/api/requests/batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workspaceId, items }),
+      const result = await post<{ created: number }>('/api/requests/batch', { workspaceId, items });
+      setCreatedTasks(prev => {
+        const next = new Set(prev);
+        keys.forEach(k => next.add(k));
+        return next;
       });
-      if (res.ok) {
-        const result = await res.json();
-        setCreatedTasks(prev => {
-          const next = new Set(prev);
-          keys.forEach(k => next.add(k));
-          return next;
-        });
-        setBatchResult({ count: result.created, timestamp: Date.now() });
-      }
+      setBatchResult({ count: result.created, timestamp: Date.now() });
     } catch { /* skip */ }
     finally { setBatchCreating(false); }
   };
@@ -316,7 +274,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
 
   useEffect(() => {
     if (workspaceId) {
-      fetch(`/api/audit-schedules/${workspaceId}`).then(r => r.ok ? r.json() : null).then(s => {
+      getOptional<{ enabled: boolean; intervalDays: number; scoreDropThreshold: number; lastRunAt?: string; lastScore?: number }>(`/api/audit-schedules/${workspaceId}`).then(s => {
         if (s) { setSchedule(s); setScheduleInterval(s.intervalDays); setScheduleThreshold(s.scoreDropThreshold); }
       }).catch(() => {});
     }
@@ -326,11 +284,8 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     if (!workspaceId) return;
     setScheduleSaving(true);
     try {
-      const res = await fetch(`/api/audit-schedules/${workspaceId}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled, intervalDays: scheduleInterval, scoreDropThreshold: scheduleThreshold }),
-      });
-      if (res.ok) setSchedule(await res.json());
+      const updated = await put<{ enabled: boolean; intervalDays: number; scoreDropThreshold: number; lastRunAt?: string; lastScore?: number }>(`/api/audit-schedules/${workspaceId}`, { enabled, intervalDays: scheduleInterval, scoreDropThreshold: scheduleThreshold });
+      setSchedule(updated);
     } catch { /* skip */ }
     finally { setScheduleSaving(false); }
   };
@@ -397,8 +352,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   }, [jobs]);
 
   const loadHistory = useCallback(() => {
-    fetch(`/api/reports/${siteId}/history`)
-      .then(r => r.json())
+    getSafe<SnapshotSummary[]>(`/api/reports/${siteId}/history`, [])
       .then(h => setHistory(Array.isArray(h) ? h : []))
       .catch(() => {});
   }, [siteId]);
@@ -422,8 +376,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
       setHasRun(true);
     } else if (!existingJob && !runningJob && !data) {
       // No in-memory job — try loading latest persisted snapshot from disk
-      fetch(`/api/reports/${siteId}/latest`)
-        .then(r => r.json())
+      getOptional<{ id: string; audit: SeoAuditResult }>(`/api/reports/${siteId}/latest`)
         .then(snapshot => {
           if (snapshot && snapshot.audit && Array.isArray(snapshot.audit.pages)) {
             setData({ ...snapshot.audit, snapshotId: snapshot.id } as SeoAuditResult & { snapshotId: string });
@@ -450,18 +403,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         return;
       }
       // Fallback: manual save for audits that weren't auto-saved
-      const res = await fetch(`/api/reports/${siteId}/snapshot`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ siteName: siteName || siteId, audit: data }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        alert(`Failed to save report (${res.status}): ${err.error || res.statusText}`);
-        setSaving(false);
-        return;
-      }
-      const result = await res.json();
+      const result = await post<{ id: string }>(`/api/reports/${siteId}/snapshot`, { siteName: siteName || siteId, audit: data });
       const url = `${window.location.origin}/report/${result.id}`;
       setShareUrl(url);
       loadHistory();

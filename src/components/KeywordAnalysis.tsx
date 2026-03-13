@@ -5,6 +5,7 @@ import {
   CheckCircle, Tag, Zap, BookOpen,
 } from 'lucide-react';
 import { scoreColorClass, scoreBgBarClass } from './ui';
+import { get, post } from '../api/client';
 
 interface PageMeta {
   id: string;
@@ -80,9 +81,8 @@ export function KeywordAnalysis({ siteId }: Props) {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/webflow/pages/${siteId}`)
-      .then(r => r.json())
-      .then((data: PageMeta[]) => setPages(data))
+    get<PageMeta[]>(`/api/webflow/pages/${siteId}`)
+      .then(data => setPages(data))
       .catch(() => setPages([]))
       .finally(() => setLoading(false));
   }, [siteId]);
@@ -97,40 +97,27 @@ export function KeywordAnalysis({ siteId }: Props) {
       try {
         const pagePath = page.publishedPath || (page.slug ? `/${page.slug}` : '');
         if (pagePath) {
-          const htmlRes = await fetch(`/api/webflow/page-html/${siteId}?path=${encodeURIComponent(pagePath)}`);
-          if (htmlRes.ok) {
-            const { text } = await htmlRes.json();
-            pageContent = text || '';
-          }
+          const result = await get<{ text?: string }>(`/api/webflow/page-html/${siteId}?path=${encodeURIComponent(pagePath)}`);
+          pageContent = result.text || '';
         }
       } catch { /* fall back to empty content */ }
 
       // Run keyword analysis and content score in parallel
-      const [kwRes, csRes] = await Promise.all([
-        fetch('/api/webflow/keyword-analysis', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            pageTitle: page.title,
-            seoTitle: page.seo?.title,
-            metaDescription: page.seo?.description,
-            slug,
-            pageContent,
-          }),
+      const [kwData, csData] = await Promise.all([
+        post<KeywordData & { error?: string }>('/api/webflow/keyword-analysis', {
+          pageTitle: page.title,
+          seoTitle: page.seo?.title,
+          metaDescription: page.seo?.description,
+          slug,
+          pageContent,
         }),
-        fetch('/api/webflow/content-score', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            pageTitle: page.title,
-            seoTitle: page.seo?.title,
-            metaDescription: page.seo?.description,
-            pageContent,
-          }),
+        post<ContentScore & { error?: string }>('/api/webflow/content-score', {
+          pageTitle: page.title,
+          seoTitle: page.seo?.title,
+          metaDescription: page.seo?.description,
+          pageContent,
         }),
       ]);
-
-      const [kwData, csData] = await Promise.all([kwRes.json(), csRes.json()]);
 
       if (!kwData.error) {
         setAnalyses(prev => ({ ...prev, [page.id]: kwData }));

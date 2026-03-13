@@ -6,6 +6,7 @@ import type { Tier } from '../ui';
 import type { WorkspaceInfo, ClientTab } from './types';
 import { clientPath } from '../../routes';
 import { useBetaMode } from './BetaContext';
+import { post } from '../../api/client';
 
 interface PlansTabProps {
   workspaceId: string;
@@ -28,9 +29,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
   const openBillingPortal = async () => {
     setBillingLoading(true);
     try {
-      const res = await fetch(`/api/public/billing-portal/${workspaceId}`, { method: 'POST' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to open billing portal');
+      const data = await post<{ url?: string }>(`/api/public/billing-portal/${workspaceId}`);
       if (data.url) window.location.href = data.url;
     } catch (err) {
       setToast({ message: err instanceof Error ? err.message : 'Could not open billing portal', type: 'error' });
@@ -178,12 +177,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                   ) : isUpgrade ? (
                     <button onClick={async () => {
                       try {
-                        const res = await fetch(`/api/public/upgrade-checkout/${workspaceId}`, {
-                          method: 'POST', headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ planId: plan.id }),
-                        });
-                        const data = await res.json();
-                        if (!res.ok) throw new Error(data.error || 'Failed to start checkout');
+                        const data = await post<{ url?: string }>(`/api/public/upgrade-checkout/${workspaceId}`, { planId: plan.id });
                         if (data.url) window.location.href = data.url;
                       } catch (err) {
                         setToast({ message: err instanceof Error ? err.message : 'Upgrade failed. Please try again.', type: 'error' });

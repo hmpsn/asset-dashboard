@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CheckCircle2, Loader2, Clock, FileText, Image, Code2, ArrowRightLeft, Package, Wrench } from 'lucide-react';
+import { getSafe } from '../../api/client';
 
 interface WorkOrder {
   id: string;
@@ -62,8 +63,7 @@ export function OrderStatus({ workspaceId }: OrderStatusProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/public/work-orders/${workspaceId}`)
-      .then(r => r.ok ? r.json() : [])
+    getSafe<WorkOrder[]>(`/api/public/work-orders/${workspaceId}`, [])
       .then(data => { setOrders(Array.isArray(data) ? data : []); setLoading(false); })
       .catch(() => setLoading(false));
   }, [workspaceId]);

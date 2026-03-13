@@ -8,94 +8,12 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'rec
 import { PageHeader, StatCard, SectionCard, TabBar, DateRangeSelector, DataList, EmptyState } from './ui';
 import { DATE_PRESETS_FULL } from './ui/constants';
 import { fmtNum as formatNumber } from '../utils/formatNumbers';
-
-interface GA4Overview {
-  totalUsers: number;
-  totalSessions: number;
-  totalPageviews: number;
-  avgSessionDuration: number;
-  bounceRate: number;
-  newUserPercentage: number;
-  dateRange: { start: string; end: string };
-}
-
-interface GA4DailyTrend {
-  date: string;
-  users: number;
-  sessions: number;
-  pageviews: number;
-}
-
-interface GA4TopPage {
-  path: string;
-  pageviews: number;
-  users: number;
-  avgEngagementTime: number;
-}
-
-interface GA4TopSource {
-  source: string;
-  medium: string;
-  users: number;
-  sessions: number;
-}
-
-interface GA4DeviceBreakdown {
-  device: string;
-  users: number;
-  sessions: number;
-  percentage: number;
-}
-
-interface GA4CountryBreakdown {
-  country: string;
-  users: number;
-  sessions: number;
-}
-
-interface GA4PeriodComparison {
-  current: GA4Overview;
-  previous: GA4Overview;
-  change: { users: number; sessions: number; pageviews: number; bounceRate: number; avgSessionDuration: number };
-  changePercent: { users: number; sessions: number; pageviews: number };
-}
-
-interface GA4NewVsReturning {
-  segment: string;
-  users: number;
-  sessions: number;
-  bounceRate: number;
-  engagementRate: number;
-  avgEngagementTime: number;
-  percentage: number;
-}
-
-interface GA4OrganicOverview {
-  organicUsers: number;
-  organicSessions: number;
-  organicPageviews: number;
-  organicBounceRate: number;
-  engagementRate: number;
-  avgEngagementTime: number;
-  shareOfTotalUsers: number;
-  dateRange: { start: string; end: string };
-}
-
-interface GA4LandingPage {
-  landingPage: string;
-  sessions: number;
-  users: number;
-  bounceRate: number;
-  avgEngagementTime: number;
-  conversions: number;
-}
-
-interface GA4ConversionSummary {
-  eventName: string;
-  conversions: number;
-  users: number;
-  rate: number;
-}
+import { ga4 } from '../api/analytics';
+import type {
+  GA4Overview, GA4DailyTrend, GA4TopPage, GA4TopSource,
+  GA4DeviceBreakdown, GA4CountryBreakdown, GA4Comparison,
+  GA4NewVsReturning, GA4OrganicOverview, GA4LandingPage, GA4ConversionSummary,
+} from '../../shared/types/analytics';
 
 type DataTab = 'overview' | 'events' | 'insights';
 
@@ -178,32 +96,31 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const qs = `?days=${numDays}`;
       const [ov, tr, tp, sr, dv, ct, cmp, nvr, org, lp, conv] = await Promise.all([
-        fetch(`/api/public/analytics-overview/${workspaceId}${qs}`).then(r => r.json()),
-        fetch(`/api/public/analytics-trend/${workspaceId}${qs}`).then(r => r.json()),
-        fetch(`/api/public/analytics-top-pages/${workspaceId}${qs}`).then(r => r.json()),
-        fetch(`/api/public/analytics-sources/${workspaceId}${qs}`).then(r => r.json()),
-        fetch(`/api/public/analytics-devices/${workspaceId}${qs}`).then(r => r.json()),
-        fetch(`/api/public/analytics-countries/${workspaceId}${qs}`).then(r => r.json()),
-        fetch(`/api/public/analytics-comparison/${workspaceId}${qs}`).then(r => r.json()).catch(() => null),
-        fetch(`/api/public/analytics-new-vs-returning/${workspaceId}${qs}`).then(r => r.json()).catch(() => []),
-        fetch(`/api/public/analytics-organic/${workspaceId}${qs}`).then(r => r.json()).catch(() => null),
-        fetch(`/api/public/analytics-landing-pages/${workspaceId}${qs}`).then(r => r.json()).catch(() => []),
-        fetch(`/api/public/analytics-conversions/${workspaceId}${qs}`).then(r => r.json()).catch(() => []),
+        ga4.overview(workspaceId, numDays),
+        ga4.trend(workspaceId, numDays),
+        ga4.topPages(workspaceId, numDays),
+        ga4.sources(workspaceId, numDays),
+        ga4.devices(workspaceId, numDays),
+        ga4.countries(workspaceId, numDays),
+        ga4.comparison(workspaceId, numDays),
+        ga4.newVsReturning(workspaceId, numDays),
+        ga4.organic(workspaceId, numDays),
+        ga4.landingPages(workspaceId, numDays),
+        ga4.conversions(workspaceId, numDays),
       ]);
-      if (ov.error) throw new Error(ov.error);
-      setOverview(ov);
-      setTrend(Array.isArray(tr) ? tr : []);
-      setTopPages(Array.isArray(tp) ? tp : []);
-      setSources(Array.isArray(sr) ? sr : []);
-      setDevices(Array.isArray(dv) ? dv : []);
-      setCountries(Array.isArray(ct) ? ct : []);
-      if (cmp && !cmp.error) setComparison(cmp);
-      if (Array.isArray(nvr)) setNewVsReturning(nvr);
-      if (org && !org.error) setOrganic(org);
-      if (Array.isArray(lp)) setLandingPages(lp);
-      if (Array.isArray(conv)) setConversions(conv);
+      if (ov) setOverview(ov);
+      else if (!overview) setError('Failed to load analytics overview');
+      setTrend(tr);
+      setTopPages(tp);
+      setSources(sr);
+      setDevices(dv);
+      setCountries(ct);
+      if (cmp) setComparison(cmp);
+      setNewVsReturning(nvr);
+      if (org) setOrganic(org);
+      setLandingPages(lp);
+      setConversions(conv);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load analytics data');
     } finally {

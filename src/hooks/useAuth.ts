@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { get, post } from '../api/client';
 
 interface AuthState {
   checking: boolean;
@@ -17,14 +18,11 @@ export function useAuth() {
 
   const check = useCallback(async () => {
     try {
-      const stored = localStorage.getItem('auth_token');
-      const res = await fetch('/api/auth/check', {
-        headers: stored ? { 'x-auth-token': stored } : {},
-      });
-      const data = await res.json();
+      const data = await get<{ required?: boolean; authenticated?: boolean }>('/api/auth/check');
       if (!data.required) {
         setState({ checking: false, required: false, authenticated: true, token: null });
       } else if (data.authenticated) {
+        const stored = localStorage.getItem('auth_token');
         setState({ checking: false, required: true, authenticated: true, token: stored });
       } else {
         localStorage.removeItem('auth_token');
@@ -39,12 +37,7 @@ export function useAuth() {
 
   const login = useCallback(async (password: string): Promise<boolean> => {
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-      });
-      const data = await res.json();
+      const data = await post<{ ok?: boolean; token?: string }>('/api/auth/login', { password });
       if (data.ok && data.token) {
         localStorage.setItem('auth_token', data.token);
         setState({ checking: false, required: true, authenticated: true, token: data.token });

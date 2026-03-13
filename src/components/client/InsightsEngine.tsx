@@ -10,6 +10,7 @@ import { useCart } from './useCart';
 import type { ProductType } from '../../../shared/types/payments.ts';
 import type { RecPriority, RecType, RecStatus, Recommendation, RecommendationSet } from '../../../shared/types/recommendations.ts';
 import { STUDIO_NAME } from '../../constants';
+import { get, post, patch, del } from '../../api/client';
 
 // ─── Props ────────────────────────────────────────────────────────
 
@@ -110,9 +111,8 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
 
   // Fetch recommendations
   useEffect(() => {
-    fetch(`/api/public/recommendations/${workspaceId}`)
-      .then(r => r.ok ? r.json() : Promise.reject('Failed to load'))
-      .then((set: RecommendationSet) => { setData(set); setLoading(false); })
+    get<RecommendationSet>(`/api/public/recommendations/${workspaceId}`)
+      .then(set => { setData(set); setLoading(false); })
       .catch(err => { setError(typeof err === 'string' ? err : 'Failed to load recommendations'); setLoading(false); });
   }, [workspaceId]);
 
@@ -120,9 +120,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
   const handleRegenerate = async () => {
     setRegenerating(true);
     try {
-      const res = await fetch(`/api/public/recommendations/${workspaceId}/generate`, { method: 'POST' });
-      if (!res.ok) throw new Error('Failed');
-      const set: RecommendationSet = await res.json();
+      const set = await post<RecommendationSet>(`/api/public/recommendations/${workspaceId}/generate`);
       setData(set);
     } catch { setError('Failed to regenerate'); }
     setRegenerating(false);
@@ -131,12 +129,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
   // Update status
   const handleStatusUpdate = async (recId: string, status: RecStatus) => {
     try {
-      const res = await fetch(`/api/public/recommendations/${workspaceId}/${recId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      });
-      if (!res.ok) return;
+      await patch(`/api/public/recommendations/${workspaceId}/${recId}`, { status });
       setData(prev => {
         if (!prev) return prev;
         return {
@@ -152,7 +145,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
   // Dismiss
   const handleDismiss = async (recId: string) => {
     try {
-      await fetch(`/api/public/recommendations/${workspaceId}/${recId}`, { method: 'DELETE' });
+      await del(`/api/public/recommendations/${workspaceId}/${recId}`);
       setData(prev => {
         if (!prev) return prev;
         return {
