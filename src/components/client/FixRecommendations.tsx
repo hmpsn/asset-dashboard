@@ -4,6 +4,7 @@ import { useCart } from './useCart';
 import type { AuditDetail } from './types';
 import { useBetaMode } from './BetaContext';
 import type { ProductType } from '../../../server/payments';
+import { getOptional, getSafe } from '../../api/client';
 
 const fmt = (usd: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(usd);
@@ -363,8 +364,7 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
   useEffect(() => {
     if (!workspaceId) return;
     let cancelled = false;
-    fetch(`/api/public/recommendations/${workspaceId}`)
-      .then(r => r.ok ? r.json() : null)
+    getOptional<{ recommendations?: ServerRecommendation[] }>(`/api/public/recommendations/${workspaceId}`)
       .then(data => {
         if (!cancelled && data?.recommendations && Array.isArray(data.recommendations)) {
           setServerRecs(data.recommendations);
@@ -377,8 +377,7 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
   // Fetch traffic data (fallback for local audit-based categories)
   useEffect(() => {
     if (!workspaceId) return;
-    fetch(`/api/public/audit-traffic/${workspaceId}`)
-      .then(r => r.ok ? r.json() : {})
+    getSafe<TrafficMap>(`/api/public/audit-traffic/${workspaceId}`, {} as TrafficMap)
       .then((m: TrafficMap) => { if (m && typeof m === 'object') setTraffic(m); setTrafficLoaded(true); })
       .catch(() => setTrafficLoaded(true));
   }, [workspaceId]);

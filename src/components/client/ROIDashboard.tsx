@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { EmptyState } from '../ui';
 import { fmtMoney, fmtMoneyFull } from '../../utils/formatNumbers';
+import { get } from '../../api/client';
 
 interface PageROI {
   pagePath: string;
@@ -55,13 +56,9 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
   const [showAllPages, setShowAllPages] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/public/roi/${workspaceId}`)
-      .then(r => {
-        if (!r.ok) throw new Error('Failed to load ROI data');
-        return r.json();
-      })
+    get<ROIData>(`/api/public/roi/${workspaceId}`)
       .then(d => { setData(d); setError(null); })
-      .catch(e => setError(e.message))
+      .catch(e => setError(e instanceof Error ? e.message : 'Failed to load ROI data'))
       .finally(() => setLoading(false));
   }, [workspaceId]);
 

@@ -4,6 +4,7 @@ import {
   CheckCircle, ArrowRight, Globe, BarChart3, Shield,
 } from 'lucide-react';
 import { scoreColorClass, scoreBgBarClass } from './ui';
+import { get, post, getOptional } from '../api/client';
 
 interface SiteMetrics {
   score: number;
@@ -82,8 +83,7 @@ export function CompetitorAnalysis({ siteUrl }: Props) {
   useEffect(() => {
     if (!siteUrl) return;
     let cancelled = false;
-    fetch(`/api/competitor-compare-latest?myUrl=${encodeURIComponent(siteUrl)}`)
-      .then(r => r.json())
+    getOptional<{ result?: ComparisonResult }>(`/api/competitor-compare-latest?myUrl=${encodeURIComponent(siteUrl)}`)
       .then(snap => {
         if (cancelled || !snap?.result) return;
         setResult(snap.result);
@@ -99,13 +99,7 @@ export function CompetitorAnalysis({ siteUrl }: Props) {
     setError(null);
     setResult(null);
     try {
-      const res = await fetch('/api/competitor-compare', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ myUrl: myUrl.trim(), competitorUrl: competitorUrl.trim(), maxPages: 20 }),
-      });
-      if (!res.ok) throw new Error(`Server error: ${res.status}`);
-      const data = await res.json();
+      const data = await post<ComparisonResult & { error?: string }>('/api/competitor-compare', { myUrl: myUrl.trim(), competitorUrl: competitorUrl.trim(), maxPages: 20 });
       if (data.error) throw new Error(data.error);
       setResult(data);
     } catch (err) {

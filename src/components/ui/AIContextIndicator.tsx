@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminPath } from '../../routes';
+import { get } from '../../api/client';
 import {
   Brain,
   CheckCircle2,
@@ -67,8 +68,7 @@ export function AIContextIndicator({ workspaceId, feature = 'all', compact = fal
   useEffect(() => {
     if (!workspaceId) return;
     let cancelled = false;
-    fetch(`/api/ai/context/${workspaceId}`)
-      .then(r => r.json())
+    get<ContextCompleteness>(`/api/ai/context/${workspaceId}`)
       .then(d => { if (!cancelled) setData(d); })
       .catch(() => { if (!cancelled) setData(null); });
     return () => { cancelled = true; };

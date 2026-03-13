@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { StatusBadge } from './ui/StatusBadge';
+import { get, patch, post, getSafe } from '../api/client';
 
 interface SeoField {
   id: string;
@@ -84,8 +85,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/webflow/cms-seo/${siteId}`);
-      const data = await res.json() as CmsCollection[];
+      const data = await get<CmsCollection[]>(`/api/webflow/cms-seo/${siteId}`);
       setCollections(data);
       // Initialize edit state
       const editMap: Record<string, Record<string, string>> = {};
@@ -114,10 +114,8 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
   // Fetch approval batches for this workspace
   useEffect(() => {
     if (!workspaceId) return;
-    fetch(`/api/approvals/${workspaceId}`)
-      .then(r => r.json())
-      .then(data => { if (Array.isArray(data)) setApprovalBatches(data); })
-      .catch(() => {});
+    getSafe<ApprovalBatch[]>(`/api/approvals/${workspaceId}`, [])
+      .then(data => { if (Array.isArray(data)) setApprovalBatches(data); });
   }, [workspaceId]);
 
   // Build per-item approval lookup: itemId → approval items across all batches
@@ -159,12 +157,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
     setSaving(prev => new Set(prev).add(itemId));
     setErrors(prev => { const n = { ...prev }; delete n[itemId]; return n; });
     try {
-      const res = await fetch(`/api/webflow/collections/${collectionId}/items/${itemId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fieldData: fields, workspaceId }),
-      });
-      const result = await res.json();
+      const result = await patch<{ success?: boolean; error?: string }>(`/api/webflow/collections/${collectionId}/items/${itemId}`, { fieldData: fields, workspaceId });
       if (!result.success) {
         setErrors(prev => ({ ...prev, [itemId]: result.error || 'Save failed' }));
       } else {
@@ -185,12 +178,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
     if (savedItemIds.length === 0) return;
     setPublishing(prev => new Set(prev).add(collectionId));
     try {
-      const res = await fetch(`/api/webflow/collections/${collectionId}/publish`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemIds: savedItemIds }),
-      });
-      const result = await res.json();
+      const result = await post<{ success?: boolean }>(`/api/webflow/collections/${collectionId}/publish`, { itemIds: savedItemIds });
       if (result.success) {
         setPublished(prev => new Set(prev).add(collectionId));
         setTimeout(() => setPublished(prev => { const n = new Set(prev); n.delete(collectionId); return n; }), 3000);
@@ -218,21 +206,16 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
       const itemSlug = collection?.items.find(i => i.id === itemId)?.fieldData?.slug;
       const pagePath = itemSlug ? `/${collection?.collectionSlug}/${itemSlug}` : undefined;
 
-      const res = await fetch('/api/webflow/seo-rewrite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pageTitle: itemName,
-          currentSeoTitle: isTitle ? currentValue : undefined,
-          currentDescription: !isTitle ? currentValue : undefined,
-          pageContent: fieldContext || undefined,
-          siteContext: collection ? `CMS collection: ${collection.collectionName}` : undefined,
-          pagePath,
-          field: isTitle ? 'title' : 'description',
-          workspaceId,
-        }),
+      const data = await post<{ text?: string; variations?: string[] }>('/api/webflow/seo-rewrite', {
+        pageTitle: itemName,
+        currentSeoTitle: isTitle ? currentValue : undefined,
+        currentDescription: !isTitle ? currentValue : undefined,
+        pageContent: fieldContext || undefined,
+        siteContext: collection ? `CMS collection: ${collection.collectionName}` : undefined,
+        pagePath,
+        field: isTitle ? 'title' : 'description',
+        workspaceId,
       });
-      const data = await res.json();
       if (data.variations?.length > 1) {
         updateField(itemId, fieldSlug, data.variations[0]);
         setVariations(prev => ({ ...prev, [itemId]: { fieldSlug, options: data.variations } }));
@@ -288,11 +271,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
         setSendingApproval(false);
         return;
       }
-      await fetch(`/api/approvals/${workspaceId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ siteId, name: `CMS SEO Changes — ${new Date().toLocaleDateString()}`, items }),
-      });
+      await post(`/api/approvals/${workspaceId}`, { siteId, name: `CMS SEO Changes — ${new Date().toLocaleDateString()}`, items });
       setApprovalSent(true);
       refreshStates();
       setApprovalSelected(new Set());
