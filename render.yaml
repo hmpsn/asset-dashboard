@@ -160,11 +160,9 @@ envVarGroups:
         sync: false
   - name: shared-turnstile
     envVars:
-      - key: TURNSTILE_SITE_KEY
+      - key: VITE_TURNSTILE_SITE_KEY
         sync: false
       - key: TURNSTILE_SECRET_KEY
-        sync: false
-      - key: VITE_TURNSTILE_SITE_KEY
         sync: false
   - name: shared-s3-backups
     envVars:
