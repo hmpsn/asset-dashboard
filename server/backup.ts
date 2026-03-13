@@ -86,7 +86,7 @@ export async function runBackup(): Promise<{ backupDir: string; files: number; b
           log.error({ result }, 'SQLite backup integrity check FAILED');
         } else {
           // Verify the backup has data (not an empty database)
-          const tables = verifyDb.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '\_%' ESCAPE '\\'").all() as Array<{ name: string }>;
+          const tables = verifyDb.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '\\_%' ESCAPE '\\'").all() as Array<{ name: string }>;
           for (const t of tables) {
             const row = verifyDb.prepare(`SELECT COUNT(*) as c FROM "${t.name}"`).get() as { c: number };
             tableCounts[t.name] = row.c;
