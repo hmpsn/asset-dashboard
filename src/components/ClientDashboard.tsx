@@ -32,6 +32,7 @@ import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 // AnomalyAlerts removed from overview — insights digest covers trend signals
 import { BetaProvider } from './client/BetaContext';
 import { useClientAuth } from '../hooks/useClientAuth';
+import TurnstileWidget from './TurnstileWidget';
 import { useClientData } from '../hooks/useClientData';
 import { useChat } from '../hooks/useChat';
 import { usePayments } from '../hooks/usePayments';
@@ -102,7 +103,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     resetConfirm, setResetConfirm, resetDone, setResetDone,
     passwordInput, setPasswordInput,
     handlePasswordSubmit, handleClientUserLogin, handleClientLogout,
-  } = useClientAuth(workspaceId, ws, (data: WorkspaceInfo) => loadDashboardData(data, setPricingData));
+  } = useClientAuth(workspaceId, ws, (data: WorkspaceInfo) => loadDashboardData(data, setPricingData), () => turnstileTokenRef.current);
+  const turnstileTokenRef = useRef<string | undefined>(undefined);
 
   // ── Chat hook ──
   const chatDeps = useMemo(() => ({
@@ -501,6 +503,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                   className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors"
                 />
               </div>
+              <TurnstileWidget onToken={(t) => { turnstileTokenRef.current = t; }} />
               {authError && <p className="text-xs text-red-400">{authError}</p>}
               <button
                 type="submit"

@@ -54,6 +54,7 @@ export function useClientAuth(
   workspaceId: string,
   ws: WorkspaceInfo | null,
   loadDashboardData: (data: WorkspaceInfo) => void,
+  getTurnstileToken?: () => string | undefined,
 ): ClientAuthState & ClientAuthActions {
   const [authenticated, setAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
@@ -93,7 +94,8 @@ export function useClientAuth(
     setAuthLoading(true);
     setAuthError('');
     try {
-      const data = await post<{ user: ClientUser }>(`/api/public/client-login/${workspaceId}`, { email: loginEmail.trim(), password: loginPassword.trim() });
+      const turnstileToken = getTurnstileToken?.();
+      const data = await post<{ user: ClientUser }>(`/api/public/client-login/${workspaceId}`, { email: loginEmail.trim(), password: loginPassword.trim(), turnstileToken });
       setClientUser(data.user);
       setAuthenticated(true);
       sessionStorage.setItem(`dash_auth_${workspaceId}`, 'true');
