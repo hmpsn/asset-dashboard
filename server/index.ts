@@ -74,13 +74,9 @@ function gracefulShutdown(signal: string) {
     log.info('HTTP server closed');
 
     // 5. Flush pending data to disk
-    flushOpenAIUsage();
-    flushSemrushCredits();
-    try {
-      await flushEmailQueue();
-    } catch (err) {
-      log.error({ err }, 'Failed to flush email queue during shutdown');
-    }
+    try { flushOpenAIUsage(); } catch (err) { log.error({ err }, 'Failed to flush OpenAI usage during shutdown'); }
+    try { flushSemrushCredits(); } catch (err) { log.error({ err }, 'Failed to flush SEMRush credits during shutdown'); }
+    try { await flushEmailQueue(); } catch (err) { log.error({ err }, 'Failed to flush email queue during shutdown'); }
 
     // 6. Close SQLite database (flushes WAL)
     try {
