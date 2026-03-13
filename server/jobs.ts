@@ -259,10 +259,10 @@ export function hasActiveJob(type: string, workspaceId?: string): Job | undefine
   return undefined;
 }
 
-/** Mark all running jobs as interrupted (called during graceful shutdown). */
+/** Mark all active (running/pending) jobs as interrupted (called during graceful shutdown). */
 export function markRunningJobsInterrupted(): void {
   for (const job of jobs.values()) {
-    if (job.status === 'running') {
+    if (job.status === 'running' || job.status === 'pending') {
       updateJob(job.id, { status: 'error', error: 'Server shutting down — job interrupted' });
     }
   }
