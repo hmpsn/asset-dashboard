@@ -17,12 +17,12 @@ test.describe('Smoke tests', () => {
   });
 
   test('app loads without errors', async ({ page }) => {
+    // No unhandled JS errors — register listener before navigation
+    const errors: string[] = [];
+    page.on('pageerror', (err) => errors.push(err.message));
     await page.goto('/');
     // Should load the React app — either login page or dashboard
     await expect(page.locator('body')).not.toBeEmpty();
-    // No unhandled JS errors
-    const errors: string[] = [];
-    page.on('pageerror', (err) => errors.push(err.message));
     await page.waitForTimeout(2000);
     // Allow WebSocket errors but no React crashes
     const criticalErrors = errors.filter(
