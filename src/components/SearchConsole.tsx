@@ -140,6 +140,7 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
         gscAdmin.comparison(siteId, siteUrl, numDays),
       ]);
       if (overviewData) setOverview(overviewData);
+      else if (!overview) setError('Failed to load search overview');
       setTrend(Array.isArray(trendData) ? trendData : []);
       if (Array.isArray(devicesData)) setDevices(devicesData as DeviceBreakdown[]);
       if (Array.isArray(countriesData)) setCountries(countriesData as CountryBreakdown[]);

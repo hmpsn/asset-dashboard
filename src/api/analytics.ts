@@ -53,10 +53,10 @@ export const ga4 = {
     getSafe<GA4Event[]>(`/api/public/analytics-events/${wsId}${qs(days, dateRange)}`, []),
 
   eventTrend: (wsId: string, eventName: string, days: number) =>
-    getSafe<GA4EventTrend[]>(`/api/public/analytics-event-trend/${wsId}?eventName=${encodeURIComponent(eventName)}&days=${days}`, []),
+    getSafe<GA4EventTrend[]>(`/api/public/analytics-event-trend/${wsId}?event=${encodeURIComponent(eventName)}&days=${days}`, []),
 
   eventPages: (wsId: string, eventName: string, days: number) =>
-    getSafe<GA4EventPageBreakdown[]>(`/api/public/analytics-event-pages/${wsId}?eventName=${encodeURIComponent(eventName)}&days=${days}`, []),
+    getSafe<GA4EventPageBreakdown[]>(`/api/public/analytics-event-explorer/${wsId}?event=${encodeURIComponent(eventName)}&days=${days}`, []),
 
   conversions: (wsId: string, days: number, dateRange?: { startDate: string; endDate: string }) =>
     getSafe<GA4ConversionSummary[]>(`/api/public/analytics-conversions/${wsId}${qs(days, dateRange)}`, []),

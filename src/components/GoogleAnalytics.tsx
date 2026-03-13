@@ -110,6 +110,7 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
         ga4.conversions(workspaceId, numDays),
       ]);
       if (ov) setOverview(ov);
+      else if (!overview) setError('Failed to load analytics overview');
       setTrend(tr);
       setTopPages(tp);
       setSources(sr);
