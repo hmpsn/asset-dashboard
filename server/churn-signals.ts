@@ -16,6 +16,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import db from './db/index.js';
 import { getUploadRoot } from './data-dir.js';
 import { listWorkspaces } from './workspaces.js';
 import { listActivity } from './activity-log.js';
@@ -23,7 +24,7 @@ import { listClientUsers } from './client-users.js';
 import { notifyTeamChurnSignal } from './email.js';
 
 const UPLOAD_ROOT = getUploadRoot();
-const SIGNALS_FILE = path.join(UPLOAD_ROOT, '.churn-signals.json');
+const MAX_SIGNALS = 200;
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // Every 6 hours
 
 export type SignalType =
@@ -50,51 +51,119 @@ export interface ChurnSignal {
   dismissedAt?: string;
 }
 
-function readSignals(): ChurnSignal[] {
-  try {
-    if (fs.existsSync(SIGNALS_FILE)) {
-      return JSON.parse(fs.readFileSync(SIGNALS_FILE, 'utf-8'));
-    }
-  } catch { /* no file yet */ }
-  return [];
+// --- SQLite row shape ---
+
+interface ChurnSignalRow {
+  id: string;
+  workspace_id: string;
+  workspace_name: string;
+  type: string;
+  severity: string;
+  title: string;
+  description: string;
+  detected_at: string;
+  dismissed_at: string | null;
 }
 
-function writeSignals(signals: ChurnSignal[]) {
-  fs.mkdirSync(path.dirname(SIGNALS_FILE), { recursive: true });
-  fs.writeFileSync(SIGNALS_FILE, JSON.stringify(signals, null, 2));
+function rowToSignal(row: ChurnSignalRow): ChurnSignal {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    workspaceName: row.workspace_name,
+    type: row.type as SignalType,
+    severity: row.severity as SignalSeverity,
+    title: row.title,
+    description: row.description,
+    detectedAt: row.detected_at,
+    dismissedAt: row.dismissed_at ?? undefined,
+  };
+}
+
+// --- Prepared statements (lazily initialized after migrations run) ---
+
+interface Stmts {
+  selectAll: ReturnType<typeof db.prepare>;
+  selectActive: ReturnType<typeof db.prepare>;
+  selectActiveByWorkspace: ReturnType<typeof db.prepare>;
+  selectById: ReturnType<typeof db.prepare>;
+  selectUndismissedByTypeWs: ReturnType<typeof db.prepare>;
+  insert: ReturnType<typeof db.prepare>;
+  dismiss: ReturnType<typeof db.prepare>;
+  countAll: ReturnType<typeof db.prepare>;
+  pruneOldest: ReturnType<typeof db.prepare>;
+}
+
+let _stmts: Stmts | null = null;
+
+function stmts(): Stmts {
+  if (!_stmts) {
+    _stmts = {
+      selectAll: db.prepare('SELECT * FROM churn_signals ORDER BY detected_at DESC'),
+      selectActive: db.prepare('SELECT * FROM churn_signals WHERE dismissed_at IS NULL ORDER BY detected_at DESC'),
+      selectActiveByWorkspace: db.prepare('SELECT * FROM churn_signals WHERE dismissed_at IS NULL AND workspace_id = ? ORDER BY detected_at DESC'),
+      selectById: db.prepare('SELECT * FROM churn_signals WHERE id = ?'),
+      selectUndismissedByTypeWs: db.prepare('SELECT * FROM churn_signals WHERE workspace_id = ? AND type = ? AND dismissed_at IS NULL LIMIT 1'),
+      insert: db.prepare(`
+        INSERT INTO churn_signals (id, workspace_id, workspace_name, type, severity,
+          title, description, detected_at, dismissed_at)
+        VALUES (@id, @workspace_id, @workspace_name, @type, @severity,
+          @title, @description, @detected_at, @dismissed_at)
+      `),
+      dismiss: db.prepare('UPDATE churn_signals SET dismissed_at = ? WHERE id = ?'),
+      countAll: db.prepare('SELECT COUNT(*) as count FROM churn_signals'),
+      pruneOldest: db.prepare(`
+        DELETE FROM churn_signals WHERE id IN (
+          SELECT id FROM churn_signals ORDER BY detected_at ASC LIMIT ?
+        )
+      `),
+    };
+  }
+  return _stmts;
 }
 
 export function listChurnSignals(workspaceId?: string): ChurnSignal[] {
-  const all = readSignals();
-  const active = all.filter(s => !s.dismissedAt);
-  if (workspaceId) return active.filter(s => s.workspaceId === workspaceId);
-  return active;
+  if (workspaceId) {
+    const rows = stmts().selectActiveByWorkspace.all(workspaceId) as ChurnSignalRow[];
+    return rows.map(rowToSignal);
+  }
+  const rows = stmts().selectActive.all() as ChurnSignalRow[];
+  return rows.map(rowToSignal);
 }
 
 export function dismissSignal(signalId: string): boolean {
-  const signals = readSignals();
-  const signal = signals.find(s => s.id === signalId);
-  if (!signal) return false;
-  signal.dismissedAt = new Date().toISOString();
-  writeSignals(signals);
-  return true;
+  const info = stmts().dismiss.run(new Date().toISOString(), signalId);
+  return info.changes > 0;
 }
 
 function addSignal(signal: Omit<ChurnSignal, 'id' | 'detectedAt'>): ChurnSignal {
-  const signals = readSignals();
   // Dedupe: don't add if same type + workspace already exists (undismissed)
-  const existing = signals.find(s => s.workspaceId === signal.workspaceId && s.type === signal.type && !s.dismissedAt);
-  if (existing) return existing;
+  const existing = stmts().selectUndismissedByTypeWs.get(signal.workspaceId, signal.type) as ChurnSignalRow | undefined;
+  if (existing) return rowToSignal(existing);
 
   const entry: ChurnSignal = {
     ...signal,
     id: `cs_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     detectedAt: new Date().toISOString(),
   };
-  signals.push(entry);
+
+  stmts().insert.run({
+    id: entry.id,
+    workspace_id: entry.workspaceId,
+    workspace_name: entry.workspaceName,
+    type: entry.type,
+    severity: entry.severity,
+    title: entry.title,
+    description: entry.description,
+    detected_at: entry.detectedAt,
+    dismissed_at: entry.dismissedAt ?? null,
+  });
+
   // Keep last 200 signals
-  if (signals.length > 200) signals.splice(0, signals.length - 200);
-  writeSignals(signals);
+  const { count } = stmts().countAll.get() as { count: number };
+  if (count > MAX_SIGNALS) {
+    stmts().pruneOldest.run(count - MAX_SIGNALS);
+  }
+
   return entry;
 }
 
@@ -160,7 +229,6 @@ async function runChurnCheck() {
     }
 
     // ── Health Score Drop ──
-    // Check audit data for score drop
     try {
       const auditDir = path.join(UPLOAD_ROOT, ws.folder);
       const auditFiles = fs.readdirSync(auditDir).filter(f => f.startsWith('audit-') && f.endsWith('.json')).sort().reverse();
@@ -176,7 +244,7 @@ async function runChurnCheck() {
             type: 'health_score_drop',
             severity: prevScore - latestScore >= 20 ? 'critical' : 'warning',
             title: `Site health dropped ${prevScore - latestScore} points`,
-            description: `${ws.name} health score went from ${prevScore} → ${latestScore}. Investigate potential regressions.`,
+            description: `${ws.name} health score went from ${prevScore} to ${latestScore}. Investigate potential regressions.`,
           });
         }
       }
@@ -228,11 +296,13 @@ async function runChurnCheck() {
   }
 
   // Send email notifications for critical signals
-  const criticalSignals = readSignals().filter(s => !s.dismissedAt && (s.severity === 'critical' || s.severity === 'warning'));
+  const allSignals = stmts().selectAll.all() as ChurnSignalRow[];
+  const criticalSignals = allSignals
+    .filter(s => !s.dismissed_at && (s.severity === 'critical' || s.severity === 'warning'));
   for (const signal of criticalSignals) {
     notifyTeamChurnSignal({
-      workspaceName: signal.workspaceName,
-      workspaceId: signal.workspaceId,
+      workspaceName: signal.workspace_name,
+      workspaceId: signal.workspace_id,
       signalTitle: signal.title,
       signalDescription: signal.description,
       severity: signal.severity,

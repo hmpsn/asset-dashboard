@@ -3,12 +3,10 @@
  * Separate from internal (admin) users. Each client user belongs to a workspace.
  */
 
-import fs from 'fs';
-import path from 'path';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import { getDataDir } from './data-dir.js';
+import db from './db/index.js';
 
 export type ClientRole = 'client_owner' | 'client_member';
 
@@ -32,40 +30,115 @@ const SALT_ROUNDS = 12;
 const JWT_SECRET = process.env.JWT_SECRET || 'hmpsn-studio-dev-secret-change-in-prod';
 const CLIENT_JWT_EXPIRES = '24h';
 
-function usersFile(): string {
-  return path.join(getDataDir('auth'), 'client-users.json');
+// --- SQLite row shapes ---
+
+interface ClientUserRow {
+  id: string;
+  email: string;
+  name: string;
+  password_hash: string;
+  role: string;
+  workspace_id: string;
+  avatar_url: string | null;
+  invited_by: string | null;
+  last_login_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
-function readUsers(): ClientUser[] {
-  const fp = usersFile();
-  try {
-    if (fs.existsSync(fp)) return JSON.parse(fs.readFileSync(fp, 'utf-8'));
-  } catch { /* corrupt file */ }
-  return [];
+interface ResetTokenRow {
+  token: string;
+  user_id: string;
+  workspace_id: string;
+  email: string;
+  expires_at: number;
 }
 
-function writeUsers(users: ClientUser[]): void {
-  const dir = path.dirname(usersFile());
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(usersFile(), JSON.stringify(users, null, 2));
+function rowToClientUser(row: ClientUserRow): ClientUser {
+  return {
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    passwordHash: row.password_hash,
+    role: row.role as ClientRole,
+    workspaceId: row.workspace_id,
+    avatarUrl: row.avatar_url ?? undefined,
+    invitedBy: row.invited_by ?? undefined,
+    lastLoginAt: row.last_login_at ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+// --- Prepared statements (lazily initialized after migrations run) ---
+
+interface Stmts {
+  selectById: ReturnType<typeof db.prepare>;
+  selectByEmailWs: ReturnType<typeof db.prepare>;
+  selectByWorkspace: ReturnType<typeof db.prepare>;
+  countByWorkspace: ReturnType<typeof db.prepare>;
+  existsByWorkspace: ReturnType<typeof db.prepare>;
+  insert: ReturnType<typeof db.prepare>;
+  update: ReturnType<typeof db.prepare>;
+  deleteById: ReturnType<typeof db.prepare>;
+  selectToken: ReturnType<typeof db.prepare>;
+  insertToken: ReturnType<typeof db.prepare>;
+  deleteToken: ReturnType<typeof db.prepare>;
+  deleteTokensByUserWs: ReturnType<typeof db.prepare>;
+  deleteExpiredTokens: ReturnType<typeof db.prepare>;
+}
+
+let _stmts: Stmts | null = null;
+
+function stmts(): Stmts {
+  if (!_stmts) {
+    _stmts = {
+      selectById: db.prepare('SELECT * FROM client_users WHERE id = ?'),
+      selectByEmailWs: db.prepare('SELECT * FROM client_users WHERE LOWER(email) = LOWER(?) AND workspace_id = ?'),
+      selectByWorkspace: db.prepare('SELECT * FROM client_users WHERE workspace_id = ?'),
+      countByWorkspace: db.prepare('SELECT COUNT(*) as count FROM client_users WHERE workspace_id = ?'),
+      existsByWorkspace: db.prepare('SELECT 1 FROM client_users WHERE workspace_id = ? LIMIT 1'),
+      insert: db.prepare(`
+        INSERT INTO client_users (id, email, name, password_hash, role, workspace_id,
+          avatar_url, invited_by, last_login_at, created_at, updated_at)
+        VALUES (@id, @email, @name, @password_hash, @role, @workspace_id,
+          @avatar_url, @invited_by, @last_login_at, @created_at, @updated_at)
+      `),
+      update: db.prepare(`
+        UPDATE client_users SET email = @email, name = @name, password_hash = @password_hash,
+          role = @role, avatar_url = @avatar_url, last_login_at = @last_login_at,
+          updated_at = @updated_at
+        WHERE id = @id
+      `),
+      deleteById: db.prepare('DELETE FROM client_users WHERE id = ?'),
+      selectToken: db.prepare('SELECT * FROM reset_tokens WHERE token = ?'),
+      insertToken: db.prepare(`
+        INSERT INTO reset_tokens (token, user_id, workspace_id, email, expires_at)
+        VALUES (@token, @user_id, @workspace_id, @email, @expires_at)
+      `),
+      deleteToken: db.prepare('DELETE FROM reset_tokens WHERE token = ?'),
+      deleteTokensByUserWs: db.prepare('DELETE FROM reset_tokens WHERE user_id = ? AND workspace_id = ?'),
+      deleteExpiredTokens: db.prepare('DELETE FROM reset_tokens WHERE expires_at <= ?'),
+    };
+  }
+  return _stmts;
 }
 
 // ── CRUD ──
 
 export function listClientUsers(workspaceId: string): SafeClientUser[] {
-  return readUsers()
-    .filter(u => u.workspaceId === workspaceId)
-    .map(stripPassword);
+  const rows = stmts().selectByWorkspace.all(workspaceId) as ClientUserRow[];
+  return rows.map(r => stripPassword(rowToClientUser(r)));
 }
 
 export function getClientUserById(id: string): ClientUser | null {
-  return readUsers().find(u => u.id === id) || null;
+  const row = stmts().selectById.get(id) as ClientUserRow | undefined;
+  return row ? rowToClientUser(row) : null;
 }
 
 export function getClientUserByEmail(email: string, workspaceId: string): ClientUser | null {
-  return readUsers().find(
-    u => u.email.toLowerCase() === email.toLowerCase() && u.workspaceId === workspaceId
-  ) || null;
+  const row = stmts().selectByEmailWs.get(email, workspaceId) as ClientUserRow | undefined;
+  return row ? rowToClientUser(row) : null;
 }
 
 export function getSafeClientUser(id: string): SafeClientUser | null {
@@ -81,10 +154,8 @@ export async function createClientUser(
   role: ClientRole = 'client_member',
   invitedBy?: string,
 ): Promise<SafeClientUser> {
-  const users = readUsers();
-
   // Duplicate check within the same workspace
-  if (users.some(u => u.email.toLowerCase() === email.toLowerCase() && u.workspaceId === workspaceId)) {
+  if (getClientUserByEmail(email, workspaceId)) {
     throw new Error('A client with this email already exists in this workspace');
   }
 
@@ -101,8 +172,20 @@ export async function createClientUser(
     updatedAt: now,
   };
 
-  users.push(user);
-  writeUsers(users);
+  stmts().insert.run({
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    password_hash: user.passwordHash,
+    role: user.role,
+    workspace_id: user.workspaceId,
+    avatar_url: user.avatarUrl ?? null,
+    invited_by: user.invitedBy ?? null,
+    last_login_at: user.lastLoginAt ?? null,
+    created_at: user.createdAt,
+    updated_at: user.updatedAt,
+  });
+
   return stripPassword(user);
 }
 
@@ -110,47 +193,78 @@ export async function updateClientUser(
   id: string,
   updates: Partial<Pick<ClientUser, 'name' | 'email' | 'role' | 'avatarUrl'>>,
 ): Promise<SafeClientUser | null> {
-  const users = readUsers();
-  const idx = users.findIndex(u => u.id === id);
-  if (idx === -1) return null;
+  const existing = getClientUserById(id);
+  if (!existing) return null;
 
-  if (updates.email && updates.email.toLowerCase() !== users[idx].email) {
-    if (users.some(u => u.id !== id && u.email.toLowerCase() === updates.email!.toLowerCase() && u.workspaceId === users[idx].workspaceId)) {
+  if (updates.email && updates.email.toLowerCase() !== existing.email) {
+    const dup = getClientUserByEmail(updates.email, existing.workspaceId);
+    if (dup && dup.id !== id) {
       throw new Error('A client with this email already exists in this workspace');
     }
     updates.email = updates.email.toLowerCase().trim();
   }
 
-  Object.assign(users[idx], updates, { updatedAt: new Date().toISOString() });
-  writeUsers(users);
-  return stripPassword(users[idx]);
+  const merged = { ...existing, ...updates, updatedAt: new Date().toISOString() };
+
+  stmts().update.run({
+    id: merged.id,
+    email: merged.email,
+    name: merged.name,
+    password_hash: merged.passwordHash,
+    role: merged.role,
+    avatar_url: merged.avatarUrl ?? null,
+    last_login_at: merged.lastLoginAt ?? null,
+    updated_at: merged.updatedAt,
+  });
+
+  return stripPassword(merged);
 }
 
 export async function changeClientPassword(id: string, newPassword: string): Promise<boolean> {
-  const users = readUsers();
-  const idx = users.findIndex(u => u.id === id);
-  if (idx === -1) return false;
-  users[idx].passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
-  users[idx].updatedAt = new Date().toISOString();
-  writeUsers(users);
+  const existing = getClientUserById(id);
+  if (!existing) return false;
+
+  const merged = {
+    ...existing,
+    passwordHash: await bcrypt.hash(newPassword, SALT_ROUNDS),
+    updatedAt: new Date().toISOString(),
+  };
+
+  stmts().update.run({
+    id: merged.id,
+    email: merged.email,
+    name: merged.name,
+    password_hash: merged.passwordHash,
+    role: merged.role,
+    avatar_url: merged.avatarUrl ?? null,
+    last_login_at: merged.lastLoginAt ?? null,
+    updated_at: merged.updatedAt,
+  });
+
   return true;
 }
 
 export function deleteClientUser(id: string): boolean {
-  const users = readUsers();
-  const idx = users.findIndex(u => u.id === id);
-  if (idx === -1) return false;
-  users.splice(idx, 1);
-  writeUsers(users);
-  return true;
+  const info = stmts().deleteById.run(id);
+  return info.changes > 0;
 }
 
 export function recordClientLogin(id: string): void {
-  const users = readUsers();
-  const idx = users.findIndex(u => u.id === id);
-  if (idx === -1) return;
-  users[idx].lastLoginAt = new Date().toISOString();
-  writeUsers(users);
+  const existing = getClientUserById(id);
+  if (!existing) return;
+
+  const merged = { ...existing, lastLoginAt: new Date().toISOString() };
+
+  stmts().update.run({
+    id: merged.id,
+    email: merged.email,
+    name: merged.name,
+    password_hash: merged.passwordHash,
+    role: merged.role,
+    avatar_url: merged.avatarUrl ?? null,
+    last_login_at: merged.lastLoginAt ?? null,
+    updated_at: merged.updatedAt,
+  });
 }
 
 // ── Auth ──
@@ -189,11 +303,12 @@ export function verifyClientToken(token: string): ClientJwtPayload | null {
 }
 
 export function clientUserCount(workspaceId: string): number {
-  return readUsers().filter(u => u.workspaceId === workspaceId).length;
+  const row = stmts().countByWorkspace.get(workspaceId) as { count: number };
+  return row.count;
 }
 
 export function hasClientUsers(workspaceId: string): boolean {
-  return readUsers().some(u => u.workspaceId === workspaceId);
+  return stmts().existsByWorkspace.get(workspaceId) != null;
 }
 
 // ── Password Reset ──
@@ -206,63 +321,44 @@ interface ResetToken {
   expiresAt: number;
 }
 
-function resetTokensFile(): string {
-  return path.join(getDataDir('auth'), 'reset-tokens.json');
-}
-
-function readResetTokens(): ResetToken[] {
-  try {
-    const fp = resetTokensFile();
-    if (fs.existsSync(fp)) return JSON.parse(fs.readFileSync(fp, 'utf-8'));
-  } catch { /* fresh */ }
-  return [];
-}
-
-function writeResetTokens(tokens: ResetToken[]): void {
-  const dir = path.dirname(resetTokensFile());
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(resetTokensFile(), JSON.stringify(tokens, null, 2));
-}
-
 export function createResetToken(email: string, workspaceId: string): { token: string; user: SafeClientUser } | null {
   const user = getClientUserByEmail(email, workspaceId);
   if (!user) return null;
 
   const token = crypto.randomBytes(32).toString('hex');
-  const tokens = readResetTokens().filter(t => t.expiresAt > Date.now()); // prune expired
-  // Remove any existing tokens for this user
-  const cleaned = tokens.filter(t => !(t.userId === user.id && t.workspaceId === workspaceId));
-  cleaned.push({
+
+  // Prune expired tokens
+  stmts().deleteExpiredTokens.run(Date.now());
+  // Remove any existing tokens for this user in this workspace
+  stmts().deleteTokensByUserWs.run(user.id, workspaceId);
+
+  stmts().insertToken.run({
     token,
-    userId: user.id,
-    workspaceId,
+    user_id: user.id,
+    workspace_id: workspaceId,
     email: user.email,
-    expiresAt: Date.now() + 60 * 60 * 1000, // 1 hour
+    expires_at: Date.now() + 60 * 60 * 1000, // 1 hour
   });
-  writeResetTokens(cleaned);
+
   return { token, user: stripPassword(user) };
 }
 
 export async function resetPasswordWithToken(token: string, newPassword: string): Promise<{ success: boolean; error?: string }> {
-  const tokens = readResetTokens();
-  const idx = tokens.findIndex(t => t.token === token);
-  if (idx === -1) return { success: false, error: 'Invalid or expired reset link' };
+  const row = stmts().selectToken.get(token) as ResetTokenRow | undefined;
+  if (!row) return { success: false, error: 'Invalid or expired reset link' };
 
-  const resetToken = tokens[idx];
-  if (resetToken.expiresAt < Date.now()) {
-    tokens.splice(idx, 1);
-    writeResetTokens(tokens);
+  if (row.expires_at < Date.now()) {
+    stmts().deleteToken.run(token);
     return { success: false, error: 'Reset link has expired. Please request a new one.' };
   }
 
   if (newPassword.length < 8) return { success: false, error: 'Password must be at least 8 characters' };
 
-  const changed = await changeClientPassword(resetToken.userId, newPassword);
+  const changed = await changeClientPassword(row.user_id, newPassword);
   if (!changed) return { success: false, error: 'User not found' };
 
   // Remove used token
-  tokens.splice(idx, 1);
-  writeResetTokens(tokens);
+  stmts().deleteToken.run(token);
   return { success: true };
 }
 

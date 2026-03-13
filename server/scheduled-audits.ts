@@ -1,15 +1,9 @@
-import fs from 'fs';
-import path from 'path';
+import db from './db/index.js';
 import { listWorkspaces, getTokenForSite, getClientPortalUrl } from './workspaces.js';
 import { runSeoAudit } from './seo-audit.js';
 import { saveSnapshot, getLatestSnapshotBefore } from './reports.js';
 import { addActivity } from './activity-log.js';
 import { notifyAuditAlert, notifyClientAuditComplete } from './email.js';
-
-import { getUploadRoot } from './data-dir.js';
-
-const UPLOAD_ROOT = getUploadRoot();
-const SCHEDULE_FILE = path.join(UPLOAD_ROOT, '.audit-schedules.json');
 
 export interface AuditSchedule {
   workspaceId: string;
@@ -20,56 +14,96 @@ export interface AuditSchedule {
   lastScore?: number;
 }
 
-function readSchedules(): AuditSchedule[] {
-  try {
-    if (fs.existsSync(SCHEDULE_FILE)) {
-      return JSON.parse(fs.readFileSync(SCHEDULE_FILE, 'utf-8'));
-    }
-  } catch { /* no file yet */ }
-  return [];
+// --- SQLite row shape ---
+
+interface AuditScheduleRow {
+  workspace_id: string;
+  enabled: number;
+  interval_days: number;
+  score_drop_threshold: number;
+  last_run_at: string | null;
+  last_score: number | null;
 }
 
-function writeSchedules(schedules: AuditSchedule[]) {
-  fs.mkdirSync(path.dirname(SCHEDULE_FILE), { recursive: true });
-  fs.writeFileSync(SCHEDULE_FILE, JSON.stringify(schedules, null, 2));
+function rowToSchedule(row: AuditScheduleRow): AuditSchedule {
+  return {
+    workspaceId: row.workspace_id,
+    enabled: row.enabled === 1,
+    intervalDays: row.interval_days,
+    scoreDropThreshold: row.score_drop_threshold,
+    lastRunAt: row.last_run_at ?? undefined,
+    lastScore: row.last_score ?? undefined,
+  };
+}
+
+// --- Prepared statements (lazily initialized after migrations run) ---
+
+interface Stmts {
+  selectAll: ReturnType<typeof db.prepare>;
+  selectById: ReturnType<typeof db.prepare>;
+  upsert: ReturnType<typeof db.prepare>;
+  deleteById: ReturnType<typeof db.prepare>;
+}
+
+let _stmts: Stmts | null = null;
+
+function stmts(): Stmts {
+  if (!_stmts) {
+    _stmts = {
+      selectAll: db.prepare('SELECT * FROM audit_schedules'),
+      selectById: db.prepare('SELECT * FROM audit_schedules WHERE workspace_id = ?'),
+      upsert: db.prepare(`
+        INSERT INTO audit_schedules (workspace_id, enabled, interval_days, score_drop_threshold,
+          last_run_at, last_score)
+        VALUES (@workspace_id, @enabled, @interval_days, @score_drop_threshold,
+          @last_run_at, @last_score)
+        ON CONFLICT(workspace_id) DO UPDATE SET
+          enabled = @enabled, interval_days = @interval_days,
+          score_drop_threshold = @score_drop_threshold,
+          last_run_at = @last_run_at, last_score = @last_score
+      `),
+      deleteById: db.prepare('DELETE FROM audit_schedules WHERE workspace_id = ?'),
+    };
+  }
+  return _stmts;
 }
 
 export function getSchedule(workspaceId: string): AuditSchedule | null {
-  return readSchedules().find(s => s.workspaceId === workspaceId) || null;
+  const row = stmts().selectById.get(workspaceId) as AuditScheduleRow | undefined;
+  return row ? rowToSchedule(row) : null;
 }
 
 export function listSchedules(): AuditSchedule[] {
-  return readSchedules();
+  const rows = stmts().selectAll.all() as AuditScheduleRow[];
+  return rows.map(rowToSchedule);
 }
 
 export function upsertSchedule(workspaceId: string, updates: Partial<Omit<AuditSchedule, 'workspaceId'>>): AuditSchedule {
-  const schedules = readSchedules();
-  const idx = schedules.findIndex(s => s.workspaceId === workspaceId);
-  if (idx >= 0) {
-    Object.assign(schedules[idx], updates);
-    writeSchedules(schedules);
-    return schedules[idx];
-  }
-  const newSchedule: AuditSchedule = {
+  const existing = getSchedule(workspaceId);
+  const merged: AuditSchedule = {
     workspaceId,
-    enabled: updates.enabled ?? true,
-    intervalDays: updates.intervalDays ?? 7,
-    scoreDropThreshold: updates.scoreDropThreshold ?? 5,
-    lastRunAt: updates.lastRunAt,
-    lastScore: updates.lastScore,
+    enabled: updates.enabled ?? existing?.enabled ?? true,
+    intervalDays: updates.intervalDays ?? existing?.intervalDays ?? 7,
+    scoreDropThreshold: updates.scoreDropThreshold ?? existing?.scoreDropThreshold ?? 5,
+    lastRunAt: updates.lastRunAt ?? existing?.lastRunAt,
+    lastScore: updates.lastScore ?? existing?.lastScore,
   };
-  schedules.push(newSchedule);
-  writeSchedules(schedules);
-  return newSchedule;
+
+  stmts().upsert.run({
+    workspace_id: merged.workspaceId,
+    enabled: merged.enabled ? 1 : 0,
+    interval_days: merged.intervalDays,
+    score_drop_threshold: merged.scoreDropThreshold,
+    last_run_at: merged.lastRunAt ?? null,
+    last_score: merged.lastScore ?? null,
+  });
+
+  return merged;
 }
 
 export function deleteSchedule(workspaceId: string): boolean {
-  const schedules = readSchedules();
-  const idx = schedules.findIndex(s => s.workspaceId === workspaceId);
-  if (idx === -1) return false;
-  schedules.splice(idx, 1);
-  writeSchedules(schedules);
-  return true;
+  const info = stmts().deleteById.run(workspaceId);
+  return info.changes > 0;
 }
 
 function sendScoreDropAlert(ws: { name: string; id: string }, oldScore: number, newScore: number) {
@@ -110,7 +144,7 @@ async function runScheduledAudit(schedule: AuditSchedule) {
     if (oldScore !== undefined && oldScore > audit.siteScore) {
       const drop = oldScore - audit.siteScore;
       if (drop >= schedule.scoreDropThreshold) {
-        console.log(`[Scheduled Audit] Score drop detected: ${oldScore} → ${audit.siteScore} (-${drop})`);
+        console.log(`[Scheduled Audit] Score drop detected: ${oldScore} -> ${audit.siteScore} (-${drop})`);
         sendScoreDropAlert(ws, oldScore, audit.siteScore);
       }
     }
@@ -170,7 +204,7 @@ export function startScheduler() {
   const CHECK_MS = 60 * 60 * 1000;
 
   const checkDue = async () => {
-    const schedules = readSchedules().filter(s => s.enabled);
+    const schedules = listSchedules().filter(s => s.enabled);
     const now = Date.now();
 
     for (const schedule of schedules) {
