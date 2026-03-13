@@ -8,6 +8,9 @@ const router = Router();
 import { runSiteSpeed, runSinglePageSpeed } from '../pagespeed.js';
 import { savePageSpeed, getPageSpeed, saveSinglePageSpeed } from '../performance-store.js';
 import { getTokenForSite } from '../workspaces.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('webflow-pagespeed');
 
 // --- PageSpeed / Core Web Vitals ---
 router.get('/api/webflow/pagespeed/:siteId', async (req, res) => {
@@ -19,7 +22,7 @@ router.get('/api/webflow/pagespeed/:siteId', async (req, res) => {
     savePageSpeed(req.params.siteId, result);
     res.json(result);
   } catch (err) {
-    console.error('PageSpeed error:', err);
+    log.error({ err: err }, 'PageSpeed error');
     res.status(500).json({ error: 'PageSpeed analysis failed' });
   }
 });
@@ -52,7 +55,7 @@ router.post('/api/webflow/pagespeed-single/:siteId', async (req, res) => {
     saveSinglePageSpeed(siteId, `${pageSlug || 'home'}_${strategy || 'mobile'}`, result);
     res.json(result);
   } catch (err) {
-    console.error('Single PageSpeed error:', err);
+    log.error({ err: err }, 'Single PageSpeed error');
     res.status(500).json({ error: 'PageSpeed analysis failed' });
   }
 });

@@ -30,6 +30,9 @@ import {
   updatePageState,
 } from '../workspaces.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('approvals');
 
 // --- Approvals (admin, authenticated) ---
 router.post('/api/approvals/:workspaceId', (req, res) => {
@@ -142,7 +145,7 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', async (req, res
         if (!result.success) throw new Error(result.error || 'CMS update failed');
         // Publish the CMS item so draft changes go live
         const pubResult = await publishCollectionItems(item.collectionId, [item.pageId], token);
-        if (!pubResult.success) console.warn(`CMS publish warning for ${item.pageId}: ${pubResult.error}`);
+        if (!pubResult.success) log.warn(`CMS publish warning for ${item.pageId}: ${pubResult.error}`);
       } else {
         // Static page — update via page SEO API
         const fields = item.field === 'seoTitle'

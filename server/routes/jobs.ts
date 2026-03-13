@@ -46,6 +46,9 @@ import {
   getClientPortalUrl,
   updatePageState,
 } from '../workspaces.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('jobs');
 
 const PORT = parseInt(process.env.PORT || '3001', 10);
 
@@ -102,7 +105,7 @@ router.post('/api/jobs', async (req, res) => {
             if (ws) {
               try {
                 await generateRecommendations(ws.id);
-                console.log(`[audit] Auto-regenerated recommendations for ${ws.id}`);
+                log.info(`Auto-regenerated recommendations for ${ws.id}`);
                 // Notify client that recommendations are ready
                 if (ws.clientEmail) {
                   const dashUrl = getClientPortalUrl(ws);
@@ -113,7 +116,7 @@ router.post('/api/jobs', async (req, res) => {
                   }
                 }
               } catch (recErr) {
-                console.error('[audit] Failed to regenerate recommendations:', recErr);
+                log.error({ err: recErr }, 'Failed to regenerate recommendations');
               }
               // Notify client of audit completion with full details
               if (ws.clientEmail) {

@@ -4,6 +4,9 @@ import { runSeoAudit } from './seo-audit.js';
 import { saveSnapshot, getLatestSnapshotBefore } from './reports.js';
 import { addActivity } from './activity-log.js';
 import { notifyAuditAlert, notifyClientAuditComplete } from './email.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('scheduled-audit');
 
 export interface AuditSchedule {
   workspaceId: string;
@@ -121,7 +124,7 @@ async function runScheduledAudit(schedule: AuditSchedule) {
   if (!ws?.webflowSiteId) return;
 
   const token = getTokenForSite(ws.webflowSiteId) || undefined;
-  console.log(`[Scheduled Audit] Running for ${ws.name} (${ws.webflowSiteId})`);
+  log.info(`Running for ${ws.name} (${ws.webflowSiteId})`);
 
   try {
     const audit = await runSeoAudit(ws.webflowSiteId, token);
@@ -144,7 +147,7 @@ async function runScheduledAudit(schedule: AuditSchedule) {
     if (oldScore !== undefined && oldScore > audit.siteScore) {
       const drop = oldScore - audit.siteScore;
       if (drop >= schedule.scoreDropThreshold) {
-        console.log(`[Scheduled Audit] Score drop detected: ${oldScore} -> ${audit.siteScore} (-${drop})`);
+        log.info(`Score drop detected: ${oldScore} -> ${audit.siteScore} (-${drop})`);
         sendScoreDropAlert(ws, oldScore, audit.siteScore);
       }
     }
@@ -191,7 +194,7 @@ async function runScheduledAudit(schedule: AuditSchedule) {
       });
     }
   } catch (err) {
-    console.error(`[Scheduled Audit] Failed for ${ws.name}:`, err);
+    log.error({ err: err }, `Failed for ${ws.name}:`);
   }
 }
 
@@ -222,14 +225,14 @@ export function startScheduler() {
 
   // Run check on startup after 30s delay, then every hour
   setTimeout(() => {
-    checkDue().catch(err => console.error('[Scheduler] Error:', err));
+    checkDue().catch(err => log.error({ err }, 'Error'));
   }, 30000);
 
   checkInterval = setInterval(() => {
-    checkDue().catch(err => console.error('[Scheduler] Error:', err));
+    checkDue().catch(err => log.error({ err }, 'Error'));
   }, CHECK_MS);
 
-  console.log('[Scheduler] Audit scheduler started (checks every hour)');
+  log.info('Audit scheduler started (checks every hour)');
 }
 
 export function stopScheduler() {

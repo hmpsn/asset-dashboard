@@ -6,6 +6,9 @@ import { getStripeSecretKey, getStripeWebhookSecret, getStripePriceId } from './
 import { getWorkspace, updateWorkspace, listWorkspaces } from './workspaces.js';
 import { createWorkOrder } from './work-orders.js';
 import { notifyTeamPaymentReceived } from './email.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('stripe');
 
 type WorkspaceBroadcastFn = (workspaceId: string, event: string, data: unknown) => void;
 let _broadcastFn: WorkspaceBroadcastFn | null = null;
@@ -322,7 +325,7 @@ export function clearTestModeCustomerIds(): number {
       cleared++;
     }
   }
-  if (cleared > 0) console.log(`[stripe] Cleared ${cleared} stale test-mode customer ID(s) — live customers will be created on next payment`);
+  if (cleared > 0) log.info(`Cleared ${cleared} stale test-mode customer ID(s) — live customers will be created on next payment`);
   return cleared;
 }
 
@@ -342,7 +345,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       const session = event.data.object as Stripe.Checkout.Session;
       const workspaceId = session.metadata?.workspaceId;
       if (!workspaceId) {
-        console.warn('[stripe] checkout.session.completed missing workspaceId in metadata');
+        log.warn('checkout.session.completed missing workspaceId in metadata');
         return;
       }
 
@@ -369,7 +372,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
         const newTier = productType === 'plan_growth' ? 'growth' : 'premium';
         updateWorkspace(workspaceId, { tier: newTier, trialEndsAt: undefined });
         _broadcastFn?.(workspaceId, 'workspace:updated', { tier: newTier });
-        console.log(`[stripe] Tier upgraded: workspace=${workspaceId} → ${newTier}`);
+        log.info(`Tier upgraded: workspace=${workspaceId} → ${newTier}`);
       }
 
       // Log activity
@@ -395,7 +398,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
           issueChecks,
           quantity,
         });
-        console.log(`[stripe] Work order created: workspace=${workspaceId} product=${productType} pages=${pageIds.length}`);
+        log.info(`Work order created: workspace=${workspaceId} product=${productType} pages=${pageIds.length}`);
       }
 
       // Handle cart checkouts (multiple line items)
@@ -428,7 +431,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
         });
       }
 
-      console.log(`[stripe] Payment completed: workspace=${workspaceId} product=${productType} amount=$${amount}`);
+      log.info(`Payment completed: workspace=${workspaceId} product=${productType} amount=$${amount}`);
       break;
     }
 
@@ -436,7 +439,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       const intent = event.data.object as Stripe.PaymentIntent;
       const workspaceId = intent.metadata?.workspaceId;
       if (!workspaceId) {
-        console.warn('[stripe] payment_intent.succeeded missing workspaceId in metadata');
+        log.warn('payment_intent.succeeded missing workspaceId in metadata');
         return;
       }
 
@@ -463,7 +466,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
         const newTier = productType === 'plan_growth' ? 'growth' : 'premium';
         updateWorkspace(workspaceId, { tier: newTier, trialEndsAt: undefined });
         _broadcastFn?.(workspaceId, 'workspace:updated', { tier: newTier });
-        console.log(`[stripe] Tier upgraded: workspace=${workspaceId} → ${newTier}`);
+        log.info(`Tier upgraded: workspace=${workspaceId} → ${newTier}`);
       }
 
       // Log activity
@@ -476,7 +479,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
         { paymentId: payment?.id, productType, stripePaymentIntentId: intent.id }
       );
 
-      console.log(`[stripe] PaymentIntent succeeded: workspace=${workspaceId} product=${productType} amount=$${amount}`);
+      log.info(`PaymentIntent succeeded: workspace=${workspaceId} product=${productType} amount=$${amount}`);
       break;
     }
 
@@ -488,7 +491,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       // Try to find and update payment record
       // payment_intent doesn't have a session ID directly, so we search by payment intent ID
       // This is a fallback — most failures are caught at checkout level
-      console.warn(`[stripe] Payment failed: workspace=${workspaceId} intent=${intent.id}`);
+      log.warn(`Payment failed: workspace=${workspaceId} intent=${intent.id}`);
 
       addActivity(
         workspaceId,
@@ -516,9 +519,9 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
         if (newTier) { updates.tier = newTier; updates.trialEndsAt = undefined; }
         updateWorkspace(workspaceId, updates as Parameters<typeof updateWorkspace>[1]);
         _broadcastFn?.(workspaceId, 'workspace:updated', { tier: newTier, subscriptionStatus: subscription.status });
-        console.log(`[stripe] Subscription ${event.type}: workspace=${workspaceId} status=${subscription.status} tier=${newTier}`);
+        log.info(`Subscription ${event.type}: workspace=${workspaceId} status=${subscription.status} tier=${newTier}`);
       } else if (subscription.status === 'past_due' || subscription.status === 'unpaid') {
-        console.warn(`[stripe] Subscription ${subscription.status}: workspace=${workspaceId} sub=${subscription.id}`);
+        log.warn(`Subscription ${subscription.status}: workspace=${workspaceId} sub=${subscription.id}`);
         addActivity(workspaceId, 'subscription_issue', `Subscription payment ${subscription.status} — please update billing`, '', { subscriptionId: subscription.id });
       }
       break;
@@ -533,7 +536,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       updateWorkspace(workspaceId, { tier: 'free', stripeSubscriptionId: undefined, trialEndsAt: undefined });
       _broadcastFn?.(workspaceId, 'workspace:updated', { tier: 'free' });
       addActivity(workspaceId, 'subscription_cancelled', 'Subscription cancelled — downgraded to Free tier', '', { subscriptionId: subscription.id });
-      console.log(`[stripe] Subscription cancelled: workspace=${workspaceId} sub=${subscription.id} → free tier`);
+      log.info(`Subscription cancelled: workspace=${workspaceId} sub=${subscription.id} → free tier`);
       break;
     }
 
@@ -543,7 +546,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       if (!subId || !invoice.metadata?.workspaceId) return;
       const workspaceId = invoice.metadata.workspaceId;
       addActivity(workspaceId, 'invoice_paid', `Invoice paid: $${((invoice.amount_paid || 0) / 100).toFixed(2)}`, '', { invoiceId: invoice.id, subscriptionId: subId });
-      console.log(`[stripe] Invoice paid: workspace=${workspaceId} amount=$${((invoice.amount_paid || 0) / 100).toFixed(2)}`);
+      log.info(`Invoice paid: workspace=${workspaceId} amount=$${((invoice.amount_paid || 0) / 100).toFixed(2)}`);
       break;
     }
 
@@ -552,12 +555,12 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       const workspaceId = invoice.metadata?.workspaceId;
       if (!workspaceId) return;
       addActivity(workspaceId, 'invoice_failed', 'Subscription payment failed — please update your payment method', '', { invoiceId: invoice.id });
-      console.warn(`[stripe] Invoice payment failed: workspace=${workspaceId} invoice=${invoice.id}`);
+      log.warn(`Invoice payment failed: workspace=${workspaceId} invoice=${invoice.id}`);
       break;
     }
 
     default:
       // Unhandled event type — log but don't error
-      console.log(`[stripe] Unhandled event type: ${event.type}`);
+      log.info(`Unhandled event type: ${event.type}`);
   }
 }

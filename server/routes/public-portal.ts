@@ -12,6 +12,9 @@ import { listSnapshots, getLatestSnapshot } from '../reports.js';
 import { getAllGscPages } from '../search-console.js';
 import { isStripeConfigured, listProducts } from '../stripe.js';
 import { updateWorkspace, getWorkspace } from '../workspaces.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('public-portal');
 
 // --- Public Client Dashboard API (no auth required) ---
 router.get('/api/public/workspace/:id', (req, res) => {
@@ -155,7 +158,7 @@ router.post('/api/public/onboarding/:id', async (req, res) => {
 
     res.json({ ok: true, message: 'Onboarding responses saved successfully' });
   } catch (err) {
-    console.error('[onboarding] Error saving responses:', err);
+    log.error({ err: err }, 'Error saving responses');
     res.status(500).json({ error: 'Failed to save onboarding responses' });
   }
 });

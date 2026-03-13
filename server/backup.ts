@@ -14,6 +14,9 @@ import fs from 'fs';
 import path from 'path';
 import { DATA_BASE, getUploadRoot } from './data-dir.js';
 import db from './db/index.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('backup');
 
 const BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const RETENTION_DAYS = parseInt(process.env.BACKUP_RETENTION_DAYS || '3', 10);
@@ -42,7 +45,7 @@ function copyUploadFiles(src: string, dest: string, stats: { files: number; byte
         stats.files++;
         stats.bytes += fs.statSync(destPath).size;
       } catch (err) {
-        console.error(`[backup] Failed to copy ${srcPath}:`, err);
+        log.error({ err: err }, `Failed to copy ${srcPath}:`);
       }
     }
   }
@@ -71,7 +74,7 @@ export function runBackup(): { backupDir: string; files: number; bytes: number }
     stats.files++;
     stats.bytes += fs.statSync(dbBackupPath).size;
   } catch (err) {
-    console.error('[backup] SQLite backup failed:', err);
+    log.error({ err: err }, 'SQLite backup failed');
   }
 
   // 3. Write backup manifest
@@ -116,9 +119,9 @@ export function startBackupScheduler(): void {
     try {
       const result = runBackup();
       const pruned = pruneOldBackups();
-      console.log(`[backup] Daily backup complete: ${result.files} files, ${(result.bytes / 1024).toFixed(1)}KB → ${result.backupDir}${pruned > 0 ? ` (pruned ${pruned} old backup${pruned > 1 ? 's' : ''})` : ''}`);
+      log.info(`Daily backup complete: ${result.files} files, ${(result.bytes / 1024).toFixed(1)}KB → ${result.backupDir}${pruned > 0 ? ` (pruned ${pruned} old backup${pruned > 1 ? 's' : ''})` : ''}`);
     } catch (err) {
-      console.error('[backup] Backup failed:', err);
+      log.error({ err: err }, 'Backup failed');
     }
   }, 30_000);
 
@@ -127,11 +130,11 @@ export function startBackupScheduler(): void {
     try {
       const result = runBackup();
       const pruned = pruneOldBackups();
-      console.log(`[backup] Daily backup complete: ${result.files} files, ${(result.bytes / 1024).toFixed(1)}KB${pruned > 0 ? ` (pruned ${pruned})` : ''}`);
+      log.info(`Daily backup complete: ${result.files} files, ${(result.bytes / 1024).toFixed(1)}KB${pruned > 0 ? ` (pruned ${pruned})` : ''}`);
     } catch (err) {
-      console.error('[backup] Backup failed:', err);
+      log.error({ err: err }, 'Backup failed');
     }
   }, BACKUP_INTERVAL_MS);
 
-  console.log(`[startup] Backup scheduler started (every 24h, retain ${RETENTION_DAYS} days)`);
+  log.info(`Backup scheduler started (every 24h, retain ${RETENTION_DAYS} days)`);
 }

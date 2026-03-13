@@ -1,6 +1,9 @@
 import nodemailer from 'nodemailer';
 import { queueEmail, registerSendFn, restoreQueue } from './email-queue.js';
 import type { EmailEvent } from './email-templates.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('email');
 
 // Configure via env vars:
 // SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
@@ -64,7 +67,7 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
     await transport.sendMail({ from: cfg.from, to, subject, html });
     return true;
   } catch (err) {
-    console.error('[email] Failed to send:', err);
+    log.error({ err: err }, 'Failed to send');
     return false;
   }
 }
@@ -74,7 +77,7 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
 export function initEmailQueue() {
   registerSendFn(sendEmail);
   restoreQueue();
-  console.log('[email] Queue initialized');
+  log.info('Queue initialized');
 }
 
 // ── Queue-based notification helpers ──

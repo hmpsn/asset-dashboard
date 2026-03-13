@@ -15,6 +15,9 @@ import {
   getTokenForSite,
   updatePageState,
 } from '../workspaces.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('webflow-cms');
 
 const router = Router();
 
@@ -149,7 +152,7 @@ router.get('/api/webflow/cms-seo/:siteId', async (req, res) => {
     res.json(results);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('CMS SEO list error:', msg);
+    log.error({ detail: msg }, 'CMS SEO list error');
     res.status(500).json({ error: msg });
   }
 });

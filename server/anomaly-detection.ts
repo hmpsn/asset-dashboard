@@ -23,6 +23,9 @@ import { listSnapshots } from './reports.js';
 import { addActivity } from './activity-log.js';
 import { callOpenAI } from './openai-helpers.js';
 import { notifyAnomalyAlert } from './email.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('anomaly');
 
 // --- WebSocket broadcast callback ---
 let _broadcast: ((workspaceId: string, event: string, data: unknown) => void) | null = null;
@@ -294,7 +297,7 @@ async function detectForWorkspace(ws: Workspace): Promise<Anomaly[]> {
         ));
       }
     } catch (err) {
-      console.log(`[Anomaly] GSC check failed for ${ws.name}: ${err instanceof Error ? err.message : err}`);
+      log.info(`GSC check failed for ${ws.name}: ${err instanceof Error ? err.message : err}`);
     }
   }
 
@@ -336,7 +339,7 @@ async function detectForWorkspace(ws: Workspace): Promise<Anomaly[]> {
         ));
       }
     } catch (err) {
-      console.log(`[Anomaly] GA4 check failed for ${ws.name}: ${err instanceof Error ? err.message : err}`);
+      log.info(`GA4 check failed for ${ws.name}: ${err instanceof Error ? err.message : err}`);
     }
 
     // Conversion drop
@@ -394,7 +397,7 @@ async function detectForWorkspace(ws: Workspace): Promise<Anomaly[]> {
         }
       }
     } catch (err) {
-      console.log(`[Anomaly] Audit check failed for ${ws.name}: ${err instanceof Error ? err.message : err}`);
+      log.info(`Audit check failed for ${ws.name}: ${err instanceof Error ? err.message : err}`);
     }
   }
 
@@ -435,7 +438,7 @@ async function generateAiSummary(anomalies: Anomaly[], workspaceName: string): P
 // --- Main scan function ---
 
 export async function runAnomalyDetection(): Promise<{ total: number; newAnomalies: number }> {
-  console.log('[Anomaly] Starting anomaly detection scan...');
+  log.info('Starting anomaly detection scan...');
   const workspaces = listWorkspaces();
   const existingCount = (stmts().selectAll.all() as AnomalyRow[]).length;
   const allNew: Anomaly[] = [];
@@ -519,14 +522,14 @@ export async function runAnomalyDetection(): Promise<{ total: number; newAnomali
         }
       }
     } catch (err) {
-      console.error(`[Anomaly] Error scanning ${ws.name}:`, err);
+      log.error({ err: err }, `Error scanning ${ws.name}:`);
     }
   }
 
   if (allNew.length > 0) {
-    console.log(`[Anomaly] Detected ${allNew.length} new anomalies across ${workspaces.length} workspaces`);
+    log.info(`Detected ${allNew.length} new anomalies across ${workspaces.length} workspaces`);
   } else {
-    console.log(`[Anomaly] No new anomalies detected`);
+    log.info(`No new anomalies detected`);
   }
 
   // Prune old anomalies (older than 60 days)
@@ -544,14 +547,14 @@ export function startAnomalyDetection() {
 
   // Run 2 minutes after startup, then every 12 hours
   setTimeout(() => {
-    runAnomalyDetection().catch(err => console.error('[Anomaly] Scan error:', err));
+    runAnomalyDetection().catch(err => log.error({ err }, 'Scan error'));
   }, 2 * 60 * 1000);
 
   anomalyInterval = setInterval(() => {
-    runAnomalyDetection().catch(err => console.error('[Anomaly] Scan error:', err));
+    runAnomalyDetection().catch(err => log.error({ err }, 'Scan error'));
   }, CHECK_INTERVAL_MS);
 
-  console.log('[Anomaly] Detection scheduler started (every 12 hours)');
+  log.info('Detection scheduler started (every 12 hours)');
 }
 
 export function stopAnomalyDetection() {

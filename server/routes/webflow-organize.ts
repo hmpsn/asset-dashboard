@@ -13,6 +13,9 @@ import {
   updateAsset,
 } from '../webflow.js';
 import { getTokenForSite } from '../workspaces.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('webflow-organize');
 
 const router = Router();
 
@@ -128,7 +131,7 @@ router.get('/api/webflow/organize-preview/:siteId', async (req, res) => {
 
     res.json(plan);
   } catch (err) {
-    console.error('Organize preview error:', err);
+    log.error({ err: err }, 'Organize preview error');
     res.status(500).json({ error: 'Failed to build organization plan' });
   }
 });
@@ -187,7 +190,7 @@ router.post('/api/webflow/organize-execute/:siteId', async (req, res) => {
       summary: { moved: successCount, failed: failCount, total: moves.length },
     });
   } catch (err) {
-    console.error('Organize execute error:', err);
+    log.error({ err: err }, 'Organize execute error');
     res.status(500).json({ error: 'Failed to execute organization plan' });
   }
 });
@@ -202,7 +205,7 @@ router.patch('/api/webflow/rename/:assetId', async (req, res) => {
     const result = await updateAsset(req.params.assetId, { displayName }, token || undefined);
     res.json(result);
   } catch (e) {
-    console.error('Rename error:', e);
+    log.error({ err: e }, 'Rename error');
     res.status(500).json({ error: 'Failed to rename asset' });
   }
 });

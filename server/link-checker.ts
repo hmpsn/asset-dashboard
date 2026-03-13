@@ -1,4 +1,7 @@
 import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from './webflow.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('link-checker');
 
 const WEBFLOW_API = 'https://api.webflow.com/v2';
 
@@ -152,7 +155,7 @@ export async function checkSiteLinks(siteId: string, tokenOverride?: string, dom
 
   const allPages = await listPages(siteId, tokenOverride);
   const pages = filterPublishedPages(allPages);
-  console.log(`Link checker: scanning ${pages.length} published pages on ${baseUrl} (filtered out ${allPages.length - pages.length})`);
+  log.info(`Link checker: scanning ${pages.length} published pages on ${baseUrl} (filtered out ${allPages.length - pages.length})`);
 
   // Collect all links from all pages
   const allLinks: Array<{ href: string; text: string; page: string; pageSlug: string }> = [];
@@ -195,7 +198,7 @@ export async function checkSiteLinks(siteId: string, tokenOverride?: string, dom
   const staticPaths = buildStaticPathSet(pages);
   const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, 30);
   if (cmsUrls.length > 0) {
-    console.log(`Link checker: also scanning ${cmsUrls.length} CMS pages for links`);
+    log.info(`Link checker: also scanning ${cmsUrls.length} CMS pages for links`);
     for (let i = 0; i < cmsUrls.length; i += batch) {
       const chunk = cmsUrls.slice(i, i + batch);
       const htmls = await Promise.all(chunk.map(item => fetchPublishedHtml(item.url)));
@@ -217,7 +220,7 @@ export async function checkSiteLinks(siteId: string, tokenOverride?: string, dom
     }
   }
 
-  console.log(`Link checker: found ${urlMap.size} unique URLs from ${allLinks.length} total links`);
+  log.info(`Link checker: found ${urlMap.size} unique URLs from ${allLinks.length} total links`);
 
   // Check all unique URLs in parallel batches
   const deadLinks: DeadLink[] = [];
@@ -272,7 +275,7 @@ export async function checkSiteLinks(siteId: string, tokenOverride?: string, dom
     }
   }
 
-  console.log(`Link checker: ${healthy} healthy, ${deadLinks.length} dead, ${redirects.length} redirects`);
+  log.info(`Link checker: ${healthy} healthy, ${deadLinks.length} dead, ${redirects.length} redirects`);
 
   return {
     totalLinks: allLinks.length,
