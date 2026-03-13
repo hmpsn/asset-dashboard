@@ -56,7 +56,7 @@ describe('TabBar', () => {
 
   it('renders tab buttons', () => {
     render(<TabBar tabs={tabs} active="home" onChange={() => {}} />);
-    const buttons = screen.getAllByRole('button');
+    const buttons = screen.getAllByRole('tab');
     expect(buttons.length).toBe(3);
   });
 });
