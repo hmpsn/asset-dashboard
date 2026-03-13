@@ -23,6 +23,7 @@ import {
 // ── Lazy-loaded sub-tool (only LinkChecker used internally for Dead Links sub-tab) ──
 const LinkChecker = lazy(() => import('./LinkChecker').then(m => ({ default: m.LinkChecker })));
 const AeoReview = lazy(() => import('./AeoReview'));
+const ContentDecay = lazy(() => import('./ContentDecay'));
 
 
 interface Props {
@@ -32,7 +33,7 @@ interface Props {
   onNavigate?: (tab: string, context?: FixContext) => void;
 }
 
-type AuditSubTab = 'audit' | 'links' | 'history' | 'aeo-review';
+type AuditSubTab = 'audit' | 'links' | 'history' | 'aeo-review' | 'content-decay';
 
 function SeoAudit({ siteId, workspaceId, siteName, onNavigate }: Props) {
   const { startJob, jobs } = useBackgroundTasks();
@@ -652,6 +653,7 @@ function SeoAudit({ siteId, workspaceId, siteName, onNavigate }: Props) {
         { id: 'links' as const, label: 'Dead Links', icon: ExternalLink },
         { id: 'history' as const, label: 'History', icon: Clock },
         { id: 'aeo-review' as const, label: 'AEO Review', icon: Sparkles },
+        { id: 'content-decay' as const, label: 'Content Decay', icon: TrendingDown },
       ]).map(t => (
         <button
           key={t.id}
@@ -669,6 +671,9 @@ function SeoAudit({ siteId, workspaceId, siteName, onNavigate }: Props) {
     </div>
   );
 
+  if (auditSubTab === 'content-decay' && workspaceId) {
+    return <div>{auditTabBar}<Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-amber-400" /></div>}><ContentDecay workspaceId={workspaceId} /></Suspense></div>;
+  }
   if (auditSubTab === 'aeo-review' && workspaceId) {
     return <div>{auditTabBar}<Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-purple-400" /></div>}><AeoReview workspaceId={workspaceId} /></Suspense></div>;
   }

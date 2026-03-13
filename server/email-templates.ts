@@ -157,7 +157,8 @@ export type EmailEventType =
   | 'audit_improved'
   | 'anomaly_alert'
   | 'content_published'
-  | 'feedback_new';
+  | 'feedback_new'
+  | 'audit_complete';
 
 // ── Template renderers ──
 
@@ -212,6 +213,8 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
       return renderContentPublished(events, count, ws, dashUrl, logoUrl);
     case 'feedback_new':
       return renderFeedbackNew(events, count, ws, dashUrl, logoUrl);
+    case 'audit_complete':
+      return renderAuditComplete(events[0], logoUrl);
     default:
       return { subject: 'Notification', html: '' };
   }
@@ -718,6 +721,82 @@ function renderAuditImproved(_events: EmailEvent[], _count: number, ws: string, 
         <div style="font-size:14px;color:#a1a1aa;margin-top:4px;">Up ${delta} point${delta !== 1 ? 's' : ''} from ${prev}</div>
       </div>`,
       cta: dashUrl ? { label: 'View Your Dashboard', url: dashUrl } : undefined,
+      logoUrl,
+    }),
+  };
+}
+
+function renderAuditComplete(e: EmailEvent, logoUrl?: string) {
+  const ws = e.workspaceName;
+  const dashUrl = e.dashboardUrl;
+  const score = (e.data.score as number) || 0;
+  const prev = e.data.previousScore as number | undefined;
+  const totalPages = (e.data.totalPages as number) || 0;
+  const errors = (e.data.errors as number) || 0;
+  const warnings = (e.data.warnings as number) || 0;
+  const topIssues = (e.data.topIssues as Array<{ message: string; severity: string }>) || [];
+  const fixedCount = (e.data.fixedCount as number) || 0;
+
+  const scoreColor = score >= 80 ? '#4ade80' : score >= 60 ? '#fbbf24' : '#f87171';
+  const hasPrev = prev != null && prev > 0;
+  const delta = hasPrev ? score - prev : 0;
+  const deltaText = hasPrev
+    ? delta > 0 ? `<span style="color:#4ade80;">↑ ${delta} pts</span> from ${prev}`
+    : delta < 0 ? `<span style="color:#f87171;">↓ ${Math.abs(delta)} pts</span> from ${prev}`
+    : `No change from ${prev}`
+    : '';
+
+  // Score + stats row
+  const statsHtml = `
+    <div style="text-align:center;padding:16px 0 20px;">
+      <div style="font-size:52px;font-weight:800;color:${scoreColor};line-height:1;">${score}</div>
+      <div style="font-size:13px;color:#6b7280;margin-top:6px;">Site Health Score</div>
+      ${deltaText ? `<div style="font-size:12px;margin-top:4px;">${deltaText}</div>` : ''}
+    </div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
+      <tr>
+        ${statRow('Pages', totalPages)}
+        <td style="width:8px;"></td>
+        ${statRow('Errors', errors, errors > 0 ? '#ef4444' : '#4ade80')}
+        <td style="width:8px;"></td>
+        ${statRow('Warnings', warnings, warnings > 0 ? '#f59e0b' : '#4ade80')}
+      </tr>
+    </table>`;
+
+  // Fixed issues callout
+  const fixedHtml = fixedCount > 0 ? `
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 16px;margin-bottom:16px;">
+      <div style="font-size:13px;font-weight:600;color:#15803d;">✓ ${fixedCount} issue${fixedCount !== 1 ? 's' : ''} fixed since last audit</div>
+    </div>` : '';
+
+  // Top remaining issues
+  const issuesHtml = topIssues.length > 0 ? `
+    <div style="margin-bottom:8px;">
+      <div style="font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Top Remaining Issues</div>
+      ${topIssues.map((issue, i) => {
+        const sevColor = issue.severity === 'error' ? '#ef4444' : issue.severity === 'warning' ? '#f59e0b' : '#6b7280';
+        const sevBg = issue.severity === 'error' ? '#fef2f2' : issue.severity === 'warning' ? '#fffbeb' : '#f9fafb';
+        return itemRow({
+          title: issue.message,
+          badge: { label: issue.severity, color: sevColor, bg: sevBg },
+          isLast: i === topIssues.length - 1,
+        });
+      }).join('')}
+    </div>` : '';
+
+  // Build health tab URL
+  const healthUrl = dashUrl ? `${dashUrl}#health` : undefined;
+
+  return {
+    subject: hasPrev && delta > 0
+      ? `Your site health improved to ${score} — ${ws}`
+      : `Site audit complete — score ${score} — ${ws}`,
+    html: layout({
+      preheader: hasPrev ? `Site health: ${prev} → ${score}` : `Site health score: ${score}`,
+      headline: hasPrev && delta > 0 ? 'Site Health Improved!' : 'Site Audit Complete',
+      subtitle: ws,
+      body: statsHtml + fixedHtml + issuesHtml,
+      cta: healthUrl ? { label: 'View Site Health', url: healthUrl } : undefined,
       logoUrl,
     }),
   };

@@ -1,10 +1,10 @@
 import fs from 'fs';
 import path from 'path';
-import { listWorkspaces, getTokenForSite } from './workspaces.js';
+import { listWorkspaces, getTokenForSite, getClientPortalUrl } from './workspaces.js';
 import { runSeoAudit } from './seo-audit.js';
-import { saveSnapshot } from './reports.js';
+import { saveSnapshot, getLatestSnapshotBefore } from './reports.js';
 import { addActivity } from './activity-log.js';
-import { notifyAuditAlert } from './email.js';
+import { notifyAuditAlert, notifyClientAuditComplete } from './email.js';
 
 import { getUploadRoot } from './data-dir.js';
 
@@ -113,6 +113,48 @@ async function runScheduledAudit(schedule: AuditSchedule) {
         console.log(`[Scheduled Audit] Score drop detected: ${oldScore} → ${audit.siteScore} (-${drop})`);
         sendScoreDropAlert(ws, oldScore, audit.siteScore);
       }
+    }
+
+    // Send audit completion email to client
+    if (ws.clientEmail) {
+      const dashUrl = getClientPortalUrl(ws);
+      const allIssues: Array<{ message: string; severity: string }> = [];
+      for (const p of audit.pages) {
+        for (const iss of p.issues) {
+          if (iss.severity === 'error' || iss.severity === 'warning') {
+            allIssues.push({ message: iss.message, severity: iss.severity });
+          }
+        }
+      }
+      const seen = new Map<string, { message: string; severity: string }>();
+      for (const iss of allIssues) {
+        const existing = seen.get(iss.message);
+        if (!existing || (iss.severity === 'error' && existing.severity !== 'error')) {
+          seen.set(iss.message, iss);
+        }
+      }
+      const uniqueIssues = [...seen.values()];
+      uniqueIssues.sort((a, b) => (a.severity === 'error' ? 0 : 1) - (b.severity === 'error' ? 0 : 1));
+      const topIssues = uniqueIssues.slice(0, 5);
+
+      let fixedCount = 0;
+      if (snapshot.previousScore != null) {
+        const prev = getLatestSnapshotBefore(ws.webflowSiteId!, snapshot.id);
+        if (prev) {
+          const prevKeys = new Set<string>();
+          for (const p of prev.audit.pages) for (const iss of p.issues) prevKeys.add(`${p.pageId}:${iss.check}`);
+          const curKeys = new Set<string>();
+          for (const p of audit.pages) for (const iss of p.issues) curKeys.add(`${p.pageId}:${iss.check}`);
+          for (const k of prevKeys) if (!curKeys.has(k)) fixedCount++;
+        }
+      }
+
+      notifyClientAuditComplete({
+        clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: ws.id,
+        score: audit.siteScore, previousScore: snapshot.previousScore,
+        totalPages: audit.totalPages, errors: audit.errors, warnings: audit.warnings,
+        topIssues, fixedCount, dashboardUrl: dashUrl,
+      });
     }
   } catch (err) {
     console.error(`[Scheduled Audit] Failed for ${ws.name}:`, err);

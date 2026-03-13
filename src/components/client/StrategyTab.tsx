@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   Zap, FileText, Sparkles, Target, Search, CheckCircle2,
+  AlertTriangle, ChevronDown, Shield, BookOpen,
 } from 'lucide-react';
 import { TierGate, StatCard, EmptyState, type Tier } from '../ui';
 import type { ClientKeywordStrategy, ClientContentRequest } from './types';
@@ -36,6 +37,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const [mapSearch, setMapSearch] = useState('');
   const [mapSort, setMapSort] = useState<'default' | 'position' | 'impressions' | 'clicks'>('default');
   const [mapIntent, setMapIntent] = useState<string>('all');
+  const [nyrExpanded, setNyrExpanded] = useState(false);
+  const [nyrExpandedPages, setNyrExpandedPages] = useState<Set<string>>(new Set());
 
   if (!strategyData) {
     return (
@@ -150,6 +153,141 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         </div>
         </TierGate>
       )}
+
+      {/* ── NOT YET RANKING ACTION PLAN ── */}
+      {(() => {
+        const unranked = strategyData.pageMap
+          .filter(p => !p.currentPosition)
+          .map(p => {
+            // Diagnose likely reason
+            const reasons: string[] = [];
+            const actions: { label: string; icon: typeof Shield; color: string }[] = [];
+            const hasImpressions = (p.impressions || 0) > 0;
+            const highKD = (p.difficulty || 0) > 60;
+            const medKD = (p.difficulty || 0) > 30;
+
+            if (hasImpressions) {
+              reasons.push('Google sees this page but hasn\'t ranked it in top 100 yet');
+              actions.push({ label: 'Near-ranking — optimize content', icon: BookOpen, color: 'text-teal-400' });
+            } else if (highKD) {
+              reasons.push(`High keyword difficulty (${p.difficulty}%) — tough competition`);
+              actions.push({ label: 'Build authority with supporting content', icon: FileText, color: 'text-amber-400' });
+            } else if (medKD) {
+              reasons.push('Moderate competition — page may need content depth');
+              actions.push({ label: 'Expand content & add internal links', icon: BookOpen, color: 'text-teal-400' });
+            } else {
+              reasons.push('Page may not be indexed or has thin content');
+              actions.push({ label: 'Check indexing & expand content', icon: Shield, color: 'text-red-400' });
+            }
+
+            // Priority: commercial intent > impressions > low KD fixable
+            const intentScore = p.searchIntent === 'commercial' ? 3 : p.searchIntent === 'transactional' ? 3 : p.searchIntent === 'informational' ? 1 : 2;
+            const priority = intentScore * 100 + (hasImpressions ? 50 : 0) + (100 - (p.difficulty || 50));
+
+            return { ...p, reasons, actions, priority, hasImpressions };
+          })
+          .sort((a, b) => b.priority - a.priority);
+
+        if (unranked.length === 0) return null;
+
+        const toggleNyrPage = (path: string) => {
+          setNyrExpandedPages(prev => { const n = new Set(prev); if (n.has(path)) n.delete(path); else n.add(path); return n; });
+        };
+
+        return (
+          <div className="bg-gradient-to-br from-red-950/20 to-zinc-900 rounded-xl border border-red-500/20 p-5 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-36 h-36 bg-red-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+            <div className="relative">
+              <button onClick={() => setNyrExpanded(!nyrExpanded)} className="w-full flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-red-500/20 flex items-center justify-center">
+                    <AlertTriangle className="w-4 h-4 text-red-400" />
+                  </div>
+                  <div className="text-left">
+                    <div className="text-sm font-semibold text-red-200">Not Yet Ranking</div>
+                    <div className="text-[11px] text-red-400/60">{unranked.length} pages mapped but not appearing in search results</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full border border-red-500/20">{unranked.length}</span>
+                  <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${nyrExpanded ? '' : '-rotate-90'}`} />
+                </div>
+              </button>
+
+              {nyrExpanded && (
+                <div className="mt-4 space-y-2">
+                  {unranked.map(page => {
+                    const isExp = nyrExpandedPages.has(page.pagePath);
+                    return (
+                      <div key={page.pagePath} className="rounded-lg bg-zinc-900/60 border border-zinc-800/80 overflow-hidden">
+                        <button onClick={() => toggleNyrPage(page.pagePath)} className="w-full flex items-center gap-3 px-3.5 py-2.5 hover:bg-zinc-800/30 transition-colors text-left">
+                          <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 flex-shrink-0 transition-transform ${isExp ? '' : '-rotate-90'}`} />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[11px] font-medium text-zinc-200 truncate">{page.pageTitle || page.pagePath}</div>
+                            <div className="text-[10px] text-zinc-500 font-mono truncate">{page.pagePath}</div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {page.hasImpressions && <span className="text-[10px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded border border-teal-500/20">Near-ranking</span>}
+                            {page.searchIntent && <span className="text-[10px] text-zinc-500 uppercase">{page.searchIntent}</span>}
+                            {page.primaryKeyword && <span className="text-[10px] text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded truncate max-w-[120px]">&ldquo;{page.primaryKeyword}&rdquo;</span>}
+                          </div>
+                        </button>
+                        {isExp && (
+                          <div className="px-3.5 pb-3 pl-10 space-y-2">
+                            {/* Diagnosis */}
+                            <div className="space-y-1">
+                              {page.reasons.map((r, i) => (
+                                <div key={i} className="text-[11px] text-zinc-400 flex items-start gap-1.5">
+                                  <span className="text-red-400 mt-0.5">•</span> {r}
+                                </div>
+                              ))}
+                            </div>
+                            {/* Metrics */}
+                            <div className="flex items-center gap-3 text-[10px]">
+                              {page.impressions != null && page.impressions > 0 && <span className="text-zinc-400">Impressions: <span className="text-zinc-200 font-medium">{page.impressions.toLocaleString()}</span></span>}
+                              {page.clicks != null && page.clicks > 0 && <span className="text-zinc-400">Clicks: <span className="text-zinc-200 font-medium">{page.clicks}</span></span>}
+                              {page.volume != null && page.volume > 0 && <span className="text-zinc-400">Volume: <span className="text-zinc-200 font-medium">{page.volume.toLocaleString()}/mo</span></span>}
+                              {page.difficulty != null && <span className={`${page.difficulty <= 30 ? 'text-green-400' : page.difficulty <= 60 ? 'text-amber-400' : 'text-red-400'}`}>KD {page.difficulty}%</span>}
+                            </div>
+                            {/* Actions */}
+                            <div className="flex items-center gap-2 mt-1">
+                              {page.actions.map((a, i) => (
+                                <span key={i} className={`flex items-center gap-1 text-[11px] font-medium ${a.color}`}>
+                                  <a.icon className="w-3 h-3" /> {a.label}
+                                </span>
+                              ))}
+                            </div>
+                            {/* CTA buttons */}
+                            {!betaMode && (
+                              <div className="flex items-center gap-2 mt-1">
+                                <button
+                                  onClick={() => setPricingModal({
+                                    serviceType: 'brief_only',
+                                    topic: page.pageTitle || page.pagePath,
+                                    targetKeyword: page.primaryKeyword,
+                                    intent: page.searchIntent || 'informational',
+                                    priority: 'high',
+                                    rationale: `Page ${page.pagePath} is not yet ranking for "${page.primaryKeyword}". Content optimization needed.`,
+                                    source: 'strategy',
+                                  })}
+                                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 font-medium hover:bg-teal-600/40 transition-all"
+                                >
+                                  <FileText className="w-3 h-3" /> Get Content Brief
+                                  {briefPrice != null && <span className="opacity-70 ml-0.5">{fmtPrice(briefPrice)}</span>}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── QUICK WINS (value proof — we're already working on it) ── */}
       {strategyData.quickWins && strategyData.quickWins.length > 0 && (

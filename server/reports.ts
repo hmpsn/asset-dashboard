@@ -280,6 +280,13 @@ export function getLatestSnapshot(siteId: string): AuditSnapshot | null {
   return getSnapshot(summaries[0].id);
 }
 
+export function getLatestSnapshotBefore(siteId: string, beforeSnapshotId: string): AuditSnapshot | null {
+  const summaries = listSnapshots(siteId);
+  const idx = summaries.findIndex(s => s.id === beforeSnapshotId);
+  if (idx < 0 || idx + 1 >= summaries.length) return null;
+  return getSnapshot(summaries[idx + 1].id);
+}
+
 export function renderReportHTML(snapshot: AuditSnapshot): string {
   const { audit, siteName, createdAt, logoUrl, actionItems, previousScore } = snapshot;
   const date = new Date(createdAt).toLocaleDateString('en-US', {

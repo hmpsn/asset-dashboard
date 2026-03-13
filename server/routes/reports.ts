@@ -24,6 +24,7 @@ import {
   getActionItems,
   extractSiteLogo,
 } from '../reports.js';
+import { getMonthlyReportHTML, listMonthlyReports } from '../monthly-report.js';
 import { runSalesAudit } from '../sales-audit.js';
 import { renderSalesReportHTML } from '../sales-report-html.js';
 import { runSeoAudit } from '../seo-audit.js';
@@ -234,10 +235,66 @@ router.get('/report/audit/:siteId', (req, res) => {
 router.post('/api/monthly-report/:workspaceId', async (req, res) => {
   try {
     const result = await triggerMonthlyReport(req.params.workspaceId);
-    res.json({ sent: result.sent, html: result.html });
+    res.json({ sent: result.sent, html: result.html, reportId: result.reportId });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate report' });
   }
+});
+
+// Public: Monthly report HTML permalink (no auth)
+router.get('/report/monthly/:id', (req, res) => {
+  const html = getMonthlyReportHTML(req.params.id);
+  if (!html) return res.status(404).send('<h1>Report not found</h1>');
+  res.type('html').send(html);
+});
+
+// Public: Unified list of all shareable reports for a workspace (audit snapshots + monthly reports)
+router.get('/api/public/reports/:workspaceId', (req, res) => {
+  const ws = listWorkspaces().find(w => w.id === req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const reports: Array<{
+    id: string;
+    type: 'audit' | 'monthly';
+    title: string;
+    createdAt: string;
+    score?: number;
+    previousScore?: number;
+    permalink: string;
+  }> = [];
+
+  // Audit snapshots
+  if (ws.webflowSiteId) {
+    const snapshots = listSnapshots(ws.webflowSiteId);
+    for (const s of snapshots) {
+      reports.push({
+        id: s.id,
+        type: 'audit',
+        title: `SEO Audit — Score ${s.siteScore}`,
+        createdAt: s.createdAt,
+        score: s.siteScore,
+        permalink: `/report/${s.id}`,
+      });
+    }
+  }
+
+  // Monthly reports
+  const monthly = listMonthlyReports(req.params.workspaceId);
+  for (const m of monthly) {
+    reports.push({
+      id: m.id,
+      type: 'monthly',
+      title: `${m.period} Report`,
+      createdAt: m.createdAt,
+      score: m.siteScore,
+      previousScore: m.previousScore,
+      permalink: `/report/monthly/${m.id}`,
+    });
+  }
+
+  // Sort all by date descending
+  reports.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  res.json(reports);
 });
 
 export default router;

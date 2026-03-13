@@ -1214,15 +1214,59 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 94. Client Audit Completion Email
+**What it does:** Sends a branded email when an SEO audit completes, showing the site health score, score delta vs previous audit, top 3 remaining issues by severity, and fixed issues count (calculated by comparing current vs previous snapshot). Triggered from both manual and scheduled audit flows. CTA links directly to the Health tab.
+
+**Agency value:** Automated touchpoint that demonstrates ongoing work without any manual effort.
+
+**Client value:** Immediate notification when their site has been re-audited, with clear before/after progress metrics.
+
+**Mutual:** High-engagement retention touchpoint — clients see tangible improvement and stay engaged.
+
+---
+
+### 95. Shareable Client Reports with Permalinks
+**What it does:** Monthly reports are now persisted to disk with unique IDs when sent (manual or auto). Public permalink route `/report/monthly/:id` serves the saved HTML. Unified API `/api/public/reports/:workspaceId` lists all shareable reports (audit snapshots + monthly reports). "Share Report" dropdown in the Site Health tab lets clients copy permalink URLs or open reports in new tabs.
+
+**Agency value:** Clients forward reports to decision-makers, expanding the agency's visibility to budget-holders without extra work.
+
+**Client value:** Persistent, shareable links to all audit and monthly reports for internal distribution and record-keeping.
+
+**Mutual:** Reduces churn by ensuring budget-holders see the value of ongoing SEO work.
+
+---
+
+### 96. Content Refresh / Decay Engine
+**What it does:** `content-decay.ts` compares current 30-day vs previous 30-day GSC page data to detect declining content. Severity tiers: critical (>50% click decline), warning (>30%), watch (>10%). AI refresh recommendations generated per decaying page via GPT-4.1-mini with full SEO context. Admin UI: `ContentDecay.tsx` lazy-loaded sub-tab in SeoAudit with summary cards, severity filters, expandable page details with click/impression/position deltas, and AI recommendation display. API routes for analysis, cached results, and batch recommendation generation. Public endpoint for client dashboard.
+
+**Agency value:** Proactively identifies content needing updates before clients notice traffic drops. Justifies ongoing subscription fees.
+
+**Client value:** Transparent view of which pages are losing traffic and AI-powered action plans to fix them.
+
+**Mutual:** Turns content maintenance from reactive to proactive — both sides benefit from catching decay early.
+
+---
+
+### 97. Not Yet Ranking Action Plan
+**What it does:** Expandable section in the Strategy tab (between Content Opportunities and Quick Wins) showing all pages mapped in the keyword strategy that have no search position. Per-page diagnosis: near-ranking (has impressions but no position), high keyword difficulty, moderate competition needing content depth, or likely not indexed/thin content. Priority sorted by commercial intent first, then pages with impressions, then fixable KD. Each page expandable with diagnosis reasons, GSC metrics, keyword metrics (volume, KD%), recommended action with icon, and "Get Content Brief" CTA with pricing.
+
+**Agency value:** Turns a passive stat ("12 pages not ranking") into an actionable pipeline of optimization opportunities with clear next steps.
+
+**Client value:** Understands exactly why pages aren't ranking and has one-click access to order content optimization.
+
+**Mutual:** Diagnosis → plan → action flow that drives content orders while solving real SEO problems.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
 |----------|:---:|---|
-| SEO & Technical | 14 | Audit, fix, and optimize faster than manual tools + AEO trust signals + change impact tracking |
+| SEO & Technical | 15 | Audit, fix, and optimize faster than manual tools + AEO trust signals + change impact tracking + content decay detection |
 | Analytics & Tracking | 7 | Unified data view replaces platform-hopping + AI time-saved tracking |
-| Content & Strategy | 8 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request |
-| Client Communication | 9 | Structured workflows + automated reports + expanded notifications + feedback widget + email capture funnel |
-| Client Self-Service | 13 | 24/7 data access, onboarding, plans, cart, order tracking, glossary, questionnaire, ROI upgrade prompts |
+| Content & Strategy | 9 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan |
+| Client Communication | 10 | Structured workflows + automated reports + expanded notifications + feedback widget + email capture funnel + audit completion email |
+| Client Self-Service | 14 | 24/7 data access, onboarding, plans, cart, order tracking, glossary, questionnaire, ROI upgrade prompts, shareable report permalinks |
 | AI & Intelligence | 7 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine + context completeness + usage dashboard + AEO page review |
 | Auth & Access Control | 3 | Internal user accounts, workspace ACL, client user accounts |
 | Security | 1 | Helmet, HTTPS, rate limiting, input sanitization |
@@ -1231,6 +1275,6 @@ When the user asks to update this document with recent features, follow this pro
 | Data Architecture | 3 | PageEditState model, cross-store writes, activity feed for client actions |
 | Architecture | 2 | Server refactor (46 route modules + 3 shared modules), frontend component decomposition |
 
-**93 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**97 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **93**. Last updated: March 2026 (SEO Change Performance Tracker, AI Usage nav, KD/impressions fix, sidebar color accents).
+Current feature count: **97**. Last updated: March 2026 (audit completion email, shareable reports, content decay engine, not-yet-ranking action plan).

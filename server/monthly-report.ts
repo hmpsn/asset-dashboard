@@ -10,6 +10,8 @@ import { getGA4PeriodComparison } from './google-analytics.js';
 import { listSessions } from './chat-memory.js';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
+import { getDataDir } from './data-dir.js';
 
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // check every 6 hours
 let reportInterval: ReturnType<typeof setInterval> | null = null;
@@ -212,6 +214,8 @@ async function checkAndSendReports() {
     console.log(`[Auto Report] Generating ${freq} report for ${ws.name} (${period})`);
 
     try {
+      const html = generateReportHTML(data);
+      saveMonthlyReport(ws.id, ws.name, html, data);
       await sendMonthlyReportEmail(ws, data);
       sent[ws.id] = period;
       changed = true;
@@ -247,14 +251,96 @@ export function stopMonthlyReports() {
 }
 
 // Manual trigger: generate + send report for a workspace now
-export async function triggerMonthlyReport(workspaceId: string): Promise<{ sent: boolean; html: string }> {
+export async function triggerMonthlyReport(workspaceId: string): Promise<{ sent: boolean; html: string; reportId?: string }> {
   const ws = listWorkspaces().find(w => w.id === workspaceId);
   if (!ws) throw new Error('Workspace not found');
   const data = await gatherMonthlyData(ws);
   const html = generateReportHTML(data);
+  // Persist the report for shareable permalink
+  const reportId = saveMonthlyReport(workspaceId, ws.name, html, data);
   if (ws.clientEmail && isEmailConfigured()) {
     await sendMonthlyReportEmail(ws, data);
-    return { sent: true, html };
+    return { sent: true, html, reportId };
   }
-  return { sent: false, html };
+  return { sent: false, html, reportId };
+}
+
+// ── Monthly Report Persistence ──
+
+const MONTHLY_REPORTS_DIR = getDataDir('monthly-reports');
+
+export interface SavedMonthlyReport {
+  id: string;
+  workspaceId: string;
+  workspaceName: string;
+  createdAt: string;
+  period: string;
+  siteScore?: number;
+  previousScore?: number;
+  totalPages?: number;
+  errors?: number;
+  warnings?: number;
+  trafficHighlights?: {
+    clicks?: { current: number; changePct: number };
+    impressions?: { current: number; changePct: number };
+    users?: { current: number; changePct: number };
+  };
+}
+
+function wsReportDir(workspaceId: string): string {
+  const dir = path.join(MONTHLY_REPORTS_DIR, workspaceId);
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function saveMonthlyReport(workspaceId: string, workspaceName: string, html: string, data: MonthlyData): string {
+  const id = `mr_${crypto.randomBytes(8).toString('hex')}`;
+  const now = new Date();
+  const period = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  const meta: SavedMonthlyReport = {
+    id,
+    workspaceId,
+    workspaceName,
+    createdAt: now.toISOString(),
+    period,
+    siteScore: data.siteScore,
+    previousScore: data.previousScore,
+    totalPages: data.totalPages,
+    errors: data.errors,
+    warnings: data.warnings,
+    trafficHighlights: data.traffic ? {
+      clicks: data.traffic.clicks ? { current: data.traffic.clicks.current, changePct: data.traffic.clicks.changePct } : undefined,
+      impressions: data.traffic.impressions ? { current: data.traffic.impressions.current, changePct: data.traffic.impressions.changePct } : undefined,
+      users: data.traffic.users ? { current: data.traffic.users.current, changePct: data.traffic.users.changePct } : undefined,
+    } : undefined,
+  };
+
+  const dir = wsReportDir(workspaceId);
+  fs.writeFileSync(path.join(dir, `${id}.json`), JSON.stringify(meta, null, 2));
+  fs.writeFileSync(path.join(dir, `${id}.html`), html);
+  return id;
+}
+
+export function getMonthlyReportHTML(reportId: string): string | null {
+  if (!fs.existsSync(MONTHLY_REPORTS_DIR)) return null;
+  const wsDirs = fs.readdirSync(MONTHLY_REPORTS_DIR);
+  for (const wsDir of wsDirs) {
+    const htmlPath = path.join(MONTHLY_REPORTS_DIR, wsDir, `${reportId}.html`);
+    if (fs.existsSync(htmlPath)) return fs.readFileSync(htmlPath, 'utf-8');
+  }
+  return null;
+}
+
+export function listMonthlyReports(workspaceId: string): SavedMonthlyReport[] {
+  const dir = path.join(MONTHLY_REPORTS_DIR, workspaceId);
+  if (!fs.existsSync(dir)) return [];
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
+  const reports: SavedMonthlyReport[] = [];
+  for (const file of files) {
+    try {
+      reports.push(JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')));
+    } catch { /* skip corrupt */ }
+  }
+  return reports.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }

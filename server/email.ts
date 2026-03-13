@@ -261,6 +261,26 @@ export function notifyClientAuditImproved(opts: {
   }));
 }
 
+export function notifyClientAuditComplete(opts: {
+  clientEmail: string;
+  workspaceName: string;
+  workspaceId: string;
+  score: number;
+  previousScore?: number;
+  totalPages: number;
+  errors: number;
+  warnings: number;
+  topIssues: Array<{ message: string; severity: string }>;
+  fixedCount: number;
+  dashboardUrl?: string;
+}): void {
+  if (!isEmailConfigured()) return;
+  queueEmail(makeEvent('audit_complete', opts.clientEmail, opts.workspaceId, opts.workspaceName, opts.dashboardUrl, {
+    score: opts.score, previousScore: opts.previousScore, totalPages: opts.totalPages,
+    errors: opts.errors, warnings: opts.warnings, topIssues: opts.topIssues, fixedCount: opts.fixedCount,
+  }));
+}
+
 export function notifyAnomalyAlert(opts: {
   workspaceName: string;
   workspaceId: string;

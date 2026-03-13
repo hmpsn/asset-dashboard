@@ -80,6 +80,7 @@ import feedbackRoutes from './routes/feedback.js';
 import publicFeedbackRoutes from './routes/public-feedback.js';
 import aeoReviewRoutes from './routes/aeo-review.js';
 import seoChangeTrackerRoutes from './routes/seo-change-tracker.js';
+import contentDecayRoutes from './routes/content-decay.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_ROOT = DATA_BASE || path.join(process.env.HOME || '', '.asset-dashboard');
@@ -411,6 +412,7 @@ app.use(feedbackRoutes);
 app.use(publicFeedbackRoutes);
 app.use(aeoReviewRoutes);
 app.use(seoChangeTrackerRoutes);
+app.use(contentDecayRoutes);
 
 
 // --- Serve frontend in production (MUST be after all API routes) ---

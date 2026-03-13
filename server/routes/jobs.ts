@@ -11,7 +11,7 @@ import { addActivity } from '../activity-log.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { generateAltText } from '../alttext.js';
 import { getDataDir } from '../data-dir.js';
-import { notifyClientRecommendationsReady, notifyClientAuditImproved } from '../email.js';
+import { notifyClientRecommendationsReady, notifyClientAuditComplete } from '../email.js';
 import { applySuppressionsToAudit, buildSchemaContext } from '../helpers.js';
 import {
   createJob,
@@ -26,7 +26,7 @@ import {
 import { APP_PASSWORD } from '../middleware.js';
 import { callOpenAI } from '../openai-helpers.js';
 import { generateRecommendations, loadRecommendations } from '../recommendations.js';
-import { saveSnapshot } from '../reports.js';
+import { saveSnapshot, getLatestSnapshotBefore } from '../reports.js';
 import { runSalesAudit } from '../sales-audit.js';
 import { saveSchemaSnapshot } from '../schema-store.js';
 import { generateSchemaSuggestions } from '../schema-suggester.js';
@@ -115,10 +115,55 @@ router.post('/api/jobs', async (req, res) => {
               } catch (recErr) {
                 console.error('[audit] Failed to regenerate recommendations:', recErr);
               }
-              // Notify client if audit score improved
-              if (snapshot.previousScore != null && result.siteScore > snapshot.previousScore && ws.clientEmail) {
+              // Notify client of audit completion with full details
+              if (ws.clientEmail) {
                 const dashUrl = getClientPortalUrl(ws);
-                notifyClientAuditImproved({ clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: ws.id, score: result.siteScore, previousScore: snapshot.previousScore, dashboardUrl: dashUrl });
+                // Collect all issues, sorted errors first, then warnings
+                const allIssues: Array<{ message: string; severity: string }> = [];
+                for (const p of result.pages) {
+                  for (const iss of p.issues) {
+                    if (iss.severity === 'error' || iss.severity === 'warning') {
+                      allIssues.push({ message: iss.message, severity: iss.severity });
+                    }
+                  }
+                }
+                // Deduplicate by message, keep highest severity
+                const seen = new Map<string, { message: string; severity: string }>();
+                for (const iss of allIssues) {
+                  const existing = seen.get(iss.message);
+                  if (!existing || (iss.severity === 'error' && existing.severity !== 'error')) {
+                    seen.set(iss.message, iss);
+                  }
+                }
+                const uniqueIssues = [...seen.values()];
+                uniqueIssues.sort((a, b) => (a.severity === 'error' ? 0 : 1) - (b.severity === 'error' ? 0 : 1));
+                const topIssues = uniqueIssues.slice(0, 5);
+
+                // Compute fixed count from previous snapshot
+                let fixedCount = 0;
+                if (snapshot.previousScore != null) {
+                  const prev = getLatestSnapshotBefore(ws.webflowSiteId!, snapshot.id);
+                  if (prev) {
+                    const prevIssueKeys = new Set<string>();
+                    for (const p of prev.audit.pages) {
+                      for (const iss of p.issues) prevIssueKeys.add(`${p.pageId}:${iss.check}`);
+                    }
+                    const curIssueKeys = new Set<string>();
+                    for (const p of result.pages) {
+                      for (const iss of p.issues) curIssueKeys.add(`${p.pageId}:${iss.check}`);
+                    }
+                    for (const k of prevIssueKeys) {
+                      if (!curIssueKeys.has(k)) fixedCount++;
+                    }
+                  }
+                }
+
+                notifyClientAuditComplete({
+                  clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: ws.id,
+                  score: result.siteScore, previousScore: snapshot.previousScore,
+                  totalPages: result.totalPages, errors: result.errors, warnings: result.warnings,
+                  topIssues, fixedCount, dashboardUrl: dashUrl,
+                });
               }
             }
           } catch (err) {

@@ -203,8 +203,9 @@
           "source": "FEATURE_VISION #10",
           "est": "6-8h",
           "priority": "P0",
-          "notes": "COMPETITIVE MOAT — Log every SEO change with timestamp → track GSC/GA4 before/after → show impact: 'After updating meta title on /services, CTR improved +124%.' Hardest thing for competitors to replicate. Infrastructure exists: trackSeoEdit timestamps + audit snapshots + getPageTrend daily GSC data.",
-          "status": "pending"
+          "notes": "Shipped — Implemented as SEO Change Performance Tracker (roadmap #231). server/seo-change-tracker.ts records every SEO/schema change with timestamp, compares GSC before/after (28-day windows with 3-day delay). SeoChangeImpact.tsx on Workspace Home shows changes + 'Compare GSC Impact' button with delta badges (clicks, impressions, CTR, position). Hooked into all update flows: editor, bulk-fix, approvals, jobs, schema publish, CMS template publish.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
         },
         {
           "id": 113,
@@ -212,8 +213,9 @@
           "source": "FEATURE_VISION #8",
           "est": "4-6h",
           "priority": "P0",
-          "notes": "CHURN REDUCER — Monthly reports already generate full HTML via renderReportHTML(). Add hosted permalink route (/report/:wsId/:reportId) + one-click 'Share this report' button. Clients forward to decision-makers. Reduces churn (budget-holders see value) + referral channel.",
-          "status": "pending"
+          "notes": "Shipped — Monthly report persistence (saveMonthlyReport/listSavedReports/getSavedReport in monthly-report.ts). Public permalink route /report/monthly/:id. Unified report listing API /api/public/reports/:workspaceId (audit + monthly combined). Share Report dropdown in HealthTab with copy-link and open-in-new-tab per report. Reports saved on both manual trigger and auto-send.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
         },
         {
           "id": 175,
@@ -231,8 +233,9 @@
           "source": "FEATURE_VISION #9",
           "est": "4-5h",
           "priority": "P1",
-          "notes": "Monitor published content performance via handleContentPerformance → flag decaying posts (clicks drop >30% over 60 days) → AI refresh recommendations → approve → republish. Justifies ongoing subscription.",
-          "status": "pending"
+          "notes": "Shipped — content-decay.ts: analyzeContentDecay compares current 30d vs previous 30d GSC data, flags pages with >10% click decline. Severity tiers: critical (>50%), warning (>30%), watch (>10%). AI refresh recommendations via GPT-4.1-mini per decaying page. Admin UI: ContentDecay.tsx lazy-loaded sub-tab in SeoAudit with summary cards, severity filters, expandable page details, AI recommendation display. Routes: POST /api/content-decay/:wsId/analyze, GET cached, POST recommendations. Public endpoint for client dashboard.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
         },
         {
           "id": 176,
@@ -349,8 +352,9 @@
           "source": "UX Narrative Audit Mar 2026",
           "est": "4-6h",
           "priority": "P1",
-          "notes": "The 'Not Yet Ranking' summary card in StrategyTab shows a count but offers no actionable path — violates diagnosis→plan→action principle. New expandable section (after Content Opportunities, before Quick Wins): per-page breakdown of unranked pages with AI-diagnosed likely reason (thin content, not indexed, high KD, cannibalization, technical issues from audit data), recommended action per page (request content expansion, view in Health tab, submit optimization request), priority sorting (commercial intent first, fixable issues above difficulty-based, pages with impressions above zero-impression), status badges if hmpsn studio is already working on it. Data sources: strategyData.pageMap (currentPosition, primaryKeyword, intent), audit detail (page issues, word count), GSC (impressions for near-ranking detection), existing request/work-order status. Placement: after Content Opportunities, before Quick Wins — 'here's what's not ranking' → 'here's why' → 'here's what to do about it'. Cross-links: 'View issues' navigates to Health tab, 'Request optimization' opens Requests, 'Get content brief' opens content flow. Future: auto-generate optimization work orders for pages with simple fixes.",
-          "status": "pending"
+          "notes": "Shipped — Expandable 'Not Yet Ranking' section in StrategyTab between Content Opportunities and Quick Wins. Per-page breakdown of unranked pages (no currentPosition in pageMap). Diagnosis engine: near-ranking (has impressions), high KD, moderate KD, or likely not indexed/thin content. Priority sorting: commercial/transactional intent first, pages with impressions above zero-impression, lower KD more fixable. Each page expandable with: diagnosis reasons, GSC metrics (impressions, clicks), keyword metrics (volume, KD%), recommended action with icon, 'Get Content Brief' CTA with pricing. Red gradient card with AlertTriangle icon, collapsible by default.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
         },
         {
           "id": 207,
@@ -358,8 +362,9 @@
           "source": "Roadmap review Mar 2026",
           "est": "1-2h",
           "priority": "P1",
-          "notes": "Send branded email when audit completes showing updated health score and delta ('Your site health improved from 72 → 85 after last week's changes'). Low-effort, high-engagement retention touchpoint. Reuse existing email-templates.ts pattern (renderAuditComplete). Trigger from audit:complete event. Include top 3 fixed issues + top 3 remaining issues + CTA to Health tab.",
-          "status": "pending"
+          "notes": "Shipped — audit_complete EmailEventType + renderAuditComplete template in email-templates.ts. Shows site health score, score delta (improved/declined), top 3 remaining issues by severity, fixed issues count (compared to previous snapshot via getLatestSnapshotBefore). notifyClientAuditComplete in email.ts. Wired into both manual audit (jobs.ts) and scheduled audit (scheduled-audits.ts) completion flows. CTA links to Health tab.",
+          "status": "done",
+          "shippedAt": "2026-03-12"
         }
       ]
     },

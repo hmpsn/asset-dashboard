@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { AlertTriangle, Info, CheckCircle2, ChevronDown, Shield, FileEdit } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { AlertTriangle, Info, CheckCircle2, ChevronDown, Shield, FileEdit, Share2, Link2, ExternalLink, FileText, BarChart3, Check } from 'lucide-react';
 import { MetricRing } from '../ui';
 import { scoreColorClass } from '../ui/constants';
 import { ScoreHistoryChart } from './helpers';
@@ -83,11 +83,79 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, tie
     return cats;
   })() : {};
 
+  // Share reports state
+  const [shareOpen, setShareOpen] = useState(false);
+  const [reports, setReports] = useState<Array<{ id: string; type: 'audit' | 'monthly'; title: string; createdAt: string; score?: number; permalink: string }>>([]);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const shareRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (shareOpen && workspaceId && reports.length === 0) {
+      fetch(`/api/public/reports/${workspaceId}`).then(r => r.ok ? r.json() : []).then(setReports).catch(() => {});
+    }
+  }, [shareOpen, workspaceId]);
+
+  useEffect(() => {
+    if (!shareOpen) return;
+    const handler = (e: MouseEvent) => { if (shareRef.current && !shareRef.current.contains(e.target as Node)) setShareOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [shareOpen]);
+
+  const copyReportLink = (permalink: string, id: string) => {
+    const url = `${window.location.origin}${permalink}`;
+    navigator.clipboard.writeText(url).then(() => { setCopiedId(id); setTimeout(() => setCopiedId(null), 2000); });
+  };
+
   if (auditDetail) return (
     <div className="space-y-5">
-      <div className="mb-2">
-        <h2 className="text-xl font-semibold text-zinc-100">Site Health</h2>
-        <p className="text-sm text-zinc-500 mt-1">{auditDetail.audit.totalPages} pages · Last scanned {new Date(auditDetail.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+      <div className="mb-2 flex items-start justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-zinc-100">Site Health</h2>
+          <p className="text-sm text-zinc-500 mt-1">{auditDetail.audit.totalPages} pages · Last scanned {new Date(auditDetail.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+        </div>
+        <div className="relative" ref={shareRef}>
+          <button onClick={() => setShareOpen(!shareOpen)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 transition-colors">
+            <Share2 className="w-3.5 h-3.5" />
+            Share Report
+          </button>
+          {shareOpen && (
+            <div className="absolute right-0 top-full mt-2 w-80 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl z-50 overflow-hidden">
+              <div className="px-4 py-3 border-b border-zinc-800">
+                <div className="text-xs font-medium text-zinc-200">Shareable Reports</div>
+                <div className="text-[11px] text-zinc-500 mt-0.5">Copy a link to share with your team</div>
+              </div>
+              <div className="max-h-64 overflow-y-auto divide-y divide-zinc-800/50">
+                {reports.length === 0 && (
+                  <div className="px-4 py-6 text-center text-xs text-zinc-500">Loading reports...</div>
+                )}
+                {reports.map(r => (
+                  <div key={r.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-zinc-800/50 transition-colors">
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${r.type === 'audit' ? 'bg-emerald-500/10' : 'bg-blue-500/10'}`}>
+                      {r.type === 'audit' ? <BarChart3 className="w-3.5 h-3.5 text-emerald-400" /> : <FileText className="w-3.5 h-3.5 text-blue-400" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[11px] font-medium text-zinc-300 truncate">{r.title}</div>
+                      <div className="text-[10px] text-zinc-500">{new Date(r.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button onClick={() => copyReportLink(r.permalink, r.id)}
+                        className={`p-1.5 rounded-md transition-colors ${copiedId === r.id ? 'bg-emerald-500/10 text-emerald-400' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'}`}
+                        title="Copy link">
+                        {copiedId === r.id ? <Check className="w-3.5 h-3.5" /> : <Link2 className="w-3.5 h-3.5" />}
+                      </button>
+                      <a href={r.permalink} target="_blank" rel="noopener noreferrer"
+                        className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors" title="Open report">
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {/* Score ring */}
