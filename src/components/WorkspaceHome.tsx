@@ -13,7 +13,7 @@ import { useAuditSummary } from '../hooks/useAuditSummary';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { AnomalyAlerts } from './AnomalyAlerts';
 import { SeoWorkStatus, ActivityFeed, RankingsSnapshot, ActiveRequestsAnnotations, SeoChangeImpact } from './workspace-home';
-import { adminPath } from '../routes';
+import { type Page, adminPath } from '../routes';
 
 interface WorkspaceHomeProps {
   workspaceId: string;
@@ -288,7 +288,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       {/* ── Action Plan (InsightsEngine) ── */}
       {workspaceId && (
         <ErrorBoundary label="Action Plan">
-          <InsightsEngine workspaceId={workspaceId} tier="premium" compact />
+          <InsightsEngine workspaceId={workspaceId} tier="premium" compact onNavigate={(tab) => navigate(adminPath(workspaceId, tab as Page))} />
         </ErrorBoundary>
       )}
 
