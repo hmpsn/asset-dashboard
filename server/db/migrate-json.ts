@@ -550,8 +550,8 @@ function migrateApprovals(): number {
 
   const insert = db.prepare(`
     INSERT OR IGNORE INTO approval_batches
-      (id, workspace_id, name, items, status, created_at, updated_at)
-    VALUES (@id, @workspace_id, @name, @items, @status, @created_at, @updated_at)
+      (id, workspace_id, site_id, name, items, status, created_at, updated_at)
+    VALUES (@id, @workspace_id, @site_id, @name, @items, @status, @created_at, @updated_at)
   `);
 
   let total = 0;
@@ -564,6 +564,7 @@ function migrateApprovals(): number {
       for (const r of records) {
         const info = insert.run({
           id: r.id, workspace_id: r.workspaceId || wsId,
+          site_id: r.siteId || '',
           name: r.name || '', items: JSON.stringify(r.items || []),
           status: r.status || 'pending',
           created_at: r.createdAt || new Date().toISOString(),
@@ -768,11 +769,11 @@ function migrateWorkOrders(): number {
 
   const insert = db.prepare(`
     INSERT OR IGNORE INTO work_orders
-      (id, workspace_id, title, description, type, status, page_ids,
-       issue_checks, assignee, due_date, created_at, updated_at)
+      (id, workspace_id, payment_id, product_type, status, page_ids,
+       issue_checks, quantity, assigned_to, completed_at, notes, created_at, updated_at)
     VALUES
-      (@id, @workspace_id, @title, @description, @type, @status, @page_ids,
-       @issue_checks, @assignee, @due_date, @created_at, @updated_at)
+      (@id, @workspace_id, @payment_id, @product_type, @status, @page_ids,
+       @issue_checks, @quantity, @assigned_to, @completed_at, @notes, @created_at, @updated_at)
   `);
 
   let total = 0;
@@ -785,11 +786,14 @@ function migrateWorkOrders(): number {
       for (const r of records) {
         const info = insert.run({
           id: r.id, workspace_id: r.workspaceId || wsId,
-          title: r.title || '', description: r.description || '',
-          type: r.type || 'general', status: r.status || 'open',
+          payment_id: r.paymentId || '', product_type: r.productType || '',
+          status: r.status || 'pending',
           page_ids: JSON.stringify(r.pageIds || []),
           issue_checks: r.issueChecks ? JSON.stringify(r.issueChecks) : null,
-          assignee: r.assignee ?? null, due_date: r.dueDate ?? null,
+          quantity: r.quantity || 1,
+          assigned_to: r.assignedTo ?? null,
+          completed_at: r.completedAt ?? null,
+          notes: r.notes ?? null,
           created_at: r.createdAt || new Date().toISOString(),
           updated_at: r.updatedAt || r.createdAt || new Date().toISOString(),
         });
@@ -848,8 +852,8 @@ function migrateAnnotations(): number {
 
   const insert = db.prepare(`
     INSERT OR IGNORE INTO annotations
-      (id, workspace_id, date, label, color, created_at)
-    VALUES (@id, @workspace_id, @date, @label, @color, @created_at)
+      (id, workspace_id, date, label, description, color, created_at)
+    VALUES (@id, @workspace_id, @date, @label, @description, @color, @created_at)
   `);
 
   const run = db.transaction(() => {
@@ -863,6 +867,7 @@ function migrateAnnotations(): number {
         const info = insert.run({
           id: r.id, workspace_id: r.workspaceId || wsId,
           date: r.date || '', label: r.label || '',
+          description: r.description ?? null,
           color: r.color ?? null,
           created_at: r.createdAt || new Date().toISOString(),
         });
@@ -960,8 +965,8 @@ function migrateRoiHistory(): number {
 
   const insert = db.prepare(`
     INSERT OR IGNORE INTO roi_snapshots
-      (id, workspace_id, value, recorded_at)
-    VALUES (@id, @workspace_id, @value, @recorded_at)
+      (workspace_id, organic_traffic_value, computed_at)
+    VALUES (@workspace_id, @organic_traffic_value, @computed_at)
   `);
 
   let total = 0;
@@ -973,10 +978,9 @@ function migrateRoiHistory(): number {
       if (!Array.isArray(records)) continue;
       for (const r of records) {
         const info = insert.run({
-          id: r.id || `roi_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
           workspace_id: wsId,
-          value: typeof r.value === 'number' ? r.value : (typeof r === 'number' ? r : 0),
-          recorded_at: r.recordedAt || r.date || new Date().toISOString(),
+          organic_traffic_value: r.organicTrafficValue ?? (typeof r.value === 'number' ? r.value : (typeof r === 'number' ? r : 0)),
+          computed_at: r.computedAt || r.recordedAt || r.date || new Date().toISOString(),
         });
         total += info.changes;
       }
@@ -997,13 +1001,11 @@ function migrateFeedback(): number {
 
   const insert = db.prepare(`
     INSERT OR IGNORE INTO feedback
-      (id, workspace_id, page_id, page_url, page_title, type, status,
-       content, author_name, author_email, author_role, replies, context,
-       created_at, updated_at)
+      (id, workspace_id, type, title, description, status,
+       context, submitted_by, replies, created_at, updated_at)
     VALUES
-      (@id, @workspace_id, @page_id, @page_url, @page_title, @type, @status,
-       @content, @author_name, @author_email, @author_role, @replies, @context,
-       @created_at, @updated_at)
+      (@id, @workspace_id, @type, @title, @description, @status,
+       @context, @submitted_by, @replies, @created_at, @updated_at)
   `);
 
   let total = 0;
@@ -1016,13 +1018,13 @@ function migrateFeedback(): number {
       for (const r of records) {
         const info = insert.run({
           id: r.id, workspace_id: r.workspaceId || wsId,
-          page_id: r.pageId ?? null, page_url: r.pageUrl ?? null,
-          page_title: r.pageTitle ?? null, type: r.type || 'general',
-          status: r.status || 'open', content: r.content || '',
-          author_name: r.authorName ?? null, author_email: r.authorEmail ?? null,
-          author_role: r.authorRole ?? null,
-          replies: JSON.stringify(r.replies || []),
+          type: r.type || 'general',
+          title: r.title || '',
+          description: r.description || r.content || '',
+          status: r.status || 'new',
           context: r.context ? JSON.stringify(r.context) : null,
+          submitted_by: r.submittedBy ?? r.authorName ?? null,
+          replies: JSON.stringify(r.replies || []),
           created_at: r.createdAt || new Date().toISOString(),
           updated_at: r.updatedAt || r.createdAt || new Date().toISOString(),
         });
@@ -1045,14 +1047,14 @@ function migrateRankTracking(): number {
 
   const insertConfig = db.prepare(`
     INSERT OR IGNORE INTO rank_tracking_config
-      (workspace_id, tracked_keywords, updated_at)
-    VALUES (@workspace_id, @tracked_keywords, @updated_at)
+      (workspace_id, tracked_keywords)
+    VALUES (@workspace_id, @tracked_keywords)
   `);
 
   const insertSnapshot = db.prepare(`
     INSERT OR IGNORE INTO rank_snapshots
-      (id, workspace_id, queries, captured_at)
-    VALUES (@id, @workspace_id, @queries, @captured_at)
+      (workspace_id, date, queries)
+    VALUES (@workspace_id, @date, @queries)
   `);
 
   const run = db.transaction(() => {
@@ -1068,7 +1070,6 @@ function migrateRankTracking(): number {
           const info = insertConfig.run({
             workspace_id: wsId,
             tracked_keywords: JSON.stringify(config.trackedKeywords || config.keywords || []),
-            updated_at: config.updatedAt || new Date().toISOString(),
           });
           total += info.changes;
           console.log(`[migrate] rank-tracking config for ${wsId}`);
@@ -1083,10 +1084,9 @@ function migrateRankTracking(): number {
           if (Array.isArray(snapshots)) {
             for (const s of snapshots) {
               const info = insertSnapshot.run({
-                id: s.id || `rs_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
                 workspace_id: wsId,
+                date: s.date || s.capturedAt || new Date().toISOString().slice(0, 10),
                 queries: JSON.stringify(s.queries || []),
-                captured_at: s.capturedAt || s.date || new Date().toISOString(),
               });
               total += info.changes;
             }
