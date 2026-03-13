@@ -2,8 +2,7 @@
  * Unit tests for server/usage-tracking.ts — per-workspace usage limits.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import fs from 'fs';
-import path from 'path';
+import db from '../../server/db/index.js';
 import {
   getLimit,
   getUsageCount,
@@ -42,10 +41,8 @@ describe('getUsageCount / incrementUsage', () => {
   const testWsId = 'ws_usage_test_' + Date.now();
 
   afterEach(() => {
-    // Clean up the test usage file
-    const usageDir = path.join(process.cwd(), 'data', 'usage');
-    const fp = path.join(usageDir, `${testWsId}.json`);
-    try { fs.unlinkSync(fp); } catch { /* skip */ }
+    // Clean up SQLite rows for this test workspace
+    db.prepare('DELETE FROM usage_tracking WHERE workspace_id = ?').run(testWsId);
   });
 
   it('returns 0 for a workspace with no usage', () => {
@@ -74,9 +71,7 @@ describe('checkUsageLimit', () => {
   const testWsId = 'ws_limit_check_' + Date.now();
 
   afterEach(() => {
-    const usageDir = path.join(process.cwd(), 'data', 'usage');
-    const fp = path.join(usageDir, `${testWsId}.json`);
-    try { fs.unlinkSync(fp); } catch { /* skip */ }
+    db.prepare('DELETE FROM usage_tracking WHERE workspace_id = ?').run(testWsId);
   });
 
   it('allows usage when under the limit', () => {
@@ -123,9 +118,7 @@ describe('getUsageSummary', () => {
   const testWsId = 'ws_summary_' + Date.now();
 
   afterEach(() => {
-    const usageDir = path.join(process.cwd(), 'data', 'usage');
-    const fp = path.join(usageDir, `${testWsId}.json`);
-    try { fs.unlinkSync(fp); } catch { /* skip */ }
+    db.prepare('DELETE FROM usage_tracking WHERE workspace_id = ?').run(testWsId);
   });
 
   it('returns summary for all features', () => {
