@@ -148,7 +148,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (state?.fixContext) {
       setFixContext(state.fixContext);
       // Clear the state so it doesn't re-trigger on back/forward
-      window.history.replaceState({}, '');
+      navigate(location.pathname + location.search, { replace: true, state: {} });
     }
   }, [location.state]);
 
