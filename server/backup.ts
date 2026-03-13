@@ -6,12 +6,12 @@
  * 
  * Retention: keeps last 3 daily backups (configurable via BACKUP_RETENTION_DAYS).
  * Storage: local disk by default (DATA_DIR/backups/). Set BACKUP_DIR to override.
- * 
- * Future: add S3/GCS upload when cloud credentials are configured.
+ * Off-site: when BACKUP_S3_BUCKET is set, uploads a tar.gz archive to S3 after local backup.
  */
 
 import fs from 'fs';
 import path from 'path';
+import { execSync } from 'child_process';
 import { DATA_BASE, getUploadRoot } from './data-dir.js';
 import db from './db/index.js';
 import { createLogger } from './logger.js';
@@ -52,7 +52,7 @@ function copyUploadFiles(src: string, dest: string, stats: { files: number; byte
 }
 
 /** Run a single backup cycle. */
-export function runBackup(): { backupDir: string; files: number; bytes: number } {
+export async function runBackup(): Promise<{ backupDir: string; files: number; bytes: number }> {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const backupDir = path.join(getBackupRoot(), `backup-${timestamp}`);
   fs.mkdirSync(backupDir, { recursive: true });
@@ -86,7 +86,82 @@ export function runBackup(): { backupDir: string; files: number; bytes: number }
   };
   fs.writeFileSync(path.join(backupDir, '_manifest.json'), JSON.stringify(manifest, null, 2));
 
+  // 4. Upload to S3 if configured
+  if (process.env.BACKUP_S3_BUCKET) {
+    try {
+      await uploadToS3(backupDir, timestamp);
+    } catch (err) {
+      log.error({ err }, 'S3 backup upload failed (local backup still available)');
+    }
+  }
+
   return { backupDir, ...stats };
+}
+
+// ── S3 Off-site Backup ──
+
+async function uploadToS3(backupDir: string, timestamp: string): Promise<void> {
+  const bucket = process.env.BACKUP_S3_BUCKET!;
+  const region = process.env.BACKUP_S3_REGION || 'us-east-1';
+  const prefix = process.env.BACKUP_S3_PREFIX || 'backups';
+
+  // Dynamically import to avoid requiring @aws-sdk/client-s3 when S3 is not configured
+  const { S3Client, PutObjectCommand, ListObjectsV2Command, DeleteObjectsCommand } = await import('@aws-sdk/client-s3');
+
+  const client = new S3Client({ region });
+
+  // Create a tar.gz archive of the backup directory
+  const archiveName = `backup-${timestamp}.tar.gz`;
+  const archivePath = path.join(path.dirname(backupDir), archiveName);
+  execSync(`tar -czf "${archivePath}" -C "${path.dirname(backupDir)}" "${path.basename(backupDir)}"`);
+
+  const archiveData = fs.readFileSync(archivePath);
+  const key = `${prefix}/${archiveName}`;
+
+  log.info({ bucket, key, sizeBytes: archiveData.length }, 'Uploading backup to S3');
+
+  await client.send(new PutObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    Body: archiveData,
+    ContentType: 'application/gzip',
+  }));
+
+  log.info({ bucket, key }, 'S3 backup upload complete');
+
+  // Clean up local archive (the uncompressed backup dir remains)
+  fs.unlinkSync(archivePath);
+
+  // Prune old S3 backups beyond retention period
+  await pruneS3Backups(client, bucket, prefix, ListObjectsV2Command, DeleteObjectsCommand);
+}
+
+async function pruneS3Backups(
+  client: InstanceType<typeof import('@aws-sdk/client-s3').S3Client>,
+  bucket: string,
+  prefix: string,
+  ListObjectsV2Command: typeof import('@aws-sdk/client-s3').ListObjectsV2Command,
+  DeleteObjectsCommand: typeof import('@aws-sdk/client-s3').DeleteObjectsCommand,
+): Promise<void> {
+  const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
+
+  const listRes = await client.send(new ListObjectsV2Command({
+    Bucket: bucket,
+    Prefix: `${prefix}/backup-`,
+  }));
+
+  const toDelete = (listRes.Contents || [])
+    .filter(obj => obj.LastModified && obj.LastModified < cutoff && obj.Key)
+    .map(obj => ({ Key: obj.Key! }));
+
+  if (toDelete.length === 0) return;
+
+  await client.send(new DeleteObjectsCommand({
+    Bucket: bucket,
+    Delete: { Objects: toDelete },
+  }));
+
+  log.info({ count: toDelete.length, bucket }, 'Pruned old S3 backups');
 }
 
 /** Remove backups older than retention period. */
@@ -114,27 +189,21 @@ function pruneOldBackups(): number {
 
 /** Start the daily backup scheduler. */
 export function startBackupScheduler(): void {
-  // Run first backup shortly after startup (30 seconds delay)
-  setTimeout(() => {
+  async function runBackupCycle() {
     try {
-      const result = runBackup();
+      const result = await runBackup();
       const pruned = pruneOldBackups();
       log.info(`Daily backup complete: ${result.files} files, ${(result.bytes / 1024).toFixed(1)}KB → ${result.backupDir}${pruned > 0 ? ` (pruned ${pruned} old backup${pruned > 1 ? 's' : ''})` : ''}`);
     } catch (err) {
       log.error({ err: err }, 'Backup failed');
     }
-  }, 30_000);
+  }
+
+  // Run first backup shortly after startup (30 seconds delay)
+  setTimeout(runBackupCycle, 30_000);
 
   // Then run every 24 hours
-  setInterval(() => {
-    try {
-      const result = runBackup();
-      const pruned = pruneOldBackups();
-      log.info(`Daily backup complete: ${result.files} files, ${(result.bytes / 1024).toFixed(1)}KB${pruned > 0 ? ` (pruned ${pruned})` : ''}`);
-    } catch (err) {
-      log.error({ err: err }, 'Backup failed');
-    }
-  }, BACKUP_INTERVAL_MS);
+  setInterval(runBackupCycle, BACKUP_INTERVAL_MS);
 
   log.info(`Backup scheduler started (every 24h, retain ${RETENTION_DAYS} days)`);
 }
