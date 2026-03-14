@@ -16,7 +16,7 @@ import { createLogger } from './logger.js';
 import { flushToDisk as flushOpenAIUsage } from './openai-helpers.js';
 import { flushCreditsToDisk as flushSemrushCredits } from './semrush.js';
 import { flushAll as flushEmailQueue } from './email-queue.js';
-import { listJobs } from './jobs.js';
+import { listJobs, markRunningJobsInterrupted } from './jobs.js';
 import { setShuttingDown } from './routes/health.js';
 
 const log = createLogger('startup');
@@ -53,11 +53,12 @@ function gracefulShutdown(signal: string) {
   // 1. Mark health endpoint as 503 so load balancer stops routing traffic
   setShuttingDown();
 
-  // 2. Log any in-progress jobs as warnings
+  // 2. Mark any in-progress jobs as interrupted in SQLite before shutdown
   const activeJobs = listJobs().filter(j => j.status === 'pending' || j.status === 'running');
   if (activeJobs.length > 0) {
     log.warn({ count: activeJobs.length, jobs: activeJobs.map(j => ({ id: j.id, type: j.type, status: j.status })) },
-      'In-progress jobs will be lost');
+      'Marking in-progress jobs as interrupted');
+    try { markRunningJobsInterrupted(); } catch (err) { log.error({ err }, 'Failed to mark jobs as interrupted'); }
   }
 
   // 3. Close WebSocket connections gracefully (must happen before server.close()
