@@ -22,6 +22,8 @@ const db = new Database(dbPath);
 
 // Enable WAL mode for better concurrent read performance
 db.pragma('journal_mode = WAL');
+// Wait up to 5 seconds when the database is locked (avoids SQLITE_BUSY in parallel test workers)
+db.pragma('busy_timeout = 5000');
 // Enable foreign key enforcement
 db.pragma('foreign_keys = ON');
 
