@@ -12,6 +12,8 @@ interface StripeProduct {
   displayName: string;
   priceUsd: number;
   enabled: boolean;
+  recurring?: boolean;
+  group?: string;
 }
 
 interface StripeConfigState {
@@ -26,24 +28,32 @@ interface StripeConfigState {
 
 // Default product catalog (matches server/stripe.ts PRODUCT_MAP)
 const DEFAULT_PRODUCTS: StripeProduct[] = [
-  { productType: 'brief_blog',       displayName: 'Blog Post Brief',       priceUsd: 125,  stripePriceId: '', enabled: true },
-  { productType: 'brief_landing',    displayName: 'Landing Page Brief',    priceUsd: 150,  stripePriceId: '', enabled: true },
-  { productType: 'brief_service',    displayName: 'Service Page Brief',    priceUsd: 150,  stripePriceId: '', enabled: true },
-  { productType: 'brief_location',   displayName: 'Location Page Brief',   priceUsd: 150,  stripePriceId: '', enabled: true },
-  { productType: 'brief_product',    displayName: 'Product Page Brief',    priceUsd: 150,  stripePriceId: '', enabled: true },
-  { productType: 'brief_pillar',     displayName: 'Pillar/Hub Page Brief', priceUsd: 200,  stripePriceId: '', enabled: true },
-  { productType: 'brief_resource',   displayName: 'Resource/Guide Brief',  priceUsd: 150,  stripePriceId: '', enabled: true },
-  { productType: 'post_draft',       displayName: 'Blog Post — AI Draft',  priceUsd: 350,  stripePriceId: '', enabled: true },
-  { productType: 'post_polished',    displayName: 'Blog Post — Polished',  priceUsd: 500,  stripePriceId: '', enabled: true },
-  { productType: 'post_premium',     displayName: 'Blog Post — Premium',   priceUsd: 1000, stripePriceId: '', enabled: true },
-  { productType: 'schema_page',      displayName: 'Schema — Per Page',     priceUsd: 39,   stripePriceId: '', enabled: true },
-  { productType: 'schema_10',        displayName: 'Schema Pack (10pg)',    priceUsd: 299,  stripePriceId: '', enabled: true },
-  { productType: 'strategy',         displayName: 'Keyword Strategy',      priceUsd: 400,  stripePriceId: '', enabled: true },
-  { productType: 'strategy_refresh', displayName: 'Strategy Refresh',      priceUsd: 200,  stripePriceId: '', enabled: true },
-  { productType: 'fix_meta',         displayName: 'Metadata Optimization', priceUsd: 20,   stripePriceId: '', enabled: true },
-  { productType: 'fix_alt',          displayName: 'Alt Text — Full Site', priceUsd: 50,  stripePriceId: '', enabled: true },
-  { productType: 'fix_redirect',     displayName: 'Redirect Fix',         priceUsd: 19,   stripePriceId: '', enabled: true },
-  { productType: 'fix_meta_10',      displayName: 'Metadata Pack (10pg)', priceUsd: 179,  stripePriceId: '', enabled: true },
+  // Dashboard plan subscriptions (recurring)
+  { productType: 'plan_growth',      displayName: 'Growth Plan',              priceUsd: 249,  stripePriceId: '', enabled: true, recurring: true, group: 'Dashboard Plans' },
+  { productType: 'plan_premium',     displayName: 'Premium Plan',             priceUsd: 999,  stripePriceId: '', enabled: true, recurring: true, group: 'Dashboard Plans' },
+  // Content subscriptions (recurring)
+  { productType: 'content_starter',  displayName: 'Starter Content (2 posts/mo)', priceUsd: 500,  stripePriceId: '', enabled: true, recurring: true, group: 'Content Subscriptions' },
+  { productType: 'content_growth',   displayName: 'Growth Content (4 posts/mo)',  priceUsd: 900,  stripePriceId: '', enabled: true, recurring: true, group: 'Content Subscriptions' },
+  { productType: 'content_scale',    displayName: 'Scale Content (8 posts/mo)',   priceUsd: 1600, stripePriceId: '', enabled: true, recurring: true, group: 'Content Subscriptions' },
+  // One-time content products
+  { productType: 'brief_blog',       displayName: 'Blog Post Brief',       priceUsd: 125,  stripePriceId: '', enabled: true, group: 'Briefs' },
+  { productType: 'brief_landing',    displayName: 'Landing Page Brief',    priceUsd: 150,  stripePriceId: '', enabled: true, group: 'Briefs' },
+  { productType: 'brief_service',    displayName: 'Service Page Brief',    priceUsd: 150,  stripePriceId: '', enabled: true, group: 'Briefs' },
+  { productType: 'brief_location',   displayName: 'Location Page Brief',   priceUsd: 150,  stripePriceId: '', enabled: true, group: 'Briefs' },
+  { productType: 'brief_product',    displayName: 'Product Page Brief',    priceUsd: 150,  stripePriceId: '', enabled: true, group: 'Briefs' },
+  { productType: 'brief_pillar',     displayName: 'Pillar/Hub Page Brief', priceUsd: 200,  stripePriceId: '', enabled: true, group: 'Briefs' },
+  { productType: 'brief_resource',   displayName: 'Resource/Guide Brief',  priceUsd: 150,  stripePriceId: '', enabled: true, group: 'Briefs' },
+  { productType: 'post_draft',       displayName: 'Blog Post — AI Draft',  priceUsd: 350,  stripePriceId: '', enabled: true, group: 'Posts' },
+  { productType: 'post_polished',    displayName: 'Blog Post — Polished',  priceUsd: 500,  stripePriceId: '', enabled: true, group: 'Posts' },
+  { productType: 'post_premium',     displayName: 'Blog Post — Premium',   priceUsd: 1000, stripePriceId: '', enabled: true, group: 'Posts' },
+  { productType: 'schema_page',      displayName: 'Schema — Per Page',     priceUsd: 39,   stripePriceId: '', enabled: true, group: 'Schema & Strategy' },
+  { productType: 'schema_10',        displayName: 'Schema Pack (10pg)',    priceUsd: 299,  stripePriceId: '', enabled: true, group: 'Schema & Strategy' },
+  { productType: 'strategy',         displayName: 'Keyword Strategy',      priceUsd: 400,  stripePriceId: '', enabled: true, group: 'Schema & Strategy' },
+  { productType: 'strategy_refresh', displayName: 'Strategy Refresh',      priceUsd: 200,  stripePriceId: '', enabled: true, group: 'Schema & Strategy' },
+  { productType: 'fix_meta',         displayName: 'Metadata Optimization', priceUsd: 20,   stripePriceId: '', enabled: true, group: 'Fixes' },
+  { productType: 'fix_alt',          displayName: 'Alt Text — Full Site', priceUsd: 50,  stripePriceId: '', enabled: true, group: 'Fixes' },
+  { productType: 'fix_redirect',     displayName: 'Redirect Fix',         priceUsd: 19,   stripePriceId: '', enabled: true, group: 'Fixes' },
+  { productType: 'fix_meta_10',      displayName: 'Metadata Pack (10pg)', priceUsd: 179,  stripePriceId: '', enabled: true, group: 'Fixes' },
 ];
 
 export function StripeSettings() {
@@ -294,39 +304,57 @@ export function StripeSettings() {
               <p className="text-[11px] text-zinc-500 mb-2">
                 Paste the <code className="text-zinc-400">price_...</code> ID from your Stripe Dashboard → Products for each item.
               </p>
-              {products.map((product, idx) => (
-                <div key={product.productType} className="flex items-center gap-2">
-                  <button
-                    onClick={() => updateProduct(idx, { enabled: !product.enabled })}
-                    className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${
-                      product.enabled ? 'bg-teal-500/20 border-teal-500/40' : 'bg-zinc-800 border-zinc-700'
-                    }`}
-                  >
-                    {product.enabled && <CheckCircle2 className="w-2.5 h-2.5 text-teal-400" />}
-                  </button>
-                  <span className={`text-[11px] w-36 truncate flex-shrink-0 ${product.enabled ? 'text-zinc-300' : 'text-zinc-600'}`}>
-                    {product.displayName}
-                  </span>
-                  <div className="flex items-center w-16 flex-shrink-0">
-                    <span className="text-[11px] text-zinc-500">$</span>
-                    <input
-                      type="number"
-                      value={product.priceUsd}
-                      onChange={e => updateProduct(idx, { priceUsd: Math.max(0, Number(e.target.value)) })}
-                      disabled={!product.enabled}
-                      className="w-full px-1 py-0.5 rounded text-[11px] text-right bg-zinc-800/50 border border-zinc-700 text-zinc-200 focus:outline-none focus:border-teal-500/50 disabled:opacity-30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    />
-                  </div>
-                  <input
-                    type="text"
-                    value={product.stripePriceId}
-                    onChange={e => updateProduct(idx, { stripePriceId: e.target.value.trim() })}
-                    placeholder="price_..."
-                    disabled={!product.enabled}
-                    className="flex-1 px-2 py-1 rounded text-[11px] bg-zinc-800/50 border border-zinc-700 text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-teal-500/50 font-mono disabled:opacity-30"
-                  />
-                </div>
-              ))}
+              {(() => {
+                let lastGroup = '';
+                return products.map((product, idx) => {
+                  const showGroupHeader = product.group && product.group !== lastGroup;
+                  if (product.group) lastGroup = product.group;
+                  return (
+                    <div key={product.productType}>
+                      {showGroupHeader && (
+                        <div className={`text-[10px] uppercase tracking-wider font-medium mt-3 mb-1.5 flex items-center gap-2 ${
+                          product.recurring ? 'text-teal-400' : 'text-zinc-500'
+                        }`}>
+                          {product.group}
+                          {product.recurring && <span className="text-[9px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400 normal-case tracking-normal font-medium">recurring</span>}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => updateProduct(idx, { enabled: !product.enabled })}
+                          className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${
+                            product.enabled ? 'bg-teal-500/20 border-teal-500/40' : 'bg-zinc-800 border-zinc-700'
+                          }`}
+                        >
+                          {product.enabled && <CheckCircle2 className="w-2.5 h-2.5 text-teal-400" />}
+                        </button>
+                        <span className={`text-[11px] w-44 truncate flex-shrink-0 ${product.enabled ? 'text-zinc-300' : 'text-zinc-600'}`}>
+                          {product.displayName}
+                        </span>
+                        <div className="flex items-center w-16 flex-shrink-0">
+                          <span className="text-[11px] text-zinc-500">$</span>
+                          <input
+                            type="number"
+                            value={product.priceUsd}
+                            onChange={e => updateProduct(idx, { priceUsd: Math.max(0, Number(e.target.value)) })}
+                            disabled={!product.enabled}
+                            className="w-full px-1 py-0.5 rounded text-[11px] text-right bg-zinc-800/50 border border-zinc-700 text-zinc-200 focus:outline-none focus:border-teal-500/50 disabled:opacity-30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                          {product.recurring && <span className="text-[10px] text-zinc-600 ml-0.5">/mo</span>}
+                        </div>
+                        <input
+                          type="text"
+                          value={product.stripePriceId}
+                          onChange={e => updateProduct(idx, { stripePriceId: e.target.value.trim() })}
+                          placeholder="price_..."
+                          disabled={!product.enabled}
+                          className="flex-1 px-2 py-1 rounded text-[11px] bg-zinc-800/50 border border-zinc-700 text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-teal-500/50 font-mono disabled:opacity-30"
+                        />
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
               <button
                 onClick={saveProductConfig}
                 disabled={savingProducts}
