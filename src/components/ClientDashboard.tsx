@@ -27,6 +27,7 @@ import { StrategyTab } from './client/StrategyTab';
 import { PerformanceTab } from './client/PerformanceTab';
 import { InboxTab } from './client/InboxTab';
 import { OverviewTab } from './client/OverviewTab';
+import { SeoEducationTip } from './client/SeoEducationTip';
 import { ErrorBoundary } from './ErrorBoundary';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 // AnomalyAlerts removed from overview — insights digest covers trend signals
@@ -805,6 +806,9 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
             </div>
           </div>
         )}
+
+        {/* SEO Education Tips — per-tab first-visit contextual tips */}
+        <SeoEducationTip tab={tab} workspaceId={workspaceId} />
 
         {/* ════════════ OVERVIEW TAB ════════════ */}
         {tab === 'overview' && (

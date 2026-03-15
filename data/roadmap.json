@@ -481,8 +481,9 @@
           "source": "Content pipeline gap",
           "est": "2h",
           "priority": "P2",
-          "notes": "readBrandDocs() reads from workspace brand-docs/ folder but no UI exists to upload/manage files. Add drag-and-drop upload section to BrandHub.tsx. Quick win that makes knowledge base self-service.",
-          "status": "pending"
+          "notes": "Shipped — Drag-and-drop upload zone in BrandHub for .txt/.md files. Backend routes (list/upload/delete) in server/routes/brand-docs.ts. Files stored in workspace brand-docs/ folder and auto-injected into AI prompts.",
+          "status": "done",
+          "shippedAt": "2026-03-15"
         },
         {
           "id": 171,
@@ -490,8 +491,9 @@
           "source": "ADMIN_UX_AUDIT P2-12",
           "est": "1-2h",
           "priority": "P3",
-          "notes": "Audit admin components for light-mode rendering.",
-          "status": "pending"
+          "notes": "Shipped — Added 16 missing light mode overrides for admin sidebar colored group hover/active states (blue, emerald, teal, amber), emerald text variants, and ring utilities.",
+          "status": "done",
+          "shippedAt": "2026-03-15"
         },
         {
           "id": 168,
@@ -499,8 +501,9 @@
           "source": "ADMIN_UX_AUDIT P2-9",
           "est": "1-2h",
           "priority": "P3",
-          "notes": "Last updated timestamps, stale data warning. Trust signal.",
-          "status": "pending"
+          "notes": "Shipped — Relative 'last updated' timestamp with Clock icon in PageHeader, amber stale warning at >1h, Refresh button to re-fetch all data, 30s tick for relative time accuracy.",
+          "status": "done",
+          "shippedAt": "2026-03-15"
         },
         {
           "id": 169,
@@ -508,8 +511,9 @@
           "source": "ADMIN_UX_AUDIT P2-10",
           "est": "1-2h",
           "priority": "P3",
-          "notes": "Contextual back link, lightweight nav stack.",
-          "status": "pending"
+          "notes": "Shipped — ArrowLeft back button in breadcrumb bar when viewing a workspace tab. Navigates to workspace home.",
+          "status": "done",
+          "shippedAt": "2026-03-15"
         },
         {
           "id": 167,
@@ -517,8 +521,9 @@
           "source": "ADMIN_UX_AUDIT P2-8",
           "est": "1h",
           "priority": "P3",
-          "notes": "Hover tooltips on sidebar items. Complements the new colored group header icons.",
-          "status": "pending"
+          "notes": "Shipped — desc field added to navGroups, rendered as title attribute on every sidebar nav button.",
+          "status": "done",
+          "shippedAt": "2026-03-15"
         },
         {
           "id": 51,
@@ -535,8 +540,9 @@
           "source": "Product idea Mar 2026",
           "est": "2-3h",
           "priority": "P2",
-          "notes": "Per-tab first-visit tooltip tours, onboarding wizard AI integration, optional 'SEO Basics' learning path. Builds on #191 and #192. Moved from Sprint B.",
-          "status": "pending"
+          "notes": "Shipped — SeoEducationTip component shows per-tab first-visit contextual SEO tips with 'Learn more' expandable sections. Covers overview, performance, health, strategy, content, ROI tabs. Persisted in localStorage.",
+          "status": "done",
+          "shippedAt": "2026-03-15"
         },
         {
           "id": 255,

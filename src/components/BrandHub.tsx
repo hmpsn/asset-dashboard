@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from './Toast';
 import {
   Loader2, Save, Sparkles, BookOpen, Users, MessageSquare,
-  Plus, Pencil, Trash2, Check,
+  Plus, Pencil, Trash2, Check, Upload, FileText, X,
 } from 'lucide-react';
 import { PageHeader } from './ui';
-import { get, patch, post } from '../api/client';
+import { get, patch, post, del } from '../api/client';
 
 interface AudiencePersona {
   id: string;
@@ -16,6 +16,12 @@ interface AudiencePersona {
   objections: string[];
   preferredContentFormat?: string;
   buyingStage?: 'awareness' | 'consideration' | 'decision';
+}
+
+interface BrandDocFile {
+  name: string;
+  size: number;
+  modifiedAt: string;
 }
 
 interface WorkspaceData {
@@ -54,13 +60,51 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
   const [personaDraft, setPersonaDraft] = useState({ name: '', description: '', painPoints: '', goals: '', objections: '', preferredContentFormat: '', buyingStage: '' as string });
   const [generatingPersonas, setGeneratingPersonas] = useState(false);
 
+  // Brand docs state
+  const [brandDocs, setBrandDocs] = useState<BrandDocFile[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const loadBrandDocs = useCallback(async () => {
+    try {
+      const data = await get<{ files: BrandDocFile[] }>(`/api/brand-docs/${workspaceId}`);
+      setBrandDocs(data.files);
+    } catch { /* ignore */ }
+  }, [workspaceId]);
+
+  const handleUploadFiles = async (files: FileList | File[]) => {
+    const valid = Array.from(files).filter(f => /\.(txt|md)$/i.test(f.name));
+    if (valid.length === 0) { toast('Only .txt and .md files are allowed', 'error'); return; }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      valid.forEach(f => fd.append('files', f));
+      const resp = await fetch(`/api/brand-docs/${workspaceId}`, { method: 'POST', body: fd });
+      if (!resp.ok) throw new Error('Upload failed');
+      const data = await resp.json();
+      setBrandDocs(data.files);
+      toast(`Uploaded ${data.uploaded.length} file${data.uploaded.length > 1 ? 's' : ''}`);
+    } catch { toast('Upload failed', 'error'); }
+    setUploading(false);
+  };
+
+  const handleDeleteDoc = async (name: string) => {
+    try {
+      await del(`/api/brand-docs/${workspaceId}/${encodeURIComponent(name)}`);
+      setBrandDocs(prev => prev.filter(f => f.name !== name));
+      toast(`Deleted ${name}`);
+    } catch { toast('Failed to delete', 'error'); }
+  };
+
   // Load workspace data
   useEffect(() => {
     get<WorkspaceData>(`/api/workspaces/${workspaceId}`).then(d => {
       setWs(d);
       if (d.brandVoice) setBrandVoice(d.brandVoice);
     }).catch(() => {});
-  }, [workspaceId]);
+    loadBrandDocs();
+  }, [workspaceId, loadBrandDocs]);
 
   const patchWorkspace = async (fields: Record<string, unknown>) => {
     const updated = await patch<WorkspaceData>(`/api/workspaces/${workspaceId}`, fields);
@@ -134,9 +178,76 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
               {generatingBrandVoice ? <><Loader2 className="w-3 h-3 animate-spin" /> Crawling site...</> : <><Sparkles className="w-3 h-3" /> Generate from Website</>}
             </button>
           </div>
-          <p className="text-[11px] text-zinc-500">
-            You can also drop <code className="text-teal-400">.txt</code> or <code className="text-teal-400">.md</code> files into the <code className="text-teal-400">brand-docs/</code> folder in your workspace uploads.
-          </p>
+        </div>
+      </section>
+
+      {/* ═══ BRAND DOCS UPLOAD ═══ */}
+      <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+        <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
+          <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+            <FileText className="w-4 h-4 text-amber-400" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-zinc-200">Brand Documents</h3>
+            <p className="text-xs text-zinc-500">
+              Upload <code className="text-teal-400">.txt</code> or <code className="text-teal-400">.md</code> files — automatically included in all AI prompts alongside brand voice
+            </p>
+          </div>
+          {brandDocs.length > 0 && <span className="text-[11px] text-emerald-400 font-medium">({brandDocs.length} file{brandDocs.length > 1 ? 's' : ''})</span>}
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          {/* Drop zone */}
+          <div
+            onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={e => { e.preventDefault(); setDragOver(false); handleUploadFiles(e.dataTransfer.files); }}
+            onClick={() => fileInputRef.current?.click()}
+            className={`border-2 border-dashed rounded-lg px-4 py-6 text-center cursor-pointer transition-colors ${
+              dragOver
+                ? 'border-teal-500 bg-teal-500/5'
+                : 'border-zinc-700 hover:border-zinc-600 hover:bg-zinc-800/30'
+            }`}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".txt,.md"
+              multiple
+              className="hidden"
+              onChange={e => { if (e.target.files?.length) handleUploadFiles(e.target.files); e.target.value = ''; }}
+            />
+            {uploading ? (
+              <div className="flex items-center justify-center gap-2 text-xs text-zinc-400">
+                <Loader2 className="w-4 h-4 animate-spin" /> Uploading...
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-1.5">
+                <Upload className="w-5 h-5 text-zinc-500" />
+                <span className="text-xs text-zinc-400">Drop .txt or .md files here, or click to browse</span>
+                <span className="text-[10px] text-zinc-600">Files are injected into AI context for content generation</span>
+              </div>
+            )}
+          </div>
+
+          {/* File list */}
+          {brandDocs.length > 0 && (
+            <div className="space-y-1">
+              {brandDocs.map(file => (
+                <div key={file.name} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-800/50 group">
+                  <FileText className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
+                  <span className="text-xs text-zinc-300 flex-1 truncate">{file.name}</span>
+                  <span className="text-[10px] text-zinc-600">{(file.size / 1024).toFixed(1)} KB</span>
+                  <button
+                    onClick={e => { e.stopPropagation(); handleDeleteDoc(file.name); }}
+                    className="p-1 rounded opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                    title={`Delete ${file.name}`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

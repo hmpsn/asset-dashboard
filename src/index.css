@@ -389,6 +389,23 @@ nav button[class*="bg-teal-500"] {
 .dashboard-light .hover\:text-zinc-400:hover { color: #1e293b !important; }
 .dashboard-light .hover\:text-zinc-500:hover { color: #334155 !important; }
 .dashboard-light .hover\:text-teal-300:hover { color: #0d9488 !important; }
+.dashboard-light .hover\:text-blue-300:hover { color: #2563eb !important; }
+.dashboard-light .hover\:text-emerald-300:hover { color: #047857 !important; }
+.dashboard-light .hover\:text-amber-300:hover { color: #b45309 !important; }
+
+/* === Sidebar colored group hover backgrounds === */
+.dashboard-light .hover\:bg-blue-500\/5:hover { background-color: rgba(37,99,235,0.05) !important; }
+.dashboard-light .hover\:bg-emerald-500\/5:hover { background-color: rgba(4,120,87,0.05) !important; }
+.dashboard-light .hover\:bg-teal-500\/5:hover { background-color: rgba(13,148,136,0.05) !important; }
+.dashboard-light .hover\:bg-amber-500\/5:hover { background-color: rgba(180,83,9,0.05) !important; }
+
+/* === Sidebar colored group active/icon text === */
+.dashboard-light .text-emerald-300 { color: #047857 !important; }       /* emrld-700 · 5.5:1 */
+.dashboard-light .text-emerald-500 { color: #047857 !important; }
+
+/* === Ring utilities === */
+.dashboard-light .ring-zinc-800 { --tw-ring-color: #e2e8f0 !important; }
+.dashboard-light .ring-zinc-700 { --tw-ring-color: #cbd5e1 !important; }
 
 /* === Focus States === */
 .dashboard-light .focus\:border-teal-500:focus { border-color: #0d9488 !important; }

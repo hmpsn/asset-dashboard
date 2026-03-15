@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Shield, Search, BarChart3, TrendingUp, TrendingDown, ArrowUpRight,
   Loader2, Bell, FileText, AlertTriangle,
-  Globe, Clipboard, Flag,
+  Globe, Clipboard, Flag, Clock, RefreshCw,
 } from 'lucide-react';
 import { StatCard, SectionCard, PageHeader } from './ui';
 import { InsightsEngine } from './client/InsightsEngine';
@@ -58,6 +58,15 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   const [annotations, setAnnotations] = useState<Array<{ id: string; date: string; label: string; color?: string }>>([]);
   const [churnSignals, setChurnSignals] = useState<Array<{ id: string; type: string; severity: string; title: string; description: string; detectedAt: string }>>([]);
   const [workOrders, setWorkOrders] = useState<Array<{ id: string; status: string; productType: string }>>([]);
+  const [lastFetched, setLastFetched] = useState<Date | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [now, setNow] = useState(() => new Date());
+
+  // Tick every 30s so relative timestamps stay fresh
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(t);
+  }, []);
 
   // Refetch a single key when a real-time event arrives
   const refetch = useCallback(async (key: string) => {
@@ -123,6 +132,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
         if (key === 'workOrders' && Array.isArray(d)) setWorkOrders(d as typeof workOrders);
       }
       setLoading(false);
+      setLastFetched(new Date());
     }).catch(() => { if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; };
@@ -157,6 +167,50 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   if (!webflowSiteId) actions.push({ label: 'No Webflow site linked', sub: 'Link a site to enable SEO tools', color: 'amber', icon: Globe, tab: 'workspace-settings' });
   if (!gscPropertyUrl) actions.push({ label: 'Google Search Console not connected', sub: 'Connect GSC for search data', color: 'amber', icon: Search, tab: 'workspace-settings' });
   if (!ga4PropertyId) actions.push({ label: 'Google Analytics not connected', sub: 'Connect GA4 for traffic data', color: 'amber', icon: BarChart3, tab: 'workspace-settings' });
+
+  // Data freshness
+  const ageMs = lastFetched ? now.getTime() - lastFetched.getTime() : 0;
+  const isStale = ageMs > 60 * 60 * 1000; // >1 hour
+  const freshnessLabel = !lastFetched ? '' : ageMs < 60_000 ? 'Just now' : ageMs < 3_600_000 ? `${Math.floor(ageMs / 60_000)}m ago` : `${Math.floor(ageMs / 3_600_000)}h ago`;
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const days = 28;
+      const fetches: Array<{ key: string; promise: Promise<unknown> }> = [
+        { key: 'ranks', promise: rankTracking.latest(workspaceId) },
+        { key: 'requests', promise: requestsApi.list({ workspaceId }) },
+        { key: 'content', promise: contentRequestsApi.list(workspaceId) },
+        { key: 'activity', promise: activityApi.list(workspaceId) },
+        { key: 'annotations', promise: annotationsApi.list(workspaceId) },
+        { key: 'churn', promise: churnApi.list(workspaceId) },
+        { key: 'workOrders', promise: workOrdersApi.list(workspaceId) },
+      ];
+      if (gscPropertyUrl) fetches.push({ key: 'search', promise: gsc.overview(workspaceId, days) });
+      if (ga4PropertyId) {
+        fetches.push({ key: 'ga4', promise: getSafe<unknown>(`/api/public/analytics-overview/${workspaceId}?days=${days}`, null) });
+        fetches.push({ key: 'comparison', promise: ga4.comparison(workspaceId, days) });
+      }
+      const results = await Promise.all(fetches.map(({ key, promise }) => promise.then(d => ({ key, d })).catch(() => ({ key, d: null }))));
+      for (const { key, d } of results) {
+        if (!d) continue;
+        const data = d as Record<string, unknown>;
+        if (key === 'search' && data.totalClicks !== undefined) setSearchData({ totalClicks: data.totalClicks as number, totalImpressions: data.totalImpressions as number, avgCtr: data.avgCtr as number, avgPosition: data.avgPosition as number });
+        if (key === 'ga4' && data.totalUsers !== undefined) setGa4Data(d as typeof ga4Data);
+        if (key === 'comparison') setComparison(d as typeof comparison);
+        if (key === 'ranks' && Array.isArray(d)) setRanks(d.slice(0, 10));
+        if (key === 'requests' && Array.isArray(d)) setRequests(d as typeof requests);
+        if (key === 'content' && Array.isArray(d)) setContentRequests(d as typeof contentRequests);
+        if (key === 'activity' && Array.isArray(d)) setActivity(d as ActivityEntry[]);
+        if (key === 'annotations' && Array.isArray(d)) setAnnotations(d.slice(0, 5));
+        if (key === 'churn' && Array.isArray(d)) setChurnSignals(d.filter((s: { severity: string }) => s.severity === 'critical' || s.severity === 'warning'));
+        if (key === 'workOrders' && Array.isArray(d)) setWorkOrders(d as typeof workOrders);
+      }
+      setLastFetched(new Date());
+    } catch { /* ignore */ }
+    setRefreshing(false);
+  };
+
   const pendingOrders = workOrders.filter(o => o.status === 'pending' || o.status === 'in_progress');
   if (pendingOrders.length > 0) actions.push({ label: `${pendingOrders.length} purchased fix${pendingOrders.length > 1 ? 'es' : ''} awaiting fulfillment`, sub: 'Complete work orders from client purchases', color: 'teal', icon: Clipboard, tab: 'workspace-settings' });
   for (const signal of churnSignals) {
@@ -176,12 +230,29 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
         subtitle={webflowSiteName || 'Workspace Dashboard'}
         icon={<Globe className="w-5 h-5 text-teal-400" />}
         actions={
-          <button
-            onClick={() => navigate(adminPath(workspaceId, 'workspace-settings'))}
-            className="text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
-          >
-            Settings →
-          </button>
+          <div className="flex items-center gap-3">
+            {lastFetched && (
+              <span className={`flex items-center gap-1 text-[11px] ${isStale ? 'text-amber-400' : 'text-zinc-500'}`} title={`Data loaded at ${lastFetched.toLocaleTimeString()}`}>
+                <Clock className="w-3 h-3" />
+                {isStale ? 'Stale — ' : ''}{freshnessLabel}
+              </span>
+            )}
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-teal-400 transition-colors disabled:opacity-50"
+              title="Refresh all data"
+            >
+              <RefreshCw className={`w-3 h-3 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+            <button
+              onClick={() => navigate(adminPath(workspaceId, 'workspace-settings'))}
+              className="text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
+            >
+              Settings →
+            </button>
+          </div>
         }
       />
 

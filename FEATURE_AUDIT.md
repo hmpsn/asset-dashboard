@@ -1496,9 +1496,9 @@ When the user asks to update this document with recent features, follow this pro
 | Architecture | 5 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types |
 | Infrastructure | 7 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3 + integrity verification), E2E tests, job persistence, anomaly deploy guard |
 
-**119 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**124 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **119**. Last updated: March 2026 (content calendar).
+Current feature count: **124**. Last updated: March 2026 (admin polish & DX sprint).
 
 ### Recent Additions (March 2026)
 
@@ -1517,3 +1517,23 @@ Current feature count: **119**. Last updated: March 2026 (content calendar).
 **119. Revenue Analytics Dashboard**
 **What it does:** Admin-only dashboard showing total revenue, current month vs previous month, revenue by client, revenue by product type, monthly trend chart (12 months), and recent transactions table. Accessible via DollarSign icon in sidebar utility bar at `/revenue`.
 **Files:** `server/routes/revenue.ts` (new), `server/payments.ts` (`listAllPayments`), `server/app.ts`, `src/components/RevenueDashboard.tsx` (new), `src/App.tsx`, `src/routes.ts`
+
+**120. Sidebar Tool Tooltips**
+**What it does:** Every sidebar navigation item now has a descriptive tooltip (via `title` attribute) explaining what that tool does. Descriptions added to all items across Analytics, Site Health, SEO, and Content groups.
+**Files:** `src/App.tsx` (navGroups type + desc field + title rendering)
+
+**121. WorkspaceHome Data Freshness Indicators**
+**What it does:** Dashboard header shows relative "last updated" timestamp (e.g. "Just now", "5m ago") with Clock icon. Turns amber when data is >1 hour stale. Manual "Refresh" button re-fetches all data sources. 30-second tick keeps relative time accurate.
+**Files:** `src/components/WorkspaceHome.tsx`
+
+**122. Consistent Back Navigation**
+**What it does:** ArrowLeft back button appears in breadcrumb bar when viewing a workspace tab (not home). Clicking it navigates back to workspace home. Provides consistent spatial navigation alongside the breadcrumb hierarchy.
+**Files:** `src/App.tsx`
+
+**123. Brand Documents Upload UI**
+**What it does:** Drag-and-drop upload zone for .txt/.md brand documents in the Brand & AI hub. Files are stored in the workspace's `brand-docs/` folder and automatically injected into all AI prompts via `readBrandDocs()`. Supports upload, list with file sizes, and delete with hover-reveal X button.
+**Files:** `server/routes/brand-docs.ts` (new), `server/app.ts`, `src/components/BrandHub.tsx`
+
+**124. SEO Education Tips (Per-Tab First-Visit)**
+**What it does:** Contextual SEO education tips appear on first visit to each client dashboard tab. Each tip explains what the tab shows and why it matters, with an expandable "Learn more" section for SEO basics. Dismissible with "Got it" — state persisted in localStorage per workspace+tab. Covers overview, performance, health, strategy, content, and ROI tabs.
+**Files:** `src/components/client/SeoEducationTip.tsx` (new), `src/components/ClientDashboard.tsx`

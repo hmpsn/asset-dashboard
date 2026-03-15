@@ -20,7 +20,7 @@ import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, Search, FileText,
   Pencil, Target, Code2, LogOut, TrendingUp, Flag, Link2, MessageSquare,
   Sun, Moon, LayoutDashboard, ChevronRight, Sparkles, Activity, Shield,
-  Zap, BookOpen, RefreshCw, CalendarDays, DollarSign,
+  Zap, BookOpen, RefreshCw, CalendarDays, DollarSign, ArrowLeft,
 } from 'lucide-react';
 
 // ── Lazy-loaded route-level chunks ──
@@ -347,42 +347,42 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   }, [tab]);
 
   // ── Sidebar navigation groups ──
-  const navGroups: Array<{ label: string; groupIcon?: typeof Globe; groupColor?: string; activeBg?: string; activeText?: string; activeIcon?: string; inactiveIcon?: string; hoverBg?: string; hoverText?: string; items: Array<{ id: Page; label: string; icon: typeof Globe; needsSite?: boolean; hidden?: boolean }> }> = [
+  const navGroups: Array<{ label: string; groupIcon?: typeof Globe; groupColor?: string; activeBg?: string; activeText?: string; activeIcon?: string; inactiveIcon?: string; hoverBg?: string; hoverText?: string; items: Array<{ id: Page; label: string; icon: typeof Globe; desc?: string; needsSite?: boolean; hidden?: boolean }> }> = [
     { label: '', items: [
-      { id: 'home', label: 'Home', icon: LayoutDashboard },
+      { id: 'home', label: 'Home', icon: LayoutDashboard, desc: 'Workspace overview and quick actions' },
     ]},
     { label: 'ANALYTICS', groupIcon: Activity, groupColor: 'text-blue-400',
       activeBg: 'bg-blue-500/10', activeText: 'text-blue-300', activeIcon: 'text-blue-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-blue-500/5', hoverText: 'hover:text-blue-300',
       items: [
-      { id: 'search', label: 'Search Console', icon: Search, needsSite: true },
-      { id: 'analytics', label: 'Google Analytics', icon: BarChart3, needsSite: true },
-      { id: 'seo-ranks', label: 'Rank Tracker', icon: TrendingUp, needsSite: true },
-      { id: 'annotations', label: 'Annotations', icon: Flag, needsSite: true },
+      { id: 'search', label: 'Search Console', icon: Search, needsSite: true, desc: 'Google Search Console queries, pages, and click data' },
+      { id: 'analytics', label: 'Google Analytics', icon: BarChart3, needsSite: true, desc: 'GA4 traffic, events, sources, and user behavior' },
+      { id: 'seo-ranks', label: 'Rank Tracker', icon: TrendingUp, needsSite: true, desc: 'Track keyword rankings over time' },
+      { id: 'annotations', label: 'Annotations', icon: Flag, needsSite: true, desc: 'Mark key events on analytics timelines' },
     ]},
     { label: 'SITE HEALTH', groupIcon: Shield, groupColor: 'text-emerald-400',
       activeBg: 'bg-emerald-500/10', activeText: 'text-emerald-300', activeIcon: 'text-emerald-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-emerald-500/5', hoverText: 'hover:text-emerald-300',
       items: [
-      { id: 'seo-audit', label: 'Site Audit', icon: Globe, needsSite: true },
-      { id: 'performance', label: 'Performance', icon: Gauge, needsSite: true },
-      { id: 'links', label: 'Links', icon: Link2, needsSite: true },
-      { id: 'media', label: 'Assets', icon: Image },
+      { id: 'seo-audit', label: 'Site Audit', icon: Globe, needsSite: true, desc: 'Comprehensive SEO audit with AI recommendations' },
+      { id: 'performance', label: 'Performance', icon: Gauge, needsSite: true, desc: 'PageSpeed scores, Core Web Vitals, and load times' },
+      { id: 'links', label: 'Links', icon: Link2, needsSite: true, desc: 'Internal links, broken links, and redirect management' },
+      { id: 'media', label: 'Assets', icon: Image, desc: 'Images, alt text, and media optimization' },
     ]},
     { label: 'SEO', groupIcon: Zap, groupColor: 'text-teal-400',
       activeBg: 'bg-teal-500/10', activeText: 'text-teal-300', activeIcon: 'text-teal-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-teal-500/5', hoverText: 'hover:text-teal-300',
       items: [
-      { id: 'brand', label: 'Brand & AI', icon: Sparkles, needsSite: false },
-      { id: 'seo-strategy', label: 'Strategy', icon: Target, needsSite: true },
-      { id: 'seo-editor', label: 'SEO Editor', icon: Pencil, needsSite: true },
-      { id: 'seo-schema', label: 'Schema', icon: Code2, needsSite: true },
+      { id: 'brand', label: 'Brand & AI', icon: Sparkles, needsSite: false, desc: 'Brand voice, knowledge base, and audience personas' },
+      { id: 'seo-strategy', label: 'Strategy', icon: Target, needsSite: true, desc: 'Keyword strategy with page-keyword mapping' },
+      { id: 'seo-editor', label: 'SEO Editor', icon: Pencil, needsSite: true, desc: 'Edit titles, descriptions, and meta tags' },
+      { id: 'seo-schema', label: 'Schema', icon: Code2, needsSite: true, desc: 'Structured data and schema markup' },
     ]},
     { label: 'CONTENT', groupIcon: BookOpen, groupColor: 'text-amber-400',
       activeBg: 'bg-amber-500/10', activeText: 'text-amber-300', activeIcon: 'text-amber-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-amber-500/5', hoverText: 'hover:text-amber-300',
       items: [
-      { id: 'seo-briefs', label: 'Content Briefs', icon: Clipboard, needsSite: true },
-      { id: 'content', label: 'Content', icon: FileText, needsSite: true },
-      { id: 'calendar', label: 'Calendar', icon: CalendarDays, needsSite: true, hidden: !hasContentItems },
-      { id: 'subscriptions', label: 'Subscriptions', icon: RefreshCw, needsSite: true },
-      { id: 'content-perf', label: 'Content Perf', icon: BarChart3, needsSite: true },
+      { id: 'seo-briefs', label: 'Content Briefs', icon: Clipboard, needsSite: true, desc: 'AI-generated content briefs from keyword strategy' },
+      { id: 'content', label: 'Content', icon: FileText, needsSite: true, desc: 'Manage and publish AI-written content' },
+      { id: 'calendar', label: 'Calendar', icon: CalendarDays, needsSite: true, hidden: !hasContentItems, desc: 'Content calendar with briefs, posts, and requests' },
+      { id: 'subscriptions', label: 'Subscriptions', icon: RefreshCw, needsSite: true, desc: 'Recurring content subscription plans' },
+      { id: 'content-perf', label: 'Content Perf', icon: BarChart3, needsSite: true, desc: 'Post-publish content performance metrics' },
     ]},
   ];
 
@@ -517,6 +517,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
                     <button
                       key={item.id}
                       onClick={() => !disabled && selected && navigate(adminPath(selected.id, item.id))}
+                      title={item.desc}
                       className={`w-full flex items-center gap-2.5 px-2.5 py-[5px] rounded-lg text-[12px] font-medium transition-all ${
                         active
                           ? `${group.activeBg || 'bg-teal-500/10'} ${group.activeText || 'text-teal-300'}`
@@ -579,6 +580,15 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
       <div className="flex-1 flex flex-col min-w-0">
         {/* Breadcrumb bar (#165) + header widgets */}
         <div className="flex items-center gap-1.5 px-5 py-2 border-b border-zinc-800 text-[11px] min-h-[36px]">
+          {selected && tab !== 'home' && (
+            <button
+              onClick={() => navigate(adminPath(selected.id))}
+              className="p-1 -ml-1 mr-0.5 rounded text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800/50 transition-colors"
+              title="Back to workspace home"
+            >
+              <ArrowLeft className="w-3 h-3" />
+            </button>
+          )}
           <button
             onClick={() => { setSelected(null); navigate('/'); }}
             className={`font-medium transition-colors ${!selected ? 'text-teal-400' : 'text-zinc-500 hover:text-zinc-300'}`}
