@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
 import { get, post, getOptional, getSafe } from '../api/client';
 import { ApiError } from '../api/client';
 import { useNavigate } from 'react-router-dom';
@@ -10,7 +10,7 @@ import {
   CheckCircle2, LineChart, Lock, Trophy, Check,
   Sun, Moon, Plus, FileText, Calendar, Clock, CreditCard, Mail,
 } from 'lucide-react';
-import { StripePaymentModal } from './StripePaymentForm';
+const LazyStripePaymentModal = lazy(() => import('./StripePaymentForm').then(m => ({ default: m.StripePaymentModal })));
 import { type Tier, Skeleton, OverviewSkeleton } from './ui';
 import { RenderMarkdown } from './client/helpers';
 import { STUDIO_NAME } from '../constants';
@@ -1150,24 +1150,26 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         );
       })()}
 
-      {/* Stripe Elements inline payment modal */}
+      {/* Stripe Elements inline payment modal (lazy-loaded — Stripe SDK only fetched on payment) */}
       {!betaMode && stripePayment && (
-        <StripePaymentModal
-          clientSecret={stripePayment.clientSecret}
-          publishableKey={stripePayment.publishableKey}
-          amount={stripePayment.amount}
-          productName={stripePayment.productName}
-          topic={stripePayment.topic}
-          targetKeyword={stripePayment.targetKeyword}
-          isFull={stripePayment.isFull}
-          onSuccess={() => {
-            setStripePayment(null);
-            setToast({ message: `Payment successful! Your ${stripePayment.productName.toLowerCase()} is being prepared.`, type: 'success' });
-            // Refresh content requests
-            getSafe<unknown[]>(`/api/public/content-requests/${workspaceId}`, []).then(setContentRequests).catch(() => {});
-          }}
-          onClose={() => setStripePayment(null)}
-        />
+        <Suspense fallback={<div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-teal-400" /></div>}>
+          <LazyStripePaymentModal
+            clientSecret={stripePayment.clientSecret}
+            publishableKey={stripePayment.publishableKey}
+            amount={stripePayment.amount}
+            productName={stripePayment.productName}
+            topic={stripePayment.topic}
+            targetKeyword={stripePayment.targetKeyword}
+            isFull={stripePayment.isFull}
+            onSuccess={() => {
+              setStripePayment(null);
+              setToast({ message: `Payment successful! Your ${stripePayment.productName.toLowerCase()} is being prepared.`, type: 'success' });
+              // Refresh content requests
+              getSafe<unknown[]>(`/api/public/content-requests/${workspaceId}`, []).then(setContentRequests).catch(() => {});
+            }}
+            onClose={() => setStripePayment(null)}
+          />
+        </Suspense>
       )}
 
       {/* Client onboarding questionnaire */}

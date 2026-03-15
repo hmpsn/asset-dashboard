@@ -25,6 +25,14 @@ async function getSentryPlugin(): Promise<Plugin[]> {
 export default defineConfig(async () => ({
   build: {
     sourcemap: !!process.env.SENTRY_AUTH_TOKEN, // Only generate source maps when Sentry is configured
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (id.includes('node_modules/react-dom/') || id.includes('node_modules/react/') || id.includes('node_modules/react-router-dom/')) return 'react-vendor';
+          if (id.includes('node_modules/@stripe/')) return 'stripe';
+        },
+      },
+    },
   },
   plugins: [
     react(),

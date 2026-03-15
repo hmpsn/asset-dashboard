@@ -137,8 +137,9 @@
           "source": "FEATURE_AUDIT",
           "est": "2h",
           "priority": "P3",
-          "notes": "Verify Lucide tree-shaking, audit chart libs.",
-          "status": "pending"
+          "notes": "Shipped — Lucide tree-shaking verified (individual icon code-splitting). Added manualChunks in vite.config.ts: react-vendor (React/ReactDOM/Router) + stripe (lazy). Lazy-loaded StripePaymentForm in ClientDashboard. Main bundle split 366→188 kB + 190 kB react-vendor. ClientDashboard 379→359 kB. Stripe 13 kB lazy chunk.",
+          "status": "done",
+          "shippedAt": "2026-03-15"
         }
       ]
     },
