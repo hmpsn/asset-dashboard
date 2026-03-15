@@ -1,16 +1,24 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus, FileText, Sparkles, Send, ChevronDown, ChevronUp,
   Check, Edit3, X, TrendingUp, Download, ExternalLink,
+  BarChart3, MousePointerClick, Eye, ArrowUpRight,
 } from 'lucide-react';
 import { TierGate, type Tier } from '../ui';
-import type { ClientContentRequest, ClientTab } from './types';
+import type { ClientContentRequest } from './types';
 import { clientPath } from '../../routes';
 import { useBetaMode } from './BetaContext';
 import type { PricingModalState } from './StrategyTab';
 import { STUDIO_NAME } from '../../constants';
 import { useContentRequests } from '../../hooks/useContentRequests';
+
+interface ContentPerfItem {
+  requestId: string;
+  daysSincePublish: number;
+  gsc: { clicks: number; impressions: number; ctr: number; position: number } | null;
+  ga4: { sessions: number; users: number } | null;
+}
 
 interface ContentTabProps {
   contentRequests: ClientContentRequest[];
@@ -39,6 +47,23 @@ export function ContentTab({
   const [newTopicNotes, setNewTopicNotes] = useState('');
   const [newTopicServiceType, setNewTopicServiceType] = useState<'brief_only' | 'full_post'>('brief_only');
   const [newTopicPageType] = useState<'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource'>('blog');
+
+  // ── Content performance data for published items ──
+  const [contentPerf, setContentPerf] = useState<Record<string, ContentPerfItem>>({});
+  useEffect(() => {
+    const hasPublished = contentRequests.some(r => r.status === 'delivered' || r.status === 'published');
+    if (!hasPublished) return;
+    fetch(`/api/public/content-performance/${workspaceId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.items) {
+          const map: Record<string, ContentPerfItem> = {};
+          for (const item of data.items) map[item.requestId] = item;
+          setContentPerf(map);
+        }
+      })
+      .catch(() => {});
+  }, [workspaceId, contentRequests]);
 
   // ── Content-specific API functions + interaction state (extracted hook) ──
   const {
@@ -75,6 +100,31 @@ export function ContentTab({
         </div>
       );
       return null;
+    })()}
+
+    {/* Status summary cards */}
+    {contentRequests.length > 0 && (() => {
+      const active = contentRequests.filter(r => r.status !== 'declined');
+      const awaitingReview = active.filter(r => r.status === 'client_review').length;
+      const inProgress = active.filter(r => ['pending_payment', 'requested', 'brief_generated', 'changes_requested', 'approved', 'in_progress'].includes(r.status)).length;
+      const delivered = active.filter(r => r.status === 'delivered').length;
+      const published = active.filter(r => r.status === 'published').length;
+      const stats = [
+        { label: 'Needs Review', value: awaitingReview, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
+        { label: 'In Progress', value: inProgress, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
+        { label: 'Delivered', value: delivered, color: 'text-teal-400', bg: 'bg-teal-500/10', border: 'border-teal-500/20' },
+        { label: 'Published', value: published, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+      ];
+      return (
+        <div className="grid grid-cols-4 gap-2">
+          {stats.map(s => (
+            <div key={s.label} className={`${s.bg} border ${s.border} rounded-lg px-3 py-2 text-center`}>
+              <div className={`text-lg font-bold ${s.color} tabular-nums`}>{s.value}</div>
+              <div className="text-[11px] text-zinc-500 font-medium">{s.label}</div>
+            </div>
+          ))}
+        </div>
+      );
     })()}
 
     <div className="flex items-center justify-between mb-1">
@@ -453,6 +503,59 @@ export function ContentTab({
                     </div>
                   </div>
                 )}
+
+                {/* Post-publish performance snippet */}
+                {(req.status === 'delivered' || req.status === 'published') && (() => {
+                  const perf = contentPerf[req.id];
+                  if (!perf?.gsc && !perf?.ga4) return null;
+                  const gsc = perf.gsc;
+                  const ga4 = perf.ga4;
+                  return (
+                    <div className="bg-gradient-to-r from-blue-500/5 to-teal-500/5 border border-blue-500/15 rounded-xl p-4 space-y-2">
+                      <div className="flex items-center gap-2 mb-1">
+                        <BarChart3 className="w-3.5 h-3.5 text-blue-400" />
+                        <span className="text-[11px] text-blue-300 font-medium uppercase tracking-wider">Content Performance</span>
+                        {perf.daysSincePublish > 0 && <span className="text-[11px] text-zinc-500 ml-auto">{perf.daysSincePublish}d since publish</span>}
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {gsc && <>
+                          <div className="bg-zinc-950/60 rounded-lg px-3 py-2 border border-zinc-800/50">
+                            <div className="flex items-center gap-1 text-[10px] text-zinc-500 mb-0.5"><MousePointerClick className="w-3 h-3" /> Clicks</div>
+                            <div className="text-sm font-bold text-teal-400 tabular-nums">{gsc.clicks.toLocaleString()}</div>
+                          </div>
+                          <div className="bg-zinc-950/60 rounded-lg px-3 py-2 border border-zinc-800/50">
+                            <div className="flex items-center gap-1 text-[10px] text-zinc-500 mb-0.5"><Eye className="w-3 h-3" /> Impressions</div>
+                            <div className="text-sm font-bold text-blue-400 tabular-nums">{gsc.impressions.toLocaleString()}</div>
+                          </div>
+                          <div className="bg-zinc-950/60 rounded-lg px-3 py-2 border border-zinc-800/50">
+                            <div className="flex items-center gap-1 text-[10px] text-zinc-500 mb-0.5"><ArrowUpRight className="w-3 h-3" /> CTR</div>
+                            <div className="text-sm font-bold text-zinc-200 tabular-nums">{gsc.ctr}%</div>
+                          </div>
+                          <div className="bg-zinc-950/60 rounded-lg px-3 py-2 border border-zinc-800/50">
+                            <div className="flex items-center gap-1 text-[10px] text-zinc-500 mb-0.5"><TrendingUp className="w-3 h-3" /> Avg Position</div>
+                            <div className={`text-sm font-bold tabular-nums ${gsc.position <= 10 ? 'text-emerald-400' : gsc.position <= 20 ? 'text-amber-400' : 'text-zinc-300'}`}>{gsc.position}</div>
+                          </div>
+                        </>}
+                        {ga4 && !gsc && <>
+                          <div className="bg-zinc-950/60 rounded-lg px-3 py-2 border border-zinc-800/50">
+                            <div className="text-[10px] text-zinc-500 mb-0.5">Sessions</div>
+                            <div className="text-sm font-bold text-teal-400 tabular-nums">{ga4.sessions.toLocaleString()}</div>
+                          </div>
+                          <div className="bg-zinc-950/60 rounded-lg px-3 py-2 border border-zinc-800/50">
+                            <div className="text-[10px] text-zinc-500 mb-0.5">Users</div>
+                            <div className="text-sm font-bold text-blue-400 tabular-nums">{ga4.users.toLocaleString()}</div>
+                          </div>
+                        </>}
+                      </div>
+                      {gsc && gsc.clicks === 0 && gsc.impressions > 0 && (
+                        <div className="text-[11px] text-zinc-500 italic">Your content is showing in search results but hasn&apos;t received clicks yet. This is normal for new content &mdash; give it time.</div>
+                      )}
+                      {gsc && gsc.impressions === 0 && (
+                        <div className="text-[11px] text-zinc-500 italic">Google hasn&apos;t indexed this page yet. It typically takes 1&ndash;4 weeks for new content to appear in search.</div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Upgrade CTA for brief_only items after approval */}
                 {canUpgrade && (

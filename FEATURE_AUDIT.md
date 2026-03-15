@@ -1401,6 +1401,39 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 109. Anomaly Detection Deploy Guard
+**What it does:** Tracks last successful anomaly scan time in SQLite. On server startup (deploy), skips the scan if the last scan was within 6 hours. Prevents clients from being spammed with anomaly emails every time the app is redeployed. The `force` parameter bypasses the guard for manual scans.
+
+**Agency value:** Deploy freely during active development without worrying about false anomaly alerts reaching clients.
+
+**Client value:** Only receives anomaly alerts that reflect genuine metric changes, not deploy artifacts.
+
+**Mutual:** Trust in the notification system — alerts mean something real happened.
+
+---
+
+### 110. Content Pipeline Status Cards & Post-Publish Performance
+**What it does:** Two additions to the client Content tab: (1) At-a-glance status summary cards showing counts for Needs Review, In Progress, Delivered, and Published items. (2) Post-publish performance snippet on delivered/published content showing GSC clicks, impressions, CTR, avg position, and contextual messages for new content not yet indexed. Uses the existing `handleContentPerformance` handler exposed via a new public endpoint.
+
+**Agency value:** Closes the content ROI loop — clients can see their investment is paying off without asking.
+
+**Client value:** Immediate visibility into pipeline status and measurable proof that content investments are driving search traffic.
+
+**Mutual:** Content performance data builds confidence for repeat purchases.
+
+---
+
+### 111. Growth Opportunities Reframe (Client Strategy Tab)
+**What it does:** Reframes the former "Not Yet Ranking" section in the client Strategy tab as "Growth Opportunities" with a positive, opportunity-focused tone. Red/alarming styling replaced with teal/encouraging colors. Diagnostic messages focus on upside potential rather than what's broken. "Near-ranking" badge changed to "Almost there."
+
+**Agency value:** Positions the agency as a growth partner rather than an alarm system. Reduces client anxiety from seeing red warning indicators.
+
+**Client value:** Understands unranked pages as opportunities to capture, not failures to fix.
+
+**Mutual:** Positive framing encourages action (content briefs) rather than worry.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
@@ -1409,16 +1442,16 @@ When the user asks to update this document with recent features, follow this pro
 | Analytics & Tracking | 7 | Unified data view replaces platform-hopping + AI time-saved tracking |
 | Content & Strategy | 9 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan |
 | Client Communication | 10 | Structured workflows + automated reports + expanded notifications + feedback widget + email capture funnel + audit completion email |
-| Client Self-Service | 14 | 24/7 data access, onboarding, plans, cart, order tracking, glossary, questionnaire, ROI upgrade prompts, shareable report permalinks |
+| Client Self-Service | 15 | 24/7 data access, onboarding, plans, cart, order tracking, glossary, questionnaire, ROI upgrade prompts, shareable report permalinks, content pipeline status cards + post-publish performance |
 | AI & Intelligence | 7 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine + context completeness + usage dashboard + AEO page review |
 | Auth & Access Control | 3 | Internal user accounts, workspace ACL, client user accounts |
 | Security | 2 | Helmet, HTTPS, rate limiting, input sanitization, Turnstile CAPTCHA, credential stuffing protection, weekly npm audit |
 | Monetization | 2 | Stripe Checkout + Subscriptions, admin settings, payment tracking, trials, encrypted config, billing portal |
-| Platform & UX | 17 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home, page state model, work orders, request linkage, admin UX overhaul, landing page, mobile guard, Recharts, portal OG/favicon, sidebar color accents, AI Usage standalone page |
+| Platform & UX | 18 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home, page state model, work orders, request linkage, admin UX overhaul, landing page, mobile guard, Recharts, portal OG/favicon, sidebar color accents, AI Usage standalone page, Growth Opportunities reframe |
 | Data Architecture | 3 | PageEditState model, cross-store writes, activity feed for client actions |
 | Architecture | 5 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types |
-| Infrastructure | 6 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3 + integrity verification), E2E tests, job persistence |
+| Infrastructure | 7 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3 + integrity verification), E2E tests, job persistence, anomaly deploy guard |
 
-**108 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**111 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **108**. Last updated: March 2026 (job persistence, backup integrity verification, security audit workflow, SQLite busy_timeout, server decomposition).
+Current feature count: **111**. Last updated: March 2026 (anomaly deploy guard, content pipeline status cards + post-publish performance, Growth Opportunities reframe, admin nav styling fixes).

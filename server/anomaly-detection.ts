@@ -35,6 +35,7 @@ export function initAnomalyBroadcast(fn: (workspaceId: string, event: string, da
 }
 
 const CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000; // Every 12 hours
+const MIN_SCAN_INTERVAL_MS = 6 * 60 * 60 * 1000; // Skip startup scan if last scan < 6h ago
 const COMPARISON_DAYS = 28;
 
 // --- Thresholds (% change that triggers an anomaly) ---
@@ -136,6 +137,8 @@ interface Stmts {
   acknowledge: ReturnType<typeof db.prepare>;
   deleteOlderThan: ReturnType<typeof db.prepare>;
   recentUndismissed: ReturnType<typeof db.prepare>;
+  getLastScan: ReturnType<typeof db.prepare>;
+  setLastScan: ReturnType<typeof db.prepare>;
 }
 
 let _stmts: Stmts | null = null;
@@ -163,9 +166,29 @@ function stmts(): Stmts {
         WHERE workspace_id = ? AND type = ? AND dismissed_at IS NULL AND detected_at > ?
         LIMIT 1
       `),
+      getLastScan: db.prepare(`SELECT detected_at FROM anomalies ORDER BY detected_at DESC LIMIT 1`),
+      setLastScan: db.prepare(`
+        INSERT OR REPLACE INTO anomalies (id, workspace_id, workspace_name, type, severity,
+          title, description, metric, current_value, previous_value, change_pct,
+          ai_summary, detected_at, dismissed_at, acknowledged_at, source)
+        VALUES ('__last_scan__', '__system__', 'System', 'traffic_drop', 'warning',
+          'Last scan marker', '', 'last_scan', 0, 0, 0,
+          NULL, ?, 'system', NULL, 'gsc')
+      `),
     };
   }
   return _stmts;
+}
+
+/** Get the timestamp of the last successful anomaly scan */
+function getLastScanTime(): Date | null {
+  const row = stmts().getLastScan.get() as { detected_at: string } | undefined;
+  return row ? new Date(row.detected_at) : null;
+}
+
+/** Record that a scan just completed */
+function recordScanTime(): void {
+  stmts().setLastScan.run(new Date().toISOString());
 }
 
 // --- Public API ---
@@ -180,7 +203,8 @@ export function listAnomalies(workspaceId?: string, includeDismissed = false): A
     rows = stmts().selectAll.all() as AnomalyRow[];
     if (!includeDismissed) rows = rows.filter(r => !r.dismissed_at);
   }
-  return rows.map(rowToAnomaly);
+  // Filter out internal scan marker row
+  return rows.filter(r => r.id !== '__last_scan__').map(rowToAnomaly);
 }
 
 export function dismissAnomaly(id: string): boolean {
@@ -437,7 +461,16 @@ async function generateAiSummary(anomalies: Anomaly[], workspaceName: string): P
 
 // --- Main scan function ---
 
-export async function runAnomalyDetection(): Promise<{ total: number; newAnomalies: number }> {
+export async function runAnomalyDetection(force = false): Promise<{ total: number; newAnomalies: number }> {
+  // Skip if last scan was too recent (prevents spam on frequent deploys)
+  if (!force) {
+    const lastScan = getLastScanTime();
+    if (lastScan && (Date.now() - lastScan.getTime()) < MIN_SCAN_INTERVAL_MS) {
+      const hoursAgo = ((Date.now() - lastScan.getTime()) / (60 * 60 * 1000)).toFixed(1);
+      log.info(`Skipping anomaly scan — last scan was ${hoursAgo}h ago (minimum interval: ${MIN_SCAN_INTERVAL_MS / (60 * 60 * 1000)}h)`);
+      return { total: 0, newAnomalies: 0 };
+    }
+  }
   log.info('Starting anomaly detection scan...');
   const workspaces = listWorkspaces();
   const existingCount = (stmts().selectAll.all() as AnomalyRow[]).length;
@@ -534,6 +567,9 @@ export async function runAnomalyDetection(): Promise<{ total: number; newAnomali
 
   // Prune old anomalies (older than 60 days)
   clearOldAnomalies(60);
+
+  // Record scan completion time
+  recordScanTime();
 
   return { total: existingCount + allNew.length, newAnomalies: allNew.length };
 }

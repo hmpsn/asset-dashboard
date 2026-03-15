@@ -343,7 +343,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
       { id: 'home', label: 'Home', icon: LayoutDashboard },
     ]},
     { label: 'ANALYTICS', groupIcon: Activity, groupColor: 'text-blue-400',
-      activeBg: 'bg-blue-500/10', activeText: 'text-blue-300', activeIcon: 'text-blue-400', inactiveIcon: 'text-blue-500/40', hoverBg: 'hover:bg-blue-500/5', hoverText: 'hover:text-blue-300',
+      activeBg: 'bg-blue-500/10', activeText: 'text-blue-300', activeIcon: 'text-blue-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-blue-500/5', hoverText: 'hover:text-blue-300',
       items: [
       { id: 'search', label: 'Search Console', icon: Search, needsSite: true },
       { id: 'analytics', label: 'Google Analytics', icon: BarChart3, needsSite: true },
@@ -351,7 +351,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
       { id: 'annotations', label: 'Annotations', icon: Flag, needsSite: true },
     ]},
     { label: 'SITE HEALTH', groupIcon: Shield, groupColor: 'text-emerald-400',
-      activeBg: 'bg-emerald-500/10', activeText: 'text-emerald-300', activeIcon: 'text-emerald-400', inactiveIcon: 'text-emerald-500/40', hoverBg: 'hover:bg-emerald-500/5', hoverText: 'hover:text-emerald-300',
+      activeBg: 'bg-emerald-500/10', activeText: 'text-emerald-300', activeIcon: 'text-emerald-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-emerald-500/5', hoverText: 'hover:text-emerald-300',
       items: [
       { id: 'seo-audit', label: 'Site Audit', icon: Globe, needsSite: true },
       { id: 'performance', label: 'Performance', icon: Gauge, needsSite: true },
@@ -359,7 +359,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
       { id: 'media', label: 'Assets', icon: Image },
     ]},
     { label: 'SEO', groupIcon: Zap, groupColor: 'text-teal-400',
-      activeBg: 'bg-teal-500/10', activeText: 'text-teal-300', activeIcon: 'text-teal-400', inactiveIcon: 'text-teal-500/40', hoverBg: 'hover:bg-teal-500/5', hoverText: 'hover:text-teal-300',
+      activeBg: 'bg-teal-500/10', activeText: 'text-teal-300', activeIcon: 'text-teal-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-teal-500/5', hoverText: 'hover:text-teal-300',
       items: [
       { id: 'brand', label: 'Brand & AI', icon: Sparkles, needsSite: false },
       { id: 'seo-strategy', label: 'Strategy', icon: Target, needsSite: true },
@@ -367,7 +367,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
       { id: 'seo-schema', label: 'Schema', icon: Code2, needsSite: true },
     ]},
     { label: 'CONTENT', groupIcon: BookOpen, groupColor: 'text-amber-400',
-      activeBg: 'bg-amber-500/10', activeText: 'text-amber-300', activeIcon: 'text-amber-400', inactiveIcon: 'text-amber-500/40', hoverBg: 'hover:bg-amber-500/5', hoverText: 'hover:text-amber-300',
+      activeBg: 'bg-amber-500/10', activeText: 'text-amber-300', activeIcon: 'text-amber-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-amber-500/5', hoverText: 'hover:text-amber-300',
       items: [
       { id: 'seo-briefs', label: 'Content Briefs', icon: Clipboard, needsSite: true },
       { id: 'content', label: 'Content', icon: FileText, needsSite: true },
@@ -508,7 +508,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
                           ? `${group.activeBg || 'bg-teal-500/10'} ${group.activeText || 'text-teal-300'}`
                           : disabled
                             ? 'text-zinc-700 cursor-not-allowed'
-                            : `text-zinc-500 ${group.hoverText || 'hover:text-zinc-300'} ${group.hoverBg || 'hover:bg-zinc-800/50'}`
+                            : `text-zinc-300 ${group.hoverText || 'hover:text-zinc-100'} ${group.hoverBg || 'hover:bg-zinc-800/50'}`
                       }`}
                     >
                       <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${active ? (group.activeIcon || 'text-teal-400') : (group.inactiveIcon || '')}`} />

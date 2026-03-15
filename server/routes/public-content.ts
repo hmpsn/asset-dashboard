@@ -314,4 +314,15 @@ router.post('/api/public/content-request/:workspaceId/from-audit', async (req, r
   res.json({ ...request, topKeywords });
 });
 
+// --- Public Content Performance (show GSC/GA4 data for published items in client dashboard) ---
+router.get('/api/public/content-performance/:workspaceId', async (req, res) => {
+  try {
+    const data = await handleContentPerformance(req.params.workspaceId);
+    res.json(data);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    res.status(err instanceof Error && msg === 'Workspace not found' ? 404 : 500).json({ error: msg });
+  }
+});
+
 export default router;

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Zap, FileText, Sparkles, Target, Search, CheckCircle2,
-  AlertTriangle, ChevronDown, Shield, BookOpen,
+  TrendingUp, ChevronDown, Shield, BookOpen,
 } from 'lucide-react';
 import { TierGate, StatCard, EmptyState, type Tier } from '../ui';
 import type { ClientKeywordStrategy, ClientContentRequest } from './types';
@@ -67,7 +67,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
             <StatCard icon={Target} label="Keywords Tracked" value={keywordsTracked} sub={`${strategyData.pageMap.length} pages mapped`} />
             <StatCard icon={FileText} label="Content Gaps" value={contentGapsFound} valueColor={contentGapsFound > 0 ? 'text-teal-400' : 'text-zinc-500'} sub={contentGapsFound > 0 ? 'topics identified' : 'none found yet'} />
             <StatCard icon={Zap} label="Quick Wins" value={quickWinsAvailable} valueColor={quickWinsAvailable > 0 ? 'text-amber-400' : 'text-zinc-500'} sub={quickWinsAvailable > 0 ? 'low-effort improvements' : 'none right now'} />
-            <StatCard icon={Search} label="Not Yet Ranking" value={pagesWithoutRankings} valueColor={pagesWithoutRankings > 0 ? 'text-red-400' : 'text-emerald-400'} sub={pagesWithoutRankings > 0 ? 'pages need attention' : 'all pages ranking'} />
+            <StatCard icon={Search} label="Growth Opportunities" value={pagesWithoutRankings} valueColor={pagesWithoutRankings > 0 ? 'text-teal-400' : 'text-emerald-400'} sub={pagesWithoutRankings > 0 ? 'pages with upside' : 'all pages ranking'} />
           </div>
         );
       })()}
@@ -154,12 +154,12 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         </TierGate>
       )}
 
-      {/* ── NOT YET RANKING ACTION PLAN ── */}
+      {/* ── GROWTH OPPORTUNITIES ── */}
       {(() => {
         const unranked = strategyData.pageMap
           .filter(p => !p.currentPosition)
           .map(p => {
-            // Diagnose likely reason
+            // Diagnose opportunity type
             const reasons: string[] = [];
             const actions: { label: string; icon: typeof Shield; color: string }[] = [];
             const hasImpressions = (p.impressions || 0) > 0;
@@ -167,17 +167,17 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
             const medKD = (p.difficulty || 0) > 30;
 
             if (hasImpressions) {
-              reasons.push('Google sees this page but hasn\'t ranked it in top 100 yet');
-              actions.push({ label: 'Near-ranking — optimize content', icon: BookOpen, color: 'text-teal-400' });
+              reasons.push('Google is already crawling this page — close to breaking through');
+              actions.push({ label: 'Near-ranking — optimize to break through', icon: BookOpen, color: 'text-teal-400' });
             } else if (highKD) {
-              reasons.push(`High keyword difficulty (${p.difficulty}%) — tough competition`);
+              reasons.push(`Competitive keyword (${p.difficulty}% difficulty) — authority building will help`);
               actions.push({ label: 'Build authority with supporting content', icon: FileText, color: 'text-amber-400' });
             } else if (medKD) {
-              reasons.push('Moderate competition — page may need content depth');
+              reasons.push('Moderate competition — content depth can unlock this');
               actions.push({ label: 'Expand content & add internal links', icon: BookOpen, color: 'text-teal-400' });
             } else {
-              reasons.push('Page may not be indexed or has thin content');
-              actions.push({ label: 'Check indexing & expand content', icon: Shield, color: 'text-red-400' });
+              reasons.push('Low competition — quick win with content improvements');
+              actions.push({ label: 'Expand content to capture this opportunity', icon: Sparkles, color: 'text-teal-400' });
             }
 
             // Priority: commercial intent > impressions > low KD fixable
@@ -195,21 +195,21 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         };
 
         return (
-          <div className="bg-gradient-to-br from-red-950/20 to-zinc-900 rounded-xl border border-red-500/20 p-5 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-36 h-36 bg-red-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+          <div className="bg-gradient-to-br from-teal-950/20 to-zinc-900 rounded-xl border border-teal-500/20 p-5 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-36 h-36 bg-teal-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
             <div className="relative">
               <button onClick={() => setNyrExpanded(!nyrExpanded)} className="w-full flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-red-500/20 flex items-center justify-center">
-                    <AlertTriangle className="w-4 h-4 text-red-400" />
+                  <div className="w-7 h-7 rounded-lg bg-teal-500/20 flex items-center justify-center">
+                    <TrendingUp className="w-4 h-4 text-teal-400" />
                   </div>
                   <div className="text-left">
-                    <div className="text-sm font-semibold text-red-200">Not Yet Ranking</div>
-                    <div className="text-[11px] text-red-400/60">{unranked.length} pages mapped but not appearing in search results</div>
+                    <div className="text-sm font-semibold text-teal-200">Growth Opportunities</div>
+                    <div className="text-[11px] text-teal-400/60">{unranked.length} pages with untapped search potential</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full border border-red-500/20">{unranked.length}</span>
+                  <span className="text-xs font-bold text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded-full border border-teal-500/20">{unranked.length}</span>
                   <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${nyrExpanded ? '' : '-rotate-90'}`} />
                 </div>
               </button>
@@ -227,7 +227,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                             <div className="text-[10px] text-zinc-500 font-mono truncate">{page.pagePath}</div>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            {page.hasImpressions && <span className="text-[10px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded border border-teal-500/20">Near-ranking</span>}
+                            {page.hasImpressions && <span className="text-[10px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded border border-teal-500/20">Almost there</span>}
                             {page.searchIntent && <span className="text-[10px] text-zinc-500 uppercase">{page.searchIntent}</span>}
                             {page.primaryKeyword && <span className="text-[10px] text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded truncate max-w-[120px]">&ldquo;{page.primaryKeyword}&rdquo;</span>}
                           </div>
@@ -238,7 +238,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                             <div className="space-y-1">
                               {page.reasons.map((r, i) => (
                                 <div key={i} className="text-[11px] text-zinc-400 flex items-start gap-1.5">
-                                  <span className="text-red-400 mt-0.5">•</span> {r}
+                                  <span className="text-teal-400 mt-0.5">•</span> {r}
                                 </div>
                               ))}
                             </div>
@@ -267,7 +267,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                                     targetKeyword: page.primaryKeyword,
                                     intent: page.searchIntent || 'informational',
                                     priority: 'high',
-                                    rationale: `Page ${page.pagePath} is not yet ranking for "${page.primaryKeyword}". Content optimization needed.`,
+                                    rationale: `Page ${page.pagePath} has growth potential for "${page.primaryKeyword}". Content optimization can unlock rankings.`,
                                     source: 'strategy',
                                   })}
                                   className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 font-medium hover:bg-teal-600/40 transition-all"

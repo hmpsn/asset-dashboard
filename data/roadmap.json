@@ -2817,6 +2817,55 @@
         }
       ],
       "shippedAt": "2026-01"
+    },
+    {
+      "id": "sprint-ux-audit",
+      "name": "UI/UX Audit & Polish",
+      "hours": "3-4",
+      "rationale": "Quality-of-life improvements across admin and client dashboards. Anomaly spam prevention, navigation clarity, content pipeline visibility, and positive framing for client-facing insights.",
+      "items": [
+        {
+          "id": 277,
+          "title": "Anomaly detection deploy guard",
+          "source": "UI/UX Audit Mar 2026",
+          "est": "30min",
+          "priority": "P0",
+          "notes": "Shipped — Tracks last scan time in SQLite, skips startup scan if last scan < 6h ago. Prevents anomaly email spam on frequent deploys.",
+          "status": "done",
+          "shippedAt": "2026-03-15"
+        },
+        {
+          "id": 278,
+          "title": "Admin nav: white text + neutral inactive icons",
+          "source": "UI/UX Audit Mar 2026",
+          "est": "5min",
+          "priority": "P1",
+          "notes": "Shipped — Changed inactive nav text from text-zinc-500 to text-zinc-300. Changed all group inactive icons from colored tints (e.g. text-teal-500/40) to neutral text-zinc-500. Fixes SEO items always appearing active.",
+          "status": "done",
+          "shippedAt": "2026-03-15"
+        },
+        {
+          "id": 279,
+          "title": "Growth Opportunities reframe (client Strategy tab)",
+          "source": "UI/UX Audit Mar 2026",
+          "est": "15min",
+          "priority": "P1",
+          "notes": "Shipped — Reframed 'Not Yet Ranking' as 'Growth Opportunities' with teal/positive styling instead of red/alarming. Opportunity-focused diagnostic messages. 'Almost there' badge for near-ranking pages.",
+          "status": "done",
+          "shippedAt": "2026-03-15"
+        },
+        {
+          "id": 280,
+          "title": "Content pipeline status cards + post-publish performance",
+          "source": "UI/UX Audit Mar 2026",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped — (1) Status summary cards at top of Content tab (Needs Review, In Progress, Delivered, Published). (2) Post-publish GSC/GA4 performance snippet on delivered/published items with clicks, impressions, CTR, position. New public endpoint: GET /api/public/content-performance/:workspaceId.",
+          "status": "done",
+          "shippedAt": "2026-03-15"
+        }
+      ],
+      "shippedAt": "2026-03-15"
     }
   ]
 }
