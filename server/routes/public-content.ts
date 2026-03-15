@@ -8,6 +8,7 @@ const router = Router();
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { getBrief } from '../content-brief.js';
+import { renderBriefHTML } from '../brief-export-html.js';
 import {
   listContentRequests,
   getContentRequest,
@@ -201,6 +202,16 @@ router.get('/api/public/content-brief/:workspaceId/:briefId', (req, res) => {
   if (!brief) return res.status(404).json({ error: 'Brief not found' });
   // Return client-safe view (exclude internal fields if any)
   res.json(brief);
+});
+
+// Client can download a brief as branded HTML
+router.get('/api/public/content-brief/:workspaceId/:briefId/export', (req, res) => {
+  const brief = getBrief(req.params.workspaceId, req.params.briefId);
+  if (!brief) return res.status(404).json({ error: 'Brief not found' });
+  const html = renderBriefHTML(brief);
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="brief-${brief.targetKeyword.replace(/\s+/g, '-')}.html"`);
+  res.send(html);
 });
 
 router.get('/api/public/content-performance/:workspaceId', async (req, res) => {

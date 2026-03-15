@@ -12,6 +12,7 @@ import {
   updateBrief,
   deleteBrief,
   generateBrief,
+  regenerateBrief,
 } from '../content-brief.js';
 import { getSearchOverview } from '../search-console.js';
 import { isSemrushConfigured, getKeywordOverview, getRelatedKeywords } from '../semrush.js';
@@ -142,6 +143,21 @@ router.post('/api/content-briefs/:workspaceId/generate', async (req, res) => {
     res.json(brief);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate brief' });
+  }
+});
+
+// Regenerate a brief with user feedback
+router.post('/api/content-briefs/:workspaceId/:briefId/regenerate', async (req, res) => {
+  try {
+    const { feedback } = req.body;
+    if (!feedback) return res.status(400).json({ error: 'feedback required' });
+    const existing = getBrief(req.params.workspaceId, req.params.briefId);
+    if (!existing) return res.status(404).json({ error: 'Brief not found' });
+    const newBrief = await regenerateBrief(req.params.workspaceId, existing, feedback);
+    log.info(`REGENERATED brief ${req.params.briefId} -> ${newBrief.id} for "${existing.targetKeyword}"`);
+    res.json(newBrief);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to regenerate brief' });
   }
 });
 

@@ -158,6 +158,11 @@ export function listPayments(workspaceId: string): PaymentRecord[] {
   return rows.map(rowToRecord);
 }
 
+export function listAllPayments(): PaymentRecord[] {
+  const rows = db.prepare('SELECT * FROM payments ORDER BY created_at DESC').all() as PaymentRow[];
+  return rows.map(rowToRecord);
+}
+
 export function getPaymentBySession(
   workspaceId: string,
   stripeSessionId: string

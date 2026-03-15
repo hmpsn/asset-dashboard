@@ -76,6 +76,8 @@ import seoChangeTrackerRoutes from './routes/seo-change-tracker.js';
 import contentDecayRoutes from './routes/content-decay.js';
 import contentPublishRoutes from './routes/content-publish.js';
 import contentSubscriptionRoutes from './routes/content-subscriptions.js';
+import dataExportRoutes from './routes/data-export.js';
+import revenueRoutes from './routes/revenue.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -288,6 +290,8 @@ export function createApp(): express.Express {
   app.use(contentDecayRoutes);
   app.use(contentPublishRoutes);
   app.use(contentSubscriptionRoutes);
+  app.use(dataExportRoutes);
+  app.use(revenueRoutes);
 
   // --- Sentry error handler (must be after all route mounts, before frontend catch-all) ---
   setupSentryErrorHandler(app);

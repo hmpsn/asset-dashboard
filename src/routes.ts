@@ -13,12 +13,13 @@ export type Page =
   | 'roadmap'
   | 'ai-usage'
   | 'requests'
-  | 'settings';
+  | 'settings'
+  | 'revenue';
 
 export type ClientTab = 'overview' | 'performance' | 'search' | 'health' | 'strategy' | 'analytics' | 'inbox' | 'approvals' | 'requests' | 'content' | 'plans' | 'roi';
 
 /** Global tabs that don't belong to a specific workspace */
-const GLOBAL_TABS = new Set<string>(['settings', 'roadmap', 'prospect', 'ai-usage']);
+const GLOBAL_TABS = new Set<string>(['settings', 'roadmap', 'prospect', 'ai-usage', 'revenue']);
 
 /** Build an admin dashboard path */
 export function adminPath(workspaceId: string, tab: Page = 'home'): string {

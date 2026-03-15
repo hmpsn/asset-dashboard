@@ -1496,6 +1496,24 @@ When the user asks to update this document with recent features, follow this pro
 | Architecture | 5 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types |
 | Infrastructure | 7 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3 + integrity verification), E2E tests, job persistence, anomaly deploy guard |
 
-**115 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**119 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **115**. Last updated: March 2026 (content calendar).
+Current feature count: **119**. Last updated: March 2026 (content calendar).
+
+### Recent Additions (March 2026)
+
+**116. Brief Regeneration with Feedback**
+**What it does:** Regenerate an existing content brief with user instructions. AI receives the previous brief + feedback, produces a refined version. New brief gets a new ID — original is preserved for version history. Purple "Regenerate" button in BriefDetail with inline feedback textarea.
+**Files:** `server/content-brief.ts` (`regenerateBrief`), `server/routes/content-briefs.ts`, `src/components/briefs/BriefDetail.tsx`, `src/components/ContentBriefs.tsx`
+
+**117. Client Brief Export (Download)**
+**What it does:** Clients can download content briefs as branded HTML files from the content tab. Public endpoint `GET /api/public/content-brief/:wsId/:briefId/export` returns the brief rendered via `renderBriefHTML` with Content-Disposition attachment header.
+**Files:** `server/routes/public-content.ts`, `src/components/client/ContentTab.tsx`
+
+**118. Data Export / Portability (CSV/JSON)**
+**What it does:** Admin can export workspace data (content briefs, content requests, keyword strategy, activity log, payments) as CSV or JSON. "Data Export" tab added to Workspace Settings with download buttons for each dataset.
+**Files:** `server/routes/data-export.ts` (new), `server/app.ts`, `src/components/WorkspaceSettings.tsx`
+
+**119. Revenue Analytics Dashboard**
+**What it does:** Admin-only dashboard showing total revenue, current month vs previous month, revenue by client, revenue by product type, monthly trend chart (12 months), and recent transactions table. Accessible via DollarSign icon in sidebar utility bar at `/revenue`.
+**Files:** `server/routes/revenue.ts` (new), `server/payments.ts` (`listAllPayments`), `server/app.ts`, `src/components/RevenueDashboard.tsx` (new), `src/App.tsx`, `src/routes.ts`

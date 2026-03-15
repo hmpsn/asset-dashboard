@@ -99,6 +99,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
   const [editingBrief, setEditingBrief] = useState<string | null>(null);
   const [activePostId, setActivePostId] = useState<string | null>(null);
   const [generatingPostFor, setGeneratingPostFor] = useState<string | null>(null);
+  const [regeneratingBrief, setRegeneratingBrief] = useState<string | null>(null);
   interface PostSummary { id: string; briefId: string; targetKeyword: string; title: string; totalWordCount: number; status: string; createdAt: string; updatedAt: string }
   const [posts, setPosts] = useState<PostSummary[]>([]);
   const [deliveringReqId, setDeliveringReqId] = useState<string | null>(null);
@@ -107,6 +108,16 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
   const [pageType, setPageType] = useState('');
   const [refUrls, setRefUrls] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const handleRegenerateBrief = async (briefId: string, feedback: string) => {
+    setRegeneratingBrief(briefId);
+    try {
+      const newBrief = await post<ContentBrief>(`/api/content-briefs/${workspaceId}/${briefId}/regenerate`, { feedback });
+      setBriefs(prev => [newBrief, ...prev]);
+      setExpanded(newBrief.id);
+    } catch { /* skip */ }
+    setRegeneratingBrief(null);
+  };
 
   const saveBriefField = async (briefId: string, updates: Partial<ContentBrief>) => {
     try {
@@ -1017,9 +1028,11 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
                   brief={brief}
                   editingBrief={editingBrief}
                   generatingPostFor={generatingPostFor}
+                  regeneratingBrief={regeneratingBrief}
                   onSaveBriefField={saveBriefField}
                   onSetEditingBrief={setEditingBrief}
                   onGeneratePost={handleGeneratePost}
+                  onRegenerate={handleRegenerateBrief}
                   onCopyAsMarkdown={copyAsMarkdown}
                   onExportClientHTML={exportClientHTML}
                   onConfirmDelete={confirmDeleteBrief}

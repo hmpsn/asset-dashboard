@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Download } from 'lucide-react';
 import { useToast } from './Toast';
 import { ConnectionsTab } from './settings/ConnectionsTab';
 import { FeaturesTab } from './settings/FeaturesTab';
@@ -41,7 +42,7 @@ interface Props {
   onUpdate?: (patch: Record<string, unknown>) => void;
 }
 
-type SectionTab = 'connections' | 'features' | 'dashboard' | 'publishing';
+type SectionTab = 'connections' | 'features' | 'dashboard' | 'publishing' | 'export';
 
 export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, webflowSiteName, onUpdate }: Props) {
   const { toast } = useToast();
@@ -106,7 +107,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
 
       {/* Tab nav */}
       <nav className="flex items-center gap-1 border-b border-zinc-800">
-        {([['connections', 'Connections'], ['features', 'Features'], ['publishing', 'Publishing'], ['dashboard', 'Client Dashboard']] as [SectionTab, string][]).map(([id, label]) => (
+        {([['connections', 'Connections'], ['features', 'Features'], ['publishing', 'Publishing'], ['dashboard', 'Client Dashboard'], ['export', 'Data Export']] as [SectionTab, string][]).map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
             className="px-4 py-2.5 text-xs font-medium border-b-2 transition-colors -mb-px"
             style={tab === id ? { borderColor: '#2dd4bf', color: '#2dd4bf' } : { borderColor: 'transparent', color: '#71717a' }}>
@@ -158,6 +159,37 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
           patchWorkspace={patchWorkspace}
           toast={toast}
         />
+      )}
+
+      {tab === 'export' && (
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold text-zinc-200">Data Export</h3>
+            <p className="text-xs text-zinc-500 mt-0.5">Download workspace data as CSV or JSON files.</p>
+          </div>
+          {[
+            { key: 'briefs', label: 'Content Briefs', desc: 'All generated content briefs with keywords, titles, and metrics' },
+            { key: 'requests', label: 'Content Requests', desc: 'Topic requests with status, priority, and service type' },
+            { key: 'strategy', label: 'Keyword Strategy', desc: 'Page-keyword map with primary and secondary keywords' },
+            { key: 'activity', label: 'Activity Log', desc: 'Recent workspace activity (up to 500 entries)' },
+            { key: 'payments', label: 'Payments', desc: 'Payment records with amounts, status, and dates' },
+          ].map(item => (
+            <div key={item.key} className="bg-zinc-900 rounded-xl border border-zinc-800 px-4 py-3 flex items-center justify-between">
+              <div>
+                <div className="text-xs font-medium text-zinc-200">{item.label}</div>
+                <div className="text-[11px] text-zinc-500 mt-0.5">{item.desc}</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <a href={`/api/export/${workspaceId}/${item.key}?format=csv`} download className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
+                  <Download className="w-3 h-3" /> CSV
+                </a>
+                <a href={`/api/export/${workspaceId}/${item.key}?format=json`} download className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-zinc-100 transition-colors">
+                  <Download className="w-3 h-3" /> JSON
+                </a>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

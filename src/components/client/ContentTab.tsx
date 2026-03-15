@@ -253,6 +253,12 @@ export function ContentTab({
                 {/* Full brief */}
                 {brief && (
                   <div className="mt-4 space-y-5">
+                    {/* Download brief */}
+                    <div className="flex items-center gap-2">
+                      <a href={`/api/public/content-brief/${workspaceId}/${req.briefId}/export`} download className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
+                        <Download className="w-3 h-3" /> Download Brief
+                      </a>
+                    </div>
                     {/* — Strategic Overview — */}
                     {brief.executiveSummary && (
                       <div className="bg-teal-500/5 border border-teal-500/20 rounded-lg px-4 py-3">

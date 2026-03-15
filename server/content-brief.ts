@@ -367,6 +367,169 @@ function getPageTypeConfig(pageType?: string): PageTypeConfig {
   return PAGE_TYPE_CONFIGS.blog;
 }
 
+/**
+ * Regenerate an existing brief with user feedback.
+ * Passes the previous brief as context so AI can refine rather than start from scratch.
+ */
+export async function regenerateBrief(
+  workspaceId: string,
+  existingBrief: ContentBrief,
+  feedback: string,
+): Promise<ContentBrief> {
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (!openaiKey) throw new Error('OPENAI_API_KEY not configured');
+
+  const { keywordBlock, brandVoiceBlock } = buildSeoContext(workspaceId);
+  const knowledgeBlock = buildKnowledgeBase(workspaceId);
+  const ptConfig = getPageTypeConfig(existingBrief.pageType);
+
+  const previousBriefJson = JSON.stringify({
+    suggestedTitle: existingBrief.suggestedTitle,
+    suggestedMetaDesc: existingBrief.suggestedMetaDesc,
+    executiveSummary: existingBrief.executiveSummary,
+    contentFormat: existingBrief.contentFormat,
+    toneAndStyle: existingBrief.toneAndStyle,
+    wordCountTarget: existingBrief.wordCountTarget,
+    intent: existingBrief.intent,
+    audience: existingBrief.audience,
+    secondaryKeywords: existingBrief.secondaryKeywords,
+    outline: existingBrief.outline,
+    peopleAlsoAsk: existingBrief.peopleAlsoAsk,
+    topicalEntities: existingBrief.topicalEntities,
+    competitorInsights: existingBrief.competitorInsights,
+    ctaRecommendations: existingBrief.ctaRecommendations,
+    internalLinkSuggestions: existingBrief.internalLinkSuggestions,
+    eeatGuidance: existingBrief.eeatGuidance,
+    contentChecklist: existingBrief.contentChecklist,
+    schemaRecommendations: existingBrief.schemaRecommendations,
+  }, null, 2);
+
+  const prompt = `You are an expert content strategist. You previously generated the following content brief for the keyword "${existingBrief.targetKeyword}".
+
+PREVIOUS BRIEF:
+${previousBriefJson}
+
+The user has reviewed this brief and wants you to regenerate it with the following feedback:
+
+USER FEEDBACK:
+${feedback}
+${keywordBlock}${brandVoiceBlock}${knowledgeBlock}
+
+Please regenerate the ENTIRE brief incorporating the user's feedback. Keep everything that was good, improve what the user requested, and maintain all required fields.
+
+Return the complete brief as valid JSON with these fields:
+{
+  "executiveSummary": "...",
+  "suggestedTitle": "...",
+  "suggestedMetaDesc": "...",
+  "secondaryKeywords": [...],
+  "contentFormat": "...",
+  "toneAndStyle": "...",
+  "outline": [{ "heading": "...", "subheadings": [...], "notes": "...", "wordCount": N, "keywords": [...] }],
+  "wordCountTarget": ${ptConfig.wordCountTarget},
+  "intent": "...",
+  "audience": "...",
+  "peopleAlsoAsk": [...],
+  "topicalEntities": [...],
+  "serpAnalysis": { "contentType": "...", "avgWordCount": N, "commonElements": [...], "gaps": [...] },
+  "difficultyScore": N,
+  "trafficPotential": "...",
+  "competitorInsights": "...",
+  "ctaRecommendations": [...],
+  "internalLinkSuggestions": [...],
+  "eeatGuidance": { "experience": "...", "expertise": "...", "authority": "...", "trust": "..." },
+  "contentChecklist": [...],
+  "schemaRecommendations": [{ "type": "...", "notes": "..." }]
+}
+
+Return ONLY valid JSON, no markdown fences, no explanation.`;
+
+  const aiResult = await callOpenAI({
+    model: 'gpt-4.1',
+    messages: [{ role: 'user', content: prompt }],
+    maxTokens: 7000,
+    temperature: 0.5,
+    feature: 'content-brief-regenerate',
+    workspaceId,
+  });
+
+  const raw = aiResult.text || '{}';
+  let parsed: Record<string, unknown>;
+  try {
+    const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '');
+    parsed = JSON.parse(cleaned);
+  } catch {
+    throw new Error('Failed to parse AI response as JSON');
+  }
+
+  // Create a new brief ID — preserves the old one for history
+  const newBrief: ContentBrief = {
+    id: `brief_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    workspaceId,
+    targetKeyword: existingBrief.targetKeyword,
+    secondaryKeywords: (parsed.secondaryKeywords as string[]) || existingBrief.secondaryKeywords,
+    suggestedTitle: (parsed.suggestedTitle as string) || existingBrief.suggestedTitle,
+    suggestedMetaDesc: (parsed.suggestedMetaDesc as string) || existingBrief.suggestedMetaDesc,
+    outline: (parsed.outline as ContentBrief['outline']) || existingBrief.outline,
+    wordCountTarget: (parsed.wordCountTarget as number) || existingBrief.wordCountTarget,
+    intent: (parsed.intent as string) || existingBrief.intent,
+    audience: (parsed.audience as string) || existingBrief.audience,
+    competitorInsights: (parsed.competitorInsights as string) || existingBrief.competitorInsights,
+    internalLinkSuggestions: (parsed.internalLinkSuggestions as string[]) || existingBrief.internalLinkSuggestions,
+    createdAt: new Date().toISOString(),
+    executiveSummary: (parsed.executiveSummary as string) || existingBrief.executiveSummary,
+    contentFormat: (parsed.contentFormat as string) || existingBrief.contentFormat,
+    toneAndStyle: (parsed.toneAndStyle as string) || existingBrief.toneAndStyle,
+    peopleAlsoAsk: (parsed.peopleAlsoAsk as string[]) || existingBrief.peopleAlsoAsk,
+    topicalEntities: (parsed.topicalEntities as string[]) || existingBrief.topicalEntities,
+    serpAnalysis: (parsed.serpAnalysis as ContentBrief['serpAnalysis']) || existingBrief.serpAnalysis,
+    difficultyScore: (parsed.difficultyScore as number) || existingBrief.difficultyScore,
+    trafficPotential: (parsed.trafficPotential as string) || existingBrief.trafficPotential,
+    ctaRecommendations: (parsed.ctaRecommendations as string[]) || existingBrief.ctaRecommendations,
+    eeatGuidance: (parsed.eeatGuidance as ContentBrief['eeatGuidance']) || existingBrief.eeatGuidance,
+    contentChecklist: (parsed.contentChecklist as string[]) || existingBrief.contentChecklist,
+    schemaRecommendations: (parsed.schemaRecommendations as ContentBrief['schemaRecommendations']) || existingBrief.schemaRecommendations,
+    pageType: existingBrief.pageType,
+    referenceUrls: existingBrief.referenceUrls,
+    realPeopleAlsoAsk: existingBrief.realPeopleAlsoAsk,
+    realTopResults: existingBrief.realTopResults,
+  };
+
+  stmts().insert.run({
+    id: newBrief.id,
+    workspace_id: workspaceId,
+    target_keyword: newBrief.targetKeyword,
+    secondary_keywords: JSON.stringify(newBrief.secondaryKeywords),
+    suggested_title: newBrief.suggestedTitle,
+    suggested_meta_desc: newBrief.suggestedMetaDesc,
+    outline: JSON.stringify(newBrief.outline),
+    word_count_target: newBrief.wordCountTarget,
+    intent: newBrief.intent,
+    audience: newBrief.audience,
+    competitor_insights: newBrief.competitorInsights,
+    internal_link_suggestions: JSON.stringify(newBrief.internalLinkSuggestions),
+    created_at: newBrief.createdAt,
+    executive_summary: newBrief.executiveSummary ?? null,
+    content_format: newBrief.contentFormat ?? null,
+    tone_and_style: newBrief.toneAndStyle ?? null,
+    people_also_ask: newBrief.peopleAlsoAsk ? JSON.stringify(newBrief.peopleAlsoAsk) : null,
+    topical_entities: newBrief.topicalEntities ? JSON.stringify(newBrief.topicalEntities) : null,
+    serp_analysis: newBrief.serpAnalysis ? JSON.stringify(newBrief.serpAnalysis) : null,
+    difficulty_score: newBrief.difficultyScore ?? null,
+    traffic_potential: newBrief.trafficPotential ?? null,
+    cta_recommendations: newBrief.ctaRecommendations ? JSON.stringify(newBrief.ctaRecommendations) : null,
+    eeat_guidance: newBrief.eeatGuidance ? JSON.stringify(newBrief.eeatGuidance) : null,
+    content_checklist: newBrief.contentChecklist ? JSON.stringify(newBrief.contentChecklist) : null,
+    schema_recommendations: newBrief.schemaRecommendations ? JSON.stringify(newBrief.schemaRecommendations) : null,
+    page_type: newBrief.pageType ?? null,
+    reference_urls: newBrief.referenceUrls ? JSON.stringify(newBrief.referenceUrls) : null,
+    real_people_also_ask: newBrief.realPeopleAlsoAsk ? JSON.stringify(newBrief.realPeopleAlsoAsk) : null,
+    real_top_results: newBrief.realTopResults ? JSON.stringify(newBrief.realTopResults) : null,
+  });
+
+  return newBrief;
+}
+
 export async function generateBrief(
   workspaceId: string,
   targetKeyword: string,

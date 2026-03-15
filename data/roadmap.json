@@ -327,8 +327,8 @@
           "source": "Content pipeline enhancement",
           "est": "3-4h",
           "priority": "P2",
-          "notes": "Re-generate a content brief with user instructions: 'make it more commercial', 'add a comparison table section'. Re-prompt with context from previous version + user feedback. Preserves version history.",
-          "status": "pending"
+          "notes": "Shipped — regenerateBrief() in server/content-brief.ts. POST /api/content-briefs/:wsId/:briefId/regenerate. Frontend: purple Regenerate button in BriefDetail with inline feedback textarea. Creates new brief ID, preserves original. Feature #116.",
+          "status": "done"
         },
         {
           "id": 202,
@@ -336,8 +336,8 @@
           "source": "Content pipeline enhancement",
           "est": "2h",
           "priority": "P2",
-          "notes": "Let clients download or print a polished branded HTML brief. Currently admin-only via renderBriefHTML(). Add public endpoint + download button in client Inbox.",
-          "status": "pending"
+          "notes": "Shipped — GET /api/public/content-brief/:wsId/:briefId/export returns branded HTML with Content-Disposition attachment. Download Brief button in client ContentTab. Feature #117.",
+          "status": "done"
         },
         {
           "id": 212,
@@ -345,8 +345,8 @@
           "source": "Roadmap review Mar 2026",
           "est": "2-3h",
           "priority": "P2",
-          "notes": "CSV/JSON export for key datasets: audit history, keyword strategy, content briefs, ROI data, activity log. Reduces churn anxiety ('what if I leave?') and is often a procurement requirement for larger agency clients. Add export buttons to Strategy, Health, ROI, and Content tabs. Server endpoints return formatted CSV or JSON.",
-          "status": "pending"
+          "notes": "Shipped — server/routes/data-export.ts with 5 endpoints (briefs, requests, strategy, activity, payments). CSV/JSON via ?format= query. Data Export tab in WorkspaceSettings. Feature #118.",
+          "status": "done"
         },
         {
           "id": 220,
@@ -364,6 +364,15 @@
           "est": "2-3h",
           "priority": "P1",
           "notes": "Shipped — 6-item review checklist (factual accuracy, brand voice, internal links, no hallucinations, meta optimized, word count target). Persisted in review_checklist JSON column (migration 010). Collapsible panel in PostEditor with progress counter. Send to Review button disabled until all items checked. Feature #114.",
+          "status": "done"
+        },
+        {
+          "id": 222,
+          "title": "Revenue analytics dashboard",
+          "source": "Admin tooling Mar 2026",
+          "est": "3-4h",
+          "priority": "P2",
+          "notes": "Shipped — Admin-only dashboard at /revenue. Total revenue, MRR proxy (current vs prev month), revenue by workspace, revenue by product type, 12-month bar chart, recent transactions table. server/routes/revenue.ts + src/components/RevenueDashboard.tsx. DollarSign sidebar icon. Feature #119.",
           "status": "done"
         }
       ]

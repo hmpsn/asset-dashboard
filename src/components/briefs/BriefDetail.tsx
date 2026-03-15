@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import {
   Loader2, Trash2, Download, Copy, Search,
   Target, MessageSquare, BarChart3, BookOpen, Users, TrendingUp,
-  Pencil, Check, PenLine,
+  Pencil, Check, PenLine, RefreshCw, Send,
 } from 'lucide-react';
 
 interface ContentBrief {
@@ -40,22 +41,27 @@ interface BriefDetailProps {
   brief: ContentBrief;
   editingBrief: string | null;
   generatingPostFor: string | null;
+  regeneratingBrief: string | null;
   onSaveBriefField: (briefId: string, updates: Partial<ContentBrief>) => void;
   onSetEditingBrief: (id: string | null) => void;
   onGeneratePost: (briefId: string) => void;
+  onRegenerate: (briefId: string, feedback: string) => void;
   onCopyAsMarkdown: (brief: ContentBrief) => void;
   onExportClientHTML: (brief: ContentBrief) => void;
   onConfirmDelete: (brief: ContentBrief) => void;
 }
 
 export function BriefDetail({
-  brief, editingBrief, generatingPostFor,
-  onSaveBriefField, onSetEditingBrief, onGeneratePost,
+  brief, editingBrief, generatingPostFor, regeneratingBrief,
+  onSaveBriefField, onSetEditingBrief, onGeneratePost, onRegenerate,
   onCopyAsMarkdown, onExportClientHTML, onConfirmDelete,
 }: BriefDetailProps) {
+  const [showRegenerate, setShowRegenerate] = useState(false);
+  const [regenFeedback, setRegenFeedback] = useState('');
+
   return (
     <div className="px-4 pb-4 space-y-4 border-t border-zinc-800">
-      {/* Export buttons */}
+      {/* Action buttons */}
       <div className="pt-3 flex items-center gap-2 flex-wrap">
         <button onClick={() => onGeneratePost(brief.id)} disabled={generatingPostFor === brief.id} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 transition-colors disabled:opacity-50">
           {generatingPostFor === brief.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <PenLine className="w-3 h-3" />}
@@ -73,7 +79,37 @@ export function BriefDetail({
         <button onClick={() => { navigator.clipboard.writeText(JSON.stringify(brief, null, 2)); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors">
           <Copy className="w-3 h-3" /> Copy JSON
         </button>
+        <button onClick={() => setShowRegenerate(!showRegenerate)} disabled={regeneratingBrief === brief.id} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors disabled:opacity-50 ${
+          showRegenerate ? 'bg-purple-600/20 border border-purple-500/30 text-purple-300' : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-700'
+        }`}>
+          <RefreshCw className={`w-3 h-3 ${regeneratingBrief === brief.id ? 'animate-spin' : ''}`} />
+          {regeneratingBrief === brief.id ? 'Regenerating...' : 'Regenerate'}
+        </button>
       </div>
+
+      {/* Regenerate with feedback */}
+      {showRegenerate && regeneratingBrief !== brief.id && (
+        <div className="bg-purple-500/5 border border-purple-500/20 rounded-lg px-4 py-3 space-y-2">
+          <div className="text-[11px] text-purple-400 font-medium uppercase tracking-wider">Regenerate with Instructions</div>
+          <textarea
+            value={regenFeedback}
+            onChange={e => setRegenFeedback(e.target.value)}
+            placeholder="e.g. 'Make it more commercial', 'Add a comparison table section', 'Target a different audience'..."
+            className="w-full text-xs text-zinc-300 bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 focus:border-purple-500/50 focus:outline-none resize-y min-h-[60px]"
+            rows={2}
+          />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { if (regenFeedback.trim()) { onRegenerate(brief.id, regenFeedback.trim()); setShowRegenerate(false); setRegenFeedback(''); } }}
+              disabled={!regenFeedback.trim()}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-purple-600/20 border border-purple-500/30 text-purple-300 hover:bg-purple-600/30 transition-colors disabled:opacity-40"
+            >
+              <Send className="w-3 h-3" /> Regenerate Brief
+            </button>
+            <span className="text-[10px] text-zinc-600">Creates a new brief — original is preserved</span>
+          </div>
+        </div>
+      )}
 
       {/* Executive Summary */}
       {brief.executiveSummary && (
