@@ -1515,8 +1515,8 @@ Current feature count: **125**. Last updated: March 2026 (dependency audit).
 **Files:** `server/routes/data-export.ts` (new), `server/app.ts`, `src/components/WorkspaceSettings.tsx`
 
 **119. Revenue Analytics Dashboard**
-**What it does:** Admin-only dashboard showing total revenue, current month vs previous month, revenue by client, revenue by product type, monthly trend chart (12 months), and recent transactions table. Accessible via DollarSign icon in sidebar utility bar at `/revenue`.
-**Files:** `server/routes/revenue.ts` (new), `server/payments.ts` (`listAllPayments`), `server/app.ts`, `src/components/RevenueDashboard.tsx` (new), `src/App.tsx`, `src/routes.ts`
+**What it does:** Admin-only dashboard showing total revenue, current month vs previous month, revenue by client, revenue by product type, monthly trend chart (12 months), and recent transactions table. Accessible via DollarSign icon in sidebar utility bar and emerald "Revenue" button in Command Center header at `/revenue`. Only displays webhook-confirmed paid transactions.
+**Files:** `server/routes/revenue.ts` (new), `server/payments.ts` (`listAllPayments`), `server/app.ts`, `src/components/RevenueDashboard.tsx` (new), `src/components/WorkspaceOverview.tsx` (header button), `src/App.tsx`, `src/routes.ts`
 
 **120. Sidebar Tool Tooltips**
 **What it does:** Every sidebar navigation item now has a descriptive tooltip (via `title` attribute) explaining what that tool does. Descriptions added to all items across Analytics, Site Health, SEO, and Content groups.

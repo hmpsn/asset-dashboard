@@ -74,8 +74,9 @@
           "source": "Platform Audit Mar 2026",
           "est": "3-4h",
           "priority": "P1",
-          "notes": "Admin-only revenue dashboard: total MRR, revenue by workspace, revenue by product type (tiers, content, fixes, hours), MoM growth chart, payment history. Data from payments.ts + Stripe.",
-          "status": "pending"
+          "notes": "Shipped — RevenueDashboard component with total revenue, MoM growth, revenue by workspace, revenue by product type, recent transactions table. Accessible via /revenue route + Command Center header button + sidebar utility bar. Only shows webhook-confirmed paid transactions.",
+          "status": "done",
+          "shippedAt": "2026-03-15"
         },
         {
           "id": 199,
