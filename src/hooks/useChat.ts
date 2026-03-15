@@ -194,40 +194,151 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
     } finally { setChatLoading(false); }
   }, [deps, buildChatContext, chatSessionId, roiValue]);
 
-  const fetchProactiveInsight = useCallback(async () => {
-    const { ws, overview, ga4Overview, betaMode } = deps;
-    if (!ws || (!overview && !ga4Overview)) return;
-    setChatLoading(true);
-    try {
-      const context = buildChatContext();
-      const proactivePrompt = 'You are proactively greeting me as I open the Insights Engine. In 2-3 concise bullet points, tell me the most important things happening with my site data right now. Be specific with numbers. Highlight anything that needs attention first, then wins, then opportunities. Keep it brief and actionable. Do not ask me questions.';
-      const data = await post<{ answer?: string; error?: string }>(`/api/public/search-chat/${ws.id}`, { question: proactivePrompt, context, sessionId: chatSessionId, betaMode });
-      if (!data.error) {
-        setChatMessages([{ role: 'assistant', content: data.answer }]);
+  // Build a proactive greeting from already-loaded data (zero AI cost)
+  const buildProactiveGreeting = useCallback((): string => {
+    const { overview, audit, ga4Overview, anomalies, strategyData, searchComparison, ga4Comparison } = deps;
+    const bullets: string[] = [];
+
+    // Anomalies first (needs attention)
+    if (anomalies.length > 0) {
+      const critical = anomalies.filter(a => a.severity === 'high' || a.severity === 'critical');
+      if (critical.length > 0) {
+        bullets.push(`⚠️ **${critical.length} alert${critical.length > 1 ? 's' : ''} need attention** — ${critical[0].title}${critical.length > 1 ? ` and ${critical.length - 1} more` : ''}.`);
       }
-    } catch { /* silent fail — user can still ask manually */ }
-    finally { setChatLoading(false); }
-  }, [deps, buildChatContext, chatSessionId]);
+    }
 
-  const fetchInlineInsight = useCallback(async () => {
-    const { ws, overview, ga4Overview, betaMode } = deps;
-    if (!ws || (!overview && !ga4Overview) || inlineInsightFetched.current) return;
-    inlineInsightFetched.current = true;
-    setProactiveInsightLoading(true);
-    try {
-      const context = buildChatContext();
-      const prompt = 'Give me a 2-3 sentence executive summary of my site\'s current performance. Lead with the single most important trend (positive or negative), then one actionable next step. Be specific with numbers. Do not use bullet points or headers — write it as a short paragraph. Do not ask me questions.';
-      const data = await post<{ answer?: string; error?: string }>(`/api/public/search-chat/${ws.id}`, { question: prompt, context, sessionId: `inline-${ws.id}`, betaMode });
-      if (!data.error && data.answer) setProactiveInsight(data.answer);
-    } catch { /* silent fail */ }
-    finally { setProactiveInsightLoading(false); }
-  }, [deps, buildChatContext]);
+    // Search performance with comparison
+    if (overview) {
+      const clicks = overview.totalClicks?.toLocaleString() ?? '—';
+      const imps = overview.totalImpressions?.toLocaleString() ?? '—';
+      const pos = overview.avgPosition != null ? overview.avgPosition.toFixed(1) : null;
+      let searchLine = `📊 **Search:** ${clicks} clicks, ${imps} impressions`;
+      if (pos) searchLine += `, avg position ${pos}`;
+      if (searchComparison?.change) {
+        const prev = searchComparison.previous?.clicks;
+        if (prev && prev > 0) {
+          const pctChange = ((searchComparison.change.clicks / prev) * 100);
+          if (Math.abs(pctChange) >= 1) {
+            const dir = pctChange > 0 ? '↑' : '↓';
+            searchLine += ` (${dir}${Math.abs(pctChange).toFixed(0)}% vs prior period)`;
+          }
+        }
+      }
+      searchLine += '.';
+      bullets.push(searchLine);
+    }
 
-  // Fire inline insight after dashboard data loads (paid tiers only)
+    // GA4 traffic
+    if (ga4Overview) {
+      let ga4Line = `👥 **Traffic:** ${ga4Overview.totalUsers?.toLocaleString() ?? '—'} users, ${ga4Overview.totalSessions?.toLocaleString() ?? '—'} sessions`;
+      if (ga4Comparison?.change && ga4Comparison.previous?.totalUsers && ga4Comparison.previous.totalUsers > 0) {
+        const pctChange = ((ga4Comparison.change.users / ga4Comparison.previous.totalUsers) * 100);
+        if (Math.abs(pctChange) >= 1) {
+          const dir = pctChange > 0 ? '↑' : '↓';
+          ga4Line += ` (${dir}${Math.abs(pctChange).toFixed(0)}%)`;
+        }
+      }
+      ga4Line += '.';
+      bullets.push(ga4Line);
+    }
+
+    // Site health
+    if (audit) {
+      const score = audit.siteScore;
+      const emoji = score >= 80 ? '✅' : score >= 50 ? '⚡' : '🔴';
+      let healthLine = `${emoji} **Site health:** ${score}/100`;
+      if (audit.previousScore != null && audit.previousScore !== score) {
+        const diff = score - audit.previousScore;
+        healthLine += ` (${diff > 0 ? '+' : ''}${diff} since last audit)`;
+      }
+      if (audit.errors > 0) healthLine += ` — ${audit.errors} error${audit.errors > 1 ? 's' : ''} to fix`;
+      healthLine += '.';
+      bullets.push(healthLine);
+    }
+
+    // Strategy opportunities
+    if (strategyData) {
+      const gaps = strategyData.contentGaps?.length ?? 0;
+      const wins = strategyData.quickWins?.length ?? 0;
+      if (gaps > 0 || wins > 0) {
+        const parts: string[] = [];
+        if (wins > 0) parts.push(`${wins} quick win${wins > 1 ? 's' : ''}`);
+        if (gaps > 0) parts.push(`${gaps} content gap${gaps > 1 ? 's' : ''}`);
+        bullets.push(`💡 **Opportunities:** ${parts.join(' and ')} identified in your strategy.`);
+      }
+    }
+
+    if (bullets.length === 0) {
+      return "Here's your Insights Engine — ask me anything about your site performance, SEO strategy, or analytics data.";
+    }
+
+    return `Here's what's happening with your site right now:\n\n${bullets.join('\n\n')}`;
+  }, [deps]);
+
+  // Build inline insight from already-loaded data (zero AI cost)
+  const buildInlineInsight = useCallback((): string | null => {
+    const { overview, ga4Overview, audit, anomalies, searchComparison, ga4Comparison, strategyData } = deps;
+    if (!overview && !ga4Overview) return null;
+
+    const sentences: string[] = [];
+
+    // Lead with the biggest change (positive or negative)
+    const changes: { label: string; pct: number }[] = [];
+    if (searchComparison?.change && searchComparison.previous?.clicks && searchComparison.previous.clicks > 0) {
+      changes.push({ label: 'search clicks', pct: (searchComparison.change.clicks / searchComparison.previous.clicks) * 100 });
+    }
+    if (searchComparison?.change && searchComparison.previous?.impressions && searchComparison.previous.impressions > 0) {
+      changes.push({ label: 'impressions', pct: (searchComparison.change.impressions / searchComparison.previous.impressions) * 100 });
+    }
+    if (ga4Comparison?.change && ga4Comparison.previous?.totalUsers && ga4Comparison.previous.totalUsers > 0) {
+      changes.push({ label: 'users', pct: (ga4Comparison.change.users / ga4Comparison.previous.totalUsers) * 100 });
+    }
+    if (ga4Comparison?.change && ga4Comparison.previous?.totalSessions && ga4Comparison.previous.totalSessions > 0) {
+      changes.push({ label: 'sessions', pct: (ga4Comparison.change.sessions / ga4Comparison.previous.totalSessions) * 100 });
+    }
+
+    // Sort by absolute magnitude
+    changes.sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct));
+    if (changes.length > 0 && Math.abs(changes[0].pct) >= 3) {
+      const c = changes[0];
+      const dir = c.pct > 0 ? 'up' : 'down';
+      sentences.push(`Your ${c.label} are ${dir} ${Math.abs(c.pct).toFixed(0)}% compared to the prior period.`);
+    } else if (overview) {
+      sentences.push(`Your site is averaging position ${overview.avgPosition?.toFixed(1) ?? '—'} with ${overview.totalClicks?.toLocaleString() ?? '—'} clicks this period.`);
+    } else if (ga4Overview) {
+      sentences.push(`Your site had ${ga4Overview.totalUsers?.toLocaleString() ?? '—'} users and ${ga4Overview.totalSessions?.toLocaleString() ?? '—'} sessions this period.`);
+    }
+
+    // Anomalies or health concern
+    if (anomalies.length > 0) {
+      const high = anomalies.filter(a => a.severity === 'high' || a.severity === 'critical');
+      if (high.length > 0) {
+        sentences.push(`There ${high.length === 1 ? 'is' : 'are'} ${high.length} alert${high.length > 1 ? 's' : ''} that may need attention.`);
+      }
+    } else if (audit && audit.errors > 0) {
+      sentences.push(`Your site health score is ${audit.siteScore}/100 with ${audit.errors} issue${audit.errors > 1 ? 's' : ''} to address.`);
+    } else if (audit && audit.siteScore >= 80) {
+      sentences.push(`Site health is strong at ${audit.siteScore}/100.`);
+    }
+
+    // Actionable next step
+    const quickWins = strategyData?.quickWins?.length ?? 0;
+    if (quickWins > 0) {
+      sentences.push(`Check your ${quickWins} quick win${quickWins > 1 ? 's' : ''} in the Strategy tab for easy ranking improvements.`);
+    } else if (audit && audit.errors > 0) {
+      sentences.push('Review the Site Health tab to resolve outstanding issues.');
+    }
+
+    return sentences.length > 0 ? sentences.join(' ') : null;
+  }, [deps]);
+
+  // Generate inline insight after dashboard data loads (paid tiers only, zero AI cost)
   useEffect(() => {
     const { ws, overview, ga4Overview, effectiveTier } = deps;
     if (ws && (overview || ga4Overview) && effectiveTier !== 'free' && !inlineInsightFetched.current) {
-      fetchInlineInsight();
+      inlineInsightFetched.current = true;
+      const insight = buildInlineInsight();
+      if (insight) setProactiveInsight(insight);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deps.overview, deps.ga4Overview, deps.ws]);
@@ -246,12 +357,13 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatOpen]);
 
-  // Auto-fire proactive insight when chat opens for first time
+  // Show proactive greeting when chat opens for first time (zero AI cost)
   useEffect(() => {
     const { overview, ga4Overview, ws, effectiveTier } = deps;
     if (chatOpen && chatMessages.length === 0 && !proactiveInsightSent.current && (overview || ga4Overview) && ws && effectiveTier !== 'free') {
       proactiveInsightSent.current = true;
-      fetchProactiveInsight();
+      const greeting = buildProactiveGreeting();
+      setChatMessages([{ role: 'assistant', content: greeting }]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatOpen]);
