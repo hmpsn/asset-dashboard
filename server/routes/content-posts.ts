@@ -18,6 +18,10 @@ import {
   regenerateSection,
   exportPostMarkdown,
   exportPostHTML,
+  snapshotPostVersion,
+  listPostVersions,
+  getPostVersion,
+  revertToVersion,
 } from '../content-posts.js';
 import { assemblePostHtml, generateSlug } from '../html-to-richtext.js';
 import {
@@ -122,6 +126,17 @@ router.post('/api/content-posts/:workspaceId/:postId/regenerate-section', async 
 // triggers publish-to-webflow in the background.
 router.patch('/api/content-posts/:workspaceId/:postId', (req, res) => {
   const previous = getPost(req.params.workspaceId, req.params.postId);
+
+  // Snapshot before content-changing edits (not status-only changes)
+  if (previous) {
+    const contentFields = ['title', 'metaDescription', 'introduction', 'sections', 'conclusion', 'seoTitle', 'seoMetaDescription'];
+    const isContentEdit = contentFields.some(f => f in req.body);
+    if (isContentEdit) {
+      const detail = contentFields.filter(f => f in req.body).join(',');
+      snapshotPostVersion(previous, 'manual_edit', `field:${detail}`);
+    }
+  }
+
   const updated = updatePostField(req.params.workspaceId, req.params.postId, req.body);
   if (!updated) return res.status(404).json({ error: 'Post not found' });
 
@@ -188,6 +203,37 @@ router.get('/api/content-posts/:workspaceId/:postId/export/html', (req, res) => 
   const html = exportPostHTML(post);
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(html);
+});
+
+// --- Version History ---
+
+// List versions for a post
+router.get('/api/content-posts/:workspaceId/:postId/versions', (req, res) => {
+  const versions = listPostVersions(req.params.workspaceId, req.params.postId);
+  // Return lightweight list (omit full content to keep response small)
+  res.json(versions.map(v => ({
+    id: v.id,
+    versionNumber: v.versionNumber,
+    trigger: v.trigger,
+    triggerDetail: v.triggerDetail,
+    totalWordCount: v.totalWordCount,
+    createdAt: v.createdAt,
+  })));
+});
+
+// Get a specific version (full content)
+router.get('/api/content-posts/:workspaceId/:postId/versions/:versionId', (req, res) => {
+  const version = getPostVersion(req.params.workspaceId, req.params.versionId);
+  if (!version || version.postId !== req.params.postId) return res.status(404).json({ error: 'Version not found' });
+  res.json(version);
+});
+
+// Revert to a specific version
+router.post('/api/content-posts/:workspaceId/:postId/versions/:versionId/revert', (req, res) => {
+  const reverted = revertToVersion(req.params.workspaceId, req.params.postId, req.params.versionId);
+  if (!reverted) return res.status(404).json({ error: 'Post or version not found' });
+  addActivity(req.params.workspaceId, 'post_reverted', `Reverted "${reverted.title}" to a previous version`);
+  res.json(reverted);
 });
 
 // Delete a post

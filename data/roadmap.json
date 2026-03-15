@@ -354,8 +354,8 @@
           "source": "Market prep analysis Mar 2026",
           "est": "2-3h",
           "priority": "P1",
-          "notes": "If you regenerate a section, the old version is gone. For a $500-$1,500 deliverable, clients expect to compare or revert versions. Add version history to content-posts.ts: snapshot current post before regeneration, store version array with timestamp and trigger (manual edit, AI regeneration, unification pass). PostEditor UI shows version timeline with diff view and one-click revert.",
-          "status": "pending"
+          "notes": "Shipped — SQLite content_post_versions table (migration 009). Auto-snapshots before section regeneration, manual edits, and reverts. API: list/get/revert versions. PostEditor History panel with version timeline and one-click revert. Feature #113.",
+          "status": "done"
         },
         {
           "id": 221,

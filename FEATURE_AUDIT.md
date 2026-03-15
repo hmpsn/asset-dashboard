@@ -1445,13 +1445,24 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 113. Content Post Version History
+**What it does:** Automatic version snapshots of generated posts before any destructive change (section regeneration, manual inline edits, reverts). `content_post_versions` SQLite table stores full post state with version number, trigger type, and trigger detail. Three API endpoints: list versions (lightweight, no content), get version (full content), revert to version (snapshots current state first, then restores). PostEditor UI: "History" toggle button in the toolbar opens a scrollable version timeline panel showing version number badges, trigger labels (e.g., "Regenerated section — Section 3", "Manual edit — introduction, sections"), timestamps, and word counts. One-click revert on hover per version entry.
+
+**Agency value:** Never lose work — every regeneration and edit is recoverable. Confidently experiment with AI regeneration knowing you can always revert. Full audit trail of content changes.
+
+**Client value:** N/A (admin-only content editing).
+
+**Mutual:** Safety net that encourages iteration. More experimentation → better content quality.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
 |----------|:---:|---|
 | SEO & Technical | 15 | Audit, fix, and optimize faster than manual tools + AEO trust signals + change impact tracking + content decay detection |
 | Analytics & Tracking | 7 | Unified data view replaces platform-hopping + AI time-saved tracking |
-| Content & Strategy | 9 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan |
+| Content & Strategy | 10 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history |
 | Client Communication | 10 | Structured workflows + automated reports + expanded notifications + feedback widget + email capture funnel + audit completion email |
 | Client Self-Service | 15 | 24/7 data access, onboarding, plans, cart, order tracking, glossary, questionnaire, ROI upgrade prompts, shareable report permalinks, content pipeline status cards + post-publish performance |
 | AI & Intelligence | 7 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine + context completeness + usage dashboard + AEO page review |
@@ -1463,6 +1474,6 @@ When the user asks to update this document with recent features, follow this pro
 | Architecture | 5 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types |
 | Infrastructure | 7 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3 + integrity verification), E2E tests, job persistence, anomaly deploy guard |
 
-**112 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**113 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **112**. Last updated: March 2026 (recurring content subscriptions).
+Current feature count: **113**. Last updated: March 2026 (content post version history).

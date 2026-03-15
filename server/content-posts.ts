@@ -53,6 +53,103 @@ interface PostStmts {
   deleteById: ReturnType<typeof db.prepare>;
 }
 
+// ── Version history types ──
+
+export interface PostVersion {
+  id: string;
+  postId: string;
+  workspaceId: string;
+  versionNumber: number;
+  trigger: 'regenerate_section' | 'manual_edit' | 'unification' | 'bulk_regenerate';
+  triggerDetail?: string;
+  title: string;
+  metaDescription: string;
+  introduction: string;
+  sections: PostSection[];
+  conclusion: string;
+  seoTitle?: string;
+  seoMetaDescription?: string;
+  totalWordCount: number;
+  createdAt: string;
+}
+
+interface VersionRow {
+  id: string;
+  post_id: string;
+  workspace_id: string;
+  version_number: number;
+  trigger: string;
+  trigger_detail: string | null;
+  title: string;
+  meta_description: string;
+  introduction: string;
+  sections: string;
+  conclusion: string;
+  seo_title: string | null;
+  seo_meta_description: string | null;
+  total_word_count: number;
+  created_at: string;
+}
+
+interface VersionStmts {
+  insert: ReturnType<typeof db.prepare>;
+  listByPost: ReturnType<typeof db.prepare>;
+  getById: ReturnType<typeof db.prepare>;
+  countByPost: ReturnType<typeof db.prepare>;
+  deleteByPost: ReturnType<typeof db.prepare>;
+}
+
+let _vStmts: VersionStmts | null = null;
+function vStmts(): VersionStmts {
+  if (!_vStmts) {
+    _vStmts = {
+      insert: db.prepare(
+        `INSERT INTO content_post_versions
+           (id, post_id, workspace_id, version_number, trigger, trigger_detail,
+            title, meta_description, introduction, sections, conclusion,
+            seo_title, seo_meta_description, total_word_count, created_at)
+         VALUES
+           (@id, @post_id, @workspace_id, @version_number, @trigger, @trigger_detail,
+            @title, @meta_description, @introduction, @sections, @conclusion,
+            @seo_title, @seo_meta_description, @total_word_count, @created_at)`,
+      ),
+      listByPost: db.prepare(
+        `SELECT * FROM content_post_versions WHERE post_id = ? AND workspace_id = ? ORDER BY version_number DESC`,
+      ),
+      getById: db.prepare(
+        `SELECT * FROM content_post_versions WHERE id = ? AND workspace_id = ?`,
+      ),
+      countByPost: db.prepare(
+        `SELECT COUNT(*) as cnt FROM content_post_versions WHERE post_id = ?`,
+      ),
+      deleteByPost: db.prepare(
+        `DELETE FROM content_post_versions WHERE post_id = ? AND workspace_id = ?`,
+      ),
+    };
+  }
+  return _vStmts;
+}
+
+function rowToVersion(row: VersionRow): PostVersion {
+  return {
+    id: row.id,
+    postId: row.post_id,
+    workspaceId: row.workspace_id,
+    versionNumber: row.version_number,
+    trigger: row.trigger as PostVersion['trigger'],
+    triggerDetail: row.trigger_detail ?? undefined,
+    title: row.title,
+    metaDescription: row.meta_description,
+    introduction: row.introduction,
+    sections: JSON.parse(row.sections),
+    conclusion: row.conclusion,
+    seoTitle: row.seo_title ?? undefined,
+    seoMetaDescription: row.seo_meta_description ?? undefined,
+    totalWordCount: row.total_word_count,
+    createdAt: row.created_at,
+  };
+}
+
 let _stmts: PostStmts | null = null;
 function stmts(): PostStmts {
   if (!_stmts) {
@@ -181,8 +278,94 @@ export function updatePostField(workspaceId: string, postId: string, updates: Pa
 }
 
 export function deletePost(workspaceId: string, postId: string): boolean {
+  // Also delete version history
+  vStmts().deleteByPost.run(postId, workspaceId);
   const info = stmts().deleteById.run(postId, workspaceId);
   return info.changes > 0;
+}
+
+// ── Version history API ──
+
+/** Snapshot the current state of a post before a destructive change. */
+export function snapshotPostVersion(
+  post: GeneratedPost,
+  trigger: PostVersion['trigger'],
+  triggerDetail?: string,
+): PostVersion {
+  const count = (vStmts().countByPost.get(post.id) as { cnt: number }).cnt;
+  const version: PostVersion = {
+    id: `pv_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    postId: post.id,
+    workspaceId: post.workspaceId,
+    versionNumber: count + 1,
+    trigger,
+    triggerDetail,
+    title: post.title,
+    metaDescription: post.metaDescription,
+    introduction: post.introduction,
+    sections: post.sections,
+    conclusion: post.conclusion,
+    seoTitle: post.seoTitle,
+    seoMetaDescription: post.seoMetaDescription,
+    totalWordCount: post.totalWordCount,
+    createdAt: new Date().toISOString(),
+  };
+  vStmts().insert.run({
+    id: version.id,
+    post_id: version.postId,
+    workspace_id: version.workspaceId,
+    version_number: version.versionNumber,
+    trigger: version.trigger,
+    trigger_detail: version.triggerDetail ?? null,
+    title: version.title,
+    meta_description: version.metaDescription,
+    introduction: version.introduction,
+    sections: JSON.stringify(version.sections),
+    conclusion: version.conclusion,
+    seo_title: version.seoTitle ?? null,
+    seo_meta_description: version.seoMetaDescription ?? null,
+    total_word_count: version.totalWordCount,
+    created_at: version.createdAt,
+  });
+  log.info(`Snapshot v${version.versionNumber} for post ${post.id} (trigger: ${trigger}${triggerDetail ? `, ${triggerDetail}` : ''})`);
+  return version;
+}
+
+/** List all versions for a post (newest first). */
+export function listPostVersions(workspaceId: string, postId: string): PostVersion[] {
+  const rows = vStmts().listByPost.all(postId, workspaceId) as VersionRow[];
+  return rows.map(rowToVersion);
+}
+
+/** Get a specific version by ID. */
+export function getPostVersion(workspaceId: string, versionId: string): PostVersion | undefined {
+  const row = vStmts().getById.get(versionId, workspaceId) as VersionRow | undefined;
+  return row ? rowToVersion(row) : undefined;
+}
+
+/** Revert a post to a previous version (snapshots current state first). */
+export function revertToVersion(workspaceId: string, postId: string, versionId: string): GeneratedPost | null {
+  const post = getPost(workspaceId, postId);
+  if (!post) return null;
+  const version = getPostVersion(workspaceId, versionId);
+  if (!version || version.postId !== postId) return null;
+
+  // Snapshot current state before reverting
+  snapshotPostVersion(post, 'manual_edit', `revert_to_v${version.versionNumber}`);
+
+  // Apply version data
+  post.title = version.title;
+  post.metaDescription = version.metaDescription;
+  post.introduction = version.introduction;
+  post.sections = version.sections;
+  post.conclusion = version.conclusion;
+  post.seoTitle = version.seoTitle;
+  post.seoMetaDescription = version.seoMetaDescription;
+  post.totalWordCount = version.totalWordCount;
+  post.updatedAt = new Date().toISOString();
+  stmts().update.run(postToParams(post));
+  log.info(`Reverted post ${postId} to version ${version.versionNumber}`);
+  return post;
 }
 
 // --- Generation ---
@@ -1023,6 +1206,9 @@ export async function regenerateSection(
   const previousSections = post.sections
     .filter((s, i) => i < sectionIndex && s.status === 'done')
     .map(s => s.content);
+
+  // Snapshot current state before regenerating
+  snapshotPostVersion(post, 'regenerate_section', `section:${sectionIndex}`);
 
   post.sections[sectionIndex].status = 'generating';
   savePost(workspaceId, post);

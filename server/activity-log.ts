@@ -39,6 +39,7 @@ export type ActivityType =
   | 'anomaly_detected'
   | 'anomaly_positive'
   | 'post_generated'
+  | 'post_reverted'
   | 'content_published'
   | 'aeo_review'
   | 'content_subscription'
