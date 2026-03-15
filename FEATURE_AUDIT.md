@@ -1379,6 +1379,17 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 108. Background Job Persistence
+**What it does:** `server/jobs.ts` rewritten with SQLite write-through cache (migration `006-jobs.sql`). Background jobs (audits, brief generation, post generation, etc.) now persist to the `jobs` table and survive server restarts. Running/pending jobs are marked as `interrupted` during graceful shutdown. Write-through cache means reads hit memory for speed, writes go to both memory and SQLite for durability.
+
+**Agency value:** Long-running jobs (AI content generation, full-site audits) no longer lost on deploy or restart. Interrupted jobs are visible in the admin UI so you know what to re-run.
+
+**Client value:** Indirect — content they ordered doesn't silently disappear mid-generation.
+
+**Mutual:** Reliability for the most expensive operations in the platform.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
@@ -1390,13 +1401,13 @@ When the user asks to update this document with recent features, follow this pro
 | Client Self-Service | 14 | 24/7 data access, onboarding, plans, cart, order tracking, glossary, questionnaire, ROI upgrade prompts, shareable report permalinks |
 | AI & Intelligence | 7 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine + context completeness + usage dashboard + AEO page review |
 | Auth & Access Control | 3 | Internal user accounts, workspace ACL, client user accounts |
-| Security | 2 | Helmet, HTTPS, rate limiting, input sanitization, Turnstile CAPTCHA, credential stuffing protection |
+| Security | 2 | Helmet, HTTPS, rate limiting, input sanitization, Turnstile CAPTCHA, credential stuffing protection, weekly npm audit |
 | Monetization | 2 | Stripe Checkout + Subscriptions, admin settings, payment tracking, trials, encrypted config, billing portal |
 | Platform & UX | 17 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home, page state model, work orders, request linkage, admin UX overhaul, landing page, mobile guard, Recharts, portal OG/favicon, sidebar color accents, AI Usage standalone page |
 | Data Architecture | 3 | PageEditState model, cross-store writes, activity feed for client actions |
 | Architecture | 5 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types |
-| Infrastructure | 5 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3), E2E tests |
+| Infrastructure | 6 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3 + integrity verification), E2E tests, job persistence |
 
-**107 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**108 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **107**. Last updated: March 2026 (Devin infrastructure sprint: structured logging, Sentry, CI/CD, graceful shutdown, S3 backups, API hardening, React Router, typed API client, shared types, E2E tests).
+Current feature count: **108**. Last updated: March 2026 (job persistence, backup integrity verification, security audit workflow, SQLite busy_timeout, server decomposition).

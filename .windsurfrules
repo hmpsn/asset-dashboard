@@ -62,8 +62,8 @@ Every completed task — no matter how small — must include these steps:
 - **Monetization** — 3 tiers (Free/Growth/Premium), per-item content purchases, 14-day Growth trial, UX soft-gating via `<TierGate>`
 - **Logging** — **Pino** structured JSON logging (`server/logger.ts`). `createLogger(module)` for child loggers. Pretty-print in dev, JSON in prod.
 - **Error monitoring** — **Sentry** (`server/sentry.ts` + frontend `@sentry/react`). Auto-tags errors with `workspaceId`. Conditional source maps.
-- **CI/CD** — GitHub Actions (`.github/workflows/ci.yml` for lint/test/build, `e2e.yml` for Playwright).
-- **Graceful shutdown** — SIGTERM/SIGINT handlers: flush email queue, close DB, close WebSocket, clean exit.
+- **CI/CD** — GitHub Actions (`.github/workflows/ci.yml` for lint/test/build, `e2e.yml` for Playwright, `security.yml` for weekly npm audit).
+- **Graceful shutdown** — SIGTERM/SIGINT handlers: flush email/AI/SEMRush queues, mark running jobs as interrupted, close DB, close WebSocket. Reentrancy guard.
 - **Backups** — Local periodic backups + optional S3 off-site upload (`BACKUP_S3_BUCKET`).
 
 ---
@@ -74,10 +74,14 @@ Every completed task — no matter how small — must include these steps:
 
 | File | Purpose | Notes |
 |------|---------|-------|
-| `index.ts` | **App setup, middleware, WS, route mounting** (~131 lines) | Minimal bootstrap: imports, middleware, Sentry init, route mounting, WS server, startup schedulers, graceful shutdown. No route handlers. |
+| `index.ts` | **Server bootstrap** (~132 lines) | Thin entry point: Sentry init, run migrations, `createApp()`, HTTP server, WS init, start schedulers, graceful shutdown (flush email/AI/SEMRush, mark jobs interrupted, close DB). No route handlers. |
+| `app.ts` | **Express app factory** (~301 lines) | `createApp()`: helmet, CORS, cookie-parser, request logger, fingerprinting, Stripe webhook (raw body), JSON/static/SPA middleware, all route mounting, Sentry error handler. Extracted from index.ts for testability. |
+| `websocket.ts` | **WebSocket server** (~130 lines) | `initWebSocket(server)`: connection handling, heartbeat, auth, workspace rooms, broadcast helpers. |
+| `startup.ts` | **Scheduler init** (~22 lines) | `startSchedulers()`: kicks off all background schedulers (churn, anomaly, trial reminders, backups, etc.). |
 | `routes/` | **48 Express Router files** | One file per domain: `auth.ts`, `webflow.ts`, `webflow-alt-text.ts`, `webflow-audit.ts`, `webflow-cms.ts`, `webflow-keywords.ts`, `webflow-organize.ts`, `aeo-review.ts`, `feedback.ts`, `public-feedback.ts`, `content-decay.ts`, `seo-change-tracker.ts`, etc. |
 | `helpers.ts` | Shared pure functions | `sanitizeString`, `validateEnum`, `parseDateRange`, `applySuppressionsToAudit`, `buildSchemaContext`, `getAuditTrafficForWorkspace`, `readEnvFile`, `writeEnvFile` |
 | `middleware.ts` | Shared middleware + auth (single source of truth) | Rate limiters, `signClientSession`/`verifyClientSession`, `signAdminToken`/`verifyAdminToken`, `upload` (multer), `moveUploadedFiles`, `IS_PROD`, `APP_PASSWORD` |
+| `middleware/` | **Extracted middleware modules** | `fingerprint.ts` (request fingerprinting), `request-logger.ts` (pino HTTP request logging), `turnstile.ts` (Cloudflare Turnstile CAPTCHA verification) |
 | `broadcast.ts` | WebSocket broadcast singleton | `setBroadcast()` called in index.ts, `broadcast()`/`broadcastToWorkspace()` imported by route files |
 | `workspaces.ts` | Workspace CRUD (SQLite), `Workspace` interface, `PageEditState` model, `KeywordStrategy` types | Core data model. `WorkspaceRow`→`rowToWorkspace()` mapper. `page_edit_states` + `seo_edit_tracking` in separate DB tables with FK→workspaces. |
 | `seo-context.ts` | `buildSeoContext()`, `buildKeywordMapContext()`, `buildKnowledgeBase()` | Shared AI prompt builders — used by chat, briefs, schema |
@@ -112,7 +116,7 @@ Every completed task — no matter how small — must include these steps:
 | `churn-signals.ts` | Churn risk detection | Background scheduler (6h), signals based on inactivity + score drops |
 | `roi.ts` | ROI calculations | Organic traffic value tracking |
 | `trial-reminders.ts` | Trial expiry emails | Scheduled daily check for expiring trials |
-| `backup.ts` | Data backup scheduler | Periodic local backup + optional S3 off-site upload (`BACKUP_S3_BUCKET`). Cleans tar.gz on upload failure. |
+| `backup.ts` | Data backup scheduler | Periodic local backup + optional S3 off-site upload (`BACKUP_S3_BUCKET`). Cleans tar.gz on upload failure. **Integrity verification** via `PRAGMA integrity_check` on backup copy. |
 | `logger.ts` | **Pino structured logging** | `createLogger(module)` for child loggers. JSON in prod, pretty-print in dev. `LOG_LEVEL` env var. |
 | `sentry.ts` | **Sentry error monitoring** | `initSentry()`, `isSentryEnabled`, auto-tags `workspaceId` from request URLs. Conditional `tracesSampleRate`. |
 | `data-dir.ts` | Data directory path singleton | `DATA_BASE`, `getDataDir(subdir)`, `getUploadRoot()`, `getOptRoot()`. Zero duplicated path patterns. |
@@ -132,6 +136,7 @@ Every completed task — no matter how small — must include these steps:
 | `link-checker.ts` | Dead link detection | Crawls site for broken internal/external links |
 | `redirect-scanner.ts` | Redirect chain detection | Scans for redirect loops and chains |
 | `processor.ts` | Background job processor | Queue-based processing for long-running tasks |
+| `jobs.ts` | **Background job persistence** (~269 lines) | SQLite-backed job tracking with write-through cache. Jobs survive server restarts. Running jobs marked as interrupted on shutdown. |
 | `internal-links.ts` | Internal link suggestions | AI-powered link opportunity detection |
 | `pagespeed.ts` | PageSpeed Insights wrapper | Google PSI API integration |
 
@@ -141,13 +146,14 @@ Every completed task — no matter how small — must include these steps:
 
 | File | Purpose |
 |------|---------|
-| `db/index.ts` | DB singleton, WAL mode, foreign keys ON, migration runner |
+| `db/index.ts` | DB singleton, WAL mode, foreign keys ON, `busy_timeout(5000)`, migration runner |
 | `db/migrate-json.ts` | One-time JSON→SQLite migration script (`npx tsx server/db/migrate-json.ts`), idempotent via INSERT OR IGNORE |
 | `db/migrations/001-payments.sql` | `payments` table |
 | `db/migrations/002-global-singletons.sql` | `users`, `client_users`, `reset_tokens`, `activity_log`, `requests`, `churn_signals`, `anomalies`, `audit_schedules` |
 | `db/migrations/003-per-workspace.sql` | `approval_batches`, `content_briefs`, `content_topic_requests`, `content_posts`, `work_orders`, `recommendation_sets`, `annotations`, `seo_changes`, `decay_analyses`, `roi_snapshots`, `feedback`, `rank_tracking_config`, `rank_snapshots` |
 | `db/migrations/004-per-site-and-config.sql` | `audit_snapshots`, `schema_snapshots`, `redirect_snapshots`, `performance_snapshots`, `chat_sessions`, `google_tokens`, `usage_tracking` |
 | `db/migrations/005-workspaces.sql` | `workspaces` (30+ columns), `page_edit_states`, `seo_edit_tracking` |
+| `db/migrations/006-jobs.sql` | `jobs` table (id, type, status, progress, total, message, result JSON, error, workspace_id, timestamps). Indexes on workspace_id, status, composite (type, workspace_id, status). |
 
 **Key patterns (follow these when writing new DB code):**
 - **Lazy prepared statements:** `let _stmt: ... | null = null;` cached at module level
@@ -226,6 +232,7 @@ Every completed task — no matter how small — must include these steps:
 | `tests/e2e/` | Playwright E2E tests — `smoke.spec.ts`, `approval-workflow.spec.ts`, `client-login.spec.ts` |
 | `.github/workflows/ci.yml` | CI pipeline: lint, type-check, unit/integration tests, build |
 | `.github/workflows/e2e.yml` | E2E pipeline: Playwright tests against running server |
+| `.github/workflows/security.yml` | Weekly npm audit (Monday 9am UTC) + on every PR |
 
 ### Data & Config
 

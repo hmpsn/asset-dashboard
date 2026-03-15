@@ -184,6 +184,46 @@
           "notes": "Shipped — Rate limit headers (X-RateLimit-*), Cloudflare Turnstile CAPTCHA on client login/forgot-password (optional via VITE_TURNSTILE_SITE_KEY + TURNSTILE_SECRET_KEY), request fingerprinting, credential stuffing protection on auth endpoints.",
           "status": "done",
           "shippedAt": "2026-03-13"
+        },
+        {
+          "id": 273,
+          "title": "Security audit CI workflow (Devin)",
+          "source": "Devin PR #42",
+          "est": "1h",
+          "priority": "P1",
+          "notes": "Shipped — .github/workflows/security.yml: weekly npm audit (Monday 9am UTC) + on every PR. Checks high-severity first, fails on critical. Also pinned Vite to stable 8.0.0.",
+          "status": "done",
+          "shippedAt": "2026-03-15"
+        },
+        {
+          "id": 274,
+          "title": "Backup integrity verification (Devin)",
+          "source": "Devin PR #43",
+          "est": "1h",
+          "priority": "P1",
+          "notes": "Shipped — PRAGMA integrity_check on backup copy after SQLite backup. Verifies backup is not corrupted before optional S3 upload.",
+          "status": "done",
+          "shippedAt": "2026-03-15"
+        },
+        {
+          "id": 275,
+          "title": "Background job persistence to SQLite (Devin)",
+          "source": "Devin PR #45",
+          "est": "3-4h",
+          "priority": "P1",
+          "notes": "Shipped — server/jobs.ts rewritten with SQLite write-through cache (migration 006-jobs.sql). Jobs survive server restarts. Running/pending jobs marked as interrupted during graceful shutdown. server/app.ts extracted (~301 lines) from index.ts for testability. websocket.ts (~130 lines) and startup.ts (~22 lines) also extracted. middleware/ directory with fingerprint.ts, request-logger.ts, turnstile.ts.",
+          "status": "done",
+          "shippedAt": "2026-03-15"
+        },
+        {
+          "id": 276,
+          "title": "SQLite busy_timeout pragma (Devin)",
+          "source": "Devin PR #47",
+          "est": "0.5h",
+          "priority": "P1",
+          "notes": "Shipped — busy_timeout(5000) pragma in server/db/index.ts to prevent SQLITE_BUSY errors in parallel test workers and concurrent requests.",
+          "status": "done",
+          "shippedAt": "2026-03-15"
         }
       ]
     },
