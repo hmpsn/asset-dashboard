@@ -4,7 +4,7 @@ export type Page =
   | 'seo-audit' | 'seo-editor'
   | 'links'
   | 'seo-strategy' | 'seo-schema' | 'seo-briefs' | 'seo-ranks'
-  | 'content' | 'brand' | 'subscriptions'
+  | 'content' | 'calendar' | 'brand' | 'subscriptions'
   | 'search' | 'analytics' | 'annotations'
   | 'performance'
   | 'content-perf'

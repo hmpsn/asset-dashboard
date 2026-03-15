@@ -1456,6 +1456,17 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 115. Content Calendar
+**What it does:** Month-view visual calendar showing the full content pipeline — briefs, posts, and content requests — plotted on their creation/publish dates. Summary stat cards show monthly counts for briefs, posts, requests, and published items. Type filter pills (All/Briefs/Posts/Requests) narrow the view. Month navigation with "Today" shortcut. Clicking a day opens a detail panel listing all items for that day with type icons, status badges, and relative timestamps. Items are color-coded: teal for briefs, amber for posts, blue for requests. Registered as "Calendar" tab in the CONTENT sidebar group, lazy-loaded.
+
+**Agency value:** At-a-glance pipeline visibility — see content velocity, identify bottlenecks (too many briefs but few posts), and plan capacity. Essential management interface for recurring content subscriptions.
+
+**Client value:** N/A (admin-only).
+
+**Mutual:** Turns the content pipeline from a flat list into a temporal view that reveals patterns and gaps.
+
+---
+
 ### 114. Human-in-the-Loop Review Checklist
 **What it does:** Structured quality gate in PostEditor that must be completed before a post can move from Draft to Review status. Six checklist items: factual accuracy verified, brand voice match confirmed, internal links verified and working, no AI hallucinations or fabricated statistics, meta title/description optimized, word count within brief target. Checklist state persists in a new `review_checklist` JSON column on `content_posts` (migration 010). Collapsible panel with progress counter (e.g., "4/6") shows checked items with green checkmarks and strikethrough. "Send to Review" button is disabled and visually muted until all 6 items are checked.
 
@@ -1473,7 +1484,7 @@ When the user asks to update this document with recent features, follow this pro
 |----------|:---:|---|
 | SEO & Technical | 15 | Audit, fix, and optimize faster than manual tools + AEO trust signals + change impact tracking + content decay detection |
 | Analytics & Tracking | 7 | Unified data view replaces platform-hopping + AI time-saved tracking |
-| Content & Strategy | 11 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist |
+| Content & Strategy | 12 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar |
 | Client Communication | 10 | Structured workflows + automated reports + expanded notifications + feedback widget + email capture funnel + audit completion email |
 | Client Self-Service | 15 | 24/7 data access, onboarding, plans, cart, order tracking, glossary, questionnaire, ROI upgrade prompts, shareable report permalinks, content pipeline status cards + post-publish performance |
 | AI & Intelligence | 7 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine + context completeness + usage dashboard + AEO page review |
@@ -1485,6 +1496,6 @@ When the user asks to update this document with recent features, follow this pro
 | Architecture | 5 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types |
 | Infrastructure | 7 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3 + integrity verification), E2E tests, job persistence, anomaly deploy guard |
 
-**114 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**115 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **114**. Last updated: March 2026 (human-in-the-loop review checklist).
+Current feature count: **115**. Last updated: March 2026 (content calendar).

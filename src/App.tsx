@@ -20,7 +20,7 @@ import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, Search, FileText,
   Pencil, Target, Code2, LogOut, TrendingUp, Flag, Link2, MessageSquare,
   Sun, Moon, LayoutDashboard, ChevronRight, Sparkles, Activity, Shield,
-  Zap, BookOpen, RefreshCw,
+  Zap, BookOpen, RefreshCw, CalendarDays,
 } from 'lucide-react';
 
 // ── Lazy-loaded route-level chunks ──
@@ -53,6 +53,7 @@ const ContentPerformance = lazy(() => import('./components/ContentPerformance').
 const LinksPanel = lazy(() => import('./components/LinksPanel').then(m => ({ default: m.LinksPanel })));
 const RankTracker = lazy(() => import('./components/RankTracker').then(m => ({ default: m.RankTracker })));
 const ContentManager = lazy(() => import('./components/ContentManager').then(m => ({ default: m.ContentManager })));
+const ContentCalendar = lazy(() => import('./components/ContentCalendar').then(m => ({ default: m.ContentCalendar })));
 const BrandHub = lazy(() => import('./components/BrandHub').then(m => ({ default: m.BrandHub })));
 const ContentSubscriptions = lazy(() => import('./components/ContentSubscriptions').then(m => ({ default: m.ContentSubscriptions })));
 
@@ -156,6 +157,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
 
   const [clipboardStatus, setClipboardStatus] = useState<string | null>(null);
   const [pendingContentRequests, setPendingContentRequests] = useState(0);
+  const [hasContentItems, setHasContentItems] = useState(false);
 
   // Sync selected workspace from URL
   useEffect(() => {
@@ -201,15 +203,20 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     refreshHealth();
   }, [refreshHealth]);
 
-  // Fetch pending content request count when workspace changes
+  // Fetch pending content request count + content item existence when workspace changes
   useEffect(() => {
     if (!selected) return;
     let cancelled = false;
-    get<Array<{ status: string }>>(`/api/content-requests/${selected.id}`)
-      .then((reqs) => {
-        if (!cancelled) setPendingContentRequests(Array.isArray(reqs) ? reqs.filter(r => r.status === 'requested').length : 0);
-      })
-      .catch(() => { if (!cancelled) setPendingContentRequests(0); });
+    Promise.all([
+      get<Array<{ status: string }>>(`/api/content-requests/${selected.id}`).catch(() => [] as Array<{ status: string }>),
+      get<unknown[]>(`/api/content-briefs/${selected.id}`).catch(() => [] as unknown[]),
+      get<unknown[]>(`/api/content-posts/${selected.id}`).catch(() => [] as unknown[]),
+    ]).then(([reqs, briefs, posts]) => {
+      if (cancelled) return;
+      const reqArr = Array.isArray(reqs) ? reqs : [];
+      setPendingContentRequests(reqArr.filter(r => r.status === 'requested').length);
+      setHasContentItems(reqArr.length > 0 || (Array.isArray(briefs) && briefs.length > 0) || (Array.isArray(posts) && posts.length > 0));
+    });
     return () => { cancelled = true; };
   }, [selected]);
 
@@ -339,7 +346,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   }, [tab]);
 
   // ── Sidebar navigation groups ──
-  const navGroups: Array<{ label: string; groupIcon?: typeof Globe; groupColor?: string; activeBg?: string; activeText?: string; activeIcon?: string; inactiveIcon?: string; hoverBg?: string; hoverText?: string; items: Array<{ id: Page; label: string; icon: typeof Globe; needsSite?: boolean }> }> = [
+  const navGroups: Array<{ label: string; groupIcon?: typeof Globe; groupColor?: string; activeBg?: string; activeText?: string; activeIcon?: string; inactiveIcon?: string; hoverBg?: string; hoverText?: string; items: Array<{ id: Page; label: string; icon: typeof Globe; needsSite?: boolean; hidden?: boolean }> }> = [
     { label: '', items: [
       { id: 'home', label: 'Home', icon: LayoutDashboard },
     ]},
@@ -372,6 +379,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
       items: [
       { id: 'seo-briefs', label: 'Content Briefs', icon: Clipboard, needsSite: true },
       { id: 'content', label: 'Content', icon: FileText, needsSite: true },
+      { id: 'calendar', label: 'Calendar', icon: CalendarDays, needsSite: true, hidden: !hasContentItems },
       { id: 'subscriptions', label: 'Subscriptions', icon: RefreshCw, needsSite: true },
       { id: 'content-perf', label: 'Content Perf', icon: BarChart3, needsSite: true },
     ]},
@@ -381,7 +389,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   const TAB_LABELS: Record<string, string> = {
     home: 'Home', media: 'Assets', 'seo-audit': 'Site Audit', 'seo-editor': 'SEO Editor',
     links: 'Links', 'seo-strategy': 'Strategy',
-    'seo-schema': 'Schema', 'seo-briefs': 'Content Briefs', content: 'Content', subscriptions: 'Subscriptions', brand: 'Brand & AI',
+    'seo-schema': 'Schema', 'seo-briefs': 'Content Briefs', content: 'Content', calendar: 'Calendar', subscriptions: 'Subscriptions', brand: 'Brand & AI',
     'seo-ranks': 'Rank Tracker', search: 'Search Console', analytics: 'Google Analytics',
     annotations: 'Annotations', performance: 'Performance', 'content-perf': 'Content Performance',
     'workspace-settings': 'Workspace Settings', prospect: 'Prospect', roadmap: 'Roadmap',
@@ -389,7 +397,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   };
 
   // ── Content renderer ──
-  const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'links', 'seo-strategy', 'seo-schema', 'seo-briefs', 'seo-ranks', 'content-perf', 'content', 'subscriptions', 'brand']);
+  const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'links', 'seo-strategy', 'seo-schema', 'seo-briefs', 'seo-ranks', 'content-perf', 'content', 'calendar', 'subscriptions', 'brand']);
   const needsSite = !!(SEO_TABS.has(tab) || tab === 'search' || tab === 'analytics' || tab === 'annotations' || tab === 'performance');
   const seoNavigate = (t: string, ctx?: FixContext) => { setFixContext(ctx || null); if (selected) navigate(adminPath(selected.id, t as Page)); };
 
@@ -432,6 +440,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (tab === 'seo-schema') return <SchemaSuggester key={`schema-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} />;
     if (tab === 'seo-briefs') return <ContentBriefs key={`briefs-${selected.id}`} workspaceId={selected.id} onRequestCountChange={setPendingContentRequests} fixContext={fixContext} />;
     if (tab === 'content') return <ContentManager key={`content-${selected.id}`} workspaceId={selected.id} />;
+    if (tab === 'calendar') return <ContentCalendar key={`calendar-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'subscriptions') return <ContentSubscriptions key={`subs-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'brand') return <BrandHub key={`brand-${selected.id}`} workspaceId={selected.id} webflowSiteId={selected.webflowSiteId} />;
     if (tab === 'seo-ranks') return <RankTracker key={`ranks-${selected.id}`} workspaceId={selected.id} hasGsc={!!selected.gscPropertyUrl} />;
@@ -498,7 +507,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
                     )}
                   </button>
                 ) : null}
-                {!isCollapsed && group.items.map(item => {
+                {!isCollapsed && group.items.filter(item => !item.hidden).map(item => {
                   const Icon = item.icon;
                   const active = tab === item.id;
                   const disabled = !selected || (item.needsSite && !selected.webflowSiteId);

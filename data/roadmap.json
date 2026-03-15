@@ -318,8 +318,8 @@
           "source": "FEATURE_AUDIT",
           "est": "3-4h",
           "priority": "P1",
-          "notes": "Visual calendar/timeline view of content in production with due dates. Shows briefs, posts, and published content. Essential interface for recurring content subscriptions (#111). Elevated from P2 — becomes the primary pipeline management UI once subscriptions are live.",
-          "status": "pending"
+          "notes": "Shipped — Month-view calendar showing briefs (teal), posts (amber), requests (blue) plotted by date. Stat cards, type filters, day detail panel with status badges. Lazy-loaded Calendar tab in CONTENT sidebar group. Feature #115.",
+          "status": "done"
         },
         {
           "id": 201,
