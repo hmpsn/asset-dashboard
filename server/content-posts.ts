@@ -57,6 +57,9 @@ let _stmts: PostStmts | null = null;
 function stmts(): PostStmts {
   if (!_stmts) {
     _stmts = {
+      // Note: INSERT omits webflow_* / published_* columns intentionally.
+      // savePost() routes existing rows to UPDATE (which includes them).
+      // New posts never have publish data so omitting here is safe.
       insert: db.prepare(
         `INSERT OR REPLACE INTO content_posts
            (id, workspace_id, brief_id, target_keyword, title, meta_description,

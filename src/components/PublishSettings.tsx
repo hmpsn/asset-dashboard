@@ -111,7 +111,7 @@ export function PublishSettings({ workspaceId, webflowSiteId, publishTarget, onS
       if (result.mapping) {
         const suggested: FieldMap = { title: '', slug: '', body: '' };
         for (const [key, val] of Object.entries(result.mapping)) {
-          if (val && key in suggested || FIELD_MAP_KEYS.some(f => f.key === key)) {
+          if (val && (key in suggested || FIELD_MAP_KEYS.some(f => f.key === key))) {
             (suggested as Record<string, string>)[key] = val;
           }
         }
