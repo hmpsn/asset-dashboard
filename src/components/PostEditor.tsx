@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Loader2, RefreshCw, Copy, Download, FileText, Check, ChevronDown, ChevronUp,
-  Pencil, X, Eye, Hash, Clock, Sparkles, AlertTriangle, Trash2,
+  Pencil, X, Eye, Hash, Clock, Sparkles, AlertTriangle, Trash2, Globe, ExternalLink,
 } from 'lucide-react';
 
 interface PostSection {
@@ -32,6 +32,10 @@ interface GeneratedPost {
   status: 'generating' | 'draft' | 'review' | 'approved';
   unificationStatus?: 'pending' | 'success' | 'failed' | 'skipped';
   unificationNote?: string;
+  webflowItemId?: string;
+  webflowCollectionId?: string;
+  publishedAt?: string;
+  publishedSlug?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -79,6 +83,41 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   const [showPreview, setShowPreview] = useState(false);
   const [copied, setCopied] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [hasPublishTarget, setHasPublishTarget] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [publishConfirm, setPublishConfirm] = useState(false);
+  const [publishError, setPublishError] = useState('');
+
+  // Check if workspace has publish target configured
+  useEffect(() => {
+    fetch(`/api/workspaces/${workspaceId}`).then(r => r.json())
+      .then(ws => { if (ws?.publishTarget) setHasPublishTarget(true); })
+      .catch(() => {});
+  }, [workspaceId]);
+
+  const handlePublish = async (generateImage = false) => {
+    if (!post) return;
+    setPublishing(true);
+    setPublishError('');
+    try {
+      const res = await fetch(`/api/content-posts/${workspaceId}/${postId}/publish-to-webflow`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ generateImage }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setPublishError(data.error || 'Publish failed');
+      } else {
+        setPublishConfirm(false);
+        if (data.post) setPost(data.post);
+        else fetchPost();
+      }
+    } catch (err) {
+      setPublishError(err instanceof Error ? err.message : 'Publish failed');
+    }
+    setPublishing(false);
+  };
 
   const fetchPost = useCallback(async () => {
     try {
@@ -287,6 +326,22 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
               <button onClick={exportHTML} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors">
                 <Download className="w-3 h-3" /> .html
               </button>
+              {hasPublishTarget && (post.status === 'approved' || post.status === 'draft' || post.status === 'review') && (
+                post.publishedAt ? (
+                  <span className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-green-500/10 border border-green-500/20 text-green-400">
+                    <Check className="w-3 h-3" /> Published {post.publishedSlug && <ExternalLink className="w-3 h-3 ml-0.5" />}
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => setPublishConfirm(true)}
+                    disabled={publishing}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50"
+                  >
+                    {publishing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Globe className="w-3 h-3" />}
+                    {publishing ? 'Publishing...' : 'Publish to Webflow'}
+                  </button>
+                )
+              )}
             </>
           )}
           <button onClick={() => setDeleteConfirm(true)} className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors">
@@ -468,6 +523,51 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
             </div>
           </div>
         </>
+      )}
+
+      {/* Publish confirmation dialog */}
+      {publishConfirm && post && (
+        <div className="bg-zinc-900 rounded-xl border border-teal-500/30 p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Globe className="w-4 h-4 text-teal-400" />
+            <h3 className="text-sm font-semibold text-zinc-200">
+              {post.webflowItemId ? 'Update on Webflow' : 'Publish to Webflow'}
+            </h3>
+          </div>
+          <div className="text-xs text-zinc-400 space-y-1">
+            <p><span className="text-zinc-300 font-medium">Title:</span> {post.title}</p>
+            <p><span className="text-zinc-300 font-medium">Status:</span> {post.status}</p>
+          </div>
+          {publishError && (
+            <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+              {publishError}
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handlePublish(false)}
+              disabled={publishing}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-teal-600 text-white hover:bg-teal-500 transition-colors disabled:opacity-50"
+            >
+              {publishing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Globe className="w-3 h-3" />}
+              {post.webflowItemId ? 'Update' : 'Publish'}
+            </button>
+            <button
+              onClick={() => handlePublish(true)}
+              disabled={publishing}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50"
+            >
+              {publishing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+              {post.webflowItemId ? 'Update + New Image' : 'Publish + Generate Image'}
+            </button>
+            <button
+              onClick={() => { setPublishConfirm(false); setPublishError(''); }}
+              className="px-3 py-1.5 rounded-lg text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
 
       {/* SEO Metadata */}

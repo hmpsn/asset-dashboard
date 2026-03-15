@@ -37,6 +37,10 @@ interface PostRow {
   status: string;
   unification_status: string | null;
   unification_note: string | null;
+  webflow_item_id: string | null;
+  webflow_collection_id: string | null;
+  published_at: string | null;
+  published_slug: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -78,7 +82,10 @@ function stmts(): PostStmts {
            seo_title = @seo_title, seo_meta_description = @seo_meta_description,
            total_word_count = @total_word_count, target_word_count = @target_word_count,
            status = @status, unification_status = @unification_status,
-           unification_note = @unification_note, updated_at = @updated_at
+           unification_note = @unification_note,
+           webflow_item_id = @webflow_item_id, webflow_collection_id = @webflow_collection_id,
+           published_at = @published_at, published_slug = @published_slug,
+           updated_at = @updated_at
          WHERE id = @id`,
       ),
       deleteById: db.prepare(
@@ -107,6 +114,10 @@ function rowToPost(row: PostRow): GeneratedPost {
     status: row.status as GeneratedPost['status'],
     unificationStatus: row.unification_status as GeneratedPost['unificationStatus'] ?? undefined,
     unificationNote: row.unification_note ?? undefined,
+    webflowItemId: row.webflow_item_id ?? undefined,
+    webflowCollectionId: row.webflow_collection_id ?? undefined,
+    publishedAt: row.published_at ?? undefined,
+    publishedSlug: row.published_slug ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -130,6 +141,10 @@ function postToParams(post: GeneratedPost): Record<string, unknown> {
     status: post.status,
     unification_status: post.unificationStatus ?? null,
     unification_note: post.unificationNote ?? null,
+    webflow_item_id: post.webflowItemId ?? null,
+    webflow_collection_id: post.webflowCollectionId ?? null,
+    published_at: post.publishedAt ?? null,
+    published_slug: post.publishedSlug ?? null,
     created_at: post.createdAt,
     updated_at: post.updatedAt,
   };

@@ -3,6 +3,7 @@ import { useToast } from './Toast';
 import { ConnectionsTab } from './settings/ConnectionsTab';
 import { FeaturesTab } from './settings/FeaturesTab';
 import { ClientDashboardTab } from './settings/ClientDashboardTab';
+import { PublishSettings } from './PublishSettings';
 import { get, patch, post } from '../api/client';
 
 interface GscSite { siteUrl: string; permissionLevel: string; }
@@ -25,6 +26,7 @@ interface WorkspaceData {
   knowledgeBase?: string;
   personas?: { id: string; name: string; description: string; painPoints: string[]; goals: string[]; objections: string[]; preferredContentFormat?: string; buyingStage?: 'awareness' | 'consideration' | 'decision' }[];
   contentPricing?: { briefPrice: number; fullPostPrice: number; currency: string; briefLabel?: string; fullPostLabel?: string; briefDescription?: string; fullPostDescription?: string } | null;
+  publishTarget?: { collectionId: string; collectionName: string; fieldMap: Record<string, string | undefined> } | null;
   tier?: 'free' | 'growth' | 'premium';
   trialEndsAt?: string;
   onboardingEnabled?: boolean;
@@ -39,7 +41,7 @@ interface Props {
   onUpdate?: (patch: Record<string, unknown>) => void;
 }
 
-type SectionTab = 'connections' | 'features' | 'dashboard';
+type SectionTab = 'connections' | 'features' | 'dashboard' | 'publishing';
 
 export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, webflowSiteName, onUpdate }: Props) {
   const { toast } = useToast();
@@ -104,7 +106,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
 
       {/* Tab nav */}
       <nav className="flex items-center gap-1 border-b border-zinc-800">
-        {([['connections', 'Connections'], ['features', 'Features'], ['dashboard', 'Client Dashboard']] as [SectionTab, string][]).map(([id, label]) => (
+        {([['connections', 'Connections'], ['features', 'Features'], ['publishing', 'Publishing'], ['dashboard', 'Client Dashboard']] as [SectionTab, string][]).map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
             className="px-4 py-2.5 text-xs font-medium border-b-2 transition-colors -mb-px"
             style={tab === id ? { borderColor: '#2dd4bf', color: '#2dd4bf' } : { borderColor: 'transparent', color: '#71717a' }}>
@@ -134,6 +136,16 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
           workspaceId={workspaceId}
           ws={ws}
           patchWorkspace={patchWorkspace}
+          toast={toast}
+        />
+      )}
+
+      {tab === 'publishing' && (
+        <PublishSettings
+          workspaceId={workspaceId}
+          webflowSiteId={webflowSiteId}
+          publishTarget={ws?.publishTarget as Parameters<typeof PublishSettings>[0]['publishTarget']}
+          onSave={async (target) => { await patchWorkspace({ publishTarget: target }); }}
           toast={toast}
         />
       )}

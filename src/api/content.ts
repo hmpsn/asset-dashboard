@@ -1,5 +1,5 @@
 // ── Content API (briefs, posts, content requests) ─────────────────
-import { get, post, patch, del, getSafe } from './client';
+import { get, post, patch, del, getSafe, getOptional } from './client';
 
 export const contentBriefs = {
   list: (wsId: string) =>
@@ -27,6 +27,11 @@ export const contentPosts = {
 
   remove: (wsId: string, postId: string) =>
     del(`/api/content-posts/${wsId}/${postId}`),
+
+  publishToWebflow: (wsId: string, postId: string, body?: { generateImage?: boolean }) =>
+    post<{ success: boolean; itemId?: string; slug?: string; isUpdate?: boolean; error?: string }>(
+      `/api/content-posts/${wsId}/${postId}/publish-to-webflow`, body,
+    ),
 };
 
 export const contentRequests = {

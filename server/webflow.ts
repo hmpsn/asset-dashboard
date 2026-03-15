@@ -285,6 +285,29 @@ export async function getCollectionSchema(collectionId: string, tokenOverride?: 
   return { fields: data.fields || [] };
 }
 
+// --- Create CMS item ---
+export async function createCollectionItem(
+  collectionId: string,
+  fieldData: Record<string, unknown>,
+  isDraft: boolean = true,
+  tokenOverride?: string
+): Promise<{ success: boolean; itemId?: string; error?: string }> {
+  try {
+    const res = await webflowFetch(`/collections/${collectionId}/items`, {
+      method: 'POST',
+      body: JSON.stringify({ isArchived: false, isDraft, fieldData }),
+    }, tokenOverride);
+    if (!res.ok) {
+      const err = await res.text();
+      return { success: false, error: `${res.status}: ${err}` };
+    }
+    const data = await res.json() as { id?: string };
+    return { success: true, itemId: data.id };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 // --- Update CMS item ---
 export async function updateCollectionItem(
   collectionId: string,

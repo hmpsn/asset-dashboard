@@ -142,6 +142,23 @@ export interface Workspace {
   seoEditTracking?: Record<string, { status: 'flagged' | 'in-review' | 'live'; updatedAt: string; fields?: string[] }>;
   // Unified page edit states (new — replaces seoEditTracking)
   pageEditStates?: Record<string, PageEditState>;
+  // Webflow CMS publish target configuration
+  publishTarget?: {
+    collectionId: string;
+    collectionName: string;
+    fieldMap: {
+      title: string;
+      slug: string;
+      body: string;
+      metaTitle?: string;
+      metaDescription?: string;
+      summary?: string;
+      featuredImage?: string;
+      author?: string;
+      publishDate?: string;
+      category?: string;
+    };
+  };
   // Content pricing (per-workspace, exposed to client portal)
   contentPricing?: {
     briefPrice: number;       // e.g. 150 (in dollars)

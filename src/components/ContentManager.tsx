@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Loader2, FileText, PenLine, Clock, CheckCircle2, Eye, Send,
   Trash2, Download, Search, ArrowUpDown, Filter,
-  Sparkles, X,
+  Sparkles, X, Globe, Check,
 } from 'lucide-react';
 import { PostEditor } from './PostEditor';
 
@@ -14,6 +14,8 @@ interface PostSummary {
   metaDescription: string;
   totalWordCount: number;
   status: 'generating' | 'draft' | 'review' | 'approved';
+  publishedAt?: string;
+  webflowItemId?: string;
   createdAt: string;
   updatedAt: string;
   sections: { heading: string; wordCount: number; status: string }[];
@@ -39,6 +41,8 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+  const [hasPublishTarget, setHasPublishTarget] = useState(false);
+  const [publishingPost, setPublishingPost] = useState<string | null>(null);
 
   const fetchPosts = useCallback(async () => {
     try {
@@ -52,6 +56,26 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
   }, [workspaceId]);
 
   useEffect(() => { void fetchPosts(); }, [fetchPosts]);
+
+  // Check if workspace has publish target configured
+  useEffect(() => {
+    fetch(`/api/workspaces/${workspaceId}`).then(r => r.json())
+      .then(ws => { if (ws?.publishTarget) setHasPublishTarget(true); })
+      .catch(() => {});
+  }, [workspaceId]);
+
+  const publishPost = async (postId: string) => {
+    setPublishingPost(postId);
+    try {
+      const res = await fetch(`/api/content-posts/${workspaceId}/${postId}/publish-to-webflow`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (res.ok) fetchPosts();
+    } catch { /* ignore */ }
+    setPublishingPost(null);
+  };
 
   // Auto-refresh generating posts
   useEffect(() => {
@@ -317,6 +341,25 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                           </button>
                         )}
                       </div>
+                    )}
+
+                    {/* Publish to Webflow */}
+                    {hasPublishTarget && !isGenerating && (post.status === 'approved' || post.status === 'review') && (
+                      post.publishedAt ? (
+                        <span className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-green-500/10 border border-green-500/20 text-green-400 font-medium">
+                          <Check className="w-3 h-3" /> Published
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => publishPost(post.id)}
+                          disabled={publishingPost === post.id}
+                          className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-teal-500/10 border border-teal-500/20 text-teal-400 hover:bg-teal-500/20 transition-colors disabled:opacity-50 font-medium"
+                          title="Publish to Webflow CMS"
+                        >
+                          {publishingPost === post.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Globe className="w-3 h-3" />}
+                          Publish
+                        </button>
+                      )
                     )}
 
                     {/* Export */}

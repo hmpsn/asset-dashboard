@@ -38,6 +38,9 @@ export const WS_EVENTS = {
 
   // Anomalies (auto-broadcast via initAnomalyBroadcast)
   ANOMALIES_UPDATE: 'anomalies:update',
+
+  // Content publishing
+  CONTENT_PUBLISHED: 'content:published',
 } as const;
 
 export type WsEventName = typeof WS_EVENTS[keyof typeof WS_EVENTS];
