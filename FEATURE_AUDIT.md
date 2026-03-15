@@ -1434,6 +1434,17 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 112. Recurring Content Subscriptions
+**What it does:** Monthly content subscription packages (Starter: 2 posts/$500, Growth: 4 posts/$900, Scale: 8 posts/$1,600). Full Stripe subscription integration with recurring monthly billing, automated period tracking, and delivery progress. Admin UI for creating/managing subscriptions per workspace with plan selection, topic source configuration (strategy gaps, AI recommended, manual), pause/resume, delivery tracking with progress bars, and subscription history. Client UI on Plans tab shows available packages with checkout flow, active subscription status, and delivery progress. Webhook handling for subscription lifecycle (creation, renewal, cancellation, past-due). DB migration creates `content_subscriptions` table with proper indexes. `create-stripe-products.ts` script extended with recurring monthly prices.
+
+**Agency value:** Recurring revenue engine — $500–$1,600/mo per client on autopilot. Content delivery tracked per period so nothing falls through the cracks. Strategy gap integration means topics are auto-sourced from keyword strategy.
+
+**Client value:** Predictable monthly content investment with clear delivery tracking. Subscribe once, get optimized posts every month.
+
+**Mutual:** Transforms one-off content purchases into predictable recurring revenue with built-in accountability via delivery progress tracking.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
@@ -1446,12 +1457,12 @@ When the user asks to update this document with recent features, follow this pro
 | AI & Intelligence | 7 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine + context completeness + usage dashboard + AEO page review |
 | Auth & Access Control | 3 | Internal user accounts, workspace ACL, client user accounts |
 | Security | 2 | Helmet, HTTPS, rate limiting, input sanitization, Turnstile CAPTCHA, credential stuffing protection, weekly npm audit |
-| Monetization | 2 | Stripe Checkout + Subscriptions, admin settings, payment tracking, trials, encrypted config, billing portal |
+| Monetization | 3 | Stripe Checkout + Subscriptions, admin settings, payment tracking, trials, encrypted config, billing portal, recurring content subscriptions |
 | Platform & UX | 18 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home, page state model, work orders, request linkage, admin UX overhaul, landing page, mobile guard, Recharts, portal OG/favicon, sidebar color accents, AI Usage standalone page, Growth Opportunities reframe |
 | Data Architecture | 3 | PageEditState model, cross-store writes, activity feed for client actions |
 | Architecture | 5 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types |
 | Infrastructure | 7 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3 + integrity verification), E2E tests, job persistence, anomaly deploy guard |
 
-**111 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**112 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **111**. Last updated: March 2026 (anomaly deploy guard, content pipeline status cards + post-publish performance, Growth Opportunities reframe, admin nav styling fixes).
+Current feature count: **112**. Last updated: March 2026 (recurring content subscriptions).

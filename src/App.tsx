@@ -20,7 +20,7 @@ import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, Search, FileText,
   Pencil, Target, Code2, LogOut, TrendingUp, Flag, Link2, MessageSquare,
   Sun, Moon, LayoutDashboard, ChevronRight, Sparkles, Activity, Shield,
-  Zap, BookOpen,
+  Zap, BookOpen, RefreshCw,
 } from 'lucide-react';
 
 // ── Lazy-loaded route-level chunks ──
@@ -54,6 +54,7 @@ const LinksPanel = lazy(() => import('./components/LinksPanel').then(m => ({ def
 const RankTracker = lazy(() => import('./components/RankTracker').then(m => ({ default: m.RankTracker })));
 const ContentManager = lazy(() => import('./components/ContentManager').then(m => ({ default: m.ContentManager })));
 const BrandHub = lazy(() => import('./components/BrandHub').then(m => ({ default: m.BrandHub })));
+const ContentSubscriptions = lazy(() => import('./components/ContentSubscriptions').then(m => ({ default: m.ContentSubscriptions })));
 
 function ChunkFallback() {
   return <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>;
@@ -371,6 +372,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
       items: [
       { id: 'seo-briefs', label: 'Content Briefs', icon: Clipboard, needsSite: true },
       { id: 'content', label: 'Content', icon: FileText, needsSite: true },
+      { id: 'subscriptions', label: 'Subscriptions', icon: RefreshCw, needsSite: true },
       { id: 'content-perf', label: 'Content Perf', icon: BarChart3, needsSite: true },
     ]},
   ];
@@ -379,7 +381,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   const TAB_LABELS: Record<string, string> = {
     home: 'Home', media: 'Assets', 'seo-audit': 'Site Audit', 'seo-editor': 'SEO Editor',
     links: 'Links', 'seo-strategy': 'Strategy',
-    'seo-schema': 'Schema', 'seo-briefs': 'Content Briefs', content: 'Content', brand: 'Brand & AI',
+    'seo-schema': 'Schema', 'seo-briefs': 'Content Briefs', content: 'Content', subscriptions: 'Subscriptions', brand: 'Brand & AI',
     'seo-ranks': 'Rank Tracker', search: 'Search Console', analytics: 'Google Analytics',
     annotations: 'Annotations', performance: 'Performance', 'content-perf': 'Content Performance',
     'workspace-settings': 'Workspace Settings', prospect: 'Prospect', roadmap: 'Roadmap',
@@ -387,7 +389,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   };
 
   // ── Content renderer ──
-  const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'links', 'seo-strategy', 'seo-schema', 'seo-briefs', 'seo-ranks', 'content-perf', 'content', 'brand']);
+  const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'links', 'seo-strategy', 'seo-schema', 'seo-briefs', 'seo-ranks', 'content-perf', 'content', 'subscriptions', 'brand']);
   const needsSite = !!(SEO_TABS.has(tab) || tab === 'search' || tab === 'analytics' || tab === 'annotations' || tab === 'performance');
   const seoNavigate = (t: string, ctx?: FixContext) => { setFixContext(ctx || null); if (selected) navigate(adminPath(selected.id, t as Page)); };
 
@@ -430,6 +432,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (tab === 'seo-schema') return <SchemaSuggester key={`schema-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} />;
     if (tab === 'seo-briefs') return <ContentBriefs key={`briefs-${selected.id}`} workspaceId={selected.id} onRequestCountChange={setPendingContentRequests} fixContext={fixContext} />;
     if (tab === 'content') return <ContentManager key={`content-${selected.id}`} workspaceId={selected.id} />;
+    if (tab === 'subscriptions') return <ContentSubscriptions key={`subs-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'brand') return <BrandHub key={`brand-${selected.id}`} workspaceId={selected.id} webflowSiteId={selected.webflowSiteId} />;
     if (tab === 'seo-ranks') return <RankTracker key={`ranks-${selected.id}`} workspaceId={selected.id} hasGsc={!!selected.gscPropertyUrl} />;
     if (tab === 'search') return <SearchConsole key={`search-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} gscPropertyUrl={selected.gscPropertyUrl} />;

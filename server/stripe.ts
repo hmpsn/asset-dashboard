@@ -7,6 +7,11 @@ import { getWorkspace, updateWorkspace, listWorkspaces } from './workspaces.js';
 import { createWorkOrder } from './work-orders.js';
 import { notifyTeamPaymentReceived } from './email.js';
 import { createLogger } from './logger.js';
+import {
+  createContentSubscription, getContentSubscriptionByStripeId,
+  updateContentSubscription, resetPeriod,
+} from './content-subscriptions.js';
+import { CONTENT_SUB_PLANS, type ContentSubscription } from '../shared/types/content.js';
 
 const log = createLogger('stripe');
 
@@ -69,6 +74,9 @@ const PRODUCT_MAP: Record<ProductType, { displayName: string; category: ProductC
   fix_meta_10:      { displayName: 'Metadata Pack (10pg)',     category: 'fix',      priceUsd: 179,  envKey: 'STRIPE_PRICE_FIX_META_10' },
   plan_growth:      { displayName: 'Growth Plan',              category: 'strategy', priceUsd: 249,  envKey: 'STRIPE_PRICE_PLAN_GROWTH' },
   plan_premium:     { displayName: 'Premium Plan',             category: 'strategy', priceUsd: 999,  envKey: 'STRIPE_PRICE_PLAN_PREMIUM' },
+  content_starter:  { displayName: 'Starter Content (2 posts/mo)', category: 'content', priceUsd: 500,  envKey: 'STRIPE_PRICE_CONTENT_STARTER' },
+  content_growth:   { displayName: 'Growth Content (4 posts/mo)',  category: 'content', priceUsd: 900,  envKey: 'STRIPE_PRICE_CONTENT_GROWTH' },
+  content_scale:    { displayName: 'Scale Content (8 posts/mo)',   category: 'content', priceUsd: 1600, envKey: 'STRIPE_PRICE_CONTENT_SCALE' },
 };
 
 export function getProductConfig(type: ProductType): ProductConfig | null {
@@ -116,7 +124,8 @@ export async function createCheckoutSession(params: CheckoutParams): Promise<{ s
   if (params.topic) metadata.topic = params.topic;
   if (params.targetKeyword) metadata.targetKeyword = params.targetKeyword;
 
-  const isSubscription = params.productType === 'plan_growth' || params.productType === 'plan_premium';
+  const isSubscription = params.productType === 'plan_growth' || params.productType === 'plan_premium'
+    || params.productType === 'content_starter' || params.productType === 'content_growth' || params.productType === 'content_scale';
 
   // Get or create a Stripe Customer for subscription mode (required) and useful for one-time too
   const customerId = await getOrCreateCustomer(stripe, params.workspaceId);
@@ -375,6 +384,23 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
         log.info(`Tier upgraded: workspace=${workspaceId} → ${newTier}`);
       }
 
+      // Handle content subscription creation
+      const contentSubPlan = CONTENT_SUB_PLANS.find(p => p.plan === productType);
+      if (contentSubPlan && session.subscription) {
+        const stripeSubId = typeof session.subscription === 'string' ? session.subscription : session.subscription.id;
+        createContentSubscription(workspaceId, {
+          plan: contentSubPlan.plan,
+          postsPerMonth: contentSubPlan.postsPerMonth,
+          priceUsd: contentSubPlan.priceUsd,
+          stripeSubscriptionId: stripeSubId,
+          status: 'active',
+          currentPeriodStart: new Date().toISOString(),
+          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        });
+        _broadcastFn?.(workspaceId, 'content-subscription:created', { plan: contentSubPlan.plan });
+        log.info(`Content subscription created: workspace=${workspaceId} plan=${contentSubPlan.plan}`);
+      }
+
       // Log activity
       const amount = session.amount_total ? (session.amount_total / 100).toFixed(2) : '?';
       addActivity(
@@ -524,6 +550,19 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
         log.warn(`Subscription ${subscription.status}: workspace=${workspaceId} sub=${subscription.id}`);
         addActivity(workspaceId, 'subscription_issue', `Subscription payment ${subscription.status} — please update billing`, '', { subscriptionId: subscription.id });
       }
+
+      // Sync content subscription status
+      const contentSub = getContentSubscriptionByStripeId(subscription.id);
+      if (contentSub) {
+        const statusMap: Record<string, ContentSubscription['status']> = {
+          active: 'active', trialing: 'active', past_due: 'past_due', unpaid: 'past_due', canceled: 'cancelled',
+        };
+        const newStatus = statusMap[subscription.status] || contentSub.status;
+        if (newStatus !== contentSub.status) {
+          updateContentSubscription(contentSub.id, { status: newStatus });
+          _broadcastFn?.(workspaceId, 'content-subscription:updated', { id: contentSub.id, status: newStatus });
+        }
+      }
       break;
     }
 
@@ -532,19 +571,40 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       const workspaceId = subscription.metadata?.workspaceId;
       if (!workspaceId) return;
 
-      // Downgrade to free tier
-      updateWorkspace(workspaceId, { tier: 'free', stripeSubscriptionId: undefined, trialEndsAt: undefined });
-      _broadcastFn?.(workspaceId, 'workspace:updated', { tier: 'free' });
-      addActivity(workspaceId, 'subscription_cancelled', 'Subscription cancelled — downgraded to Free tier', '', { subscriptionId: subscription.id });
-      log.info(`Subscription cancelled: workspace=${workspaceId} sub=${subscription.id} → free tier`);
+      // Check if this is a content subscription
+      const contentSub = getContentSubscriptionByStripeId(subscription.id);
+      if (contentSub) {
+        updateContentSubscription(contentSub.id, { status: 'cancelled' });
+        _broadcastFn?.(workspaceId, 'content-subscription:updated', { id: contentSub.id, status: 'cancelled' });
+        addActivity(workspaceId, 'content_subscription', 'Content subscription cancelled', '', { subscriptionId: contentSub.id });
+        log.info(`Content subscription cancelled: workspace=${workspaceId} sub=${subscription.id}`);
+      } else {
+        // Downgrade to free tier (platform plan)
+        updateWorkspace(workspaceId, { tier: 'free', stripeSubscriptionId: undefined, trialEndsAt: undefined });
+        _broadcastFn?.(workspaceId, 'workspace:updated', { tier: 'free' });
+        addActivity(workspaceId, 'subscription_cancelled', 'Subscription cancelled — downgraded to Free tier', '', { subscriptionId: subscription.id });
+        log.info(`Subscription cancelled: workspace=${workspaceId} sub=${subscription.id} → free tier`);
+      }
       break;
     }
 
     case 'invoice.paid': {
       const invoice = event.data.object as Stripe.Invoice;
-      const subId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id;
+      const subId = (invoice as unknown as Record<string, unknown>).subscription as string | undefined;
       if (!subId || !invoice.metadata?.workspaceId) return;
       const workspaceId = invoice.metadata.workspaceId;
+
+      // Reset content subscription period on renewal
+      const contentSub = getContentSubscriptionByStripeId(subId);
+      if (contentSub) {
+        const periodStart = new Date().toISOString();
+        const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        resetPeriod(contentSub.id, periodStart, periodEnd);
+        updateContentSubscription(contentSub.id, { status: 'active' });
+        _broadcastFn?.(workspaceId, 'content-subscription:renewed', { id: contentSub.id });
+        log.info(`Content subscription renewed: workspace=${workspaceId} sub=${subId}`);
+      }
+
       addActivity(workspaceId, 'invoice_paid', `Invoice paid: $${((invoice.amount_paid || 0) / 100).toFixed(2)}`, '', { invoiceId: invoice.id, subscriptionId: subId });
       log.info(`Invoice paid: workspace=${workspaceId} amount=$${((invoice.amount_paid || 0) / 100).toFixed(2)}`);
       break;

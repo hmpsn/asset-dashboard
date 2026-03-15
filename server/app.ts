@@ -75,6 +75,7 @@ import aeoReviewRoutes from './routes/aeo-review.js';
 import seoChangeTrackerRoutes from './routes/seo-change-tracker.js';
 import contentDecayRoutes from './routes/content-decay.js';
 import contentPublishRoutes from './routes/content-publish.js';
+import contentSubscriptionRoutes from './routes/content-subscriptions.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -286,6 +287,7 @@ export function createApp(): express.Express {
   app.use(seoChangeTrackerRoutes);
   app.use(contentDecayRoutes);
   app.use(contentPublishRoutes);
+  app.use(contentSubscriptionRoutes);
 
   // --- Sentry error handler (must be after all route mounts, before frontend catch-all) ---
   setupSentryErrorHandler(app);

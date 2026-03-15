@@ -1,5 +1,6 @@
 // ── Miscellaneous API endpoints ────────────────────────────────────
 import { get, post, patch, del, getSafe, getOptional, postForm } from './client';
+import type { ContentSubscription, ContentSubscriptionPlanConfig } from '../../shared/types/content';
 
 // ── Requests (client requests / support tickets) ────────────────
 export const requests = {
@@ -205,4 +206,34 @@ export const redirects = {
 
   save: (siteId: string, body: Record<string, unknown>) =>
     post<unknown>(`/api/webflow/redirects/${siteId}`, body),
+};
+
+// ── Content subscriptions ──────────────────────────────────────
+export const contentSubscriptions = {
+  list: (wsId: string) =>
+    getSafe<ContentSubscription[]>(`/api/content-subscriptions/${wsId}`, []),
+
+  get: (id: string) =>
+    getOptional<ContentSubscription>(`/api/content-subscription/${id}`),
+
+  create: (wsId: string, body: { plan: string; topicSource?: string; preferredPageTypes?: string[]; notes?: string }) =>
+    post<ContentSubscription>(`/api/content-subscriptions/${wsId}`, body),
+
+  update: (id: string, body: Record<string, unknown>) =>
+    patch<ContentSubscription>(`/api/content-subscription/${id}`, body),
+
+  remove: (id: string) => del(`/api/content-subscription/${id}`),
+
+  markDelivered: (id: string, count?: number) =>
+    post<ContentSubscription>(`/api/content-subscription/${id}/delivered`, { count: count || 1 }),
+
+  // Client-facing
+  plans: () =>
+    getSafe<ContentSubscriptionPlanConfig[]>('/api/public/content-plans', []),
+
+  clientStatus: (wsId: string) =>
+    getOptional<{ subscription: ContentSubscription | null; plans: ContentSubscriptionPlanConfig[] }>(`/api/public/content-subscription/${wsId}`),
+
+  subscribe: (wsId: string, plan: string) =>
+    post<{ sessionId: string; url: string }>(`/api/public/content-subscribe/${wsId}`, { plan }),
 };

@@ -299,8 +299,9 @@
           "source": "FEATURE_VISION #6",
           "est": "6-8h",
           "priority": "P1",
-          "notes": "Monthly content packages: '4 posts/mo from strategy gaps → generate → approve → publish.' Add Stripe subscription product + scheduler. $500-2K/mo additional recurring per client. Depends on auto-publish (#106).",
-          "status": "pending"
+          "notes": "Shipped — 3 plans (Starter $500/2 posts, Growth $900/4 posts, Scale $1600/8 posts). Full Stripe subscription lifecycle (checkout, renewal, cancellation, past-due). DB migration, server CRUD module, API routes, admin UI with plan creation/pause/resume/delivery tracking, client UI on Plans tab with checkout + status. Webhook handlers for all subscription events. create-stripe-products script updated with recurring prices.",
+          "status": "done",
+          "shippedAt": "2026-03"
         },
         {
           "id": 177,

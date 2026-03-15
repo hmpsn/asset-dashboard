@@ -107,3 +107,40 @@ export interface ContentTopicRequest {
   requestedAt: string;
   updatedAt: string;
 }
+
+// ── Content Subscriptions (recurring monthly packages) ──────────
+
+export type ContentSubPlan = 'content_starter' | 'content_growth' | 'content_scale';
+
+export interface ContentSubscriptionPlanConfig {
+  plan: ContentSubPlan;
+  displayName: string;
+  postsPerMonth: number;
+  priceUsd: number;
+  description: string;
+}
+
+export const CONTENT_SUB_PLANS: ContentSubscriptionPlanConfig[] = [
+  { plan: 'content_starter', displayName: 'Starter Content', postsPerMonth: 2,  priceUsd: 500,  description: '2 SEO-optimized posts per month' },
+  { plan: 'content_growth',  displayName: 'Growth Content',  postsPerMonth: 4,  priceUsd: 900,  description: '4 SEO-optimized posts per month' },
+  { plan: 'content_scale',   displayName: 'Scale Content',   postsPerMonth: 8,  priceUsd: 1600, description: '8 SEO-optimized posts per month' },
+];
+
+export interface ContentSubscription {
+  id: string;
+  workspaceId: string;
+  stripeSubscriptionId?: string;
+  stripePriceId?: string;
+  plan: ContentSubPlan;
+  postsPerMonth: number;
+  priceUsd: number;
+  status: 'active' | 'paused' | 'cancelled' | 'past_due' | 'pending';
+  currentPeriodStart?: string;
+  currentPeriodEnd?: string;
+  postsDeliveredThisPeriod: number;
+  topicSource: 'strategy_gaps' | 'manual' | 'ai_recommended';
+  preferredPageTypes?: string[];
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}

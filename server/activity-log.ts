@@ -41,6 +41,11 @@ export type ActivityType =
   | 'post_generated'
   | 'content_published'
   | 'aeo_review'
+  | 'content_subscription'
+  | 'subscription_issue'
+  | 'subscription_cancelled'
+  | 'invoice_paid'
+  | 'invoice_failed'
   | 'note';
 
 export interface ActivityEntry {

@@ -1,5 +1,5 @@
-import { CheckCircle2, FileText, MessageSquare, Sparkles, X, Zap, DollarSign, TrendingUp, CreditCard, Loader2 } from 'lucide-react';
-import { useState } from 'react';
+import { CheckCircle2, FileText, MessageSquare, Sparkles, X, Zap, DollarSign, TrendingUp, CreditCard, Loader2, RefreshCw } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { STUDIO_NAME } from '../../constants';
 import type { Tier } from '../ui';
@@ -7,6 +7,8 @@ import type { WorkspaceInfo, ClientTab } from './types';
 import { clientPath } from '../../routes';
 import { useBetaMode } from './BetaContext';
 import { post } from '../../api/client';
+import { contentSubscriptions } from '../../api/misc';
+import type { ContentSubscription, ContentSubscriptionPlanConfig } from '../../../shared/types/content';
 
 interface PlansTabProps {
   workspaceId: string;
@@ -25,6 +27,26 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
   const tier = effectiveTier;
   const isTrial = ws.isTrial && ws.trialDaysRemaining != null && ws.trialDaysRemaining > 0;
   const [billingLoading, setBillingLoading] = useState(false);
+
+  // Content subscription state
+  const [subData, setSubData] = useState<{ subscription: ContentSubscription | null; plans: ContentSubscriptionPlanConfig[] } | null>(null);
+  const [subLoading, setSubLoading] = useState(false);
+
+  useEffect(() => {
+    contentSubscriptions.clientStatus(workspaceId).then(data => {
+      if (data) setSubData(data);
+    });
+  }, [workspaceId]);
+
+  const handleSubscribe = async (plan: string) => {
+    setSubLoading(true);
+    try {
+      const data = await contentSubscriptions.subscribe(workspaceId, plan);
+      if (data.url) window.location.href = data.url;
+    } catch (err) {
+      setToast({ message: err instanceof Error ? err.message : 'Failed to start checkout', type: 'error' });
+    } finally { setSubLoading(false); }
+  };
 
   const openBillingPortal = async () => {
     setBillingLoading(true);
@@ -239,6 +261,79 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
               <button onClick={() => navigate(clientPath(workspaceId, 'content', betaMode))} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-xs text-white font-medium transition-colors">
                 <FileText className="w-3.5 h-3.5" /> Browse Content Opportunities
               </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Content subscription packages */}
+      {subData && subData.plans.length > 0 && (
+        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <RefreshCw className="w-5 h-5 text-teal-400" />
+            <h3 className="text-lg font-semibold text-zinc-100">Monthly Content Packages</h3>
+          </div>
+          <p className="text-xs text-zinc-500 mb-5">Recurring SEO-optimized content delivered every month, powered by your keyword strategy.</p>
+
+          {/* Active subscription banner */}
+          {subData.subscription && (
+            <div className="mb-5 p-4 rounded-xl bg-teal-500/5 border border-teal-500/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-teal-400" />
+                    <span className="text-sm font-medium text-zinc-200">
+                      {subData.plans.find(p => p.plan === subData.subscription?.plan)?.displayName || subData.subscription.plan}
+                    </span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                      subData.subscription.status === 'active' ? 'bg-emerald-500/10 text-emerald-400' :
+                      subData.subscription.status === 'past_due' ? 'bg-red-500/10 text-red-400' :
+                      'bg-zinc-800 text-zinc-500'
+                    }`}>
+                      {subData.subscription.status === 'active' ? 'Active' : subData.subscription.status === 'past_due' ? 'Past Due' : subData.subscription.status}
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-400 mt-1">
+                    {subData.subscription.postsDeliveredThisPeriod} of {subData.subscription.postsPerMonth} posts delivered this period
+                  </p>
+                </div>
+                <div className="text-right">
+                  <div className="text-lg font-bold text-teal-300">${subData.subscription.priceUsd}<span className="text-xs text-zinc-500">/mo</span></div>
+                </div>
+              </div>
+              {/* Progress */}
+              <div className="mt-3">
+                <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full transition-all"
+                    style={{ width: `${Math.min(100, (subData.subscription.postsDeliveredThisPeriod / subData.subscription.postsPerMonth) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Plan cards (only show if no active subscription) */}
+          {!subData.subscription && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {subData.plans.map(plan => (
+                <div key={plan.plan} className="p-4 rounded-xl bg-zinc-800/50 border border-zinc-700 hover:border-zinc-600 transition-colors">
+                  <h4 className="text-sm font-semibold text-zinc-200">{plan.displayName}</h4>
+                  <p className="text-[11px] text-zinc-500 mt-1">{plan.description}</p>
+                  <div className="flex items-baseline gap-1 mt-3">
+                    <span className="text-xl font-bold text-teal-300">${plan.priceUsd}</span>
+                    <span className="text-xs text-zinc-500">/mo</span>
+                  </div>
+                  <button
+                    onClick={() => handleSubscribe(plan.plan)}
+                    disabled={subLoading}
+                    className="mt-3 w-full py-2 rounded-lg text-xs font-medium text-center transition-all bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  >
+                    {subLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                    Subscribe
+                  </button>
+                </div>
+              ))}
             </div>
           )}
         </div>

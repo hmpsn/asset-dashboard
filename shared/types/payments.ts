@@ -7,7 +7,8 @@ export type ProductType =
   | 'schema_page' | 'schema_10'
   | 'strategy' | 'strategy_refresh'
   | 'fix_meta' | 'fix_alt' | 'fix_redirect' | 'fix_meta_10'
-  | 'plan_growth' | 'plan_premium';
+  | 'plan_growth' | 'plan_premium'
+  | 'content_starter' | 'content_growth' | 'content_scale';
 
 export interface PaymentRecord {
   id: string;

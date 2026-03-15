@@ -18,7 +18,7 @@
 
 import Stripe from 'stripe';
 
-const PRODUCT_MAP: Record<string, { displayName: string; category: string; priceUsd: number; envKey: string }> = {
+const PRODUCT_MAP: Record<string, { displayName: string; category: string; priceUsd: number; envKey: string; recurring?: boolean }> = {
   brief_blog:       { displayName: 'Blog Post Brief',         category: 'brief',    priceUsd: 125,  envKey: 'STRIPE_PRICE_BRIEF' },
   brief_landing:    { displayName: 'Landing Page Brief',      category: 'brief',    priceUsd: 150,  envKey: 'STRIPE_PRICE_BRIEF' },
   brief_service:    { displayName: 'Service Page Brief',      category: 'brief',    priceUsd: 150,  envKey: 'STRIPE_PRICE_BRIEF' },
@@ -33,8 +33,12 @@ const PRODUCT_MAP: Record<string, { displayName: string; category: string; price
   schema_site:      { displayName: 'Schema — Full Site',      category: 'schema',   priceUsd: 350,  envKey: 'STRIPE_PRICE_SCHEMA_SITE' },
   strategy:         { displayName: 'Keyword Strategy',        category: 'strategy', priceUsd: 400,  envKey: 'STRIPE_PRICE_STRATEGY' },
   strategy_refresh: { displayName: 'Strategy Refresh',        category: 'strategy', priceUsd: 200,  envKey: 'STRIPE_PRICE_STRATEGY_REFRESH' },
-  plan_growth:      { displayName: 'Growth Plan',             category: 'plan',     priceUsd: 99,   envKey: 'STRIPE_PRICE_PLAN_GROWTH' },
-  plan_premium:     { displayName: 'Premium Plan',            category: 'plan',     priceUsd: 249,  envKey: 'STRIPE_PRICE_PLAN_PREMIUM' },
+  plan_growth:      { displayName: 'Growth Plan',             category: 'plan',     priceUsd: 99,   envKey: 'STRIPE_PRICE_PLAN_GROWTH', recurring: true },
+  plan_premium:     { displayName: 'Premium Plan',            category: 'plan',     priceUsd: 249,  envKey: 'STRIPE_PRICE_PLAN_PREMIUM', recurring: true },
+  // Content subscriptions — recurring monthly
+  content_starter:  { displayName: 'Starter Content (2 posts/mo)', category: 'subscription', priceUsd: 500,  envKey: 'STRIPE_PRICE_CONTENT_STARTER', recurring: true },
+  content_growth:   { displayName: 'Growth Content (4 posts/mo)',  category: 'subscription', priceUsd: 900,  envKey: 'STRIPE_PRICE_CONTENT_GROWTH',  recurring: true },
+  content_scale:    { displayName: 'Scale Content (8 posts/mo)',   category: 'subscription', priceUsd: 1600, envKey: 'STRIPE_PRICE_CONTENT_SCALE',   recurring: true },
 };
 
 async function main() {
@@ -74,11 +78,12 @@ async function main() {
         metadata: { productType, category: config.category, source: 'asset-dashboard' },
       });
 
-      // Create one-time price
+      // Create price (one-time or recurring monthly)
       const price = await stripe.prices.create({
         product: product.id,
         unit_amount: config.priceUsd * 100, // cents
         currency: 'usd',
+        ...(config.recurring ? { recurring: { interval: 'month' as const } } : {}),
         metadata: { productType },
       });
 
