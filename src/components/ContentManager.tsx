@@ -5,6 +5,8 @@ import {
   Sparkles, X, Globe, Check,
 } from 'lucide-react';
 import { PostEditor } from './PostEditor';
+import { contentPosts } from '../api/content';
+import { workspaces as workspacesApi } from '../api/workspaces';
 
 interface PostSummary {
   id: string;
@@ -59,20 +61,16 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
 
   // Check if workspace has publish target configured
   useEffect(() => {
-    fetch(`/api/workspaces/${workspaceId}`).then(r => r.json())
-      .then(ws => { if (ws?.publishTarget) setHasPublishTarget(true); })
+    workspacesApi.getById(workspaceId)
+      .then((ws: any) => { if (ws?.publishTarget) setHasPublishTarget(true); })
       .catch(() => {});
   }, [workspaceId]);
 
   const publishPost = async (postId: string) => {
     setPublishingPost(postId);
     try {
-      const res = await fetch(`/api/content-posts/${workspaceId}/${postId}/publish-to-webflow`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-      if (res.ok) fetchPosts();
+      const result = await contentPosts.publishToWebflow(workspaceId, postId, {});
+      if (result.success) fetchPosts();
     } catch { /* ignore */ }
     setPublishingPost(null);
   };

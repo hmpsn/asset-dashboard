@@ -3,6 +3,8 @@ import {
   Loader2, RefreshCw, Copy, Download, FileText, Check, ChevronDown, ChevronUp,
   Pencil, X, Eye, Hash, Clock, Sparkles, AlertTriangle, Trash2, Globe, ExternalLink,
 } from 'lucide-react';
+import { contentPosts } from '../api/content';
+import { workspaces as workspacesApi } from '../api/workspaces';
 
 interface PostSection {
   index: number;
@@ -90,8 +92,8 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
 
   // Check if workspace has publish target configured
   useEffect(() => {
-    fetch(`/api/workspaces/${workspaceId}`).then(r => r.json())
-      .then(ws => { if (ws?.publishTarget) setHasPublishTarget(true); })
+    workspacesApi.getById(workspaceId)
+      .then((ws: any) => { if (ws?.publishTarget) setHasPublishTarget(true); })
       .catch(() => {});
   }, [workspaceId]);
 
@@ -100,17 +102,12 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     setPublishing(true);
     setPublishError('');
     try {
-      const res = await fetch(`/api/content-posts/${workspaceId}/${postId}/publish-to-webflow`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ generateImage }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
+      const data = await contentPosts.publishToWebflow(workspaceId, postId, { generateImage });
+      if (!data.success) {
         setPublishError(data.error || 'Publish failed');
       } else {
         setPublishConfirm(false);
-        if (data.post) setPost(data.post);
+        if (data.post) setPost(data.post as GeneratedPost);
         else fetchPost();
       }
     } catch (err) {

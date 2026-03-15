@@ -83,15 +83,19 @@ router.post('/api/content-posts/:workspaceId/:postId/publish-to-webflow', async 
     let itemId: string | undefined;
     let isUpdate = false;
 
+    // Re-read post to avoid race with auto-publish on approval (which runs
+    // in the background and may have completed between our initial read and now)
+    const freshPost = getPost(workspaceId, postId) || post;
+
     // Check if already published (update vs create)
-    if (post.webflowItemId && post.webflowCollectionId === collectionId) {
+    if (freshPost.webflowItemId && freshPost.webflowCollectionId === collectionId) {
       // Update existing CMS item
       isUpdate = true;
-      const updateResult = await updateCollectionItem(collectionId, post.webflowItemId, fieldData, token);
+      const updateResult = await updateCollectionItem(collectionId, freshPost.webflowItemId!, fieldData, token);
       if (!updateResult.success) {
         return res.status(500).json({ error: `Failed to update CMS item: ${updateResult.error}` });
       }
-      itemId = post.webflowItemId;
+      itemId = freshPost.webflowItemId;
     } else {
       // Create new CMS item (live, not draft)
       const createResult = await createCollectionItem(collectionId, fieldData, false, token);
