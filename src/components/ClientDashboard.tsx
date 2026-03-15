@@ -976,7 +976,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
         {/* ════════════ PLANS TAB ════════════ */}
         {tab === 'plans' && (
-          <PlansTab workspaceId={workspaceId} ws={ws} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setToast={setToast} onOpenChat={() => setChatOpen(true)} />
+          <PlansTab workspaceId={workspaceId} ws={ws} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setToast={setToast} onOpenChat={() => setChatOpen(true)} pricingData={pricingData} />
         )}
 
         {/* ════════════ ROI TAB ════════════ */}

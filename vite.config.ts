@@ -44,6 +44,7 @@ export default defineConfig(async () => ({
   },
   test: {
     environment: 'jsdom',
+    globalSetup: ['tests/global-setup.ts'],
     setupFiles: ['tests/component/setup.ts'],
     include: ['tests/**/*.test.{ts,tsx}'],
   },

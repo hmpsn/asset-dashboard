@@ -9,6 +9,7 @@ import { useBetaMode } from './BetaContext';
 import { post } from '../../api/client';
 import { contentSubscriptions } from '../../api/misc';
 import type { ContentSubscription, ContentSubscriptionPlanConfig } from '../../../shared/types/content';
+import type { PricingData } from '../../hooks/usePayments';
 
 interface PlansTabProps {
   workspaceId: string;
@@ -19,9 +20,10 @@ interface PlansTabProps {
   fmtPrice: (n: number) => string;
   setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
   onOpenChat: () => void;
+  pricingData?: PricingData | null;
 }
 
-export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setToast, onOpenChat }: PlansTabProps) {
+export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setToast, onOpenChat, pricingData }: PlansTabProps) {
   const navigate = useNavigate();
   const betaMode = useBetaMode();
   const tier = effectiveTier;
@@ -83,7 +85,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
       ],
     },
     {
-      id: 'growth', name: 'Growth', price: '$249', tagline: 'AI-powered SEO engine',
+      id: 'growth', name: 'Growth', price: pricingData?.products?.plan_growth ? `$${pricingData.products.plan_growth.price}` : '$249', tagline: 'AI-powered SEO engine',
       color: 'text-teal-300', borderColor: 'border-teal-500/30', bgColor: 'bg-teal-500/5',
       featureGroups: [
         { category: 'Everything in Starter, plus:', features: [] },
@@ -106,7 +108,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
       ],
     },
     {
-      id: 'premium', name: 'Premium', price: '$999', tagline: 'Managed SEO partnership',
+      id: 'premium', name: 'Premium', price: pricingData?.products?.plan_premium ? `$${pricingData.products.plan_premium.price}` : '$999', tagline: 'Managed SEO partnership',
       color: 'text-teal-200', borderColor: 'border-teal-400/30', bgColor: 'bg-teal-500/5',
       featureGroups: [
         { category: 'Everything in Growth, plus:', features: [] },
