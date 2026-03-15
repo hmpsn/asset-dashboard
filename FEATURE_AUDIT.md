@@ -1496,9 +1496,9 @@ When the user asks to update this document with recent features, follow this pro
 | Architecture | 5 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types |
 | Infrastructure | 7 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3 + integrity verification), E2E tests, job persistence, anomaly deploy guard |
 
-**125 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**126 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **125**. Last updated: March 2026 (dependency audit).
+Current feature count: **126**. Last updated: March 2026 (backlink profile).
 
 ### Recent Additions (March 2026)
 
@@ -1541,3 +1541,7 @@ Current feature count: **125**. Last updated: March 2026 (dependency audit).
 **125. Bundle Optimization & Dependency Audit**
 **What it does:** Verified Lucide tree-shaking (each icon individually code-split), added vendor chunk splitting via `manualChunks` in Vite config (react-vendor, stripe), and lazy-loaded StripePaymentForm so the Stripe SDK only loads when a payment is initiated. Main bundle split from 366 kB into 188 kB (app) + 190 kB (react-vendor) for independent caching. ClientDashboard reduced from 379 → 359 kB by extracting Stripe into a 13 kB lazy chunk. Total JS unchanged (~1,947 kB) but initial page load and long-term caching significantly improved.
 **Files:** `vite.config.ts` (manualChunks), `src/components/ClientDashboard.tsx` (lazy Stripe import)
+
+**126. Lightweight Backlink Profile Overview**
+**What it does:** Domain-level backlink profile section in the Strategy tab powered by SEMRush Backlinks API. Shows total backlinks, referring domains, follow/nofollow ratio, link types (text/image), and a sortable table of top 15 referring domains with backlink counts and first/last seen dates. Domains are clickable external links. Data cached for 48 hours. Gracefully handles missing SEMRush config with an informational message.
+**Files:** `server/semrush.ts` (`getBacklinksOverview`, `getTopReferringDomains`), `server/routes/backlinks.ts` (new), `server/app.ts`, `src/components/strategy/BacklinkProfile.tsx` (new), `src/components/KeywordStrategy.tsx`

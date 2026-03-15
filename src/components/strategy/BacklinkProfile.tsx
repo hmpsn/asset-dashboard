@@ -1,0 +1,159 @@
+import { useState, useEffect } from 'react';
+import { Link2, Globe, ExternalLink, Loader2, Shield, AlertTriangle } from 'lucide-react';
+import { SectionCard, StatCard, EmptyState } from '../ui';
+
+interface BacklinksOverview {
+  totalBacklinks: number;
+  referringDomains: number;
+  followLinks: number;
+  nofollowLinks: number;
+  textLinks: number;
+  imageLinks: number;
+}
+
+interface ReferringDomain {
+  domain: string;
+  backlinksCount: number;
+  firstSeen: string;
+  lastSeen: string;
+}
+
+interface BacklinkData {
+  domain: string;
+  overview: BacklinksOverview | null;
+  referringDomains: ReferringDomain[];
+}
+
+interface Props {
+  workspaceId: string;
+}
+
+function fmtNum(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return n.toLocaleString();
+}
+
+export function BacklinkProfile({ workspaceId }: Props) {
+  const [data, setData] = useState<BacklinkData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch(`/api/backlinks/${workspaceId}`)
+      .then(async r => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({ error: 'Unknown error' }));
+          throw new Error(body.error || `HTTP ${r.status}`);
+        }
+        return r.json();
+      })
+      .then((d: BacklinkData) => { if (!cancelled) setData(d); })
+      .catch(err => { if (!cancelled) setError(err.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+
+    return () => { cancelled = true; };
+  }, [workspaceId]);
+
+  if (loading) {
+    return (
+      <SectionCard>
+        <div className="px-4 py-6 flex items-center justify-center gap-2 text-zinc-500 text-sm">
+          <Loader2 className="w-4 h-4 animate-spin" /> Loading backlink profile…
+        </div>
+      </SectionCard>
+    );
+  }
+
+  if (error) {
+    if (error.includes('SEMRush is not configured')) {
+      return (
+        <SectionCard>
+          <div className="px-4 py-4 flex items-center gap-2 text-zinc-500 text-xs">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+            <span>Backlink data requires SEMRush. Set <code className="text-zinc-400">SEMRUSH_API_KEY</code> in environment to enable.</span>
+          </div>
+        </SectionCard>
+      );
+    }
+    return (
+      <SectionCard>
+        <div className="px-4 py-4 flex items-center gap-2 text-red-400 text-xs">
+          <AlertTriangle className="w-3.5 h-3.5" /> {error}
+        </div>
+      </SectionCard>
+    );
+  }
+
+  if (!data?.overview) {
+    return (
+      <EmptyState icon={Link2} title="No Backlink Data" description="No backlink data found for this domain. This may be a new or low-traffic site." />
+    );
+  }
+
+  const { overview, referringDomains, domain } = data;
+  const followPct = overview.totalBacklinks > 0
+    ? Math.round((overview.followLinks / overview.totalBacklinks) * 100)
+    : 0;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 mb-1">
+        <Link2 className="w-4 h-4 text-teal-400" />
+        <h3 className="text-sm font-semibold text-zinc-200">Backlink Profile</h3>
+        <span className="text-[11px] text-zinc-600 ml-1">{domain}</span>
+      </div>
+
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatCard label="Total Backlinks" value={fmtNum(overview.totalBacklinks)} icon={Link2} />
+        <StatCard label="Referring Domains" value={fmtNum(overview.referringDomains)} icon={Globe} />
+        <StatCard label="Follow Links" value={`${followPct}%`} sub={`${fmtNum(overview.followLinks)} follow`} icon={Shield} />
+        <StatCard label="Link Types" value={`${fmtNum(overview.textLinks)} text`} sub={`${fmtNum(overview.imageLinks)} image`} icon={ExternalLink} />
+      </div>
+
+      {/* Referring domains table */}
+      {referringDomains.length > 0 && (
+        <SectionCard>
+          <div className="px-4 py-3">
+            <div className="text-xs font-medium text-zinc-200 mb-3">Top Referring Domains</div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-zinc-500 text-left">
+                    <th className="pb-2 font-medium">Domain</th>
+                    <th className="pb-2 font-medium text-right">Backlinks</th>
+                    <th className="pb-2 font-medium text-right">First Seen</th>
+                    <th className="pb-2 font-medium text-right">Last Seen</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-800">
+                  {referringDomains.map(rd => (
+                    <tr key={rd.domain}>
+                      <td className="py-2">
+                        <a
+                          href={`https://${rd.domain}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-teal-400 hover:text-teal-300 transition-colors flex items-center gap-1"
+                        >
+                          {rd.domain}
+                          <ExternalLink className="w-2.5 h-2.5 opacity-50" />
+                        </a>
+                      </td>
+                      <td className="py-2 text-zinc-300 text-right font-medium">{fmtNum(rd.backlinksCount)}</td>
+                      <td className="py-2 text-zinc-500 text-right">{rd.firstSeen ? new Date(rd.firstSeen).toLocaleDateString() : '—'}</td>
+                      <td className="py-2 text-zinc-500 text-right">{rd.lastSeen ? new Date(rd.lastSeen).toLocaleDateString() : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </SectionCard>
+      )}
+    </div>
+  );
+}

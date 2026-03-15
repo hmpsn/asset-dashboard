@@ -79,6 +79,7 @@ import contentSubscriptionRoutes from './routes/content-subscriptions.js';
 import dataExportRoutes from './routes/data-export.js';
 import revenueRoutes from './routes/revenue.js';
 import brandDocsRoutes from './routes/brand-docs.js';
+import backlinksRoutes from './routes/backlinks.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -294,6 +295,7 @@ export function createApp(): express.Express {
   app.use(dataExportRoutes);
   app.use(revenueRoutes);
   app.use(brandDocsRoutes);
+  app.use(backlinksRoutes);
 
   // --- Sentry error handler (must be after all route mounts, before frontend catch-all) ---
   setupSentryErrorHandler(app);

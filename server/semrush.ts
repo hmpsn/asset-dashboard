@@ -451,6 +451,144 @@ export async function getRelatedKeywords(
   return results;
 }
 
+// ── Backlinks Overview (domain-level backlink summary) ──
+export interface BacklinksOverview {
+  totalBacklinks: number;
+  referringDomains: number;
+  followLinks: number;
+  nofollowLinks: number;
+  textLinks: number;
+  imageLinks: number;
+  formLinks: number;
+  frameLinks: number;
+}
+
+export async function getBacklinksOverview(
+  domain: string,
+  workspaceId: string,
+  database = 'us'
+): Promise<BacklinksOverview | null> {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error('SEMRUSH_API_KEY not configured');
+
+  const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  const cacheKey = `backlinks_overview_${database}_${cleanDomain.replace(/\./g, '_')}`;
+  const cached = readCache<BacklinksOverview>(workspaceId, cacheKey, 48);
+  if (cached) {
+    logCreditUsage({ credits: 0, endpoint: 'backlinks_overview', query: cleanDomain, rowsReturned: 1, workspaceId, cached: true });
+    return cached;
+  }
+
+  const params = new URLSearchParams({
+    type: 'backlinks_overview',
+    key: apiKey,
+    target: cleanDomain,
+    target_type: 'root_domain',
+    export_columns: 'total,domains_num,urls_num,ips_num,follows_num,nofollows_num,texts_num,images_num,forms_num,frames_num',
+  });
+
+  const res = await fetch(`${SEMRUSH_API_BASE}?${params}`);
+  if (!res.ok) {
+    const errText = await res.text();
+    log.warn(`Backlinks overview error for "${cleanDomain}": ${errText.slice(0, 200)}`);
+    return null;
+  }
+
+  const csv = await res.text();
+  if (csv.startsWith('ERROR')) {
+    if (csv.includes('NOTHING FOUND')) {
+      log.info(`No backlink data found for "${cleanDomain}"`);
+    } else {
+      log.warn(`Backlinks overview error for "${cleanDomain}": ${csv}`);
+    }
+    return null;
+  }
+
+  const rows = parseSemrushCSV(csv);
+  if (rows.length === 0) return null;
+
+  const row = rows[0];
+  const overview: BacklinksOverview = {
+    totalBacklinks: parseInt(row['total'] || '0', 10),
+    referringDomains: parseInt(row['domains_num'] || '0', 10),
+    followLinks: parseInt(row['follows_num'] || '0', 10),
+    nofollowLinks: parseInt(row['nofollows_num'] || '0', 10),
+    textLinks: parseInt(row['texts_num'] || '0', 10),
+    imageLinks: parseInt(row['images_num'] || '0', 10),
+    formLinks: parseInt(row['forms_num'] || '0', 10),
+    frameLinks: parseInt(row['frames_num'] || '0', 10),
+  };
+
+  logCreditUsage({ credits: 40, endpoint: 'backlinks_overview', query: cleanDomain, rowsReturned: 1, workspaceId, cached: false });
+  writeCache(workspaceId, cacheKey, overview);
+  return overview;
+}
+
+// ── Top Referring Domains ──
+export interface ReferringDomain {
+  domain: string;
+  backlinksCount: number;
+  firstSeen: string;
+  lastSeen: string;
+}
+
+export async function getTopReferringDomains(
+  domain: string,
+  workspaceId: string,
+  limit = 20,
+  database = 'us'
+): Promise<ReferringDomain[]> {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error('SEMRUSH_API_KEY not configured');
+
+  const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  const cacheKey = `backlinks_refdomains_${database}_${cleanDomain.replace(/\./g, '_')}_${limit}`;
+  const cached = readCache<ReferringDomain[]>(workspaceId, cacheKey, 48);
+  if (cached) {
+    logCreditUsage({ credits: 0, endpoint: 'backlinks_refdomains', query: cleanDomain, rowsReturned: cached.length, workspaceId, cached: true });
+    return cached;
+  }
+
+  const params = new URLSearchParams({
+    type: 'backlinks_refdomains',
+    key: apiKey,
+    target: cleanDomain,
+    target_type: 'root_domain',
+    display_limit: String(limit),
+    display_sort: 'domain_ascore_desc',
+    export_columns: 'domain_ascore,domain,backlinks_num,first_seen,last_seen',
+  });
+
+  const res = await fetch(`${SEMRUSH_API_BASE}?${params}`);
+  if (!res.ok) {
+    const errText = await res.text();
+    log.warn(`Referring domains error for "${cleanDomain}": ${errText.slice(0, 200)}`);
+    return [];
+  }
+
+  const csv = await res.text();
+  if (csv.startsWith('ERROR')) {
+    if (csv.includes('NOTHING FOUND')) {
+      log.info(`No referring domains found for "${cleanDomain}"`);
+    } else {
+      log.warn(`Referring domains error for "${cleanDomain}": ${csv}`);
+    }
+    return [];
+  }
+
+  const rows = parseSemrushCSV(csv);
+  const results: ReferringDomain[] = rows.map(row => ({
+    domain: row['domain'] || '',
+    backlinksCount: parseInt(row['backlinks_num'] || '0', 10),
+    firstSeen: row['first_seen'] || '',
+    lastSeen: row['last_seen'] || '',
+  }));
+
+  logCreditUsage({ credits: results.length * 10, endpoint: 'backlinks_refdomains', query: cleanDomain, rowsReturned: results.length, workspaceId, cached: false });
+  writeCache(workspaceId, cacheKey, results);
+  return results;
+}
+
 // ── Estimate credit cost for an operation ──
 export function estimateCreditCost(opts: {
   mode: 'quick' | 'full';

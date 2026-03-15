@@ -111,8 +111,9 @@
           "source": "Roadmap review Mar 2026",
           "est": "2-3h",
           "priority": "P2",
-          "notes": "Quick win using existing SEMRush integration (getDomainOrganic already available). Show: total backlinks, referring domains count, top 10 referring domains, new/lost backlinks trend (30d). Add as sub-section in Strategy tab or standalone panel. Backlinks are a top-3 ranking factor — even a basic view strengthens premium tier value prop significantly. Full backlink intelligence (#110) is a separate, larger effort.",
-          "status": "pending"
+          "notes": "Shipped — BacklinkProfile component in Strategy tab via SEMRush backlinks_overview + backlinks_refdomains APIs. Shows total backlinks, referring domains, follow/nofollow ratio, link types, top 15 referring domains table. Cached 48h. Graceful fallback when SEMRush not configured.",
+          "status": "done",
+          "shippedAt": "2026-03-15"
         },
         {
           "id": 36,
