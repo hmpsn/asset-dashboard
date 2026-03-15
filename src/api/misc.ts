@@ -107,8 +107,8 @@ export const jobs = {
 
 // ── Chat (admin + public) ───────────────────────────────────────
 export const chat = {
-  adminAsk: (body: { workspaceId: string; question: string; context: Record<string, unknown>; sessionId: string }) =>
-    post<{ answer?: string; error?: string }>('/api/admin-chat', body),
+  adminAsk: (body: { workspaceId: string; question: string; sessionId: string; days?: number }) =>
+    post<{ answer?: string; error?: string; mode?: string; dataSourceCount?: number }>('/api/admin-chat', body),
 
   publicAsk: (wsId: string, body: { question: string; context: Record<string, unknown>; sessionId: string; betaMode?: boolean }) =>
     post<{ answer?: string; error?: string }>(`/api/public/search-chat/${wsId}`, body),

@@ -2,14 +2,13 @@ import { useState, useEffect } from 'react';
 import {
   Loader2, Search, TrendingUp, TrendingDown, Eye, MousePointer,
   BarChart3, ExternalLink, ArrowUpDown,
-  Sparkles, AlertTriangle, Target, Zap, Shield, X,
+  AlertTriangle, Target, Zap, Shield,
 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import { PageHeader, StatCard, SectionCard, TabBar, DateRangeSelector, EmptyState } from './ui';
 import { DATE_PRESETS_SEARCH } from './ui/constants';
-import { ChatPanel, type ChatMessage } from './ChatPanel';
 import { gscAdmin } from '../api/analytics';
-import type { SearchOverview, PerformanceTrend, SearchComparison } from '../../shared/types/analytics';
+import type { SearchOverview, PerformanceTrend, SearchComparison, SearchQuery, SearchPage } from '../../shared/types/analytics';
 
 interface DeviceBreakdown {
   device: string;
@@ -90,12 +89,6 @@ function TrendChart({ data, metric, color, height = 80 }: { data: PerformanceTre
 type SortKey = 'clicks' | 'impressions' | 'ctr' | 'position';
 type DataTab = 'queries' | 'pages' | 'insights';
 
-const QUICK_QUESTIONS = [
-  'What are my biggest SEO opportunities right now?',
-  'Which pages should I optimize first for more traffic?',
-  'Why is my CTR low and how can I improve it?',
-  'What content should I create next based on search data?',
-];
 
 export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
   const [overview, setOverview] = useState<SearchOverview | null>(null);
@@ -111,11 +104,6 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>('clicks');
   const [sortAsc, setSortAsc] = useState(false);
 
-  // AI Chat state
-  const [chatOpen, setChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [chatInput, setChatInput] = useState('');
-  const [chatLoading, setChatLoading] = useState(false);
 
   // Load data when gscPropertyUrl is available
   useEffect(() => {
@@ -153,40 +141,6 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
     }
   };
 
-  const askAi = async (question: string) => {
-    if (!question.trim() || !overview) return;
-    const userMsg: ChatMessage = { role: 'user', content: question.trim() };
-    setChatMessages(prev => [...prev, userMsg]);
-    setChatInput('');
-    setChatLoading(true);
-    try {
-      const context = {
-        dateRange: overview.dateRange,
-        days,
-        totalClicks: overview.totalClicks,
-        totalImpressions: overview.totalImpressions,
-        avgCtr: overview.avgCtr,
-        avgPosition: overview.avgPosition,
-        topQueries: overview.topQueries,
-        topPages: overview.topPages,
-        trendSummary: trend.length > 1 ? {
-          firstDay: trend[0],
-          lastDay: trend[trend.length - 1],
-          totalDays: trend.length,
-        } : null,
-        devices: devices.length > 0 ? devices : undefined,
-        countries: countries.length > 0 ? countries.slice(0, 5) : undefined,
-        searchTypes: searchTypes.length > 0 ? searchTypes : undefined,
-        periodComparison: comparison || undefined,
-      };
-      const data = await gscAdmin.chat(siteId, { question: question.trim(), context });
-      setChatMessages(prev => [...prev, { role: 'assistant', content: data.answer }]);
-    } catch {
-      setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I couldn\'t process that question. Please try again.' }]);
-    } finally {
-      setChatLoading(false);
-    }
-  };
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -249,14 +203,6 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
         subtitle={gscPropertyUrl}
         icon={<Search className="w-4 h-4 text-zinc-500" />}
         actions={<>
-          <button
-            onClick={() => setChatOpen(!chatOpen)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-              chatOpen ? 'bg-teal-600 text-white' : 'bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5" /> Ask AI
-          </button>
           <DateRangeSelector
             options={DATE_PRESETS_SEARCH}
             selected={days}
@@ -276,30 +222,6 @@ export function SearchConsole({ siteId, gscPropertyUrl }: Props) {
         </div>
       )}
 
-      {/* AI Chat Panel */}
-      {chatOpen && overview && (
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-teal-400" />
-              <span className="text-sm font-medium text-zinc-200">SEO AI Assistant</span>
-              <span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">GPT-4o</span>
-            </div>
-            <button onClick={() => setChatOpen(false)} className="text-zinc-500 hover:text-zinc-300" aria-label="Close chat"><X className="w-4 h-4" /></button>
-          </div>
-          <div className="max-h-80 overflow-y-auto">
-            <ChatPanel
-              messages={chatMessages}
-              loading={chatLoading}
-              input={chatInput}
-              onInputChange={setChatInput}
-              onSend={askAi}
-              quickQuestions={QUICK_QUESTIONS}
-              placeholder="Ask about your search data..."
-            />
-          </div>
-        </div>
-      )}
 
       {overview && !dataLoading && (
         <>
