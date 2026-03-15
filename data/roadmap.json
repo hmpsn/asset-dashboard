@@ -121,8 +121,9 @@
           "source": "FEATURE_AUDIT",
           "est": "2-3h",
           "priority": "P3",
-          "notes": "Pull crawl errors from GSC to seed redirect scanner in Links tab.",
-          "status": "pending"
+          "notes": "Shipped — Already implemented via getAllGscPages() ghost URL cross-referencing in redirect scanner. GSC pages that don't exist on site are added with source:'gsc', shown with amber badges in UI, and get redirect recommendations.",
+          "status": "done",
+          "shippedAt": "2026-03-15"
         },
         {
           "id": 37,
@@ -1808,6 +1809,27 @@
           "title": "Beta client feedback & bug submission",
           "status": "done",
           "shippedAt": "2026"
+        },
+        {
+          "id": 204,
+          "title": "Bulk page operations in SEO Editor (pattern apply + bulk AI rewrite)",
+          "status": "done",
+          "shippedAt": "2026-03",
+          "notes": "Shipped — multi-select toolbar, pattern append/prepend, concurrent AI rewrite with dry-run preview"
+        },
+        {
+          "id": 199,
+          "title": "Competitive Intelligence Hub in Strategy tab",
+          "status": "done",
+          "shippedAt": "2026-03",
+          "notes": "Shipped — SEMRush domain overview, keyword gaps, backlinks, top keywords comparison for up to 3 competitors"
+        },
+        {
+          "id": 107,
+          "title": "AI internal linking engine enhancements",
+          "status": "done",
+          "shippedAt": "2026-03",
+          "notes": "Shipped — orphan page detection, per-page link health scoring, grouped view, copy-to-clipboard HTML links"
         }
       ]
     }

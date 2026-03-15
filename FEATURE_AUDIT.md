@@ -1496,9 +1496,9 @@ When the user asks to update this document with recent features, follow this pro
 | Architecture | 5 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types |
 | Infrastructure | 7 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3 + integrity verification), E2E tests, job persistence, anomaly deploy guard |
 
-**126 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**129 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **126**. Last updated: March 2026 (backlink profile).
+Current feature count: **129**. Last updated: March 2026 (bulk ops, competitive intel, internal links enhancements).
 
 ### Recent Additions (March 2026)
 
@@ -1545,3 +1545,15 @@ Current feature count: **126**. Last updated: March 2026 (backlink profile).
 **126. Lightweight Backlink Profile Overview**
 **What it does:** Domain-level backlink profile section in the Strategy tab powered by SEMRush Backlinks API. Shows total backlinks, referring domains, follow/nofollow ratio, link types (text/image), and a sortable table of top 15 referring domains with backlink counts and first/last seen dates. Domains are clickable external links. Data cached for 48 hours. Gracefully handles missing SEMRush config with an informational message.
 **Files:** `server/semrush.ts` (`getBacklinksOverview`, `getTopReferringDomains`), `server/routes/backlinks.ts` (new), `server/app.ts`, `src/components/strategy/BacklinkProfile.tsx` (new), `src/components/KeywordStrategy.tsx`
+
+**127. Bulk Page Operations in SEO Editor**
+**What it does:** Multi-select pages in the SEO Editor and apply bulk operations. Two modes: (1) Pattern Apply — append/prepend text to selected pages' titles or descriptions with instant preview and length-aware truncation. (2) Bulk AI Rewrite — concurrent AI rewriting (3 at a time) with dry-run preview showing old→new diff for each page before committing. Toolbar appears when pages are selected with field picker, action buttons, and progress bar during application. Both modes push changes to Webflow via the existing SEO update API.
+**Files:** `server/routes/webflow-seo.ts` (2 new POST routes: `seo-pattern-apply`, `seo-bulk-rewrite`), `shared/types/workspace.ts` (extended `source` union), `src/components/SeoEditor.tsx` (bulk state, handlers, toolbar + preview UI)
+
+**128. Competitive Intelligence Hub**
+**What it does:** SEMRush-powered competitive intelligence section in the Strategy tab. Fetches domain overview metrics (organic traffic, keywords, traffic value), backlink data, keyword gaps, and top keywords for your domain vs up to 3 competitors — all in parallel. UI shows stat cards for your domain, expandable competitor panels with side-by-side comparison bars (traffic, keywords, referring domains, traffic value), competitor top keywords table, and a collapsible keyword gaps section sorted by traffic potential. Requires SEMRush in "full" mode with competitor domains configured.
+**Files:** `server/semrush.ts` (`getDomainOverview` — new `domain_ranks` API function), `server/routes/semrush.ts` (new `GET /api/semrush/competitive-intel/:workspaceId`), `src/components/strategy/CompetitiveIntel.tsx` (new), `src/components/KeywordStrategy.tsx`
+
+**129. AI Internal Linking Engine Enhancements**
+**What it does:** Extends the internal linking analysis with orphan page detection and per-page link health scoring. Each page gets a 0-100 health score based on inbound + outbound link counts. Orphan pages (zero inbound links, excluding homepage) are flagged with a dedicated expandable warning section showing path, title, and outbound count. Frontend adds: 5-column stat bar (High/Medium/Low priority + Orphan Pages + Avg Link Score), collapsible orphan pages panel, list/grouped view toggle (group suggestions by source page for batch implementation), and one-click copy-to-clipboard for HTML link snippets (`<a href="...">anchor</a>`).
+**Files:** `server/internal-links.ts` (`PageLinkHealth` interface, orphan detection, per-page scoring), `src/components/InternalLinks.tsx` (orphan UI, grouped view, copy buttons)

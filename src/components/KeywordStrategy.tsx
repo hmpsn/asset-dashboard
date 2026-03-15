@@ -11,6 +11,7 @@ import { KeywordAnalysis } from './KeywordAnalysis';
 import { StatCard, AIContextIndicator } from './ui';
 import { SeoCopyPanel } from './strategy/SeoCopyPanel';
 import { BacklinkProfile } from './strategy/BacklinkProfile';
+import { CompetitiveIntel } from './strategy/CompetitiveIntel';
 import { adminPath } from '../routes';
 
 interface PageKeywordMap {
@@ -1068,6 +1069,13 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
 
           {/* Backlink Profile */}
           <BacklinkProfile workspaceId={workspaceId} />
+
+          {/* Competitive Intelligence Hub */}
+          <CompetitiveIntel
+            workspaceId={workspaceId}
+            competitors={competitors.split(/[,\n]+/).map(c => c.trim()).filter(Boolean)}
+            semrushAvailable={semrushAvailable && semrushMode === 'full'}
+          />
 
           {/* How it works */}
           <div className="bg-zinc-800/30 rounded-lg border border-zinc-800 px-4 py-3">

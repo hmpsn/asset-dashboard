@@ -313,6 +313,175 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', async (req, res) => {
   res.json({ results, field });
 });
 
+// --- Bulk Pattern Apply (instant text transforms, no AI) ---
+router.post('/api/webflow/seo-pattern-apply/:siteId', async (req, res) => {
+  const { pages, field, action, text: patternText } = req.body as {
+    pages: Array<{ pageId: string; title: string; slug?: string; currentValue: string }>;
+    field: 'title' | 'description';
+    action: 'append' | 'prepend' | 'replace';
+    text: string;
+  };
+  if (!pages?.length || !field || !action || !patternText) {
+    return res.status(400).json({ error: 'pages, field, action, text required' });
+  }
+
+  const siteId = req.params.siteId;
+  const token = getTokenForSite(siteId) || undefined;
+  const ws = listWorkspaces().find(w => w.webflowSiteId === siteId);
+  const maxLen = field === 'description' ? 160 : 60;
+
+  const results: Array<{ pageId: string; oldValue: string; newValue: string; applied: boolean; error?: string }> = [];
+
+  for (const page of pages) {
+    try {
+      let newValue: string;
+      if (action === 'append') {
+        newValue = `${page.currentValue} ${patternText}`.trim();
+      } else if (action === 'prepend') {
+        newValue = `${patternText} ${page.currentValue}`.trim();
+      } else {
+        newValue = patternText;
+      }
+
+      // Truncate if over limit
+      if (newValue.length > maxLen) {
+        const truncated = newValue.slice(0, maxLen);
+        const lastSpace = truncated.lastIndexOf(' ');
+        newValue = lastSpace > maxLen * 0.6 ? truncated.slice(0, lastSpace) : truncated;
+      }
+
+      const seoFields = field === 'description'
+        ? { seo: { description: newValue } }
+        : { seo: { title: newValue } };
+      await updatePageSeo(page.pageId, seoFields, token);
+
+      if (ws) {
+        updatePageState(ws.id, page.pageId, { status: 'live', source: 'pattern-apply', fields: [field], updatedBy: 'admin' });
+        recordSeoChange(ws.id, page.pageId, page.slug || '', page.title || '', [field], 'pattern-apply');
+      }
+      results.push({ pageId: page.pageId, oldValue: page.currentValue, newValue, applied: true });
+    } catch (err) {
+      results.push({ pageId: page.pageId, oldValue: page.currentValue, newValue: '', applied: false, error: String(err) });
+    }
+  }
+
+  res.json({ results, field, action });
+});
+
+// --- Bulk AI Rewrite (selected pages, concurrency-limited) ---
+router.post('/api/webflow/seo-bulk-rewrite/:siteId', async (req, res) => {
+  const { pages, field, workspaceId, dryRun } = req.body as {
+    pages: Array<{ pageId: string; title: string; slug?: string; currentSeoTitle?: string; currentDescription?: string }>;
+    field: 'title' | 'description';
+    workspaceId?: string;
+    dryRun?: boolean; // preview only, don't push to Webflow
+  };
+  if (!pages?.length || !field) return res.status(400).json({ error: 'pages, field required' });
+
+  const openaiKey = process.env.OPENAI_API_KEY;
+  const siteId = req.params.siteId;
+  const token = getTokenForSite(siteId) || undefined;
+  if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
+
+  const ws = workspaceId ? getWorkspace(workspaceId) : listWorkspaces().find(w => w.webflowSiteId === siteId);
+  let baseUrl = '';
+  if (ws?.liveDomain) {
+    baseUrl = ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;
+  } else {
+    try {
+      const sub = await getSiteSubdomain(siteId, token);
+      if (sub) baseUrl = `https://${sub}.webflow.io`;
+    } catch { /* best-effort */ }
+  }
+
+  const inlineBrandName = ws?.webflowSiteName || ws?.name || '';
+  const maxLen = field === 'description' ? 160 : 60;
+  const CONCURRENCY = 3;
+
+  const results: Array<{ pageId: string; oldValue: string; newValue: string; applied: boolean; error?: string }> = [];
+
+  // Process in concurrent batches for performance
+  for (let i = 0; i < pages.length; i += CONCURRENCY) {
+    const batch = pages.slice(i, i + CONCURRENCY);
+    const batchResults = await Promise.allSettled(batch.map(async (page) => {
+      const { keywordBlock, brandVoiceBlock: bvBlock } = buildSeoContext(workspaceId || ws?.id, page.slug ? `/${page.slug}` : undefined);
+
+      // Fetch page content for context (best-effort)
+      let contentExcerpt = '';
+      if (baseUrl && page.slug) {
+        try {
+          const htmlRes = await fetch(`${baseUrl}/${page.slug}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
+          if (htmlRes.ok) {
+            const html = await htmlRes.text();
+            const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+            const body = bodyMatch ? bodyMatch[1] : html;
+            contentExcerpt = body
+              .replace(/<script[\s\S]*?<\/script>/gi, '')
+              .replace(/<style[\s\S]*?<\/style>/gi, '')
+              .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+              .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+              .replace(/<[^>]+>/g, ' ')
+              .replace(/\s+/g, ' ')
+              .trim()
+              .slice(0, 800);
+          }
+        } catch { /* best-effort */ }
+      }
+
+      const contentSection = contentExcerpt ? `\nPage content excerpt: ${contentExcerpt}` : '';
+      const brandNote = inlineBrandName ? `\nBrand name is "${inlineBrandName}" — use this exact name, never an abbreviated version.` : '';
+      const locationRule = `\n- LOCATION RULE: If this page's primary keyword targets a specific city/region, ALWAYS use THAT location.`;
+
+      const oldValue = field === 'title' ? (page.currentSeoTitle || '') : (page.currentDescription || '');
+      const prompt = field === 'description'
+        ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${oldValue}".${contentSection}${keywordBlock}${bvBlock}${brandNote}\n\nRules:\n- 150-160 characters, hard limit 160\n- Include primary keyword naturally\n- Include a call-to-action or value proposition\n- Match the brand voice if provided${locationRule}\nReturn ONLY the text.`
+        : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${oldValue}".${contentSection}${keywordBlock}${bvBlock}${brandNote}\n\nRules:\n- 50-60 characters, hard limit 60\n- Front-load the primary keyword\n- Match the brand voice if provided${locationRule}\nReturn ONLY the text.`;
+
+      const aiResult = await callOpenAI({
+        model: 'gpt-4.1-mini',
+        messages: [{ role: 'user', content: prompt }],
+        maxTokens: 200,
+        temperature: 0.7,
+        feature: 'seo-bulk-rewrite',
+        workspaceId: workspaceId || ws?.id,
+      });
+
+      let text = aiResult.text.replace(/^["']|["']$/g, '');
+      if (text.length > maxLen) {
+        const truncated = text.slice(0, maxLen);
+        const lastSpace = truncated.lastIndexOf(' ');
+        text = lastSpace > maxLen * 0.6 ? truncated.slice(0, lastSpace) : truncated;
+      }
+
+      if (!text) return { pageId: page.pageId, oldValue, newValue: '', applied: false, error: 'Empty AI response' };
+
+      if (!dryRun) {
+        const seoFields = field === 'description'
+          ? { seo: { description: text } }
+          : { seo: { title: text } };
+        await updatePageSeo(page.pageId, seoFields, token);
+        if (ws) {
+          updatePageState(ws.id, page.pageId, { status: 'live', source: 'bulk-rewrite', fields: [field], updatedBy: 'admin' });
+          recordSeoChange(ws.id, page.pageId, page.slug || '', page.title || '', [field], 'bulk-rewrite');
+        }
+      }
+
+      return { pageId: page.pageId, oldValue, newValue: text, applied: !dryRun };
+    }));
+
+    for (const r of batchResults) {
+      if (r.status === 'fulfilled') {
+        results.push(r.value);
+      } else {
+        results.push({ pageId: batch[results.length % batch.length]?.pageId || '', oldValue: '', newValue: '', applied: false, error: String(r.reason) });
+      }
+    }
+  }
+
+  log.info(`Bulk rewrite: ${results.filter(r => r.applied).length}/${pages.length} ${field}s ${dryRun ? 'previewed' : 'updated'}`);
+  res.json({ results, field, dryRun: !!dryRun });
+});
+
 // --- Fetch page HTML body text (for keyword analysis) ---
 router.get('/api/webflow/page-html/:siteId', async (req, res) => {
   const { siteId } = req.params;

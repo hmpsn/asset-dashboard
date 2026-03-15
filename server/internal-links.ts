@@ -31,11 +31,22 @@ export interface LinkSuggestion {
   priority: 'high' | 'medium' | 'low';
 }
 
+export interface PageLinkHealth {
+  path: string;
+  title: string;
+  outboundLinks: number;
+  inboundLinks: number;
+  score: number; // 0-100
+  isOrphan: boolean; // no inbound links from other pages
+}
+
 export interface InternalLinkResult {
   suggestions: LinkSuggestion[];
   pageCount: number;
   existingLinkCount: number;
   analyzedAt: string;
+  pageHealth?: PageLinkHealth[];
+  orphanCount?: number;
 }
 
 async function fetchPageContent(url: string): Promise<{ content: string; internalLinks: string[] } | null> {
@@ -147,8 +158,38 @@ export async function analyzeInternalLinks(
   const existingLinkCount = pages.reduce((sum, p) => sum + p.existingInternalLinks.length, 0);
   log.info(`Internal links: ${pages.length} pages loaded, ${existingLinkCount} existing internal links`);
 
+  // Compute per-page link health + orphan detection
+  const allPaths = new Set(pages.map(p => p.path.toLowerCase()));
+  const inboundCounts = new Map<string, number>();
+  for (const p of pages) {
+    for (const link of p.existingInternalLinks) {
+      const norm = link.toLowerCase().replace(/\/$/, '') || '/';
+      if (allPaths.has(norm) && norm !== p.path.toLowerCase()) {
+        inboundCounts.set(norm, (inboundCounts.get(norm) || 0) + 1);
+      }
+    }
+  }
+
+  const pageHealth: PageLinkHealth[] = pages.map(p => {
+    const normPath = p.path.toLowerCase().replace(/\/$/, '') || '/';
+    const outbound = p.existingInternalLinks.filter(l => {
+      const n = l.toLowerCase().replace(/\/$/, '') || '/';
+      return allPaths.has(n) && n !== normPath;
+    }).length;
+    const inbound = inboundCounts.get(normPath) || 0;
+    const isOrphan = inbound === 0 && normPath !== '/';
+    // Score: 0-100 based on having healthy inbound + outbound links
+    const inScore = Math.min(inbound, 5) * 10; // up to 50 for 5+ inbound
+    const outScore = Math.min(outbound, 5) * 10; // up to 50 for 5+ outbound
+    const score = Math.min(inScore + outScore, 100);
+    return { path: p.path, title: p.title, outboundLinks: outbound, inboundLinks: inbound, score, isOrphan };
+  });
+
+  const orphanCount = pageHealth.filter(p => p.isOrphan).length;
+  log.info(`Internal links: ${orphanCount} orphan pages detected`);
+
   if (!openaiKey || pages.length < 2) {
-    return { suggestions: [], pageCount: pages.length, existingLinkCount, analyzedAt: new Date().toISOString() };
+    return { suggestions: [], pageCount: pages.length, existingLinkCount, analyzedAt: new Date().toISOString(), pageHealth, orphanCount };
   }
 
   // Enrich with brand voice for better anchor text quality
@@ -257,9 +298,11 @@ Return ONLY valid JSON array, no markdown fences, no explanation.`;
       pageCount: pages.length,
       existingLinkCount,
       analyzedAt: new Date().toISOString(),
+      pageHealth,
+      orphanCount,
     };
   } catch (err) {
     log.error({ err: err }, 'Internal links analysis error');
-    return { suggestions: [], pageCount: pages.length, existingLinkCount, analyzedAt: new Date().toISOString() };
+    return { suggestions: [], pageCount: pages.length, existingLinkCount, analyzedAt: new Date().toISOString(), pageHealth, orphanCount };
   }
 }

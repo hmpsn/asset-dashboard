@@ -451,6 +451,77 @@ export async function getRelatedKeywords(
   return results;
 }
 
+// ── Domain Overview (domain-level organic traffic & keyword metrics) ──
+export interface DomainOverview {
+  domain: string;
+  organicKeywords: number;
+  organicTraffic: number;
+  organicCost: number;  // estimated cost if paying via PPC
+  paidKeywords: number;
+  paidTraffic: number;
+  paidCost: number;
+}
+
+export async function getDomainOverview(
+  domain: string,
+  workspaceId: string,
+  database = 'us'
+): Promise<DomainOverview | null> {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error('SEMRUSH_API_KEY not configured');
+
+  const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  const cacheKey = `domain_overview_${database}_${cleanDomain.replace(/\./g, '_')}`;
+  const cached = readCache<DomainOverview>(workspaceId, cacheKey, 48);
+  if (cached) {
+    logCreditUsage({ credits: 0, endpoint: 'domain_ranks', query: cleanDomain, rowsReturned: 1, workspaceId, cached: true });
+    return cached;
+  }
+
+  const params = new URLSearchParams({
+    type: 'domain_ranks',
+    key: apiKey,
+    domain: cleanDomain,
+    database,
+    export_columns: 'Dn,Or,Ot,Oc,Ad,At,Ac',
+  });
+
+  const res = await fetch(`${SEMRUSH_API_BASE}?${params}`);
+  if (!res.ok) {
+    const errText = await res.text();
+    log.warn(`Domain overview error for "${cleanDomain}": ${errText.slice(0, 200)}`);
+    return null;
+  }
+
+  const csv = await res.text();
+  if (csv.startsWith('ERROR')) {
+    if (csv.includes('NOTHING FOUND')) {
+      log.info(`No domain overview data for "${cleanDomain}"`);
+    } else {
+      log.warn(`Domain overview error for "${cleanDomain}": ${csv}`);
+    }
+    return null;
+  }
+
+  const rows = parseSemrushCSV(csv);
+  if (rows.length === 0) return null;
+
+  const row = rows[0];
+  const overview: DomainOverview = {
+    domain: cleanDomain,
+    organicKeywords: parseInt(row['Or'] || '0', 10),
+    organicTraffic: parseInt(row['Ot'] || '0', 10),
+    organicCost: parseFloat(row['Oc'] || '0'),
+    paidKeywords: parseInt(row['Ad'] || '0', 10),
+    paidTraffic: parseInt(row['At'] || '0', 10),
+    paidCost: parseFloat(row['Ac'] || '0'),
+  };
+
+  logCreditUsage({ credits: 10, endpoint: 'domain_ranks', query: cleanDomain, rowsReturned: 1, workspaceId, cached: false });
+  writeCache(workspaceId, cacheKey, overview);
+  return overview;
+}
+
 // ── Backlinks Overview (domain-level backlink summary) ──
 export interface BacklinksOverview {
   totalBacklinks: number;

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Loader2, ArrowRight, RefreshCw, ExternalLink, Search as SearchIcon,
   Link, AlertCircle, ChevronDown, ChevronRight, ArrowUpRight,
+  AlertTriangle, Copy, Check, LayoutList, List,
 } from 'lucide-react';
 import { PageHeader, StatCard } from './ui';
 
@@ -15,11 +16,22 @@ interface LinkSuggestion {
   priority: 'high' | 'medium' | 'low';
 }
 
+interface PageLinkHealth {
+  path: string;
+  title: string;
+  outboundLinks: number;
+  inboundLinks: number;
+  score: number;
+  isOrphan: boolean;
+}
+
 interface InternalLinkResult {
   suggestions: LinkSuggestion[];
   pageCount: number;
   existingLinkCount: number;
   analyzedAt: string;
+  pageHealth?: PageLinkHealth[];
+  orphanCount?: number;
 }
 
 interface Props {
@@ -42,6 +54,9 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
   const [filter, setFilter] = useState<PriorityFilter>('all');
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [viewMode, setViewMode] = useState<'list' | 'grouped'>('list');
+  const [copied, setCopied] = useState<number | null>(null);
+  const [showOrphans, setShowOrphans] = useState(false);
 
   const runAnalysis = async () => {
     setLoading(true);
@@ -149,11 +164,40 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
       />
 
       {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-5 gap-3">
         <StatCard label="High Priority" value={counts.high} valueColor="text-red-400" />
         <StatCard label="Medium Priority" value={counts.medium} valueColor="text-amber-400" />
         <StatCard label="Low Priority" value={counts.low} valueColor="text-blue-400" />
+        <StatCard label="Orphan Pages" value={data.orphanCount || 0} valueColor={data.orphanCount ? 'text-orange-400' : 'text-zinc-400'} />
+        <StatCard label="Avg Link Score" value={data.pageHealth?.length ? Math.round(data.pageHealth.reduce((s, p) => s + p.score, 0) / data.pageHealth.length) : '—'} sub="/100" />
       </div>
+
+      {/* Orphan Pages Warning */}
+      {data.orphanCount && data.orphanCount > 0 && (
+        <div className="bg-zinc-900 rounded-xl border border-orange-500/20 overflow-hidden">
+          <button
+            onClick={() => setShowOrphans(!showOrphans)}
+            className="w-full px-4 py-3 flex items-center gap-2 hover:bg-zinc-800/30 transition-colors"
+          >
+            {showOrphans ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500" />}
+            <AlertTriangle className="w-4 h-4 text-orange-400" />
+            <span className="text-sm font-medium text-orange-300 flex-1 text-left">{data.orphanCount} Orphan Pages</span>
+            <span className="text-[11px] text-zinc-500">No internal links point to these pages</span>
+          </button>
+          {showOrphans && data.pageHealth && (
+            <div className="px-4 pb-3 border-t border-zinc-800 pt-2 space-y-1 max-h-[250px] overflow-y-auto">
+              {data.pageHealth.filter(p => p.isOrphan).map((p, i) => (
+                <div key={i} className="flex items-center gap-3 px-2 py-1.5 bg-zinc-950/50 rounded-lg text-xs">
+                  <span className="text-zinc-500 font-mono flex-1 truncate">{p.path}</span>
+                  <span className="text-zinc-400 truncate max-w-[200px]">{p.title}</span>
+                  <span className="text-orange-400">0 inbound</span>
+                  <span className="text-zinc-500">{p.outboundLinks} outbound</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Filter + search */}
       <div className="flex items-center gap-2">
@@ -189,6 +233,14 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
             className="w-full pl-7 pr-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
           />
         </div>
+        <div className="flex items-center gap-0.5 bg-zinc-800 rounded-lg p-0.5">
+          <button onClick={() => setViewMode('list')} className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500'}`} title="List view">
+            <List className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={() => setViewMode('grouped')} className={`p-1.5 rounded ${viewMode === 'grouped' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500'}`} title="Group by page">
+            <LayoutList className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* Suggestions list */}
@@ -197,6 +249,46 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
           <div className="px-4 py-8 text-center text-xs text-zinc-500">
             No suggestions match your filter
           </div>
+        ) : viewMode === 'grouped' ? (
+          // Grouped by source page
+          (() => {
+            const groups = new Map<string, typeof filtered>();
+            for (const s of filtered) {
+              const key = s.fromPage;
+              if (!groups.has(key)) groups.set(key, []);
+              groups.get(key)!.push(s);
+            }
+            return Array.from(groups.entries()).map(([fromPage, suggestions]) => (
+              <div key={fromPage} className="border-b border-zinc-800/50 last:border-b-0">
+                <div className="px-4 py-2.5 bg-zinc-800/30">
+                  <div className="flex items-center gap-2">
+                    <Link className="w-3.5 h-3.5 text-teal-400" />
+                    <span className="text-xs font-medium text-zinc-200">{suggestions[0].fromTitle}</span>
+                    <span className="text-[11px] text-zinc-500 font-mono">{fromPage}</span>
+                    <span className="text-[11px] text-zinc-500 ml-auto">{suggestions.length} links to add</span>
+                  </div>
+                </div>
+                {suggestions.map((s, i) => {
+                  const cfg = priorityConfig[s.priority];
+                  return (
+                    <div key={i} className="flex items-center gap-3 px-4 py-2 pl-10 hover:bg-zinc-800/20 transition-colors">
+                      <ArrowRight className="w-3 h-3 text-zinc-500 flex-shrink-0" />
+                      <span className="text-xs text-zinc-300 font-mono truncate max-w-[160px]">{s.toPage}</span>
+                      <span className="text-[11px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded truncate max-w-[180px]">"{s.anchorText}"</span>
+                      <span className={`text-[11px] px-1.5 py-0.5 rounded border ${cfg.bg} ${cfg.color}`}>{cfg.label}</span>
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(`<a href="${s.toPage}">${s.anchorText}</a>`); setCopied(i); setTimeout(() => setCopied(null), 2000); }}
+                        className="ml-auto text-zinc-500 hover:text-zinc-300 transition-colors"
+                        title="Copy HTML link"
+                      >
+                        {copied === i ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            ));
+          })()
         ) : (
           filtered.map((s, idx) => {
             const isExpanded = expanded.has(idx);
@@ -221,6 +313,13 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
                     <span className={`text-[11px] px-1.5 py-0.5 rounded border ${cfg.bg} ${cfg.color}`}>
                       {cfg.label}
                     </span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(`<a href="${s.toPage}">${s.anchorText}</a>`); setCopied(idx); setTimeout(() => setCopied(null), 2000); }}
+                      className="text-zinc-500 hover:text-zinc-300 transition-colors"
+                      title="Copy HTML link"
+                    >
+                      {copied === idx ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
+                    </button>
                   </div>
                 </button>
                 {isExpanded && (
