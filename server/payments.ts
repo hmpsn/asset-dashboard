@@ -163,6 +163,16 @@ export function listAllPayments(): PaymentRecord[] {
   return rows.map(rowToRecord);
 }
 
+export function deletePayment(id: string): boolean {
+  const result = db.prepare('DELETE FROM payments WHERE id = ?').run(id);
+  return result.changes > 0;
+}
+
+export function deleteAllPayments(): number {
+  const result = db.prepare('DELETE FROM payments').run();
+  return result.changes;
+}
+
 export function getPaymentBySession(
   workspaceId: string,
   stripeSessionId: string

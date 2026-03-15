@@ -2,7 +2,7 @@
  * revenue routes — admin-only revenue analytics dashboard
  */
 import { Router } from 'express';
-import { listAllPayments } from '../payments.js';
+import { listAllPayments, deletePayment, deleteAllPayments } from '../payments.js';
 import { listWorkspaces } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 
@@ -101,6 +101,29 @@ router.get('/api/revenue/summary', (_req, res) => {
   } catch (err) {
     log.error({ err }, 'Failed to generate revenue summary');
     res.status(500).json({ error: 'Failed to generate revenue summary' });
+  }
+});
+
+router.delete('/api/revenue/payments/:id', (req, res) => {
+  try {
+    const deleted = deletePayment(req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Payment not found' });
+    log.info(`Payment deleted: ${req.params.id}`);
+    res.json({ ok: true });
+  } catch (err) {
+    log.error({ err }, 'Failed to delete payment');
+    res.status(500).json({ error: 'Failed to delete payment' });
+  }
+});
+
+router.delete('/api/revenue/payments', (_req, res) => {
+  try {
+    const count = deleteAllPayments();
+    log.info(`Purged all payments: ${count} deleted`);
+    res.json({ ok: true, deleted: count });
+  } catch (err) {
+    log.error({ err }, 'Failed to purge payments');
+    res.status(500).json({ error: 'Failed to purge payments' });
   }
 });
 
