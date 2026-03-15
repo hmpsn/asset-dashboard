@@ -74,10 +74,13 @@ export async function generateFeaturedImage(
     const fileName = `${slug}-featured.png`;
     const altText = `Featured image for: ${post.title}`;
 
-    const uploadResult = await uploadAsset(siteId, tmpFile, fileName, altText, tokenOverride);
-
-    // Clean up temp file
-    try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+    let uploadResult: { success: boolean; assetId?: string; hostedUrl?: string; error?: string };
+    try {
+      uploadResult = await uploadAsset(siteId, tmpFile, fileName, altText, tokenOverride);
+    } finally {
+      // Clean up temp file regardless of success/failure
+      try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+    }
 
     if (!uploadResult.success) {
       return { success: false, error: uploadResult.error || 'Asset upload failed' };

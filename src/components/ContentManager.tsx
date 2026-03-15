@@ -62,7 +62,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
   // Check if workspace has publish target configured
   useEffect(() => {
     workspacesApi.getById(workspaceId)
-      .then((ws: any) => { if (ws?.publishTarget) setHasPublishTarget(true); })
+      .then((ws: Record<string, unknown>) => { if (ws && 'publishTarget' in ws && ws.publishTarget) setHasPublishTarget(true); })
       .catch(() => {});
   }, [workspaceId]);
 
