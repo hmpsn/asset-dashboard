@@ -63,7 +63,31 @@ export function runMigrations(): void {
   const applyMigration = db.transaction((file: string) => {
     const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf-8');
     log.info(`Applying migration: ${file}`);
-    db.exec(sql);
+    // For migrations containing ALTER TABLE ADD COLUMN, execute each
+    // statement individually so "duplicate column" errors (from concurrent
+    // test workers) don't abort the entire migration.
+    if (/ALTER\s+TABLE\s+\S+\s+ADD\s+COLUMN/i.test(sql)) {
+      // Strip comment lines, then split on semicolons
+      const stripped = sql.replace(/^--.*$/gm, '');
+      const statements = stripped
+        .split(';')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+      for (const stmt of statements) {
+        try {
+          db.exec(stmt);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : '';
+          if (msg.includes('duplicate column name')) {
+            log.info(`Skipping (column already exists): ${stmt.slice(0, 60)}…`);
+          } else {
+            throw err;
+          }
+        }
+      }
+    } else {
+      db.exec(sql);
+    }
     insert.run(file, new Date().toISOString());
   });
 

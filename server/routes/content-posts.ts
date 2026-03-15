@@ -6,6 +6,7 @@ import { Router } from 'express';
 const router = Router();
 
 import { addActivity } from '../activity-log.js';
+import { broadcastToWorkspace } from '../broadcast.js';
 import { getBrief } from '../content-brief.js';
 import {
   listPosts,
@@ -18,7 +19,13 @@ import {
   exportPostMarkdown,
   exportPostHTML,
 } from '../content-posts.js';
-import { getWorkspace } from '../workspaces.js';
+import { assemblePostHtml, generateSlug } from '../html-to-richtext.js';
+import {
+  createCollectionItem,
+  publishCollectionItems,
+} from '../webflow.js';
+import { getWorkspace, getTokenForSite } from '../workspaces.js';
+import { WS_EVENTS } from '../ws-events.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('content-posts');
@@ -111,9 +118,56 @@ router.post('/api/content-posts/:workspaceId/:postId/regenerate-section', async 
 });
 
 // Update post fields (inline editing of title, sections, status, etc.)
+// If status is changed to 'approved' and workspace has auto-publish configured,
+// triggers publish-to-webflow in the background.
 router.patch('/api/content-posts/:workspaceId/:postId', (req, res) => {
+  const previous = getPost(req.params.workspaceId, req.params.postId);
   const updated = updatePostField(req.params.workspaceId, req.params.postId, req.body);
   if (!updated) return res.status(404).json({ error: 'Post not found' });
+
+  // Auto-publish on approval if workspace has publishTarget and post isn't already published
+  if (req.body.status === 'approved' && previous?.status !== 'approved' && !updated.webflowItemId) {
+    const ws = getWorkspace(req.params.workspaceId);
+    if (ws?.publishTarget && ws.webflowSiteId) {
+      const token = getTokenForSite(ws.webflowSiteId) || undefined;
+      if (token) {
+        // Fire-and-forget background publish
+        const { collectionId, fieldMap } = ws.publishTarget;
+        const bodyHtml = assemblePostHtml(updated);
+        const slug = generateSlug(updated.title);
+        const fieldData: Record<string, unknown> = {};
+        if (fieldMap.title) fieldData[fieldMap.title] = updated.title;
+        if (fieldMap.slug) fieldData[fieldMap.slug] = slug;
+        if (fieldMap.body) fieldData[fieldMap.body] = bodyHtml;
+        if (fieldMap.metaTitle) fieldData[fieldMap.metaTitle] = updated.seoTitle || updated.title;
+        if (fieldMap.metaDescription) fieldData[fieldMap.metaDescription] = updated.seoMetaDescription || updated.metaDescription;
+        if (fieldMap.publishDate) fieldData[fieldMap.publishDate] = new Date().toISOString();
+
+        createCollectionItem(collectionId, fieldData, false, token).then(async (result) => {
+          if (result.success && result.itemId) {
+            await publishCollectionItems(collectionId, [result.itemId], token);
+            updatePostField(req.params.workspaceId, req.params.postId, {
+              webflowItemId: result.itemId,
+              webflowCollectionId: collectionId,
+              publishedAt: new Date().toISOString(),
+              publishedSlug: slug,
+            });
+            addActivity(req.params.workspaceId, 'content_published',
+              `Auto-published "${updated.title}" to Webflow CMS on approval`,
+              `Collection: ${ws.publishTarget!.collectionName} · Slug: ${slug}`,
+              { postId: req.params.postId, itemId: result.itemId, collectionId, slug });
+            broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_PUBLISHED, {
+              postId: req.params.postId, itemId: result.itemId, slug, title: updated.title });
+          } else {
+            log.warn(`Auto-publish failed for ${req.params.postId}: ${result.error}`);
+          }
+        }).catch(err => {
+          log.error({ err }, `Auto-publish error for ${req.params.postId}`);
+        });
+      }
+    }
+  }
+
   res.json(updated);
 });
 

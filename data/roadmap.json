@@ -289,8 +289,9 @@
           "source": "FEATURE_VISION #1",
           "est": "6-8h",
           "priority": "P0",
-          "notes": "Brief → AI generates → client approves → one-click publish to CMS collection. Already have Webflow CMS write access (PATCH collections/:id/items/:id). Gap is markdown → Webflow rich text formatting. Killer differentiator — no competitor goes from brief to live on site.",
-          "status": "pending"
+          "notes": "Shipped — Full pipeline: createCollectionItem API, HTML→rich-text converter, field mapping config with AI suggestions, DALL-E featured image generation, publish endpoint, PublishSettings admin UI, publish buttons in PostEditor/ContentManager, auto-publish on approval. Brief → AI generates → client approves → one-click publish to Webflow CMS collection.",
+          "status": "done",
+          "shippedAt": "2026-03"
         },
         {
           "id": 111,

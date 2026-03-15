@@ -65,6 +65,11 @@ export interface GeneratedPost {
   status: 'generating' | 'draft' | 'review' | 'approved';
   unificationStatus?: 'pending' | 'success' | 'failed' | 'skipped';
   unificationNote?: string;
+  // Webflow publish tracking
+  webflowItemId?: string;
+  webflowCollectionId?: string;
+  publishedAt?: string;
+  publishedSlug?: string;
   createdAt: string;
   updatedAt: string;
 }

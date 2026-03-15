@@ -39,6 +39,7 @@ export type ActivityType =
   | 'anomaly_detected'
   | 'anomaly_positive'
   | 'post_generated'
+  | 'content_published'
   | 'aeo_review'
   | 'note';
 
@@ -182,6 +183,7 @@ const CLIENT_VISIBLE_TYPES: Set<ActivityType> = new Set([
   'audit_completed', 'request_resolved', 'approval_applied', 'seo_updated',
   'images_optimized', 'links_fixed', 'content_updated', 'content_requested',
   'brief_generated', 'brief_approved', 'content_upgraded', 'fix_completed',
+  'content_published',
 ]);
 
 export function listClientActivity(workspaceId: string, limit = 50): ActivityEntry[] {

@@ -50,6 +50,7 @@ interface WorkspaceRow {
   content_pricing: string | null;
   portal_contacts: string | null;
   audit_suppressions: string | null;
+  publish_target: string | null;
   created_at: string;
 }
 
@@ -116,6 +117,7 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   if (row.content_pricing) ws.contentPricing = JSON.parse(row.content_pricing);
   if (row.portal_contacts) ws.portalContacts = JSON.parse(row.portal_contacts);
   if (row.audit_suppressions) ws.auditSuppressions = JSON.parse(row.audit_suppressions);
+  if (row.publish_target) ws.publishTarget = JSON.parse(row.publish_target);
   return ws;
 }
 
@@ -328,6 +330,7 @@ function workspaceToParams(ws: Workspace) {
     content_pricing: ws.contentPricing ? JSON.stringify(ws.contentPricing) : null,
     portal_contacts: ws.portalContacts ? JSON.stringify(ws.portalContacts) : null,
     audit_suppressions: ws.auditSuppressions ? JSON.stringify(ws.auditSuppressions) : null,
+    publish_target: ws.publishTarget ? JSON.stringify(ws.publishTarget) : null,
     created_at: ws.createdAt,
   };
 }
@@ -392,7 +395,7 @@ export function createWorkspace(name: string, webflowSiteId?: string, webflowSit
   return workspace;
 }
 
-export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'seoEditTracking' | 'pageEditStates'>>): Workspace | null {
+export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'seoEditTracking' | 'pageEditStates' | 'publishTarget'>>): Workspace | null {
   const row = getByIdStmt().get(id) as WorkspaceRow | undefined;
   if (!row) return null;
 
@@ -420,6 +423,7 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
     tier: 'tier', trialEndsAt: 'trial_ends_at',
     onboardingEnabled: 'onboarding_enabled', onboardingCompleted: 'onboarding_completed',
     portalContacts: 'portal_contacts', auditSuppressions: 'audit_suppressions',
+    publishTarget: 'publish_target',
   };
 
   for (const [key, col] of Object.entries(columnMap)) {
