@@ -441,7 +441,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                   {section.status === 'done' && <WordBadge actual={section.wordCount} target={section.targetWordCount} />}
                 </div>
                 <div className="flex items-center gap-2">
-                  {section.keywords.length > 0 && expandedSections.has(section.index) && (
+                  {section.keywords && section.keywords.length > 0 && expandedSections.has(section.index) && (
                     <div className="hidden sm:flex items-center gap-1">
                       {section.keywords.slice(0, 3).map((kw, i) => (
                         <span key={i} className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400/60">{kw}</span>
