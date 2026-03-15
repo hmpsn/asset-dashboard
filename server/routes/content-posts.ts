@@ -22,7 +22,6 @@ import {
 import { assemblePostHtml, generateSlug } from '../html-to-richtext.js';
 import {
   createCollectionItem,
-  updateCollectionItem,
   publishCollectionItems,
 } from '../webflow.js';
 import { getWorkspace, getTokenForSite } from '../workspaces.js';
