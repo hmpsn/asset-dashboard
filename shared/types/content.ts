@@ -48,6 +48,15 @@ export interface PostSection {
   error?: string;
 }
 
+export interface ReviewChecklist {
+  factual_accuracy: boolean;
+  brand_voice: boolean;
+  internal_links: boolean;
+  no_hallucinations: boolean;
+  meta_optimized: boolean;
+  word_count_target: boolean;
+}
+
 export interface GeneratedPost {
   id: string;
   workspaceId: string;
@@ -65,6 +74,7 @@ export interface GeneratedPost {
   status: 'generating' | 'draft' | 'review' | 'approved';
   unificationStatus?: 'pending' | 'success' | 'failed' | 'skipped';
   unificationNote?: string;
+  reviewChecklist?: ReviewChecklist;
   // Webflow publish tracking
   webflowItemId?: string;
   webflowCollectionId?: string;

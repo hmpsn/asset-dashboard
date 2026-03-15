@@ -363,8 +363,8 @@
           "source": "Market prep analysis Mar 2026",
           "est": "2-3h",
           "priority": "P1",
-          "notes": "Briefs have an approval workflow, but full posts go straight from AI to draft status. For a paid deliverable, clients expect human polish. Add structured review checklist to PostEditor: factual accuracy verified, brand voice match confirmed, internal links verified and working, no AI hallucinations/fabricated stats, meta title/description optimized, word count within brief target. Post cannot move to review status until all checklist items checked. Shows professionalism and catches AI errors before client sees them.",
-          "status": "pending"
+          "notes": "Shipped — 6-item review checklist (factual accuracy, brand voice, internal links, no hallucinations, meta optimized, word count target). Persisted in review_checklist JSON column (migration 010). Collapsible panel in PostEditor with progress counter. Send to Review button disabled until all items checked. Feature #114.",
+          "status": "done"
         }
       ]
     },

@@ -41,6 +41,7 @@ interface PostRow {
   webflow_collection_id: string | null;
   published_at: string | null;
   published_slug: string | null;
+  review_checklist: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -162,12 +163,12 @@ function stmts(): PostStmts {
            (id, workspace_id, brief_id, target_keyword, title, meta_description,
             introduction, sections, conclusion, seo_title, seo_meta_description,
             total_word_count, target_word_count, status, unification_status,
-            unification_note, created_at, updated_at)
+            unification_note, review_checklist, created_at, updated_at)
          VALUES
            (@id, @workspace_id, @brief_id, @target_keyword, @title, @meta_description,
             @introduction, @sections, @conclusion, @seo_title, @seo_meta_description,
             @total_word_count, @target_word_count, @status, @unification_status,
-            @unification_note, @created_at, @updated_at)`,
+            @unification_note, @review_checklist, @created_at, @updated_at)`,
       ),
       selectByWorkspace: db.prepare(
         `SELECT * FROM content_posts WHERE workspace_id = ? ORDER BY created_at DESC`,
@@ -182,7 +183,7 @@ function stmts(): PostStmts {
            seo_title = @seo_title, seo_meta_description = @seo_meta_description,
            total_word_count = @total_word_count, target_word_count = @target_word_count,
            status = @status, unification_status = @unification_status,
-           unification_note = @unification_note,
+           unification_note = @unification_note, review_checklist = @review_checklist,
            webflow_item_id = @webflow_item_id, webflow_collection_id = @webflow_collection_id,
            published_at = @published_at, published_slug = @published_slug,
            updated_at = @updated_at
@@ -218,6 +219,7 @@ function rowToPost(row: PostRow): GeneratedPost {
     webflowCollectionId: row.webflow_collection_id ?? undefined,
     publishedAt: row.published_at ?? undefined,
     publishedSlug: row.published_slug ?? undefined,
+    reviewChecklist: row.review_checklist ? JSON.parse(row.review_checklist) : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -245,6 +247,7 @@ function postToParams(post: GeneratedPost): Record<string, unknown> {
     webflow_collection_id: post.webflowCollectionId ?? null,
     published_at: post.publishedAt ?? null,
     published_slug: post.publishedSlug ?? null,
+    review_checklist: post.reviewChecklist ? JSON.stringify(post.reviewChecklist) : null,
     created_at: post.createdAt,
     updated_at: post.updatedAt,
   };
