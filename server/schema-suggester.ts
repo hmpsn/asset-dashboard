@@ -240,6 +240,52 @@ function autoFixSchema(schema: Record<string, unknown>): void {
   }
 }
 
+// Post-processing: inject cross-references the AI consistently omits
+function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string): void {
+  const graph = schema['@graph'] as Record<string, unknown>[] | undefined;
+  if (!Array.isArray(graph)) return;
+
+  const orgId = `${siteUrl}/#organization`;
+  const websiteId = `${siteUrl}/#website`;
+
+  // Identify the "primary entity" — the first non-structural node for mainEntity
+  const structuralTypes = new Set(['Organization', 'WebSite', 'WebPage', 'BreadcrumbList']);
+  const primaryEntity = graph.find(n => {
+    const t = n['@type'] as string;
+    return t && !structuralTypes.has(t) && n['@id'];
+  });
+
+  for (const node of graph) {
+    const type = node['@type'] as string;
+    if (!type) continue;
+
+    // WebSite → publisher → Organization
+    if (type === 'WebSite' && !node['publisher']) {
+      node['publisher'] = { '@id': orgId };
+    }
+
+    // WebPage → isPartOf → WebSite
+    if (type === 'WebPage' && !node['isPartOf']) {
+      node['isPartOf'] = { '@id': websiteId };
+    }
+
+    // WebPage → mainEntity → primary entity (SoftwareApplication, Service, etc.)
+    if (type === 'WebPage' && !node['mainEntity'] && primaryEntity) {
+      node['mainEntity'] = { '@id': primaryEntity['@id'] };
+    }
+
+    // Service / SoftwareApplication → provider → Organization
+    if ((type === 'Service' || type === 'SoftwareApplication') && !node['provider']) {
+      node['provider'] = { '@id': orgId };
+    }
+
+    // Article / BlogPosting → publisher → Organization
+    if ((type === 'Article' || type === 'BlogPosting') && !node['publisher']) {
+      node['publisher'] = { '@id': orgId };
+    }
+  }
+}
+
 interface PageMeta {
   id: string;
   title: string;
@@ -634,10 +680,14 @@ Return ONLY the JSON-LD object. No markdown, no explanation, no wrapping.`;
       // AI returned a single type instead of @graph — wrap it
       const wrapped = { '@context': 'https://schema.org', '@graph': [schema] };
       delete (wrapped['@graph'][0] as Record<string, unknown>)['@context'];
+      injectCrossReferences(wrapped, siteUrl);
       const errors = validateUnifiedSchema(wrapped);
       const types = (wrapped['@graph'] as Record<string, unknown>[]).map(n => n['@type']).filter(Boolean);
       return { schema: wrapped, reason: `Unified schema with ${types.join(', ')}`, errors };
     }
+
+    // Inject cross-references the AI consistently omits
+    injectCrossReferences(schema, siteUrl);
 
     const errors = validateUnifiedSchema(schema);
     const graph = schema['@graph'] as Record<string, unknown>[];
