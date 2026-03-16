@@ -17,7 +17,6 @@ import { type Page, adminPath } from '../routes';
 import { activity as activityApi, workOrders as workOrdersApi, workspaceHome } from '../api/misc';
 import { contentRequests as contentRequestsApi } from '../api/content';
 import { requests as requestsApi } from '../api/misc';
-import { useWorkspaceData } from '../contexts/WorkspaceDataContext';
 
 interface WorkspaceHomeProps {
   workspaceId: string;
@@ -46,10 +45,6 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   const navigate = useNavigate();
   const { summary: seoStatus } = usePageEditStates(workspaceId);
   const { audit } = useAuditSummary(workspaceId);
-  const wsActivity = useWorkspaceData<ActivityEntry[]>('activity');
-  const wsAnnotations = useWorkspaceData<Array<{ id: string; date: string; label: string; color?: string }>>('annotations');
-  const wsRanks = useWorkspaceData<Array<{ query: string; position: number; previousPosition?: number; change?: number }>>('ranks');
-  const wsGscOverview = useWorkspaceData<{ totalClicks: number; totalImpressions: number; avgCtr: number; avgPosition: number }>('gsc-overview');
   const [loading, setLoading] = useState(true);
   const [searchData, setSearchData] = useState<{ totalClicks: number; totalImpressions: number; avgCtr: number; avgPosition: number } | null>(null);
   const [ga4Data, setGa4Data] = useState<{ totalUsers: number; totalSessions: number; totalPageviews: number; newUserPercentage: number } | null>(null);
@@ -142,7 +137,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   // Action items
   const actions: Array<{ label: string; sub: string; color: 'red' | 'amber' | 'teal' | 'green'; icon: typeof Bell; tab: string }> = [];
   if (newRequests.length > 0) actions.push({ label: `${newRequests.length} new client request${newRequests.length > 1 ? 's' : ''}`, sub: 'Review and respond', color: 'red', icon: Bell, tab: 'requests' });
-  if (pendingContent.length > 0) actions.push({ label: `${pendingContent.length} content brief${pendingContent.length > 1 ? 's' : ''} awaiting review`, sub: 'Approve or edit briefs', color: 'amber', icon: FileText, tab: 'seo-briefs' });
+  if (pendingContent.length > 0) actions.push({ label: `${pendingContent.length} content brief${pendingContent.length > 1 ? 's' : ''} awaiting review`, sub: 'Approve or edit briefs', color: 'amber', icon: FileText, tab: 'content-pipeline' });
   if (audit && audit.errors > 0) actions.push({ label: `${audit.errors} SEO error${audit.errors > 1 ? 's' : ''} found in audit`, sub: `${audit.warnings} warnings · Score ${audit.siteScore}`, color: audit.errors > 5 ? 'red' : 'amber', icon: AlertTriangle, tab: 'seo-audit' });
   if (rankDown > 3) actions.push({ label: `${rankDown} keywords dropped in position`, sub: `${rankUp} improved`, color: 'amber', icon: TrendingDown, tab: 'seo-ranks' });
   if (!webflowSiteId) actions.push({ label: 'No Webflow site linked', sub: 'Link a site to enable SEO tools', color: 'amber', icon: Globe, tab: 'workspace-settings' });

@@ -138,7 +138,7 @@ export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
             icon: Clipboard,
             workspaceId: ws.id,
             workspaceName: ws.name,
-            tab: 'seo-briefs',
+            tab: 'content-pipeline',
           });
         }
         if ((ws.workOrders?.pending || 0) > 0) {
