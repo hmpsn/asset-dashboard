@@ -367,13 +367,13 @@ function getPageTypeInstructions(pageType: SchemaPageType | undefined, siteUrl: 
   if (!pageType || pageType === 'auto') return '';
   const instructions: Record<string, string> = {
     homepage: `PAGE TYPE INSTRUCTIONS (Homepage):
-- MUST include WebSite node with "@id": "${siteUrl}/#website" and potentialAction ONLY if a real search URL exists
-- MUST include Organization with full details: name, url, logo, description, knowsAbout, sameAs (only from page content)
-- If the page presents multiple services/solutions, include each as a separate Service node with provider → Organization
+- MUST include WebSite node with "@id": "${siteUrl}/#website", "publisher": {"@id": "${siteUrl}/#organization"}, and potentialAction ONLY if a real search URL exists
+- MUST include Organization with: name, url, logo, description, knowsAbout (3-5 concise terms), sameAs (ONLY from page content)
+- For SaaS/platform sites: use SoftwareApplication (not Service) as the primary product node with applicationCategory, operatingSystem "Web", provider → Organization. Do NOT create separate Service nodes for product features — describe features in the SoftwareApplication description or featureList.
+- For service businesses: use ONE Service node for the primary service offering, or 2-3 max if the page clearly presents distinct service lines with separate URLs
 - If testimonials/reviews appear, include them as Review nodes on the Organization
-- For SaaS/platform homepages, prefer SoftwareApplication alongside or instead of Service
 - Include BreadcrumbList with just Home
-- WebPage should use "mainEntity": {"@id": "${siteUrl}/#organization"}`,
+- WebPage MUST include "isPartOf": {"@id": "${siteUrl}/#website"} and "mainEntity": {"@id": "${siteUrl}/#organization"} (or reference the primary SoftwareApplication/Service)`,
 
     service: `PAGE TYPE INSTRUCTIONS (Service Page):
 - MUST include a Service node as mainEntity with: name, description, serviceType (1-3 concise types), provider → Organization, url, areaServed (if geographic)
@@ -553,17 +553,25 @@ REQUIREMENTS:
     - For procedural how-to content, use "HowTo" with step-by-step instructions extracted from the page
 18. DATASET PAGES: If the page presents data tables, rankings, indexes, or structured data collections, include "Dataset" schema with name, description, distribution (if downloadable), dateModified, and creator referencing the Organization
 19. ENTITY LINKING (sameAs): On the Organization node, include a "sameAs" array with links to the business's verified external profiles (Google Business, LinkedIn, Facebook, Yelp, industry association pages) — but ONLY if these URLs actually appear in the page content or site footer. Never fabricate profile URLs
-20. SAAS / PLATFORM HOMEPAGES: If the homepage presents a software product or platform with multiple features, solutions, or use cases:
-    - Use "SoftwareApplication" instead of (or alongside) "Service" for SaaS products. Include applicationCategory, operatingSystem ("Web"), and offers if pricing is visible
-    - If the page shows MULTIPLE distinct products, solutions, or use cases (e.g. "Solutions for Developers", "Solutions for Executives"), represent each as a separate Service node with its own name, description, url, serviceType, and "audience": {"@type": "Audience", "audienceType": "..."} — link each back to the Organization via "provider"
-    - If the page features CUSTOMER TESTIMONIALS or quotes, include them as "review" on the Organization or relevant Service node using {"@type": "Review", "author": {"@type": "Person", "name": "..."}, "reviewBody": "..."}. Only use quotes that actually appear on the page. Include the reviewer's title/company if visible.
-    - Use "knowsAbout" on the Organization to capture the company's domain expertise areas extracted from the page content
-    - Do NOT collapse a multi-offering page into a single generic Service — if the page presents 3+ distinct solutions with their own URLs, represent them individually
+20. SAAS / PLATFORM HOMEPAGES: If the homepage presents a software product or platform:
+    - Use "SoftwareApplication" as the primary product node (not Service). Include applicationCategory, operatingSystem ("Web"), and offers if pricing is visible
+    - CRITICAL: Product FEATURES (e.g. "dashboards", "team pages", "AI summaries", "widgets") are NOT separate Services. They are features of ONE product. Describe them in the SoftwareApplication description or use "featureList" — do NOT create a Service node for each feature.
+    - Only create separate Service nodes if the page presents genuinely DISTINCT products/solutions with their OWN separate URLs (e.g. "Product A" linking to /product-a, "Product B" linking to /product-b)
+    - If the page features CUSTOMER TESTIMONIALS or quotes, include them as "review" on the Organization using {"@type": "Review", "author": {"@type": "Person", "name": "..."}, "reviewBody": "..."}. Only use quotes that actually appear on the page.
+    - Use "knowsAbout" on the Organization to capture domain expertise areas (keep to 3-5 concise terms, not 10+)
+
+STRUCTURAL RULES — mandatory:
+17. ALL major entities (Organization, WebSite, WebPage, SoftwareApplication, Service, FAQPage, Article, LocalBusiness, BreadcrumbList) MUST be top-level nodes in the @graph array with their own "@id". NEVER nest them inside another node's properties — use {"@id": "..."} references instead.
+18. EVERY WebPage MUST include "isPartOf": {"@id": "${siteUrl}/#website"}
+19. EVERY WebSite MUST include "publisher": {"@id": "${siteUrl}/#organization"}
+20. EVERY Service/SoftwareApplication MUST include "provider": {"@id": "${siteUrl}/#organization"}
+21. EVERY Article/BlogPosting MUST include "publisher": {"@id": "${siteUrl}/#organization"}
+22. WebPage.mainEntity should be an @id REFERENCE to another @graph node, not an inline object. Example: "mainEntity": {"@id": "${siteUrl}/#software"}
 
 QUALITY RULES — strict:
-17. NEVER include empty arrays or empty strings. If a property has no value (e.g. "sameAs": []), OMIT it entirely.
-18. NEVER include empty objects. If a nested object would have no meaningful properties, omit the parent property.
-19. Use CONSISTENT @id naming across all pages. Follow this exact convention:
+23. NEVER include empty arrays or empty strings. If a property has no value (e.g. "sameAs": []), OMIT it entirely.
+24. NEVER include empty objects. If a nested object would have no meaningful properties, omit the parent property.
+25. Use CONSISTENT @id naming across all pages. Follow this exact convention:
     - Organization: "${siteUrl}/#organization"
     - WebSite (homepage only): "${siteUrl}/#website"
     - WebPage: "{pageUrl}/#webpage"
@@ -572,21 +580,19 @@ QUALITY RULES — strict:
     - Service (mainEntity): "{pageUrl}/#service"
     - FAQPage: "{pageUrl}/#faq"
     - Article/BlogPosting: "{pageUrl}/#article"
-20. For openingHours, prefer the OpeningHoursSpecification format:
+26. For openingHours, prefer the OpeningHoursSpecification format:
     "openingHoursSpecification": [{"@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday","Tuesday",...], "opens": "08:00", "closes": "17:00"}]
 
-CROSS-REFERENCE & PROPERTY RULES — these are enforced by automated validation:
-21. Every Service node MUST include "provider": {"@id": "${siteUrl}/#organization"} linking back to the Organization
-22. Every WebPage node MUST include "isPartOf": {"@id": "${siteUrl}/#website"} linking to the WebSite (even on subpages where WebSite isn't in the @graph — the @id reference is still valid)
-23. Article/BlogPosting MUST include "publisher": {"@id": "${siteUrl}/#organization"}
-24. NEVER use these INVALID Schema.org properties — they are commonly hallucinated but do not exist:
+PROPERTY RULES — enforced by automated validation:
+27. NEVER use these INVALID Schema.org properties — they are commonly hallucinated but do not exist:
     - Organization: "industry", "founded", "headquarters", "employeeCount", "products", "services"
     - Service: "features", "benefits", "pricing"
     - WebPage: "keywords", "category"
     - Person: "title", "company"
     Instead of "industry", use "knowsAbout": ["topic1", "topic2"] on Organization
-25. "telephone" values MUST be properly formatted — use "+1-555-123-4567" or "(555) 123-4567" format. Never output malformed numbers like "5551234567" without separators
-26. "serviceType" should be 1-3 CONCISE types (e.g. "Context Engineering", "AI Development Tools"). Do NOT keyword-stuff with long phrases — move detailed descriptions to the "description" field instead
+28. "telephone" values MUST be properly formatted — use "+1-555-123-4567" or "(555) 123-4567" format. Never output malformed numbers like "5551234567" without separators
+29. "serviceType" should be 1-3 CONCISE types (e.g. "Context Engineering", "AI Development Tools"). Do NOT keyword-stuff with long phrases — move detailed descriptions to the "description" field instead
+30. "knowsAbout" should contain 3-5 concise domain expertise terms, not 10+ verbose phrases
 
 Return ONLY the JSON-LD object. No markdown, no explanation, no wrapping.`;
 
