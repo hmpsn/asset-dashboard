@@ -1,16 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { get, post, patch, del, getSafe } from '../api/client';
 import {
-  Loader2, Clipboard, Trash2, ChevronDown, ChevronUp, Sparkles, FileText,
-  Inbox, CheckCircle2, XCircle, Clock, Zap, Download, Copy, Search,
-  Target, MessageSquare, BarChart3, BookOpen, Users, TrendingUp,
-  AlertTriangle, ArrowUpDown, X, Pencil, Check, ExternalLink, Link2,
-  PenLine,
+  Loader2, Trash2, AlertTriangle, PenLine,
 } from 'lucide-react';
 import type { FixContext } from '../App';
 import { PostEditor } from './PostEditor';
-import { AIContextIndicator } from './ui';
-import { BriefDetail } from './briefs/BriefDetail';
+import { BriefGenerator } from './briefs/BriefGenerator';
+import { RequestList } from './briefs/RequestList';
+import { BriefList } from './briefs/BriefList';
 
 interface ContentBrief {
   id: string;
@@ -424,625 +421,68 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
       )}
 
       {/* Client Requests */}
-      {clientRequests.length > 0 && (
-        <div className="bg-zinc-900 rounded-xl border border-amber-500/20 p-4 space-y-3">
-          <div className="flex items-center gap-2 mb-1">
-            <Inbox className="w-4 h-4 text-amber-400" />
-            <span className="text-xs font-medium text-zinc-300">Client Content Requests</span>
-            <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
-              {clientRequests.filter(r => r.status === 'requested').length} new
-            </span>
-          </div>
-          <div className="space-y-2">
-            {clientRequests.map(req => {
-              const statusConfig: Record<string, { icon: typeof Clock; color: string; label: string }> = {
-                pending_payment: { icon: Clock, color: 'text-amber-400', label: 'Awaiting Payment' },
-                requested: { icon: Clock, color: 'text-amber-400', label: 'Awaiting Review' },
-                brief_generated: { icon: FileText, color: 'text-blue-400', label: 'Brief Ready' },
-                client_review: { icon: Clock, color: 'text-cyan-400', label: 'Client Review' },
-                approved: { icon: CheckCircle2, color: 'text-green-400', label: 'Approved' },
-                changes_requested: { icon: Clock, color: 'text-orange-400', label: 'Changes Requested' },
-                in_progress: { icon: Zap, color: 'text-teal-400', label: 'In Progress' },
-                delivered: { icon: CheckCircle2, color: 'text-green-400', label: 'Delivered' },
-                published: { icon: CheckCircle2, color: 'text-teal-400', label: 'Published' },
-                declined: { icon: XCircle, color: 'text-zinc-500', label: 'Declined' },
-              };
-              const sc = statusConfig[req.status] || statusConfig.requested;
-              const StatusIcon = sc.icon;
-              const isGenerating = generatingBriefFor === req.id;
-              const hasBrief = !!req.briefId;
-              const inlineBrief = hasBrief && expandedRequest === req.id ? getBriefById(req.briefId!) : null;
-              return (
-                <div key={req.id} className="rounded-xl bg-zinc-900 border border-zinc-800 overflow-hidden">
-                  <div className="px-3 py-2.5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium text-zinc-200">{req.topic}</span>
-                          {req.source === 'client' && <span className="text-[11px] px-1 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20">Client</span>}
-                          <span className={`text-[11px] px-1 py-0.5 rounded border ${(req.serviceType || 'brief_only') === 'full_post' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>{(req.serviceType || 'brief_only') === 'full_post' ? 'Full Post' : 'Brief Only'}</span>
-                          {req.upgradedAt && <span className="text-[11px] px-1 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">Upgraded</span>}
-                        </div>
-                        <div className="text-[11px] text-teal-400 mt-0.5">"{req.targetKeyword}"</div>
-                        <div className="flex items-center gap-3 mt-1">
-                          <span className="text-[11px] text-zinc-500 uppercase">{req.intent} · {req.priority}</span>
-                          <span className="text-[11px] text-zinc-500">{new Date(req.requestedAt).toLocaleDateString()}</span>
-                          {req.comments && req.comments.length > 0 && <span className="flex items-center gap-0.5 text-[11px] text-zinc-500"><MessageSquare className="w-2.5 h-2.5" />{req.comments.length}</span>}
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                        <span className={`flex items-center gap-1 text-[11px] ${sc.color}`}><StatusIcon className="w-3 h-3" /> {sc.label}</span>
-                        <div className="flex items-center gap-1 flex-wrap justify-end">
-                          {hasBrief && req.status !== 'requested' && (
-                            <button onClick={() => toggleRequestBrief(req.id, req.briefId!)} disabled={loadingBrief === req.id} className={`flex items-center gap-1 px-2 py-1 rounded border text-[11px] transition-colors ${expandedRequest === req.id ? 'bg-blue-600/30 border-blue-500/40 text-blue-200' : 'bg-blue-600/20 border-blue-500/30 text-blue-300 hover:bg-blue-600/30'}`}>
-                              {loadingBrief === req.id ? <><Loader2 className="w-3 h-3 animate-spin" /> Loading...</> : expandedRequest === req.id ? 'Hide Brief' : 'View Brief'}
-                            </button>
-                          )}
-                          {req.status === 'requested' && (
-                            <>
-                              <button disabled={isGenerating} onClick={() => handleGenerateBriefForRequest(req)} className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50">
-                                {isGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                                {isGenerating ? 'Generating...' : 'Generate Brief'}
-                              </button>
-                              <button onClick={() => handleUpdateRequestStatus(req.id, 'declined')} className="px-2 py-1 rounded bg-zinc-800 text-[11px] text-zinc-500 hover:text-red-400 transition-colors">Decline</button>
-                            </>
-                          )}
-                          {req.status === 'brief_generated' && (
-                            <button onClick={() => handleUpdateRequestStatus(req.id, 'client_review')} className="px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 text-[11px] text-cyan-300 hover:bg-cyan-600/30 transition-colors">Send to Client</button>
-                          )}
-                          {req.status === 'client_review' && (
-                            <span className="text-[11px] text-cyan-400/60 italic">Awaiting client feedback</span>
-                          )}
-                          {req.status === 'approved' && (
-                            <button onClick={() => handleUpdateRequestStatus(req.id, 'in_progress')} className="px-2 py-1 rounded bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 hover:bg-teal-600/30 transition-colors">Start Production</button>
-                          )}
-                          {req.status === 'changes_requested' && (
-                            <button onClick={() => handleUpdateRequestStatus(req.id, 'client_review')} className="px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 text-[11px] text-cyan-300 hover:bg-cyan-600/30 transition-colors">Resubmit to Client</button>
-                          )}
-                          {req.status === 'in_progress' && deliveringReqId !== req.id && (
-                            <button onClick={() => { setDeliveringReqId(req.id); setDeliveryUrl(req.deliveryUrl || ''); setDeliveryNotes(req.deliveryNotes || ''); }} className="px-2 py-1 rounded bg-green-600/20 border border-green-500/30 text-[11px] text-green-300 hover:bg-green-600/30 transition-colors flex items-center gap-1"><Link2 className="w-3 h-3" /> Deliver Content</button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    {/* Delivery form */}
-                    {req.status === 'in_progress' && deliveringReqId === req.id && (
-                      <div className="mt-2 bg-green-500/5 border border-green-500/20 rounded-lg p-3 space-y-2">
-                        <div className="flex items-center gap-1.5 mb-1"><Link2 className="w-3.5 h-3.5 text-green-400" /><span className="text-[11px] text-green-400 font-medium uppercase tracking-wider">Attach Deliverable</span></div>
-                        <input type="url" value={deliveryUrl} onChange={e => setDeliveryUrl(e.target.value)} placeholder="Google Doc link, Dropbox URL, or any content URL..." className="w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 focus:border-green-500/50 focus:outline-none" />
-                        <textarea value={deliveryNotes} onChange={e => setDeliveryNotes(e.target.value)} placeholder="Delivery notes (optional) — e.g. revision notes, word count, etc." className="w-full px-3 py-1.5 bg-zinc-950 border border-zinc-700 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 focus:border-green-500/50 focus:outline-none resize-y" rows={2} />
-                        <div className="flex items-center gap-2">
-                          <button onClick={async () => { await handleUpdateRequestStatus(req.id, 'delivered', { deliveryUrl: deliveryUrl.trim() || undefined, deliveryNotes: deliveryNotes.trim() || undefined }); setDeliveringReqId(null); setDeliveryUrl(''); setDeliveryNotes(''); }} className="px-3 py-1.5 rounded-lg bg-green-600/20 border border-green-500/30 text-[11px] font-medium text-green-300 hover:bg-green-600/30 transition-colors flex items-center gap-1"><Check className="w-3 h-3" /> Mark Delivered</button>
-                          <button onClick={() => { setDeliveringReqId(null); setDeliveryUrl(''); setDeliveryNotes(''); }} className="px-3 py-1.5 rounded-lg text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors">Cancel</button>
-                        </div>
-                      </div>
-                    )}
-                    {/* Mark Published button for delivered content */}
-                    {req.status === 'delivered' && (
-                      <div className="mt-2 flex items-center gap-2">
-                        <button onClick={() => handleUpdateRequestStatus(req.id, 'published')} className="px-3 py-1.5 rounded-lg bg-teal-600/20 border border-teal-500/30 text-[11px] font-medium text-teal-300 hover:bg-teal-600/30 transition-colors flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Mark Published</button>
-                        {req.targetPageId && <span className="text-[11px] text-zinc-500">Will mark target page as Live</span>}
-                      </div>
-                    )}
-                    {/* Show delivery info */}
-                    {(req.status === 'delivered' || req.status === 'published') && req.deliveryUrl && (
-                      <div className="mt-2 bg-green-500/5 border border-green-500/20 rounded-lg px-3 py-2">
-                        <div className="flex items-center gap-2">
-                          <ExternalLink className="w-3 h-3 text-green-400 flex-shrink-0" />
-                          <a href={req.deliveryUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] text-green-400 hover:text-green-300 underline underline-offset-2 truncate">{req.deliveryUrl}</a>
-                        </div>
-                        {req.deliveryNotes && <div className="text-[11px] text-zinc-400 mt-1">{req.deliveryNotes}</div>}
-                      </div>
-                    )}
-                    {req.status === 'changes_requested' && req.clientFeedback && (
-                      <div className="mt-2 text-[11px] text-orange-300/80 bg-orange-500/10 px-2.5 py-1.5 rounded border border-orange-500/20"><span className="text-orange-400 font-medium">Client feedback:</span> {req.clientFeedback}</div>
-                    )}
-                    {req.status === 'declined' && req.declineReason && (
-                      <div className="mt-2 text-[11px] text-zinc-500 bg-zinc-800/50 px-2.5 py-1.5 rounded border border-zinc-800"><span className="text-zinc-400 font-medium">Reason:</span> {req.declineReason}</div>
-                    )}
-                    <div className="flex items-center justify-end mt-1.5">
-                      <button onClick={(e) => { e.stopPropagation(); confirmDeleteRequest(req); }} className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-red-400 transition-colors px-1.5 py-0.5 rounded hover:bg-red-500/10">
-                        <Trash2 className="w-3 h-3" /> Delete Request
-                      </button>
-                    </div>
-                  </div>
-                  {/* Brief error message */}
-                  {expandedRequest === req.id && !inlineBrief && briefError && (
-                    <div className="border-t border-red-500/20 px-3 py-3 bg-red-950/20">
-                      <div className="flex items-center gap-2 text-[11px] text-red-400">
-                        <XCircle className="w-3.5 h-3.5 flex-shrink-0" />
-                        <span>{briefError}</span>
-                      </div>
-                      <button onClick={() => { handleGenerateBriefForRequest(req); setBriefError(null); setExpandedRequest(null); }} className="mt-2 flex items-center gap-1 px-2 py-1 rounded bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 hover:bg-teal-600/30 transition-colors">
-                        <Sparkles className="w-3 h-3" /> Regenerate Brief
-                      </button>
-                    </div>
-                  )}
-                  {/* Full inline brief detail */}
-                  {inlineBrief && (
-                    <div className="border-t border-zinc-800 px-4 pb-4 space-y-4">
-                      {/* Export buttons */}
-                      <div className="pt-3 flex items-center gap-2">
-                        <button onClick={() => copyAsMarkdown(inlineBrief)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
-                          <Copy className="w-3 h-3" /> Copy for AI Tool
-                        </button>
-                        <button onClick={() => exportClientHTML(inlineBrief)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
-                          <Download className="w-3 h-3" /> Export PDF
-                        </button>
-                        <button onClick={() => { navigator.clipboard.writeText(JSON.stringify(inlineBrief, null, 2)); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors">
-                          <Copy className="w-3 h-3" /> Copy JSON
-                        </button>
-                      </div>
-
-                      {/* Executive Summary */}
-                      {inlineBrief.executiveSummary && (
-                        <div className="bg-teal-500/5 border border-teal-500/20 rounded-lg px-4 py-3">
-                          <div className="flex items-center gap-1.5 mb-1.5"><BookOpen className="w-3.5 h-3.5 text-teal-400" /><span className="text-[11px] text-teal-400 font-medium uppercase tracking-wider">Executive Summary</span></div>
-                          <div className="text-xs text-zinc-300 leading-relaxed">{inlineBrief.executiveSummary}</div>
-                        </div>
-                      )}
-
-                      {/* Title & Meta */}
-                      <div className="space-y-2">
-                        <div>
-                          <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-1">Suggested Title</div>
-                          <div className="text-xs text-teal-400 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">{inlineBrief.suggestedTitle}</div>
-                        </div>
-                        <div>
-                          <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-1">Meta Description</div>
-                          <div className="text-xs text-zinc-300 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">{inlineBrief.suggestedMetaDesc}</div>
-                        </div>
-                      </div>
-
-                      {/* Key Metrics Row */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
-                          <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-0.5">Word Count</div>
-                          <div className="text-sm font-bold text-blue-400">{inlineBrief.wordCountTarget?.toLocaleString()}</div>
-                        </div>
-                        <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
-                          <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-0.5">Intent</div>
-                          <div className="text-xs text-zinc-300 capitalize font-medium">{inlineBrief.intent}</div>
-                        </div>
-                        {inlineBrief.contentFormat && (
-                          <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
-                            <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-0.5">Format</div>
-                            <div className="text-xs text-amber-400 capitalize font-medium">{inlineBrief.contentFormat}</div>
-                          </div>
-                        )}
-                        {inlineBrief.difficultyScore != null && (
-                          <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
-                            <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-0.5">Difficulty</div>
-                            <div className={`text-sm font-bold ${inlineBrief.difficultyScore <= 30 ? 'text-green-400' : inlineBrief.difficultyScore <= 60 ? 'text-amber-400' : 'text-red-400'}`}>{inlineBrief.difficultyScore}/100</div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Traffic Potential */}
-                      {inlineBrief.trafficPotential && (
-                        <div className="flex items-start gap-2 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
-                          <TrendingUp className="w-3.5 h-3.5 text-green-400 mt-0.5 flex-shrink-0" />
-                          <div><div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-0.5">Traffic Potential</div><div className="text-xs text-zinc-300">{inlineBrief.trafficPotential}</div></div>
-                        </div>
-                      )}
-
-                      {/* Audience & Tone */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <div className="flex items-center gap-1.5 mb-1"><Users className="w-3 h-3 text-zinc-500" /><span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Audience</span></div>
-                          <div className="text-xs text-zinc-400 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">{inlineBrief.audience}</div>
-                        </div>
-                        {inlineBrief.toneAndStyle && (
-                          <div>
-                            <div className="flex items-center gap-1.5 mb-1"><MessageSquare className="w-3 h-3 text-zinc-500" /><span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Tone & Style</span></div>
-                            <div className="text-xs text-zinc-400 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">{inlineBrief.toneAndStyle}</div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Secondary Keywords */}
-                      {inlineBrief.secondaryKeywords?.length > 0 && (
-                        <div>
-                          <div className="flex items-center gap-1.5 mb-1.5"><Search className="w-3 h-3 text-zinc-500" /><span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Secondary Keywords</span></div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {inlineBrief.secondaryKeywords.map((kw, i) => (
-                              <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">{kw}</span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Topical Entities */}
-                      {inlineBrief.topicalEntities && inlineBrief.topicalEntities.length > 0 && (
-                        <div>
-                          <div className="flex items-center gap-1.5 mb-1.5"><Target className="w-3 h-3 text-zinc-500" /><span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Topical Entities to Cover</span></div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {inlineBrief.topicalEntities.map((entity, i) => (
-                              <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-300">{entity}</span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* People Also Ask */}
-                      {inlineBrief.peopleAlsoAsk && inlineBrief.peopleAlsoAsk.length > 0 && (
-                        <div>
-                          <div className="flex items-center gap-1.5 mb-1.5"><MessageSquare className="w-3 h-3 text-zinc-500" /><span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Questions to Answer</span></div>
-                          <div className="space-y-1">
-                            {inlineBrief.peopleAlsoAsk.map((q, i) => (
-                              <div key={i} className="flex items-start gap-2 text-xs text-zinc-300 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
-                                <span className="text-amber-400 flex-shrink-0 font-medium">Q{i + 1}.</span> {q}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* SERP Analysis */}
-                      {inlineBrief.serpAnalysis && (
-                        <div>
-                          <div className="flex items-center gap-1.5 mb-1.5"><BarChart3 className="w-3 h-3 text-zinc-500" /><span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">SERP Analysis</span></div>
-                          <div className="bg-zinc-950 rounded-lg px-3 py-3 border border-zinc-800 space-y-2">
-                            <div className="grid grid-cols-2 gap-3">
-                              <div><span className="text-[11px] text-zinc-500">Content Type:</span><span className="text-xs text-zinc-300 ml-1">{inlineBrief.serpAnalysis.contentType}</span></div>
-                              <div><span className="text-[11px] text-zinc-500">Avg Word Count:</span><span className="text-xs text-zinc-300 ml-1">{inlineBrief.serpAnalysis.avgWordCount.toLocaleString()}</span></div>
-                            </div>
-                            {inlineBrief.serpAnalysis.commonElements.length > 0 && (
-                              <div><span className="text-[11px] text-zinc-500 block mb-1">Common Elements:</span><div className="flex flex-wrap gap-1">{inlineBrief.serpAnalysis.commonElements.map((el, i) => <span key={i} className="text-[11px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400">{el}</span>)}</div></div>
-                            )}
-                            {inlineBrief.serpAnalysis.gaps.length > 0 && (
-                              <div><span className="text-[11px] text-green-400/80 block mb-1">Opportunities (gaps in existing content):</span><div className="space-y-1">{inlineBrief.serpAnalysis.gaps.map((g, i) => <div key={i} className="text-[11px] text-green-300/80 flex items-start gap-1.5"><span className="text-green-400 mt-0.5">→</span>{g}</div>)}</div></div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Content Outline */}
-                      {inlineBrief.outline?.length > 0 && (
-                        <div>
-                          <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-2">Content Outline</div>
-                          <div className="space-y-2">
-                            {inlineBrief.outline.map((section, i) => (
-                              <div key={i} className="bg-zinc-950 rounded-lg px-3 py-2.5 border border-zinc-800">
-                                <div className="flex items-center justify-between">
-                                  <div className="text-xs font-medium text-zinc-200">H2: {section.heading}</div>
-                                  {section.wordCount && <span className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{section.wordCount} words</span>}
-                                </div>
-                                <div className="text-[11px] text-zinc-500 mt-1 leading-relaxed">{section.notes}</div>
-                                {section.keywords && section.keywords.length > 0 && (
-                                  <div className="flex flex-wrap gap-1 mt-1.5">{section.keywords.map((kw, j) => <span key={j} className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400/80">{kw}</span>)}</div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* CTA Recommendations */}
-                      {inlineBrief.ctaRecommendations && inlineBrief.ctaRecommendations.length > 0 && (
-                        <div>
-                          <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-1.5">CTA Recommendations</div>
-                          <div className="space-y-1">{inlineBrief.ctaRecommendations.map((cta, i) => (
-                            <div key={i} className="text-xs text-zinc-300 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800 flex items-start gap-2">
-                              <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${i === 0 ? 'bg-teal-500/20 text-teal-400' : 'bg-zinc-800 text-zinc-500'}`}>{i === 0 ? 'Primary' : 'Secondary'}</span>{cta}
-                            </div>
-                          ))}</div>
-                        </div>
-                      )}
-
-                      {/* Competitor Insights */}
-                      {inlineBrief.competitorInsights && (
-                        <div>
-                          <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-1">Competitor Insights</div>
-                          <div className="text-xs text-zinc-400 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800 leading-relaxed">{inlineBrief.competitorInsights}</div>
-                        </div>
-                      )}
-
-                      {/* Internal Links */}
-                      {inlineBrief.internalLinkSuggestions?.length > 0 && (
-                        <div>
-                          <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-1">Internal Link Suggestions</div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {inlineBrief.internalLinkSuggestions.map((link, i) => (
-                              <span key={i} className="text-[11px] px-2 py-0.5 rounded bg-zinc-800 text-blue-400">/{link}</span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* E-E-A-T Guidance */}
-                      {inlineBrief.eeatGuidance && (
-                        <div>
-                          <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-2">E-E-A-T Signals</div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {[
-                              { label: 'Experience', value: inlineBrief.eeatGuidance.experience, color: 'text-blue-400' },
-                              { label: 'Expertise', value: inlineBrief.eeatGuidance.expertise, color: 'text-teal-400' },
-                              { label: 'Authority', value: inlineBrief.eeatGuidance.authority, color: 'text-teal-400' },
-                              { label: 'Trust', value: inlineBrief.eeatGuidance.trust, color: 'text-amber-400' },
-                            ].filter(e => e.value).map((e, i) => (
-                              <div key={i} className="bg-zinc-950 rounded-lg px-3 py-2.5 border border-zinc-800">
-                                <div className={`text-[11px] ${e.color} font-medium uppercase tracking-wider mb-1`}>{e.label}</div>
-                                <div className="text-[11px] text-zinc-400 leading-relaxed">{e.value}</div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Content Checklist */}
-                      {inlineBrief.contentChecklist && inlineBrief.contentChecklist.length > 0 && (
-                        <div>
-                          <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-2">Content Checklist</div>
-                          <div className="bg-zinc-950 rounded-lg border border-zinc-800 divide-y divide-zinc-800/50">
-                            {inlineBrief.contentChecklist.map((item, i) => (
-                              <div key={i} className="flex items-start gap-2.5 px-4 py-2.5">
-                                <div className="w-4 h-4 mt-0.5 rounded border border-zinc-700 flex-shrink-0" />
-                                <span className="text-[11px] text-zinc-400 leading-relaxed">{item}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Schema Recommendations */}
-                      {inlineBrief.schemaRecommendations && inlineBrief.schemaRecommendations.length > 0 && (
-                        <div>
-                          <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-2">Schema Markup</div>
-                          <div className="space-y-2">
-                            {inlineBrief.schemaRecommendations.map((schema, i) => (
-                              <div key={i} className="bg-zinc-950 rounded-lg px-4 py-3 border border-zinc-800">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="text-[11px] px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-medium">{schema.type}</span>
-                                </div>
-                                <div className="text-[11px] text-zinc-400 leading-relaxed">{schema.notes}</div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Header */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Clipboard className="w-5 h-5 text-teal-400" />
-            <h2 className="text-sm font-semibold text-zinc-200">Content Briefs</h2>
-            <span className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{briefs.length} total</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                value={briefSearch}
-                onChange={e => setBriefSearch(e.target.value)}
-                placeholder="Search briefs..."
-                className="w-48 pl-8 pr-7 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 focus:border-zinc-700 focus:outline-none"
-              />
-              {briefSearch && (
-                <button onClick={() => setBriefSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-400">
-                  <X className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-            <div className="flex items-center gap-1 text-[11px] text-zinc-500">
-              <ArrowUpDown className="w-3 h-3" />
-              <select value={briefSort} onChange={e => setBriefSort(e.target.value as 'date' | 'keyword' | 'difficulty')} className="bg-zinc-900 border border-zinc-800 rounded px-1.5 py-1 text-[11px] text-zinc-400 focus:outline-none cursor-pointer">
-                <option value="date">Newest</option>
-                <option value="keyword">Keyword A-Z</option>
-                <option value="difficulty">Difficulty</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
+      <RequestList
+        clientRequests={clientRequests}
+        expandedRequest={expandedRequest}
+        generatingBriefFor={generatingBriefFor}
+        loadingBrief={loadingBrief}
+        briefError={briefError}
+        deliveringReqId={deliveringReqId}
+        deliveryUrl={deliveryUrl}
+        deliveryNotes={deliveryNotes}
+        getBriefById={getBriefById}
+        onToggleRequestBrief={toggleRequestBrief}
+        onGenerateBriefForRequest={handleGenerateBriefForRequest}
+        onUpdateRequestStatus={handleUpdateRequestStatus}
+        onConfirmDeleteRequest={confirmDeleteRequest}
+        onSetDeliveringReqId={setDeliveringReqId}
+        onSetDeliveryUrl={setDeliveryUrl}
+        onSetDeliveryNotes={setDeliveryNotes}
+        onSetBriefError={setBriefError}
+        onSetExpandedRequest={setExpandedRequest}
+        onCopyAsMarkdown={copyAsMarkdown}
+        onExportClientHTML={exportClientHTML}
+      />
 
       {/* Generator */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 space-y-3">
-        <div className="flex items-center gap-2 mb-1">
-          <Sparkles className="w-4 h-4 text-amber-400" />
-          <span className="text-xs font-medium text-zinc-300">Generate AI Content Brief</span>
-        </div>
-        <div className="grid grid-cols-1 gap-2">
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_160px] gap-2">
-            <div>
-              <label className="text-[11px] text-zinc-500 block mb-0.5">Target Keyword *</label>
-              <input
-                type="text"
-                value={keyword}
-                onChange={e => setKeyword(e.target.value)}
-                placeholder="e.g. dental implants near me"
-                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600"
-                onKeyDown={e => e.key === 'Enter' && !generating && handleGenerate()}
-              />
-            </div>
-            <div>
-              <label className="text-[11px] text-zinc-500 block mb-0.5">Page Type</label>
-              <select
-                value={pageType}
-                onChange={e => setPageType(e.target.value)}
-                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 focus:outline-none cursor-pointer"
-              >
-                <option value="">Auto-detect</option>
-                <option value="blog">Blog Post</option>
-                <option value="landing">Landing Page</option>
-                <option value="service">Service Page</option>
-                <option value="location">Location Page</option>
-                <option value="product">Product Page</option>
-                <option value="pillar">Pillar Page</option>
-                <option value="resource">Resource / Guide</option>
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="text-[11px] text-zinc-500 block mb-0.5">Business Context (optional)</label>
-            <input
-              type="text"
-              value={businessCtx}
-              onChange={e => setBusinessCtx(e.target.value)}
-              placeholder="e.g. Local dental practice in Austin, TX specializing in cosmetic dentistry"
-              className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600"
-            />
-          </div>
-        </div>
-
-        {/* Advanced Options */}
-        <button
-          onClick={() => setShowAdvanced(!showAdvanced)}
-          className="flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-zinc-400 transition-colors"
-        >
-          {showAdvanced ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          Advanced Options
-        </button>
-        {showAdvanced && (
-          <div className="space-y-2 pl-1 border-l-2 border-zinc-800 ml-1">
-            <div>
-              <label className="text-[11px] text-zinc-500 block mb-0.5">
-                <ExternalLink className="w-3 h-3 inline mr-1" />
-                Reference URLs (competitor/inspiration pages — one per line)
-              </label>
-              <textarea
-                value={refUrls}
-                onChange={e => setRefUrls(e.target.value)}
-                placeholder={"https://competitor.com/their-great-article\nhttps://example.com/inspiring-content"}
-                rows={3}
-                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 resize-none font-mono"
-              />
-              <p className="text-[11px] text-zinc-600 mt-0.5">We&apos;ll scrape these pages and use their structure/tone as context (up to 5 URLs)</p>
-            </div>
-          </div>
-        )}
-
-        <AIContextIndicator workspaceId={workspaceId} feature="briefs" />
-
-        {error && <p className="text-xs text-red-400">{error}</p>}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleGenerate}
-            disabled={!keyword.trim() || generating}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 transition-colors"
-          >
-            {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-            {generating ? 'Generating...' : 'Generate Brief'}
-          </button>
-          {generating && (
-            <span className="text-[11px] text-zinc-500 animate-pulse">Enriching with SERP data, GA4 insights, and knowledge base...</span>
-          )}
-        </div>
-      </div>
+      <BriefGenerator
+        workspaceId={workspaceId}
+        keyword={keyword}
+        businessCtx={businessCtx}
+        pageType={pageType}
+        refUrls={refUrls}
+        showAdvanced={showAdvanced}
+        generating={generating}
+        error={error}
+        onSetKeyword={setKeyword}
+        onSetBusinessCtx={setBusinessCtx}
+        onSetPageType={setPageType}
+        onSetRefUrls={setRefUrls}
+        onSetShowAdvanced={setShowAdvanced}
+        onGenerate={handleGenerate}
+      />
 
       {/* Briefs list (standalone — not linked to a request) */}
-      {(() => {
-        const linkedBriefIds = new Set(clientRequests.filter(r => r.briefId).map(r => r.briefId!));
-        let standaloneBriefs = briefs.filter(b => !linkedBriefIds.has(b.id));
-
-        // Apply search filter
-        if (briefSearch.trim()) {
-          const q = briefSearch.toLowerCase();
-          standaloneBriefs = standaloneBriefs.filter(b =>
-            b.targetKeyword.toLowerCase().includes(q) ||
-            b.suggestedTitle.toLowerCase().includes(q) ||
-            b.intent.toLowerCase().includes(q) ||
-            b.secondaryKeywords.some(k => k.toLowerCase().includes(q))
-          );
-        }
-
-        // Apply sort
-        standaloneBriefs = [...standaloneBriefs].sort((a, b) => {
-          if (briefSort === 'keyword') return a.targetKeyword.localeCompare(b.targetKeyword);
-          if (briefSort === 'difficulty') return (b.difficultyScore ?? 0) - (a.difficultyScore ?? 0);
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        });
-
-        if (standaloneBriefs.length === 0 && !briefSearch.trim()) return (
-          <div className="text-center py-12">
-            <FileText className="w-8 h-8 text-zinc-700 mx-auto mb-2" />
-            <p className="text-sm text-zinc-500">No standalone briefs yet</p>
-            <p className="text-xs text-zinc-500 mt-1">Generate a brief above, or briefs linked to requests will appear in the request cards</p>
-          </div>
-        );
-
-        if (standaloneBriefs.length === 0 && briefSearch.trim()) return (
-          <div className="text-center py-8">
-            <Search className="w-6 h-6 text-zinc-700 mx-auto mb-2" />
-            <p className="text-sm text-zinc-500">No briefs match &ldquo;{briefSearch}&rdquo;</p>
-            <button onClick={() => setBriefSearch('')} className="text-xs text-teal-400 mt-1 hover:underline">Clear search</button>
-          </div>
-        );
-
-        return (
-        <div className="space-y-2">
-          {standaloneBriefs.map(brief => (
-            <div key={brief.id} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden group/brief">
-              {/* Brief header row — metrics + quick actions visible at all times */}
-              <div className="flex items-center gap-3 px-4 py-3">
-                <button
-                  onClick={() => setExpanded(expanded === brief.id ? null : brief.id)}
-                  className="flex-1 min-w-0 text-left"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-zinc-200 truncate">{brief.targetKeyword}</span>
-                    {brief.difficultyScore != null && (
-                      <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${brief.difficultyScore <= 30 ? 'bg-green-500/10 text-green-400 border border-green-500/20' : brief.difficultyScore <= 60 ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>{brief.difficultyScore}/100</span>
-                    )}
-                  </div>
-                  <div className="text-[11px] text-zinc-500 mt-0.5 truncate">{brief.suggestedTitle}</div>
-                </button>
-                {/* At-a-glance metrics */}
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium">{brief.wordCountTarget.toLocaleString()} words</span>
-                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 capitalize">{brief.intent}</span>
-                  {brief.contentFormat && <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400/80 border border-amber-500/20 capitalize hidden sm:inline-block">{brief.contentFormat}</span>}
-                </div>
-                {/* Quick actions — always visible */}
-                <div className="flex items-center gap-0.5 flex-shrink-0 opacity-40 group-hover/brief:opacity-100 transition-opacity">
-                  <button onClick={(e) => { e.stopPropagation(); copyAsMarkdown(brief); }} title="Copy for AI tool" className="p-1.5 rounded hover:bg-teal-500/10 text-zinc-500 hover:text-teal-400 transition-colors">
-                    <Copy className="w-3.5 h-3.5" />
-                  </button>
-                  <button onClick={(e) => { e.stopPropagation(); exportClientHTML(brief); }} title="Export PDF" className="p-1.5 rounded hover:bg-teal-500/10 text-zinc-500 hover:text-teal-400 transition-colors">
-                    <Download className="w-3.5 h-3.5" />
-                  </button>
-                  <button onClick={(e) => { e.stopPropagation(); confirmDeleteBrief(brief); }} title="Delete brief" className="p-1.5 rounded hover:bg-red-500/10 text-zinc-500 hover:text-red-400 transition-colors">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-                {/* Date + expand */}
-                <span className="text-[11px] text-zinc-500 flex-shrink-0">{new Date(brief.createdAt).toLocaleDateString()}</span>
-                <button onClick={() => setExpanded(expanded === brief.id ? null : brief.id)} className="flex-shrink-0 p-1 rounded hover:bg-zinc-800 transition-colors">
-                  {expanded === brief.id ? <ChevronUp className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />}
-                </button>
-              </div>
-
-              {/* Brief details */}
-              {expanded === brief.id && (
-                <BriefDetail
-                  brief={brief}
-                  editingBrief={editingBrief}
-                  generatingPostFor={generatingPostFor}
-                  regeneratingBrief={regeneratingBrief}
-                  onSaveBriefField={saveBriefField}
-                  onSetEditingBrief={setEditingBrief}
-                  onGeneratePost={handleGeneratePost}
-                  onRegenerate={handleRegenerateBrief}
-                  onCopyAsMarkdown={copyAsMarkdown}
-                  onExportClientHTML={exportClientHTML}
-                  onConfirmDelete={confirmDeleteBrief}
-                />
-              )}
-            </div>
-          ))}
-        </div>
-        );
-      })()}
+      <BriefList
+        briefs={briefs}
+        clientRequests={clientRequests}
+        expanded={expanded}
+        briefSearch={briefSearch}
+        briefSort={briefSort}
+        editingBrief={editingBrief}
+        generatingPostFor={generatingPostFor}
+        regeneratingBrief={regeneratingBrief}
+        onSetExpanded={setExpanded}
+        onSetBriefSearch={setBriefSearch}
+        onSetBriefSort={setBriefSort}
+        onSetEditingBrief={setEditingBrief}
+        onSaveBriefField={saveBriefField}
+        onGeneratePost={handleGeneratePost}
+        onRegenerate={handleRegenerateBrief}
+        onCopyAsMarkdown={copyAsMarkdown}
+        onExportClientHTML={exportClientHTML}
+        onConfirmDeleteBrief={confirmDeleteBrief}
+      />
     </div>
   );
 }

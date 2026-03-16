@@ -2,16 +2,17 @@ import { useState, useEffect, useRef } from 'react';
 import { get, post, getSafe } from '../api/client';
 import type { FixContext } from '../App';
 import {
-  Loader2, ChevronDown, ChevronRight, Copy, CheckCircle,
-  AlertCircle, Info, Sparkles, RefreshCw, Upload, Send, Search, Plus, Database,
-  ArrowRight, GitCompareArrows, Pencil, AlertTriangle,
+  Loader2, CheckCircle,
+  AlertCircle, Info, Sparkles, RefreshCw, Plus, Database,
 } from 'lucide-react';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { StatusBadge } from './ui/StatusBadge';
-import { statusBorderClass } from './ui/statusConfig';
 import { CmsTemplatePanel } from './schema/CmsTemplatePanel';
+import { SchemaPageCard } from './schema/SchemaPageCard';
+import { BulkPublishPanel } from './schema/BulkPublishPanel';
+import { PagePicker, InitialPagePicker } from './schema/PagePicker';
 
 interface SchemaSuggestion {
   type: string;
@@ -475,42 +476,14 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
           </button>
         </div>
         {showPagePicker && (
-          <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden mt-2">
-            <div className="px-3 py-2 border-b border-zinc-800">
-              <div className="relative">
-                <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
-                <input
-                  type="text"
-                  value={pageSearch}
-                  onChange={e => setPageSearch(e.target.value)}
-                  placeholder="Search pages..."
-                  className="w-full pl-7 pr-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
-                  autoFocus
-                />
-              </div>
-            </div>
-            <div className="max-h-[200px] overflow-y-auto">
-              {availablePages
-                .filter(p => !pageSearch || p.title.toLowerCase().includes(pageSearch.toLowerCase()) || p.slug.toLowerCase().includes(pageSearch.toLowerCase()))
-                .map(p => (
-                  <button
-                    key={p.id}
-                    onClick={() => generateSinglePage(p.id)}
-                    disabled={generatingSingle === p.id}
-                    className="w-full text-left px-4 py-2 hover:bg-zinc-800/50 transition-colors border-b border-zinc-800/30 last:border-b-0 disabled:opacity-50"
-                  >
-                    <span className="text-xs text-zinc-300 block">{p.title}</span>
-                    <span className="text-[11px] text-zinc-500">/{p.slug}</span>
-                  </button>
-                ))}
-              {availablePages.length === 0 && (
-                <div className="px-4 py-3 text-xs text-zinc-500 text-center">No pages found</div>
-              )}
-            </div>
-            <div className="px-3 py-2 border-t border-zinc-800">
-              <button onClick={() => setShowPagePicker(false)} className="text-[11px] text-zinc-500 hover:text-zinc-400 transition-colors">Cancel</button>
-            </div>
-          </div>
+          <InitialPagePicker
+            availablePages={availablePages}
+            pageSearch={pageSearch}
+            generatingSingle={generatingSingle}
+            onPageSearchChange={setPageSearch}
+            onSelectPage={generateSinglePage}
+            onClose={() => setShowPagePicker(false)}
+          />
         )}
         <CmsTemplatePanel
           showCmsPanel={showCmsPanel}
@@ -604,31 +577,17 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
         </div>
         <div className="flex items-center gap-2">
           {!loading && data.length > 0 && (
-            <>
-              {(() => {
-                const unpublished = data.filter(p => !p.pageId.startsWith('cms-') && !published.has(p.pageId) && p.suggestedSchemas[0]?.template).length;
-                return unpublished > 0 ? (
-                  <button
-                    onClick={publishAllToWebflow}
-                    disabled={bulkPublishing}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white"
-                  >
-                    {bulkPublishing ? (
-                      <><Loader2 className="w-3 h-3 animate-spin" /> Publishing {bulkProgress?.done}/{bulkProgress?.total}...</>
-                    ) : (
-                      <><Upload className="w-3 h-3" /> Publish All ({unpublished})</>
-                    )}
-                  </button>
-                ) : null;
-              })()}
-              <button
-                onClick={sendSchemasToClient}
-                disabled={sendingToClient || sentToClient}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs text-teal-400 hover:text-teal-300 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Send className="w-3 h-3" /> {sentToClient ? 'Sent to Client' : sendingToClient ? 'Sending...' : 'Send to Client'}
-              </button>
-            </>
+            <BulkPublishPanel
+              dataCount={data.length}
+              unpublishedCount={data.filter(p => !p.pageId.startsWith('cms-') && !published.has(p.pageId) && p.suggestedSchemas[0]?.template).length}
+              bulkPublishing={bulkPublishing}
+              bulkProgress={bulkProgress}
+              sendingToClient={sendingToClient}
+              sentToClient={sentToClient}
+              loading={loading}
+              onPublishAll={publishAllToWebflow}
+              onSendToClient={sendSchemasToClient}
+            />
           )}
           <div className="relative">
             <button
@@ -639,45 +598,15 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
               {loadingPages ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />} Add Page
             </button>
             {showPagePicker && (
-              <div className="absolute right-0 top-full mt-1 w-72 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-xl z-20">
-                <div className="px-3 py-2 border-b border-zinc-800">
-                  <div className="relative">
-                    <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
-                    <input
-                      type="text"
-                      value={pageSearch}
-                      onChange={e => setPageSearch(e.target.value)}
-                      placeholder="Search pages..."
-                      className="w-full pl-7 pr-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
-                      autoFocus
-                    />
-                  </div>
-                </div>
-                <div className="max-h-[200px] overflow-y-auto">
-                  {availablePages
-                    .filter(p => !pageSearch || p.title.toLowerCase().includes(pageSearch.toLowerCase()) || p.slug.toLowerCase().includes(pageSearch.toLowerCase()))
-                    .map(p => {
-                      const alreadyGenerated = data?.some(d => d.pageId === p.id);
-                      return (
-                        <button
-                          key={p.id}
-                          onClick={() => generateSinglePage(p.id)}
-                          disabled={generatingSingle === p.id}
-                          className="w-full text-left px-4 py-2 hover:bg-zinc-800/50 transition-colors border-b border-zinc-800/30 last:border-b-0 disabled:opacity-50"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-zinc-300">{p.title}</span>
-                            {alreadyGenerated && <span className="text-[11px] text-zinc-500">exists</span>}
-                          </div>
-                          <span className="text-[11px] text-zinc-500">/{p.slug}</span>
-                        </button>
-                      );
-                    })}
-                </div>
-                <div className="px-3 py-2 border-t border-zinc-800">
-                  <button onClick={() => { setShowPagePicker(false); setPageSearch(''); }} className="text-[11px] text-zinc-500 hover:text-zinc-400 transition-colors">Close</button>
-                </div>
-              </div>
+              <PagePicker
+                availablePages={availablePages}
+                pageSearch={pageSearch}
+                generatingSingle={generatingSingle}
+                existingPageIds={new Set(data?.map(d => d.pageId) || [])}
+                onPageSearchChange={setPageSearch}
+                onSelectPage={generateSinglePage}
+                onClose={() => { setShowPagePicker(false); setPageSearch(''); }}
+              />
             )}
           </div>
           <button onClick={runScan} disabled={loading} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
@@ -727,285 +656,38 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
       {/* Page list */}
       <div className="space-y-2">
         {data.map(page => {
-          const isOpen = expanded.has(page.pageId);
-          const isRegenLoading = regenerating.has(page.pageId);
-          const hasErrors = (page.validationErrors?.length || 0) > 0;
-          const schema = page.suggestedSchemas[0];
-          const graphTypes = schema ? ((schema.template?.['@graph'] as Record<string, unknown>[]) || []).map(n => n['@type'] as string).filter(Boolean) : [];
+          const schemaRecs = recsLoaded ? recsForPage(page.slug).filter(r => r.type === 'schema') : [];
           return (
-            <div key={page.pageId} className={`bg-zinc-900 rounded-xl border overflow-hidden ${statusBorderClass(getState(page.pageId)?.status) || (hasErrors ? 'border-amber-500/30' : 'border-zinc-800')}`}>
-              <div className="flex items-center gap-3 px-4 py-3">
-                <button
-                  onClick={() => toggleExpand(page.pageId)}
-                  className="flex items-center gap-3 flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
-                >
-                  {isOpen ? <ChevronDown className="w-4 h-4 text-zinc-500 flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-zinc-500 flex-shrink-0" />}
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-zinc-200 truncate">{page.pageTitle}</div>
-                    <div className="text-xs text-zinc-500 truncate">/{page.slug}</div>
-                  </div>
-                </button>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <StatusBadge status={getState(page.pageId)?.status} />
-                  {page.existingSchemas.length > 0 && (
-                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-500/10 text-green-400 border border-green-500/20">
-                      <CheckCircle className="w-3 h-3" /> {page.existingSchemas.length} existing
-                    </span>
-                  )}
-                  {graphTypes.length > 0 && (
-                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-teal-500/10 text-teal-400 border border-teal-500/20">
-                      <Sparkles className="w-3 h-3" /> {graphTypes.length} types
-                    </span>
-                  )}
-                  {hasErrors && (
-                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                      <AlertCircle className="w-3 h-3" /> {page.validationErrors!.length}
-                    </span>
-                  )}
-                  {(() => {
-                    const schemaRecs = recsLoaded ? recsForPage(page.slug).filter(r => r.type === 'schema') : [];
-                    return schemaRecs.length > 0 ? (
-                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                        <AlertTriangle className="w-3 h-3" /> {schemaRecs.length} rec{schemaRecs.length > 1 ? 's' : ''}
-                      </span>
-                    ) : null;
-                  })()}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); regeneratePage(page.pageId); }}
-                    disabled={isRegenLoading}
-                    className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors disabled:opacity-50 text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700"
-                    title="Regenerate schema for this page"
-                  >
-                    {isRegenLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                  </button>
-                </div>
-              </div>
-
-              {isOpen && schema && (
-                <div className="border-t border-zinc-800">
-                  {/* Existing schemas */}
-                  {page.existingSchemas.length > 0 && (
-                    <div className="px-4 py-3 border-b border-zinc-800/50">
-                      <div className="text-xs font-medium text-zinc-400 mb-2">Already on page</div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {page.existingSchemas.map((s, i) => (
-                          <span key={i} className="px-2 py-1 rounded-md text-xs font-mono bg-green-500/10 text-green-400 border border-green-500/20">
-                            {s}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Validation errors */}
-                  {hasErrors && (
-                    <div className="px-4 py-2 bg-amber-500/5 border-b border-amber-500/20">
-                      <div className="text-xs font-medium text-amber-400 mb-1">Validation warnings</div>
-                      {page.validationErrors!.map((err, i) => (
-                        <div key={i} className="text-[11px] text-amber-300/80">• {err}</div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Recommendation banners */}
-                  {(() => {
-                    const schemaRecs = recsLoaded ? recsForPage(page.slug).filter(r => r.type === 'schema') : [];
-                    return schemaRecs.length > 0 ? (
-                      <div className="px-4 py-2 border-b border-amber-500/20 bg-amber-500/5 space-y-1.5">
-                        {schemaRecs.map(rec => (
-                          <div key={rec.id} className="flex items-start gap-2">
-                            <AlertTriangle className="w-3 h-3 text-amber-400 flex-shrink-0 mt-0.5" />
-                            <div className="flex-1 min-w-0">
-                              <div className="text-[11px] font-medium text-amber-300">{rec.title}</div>
-                              <div className="text-[11px] text-zinc-400">{rec.insight}</div>
-                              {rec.trafficAtRisk > 0 && (
-                                <div className="text-[10px] text-amber-400/70 mt-0.5">
-                                  {rec.trafficAtRisk.toLocaleString()} clicks at risk · {rec.estimatedGain}
-                                </div>
-                              )}
-                            </div>
-                            <span className={`flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                              rec.priority === 'fix_now' ? 'bg-red-500/15 text-red-400' :
-                              rec.priority === 'fix_soon' ? 'bg-amber-500/15 text-amber-400' :
-                              'bg-zinc-500/15 text-zinc-400'
-                            }`}>
-                              {rec.priority.replace('_', ' ')}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null;
-                  })()}
-
-                  {/* Graph types */}
-                  <div className="px-4 py-2 border-b border-zinc-800/50">
-                    <div className="text-xs font-medium text-zinc-400 mb-1.5">@graph types</div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {graphTypes.map((t, i) => (
-                        <span key={i} className="px-2 py-1 rounded-md text-xs font-mono bg-teal-500/10 text-teal-300 border border-teal-500/20">
-                          {t}
-                        </span>
-                      ))}
-                    </div>
-                    <p className="text-[11px] text-zinc-500 mt-1.5">{schema.reason}</p>
-                  </div>
-
-                  {/* Schema preview / diff */}
-                  <div className="px-4 py-3">
-                    {/* Diff toggle + copy buttons */}
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        {page.existingSchemaJson && page.existingSchemaJson.length > 0 && (
-                          <button
-                            onClick={() => toggleDiff(page.pageId)}
-                            className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
-                              showDiff.has(page.pageId)
-                                ? 'bg-purple-500/15 text-purple-400 border border-purple-500/30'
-                                : 'bg-zinc-800 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700'
-                            }`}
-                          >
-                            <GitCompareArrows className="w-3 h-3" />
-                            {showDiff.has(page.pageId) ? 'Hide Diff' : 'Show Diff'}
-                          </button>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => toggleSchemaEdit(page.pageId, schema.template)}
-                          className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
-                            editingSchema.has(page.pageId)
-                              ? 'bg-teal-500/15 text-teal-400 border border-teal-500/30'
-                              : 'bg-zinc-800 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700'
-                          }`}
-                        >
-                          <Pencil className="w-3 h-3" />
-                          {editingSchema.has(page.pageId) ? 'Done Editing' : 'Edit'}
-                        </button>
-                        <button
-                          onClick={() => copyTemplate(schema, page.pageId)}
-                          className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors"
-                        >
-                          {copiedId === `${page.pageId}-${schema.type}` ? (
-                            <><CheckCircle className="w-3 h-3 text-green-400" /> Copied</>
-                          ) : (
-                            <><Copy className="w-3 h-3" /> Copy</>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-
-                    {showDiff.has(page.pageId) && page.existingSchemaJson ? (
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <div className="text-[11px] font-medium text-red-400/80 mb-1 flex items-center gap-1">
-                            <span className="w-2 h-2 rounded-full bg-red-400/60" /> Current (on page)
-                          </div>
-                          <pre className="text-xs font-mono bg-zinc-950 rounded-lg p-3 overflow-x-auto text-zinc-500 border border-red-500/20 max-h-64 overflow-y-auto whitespace-pre-wrap">
-                            {JSON.stringify(page.existingSchemaJson.length === 1 ? page.existingSchemaJson[0] : page.existingSchemaJson, null, 2)}
-                          </pre>
-                        </div>
-                        <div>
-                          <div className="text-[11px] font-medium text-green-400/80 mb-1 flex items-center gap-1">
-                            <span className="w-2 h-2 rounded-full bg-green-400/60" /> Suggested <ArrowRight className="w-3 h-3" />
-                          </div>
-                          <pre className="text-xs font-mono bg-zinc-950 rounded-lg p-3 overflow-x-auto text-zinc-400 border border-green-500/20 max-h-64 overflow-y-auto whitespace-pre-wrap">
-                            {JSON.stringify(schema.template, null, 2)}
-                          </pre>
-                        </div>
-                      </div>
-                    ) : editingSchema.has(page.pageId) ? (
-                      <div className="relative">
-                        <textarea
-                          value={editedSchemaJson[page.pageId] || JSON.stringify(schema.template, null, 2)}
-                          onChange={e => handleSchemaJsonChange(page.pageId, e.target.value)}
-                          className={`w-full text-xs font-mono bg-zinc-950 rounded-lg p-3 text-zinc-300 border ${schemaParseError[page.pageId] ? 'border-red-500/50' : 'border-teal-500/30'} max-h-96 min-h-[200px] overflow-y-auto resize-y focus:outline-none focus:border-teal-500/60`}
-                          spellCheck={false}
-                        />
-                        {schemaParseError[page.pageId] && (
-                          <div className="flex items-center gap-1.5 mt-1.5 text-[11px] text-red-400">
-                            <AlertCircle className="w-3 h-3" />
-                            {schemaParseError[page.pageId]}
-                          </div>
-                        )}
-                        {editedSchemaJson[page.pageId] && !schemaParseError[page.pageId] && (
-                          <div className="flex items-center gap-1.5 mt-1.5 text-[11px] text-teal-400">
-                            <CheckCircle className="w-3 h-3" />
-                            Valid JSON — edits will be used for copy &amp; publish
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <pre className="text-xs font-mono bg-zinc-950 rounded-lg p-3 overflow-x-auto text-zinc-400 border border-zinc-800 max-h-64 overflow-y-auto">
-                        {JSON.stringify(getEffectiveSchema(page.pageId, schema.template), null, 2)}
-                      </pre>
-                    )}
-
-                    {/* Publish to Webflow */}
-                    <div className="mt-3 flex items-center gap-2">
-                      {!page.pageId.startsWith('cms-') && (
-                        published.has(page.pageId) ? (
-                          <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
-                            <CheckCircle className="w-3.5 h-3.5" /> Published to Webflow
-                          </span>
-                        ) : confirmPublish === page.pageId ? (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-amber-400">Publish {editedSchemaJson[page.pageId] ? 'edited ' : ''}schema to this page's &lt;head&gt;?</span>
-                            <button
-                              onClick={() => publishToWebflow(page.pageId, getEffectiveSchema(page.pageId, schema.template))}
-                              disabled={publishing.has(page.pageId) || !!schemaParseError[page.pageId]}
-                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 bg-green-600 hover:bg-green-500 text-white"
-                            >
-                              {publishing.has(page.pageId) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
-                              Yes, publish
-                            </button>
-                            <button
-                              onClick={() => setConfirmPublish(null)}
-                              className="px-2 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setConfirmPublish(page.pageId)}
-                            disabled={publishing.has(page.pageId)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white"
-                          >
-                            {publishing.has(page.pageId) ? (
-                              <><Loader2 className="w-3 h-3 animate-spin" /> Publishing...</>
-                            ) : (
-                              <><Upload className="w-3.5 h-3.5" /> Publish to Webflow</>
-                            )}
-                          </button>
-                        )
-                      )}
-                      {publishError[page.pageId] && (
-                        <span className="text-xs text-red-400">{publishError[page.pageId]}</span>
-                      )}
-                      {workspaceId && (
-                        sentPages.has(page.pageId) ? (
-                          <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-teal-500/10 text-teal-400 border border-teal-500/20">
-                            <CheckCircle className="w-3.5 h-3.5" /> Sent for Approval
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => sendSingleSchemaToClient(page)}
-                            disabled={sendingPage.has(page.pageId)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/30"
-                          >
-                            {sendingPage.has(page.pageId) ? (
-                              <><Loader2 className="w-3 h-3 animate-spin" /> Sending...</>
-                            ) : (
-                              <><Send className="w-3.5 h-3.5" /> Send to Client</>
-                            )}
-                          </button>
-                        )
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+            <SchemaPageCard
+              key={page.pageId}
+              page={page}
+              isOpen={expanded.has(page.pageId)}
+              isRegenLoading={regenerating.has(page.pageId)}
+              editState={getState(page.pageId)}
+              copiedId={copiedId}
+              published={published.has(page.pageId)}
+              publishing={publishing.has(page.pageId)}
+              publishError={publishError[page.pageId]}
+              confirmPublish={confirmPublish === page.pageId}
+              sentPage={sentPages.has(page.pageId)}
+              sendingPage={sendingPage.has(page.pageId)}
+              editingSchema={editingSchema.has(page.pageId)}
+              editedSchemaJson={editedSchemaJson[page.pageId]}
+              schemaParseError={schemaParseError[page.pageId]}
+              showDiff={showDiff.has(page.pageId)}
+              schemaRecs={schemaRecs}
+              workspaceId={workspaceId}
+              onToggleExpand={toggleExpand}
+              onRegenerate={regeneratePage}
+              onToggleDiff={toggleDiff}
+              onToggleSchemaEdit={toggleSchemaEdit}
+              onSchemaJsonChange={handleSchemaJsonChange}
+              onCopyTemplate={copyTemplate}
+              onPublish={publishToWebflow}
+              onConfirmPublish={setConfirmPublish}
+              onSendToClient={sendSingleSchemaToClient}
+              getEffectiveSchema={getEffectiveSchema}
+            />
           );
         })}
       </div>

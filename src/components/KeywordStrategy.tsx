@@ -1,18 +1,19 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Loader2, Target, ChevronDown, ChevronRight, RefreshCw,
-  TrendingUp, AlertCircle, Sparkles, Pencil, Check, X, Briefcase,
-  BarChart3, Shield, DollarSign, Users, Search, Zap, FileText,
-  Eye, MousePointerClick, Trophy, ArrowUp, ArrowDown, Wand2,
-  Copy, Link, MessageSquare,
+  AlertCircle, Sparkles, Briefcase,
+  BarChart3, Users, Search, FileText,
+  Eye, MousePointerClick, Trophy,
 } from 'lucide-react';
 import { KeywordAnalysis } from './KeywordAnalysis';
 import { StatCard, AIContextIndicator } from './ui';
-import { SeoCopyPanel } from './strategy/SeoCopyPanel';
 import { BacklinkProfile } from './strategy/BacklinkProfile';
 import { CompetitiveIntel } from './strategy/CompetitiveIntel';
-import { adminPath } from '../routes';
+import { PageKeywordMapPanel } from './strategy/PageKeywordMap';
+import { ContentGaps } from './strategy/ContentGaps';
+import { QuickWins } from './strategy/QuickWins';
+import { KeywordGaps } from './strategy/KeywordGaps';
+import { LowHangingFruit } from './strategy/LowHangingFruit';
 import { keywords } from '../api/seo';
 
 interface PageKeywordMap {
@@ -687,96 +688,13 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
           )}
 
           {/* ── Low-Hanging Fruit ── */}
-          {lowHangingFruit.length > 0 && (
-            <div className="bg-zinc-900 rounded-xl border border-amber-500/20 p-4">
-              <h4 className="text-xs font-semibold text-amber-300 mb-1 flex items-center gap-1.5">
-                <Zap className="w-3.5 h-3.5" /> Low-Hanging Fruit
-              </h4>
-              <p className="text-[11px] text-zinc-500 mb-3">Pages ranking #4–20 with significant impressions — small improvements here drive major traffic gains.</p>
-              <div className="space-y-1.5">
-                {lowHangingFruit.map((page, i) => (
-                  <div key={i} className="flex items-center justify-between px-3 py-2 bg-zinc-800/50 rounded-lg">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[11px] text-zinc-300 truncate">{page.pageTitle}</div>
-                      <div className="text-[11px] text-zinc-500 font-mono">{page.pagePath}</div>
-                    </div>
-                    <div className="flex items-center gap-3 flex-shrink-0 ml-3">
-                      <span className="text-[11px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded truncate max-w-[160px]">{page.primaryKeyword}</span>
-                      <span className={`text-[11px] font-mono font-medium ${positionColor(page.currentPosition)}`}>#{page.currentPosition?.toFixed(0)}</span>
-                      <span className="text-[11px] text-zinc-500">{(page.impressions || 0).toLocaleString()} imp</span>
-                      {page.clicks !== undefined && page.clicks > 0 && <span className="text-[11px] text-zinc-500">{page.clicks} clicks</span>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <LowHangingFruit pages={lowHangingFruit} positionColor={positionColor} />
 
           {/* ── Quick Wins ── */}
-          {strategy.quickWins && strategy.quickWins.length > 0 && (
-            <div className="bg-zinc-900 rounded-xl border border-emerald-500/20 p-4">
-              <h4 className="text-xs font-semibold text-emerald-300 mb-1 flex items-center gap-1.5">
-                <TrendingUp className="w-3.5 h-3.5" /> Quick Wins
-              </h4>
-              <p className="text-[11px] text-zinc-500 mb-3">High-impact changes that can be implemented immediately.</p>
-              <div className="space-y-2">
-                {strategy.quickWins.map((qw, i) => {
-                  const impactColor = qw.estimatedImpact === 'high' ? 'text-green-400 bg-green-500/10 border-green-500/20' : qw.estimatedImpact === 'medium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
-                  return (
-                    <div key={i} className="px-3 py-2.5 bg-zinc-800/40 rounded-lg border border-zinc-800">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-mono text-zinc-500">{qw.pagePath}</span>
-                        <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded border ${impactColor}`}>{qw.estimatedImpact} impact</span>
-                      </div>
-                      <div className="text-[11px] text-zinc-200 mt-1 font-medium">{qw.action}</div>
-                      <div className="text-[11px] text-zinc-500 mt-0.5">{qw.rationale}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          <QuickWins quickWins={strategy.quickWins || []} />
 
           {/* ── Content Gaps ── */}
-          {strategy.contentGaps && strategy.contentGaps.length > 0 && (
-            <div className="bg-zinc-900 rounded-xl border border-blue-500/20 p-4">
-              <h4 className="text-xs font-semibold text-blue-300 mb-1 flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5" /> Content Gaps
-              </h4>
-              <p className="text-[11px] text-zinc-500 mb-3">New content to create — topics with search demand but no page on the site.</p>
-              <div className="space-y-2">
-                {strategy.contentGaps.map((gap, i) => {
-                  const prioColor = gap.priority === 'high' ? 'text-red-400 bg-red-500/10 border-red-500/20' : gap.priority === 'medium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
-                  return (
-                    <div key={i} className="px-3 py-2.5 bg-zinc-800/40 rounded-lg border border-zinc-800">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-zinc-200">{gap.topic}</span>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[11px] uppercase px-1.5 py-0.5 rounded-full border font-medium ${intentColor(gap.intent)}`}>{gap.intent}</span>
-                          <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded border ${prioColor}`}>{gap.priority}</span>
-                          {gap.suggestedPageType && gap.suggestedPageType !== 'blog' && (
-                            <span className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20 font-medium capitalize">{gap.suggestedPageType}</span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between mt-1">
-                        <div className="text-[11px] text-teal-400">Target keyword: &ldquo;{gap.targetKeyword}&rdquo;</div>
-                        {workspaceId && (
-                          <button
-                            onClick={() => navigate(adminPath(workspaceId, 'seo-briefs'), { state: { fixContext: { pageName: gap.targetKeyword } } })}
-                            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 font-medium hover:bg-teal-600/40 transition-all flex-shrink-0"
-                          >
-                            <Sparkles className="w-3 h-3" /> Generate Brief
-                          </button>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-zinc-500 mt-0.5">{gap.rationale}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          <ContentGaps contentGaps={strategy.contentGaps || []} workspaceId={workspaceId} intentColor={intentColor} />
 
           {/* ── Site Keywords ── */}
           <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
@@ -819,244 +737,37 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
           )}
 
           {/* ── Page Keyword Map ── */}
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-            <div className="px-4 py-3 border-b border-zinc-800">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-xs font-semibold text-zinc-300">Page Keyword Map</h4>
-                  <p className="text-[11px] text-zinc-500 mt-0.5">{filteredPages.length} pages · Click to expand · Pencil to edit</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 mt-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
-                  <input
-                    type="text"
-                    value={pageSearch}
-                    onChange={e => setPageSearch(e.target.value)}
-                    placeholder="Search pages, keywords..."
-                    className="w-full pl-8 pr-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-[11px] text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-teal-500"
-                  />
-                </div>
-                <div className="flex items-center gap-1">
-                  {(['opportunity', 'position', 'impressions', 'volume'] as const).map(s => (
-                    <button
-                      key={s}
-                      onClick={() => { if (sortBy === s) setSortDir(d => d === 'desc' ? 'asc' : 'desc'); else { setSortBy(s); setSortDir('desc'); } }}
-                      className={`px-2 py-1 rounded text-[11px] font-medium transition-colors flex items-center gap-0.5 ${
-                        sortBy === s ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' : 'bg-zinc-800 text-zinc-500 border border-zinc-700 hover:text-zinc-300'
-                      }`}
-                    >
-                      {s === 'opportunity' ? 'Priority' : s.charAt(0).toUpperCase() + s.slice(1)}
-                      {sortBy === s && (sortDir === 'desc' ? <ArrowDown className="w-2.5 h-2.5" /> : <ArrowUp className="w-2.5 h-2.5" />)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-            {filteredPages.map((page) => {
-              const realIdx = strategy.pageMap.indexOf(page);
-              const isExpanded = expandedPages.has(realIdx);
-              const isEditing = editingPage === realIdx;
-
-              return (
-                <div key={realIdx} className="border-b border-zinc-800/50 last:border-b-0">
-                  <button
-                    onClick={() => togglePage(realIdx)}
-                    className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-zinc-800/20 transition-colors text-left"
-                  >
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />}
-                      <div className="min-w-0 flex-1">
-                        <span className="text-xs text-zinc-300 truncate block">{page.pageTitle}</span>
-                        <span className="text-[11px] text-zinc-500 font-mono">{page.pagePath}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                      {page.searchIntent && (
-                        <span className={`text-[11px] px-1.5 py-0.5 rounded-full border font-medium ${intentColor(page.searchIntent)}`}>
-                          {page.searchIntent}
-                        </span>
-                      )}
-                      <span className="text-[11px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded max-w-[180px] truncate">
-                        {page.primaryKeyword}
-                      </span>
-                      {page.volume !== undefined && (
-                        <span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded font-mono">
-                          {page.volume.toLocaleString()}/mo
-                        </span>
-                      )}
-                      {page.difficulty !== undefined && (
-                        <span className={`text-[11px] ${difficultyColor(page.difficulty)} bg-zinc-800 px-1.5 py-0.5 rounded font-mono`}>
-                          KD {page.difficulty}%
-                        </span>
-                      )}
-                      {page.currentPosition ? (
-                        <span className={`text-[11px] ${positionColor(page.currentPosition)} font-mono font-medium bg-zinc-800 px-1.5 py-0.5 rounded`}>
-                          #{page.currentPosition.toFixed(0)}
-                        </span>
-                      ) : (
-                        <span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded font-mono">—</span>
-                      )}
-                      {page.impressions !== undefined && page.impressions > 0 && (
-                        <span className="text-[11px] text-zinc-500 font-mono">{page.impressions.toLocaleString()} imp</span>
-                      )}
-                    </div>
-                  </button>
-
-                  {isExpanded && (
-                    <div className="px-4 pb-4 pl-10 space-y-2">
-                      {!isEditing ? (
-                        <>
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Primary Keyword</span>
-                              <p className="text-xs text-zinc-200 mt-0.5">{page.primaryKeyword}</p>
-                            </div>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); startEdit(realIdx); }}
-                              className="p-1 text-zinc-500 hover:text-teal-400 transition-colors"
-                              title="Edit keywords"
-                            >
-                              <Pencil className="w-3 h-3" />
-                            </button>
-                          </div>
-                          <div>
-                            <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Secondary Keywords</span>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {page.secondaryKeywords.map((kw, i) => (
-                                <span key={i} className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-[11px] text-zinc-400">
-                                  {kw}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                          {/* Metrics row */}
-                          <div className="flex flex-wrap gap-3 mt-1">
-                            {page.volume != null && page.volume > 0 && (
-                              <div className="text-[11px] text-zinc-500 flex items-center gap-1">
-                                <BarChart3 className="w-3 h-3 text-orange-400" />
-                                <span className="text-zinc-300 font-medium">{page.volume.toLocaleString()}</span>/mo
-                              </div>
-                            )}
-                            {page.difficulty != null && page.difficulty > 0 && (
-                              <div className="text-[11px] text-zinc-500 flex items-center gap-1">
-                                <Shield className="w-3 h-3" />
-                                KD: <span className={`font-medium ${difficultyColor(page.difficulty)}`}>{page.difficulty}%</span>
-                                <span className={`text-[11px] ${difficultyColor(page.difficulty)}`}>({difficultyLabel(page.difficulty)})</span>
-                              </div>
-                            )}
-                            {page.cpc !== undefined && page.cpc > 0 && (
-                              <div className="text-[11px] text-zinc-500 flex items-center gap-1">
-                                <DollarSign className="w-3 h-3 text-green-400" />
-                                CPC: <span className="text-green-400 font-medium">${page.cpc.toFixed(2)}</span>
-                              </div>
-                            )}
-                            {page.impressions !== undefined && (
-                              <div className="text-[11px] text-zinc-500">
-                                <span className="text-zinc-400 font-medium">{page.impressions.toLocaleString()}</span> impressions
-                              </div>
-                            )}
-                            {page.clicks !== undefined && (
-                              <div className="text-[11px] text-zinc-500">
-                                <span className="text-zinc-400 font-medium">{page.clicks.toLocaleString()}</span> clicks
-                              </div>
-                            )}
-                            {page.currentPosition && (
-                              <div className="text-[11px] text-zinc-500">
-                                Avg position: <span className={`font-medium ${positionColor(page.currentPosition)}`}>#{page.currentPosition.toFixed(1)}</span>
-                              </div>
-                            )}
-                          </div>
-                          {/* Secondary keyword metrics */}
-                          {page.secondaryMetrics && page.secondaryMetrics.length > 0 && (
-                            <div className="mt-1">
-                              <span className="text-[11px] text-zinc-500 uppercase tracking-wider">Secondary keyword data</span>
-                              <div className="flex flex-wrap gap-1 mt-0.5">
-                                {page.secondaryMetrics.filter(sm => sm.volume > 0 || sm.difficulty > 0).map((sm, si) => (
-                                  <span key={si} className="text-[11px] px-1.5 py-0.5 bg-zinc-800/80 border border-zinc-700/50 rounded text-zinc-500">
-                                    {sm.keyword} {sm.volume > 0 && <span className="text-zinc-400">{sm.volume}/mo</span>} {sm.difficulty > 0 && <span className={difficultyColor(sm.difficulty)}>KD {sm.difficulty}%</span>}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Generate SEO Copy */}
-                          <SeoCopyPanel
-                            page={page}
-                            seoCopyResults={seoCopyResults}
-                            generatingCopy={generatingCopy}
-                            copiedField={copiedField}
-                            onGenerateSeoCopy={generateSeoCopy}
-                            onCopyText={copyText}
-                          />
-                        </>
-                      ) : (
-                        <div className="space-y-2">
-                          <div>
-                            <label className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider block mb-1">Primary Keyword</label>
-                            <input
-                              type="text"
-                              value={editDraft.primary}
-                              onChange={e => setEditDraft(prev => ({ ...prev, primary: e.target.value }))}
-                              className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider block mb-1">Secondary Keywords (comma-separated)</label>
-                            <input
-                              type="text"
-                              value={editDraft.secondary}
-                              onChange={e => setEditDraft(prev => ({ ...prev, secondary: e.target.value }))}
-                              className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
-                            />
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={saveEdit}
-                              disabled={saving}
-                              className="flex items-center gap-1 px-2.5 py-1 rounded bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-[11px] font-medium"
-                            >
-                              {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} Save
-                            </button>
-                            <button
-                              onClick={() => setEditingPage(null)}
-                              className="flex items-center gap-1 px-2.5 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-[11px] font-medium"
-                            >
-                              <X className="w-3 h-3" /> Cancel
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <PageKeywordMapPanel
+            filteredPages={filteredPages}
+            pageMap={strategy.pageMap}
+            expandedPages={expandedPages}
+            editingPage={editingPage}
+            editDraft={editDraft}
+            saving={saving}
+            pageSearch={pageSearch}
+            sortBy={sortBy}
+            sortDir={sortDir}
+            seoCopyResults={seoCopyResults}
+            generatingCopy={generatingCopy}
+            copiedField={copiedField}
+            positionColor={positionColor}
+            difficultyColor={difficultyColor}
+            difficultyLabel={difficultyLabel}
+            intentColor={intentColor}
+            onTogglePage={togglePage}
+            onStartEdit={startEdit}
+            onSaveEdit={saveEdit}
+            onSetEditingPage={setEditingPage}
+            onSetEditDraft={setEditDraft}
+            onSetPageSearch={setPageSearch}
+            onSetSortBy={setSortBy}
+            onSetSortDir={setSortDir}
+            onGenerateSeoCopy={generateSeoCopy}
+            onCopyText={copyText}
+          />
 
           {/* Keyword Gaps */}
-          {strategy.keywordGaps && strategy.keywordGaps.length > 0 && (
-            <div className="bg-zinc-900 rounded-xl border border-orange-500/20 p-4">
-              <h4 className="text-xs font-semibold text-orange-300 mb-2 flex items-center gap-1.5">
-                <Users className="w-3.5 h-3.5" /> Competitor Keyword Gaps
-              </h4>
-              <p className="text-[11px] text-zinc-500 mb-2">Keywords your competitors rank for that you don't — high-priority opportunities.</p>
-              <div className="space-y-1">
-                {strategy.keywordGaps.map((gap, i) => (
-                  <div key={i} className="flex items-center justify-between px-2.5 py-1.5 bg-zinc-800/50 rounded-lg">
-                    <span className="text-[11px] text-zinc-300">{gap.keyword}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-zinc-500 font-mono">{gap.volume.toLocaleString()}/mo</span>
-                      <span className={`text-[11px] font-mono ${difficultyColor(gap.difficulty)}`}>KD {gap.difficulty}%</span>
-                      <span className="text-[11px] text-zinc-500">{gap.competitorDomain} #{gap.competitorPosition}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <KeywordGaps keywordGaps={strategy.keywordGaps || []} difficultyColor={difficultyColor} />
 
           {/* Backlink Profile */}
           <BacklinkProfile workspaceId={workspaceId} />
