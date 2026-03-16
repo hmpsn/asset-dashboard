@@ -488,13 +488,21 @@ router.get('/api/workspaces/:id/audit-suppressions', requireWorkspaceAccess(), (
 router.post('/api/workspaces/:id/audit-suppressions', requireWorkspaceAccess(), (req, res) => {
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Not found' });
-  const { check, pageSlug, reason } = req.body;
-  if (!check || !pageSlug) return res.status(400).json({ error: 'check and pageSlug required' });
+  const { check, pageSlug, pagePattern, reason } = req.body;
+  if (!check || (!pageSlug && !pagePattern)) return res.status(400).json({ error: 'check and (pageSlug or pagePattern) required' });
   const suppressions = ws.auditSuppressions || [];
-  if (suppressions.some(s => s.check === check && s.pageSlug === pageSlug)) {
-    return res.json({ ok: true, suppressions });
+  // Deduplicate: check for existing exact or pattern match
+  if (pagePattern) {
+    if (suppressions.some(s => s.check === check && s.pagePattern === pagePattern)) {
+      return res.json({ ok: true, suppressions });
+    }
+    suppressions.push({ check, pageSlug: pageSlug || `[pattern] ${pagePattern}`, pagePattern, reason: reason || undefined, createdAt: new Date().toISOString() });
+  } else {
+    if (suppressions.some(s => s.check === check && s.pageSlug === pageSlug && !s.pagePattern)) {
+      return res.json({ ok: true, suppressions });
+    }
+    suppressions.push({ check, pageSlug, reason: reason || undefined, createdAt: new Date().toISOString() });
   }
-  suppressions.push({ check, pageSlug, reason: reason || undefined, createdAt: new Date().toISOString() });
   updateWorkspace(req.params.id, { auditSuppressions: suppressions });
   res.json({ ok: true, suppressions });
 });
@@ -502,9 +510,12 @@ router.post('/api/workspaces/:id/audit-suppressions', requireWorkspaceAccess(), 
 router.delete('/api/workspaces/:id/audit-suppressions', requireWorkspaceAccess(), (req, res) => {
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Not found' });
-  const { check, pageSlug } = req.body;
-  if (!check || !pageSlug) return res.status(400).json({ error: 'check and pageSlug required' });
-  const suppressions = (ws.auditSuppressions || []).filter(s => !(s.check === check && s.pageSlug === pageSlug));
+  const { check, pageSlug, pagePattern } = req.body;
+  if (!check || (!pageSlug && !pagePattern)) return res.status(400).json({ error: 'check and (pageSlug or pagePattern) required' });
+  const suppressions = (ws.auditSuppressions || []).filter(s => {
+    if (pagePattern) return !(s.check === check && s.pagePattern === pagePattern);
+    return !(s.check === check && s.pageSlug === pageSlug && !s.pagePattern);
+  });
   updateWorkspace(req.params.id, { auditSuppressions: suppressions });
   res.json({ ok: true, suppressions });
 });

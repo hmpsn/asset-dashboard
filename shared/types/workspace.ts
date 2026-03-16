@@ -137,7 +137,7 @@ export interface Workspace {
   // Portal contacts (emails captured from shared-password visitors)
   portalContacts?: { email: string; name?: string; capturedAt: string }[];
   // Audit issue suppressions (per-page check exclusions)
-  auditSuppressions?: { check: string; pageSlug: string; reason?: string; createdAt: string }[];
+  auditSuppressions?: { check: string; pageSlug: string; pagePattern?: string; reason?: string; createdAt: string }[];
   // SEO edit tracking (legacy — kept for backward compat, written by updatePageState)
   seoEditTracking?: Record<string, { status: 'flagged' | 'in-review' | 'live'; updatedAt: string; fields?: string[] }>;
   // Unified page edit states (new — replaces seoEditTracking)

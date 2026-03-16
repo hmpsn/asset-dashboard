@@ -436,6 +436,12 @@
       "shippedAt": "2026-03",
       "items": [
         {
+          "id": 281,
+          "title": "Pattern-based audit suppression (suppress check for all blog/*, resources/*, etc.)",
+          "status": "done",
+          "shippedAt": "2026-03-16"
+        },
+        {
           "id": 280,
           "title": "SEO audit: strip hidden elements before content checks (fixes false-positive duplicate H1 on Webflow conditional visibility)",
           "status": "done",

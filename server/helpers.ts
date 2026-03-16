@@ -32,6 +32,15 @@ export function parseDateRange(query: Record<string, unknown>): CustomDateRange 
   return (s && e) ? { startDate: s, endDate: e } : undefined;
 }
 
+// ── Glob Pattern Matching ──
+
+/** Convert a simple glob pattern to a RegExp. Supports * (any chars) and ? (single char). */
+function globToRegex(pattern: string): RegExp {
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  const regexStr = escaped.replace(/\*/g, '.*').replace(/\?/g, '.');
+  return new RegExp(`^${regexStr}$`, 'i');
+}
+
 // ── Audit Suppression Helpers ──
 
 // Scoring weights must mirror seo-audit.ts auditPage() exactly
@@ -45,7 +54,7 @@ export const MODERATE_CHECKS_SET = new Set([
   'duplicate-description', 'img-filesize', 'html-size',
 ]);
 
-export interface AuditSuppression { check: string; pageSlug: string; reason?: string; createdAt: string }
+export interface AuditSuppression { check: string; pageSlug: string; pagePattern?: string; reason?: string; createdAt: string }
 
 export function applySuppressionsToAudit(
   audit: SeoAuditResult,
@@ -53,15 +62,28 @@ export function applySuppressionsToAudit(
 ): SeoAuditResult {
   if (!suppressions || suppressions.length === 0) return audit;
 
-  // Build a fast lookup: "check::pageSlug" → true
-  const suppSet = new Set(suppressions.map(s => `${s.check}::${s.pageSlug}`));
+  // Exact suppressions: "check::pageSlug" → true
+  const exactSupps = suppressions.filter(s => !s.pagePattern);
+  const suppSet = new Set(exactSupps.map(s => `${s.check}::${s.pageSlug}`));
+
+  // Pattern suppressions: check + glob pattern (e.g. "blog/*", "resources/*")
+  const patternSupps = suppressions.filter(s => s.pagePattern);
+  const patternMatchers = patternSupps.map(s => ({
+    check: s.check,
+    regex: globToRegex(s.pagePattern!),
+  }));
 
   let totalErrors = 0, totalWarnings = 0, totalInfos = 0;
 
   const filteredPages = audit.pages.map(page => {
     const filteredIssues = page.issues.filter(issue => {
-      const key = `${issue.check}::${page.slug}`;
-      return !suppSet.has(key);
+      // Exact match
+      if (suppSet.has(`${issue.check}::${page.slug}`)) return false;
+      // Pattern match
+      for (const pm of patternMatchers) {
+        if (pm.check === issue.check && pm.regex.test(page.slug)) return false;
+      }
+      return true;
     });
 
     // Recalculate page score with remaining issues

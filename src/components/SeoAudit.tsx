@@ -79,11 +79,11 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   }, [siteId]);
 
   // Audit issue suppressions
-  const [suppressions, setSuppressions] = useState<{ check: string; pageSlug: string }[]>([]);
+  const [suppressions, setSuppressions] = useState<{ check: string; pageSlug: string; pagePattern?: string }[]>([]);
 
   useEffect(() => {
     if (workspaceId) {
-      getSafe<{ check: string; pageSlug: string }[]>(`/api/workspaces/${workspaceId}/audit-suppressions`, [])
+      getSafe<{ check: string; pageSlug: string; pagePattern?: string }[]>(`/api/workspaces/${workspaceId}/audit-suppressions`, [])
         .then(s => { if (Array.isArray(s)) setSuppressions(s); })
         .catch(() => {});
     }
@@ -92,7 +92,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   const suppressIssue = async (check: string, pageSlug: string) => {
     if (!workspaceId) return;
     try {
-      const { suppressions: updated } = await post<{ suppressions: { check: string; pageSlug: string }[] }>(`/api/workspaces/${workspaceId}/audit-suppressions`, { check, pageSlug });
+      const { suppressions: updated } = await post<{ suppressions: { check: string; pageSlug: string; pagePattern?: string }[] }>(`/api/workspaces/${workspaceId}/audit-suppressions`, { check, pageSlug });
       setSuppressions(updated);
     } catch {}
     setActionMenuKey(null);
@@ -101,9 +101,20 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   const unsuppressIssue = async (check: string, pageSlug: string) => {
     if (!workspaceId) return;
     try {
-      const { suppressions: updated } = await del<{ suppressions: { check: string; pageSlug: string }[] }>(`/api/workspaces/${workspaceId}/audit-suppressions`, { check, pageSlug });
+      const { suppressions: updated } = await del<{ suppressions: { check: string; pageSlug: string; pagePattern?: string }[] }>(`/api/workspaces/${workspaceId}/audit-suppressions`, { check, pageSlug });
       setSuppressions(updated);
     } catch {}
+  };
+
+  const suppressPattern = async (check: string, pageSlug: string) => {
+    if (!workspaceId) return;
+    const prefix = pageSlug.includes('/') ? pageSlug.split('/')[0] : pageSlug;
+    const pattern = `${prefix}/*`;
+    try {
+      const { suppressions: updated } = await post<{ suppressions: { check: string; pageSlug: string; pagePattern?: string }[] }>(`/api/workspaces/${workspaceId}/audit-suppressions`, { check, pagePattern: pattern, reason: `Pattern: ${pattern}` });
+      setSuppressions(updated);
+    } catch {}
+    setActionMenuKey(null);
   };
 
   const acceptSuggestion = async (pageId: string, issue: SeoIssue) => {
@@ -443,11 +454,26 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   // Effective audit data with suppressions applied (filters issues, recalculates scores)
   const effectiveData = useMemo(() => {
     if (!data) return null;
-    const suppSet = new Set(suppressions.map(s => `${s.check}:${s.pageSlug}`));
-    if (suppSet.size === 0) return data;
+    const exactSupps = suppressions.filter(s => !s.pagePattern);
+    const patternSupps = suppressions.filter(s => s.pagePattern);
+    const suppSet = new Set(exactSupps.map(s => `${s.check}:${s.pageSlug}`));
+    if (suppSet.size === 0 && patternSupps.length === 0) return data;
+
+    // Simple glob matcher for client-side pattern filtering
+    const patternMatchers = patternSupps.map(s => {
+      const escaped = s.pagePattern!.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+      const regexStr = escaped.replace(/\*/g, '.*').replace(/\?/g, '.');
+      return { check: s.check, regex: new RegExp(`^${regexStr}$`, 'i') };
+    });
 
     const pages = data.pages.map(page => {
-      const filtered = page.issues.filter(i => !suppSet.has(`${i.check}:${page.slug}`));
+      const filtered = page.issues.filter(i => {
+        if (suppSet.has(`${i.check}:${page.slug}`)) return false;
+        for (const pm of patternMatchers) {
+          if (pm.check === i.check && pm.regex.test(page.slug)) return false;
+        }
+        return true;
+      });
       if (filtered.length === page.issues.length) return page;
       let score = 100;
       for (const issue of filtered) {
@@ -785,7 +811,18 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         batchCreating={batchCreating}
         batchResult={batchResult}
         onBatchCreateTasks={batchCreateTasks}
-        onUnsuppressAll={async () => { for (const s of suppressions) await unsuppressIssue(s.check, s.pageSlug); }}
+        onUnsuppressAll={async () => {
+          for (const s of suppressions) {
+            if (s.pagePattern) {
+              try {
+                const { suppressions: updated } = await del<{ suppressions: typeof suppressions }>(`/api/workspaces/${workspaceId}/audit-suppressions`, { check: s.check, pagePattern: s.pagePattern });
+                setSuppressions(updated);
+              } catch {}
+            } else {
+              await unsuppressIssue(s.check, s.pageSlug);
+            }
+          }
+        }}
         onClearFilters={() => { setSeverityFilter('all'); setCategoryFilter('all'); }}
         sortMode={sortMode}
         onSetSortMode={setSortMode}
@@ -883,6 +920,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
                           onSetFlaggingKey={setFlaggingKey}
                           onSetFlagNote={setFlagNote}
                           onSuppressIssue={suppressIssue}
+                          onSuppressPattern={suppressPattern}
                           issueToTaskKey={issueToTaskKey}
                         />
                       ))

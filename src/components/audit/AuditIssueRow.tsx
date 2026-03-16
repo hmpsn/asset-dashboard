@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { adminPath, type Page } from '../../routes';
 import {
   Loader2, CheckCircle, Send, Wrench, X, Pencil,
-  MoreVertical, EyeOff, ClipboardList,
+  MoreVertical, EyeOff, ClipboardList, Layers,
 } from 'lucide-react';
 import type { SeoIssue, PageSeoResult } from './types';
 import { SEVERITY_CONFIG, CATEGORY_CONFIG, FIX_TAB_LABELS, getFixTab } from './types';
@@ -43,6 +43,7 @@ export interface AuditIssueRowProps {
   onSetFlaggingKey: (key: string | null) => void;
   onSetFlagNote: (note: string) => void;
   onSuppressIssue: (check: string, pageSlug: string) => void;
+  onSuppressPattern?: (check: string, pageSlug: string) => void;
   issueToTaskKey: (page: PageSeoResult, issue: SeoIssue) => string;
 }
 
@@ -53,7 +54,7 @@ export function AuditIssueRow({
   createdTasks, creatingTask, flaggedIssues, flaggingKey, flagNote, flagSending, actionMenuKey,
   onAcceptSuggestion, onSendForReview, onSetEditingKey, onSetEditedSuggestion,
   onSetActionMenuKey, onCreateTask, onFlagForClient, onSetFlaggingKey, onSetFlagNote,
-  onSuppressIssue, issueToTaskKey,
+  onSuppressIssue, onSuppressPattern, issueToTaskKey,
 }: AuditIssueRowProps) {
   const navigate = useNavigate();
 
@@ -223,6 +224,8 @@ export function AuditIssueRow({
             onFlagForClient={() => { onSetFlaggingKey(taskKey); onSetFlagNote(''); onSetActionMenuKey(null); }}
             onCreateTask={() => { onCreateTask(page, issue); onSetActionMenuKey(null); }}
             onSuppress={() => onSuppressIssue(issue.check, page.slug)}
+            onSuppressPattern={onSuppressPattern ? () => onSuppressPattern(issue.check, page.slug) : undefined}
+            pageSlug={page.slug}
           />
         )}
         {/* Show individual done states when only one is done */}
@@ -234,6 +237,8 @@ export function AuditIssueRow({
             onToggle={() => onSetActionMenuKey(menuOpen ? null : taskKey)}
             onCreateTask={() => { onCreateTask(page, issue); onSetActionMenuKey(null); }}
             onSuppress={() => onSuppressIssue(issue.check, page.slug)}
+            onSuppressPattern={onSuppressPattern ? () => onSuppressPattern(issue.check, page.slug) : undefined}
+            pageSlug={page.slug}
           />
         )}
         {workspaceId && !isFlagged && isCreated && (
@@ -244,6 +249,8 @@ export function AuditIssueRow({
             onToggle={() => onSetActionMenuKey(menuOpen ? null : taskKey)}
             onFlagForClient={() => { onSetFlaggingKey(taskKey); onSetFlagNote(''); onSetActionMenuKey(null); }}
             onSuppress={() => onSuppressIssue(issue.check, page.slug)}
+            onSuppressPattern={onSuppressPattern ? () => onSuppressPattern(issue.check, page.slug) : undefined}
+            pageSlug={page.slug}
           />
         )}
       </div>
@@ -261,9 +268,12 @@ interface OverflowMenuProps {
   onFlagForClient?: () => void;
   onCreateTask?: () => void;
   onSuppress: () => void;
+  onSuppressPattern?: () => void;
+  pageSlug?: string;
 }
 
-function OverflowMenu({ menuOpen, isCreating, onToggle, onFlagForClient, onCreateTask, onSuppress }: OverflowMenuProps) {
+function OverflowMenu({ menuOpen, isCreating, onToggle, onFlagForClient, onCreateTask, onSuppress, onSuppressPattern, pageSlug }: OverflowMenuProps) {
+  const slugPrefix = pageSlug?.includes('/') ? pageSlug.split('/')[0] : null;
   return (
     <div className="relative">
       <button
@@ -298,6 +308,14 @@ function OverflowMenu({ menuOpen, isCreating, onToggle, onFlagForClient, onCreat
           >
             <EyeOff className="w-3 h-3" /> Suppress Issue
           </button>
+          {onSuppressPattern && slugPrefix && (
+            <button
+              onClick={onSuppressPattern}
+              className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-zinc-500 hover:bg-zinc-800 transition-colors"
+            >
+              <Layers className="w-3 h-3" /> Suppress for {slugPrefix}/*
+            </button>
+          )}
         </div>
       )}
     </div>

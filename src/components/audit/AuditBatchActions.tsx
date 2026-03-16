@@ -11,7 +11,7 @@ interface Props {
   workspaceId?: string;
   severityFilter: Severity | 'all';
   categoryFilter: CheckCategory | 'all';
-  suppressions: { check: string; pageSlug: string }[];
+  suppressions: { check: string; pageSlug: string; pagePattern?: string }[];
   batchCreating: boolean;
   batchResult: { count: number; timestamp: number } | null;
   onBatchCreateTasks: (mode: 'all' | 'errors' | 'filtered') => void;
@@ -33,12 +33,19 @@ export function AuditBatchActions({
     <div className="flex items-center justify-between px-1">
       <div className="flex items-center gap-3 text-xs text-zinc-500">
         <span>Showing {filteredPages.length} of {effectiveData.pages.length} pages</span>
-        {suppressions.length > 0 && (
-          <span className="flex items-center gap-1 text-[11px] text-zinc-500">
-            <EyeOff className="w-3 h-3" /> {suppressions.length} suppressed
-            <button onClick={onUnsuppressAll} className="text-zinc-500 hover:text-zinc-300 underline ml-0.5" title="Remove all suppressions">clear</button>
-          </span>
-        )}
+        {suppressions.length > 0 && (() => {
+          const patternCount = suppressions.filter(s => s.pagePattern).length;
+          const exactCount = suppressions.length - patternCount;
+          const label = patternCount > 0
+            ? `${exactCount > 0 ? `${exactCount} page` : ''}${exactCount > 0 && patternCount > 0 ? ' + ' : ''}${patternCount > 0 ? `${patternCount} pattern` : ''} suppressed`
+            : `${suppressions.length} suppressed`;
+          return (
+            <span className="flex items-center gap-1 text-[11px] text-zinc-500">
+              <EyeOff className="w-3 h-3" /> {label}
+              <button onClick={onUnsuppressAll} className="text-zinc-500 hover:text-zinc-300 underline ml-0.5" title="Remove all suppressions">clear</button>
+            </span>
+          );
+        })()}
         {(severityFilter !== 'all' || categoryFilter !== 'all') && (
           <button onClick={onClearFilters} className="text-zinc-500 hover:text-zinc-300 underline">
             Clear filters
