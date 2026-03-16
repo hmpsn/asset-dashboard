@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { get, post, patch, getSafe } from '../api/client';
 import {
-  Search, Image, AlertTriangle, Trash2, Sparkles, Check, X,
-  FileText, ExternalLink, ChevronDown, Loader2, Minimize2, Wand2, FolderOpen,
+  Image, AlertTriangle, Trash2, Sparkles, X,
+  Loader2, Minimize2, FolderOpen,
 } from 'lucide-react';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { OrganizePreview } from './assets/OrganizePreview';
+import { AssetFilters } from './assets/AssetFilters';
+import { AssetCard } from './assets/AssetCard';
+import { BulkActions } from './assets/BulkActions';
 
 interface Asset {
   id: string;
@@ -577,99 +580,21 @@ function AssetBrowser({ siteId }: Props) {
       )}
 
       {/* Toolbar */}
-      <div className="flex items-center gap-3 sticky top-0 z-10 bg-zinc-950/95 backdrop-blur-sm py-2 -mx-1 px-1">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search by name or alt text..."
-            className="w-full pl-10 pr-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm focus:outline-none focus:border-zinc-600"
-          />
-        </div>
-
-        <div className="relative">
-          <select
-            value={filter}
-            onChange={e => setFilter(e.target.value as FilterType)}
-            className="appearance-none pl-3 pr-8 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm focus:outline-none cursor-pointer"
-          >
-            <option value="all">All</option>
-            <option value="missing-alt">Missing Alt</option>
-            <option value="oversized">Oversized</option>
-            <option value="images">Images</option>
-            <option value="svg">SVG</option>
-            <option value="unused">Unused</option>
-          </select>
-          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
-        </div>
-
-        <div className="relative">
-          <select
-            value={sort}
-            onChange={e => setSort(e.target.value as SortField)}
-            className="appearance-none pl-3 pr-8 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm focus:outline-none cursor-pointer"
-          >
-            <option value="createdOn">Newest</option>
-            <option value="fileName">Name</option>
-            <option value="fileSize">Size</option>
-          </select>
-          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
-        </div>
-      </div>
+      <AssetFilters
+        search={search} filter={filter} sort={sort}
+        onSearchChange={setSearch} onFilterChange={setFilter} onSortChange={setSort}
+      />
 
       {/* Bulk actions */}
       {selected.size > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-lg text-sm sticky top-0 z-20 shadow-lg shadow-black/30">
-          <span className="text-zinc-300 font-medium">{selected.size} selected</span>
-          <button
-            onClick={handleBulkGenerateAlt}
-            disabled={!!bulkProgress}
-            className="flex items-center gap-1.5 px-3 py-1 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs font-medium transition-colors"
-          >
-            {bulkProgress ? (
-              <><Loader2 className="w-3 h-3 animate-spin" /> {bulkProgress.done}/{bulkProgress.total}</>
-            ) : (
-              <><Sparkles className="w-3 h-3" /> Generate Alt Text</>
-            )}
-          </button>
-          <button
-            onClick={handleBulkRename}
-            disabled={!!bulkRenameProgress}
-            className="flex items-center gap-1.5 px-3 py-1 bg-cyan-700 hover:bg-cyan-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs font-medium transition-colors"
-          >
-            {bulkRenameProgress ? (
-              <><Loader2 className="w-3 h-3 animate-spin" /> {bulkRenameProgress.done}/{bulkRenameProgress.total}</>
-            ) : (
-              <><Wand2 className="w-3 h-3" /> Smart Rename</>
-            )}
-          </button>
-          <button
-            onClick={handleBulkCompress}
-            disabled={!!bulkCompressProgress}
-            className="flex items-center gap-1.5 px-3 py-1 bg-orange-700 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs font-medium transition-colors"
-          >
-            {bulkCompressProgress ? (
-              <><Loader2 className="w-3 h-3 animate-spin" /> {bulkCompressProgress.done}/{bulkCompressProgress.total}</>
-            ) : (
-              <><Minimize2 className="w-3 h-3" /> Compress</>
-            )}
-          </button>
-          <button
-            onClick={handleBulkDelete}
-            disabled={deleting}
-            className="flex items-center gap-1.5 px-3 py-1 bg-red-900/50 hover:bg-red-800 text-red-300 rounded text-xs font-medium transition-colors"
-          >
-            <Trash2 className="w-3 h-3" /> {deleting ? 'Deleting...' : 'Delete'}
-          </button>
-          <button
-            onClick={() => setSelected(new Set())}
-            className="ml-auto text-zinc-500 hover:text-zinc-300 text-xs"
-          >
-            Clear selection
-          </button>
-        </div>
+        <BulkActions
+          selectedCount={selected.size} bulkProgress={bulkProgress}
+          bulkRenameProgress={bulkRenameProgress} bulkCompressProgress={bulkCompressProgress}
+          deleting={deleting}
+          onBulkGenerateAlt={handleBulkGenerateAlt} onBulkRename={handleBulkRename}
+          onBulkCompress={handleBulkCompress} onBulkDelete={handleBulkDelete}
+          onClearSelection={() => setSelected(new Set())}
+        />
       )}
 
       {/* Asset grid */}
@@ -693,160 +618,21 @@ function AssetBrowser({ siteId }: Props) {
 
         {/* Rows */}
         {filtered.map(asset => (
-          <div
-            key={asset.id}
-            className={`grid grid-cols-[32px_48px_1fr_200px_80px_100px] gap-3 px-3 py-2 rounded-lg items-center text-sm transition-colors ${
-              selected.has(asset.id) ? 'bg-zinc-800/80' : 'hover:bg-zinc-900/50'
-            }`}
-          >
-            <div>
-              <input
-                type="checkbox"
-                checked={selected.has(asset.id)}
-                onChange={() => toggleSelect(asset.id)}
-                className="rounded"
-              />
-            </div>
-
-            {/* Thumbnail */}
-            <div className="w-10 h-10 rounded bg-zinc-800 overflow-hidden flex items-center justify-center">
-              {asset.contentType?.includes('svg') ? (
-                <FileText className="w-4 h-4 text-zinc-500" />
-              ) : (
-                <img
-                  src={asset.hostedUrl || asset.url}
-                  alt=""
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                />
-              )}
-            </div>
-
-            {/* Name */}
-            <div className="truncate text-zinc-300 flex items-center gap-1 min-w-0">
-              {renamingId === asset.id ? (
-                <div className="flex items-center gap-1 w-full">
-                  <input
-                    type="text"
-                    value={renameDraft}
-                    onChange={e => setRenameDraft(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleSaveRename(asset.id)}
-                    className="flex-1 min-w-0 px-2 py-1 bg-zinc-800 border border-cyan-600 rounded text-xs focus:outline-none"
-                    autoFocus
-                  />
-                  <button onClick={() => handleSaveRename(asset.id)} className="text-green-400 hover:text-green-300 shrink-0">
-                    <Check className="w-3.5 h-3.5" />
-                  </button>
-                  <button onClick={() => { setRenamingId(null); setRenameDraft(''); }} className="text-zinc-500 hover:text-zinc-300 shrink-0">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <span className="truncate" title={asset.displayName || asset.originalFileName}>
-                    {asset.displayName || asset.originalFileName}
-                  </span>
-                  {(!asset.altText || asset.altText.trim() === '') && (
-                    <span className="shrink-0 px-1 py-0.5 rounded text-[11px] font-semibold bg-amber-900/40 text-amber-400 leading-none">No Alt</span>
-                  )}
-                  {asset.size > 500 * 1024 && (
-                    <span className="shrink-0 px-1 py-0.5 rounded text-[11px] font-semibold bg-orange-900/40 text-orange-400 leading-none">Oversized</span>
-                  )}
-                  {unusedIds?.has(asset.id) && (
-                    <span className="shrink-0 px-1 py-0.5 rounded text-[11px] font-semibold bg-red-900/40 text-red-400 leading-none">Unused</span>
-                  )}
-                  <button
-                    onClick={() => handleSmartRename(asset)}
-                    disabled={renameLoading.has(asset.id)}
-                    className="shrink-0 p-0.5 rounded text-zinc-500 hover:text-cyan-400 transition-colors"
-                    title="Smart rename"
-                  >
-                    {renameLoading.has(asset.id) ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <Wand2 className="w-3 h-3" />
-                    )}
-                  </button>
-                </>
-              )}
-            </div>
-
-            {/* Alt text */}
-            <div className="truncate">
-              {editingAlt === asset.id ? (
-                <div className="flex items-center gap-1">
-                  <input
-                    type="text"
-                    value={altDraft}
-                    onChange={e => setAltDraft(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleSaveAlt(asset.id)}
-                    className="flex-1 px-2 py-1 bg-zinc-800 border border-zinc-600 rounded text-xs focus:outline-none"
-                    autoFocus
-                  />
-                  <button onClick={() => handleSaveAlt(asset.id)} className="text-green-400 hover:text-green-300">
-                    <Check className="w-3.5 h-3.5" />
-                  </button>
-                  <button onClick={() => setEditingAlt(null)} className="text-zinc-500 hover:text-zinc-300">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => { setEditingAlt(asset.id); setAltDraft(asset.altText || ''); }}
-                  className={`truncate text-left text-xs w-full ${
-                    asset.altText ? 'text-zinc-400' : 'text-amber-500/70 italic'
-                  }`}
-                  title={asset.altText || 'Click to add alt text'}
-                >
-                  {asset.altText || 'No alt text'}
-                </button>
-              )}
-            </div>
-
-            {/* Size */}
-            <div className={`text-right text-xs ${asset.size > 500 * 1024 ? 'text-orange-400' : 'text-zinc-500'}`}>
-              {asset.size > 0 ? formatSize(asset.size) : '—'}
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center gap-1 justify-end">
-              <button
-                onClick={() => handleGenerateAlt(asset)}
-                disabled={generatingAlt.has(asset.id)}
-                className="p-1.5 rounded text-zinc-500 hover:text-teal-400 hover:bg-zinc-800 transition-colors"
-                title="Generate alt text with AI"
-              >
-                {generatingAlt.has(asset.id) ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="w-3.5 h-3.5" />
-                )}
-              </button>
-              {asset.size > 0 && (
-                <button
-                  onClick={() => handleCompress(asset)}
-                  disabled={compressing.has(asset.id)}
-                  className="p-1.5 rounded text-zinc-500 hover:text-blue-400 hover:bg-zinc-800 transition-colors"
-                  title="Compress image"
-                >
-                  {compressing.has(asset.id) ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Minimize2 className="w-3.5 h-3.5" />
-                  )}
-                </button>
-              )}
-              <a
-                href={asset.hostedUrl || asset.url}
-                target="_blank"
-                rel="noopener"
-                className="p-1.5 rounded text-zinc-500 hover:text-blue-400 hover:bg-zinc-800 transition-colors"
-                title="Open in new tab"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-            </div>
-          </div>
+          <AssetCard
+            key={asset.id} asset={asset} selected={selected.has(asset.id)}
+            editingAlt={editingAlt === asset.id} altDraft={altDraft}
+            generatingAlt={generatingAlt.has(asset.id)} compressing={compressing.has(asset.id)}
+            renamingId={renamingId === asset.id} renameDraft={renameDraft}
+            renameLoading={renameLoading.has(asset.id)} unusedFlag={!!unusedIds?.has(asset.id)}
+            onToggleSelect={toggleSelect}
+            onEditAlt={(id, currentAlt) => { setEditingAlt(id); setAltDraft(currentAlt); }}
+            onCancelEditAlt={() => setEditingAlt(null)}
+            onSaveAlt={handleSaveAlt} onAltDraftChange={setAltDraft}
+            onGenerateAlt={handleGenerateAlt} onCompress={handleCompress}
+            onSmartRename={handleSmartRename} onSaveRename={handleSaveRename}
+            onCancelRename={() => { setRenamingId(null); setRenameDraft(''); }}
+            onRenameDraftChange={setRenameDraft}
+          />
         ))}
 
         {filtered.length === 0 && (
