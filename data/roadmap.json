@@ -1952,6 +1952,15 @@
           "priority": "P3",
           "notes": "Add Send to Client for decaying content pages. Sends page title, traffic decline data, and recommended action (refresh, merge, redirect) to client for awareness/approval.",
           "status": "pending"
+        },
+        {
+          "id": 298,
+          "title": "Schema Post-Processing Pipeline: Content Verification + AI Auto-Fix Loop",
+          "source": "Schema quality improvements",
+          "est": "3h",
+          "priority": "P0",
+          "notes": "Shipped — 7-step postProcessSchema pipeline: autoFix → content verification (strips hallucinated emails/phones/addresses/hours/geo/sameAs) → cross-reference injection → clean → validate → AI auto-fix loop → final output. Also hardened extractStructuredInfo to use visible text only, added anti-fragmentation prompt rules for SaaS sites.",
+          "status": "done"
         }
       ]
     }
