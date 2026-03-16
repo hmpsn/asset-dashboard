@@ -18,7 +18,7 @@ import { NotificationBell } from './components/NotificationBell';
 import { CommandPalette } from './components/CommandPalette';
 import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, Search, FileText,
-  Pencil, Target, Code2, LogOut, TrendingUp, Flag, Link2, MessageSquare,
+  Pencil, Target, Code2, LogOut, TrendingUp, Link2, MessageSquare,
   Sun, Moon, LayoutDashboard, ChevronRight, Sparkles, Activity, Shield,
   Zap, BookOpen, RefreshCw, CalendarDays, DollarSign, ArrowLeft,
 } from 'lucide-react';
@@ -37,7 +37,6 @@ const SeoAudit = lazy(() => import('./components/SeoAudit').then(m => ({ default
 const SearchConsole = lazy(() => import('./components/SearchConsole').then(m => ({ default: m.SearchConsole })));
 const Performance = lazy(() => import('./components/Performance').then(m => ({ default: m.Performance })));
 const GoogleAnalytics = lazy(() => import('./components/GoogleAnalytics').then(m => ({ default: m.GoogleAnalytics })));
-const Annotations = lazy(() => import('./components/Annotations').then(m => ({ default: m.Annotations })));
 const RequestManager = lazy(() => import('./components/RequestManager').then(m => ({ default: m.RequestManager })));
 const SalesReport = lazy(() => import('./components/SalesReport').then(m => ({ default: m.SalesReport })));
 const Roadmap = lazy(() => import('./components/Roadmap').then(m => ({ default: m.Roadmap })));
@@ -358,7 +357,6 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
       { id: 'search', label: 'Search Console', icon: Search, needsSite: true, desc: 'Google Search Console queries, pages, and click data' },
       { id: 'analytics', label: 'Google Analytics', icon: BarChart3, needsSite: true, desc: 'GA4 traffic, events, sources, and user behavior' },
       { id: 'seo-ranks', label: 'Rank Tracker', icon: TrendingUp, needsSite: true, desc: 'Track keyword rankings over time' },
-      { id: 'annotations', label: 'Annotations', icon: Flag, needsSite: true, desc: 'Mark key events on analytics timelines' },
     ]},
     { label: 'SITE HEALTH', groupIcon: Shield, groupColor: 'text-emerald-400',
       activeBg: 'bg-emerald-500/10', activeText: 'text-emerald-300', activeIcon: 'text-emerald-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-emerald-500/5', hoverText: 'hover:text-emerald-300',
@@ -381,6 +379,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
       items: [
       { id: 'content-pipeline', label: 'Content Pipeline', icon: Clipboard, needsSite: true, desc: 'Briefs, posts, and subscriptions in one view' },
       { id: 'calendar', label: 'Calendar', icon: CalendarDays, needsSite: true, hidden: !hasContentItems, desc: 'Content calendar with briefs, posts, and requests' },
+      { id: 'requests', label: 'Requests', icon: MessageSquare, needsSite: true, desc: 'Client content requests and feedback' },
       { id: 'content-perf', label: 'Content Perf', icon: BarChart3, needsSite: true, desc: 'Post-publish content performance metrics' },
     ]},
   ];
@@ -398,7 +397,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
 
   // ── Content renderer ──
   const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'links', 'seo-strategy', 'seo-schema', 'seo-briefs', 'seo-ranks', 'content-perf', 'content', 'calendar', 'subscriptions', 'brand', 'content-pipeline']);
-  const needsSite = !!(SEO_TABS.has(tab) || tab === 'search' || tab === 'analytics' || tab === 'annotations' || tab === 'performance');
+  const needsSite = !!(SEO_TABS.has(tab) || tab === 'search' || tab === 'analytics' || tab === 'performance');
   const seoNavigate = (t: string, ctx?: FixContext) => { setFixContext(ctx || null); if (selected) navigate(adminPath(selected.id, t as Page)); };
 
   const renderContent = () => {
@@ -446,10 +445,9 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (tab === 'subscriptions') return <ContentSubscriptions key={`subs-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'brand') return <BrandHub key={`brand-${selected.id}`} workspaceId={selected.id} webflowSiteId={selected.webflowSiteId} />;
     if (tab === 'seo-ranks') return <RankTracker key={`ranks-${selected.id}`} workspaceId={selected.id} hasGsc={!!selected.gscPropertyUrl} />;
-    if (tab === 'search') return <SearchConsole key={`search-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} gscPropertyUrl={selected.gscPropertyUrl} />;
+    if (tab === 'search') return <SearchConsole key={`search-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} gscPropertyUrl={selected.gscPropertyUrl} />;
     if (tab === 'performance') return <Performance key={`perf-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
     if (tab === 'analytics') return <GoogleAnalytics key={`ga4-${selected.id}`} workspaceId={selected.id} ga4PropertyId={selected.ga4PropertyId} />;
-    if (tab === 'annotations') return <Annotations key={`ann-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'content-perf') return <ContentPerformance key={`content-perf-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'requests') return <RequestManager key={`requests-${selected.id}`} workspaceId={selected.id} />;
 
@@ -708,8 +706,6 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
           <AdminChat
             workspaceId={selected.id}
             workspaceName={selected.webflowSiteName || selected.name}
-            ga4PropertyId={selected.ga4PropertyId}
-            gscPropertyUrl={selected.gscPropertyUrl}
           />
         </ErrorBoundary>
       )}
