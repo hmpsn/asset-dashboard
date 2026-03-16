@@ -490,11 +490,11 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
         showAdvanced={showAdvanced}
         generating={generating}
         error={error}
-        onSetKeyword={setKeyword}
-        onSetBusinessCtx={setBusinessCtx}
-        onSetPageType={setPageType}
-        onSetRefUrls={setRefUrls}
-        onSetShowAdvanced={setShowAdvanced}
+        onKeywordChange={setKeyword}
+        onBusinessCtxChange={setBusinessCtx}
+        onPageTypeChange={setPageType}
+        onRefUrlsChange={setRefUrls}
+        onToggleAdvanced={() => setShowAdvanced(v => !v)}
         onGenerate={handleGenerate}
       />
 
