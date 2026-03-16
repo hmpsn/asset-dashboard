@@ -1907,6 +1907,51 @@
           "status": "done",
           "notes": "Shipped — Pages auto-load on mount with page type dropdowns (13 types). Page type hint passed to AI prompt for tailored schema generation. Initial view replaced with full page list + type selectors + per-page generate buttons.",
           "shippedAt": "2026-03-16"
+        },
+        {
+          "id": 293,
+          "title": "AEO Review: Send to Client per-page changes",
+          "source": "Send to Client consistency initiative",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Add per-page Send to Client button to AEO Review change cards. Each recommended change (rewrite_intro, add_faq, add_section, etc.) should be sendable to the client approval queue with current→suggested diff as the approval payload.",
+          "status": "pending"
+        },
+        {
+          "id": 294,
+          "title": "Internal Links: Send to Client link suggestions",
+          "source": "Send to Client consistency initiative",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Add Send to Client button per page in Internal Links results. Sends suggested link insertions (anchor text, target URL, context snippet) to client approval queue so client can approve before agency implements.",
+          "status": "pending"
+        },
+        {
+          "id": 295,
+          "title": "Keyword Strategy: Send to Client strategy recommendations",
+          "source": "Send to Client consistency initiative",
+          "est": "1-2h",
+          "priority": "P3",
+          "notes": "Add bulk Send to Client for keyword strategy tabs (Quick Wins, Content Gaps, Low Hanging Fruit). Packages selected recommendations into approval batch for client review before implementation.",
+          "status": "pending"
+        },
+        {
+          "id": 296,
+          "title": "Redirect Manager: Send to Client redirect proposals",
+          "source": "Send to Client consistency initiative",
+          "est": "1-2h",
+          "priority": "P2",
+          "notes": "Add Send to Client for proposed redirects (broken links, chain fixes). Client reviews source→target mappings before agency publishes them to Webflow.",
+          "status": "pending"
+        },
+        {
+          "id": 297,
+          "title": "Content Decay: Send to Client refresh recommendations",
+          "source": "Send to Client consistency initiative",
+          "est": "1-2h",
+          "priority": "P3",
+          "notes": "Add Send to Client for decaying content pages. Sends page title, traffic decline data, and recommended action (refresh, merge, redirect) to client for awareness/approval.",
+          "status": "pending"
         }
       ]
     }
