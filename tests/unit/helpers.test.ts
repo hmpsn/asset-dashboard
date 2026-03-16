@@ -132,8 +132,8 @@ describe('applySuppressionsToAudit', () => {
       {
         slug: 'home',
         issues: [
-          { check: 'title', severity: 'error' }, // critical -20
-          { check: 'og-tags', severity: 'warning' }, // moderate -6
+          { check: 'title', severity: 'error' }, // critical -15
+          { check: 'og-tags', severity: 'warning' }, // moderate -3
         ],
       },
     ]);
@@ -141,8 +141,8 @@ describe('applySuppressionsToAudit', () => {
       { check: 'title', pageSlug: 'home', createdAt: new Date().toISOString() },
     ];
     const result = applySuppressionsToAudit(audit, suppressions);
-    // Only og-tags warning remains: 100 - 6 = 94
-    expect(result.pages[0].score).toBe(94);
+    // Only og-tags warning remains: 100 - 3 = 97
+    expect(result.pages[0].score).toBe(97);
   });
 
   it('calculates correct site score as average of page scores', () => {
