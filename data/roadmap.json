@@ -436,6 +436,12 @@
       "shippedAt": "2026-03",
       "items": [
         {
+          "id": 285,
+          "title": "AEO page analysis: discover CMS collection pages via sitemap + Webflow API instead of audit-snapshot-only",
+          "status": "done",
+          "shippedAt": "2026-03-16"
+        },
+        {
           "id": 284,
           "title": "Noindex page awareness: exclude from site score, info severity, visual badge + banner explaining no search impact",
           "status": "done",

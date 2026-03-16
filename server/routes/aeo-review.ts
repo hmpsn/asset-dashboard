@@ -8,6 +8,8 @@ import { getDataDir } from '../data-dir.js';
 import { reviewPage, reviewSitePages } from '../aeo-page-review.js';
 import { getWorkspace } from '../workspaces.js';
 import { getLatestSnapshot } from '../reports.js';
+import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from '../webflow.js';
+import { isContentPage, isExcludedPage } from '../audit-page.js';
 import { addActivity } from '../activity-log.js';
 import type { SeoIssue } from '../seo-audit.js';
 import { createLogger } from '../logger.js';
@@ -100,41 +102,82 @@ router.post('/api/aeo-review/:workspaceId/site', async (req, res) => {
   const maxPages = Math.min(Number(req.body.maxPages) || 10, 25);
 
   try {
-    // Get latest audit snapshot for issues
-    const snapshot = getLatestSnapshot(ws.webflowSiteId);
-    if (!snapshot) return res.status(400).json({ error: 'No audit snapshot found — run an SEO audit first' });
-
     const baseUrl = ws.liveDomain
       ? (ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`)
       : '';
     if (!baseUrl) return res.status(400).json({ error: 'No live domain configured for this workspace' });
 
-    // Get pages with AEO issues (prioritize those with most issues)
-    const pagesWithAeo = snapshot.audit.pages
-      .filter((p: { issues: SeoIssue[] }) => p.issues.some((i: SeoIssue) => i.check.startsWith('aeo-')))
-      .sort((a: { issues: SeoIssue[] }, b: { issues: SeoIssue[] }) =>
-        b.issues.filter((i: SeoIssue) => i.check.startsWith('aeo-')).length -
-        a.issues.filter((i: SeoIssue) => i.check.startsWith('aeo-')).length
-      )
-      .slice(0, maxPages);
-
-    if (pagesWithAeo.length === 0) {
-      return res.json({ workspaceId, generatedAt: new Date().toISOString(), pages: [], sitewideSummary: 'No pages with AEO issues found.', totalChanges: 0, quickWins: 0 });
+    // Build audit issue map from snapshot (if available) for enrichment
+    const snapshot = getLatestSnapshot(ws.webflowSiteId);
+    const issueMap = new Map<string, SeoIssue[]>();
+    if (snapshot) {
+      for (const p of snapshot.audit.pages) {
+        issueMap.set(p.slug, p.issues);
+      }
     }
+
+    // ── Discover ALL pages: static (Webflow API) + CMS (sitemap) ──
+    const token = ws.webflowToken || process.env.WEBFLOW_API_TOKEN;
+    const allPageUrls: { url: string; slug: string; name: string }[] = [];
+
+    // 1. Static pages from Webflow API
+    try {
+      const allPages = await listPages(ws.webflowSiteId, token || undefined);
+      const published = filterPublishedPages(allPages);
+      for (const p of published) {
+        if (isExcludedPage(p.slug, p.title)) continue;
+        const pagePath = p.publishedPath || (p.slug ? `/${p.slug}` : '');
+        const slug = pagePath.replace(/^\//, '') || p.slug || '';
+        allPageUrls.push({ url: `${baseUrl}${pagePath}`, slug, name: p.title });
+      }
+
+      // 2. CMS pages from sitemap
+      const staticPaths = buildStaticPathSet(published);
+      const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, 200);
+      for (const cms of cmsUrls) {
+        if (isExcludedPage(cms.path, cms.pageName)) continue;
+        const slug = cms.path.replace(/^\//, '');
+        allPageUrls.push({ url: cms.url, slug, name: cms.pageName });
+      }
+    } catch (err) {
+      log.warn({ err }, 'Page discovery failed, falling back to audit snapshot');
+      // Fallback: use audit snapshot pages
+      if (snapshot) {
+        for (const p of snapshot.audit.pages) {
+          allPageUrls.push({ url: p.url || `${baseUrl}/${p.slug}`, slug: p.slug, name: p.page });
+        }
+      }
+    }
+
+    log.info(`AEO review: discovered ${allPageUrls.length} pages (static + CMS)`);
+
+    if (allPageUrls.length === 0) {
+      return res.json({ workspaceId, generatedAt: new Date().toISOString(), pages: [], sitewideSummary: 'No pages found.', totalChanges: 0, quickWins: 0 });
+    }
+
+    // Prioritize content pages (blog, articles, guides) then pages with AEO issues
+    const scored = allPageUrls.map(p => {
+      const isContent = isContentPage(p.slug) ? 2 : 0;
+      const aeoIssueCount = (issueMap.get(p.slug) || []).filter(i => i.check.startsWith('aeo-')).length;
+      return { ...p, priority: isContent + aeoIssueCount };
+    });
+    scored.sort((a, b) => b.priority - a.priority);
+    const selected = scored.slice(0, maxPages);
 
     // Fetch HTML for each page
     const pagesToReview: { url: string; title: string; html: string; issues: SeoIssue[] }[] = [];
-    await Promise.all(pagesWithAeo.map(async (page) => {
-      const pageUrl = page.slug ? `${baseUrl}/${page.slug}` : baseUrl;
+    await Promise.all(selected.map(async (page) => {
       try {
-        const htmlRes = await fetch(pageUrl, { redirect: 'follow', signal: AbortSignal.timeout(10_000) });
+        const htmlRes = await fetch(page.url, { redirect: 'follow', signal: AbortSignal.timeout(10_000) });
         if (htmlRes.ok) {
           const html = await htmlRes.text();
-          const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || page.slug;
-          pagesToReview.push({ url: pageUrl, title, html, issues: page.issues });
+          const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || page.name;
+          pagesToReview.push({ url: page.url, title, html, issues: issueMap.get(page.slug) || [] });
         }
       } catch { /* skip unreachable / timed-out pages */ }
     }));
+
+    log.info(`AEO review: fetched ${pagesToReview.length}/${selected.length} pages, sending to AI`);
 
     const result = await reviewSitePages(workspaceId, pagesToReview);
 
