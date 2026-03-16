@@ -42,7 +42,7 @@ import {
 } from '../search-console.js';
 import { buildSeoContext, buildKeywordMapContext, buildKnowledgeBase, RICH_BLOCKS_PROMPT } from '../seo-context.js';
 import { incrementUsage } from '../usage-tracking.js';
-import { getWorkspace } from '../workspaces.js';
+import { getWorkspace, getBrandName } from '../workspaces.js';
 
 router.get('/api/public/search-overview/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
@@ -284,7 +284,7 @@ CRITICAL RULES:
 - When you reference pending approvals or active requests, encourage the client to take action on them.
 - If strategy data includes quick wins, proactively mention them — they're pre-identified high-impact opportunities.
 
-Site: ${ws.webflowSiteName || ws.name}
+Site: ${getBrandName(ws)}
 Date range: last ${context?.days || 28} days
 ${seoContextBlock}
 Current data context:

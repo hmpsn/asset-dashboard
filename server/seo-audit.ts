@@ -2,7 +2,7 @@ import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } 
 import { scanRedirects } from './redirect-scanner.js';
 import { runSinglePageSpeed } from './pagespeed.js';
 import { buildSeoContext } from './seo-context.js';
-import { listWorkspaces } from './workspaces.js';
+import { listWorkspaces, getBrandName } from './workspaces.js';
 import { callOpenAI } from './openai-helpers.js';
 import { extractMetaContent, extractLinks } from './seo-audit-html.js';
 import { auditPage, isExcludedPage, CHECK_CATEGORY } from './audit-page.js';
@@ -476,7 +476,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
 
     // Resolve brand name so AI uses correct name in suggestions
     const auditWs = wsId ? listWorkspaces().find(w => w.id === wsId) : undefined;
-    const auditBrandName = auditWs?.webflowSiteName || auditWs?.name || '';
+    const auditBrandName = getBrandName(auditWs);
 
     // Helper: extract readable body text from HTML for context
     const extractBodyText = (html: string): string => {

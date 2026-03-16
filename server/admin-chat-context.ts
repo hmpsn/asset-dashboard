@@ -8,7 +8,7 @@
  */
 
 import type { Workspace } from './workspaces.js';
-import { getWorkspace } from './workspaces.js';
+import { getWorkspace, getBrandName } from './workspaces.js';
 import { getLatestSnapshot } from './reports.js';
 import { listBriefs } from './content-brief.js';
 import { listContentRequests } from './content-requests.js';
@@ -652,7 +652,7 @@ function buildAnalystPrompt(
   days: number,
   priorContext: string,
 ): string {
-  return `You are an expert internal analytics analyst for **${ws.webflowSiteName || ws.name}**. You're embedded in the admin dashboard of hmpsn studio's platform. The user is a team member managing this client's website — give them unfiltered, technical, data-driven analysis.
+  return `You are an expert internal analytics analyst for **${getBrandName(ws)}**. You're embedded in the admin dashboard of hmpsn studio's platform. The user is a team member managing this client's website — give them unfiltered, technical, data-driven analysis.
 
 AVAILABLE DATA:
 ${assembled.dataSources.map(d => `• ${d}`).join('\n')}
@@ -675,7 +675,7 @@ TONE:
 - Numbers first, narrative second
 - 200-400 words unless the question demands more
 ${RICH_BLOCKS_PROMPT}
-Site: ${ws.webflowSiteName || ws.name}
+Site: ${getBrandName(ws)}
 Date range: last ${days} days`;
 }
 
@@ -686,7 +686,7 @@ function buildPageAnalysisPrompt(
   priorContext: string,
 ): string {
   const pageUrl = assembled.pageContext?.url || 'unknown page';
-  return `You are an expert SEO analyst reviewing a specific page on **${ws.webflowSiteName || ws.name}**: \`${pageUrl}\`
+  return `You are an expert SEO analyst reviewing a specific page on **${getBrandName(ws)}**: \`${pageUrl}\`
 
 You have full context from the live page content, SEO audit results, search performance data, keyword strategy, and brand guidelines. Provide a thorough page-level analysis.
 
@@ -710,7 +710,7 @@ TONE:
 - Use markdown formatting for clarity
 - Organize by priority (critical → important → nice-to-have)
 ${RICH_BLOCKS_PROMPT}
-Site: ${ws.webflowSiteName || ws.name}
+Site: ${getBrandName(ws)}
 Date range: last ${days} days`;
 }
 
@@ -719,7 +719,7 @@ function buildContentReviewPrompt(
   assembled: AssembledContext,
   priorContext: string,
 ): string {
-  return `You are an expert content editor and SEO specialist reviewing a piece of content for **${ws.webflowSiteName || ws.name}**.
+  return `You are an expert content editor and SEO specialist reviewing a piece of content for **${getBrandName(ws)}**.
 
 The user has pasted content (a draft, document, or text) for your review. Evaluate it against the brand's voice, keyword strategy, SEO best practices, and audience personas.
 

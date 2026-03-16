@@ -13,6 +13,22 @@ export type {
 } from '../shared/types/workspace.ts';
 import type { PageEditStatus, PageEditState, Workspace } from '../shared/types/workspace.ts';
 
+// ── Brand name resolution ──
+
+/**
+ * Resolve the brand/company name for a workspace.
+ * Priority: ws.name (user-set) > webflowSiteName (Webflow API name, stripped of "Copy of" prefix).
+ * This prevents Webflow's internal naming ("Copy of Faros AI") from leaking into AI-generated content.
+ */
+export function getBrandName(ws: Pick<Workspace, 'name' | 'webflowSiteName'> | null | undefined): string {
+  if (!ws) return '';
+  // User-set workspace name is the canonical business/brand name
+  if (ws.name) return ws.name;
+  // Fallback to Webflow site name, but strip "Copy of " prefix
+  if (ws.webflowSiteName) return ws.webflowSiteName.replace(/^copy\s+of\s+/i, '');
+  return '';
+}
+
 // ── Prepared statements (lazy) ──
 
 interface WorkspaceRow {

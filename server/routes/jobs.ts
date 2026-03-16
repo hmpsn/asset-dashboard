@@ -45,6 +45,7 @@ import {
   getTokenForSite,
   getClientPortalUrl,
   updatePageState,
+  getBrandName,
 } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 
@@ -92,7 +93,7 @@ router.post('/api/jobs', async (req, res) => {
             const result = await runSeoAudit(siteId, token, params.workspaceId as string);
             // Auto-save snapshot so overview + client dashboard stay in sync
             const ws = getWorkspace(params.workspaceId as string);
-            const siteName = ws?.webflowSiteName || ws?.name || siteId;
+            const siteName = getBrandName(ws) || siteId;
             const snapshot = saveSnapshot(siteId, siteName, result);
             const effectiveResult = ws?.auditSuppressions?.length ? applySuppressionsToAudit(result, ws.auditSuppressions) : result;
             if (ws) {
@@ -360,7 +361,7 @@ router.post('/api/jobs', async (req, res) => {
                 if (sub) bulkBaseUrl = `https://${sub}.webflow.io`;
               } catch { /* best-effort */ }
             }
-            const bulkBrandName = bulkWs?.webflowSiteName || bulkWs?.name || '';
+            const bulkBrandName = getBrandName(bulkWs);
 
             const results: Array<{ pageId: string; text: string; applied: boolean; error?: string }> = [];
             for (let i = 0; i < pages.length; i++) {

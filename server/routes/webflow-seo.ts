@@ -15,6 +15,7 @@ import {
   getWorkspace,
   getTokenForSite,
   updatePageState,
+  getBrandName,
 } from '../workspaces.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { createLogger } from '../logger.js';
@@ -63,7 +64,7 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
   let brandName = '';
   if (workspaceId) {
     const wsForBrand = getWorkspace(workspaceId);
-    brandName = wsForBrand?.webflowSiteName || wsForBrand?.name || '';
+    brandName = getBrandName(wsForBrand);
   }
 
   // Build audit context for this page (if available)
@@ -239,7 +240,7 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', async (req, res) => {
     } catch { /* best-effort */ }
   }
 
-  const inlineBrandName = ws?.webflowSiteName || ws?.name || '';
+  const inlineBrandName = getBrandName(ws);
 
   const results = [];
   for (const page of pages) {
@@ -394,7 +395,7 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', async (req, res) => {
     } catch { /* best-effort */ }
   }
 
-  const inlineBrandName = ws?.webflowSiteName || ws?.name || '';
+  const inlineBrandName = getBrandName(ws);
   const maxLen = field === 'description' ? 160 : 60;
   const CONCURRENCY = 3;
 
@@ -570,7 +571,7 @@ router.post('/api/webflow/seo-copy', async (req, res) => {
 
   // Resolve brand name
   const copyWs = getWorkspace(workspaceId);
-  const copyBrandName = copyWs?.webflowSiteName || copyWs?.name || '';
+  const copyBrandName = getBrandName(copyWs);
 
   const prompt = `You are an expert SEO copywriter. Generate optimized SEO copy for this specific web page.
 
