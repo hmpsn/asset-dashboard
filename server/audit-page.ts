@@ -1,6 +1,7 @@
 import {
   extractTag, extractMetaContent, countWords, extractLinks,
   extractImgTags, extractStyleBlocks, extractInlineScripts, countExternalResources,
+  stripHiddenElements,
 } from './seo-audit-html.js';
 
 export type Severity = 'error' | 'warning' | 'info';
@@ -134,8 +135,12 @@ export function auditPage(
 
   // --- HTML-based checks ---
   if (html) {
+    // Strip hidden elements (Webflow conditional visibility, display:none) before content checks
+    // to avoid false positives from elements that aren't visible to users or crawlers.
+    const visibleHtml = stripHiddenElements(html);
+
     // H1 tags
-    const h1s = extractTag(html, 'h1');
+    const h1s = extractTag(visibleHtml, 'h1');
     if (h1s.length === 0) {
       issues.push({ check: 'h1', severity: 'error', message: 'Missing H1 tag', recommendation: 'Add exactly one H1 tag per page that describes the main content.' });
     } else if (h1s.length > 1) {
@@ -149,7 +154,7 @@ export function auditPage(
     const headingRegex = /<h([1-6])[^>]*>/gi;
     const levels: number[] = [];
     let hm;
-    while ((hm = headingRegex.exec(html)) !== null) levels.push(parseInt(hm[1]));
+    while ((hm = headingRegex.exec(visibleHtml)) !== null) levels.push(parseInt(hm[1]));
     for (let i = 1; i < levels.length; i++) {
       if (levels[i] - levels[i - 1] > 1) {
         issues.push({ check: 'heading-hierarchy', severity: 'warning', message: `Heading hierarchy skips from H${levels[i - 1]} to H${levels[i]}`, recommendation: `Don't skip heading levels. Use H${levels[i - 1] + 1} before H${levels[i]}.` });
@@ -158,7 +163,7 @@ export function auditPage(
     }
 
     // Images without alt text (only flag images truly missing the alt attribute, not decorative alt="")
-    const imgs = extractImgTags(html);
+    const imgs = extractImgTags(visibleHtml);
     const noAlt = imgs.filter(i => !i.hasAlt);
     if (noAlt.length > 0) {
       issues.push({ check: 'img-alt', severity: 'warning', message: `${noAlt.length} image${noAlt.length > 1 ? 's' : ''} missing alt text`, recommendation: 'Add descriptive alt text to all meaningful images for accessibility and SEO.' });
@@ -183,13 +188,13 @@ export function auditPage(
     }
 
     // Content length
-    const wordCount = countWords(html);
+    const wordCount = countWords(visibleHtml);
     if (wordCount < 300) {
       issues.push({ check: 'content-length', severity: 'warning', message: `Thin content (${wordCount} words)`, recommendation: 'Pages with fewer than 300 words may rank poorly. Add more valuable content.' });
     }
 
     // Internal links
-    const links = extractLinks(html);
+    const links = extractLinks(visibleHtml);
     const internalLinks = links.filter(l => l.href.startsWith('/') || l.href.includes('webflow.io'));
     if (internalLinks.length === 0) {
       issues.push({ check: 'internal-links', severity: 'info', message: 'No internal links found', recommendation: 'Add internal links to help search engines discover other pages and distribute page authority.' });
@@ -199,7 +204,7 @@ export function auditPage(
     const linkRegex2 = /<a\s+([^>]*)>([\s\S]*?)<\/a>/gi;
     let emptyLinkCount = 0;
     let lm2;
-    while ((lm2 = linkRegex2.exec(html)) !== null) {
+    while ((lm2 = linkRegex2.exec(visibleHtml)) !== null) {
       const innerContent = lm2[2];
       const linkAttrs = lm2[1];
       const hrefAttr = linkAttrs.match(/href=["']([^"']*)['"]/);
@@ -344,7 +349,7 @@ export function auditPage(
 
     // AEO-3: Answer-first content structure
     // Extract text after the first H1/H2 and check if it starts with a direct answer
-    const bodyText = html
+    const bodyText = visibleHtml
       .replace(/<script[\s\S]*?<\/script>/gi, '')
       .replace(/<style[\s\S]*?<\/style>/gi, '')
       .replace(/<nav[\s\S]*?<\/nav>/gi, '')

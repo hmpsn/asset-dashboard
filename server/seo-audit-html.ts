@@ -1,6 +1,22 @@
 // HTML extraction utilities for SEO audit engine
 // Extracted from seo-audit.ts for modularity
 
+/**
+ * Strip elements that are hidden via inline styles or Webflow conditional visibility.
+ * Removes elements with display:none, visibility:hidden, or the w-condition-invisible class.
+ * This prevents false positives from conditional CMS sections (e.g., two hero blocks where only one is visible).
+ */
+export function stripHiddenElements(html: string): string {
+  // Remove elements whose opening tag contains display:none or visibility:hidden in a style attribute,
+  // or the Webflow conditional-visibility class w-condition-invisible.
+  // We handle both self-closing and container elements.
+  return html
+    // Container elements with hidden styles/classes — match outermost only via non-greedy inner
+    .replace(/<(div|section|header|article|aside|main|figure|span|p|ul|ol|li|h[1-6])\b([^>]*(?:style\s*=\s*["'][^"']*display\s*:\s*none[^"']*["']|class\s*=\s*["'][^"']*w-condition-invisible[^"']*["']|style\s*=\s*["'][^"']*visibility\s*:\s*hidden[^"']*["'])[^>]*)>[\s\S]*?<\/\1>/gi, '')
+    // Self-closing or void elements (img, input, etc.) with hidden styles
+    .replace(/<(?:img|input|hr|br)\b[^>]*(?:style\s*=\s*["'][^"']*display\s*:\s*none[^"']*["']|class\s*=\s*["'][^"']*w-condition-invisible[^"']*["'])[^>]*\/?>/gi, '');
+}
+
 export function extractTag(html: string, tag: string): string[] {
   const regex = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, 'gi');
   const matches: string[] = [];

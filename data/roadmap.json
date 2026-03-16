@@ -436,6 +436,18 @@
       "shippedAt": "2026-03",
       "items": [
         {
+          "id": 280,
+          "title": "SEO audit: strip hidden elements before content checks (fixes false-positive duplicate H1 on Webflow conditional visibility)",
+          "status": "done",
+          "shippedAt": "2026-03-16"
+        },
+        {
+          "id": 279,
+          "title": "Fix cross-workspace audit data leakage (SeoAudit job lookup missing workspaceId filter)",
+          "status": "done",
+          "shippedAt": "2026-03-16"
+        },
+        {
           "id": 170,
           "title": "AdminChat improvements",
           "status": "done",
