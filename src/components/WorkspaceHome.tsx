@@ -14,11 +14,9 @@ import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { AnomalyAlerts } from './AnomalyAlerts';
 import { SeoWorkStatus, ActivityFeed, RankingsSnapshot, ActiveRequestsAnnotations, SeoChangeImpact } from './workspace-home';
 import { type Page, adminPath } from '../routes';
-import { getSafe } from '../api/client';
-import { rankTracking, activity as activityApi, annotations as annotationsApi, churnSignals as churnApi, workOrders as workOrdersApi } from '../api/misc';
+import { activity as activityApi, workOrders as workOrdersApi, workspaceHome } from '../api/misc';
 import { contentRequests as contentRequestsApi } from '../api/content';
 import { requests as requestsApi } from '../api/misc';
-import { gsc, ga4 } from '../api/analytics';
 import { useWorkspaceData } from '../contexts/WorkspaceDataContext';
 
 interface WorkspaceHomeProps {
@@ -100,48 +98,26 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
     },
   });
 
+  // Single aggregated fetch replaces 10+ parallel calls
   useEffect(() => {
     let cancelled = false;
-    const days = 28;
-
-    // Build fetch promises with string keys
-    const fetches: Array<{ key: string; promise: Promise<unknown> }> = [
-      { key: 'ranks', promise: rankTracking.latest(workspaceId) },
-      { key: 'requests', promise: requestsApi.list({ workspaceId }) },
-      { key: 'content', promise: contentRequestsApi.list(workspaceId) },
-      { key: 'activity', promise: activityApi.list(workspaceId) },
-      { key: 'annotations', promise: annotationsApi.list(workspaceId) },
-      { key: 'churn', promise: churnApi.list(workspaceId) },
-      { key: 'workOrders', promise: workOrdersApi.list(workspaceId) },
-    ];
-    if (gscPropertyUrl) fetches.push({ key: 'search', promise: gsc.overview(workspaceId, days) });
-    if (ga4PropertyId) {
-      fetches.push({ key: 'ga4', promise: getSafe<unknown>(`/api/public/analytics-overview/${workspaceId}?days=${days}`, null) });
-      fetches.push({ key: 'comparison', promise: ga4.comparison(workspaceId, days) });
-    }
-
-    Promise.all(fetches.map(({ key, promise }) => promise.then(d => ({ key, d })).catch(() => ({ key, d: null })))).then(results => {
+    workspaceHome.get(workspaceId).then(d => {
       if (cancelled) return;
-      for (const { key, d } of results) {
-        if (!d) continue;
-        const data = d as Record<string, unknown>;
-        if (key === 'search' && data.totalClicks !== undefined) setSearchData({ totalClicks: data.totalClicks as number, totalImpressions: data.totalImpressions as number, avgCtr: data.avgCtr as number, avgPosition: data.avgPosition as number });
-        if (key === 'ga4' && data.totalUsers !== undefined) setGa4Data(d as typeof ga4Data);
-        if (key === 'comparison') setComparison(d as typeof comparison);
-        if (key === 'ranks' && Array.isArray(d)) setRanks(d.slice(0, 10));
-        if (key === 'requests' && Array.isArray(d)) setRequests(d as typeof requests);
-        if (key === 'content' && Array.isArray(d)) setContentRequests(d as typeof contentRequests);
-        if (key === 'activity' && Array.isArray(d)) setActivity(d as ActivityEntry[]);
-        if (key === 'annotations' && Array.isArray(d)) setAnnotations(d.slice(0, 5));
-        if (key === 'churn' && Array.isArray(d)) setChurnSignals(d.filter((s: { severity: string }) => s.severity === 'critical' || s.severity === 'warning'));
-        if (key === 'workOrders' && Array.isArray(d)) setWorkOrders(d as typeof workOrders);
-      }
+      if (Array.isArray(d.ranks)) setRanks(d.ranks.slice(0, 10) as typeof ranks);
+      if (Array.isArray(d.requests)) setRequests(d.requests as typeof requests);
+      if (Array.isArray(d.contentRequests)) setContentRequests(d.contentRequests as typeof contentRequests);
+      if (Array.isArray(d.activity)) setActivity(d.activity as ActivityEntry[]);
+      if (Array.isArray(d.annotations)) setAnnotations(d.annotations.slice(0, 5) as typeof annotations);
+      if (Array.isArray(d.churnSignals)) setChurnSignals((d.churnSignals as Array<{ id: string; type: string; severity: string; title: string; description: string; detectedAt: string }>).filter(s => s.severity === 'critical' || s.severity === 'warning'));
+      if (Array.isArray(d.workOrders)) setWorkOrders(d.workOrders as typeof workOrders);
+      if (d.searchData) setSearchData(d.searchData);
+      if (d.ga4Data) setGa4Data(d.ga4Data);
+      if (d.comparison) setComparison(d.comparison);
       setLoading(false);
       setLastFetched(new Date());
     }).catch(() => { if (!cancelled) setLoading(false); });
-
     return () => { cancelled = true; };
-  }, [workspaceId, gscPropertyUrl, ga4PropertyId]);
+  }, [workspaceId]);
 
   if (loading) {
     return (
@@ -181,36 +157,17 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      const days = 28;
-      const fetches: Array<{ key: string; promise: Promise<unknown> }> = [
-        { key: 'ranks', promise: rankTracking.latest(workspaceId) },
-        { key: 'requests', promise: requestsApi.list({ workspaceId }) },
-        { key: 'content', promise: contentRequestsApi.list(workspaceId) },
-        { key: 'activity', promise: activityApi.list(workspaceId) },
-        { key: 'annotations', promise: annotationsApi.list(workspaceId) },
-        { key: 'churn', promise: churnApi.list(workspaceId) },
-        { key: 'workOrders', promise: workOrdersApi.list(workspaceId) },
-      ];
-      if (gscPropertyUrl) fetches.push({ key: 'search', promise: gsc.overview(workspaceId, days) });
-      if (ga4PropertyId) {
-        fetches.push({ key: 'ga4', promise: getSafe<unknown>(`/api/public/analytics-overview/${workspaceId}?days=${days}`, null) });
-        fetches.push({ key: 'comparison', promise: ga4.comparison(workspaceId, days) });
-      }
-      const results = await Promise.all(fetches.map(({ key, promise }) => promise.then(d => ({ key, d })).catch(() => ({ key, d: null }))));
-      for (const { key, d } of results) {
-        if (!d) continue;
-        const data = d as Record<string, unknown>;
-        if (key === 'search' && data.totalClicks !== undefined) setSearchData({ totalClicks: data.totalClicks as number, totalImpressions: data.totalImpressions as number, avgCtr: data.avgCtr as number, avgPosition: data.avgPosition as number });
-        if (key === 'ga4' && data.totalUsers !== undefined) setGa4Data(d as typeof ga4Data);
-        if (key === 'comparison') setComparison(d as typeof comparison);
-        if (key === 'ranks' && Array.isArray(d)) setRanks(d.slice(0, 10));
-        if (key === 'requests' && Array.isArray(d)) setRequests(d as typeof requests);
-        if (key === 'content' && Array.isArray(d)) setContentRequests(d as typeof contentRequests);
-        if (key === 'activity' && Array.isArray(d)) setActivity(d as ActivityEntry[]);
-        if (key === 'annotations' && Array.isArray(d)) setAnnotations(d.slice(0, 5));
-        if (key === 'churn' && Array.isArray(d)) setChurnSignals(d.filter((s: { severity: string }) => s.severity === 'critical' || s.severity === 'warning'));
-        if (key === 'workOrders' && Array.isArray(d)) setWorkOrders(d as typeof workOrders);
-      }
+      const d = await workspaceHome.get(workspaceId);
+      if (Array.isArray(d.ranks)) setRanks(d.ranks.slice(0, 10) as typeof ranks);
+      if (Array.isArray(d.requests)) setRequests(d.requests as typeof requests);
+      if (Array.isArray(d.contentRequests)) setContentRequests(d.contentRequests as typeof contentRequests);
+      if (Array.isArray(d.activity)) setActivity(d.activity as ActivityEntry[]);
+      if (Array.isArray(d.annotations)) setAnnotations(d.annotations.slice(0, 5) as typeof annotations);
+      if (Array.isArray(d.churnSignals)) setChurnSignals((d.churnSignals as Array<{ id: string; type: string; severity: string; title: string; description: string; detectedAt: string }>).filter(s => s.severity === 'critical' || s.severity === 'warning'));
+      if (Array.isArray(d.workOrders)) setWorkOrders(d.workOrders as typeof workOrders);
+      if (d.searchData) setSearchData(d.searchData);
+      if (d.ga4Data) setGa4Data(d.ga4Data);
+      if (d.comparison) setComparison(d.comparison);
       setLastFetched(new Date());
     } catch { /* ignore */ }
     setRefreshing(false);

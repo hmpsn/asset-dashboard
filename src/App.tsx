@@ -205,20 +205,17 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     refreshHealth();
   }, [refreshHealth]);
 
-  // Fetch pending content request count + content item existence when workspace changes
+  // Fetch badge counts via dedicated lightweight endpoint
   useEffect(() => {
     if (!selected) return;
     let cancelled = false;
-    Promise.all([
-      get<Array<{ status: string }>>(`/api/content-requests/${selected.id}`).catch(() => [] as Array<{ status: string }>),
-      get<unknown[]>(`/api/content-briefs/${selected.id}`).catch(() => [] as unknown[]),
-      get<unknown[]>(`/api/content-posts/${selected.id}`).catch(() => [] as unknown[]),
-    ]).then(([reqs, briefs, posts]) => {
-      if (cancelled) return;
-      const reqArr = Array.isArray(reqs) ? reqs : [];
-      setPendingContentRequests(reqArr.filter(r => r.status === 'requested').length);
-      setHasContentItems(reqArr.length > 0 || (Array.isArray(briefs) && briefs.length > 0) || (Array.isArray(posts) && posts.length > 0));
-    });
+    get<{ pendingRequests: number; hasContent: boolean }>(`/api/workspace-badges/${selected.id}`)
+      .then(badges => {
+        if (cancelled) return;
+        setPendingContentRequests(badges.pendingRequests);
+        setHasContentItems(badges.hasContent);
+      })
+      .catch(() => {});
     return () => { cancelled = true; };
   }, [selected]);
 

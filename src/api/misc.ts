@@ -212,6 +212,36 @@ export const workOrders = {
     getSafe<unknown[]>(`/api/work-orders/${wsId}`, []),
 };
 
+// ── Workspace home (aggregated) ─────────────────────────────────
+export interface WorkspaceHomeData {
+  ranks: unknown[];
+  requests: unknown[];
+  contentRequests: unknown[];
+  activity: unknown[];
+  annotations: unknown[];
+  churnSignals: unknown[];
+  workOrders: unknown[];
+  searchData: { totalClicks: number; totalImpressions: number; avgCtr: number; avgPosition: number } | null;
+  ga4Data: { totalUsers: number; totalSessions: number; totalPageviews: number; newUserPercentage: number } | null;
+  comparison: { users?: { current: number; previous: number }; sessions?: { current: number; previous: number } } | null;
+}
+
+export const workspaceHome = {
+  get: (wsId: string, days = 28) =>
+    get<WorkspaceHomeData>(`/api/workspace-home/${wsId}?days=${days}`),
+};
+
+// ── Workspace badges (lightweight) ──────────────────────────────
+export interface WorkspaceBadges {
+  pendingRequests: number;
+  hasContent: boolean;
+}
+
+export const workspaceBadges = {
+  get: (wsId: string) =>
+    get<WorkspaceBadges>(`/api/workspace-badges/${wsId}`),
+};
+
 // ── Redirect manager ────────────────────────────────────────────
 export const redirects = {
   list: (siteId: string) =>
