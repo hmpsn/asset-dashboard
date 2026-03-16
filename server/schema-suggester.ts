@@ -286,6 +286,93 @@ function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string)
   }
 }
 
+// Content verification: cross-check schema values against actual page content
+function verifySchemaContent(schema: Record<string, unknown>, pageText: string, html: string | null): string[] {
+  const graph = schema['@graph'] as Record<string, unknown>[] | undefined;
+  if (!Array.isArray(graph) || !pageText) return [];
+
+  const stripped: string[] = [];
+  const lowerText = pageText.toLowerCase();
+  // Also check the raw HTML (lowered) for things like mailto: links, tel: links
+  const lowerHtml = (html || '').toLowerCase();
+
+  for (const node of graph) {
+    const type = node['@type'] as string;
+    if (!type) continue;
+
+    // Check email — must appear in visible text or as mailto: link
+    const email = node['email'] as string | undefined;
+    if (email && typeof email === 'string') {
+      if (!lowerText.includes(email.toLowerCase()) && !lowerHtml.includes(`mailto:${email.toLowerCase()}`)) {
+        stripped.push(`${type}: removed hallucinated email "${email}" (not found in page content)`);
+        delete node['email'];
+      }
+    }
+
+    // Check telephone — must appear in visible text or as tel: link
+    const tel = node['telephone'];
+    if (tel) {
+      const phones = Array.isArray(tel) ? tel : [tel];
+      const verified = phones.filter((p: string) => {
+        const digits = String(p).replace(/\D/g, '');
+        return lowerText.includes(digits) || lowerText.includes(String(p)) || lowerHtml.includes(`tel:${digits}`) || lowerHtml.includes(`tel:+${digits}`);
+      });
+      if (verified.length === 0) {
+        stripped.push(`${type}: removed hallucinated telephone (not found in page content)`);
+        delete node['telephone'];
+      } else if (verified.length < phones.length) {
+        stripped.push(`${type}: removed ${phones.length - verified.length} unverified phone number(s)`);
+        node['telephone'] = verified.length === 1 ? verified[0] : verified;
+      }
+    }
+
+    // Check address — if PostalAddress exists, verify street/city appear in content
+    const address = node['address'] as Record<string, unknown> | undefined;
+    if (address && typeof address === 'object' && address['@type'] === 'PostalAddress') {
+      const street = (address['streetAddress'] as string || '').toLowerCase();
+      const city = (address['addressLocality'] as string || '').toLowerCase();
+      if (street && !lowerText.includes(street) && city && !lowerText.includes(city)) {
+        stripped.push(`${type}: removed hallucinated address (street/city not found in page content)`);
+        delete node['address'];
+      }
+    }
+
+    // Check openingHoursSpecification — remove if no hours pattern found in content
+    if (node['openingHoursSpecification'] && !lowerText.match(/\d{1,2}:\d{2}\s*(?:am|pm|–|-|to)/i) && !lowerText.match(/(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i)) {
+      stripped.push(`${type}: removed hallucinated openingHoursSpecification (no hours found in page content)`);
+      delete node['openingHoursSpecification'];
+    }
+
+    // Check geo coordinates — remove if no coordinate-like numbers in content
+    const geo = node['geo'] as Record<string, unknown> | undefined;
+    if (geo && typeof geo === 'object' && geo['@type'] === 'GeoCoordinates') {
+      const lat = String(geo['latitude'] || '');
+      const lon = String(geo['longitude'] || '');
+      if (lat && !lowerText.includes(lat) && lon && !lowerText.includes(lon)) {
+        stripped.push(`${type}: removed hallucinated geo coordinates (not found in page content)`);
+        delete node['geo'];
+      }
+    }
+
+    // Check sameAs URLs — filter to only URLs that appear in the HTML
+    const sameAs = node['sameAs'] as string[] | undefined;
+    if (Array.isArray(sameAs)) {
+      const verified = sameAs.filter(url => lowerHtml.includes(url.toLowerCase()));
+      if (verified.length < sameAs.length) {
+        const removed = sameAs.length - verified.length;
+        stripped.push(`${type}: removed ${removed} hallucinated sameAs URL(s) (not found in page HTML)`);
+        if (verified.length === 0) {
+          delete node['sameAs'];
+        } else {
+          node['sameAs'] = verified;
+        }
+      }
+    }
+  }
+
+  return stripped;
+}
+
 interface PageMeta {
   id: string;
   title: string;
@@ -526,6 +613,116 @@ function getPageTypeInstructions(pageType: SchemaPageType | undefined, siteUrl: 
   return instructions[pageType] || '';
 }
 
+// Full post-processing pipeline: fix → verify content → inject refs → validate → auto-fix loop
+async function postProcessSchema(
+  schema: Record<string, unknown>,
+  siteUrl: string,
+  pageContent: string,
+  html: string | null,
+  ctx: SchemaContext,
+): Promise<{ schema: Record<string, unknown>; reason: string; errors: string[] }> {
+  // Step 1: Auto-fix invalid properties and malformed values
+  autoFixSchema(schema);
+
+  // Step 2: Ensure @graph structure
+  if (!schema['@graph'] && schema['@type']) {
+    const wrapped = { '@context': 'https://schema.org', '@graph': [schema] };
+    delete (wrapped['@graph'][0] as Record<string, unknown>)['@context'];
+    schema = wrapped;
+  }
+
+  // Step 3: Content verification — strip hallucinated factual claims
+  const contentWarnings = verifySchemaContent(schema, pageContent, html);
+  if (contentWarnings.length > 0) {
+    log.info({ warnings: contentWarnings }, 'Content verification stripped hallucinated values');
+  }
+
+  // Step 4: Inject cross-references
+  injectCrossReferences(schema, siteUrl);
+
+  // Step 5: Clean again after modifications (remove any empty values created by stripping)
+  const cleaned = cleanSchema(schema);
+
+  // Step 6: Validate
+  const errors = validateUnifiedSchema(cleaned);
+  const graph = cleaned['@graph'] as Record<string, unknown>[];
+  const types = graph?.map(n => n['@type']).filter(Boolean) || [];
+
+  // Step 7: Auto-fix loop — if validation errors exist, ask AI to fix them (one attempt)
+  const fixableErrors = errors.filter(e =>
+    !e.includes('not found in @graph') && // cross-ref warnings are informational
+    !e.includes('appears malformed') // already auto-fixed
+  );
+
+  if (fixableErrors.length > 0 && process.env.OPENAI_API_KEY) {
+    log.info({ errorCount: fixableErrors.length }, 'Schema has validation errors — attempting AI auto-fix');
+    try {
+      const fixPrompt = `You are a Schema.org JSON-LD expert. The following schema has validation errors. Fix ONLY the listed errors — do not change anything else. Return the corrected JSON-LD object only, no explanation.
+
+CURRENT SCHEMA:
+${JSON.stringify(cleaned, null, 2)}
+
+VALIDATION ERRORS TO FIX:
+${fixableErrors.map((e, i) => `${i + 1}. ${e}`).join('\n')}
+
+RULES:
+- Fix only the specific errors listed above
+- Do not remove any nodes or properties that are correct
+- Do not add new nodes unless required to fix an error
+- All cross-references must use {"@id": "..."} format
+- Return ONLY the corrected JSON-LD object`;
+
+      const fixResult = await callOpenAI({
+        model: 'gpt-4.1-mini',
+        messages: [{ role: 'user', content: fixPrompt }],
+        maxTokens: 3000,
+        temperature: 0.1,
+        feature: 'schema-auto-fix',
+        workspaceId: ctx.workspaceId,
+        maxRetries: 2,
+      });
+
+      if (fixResult.text) {
+        let fixJson = fixResult.text;
+        const fixMd = fixJson.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (fixMd) fixJson = fixMd[1].trim();
+
+        const fixedRaw = JSON.parse(fixJson) as Record<string, unknown>;
+        const fixedSchema = cleanSchema(fixedRaw);
+
+        // Re-run auto-fix and cross-references on the fixed version
+        autoFixSchema(fixedSchema);
+        injectCrossReferences(fixedSchema, siteUrl);
+
+        // Re-validate
+        const fixedErrors = validateUnifiedSchema(fixedSchema);
+        if (fixedErrors.length < errors.length) {
+          log.info({ before: errors.length, after: fixedErrors.length }, 'AI auto-fix reduced validation errors');
+          const fixedGraph = fixedSchema['@graph'] as Record<string, unknown>[];
+          const fixedTypes = fixedGraph?.map(n => n['@type']).filter(Boolean) || [];
+          return {
+            schema: fixedSchema,
+            reason: `Unified @graph schema with ${fixedTypes.join(', ')} (auto-fixed ${errors.length - fixedErrors.length} error${errors.length - fixedErrors.length > 1 ? 's' : ''})`,
+            errors: fixedErrors,
+          };
+        }
+        log.info('AI auto-fix did not improve errors — keeping original');
+      }
+    } catch (fixErr) {
+      log.warn({ err: fixErr }, 'AI auto-fix failed — keeping original schema');
+    }
+  }
+
+  // Add content verification warnings to the errors list for visibility
+  const allErrors = [...errors, ...contentWarnings.map(w => `[content-check] ${w}`)];
+
+  return {
+    schema: cleaned,
+    reason: `Unified @graph schema with ${types.join(', ')}`,
+    errors: allErrors,
+  };
+}
+
 async function aiGenerateUnifiedSchema(
   pageTitle: string,
   slug: string,
@@ -672,27 +869,9 @@ Return ONLY the JSON-LD object. No markdown, no explanation, no wrapping.`;
     const rawSchema = JSON.parse(jsonStr) as Record<string, unknown>;
     const schema = cleanSchema(rawSchema);
 
-    // Auto-fix: strip invalid properties that AI sometimes hallucinates
-    autoFixSchema(schema);
-
-    // Ensure it has @graph structure
-    if (!schema['@graph'] && schema['@type']) {
-      // AI returned a single type instead of @graph — wrap it
-      const wrapped = { '@context': 'https://schema.org', '@graph': [schema] };
-      delete (wrapped['@graph'][0] as Record<string, unknown>)['@context'];
-      injectCrossReferences(wrapped, siteUrl);
-      const errors = validateUnifiedSchema(wrapped);
-      const types = (wrapped['@graph'] as Record<string, unknown>[]).map(n => n['@type']).filter(Boolean);
-      return { schema: wrapped, reason: `Unified schema with ${types.join(', ')}`, errors };
-    }
-
-    // Inject cross-references the AI consistently omits
-    injectCrossReferences(schema, siteUrl);
-
-    const errors = validateUnifiedSchema(schema);
-    const graph = schema['@graph'] as Record<string, unknown>[];
-    const types = graph?.map(n => n['@type']).filter(Boolean) || [];
-    return { schema, reason: `Unified @graph schema with ${types.join(', ')}`, errors };
+    // Post-processing pipeline: fix → verify → inject refs → validate → auto-fix loop
+    const finalSchema = await postProcessSchema(schema, siteUrl, pageContent, html, ctx);
+    return finalSchema;
   } catch (err: unknown) {
     log.error({ err: err }, 'AI unified generation error');
     return null;
