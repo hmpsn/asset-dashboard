@@ -56,6 +56,7 @@ const ContentManager = lazy(() => import('./components/ContentManager').then(m =
 const ContentCalendar = lazy(() => import('./components/ContentCalendar').then(m => ({ default: m.ContentCalendar })));
 const BrandHub = lazy(() => import('./components/BrandHub').then(m => ({ default: m.BrandHub })));
 const ContentSubscriptions = lazy(() => import('./components/ContentSubscriptions').then(m => ({ default: m.ContentSubscriptions })));
+const ContentPipeline = lazy(() => import('./components/ContentPipeline').then(m => ({ default: m.ContentPipeline })));
 const RevenueDashboard = lazy(() => import('./components/RevenueDashboard').then(m => ({ default: m.RevenueDashboard })));
 
 function ChunkFallback() {
@@ -378,10 +379,8 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     { label: 'CONTENT', groupIcon: BookOpen, groupColor: 'text-amber-400',
       activeBg: 'bg-amber-500/10', activeText: 'text-amber-300', activeIcon: 'text-amber-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-amber-500/5', hoverText: 'hover:text-amber-300',
       items: [
-      { id: 'seo-briefs', label: 'Content Briefs', icon: Clipboard, needsSite: true, desc: 'AI-generated content briefs from keyword strategy' },
-      { id: 'content', label: 'Content', icon: FileText, needsSite: true, desc: 'Manage and publish AI-written content' },
+      { id: 'content-pipeline', label: 'Content Pipeline', icon: Clipboard, needsSite: true, desc: 'Briefs, posts, and subscriptions in one view' },
       { id: 'calendar', label: 'Calendar', icon: CalendarDays, needsSite: true, hidden: !hasContentItems, desc: 'Content calendar with briefs, posts, and requests' },
-      { id: 'subscriptions', label: 'Subscriptions', icon: RefreshCw, needsSite: true, desc: 'Recurring content subscription plans' },
       { id: 'content-perf', label: 'Content Perf', icon: BarChart3, needsSite: true, desc: 'Post-publish content performance metrics' },
     ]},
   ];
@@ -390,7 +389,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   const TAB_LABELS: Record<string, string> = {
     home: 'Home', media: 'Assets', 'seo-audit': 'Site Audit', 'seo-editor': 'SEO Editor',
     links: 'Links', 'seo-strategy': 'Strategy',
-    'seo-schema': 'Schema', 'seo-briefs': 'Content Briefs', content: 'Content', calendar: 'Calendar', subscriptions: 'Subscriptions', brand: 'Brand & AI',
+    'seo-schema': 'Schema', 'seo-briefs': 'Content Briefs', content: 'Content', calendar: 'Calendar', subscriptions: 'Subscriptions', brand: 'Brand & AI', 'content-pipeline': 'Content Pipeline',
     'seo-ranks': 'Rank Tracker', search: 'Search Console', analytics: 'Google Analytics',
     annotations: 'Annotations', performance: 'Performance', 'content-perf': 'Content Performance',
     'workspace-settings': 'Workspace Settings', prospect: 'Prospect', roadmap: 'Roadmap',
@@ -398,7 +397,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   };
 
   // ── Content renderer ──
-  const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'links', 'seo-strategy', 'seo-schema', 'seo-briefs', 'seo-ranks', 'content-perf', 'content', 'calendar', 'subscriptions', 'brand']);
+  const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'links', 'seo-strategy', 'seo-schema', 'seo-briefs', 'seo-ranks', 'content-perf', 'content', 'calendar', 'subscriptions', 'brand', 'content-pipeline']);
   const needsSite = !!(SEO_TABS.has(tab) || tab === 'search' || tab === 'analytics' || tab === 'annotations' || tab === 'performance');
   const seoNavigate = (t: string, ctx?: FixContext) => { setFixContext(ctx || null); if (selected) navigate(adminPath(selected.id, t as Page)); };
 
@@ -440,6 +439,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (tab === 'seo-strategy') return <KeywordStrategyPanel key={`strategy-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId!} />;
     if (tab === 'links') return <LinksPanel key={`links-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} />;
     if (tab === 'seo-schema') return <SchemaSuggester key={`schema-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} />;
+    if (tab === 'content-pipeline') return <ContentPipeline key={`pipeline-${selected.id}`} workspaceId={selected.id} onRequestCountChange={setPendingContentRequests} fixContext={fixContext} />;
     if (tab === 'seo-briefs') return <ContentBriefs key={`briefs-${selected.id}`} workspaceId={selected.id} onRequestCountChange={setPendingContentRequests} fixContext={fixContext} />;
     if (tab === 'content') return <ContentManager key={`content-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'calendar') return <ContentCalendar key={`calendar-${selected.id}`} workspaceId={selected.id} />;
@@ -487,7 +487,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
           {navGroups.map((group, gi) => {
             const isCollapsed = !!group.label && collapsedGroups.has(group.label);
             const groupBadgeCount = group.items.reduce((sum, item) =>
-              item.id === 'seo-briefs' ? sum + pendingContentRequests : sum, 0);
+              item.id === 'content-pipeline' ? sum + pendingContentRequests : sum, 0);
 
             return (
               <div key={group.label || `group-${gi}`} className={group.label ? 'mt-3' : ''}>
@@ -528,7 +528,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
                     >
                       <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${active ? (group.activeIcon || 'text-teal-400') : (group.inactiveIcon || '')}`} />
                       <span className="truncate">{item.label}</span>
-                      {item.id === 'seo-briefs' && pendingContentRequests > 0 && (
+                      {item.id === 'content-pipeline' && pendingContentRequests > 0 && (
                         <span className="ml-auto text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 tabular-nums flex-shrink-0 min-w-[20px] text-center leading-tight">
                           {pendingContentRequests}
                         </span>
@@ -668,9 +668,9 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
         <main className="flex-1 overflow-auto p-6">
           {/* max-w-5xl for admin (sidebar present); client uses max-w-6xl (full-width data) */}
           <div className="max-w-5xl mx-auto">
-            {pendingContentRequests > 0 && selected && tab !== 'seo-briefs' && (
+            {pendingContentRequests > 0 && selected && tab !== 'content-pipeline' && (
               <button
-                onClick={() => selected && navigate(adminPath(selected.id, 'seo-briefs'))}
+                onClick={() => selected && navigate(adminPath(selected.id, 'content-pipeline'))}
                 className="w-full mb-4 flex items-center gap-3 px-4 py-3 rounded-xl border transition-all hover:border-amber-400/40"
                 style={{ backgroundColor: 'rgba(245,158,11,0.06)', borderColor: 'rgba(245,158,11,0.2)' }}
               >
