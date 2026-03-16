@@ -1,15 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { get, put, post } from '../api/client';
 import {
-  Loader2, Save, Sparkles, Upload, ChevronDown, ChevronRight,
-  Check, AlertCircle, Wand2, Send, CheckSquare, Square, AlertTriangle,
-  Type, ArrowRight, X, Eye,
+  Loader2, Upload, ChevronDown, ChevronRight,
+  Check, AlertCircle, Wand2, AlertTriangle,
 } from 'lucide-react';
 import type { FixContext } from '../App';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { StatusBadge } from './ui/StatusBadge';
-import { statusBorderClass } from './ui/statusConfig';
+import { PageEditRow } from './editor/PageEditRow';
+import { BulkOperations } from './editor/BulkOperations';
+import { ApprovalPanel } from './editor/ApprovalPanel';
 
 interface PageMeta {
   id: string;
@@ -424,16 +425,12 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
           <Wand2 className="w-3 h-3" /> AI Fix Descriptions ({missingDescs})
         </button>
         {workspaceId && (
-          <button
-            onClick={sendForApproval}
-            disabled={sendingApproval || approvalSelected.size === 0}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              approvalSent ? 'bg-green-600 text-white' : 'bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white'
-            }`}
-          >
-            {sendingApproval ? <Loader2 className="w-3 h-3 animate-spin" /> : approvalSent ? <Check className="w-3 h-3" /> : <Send className="w-3 h-3" />}
-            {approvalSent ? 'Sent!' : sendingApproval ? 'Sending...' : `Send for Approval (${approvalSelected.size})`}
-          </button>
+          <ApprovalPanel
+            approvalSelected={approvalSelected}
+            sendingApproval={sendingApproval}
+            approvalSent={approvalSent}
+            onSendApproval={sendForApproval}
+          />
         )}
         <button
           onClick={handlePublish}
@@ -492,315 +489,36 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         </div>
       )}
 
-      {/* Select all + bulk actions */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <button onClick={selectAllForApproval} className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors">
-          {approvalSelected.size === filteredPages.length && filteredPages.length > 0 ? <CheckSquare className="w-3.5 h-3.5 text-teal-400" /> : <Square className="w-3.5 h-3.5" />}
-          {approvalSelected.size === filteredPages.length && filteredPages.length > 0 ? 'Deselect all' : 'Select all'}
-        </button>
-        {approvalSelected.size > 0 && <span className="text-xs text-teal-400">{approvalSelected.size} selected</span>}
-        {approvalSelected.size > 0 && bulkMode === 'idle' && (
-          <>
-            <span className="text-zinc-700">|</span>
-            <button onClick={() => { setBulkField('title'); setBulkMode('pattern'); }} className="flex items-center gap-1 px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-300 transition-colors">
-              <Type className="w-3 h-3" /> Pattern Apply
-            </button>
-            <button onClick={() => bulkAiRewrite('title', true)} className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/80 hover:bg-teal-500 text-xs text-white transition-colors">
-              <Sparkles className="w-3 h-3" /> AI Rewrite Titles
-            </button>
-            <button onClick={() => bulkAiRewrite('description', true)} className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/80 hover:bg-teal-500 text-xs text-white transition-colors">
-              <Sparkles className="w-3 h-3" /> AI Rewrite Descriptions
-            </button>
-          </>
-        )}
-      </div>
-
-      {/* Pattern Apply Modal */}
-      {bulkMode === 'pattern' && (
-        <div className="bg-zinc-900 rounded-xl border border-teal-500/30 p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-zinc-200 flex items-center gap-2">
-              <Type className="w-4 h-4 text-teal-400" /> Pattern Apply — {approvalSelected.size} pages
-            </h4>
-            <button onClick={() => { setBulkMode('idle'); setPatternText(''); }} className="text-zinc-500 hover:text-zinc-300"><X className="w-4 h-4" /></button>
-          </div>
-          <div className="flex items-center gap-2">
-            <select
-              value={bulkField}
-              onChange={e => setBulkField(e.target.value as 'title' | 'description')}
-              className="px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-200"
-            >
-              <option value="title">SEO Title</option>
-              <option value="description">Meta Description</option>
-            </select>
-            <select
-              value={patternAction}
-              onChange={e => setPatternAction(e.target.value as 'append' | 'prepend')}
-              className="px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-200"
-            >
-              <option value="append">Append</option>
-              <option value="prepend">Prepend</option>
-            </select>
-            <input
-              type="text"
-              value={patternText}
-              onChange={e => setPatternText(e.target.value)}
-              placeholder={patternAction === 'append' ? 'e.g. | Brand Name' : 'e.g. Brand Name |'}
-              className="flex-1 px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
-              autoFocus
-            />
-            <button
-              onClick={previewPattern}
-              disabled={!patternText.trim()}
-              className="flex items-center gap-1 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded text-xs font-medium text-white transition-colors"
-            >
-              <Eye className="w-3 h-3" /> Preview
-            </button>
-          </div>
-          <p className="text-[11px] text-zinc-500">
-            {patternAction === 'append' ? 'Text will be added after' : 'Text will be added before'} each page's {bulkField === 'title' ? 'SEO title' : 'meta description'}.
-            {bulkField === 'title' && ' Titles will be truncated to 60 characters.'}
-          </p>
-        </div>
-      )}
-
-      {/* Bulk Rewrite Preview / Diff */}
-      {bulkMode === 'rewrite-preview' && bulkPreview.length > 0 && (
-        <div className="bg-zinc-900 rounded-xl border border-teal-500/30 overflow-hidden">
-          <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
-            <div>
-              <h4 className="text-sm font-semibold text-zinc-200 flex items-center gap-2">
-                <Eye className="w-4 h-4 text-teal-400" /> Preview Changes — {bulkPreview.length} pages
-              </h4>
-              <p className="text-[11px] text-zinc-500 mt-0.5">Review before applying to Webflow</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={bulkSource === 'ai' ? applyBulkRewrite : applyPattern} className="flex items-center gap-1 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded text-xs font-medium text-white transition-colors">
-                <Check className="w-3 h-3" /> Apply All
-              </button>
-              <button onClick={() => { setBulkMode('idle'); setBulkPreview([]); }} className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-xs text-zinc-300 transition-colors">
-                <X className="w-3 h-3" /> Cancel
-              </button>
-            </div>
-          </div>
-          <div className="max-h-[350px] overflow-y-auto divide-y divide-zinc-800/50">
-            {bulkPreview.map(item => {
-              const page = pages.find(p => p.id === item.pageId);
-              return (
-                <div key={item.pageId} className="px-4 py-2.5">
-                  <div className="text-xs font-medium text-zinc-300 mb-1">/{page?.slug || '?'} — {page?.title || ''}</div>
-                  <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-start">
-                    <div className="text-[11px] text-red-400/80 bg-red-500/5 rounded px-2 py-1 font-mono leading-relaxed line-through">{item.oldValue || '(empty)'}</div>
-                    <ArrowRight className="w-3 h-3 text-zinc-500 mt-1.5 flex-shrink-0" />
-                    <div className="text-[11px] text-green-400/80 bg-green-500/5 rounded px-2 py-1 font-mono leading-relaxed">{item.newValue} <span className="text-zinc-500">({item.newValue.length})</span></div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Bulk operation progress */}
-      {bulkMode === 'rewriting' && (
-        <div className="flex items-center gap-3 px-4 py-3 bg-teal-500/10 border border-teal-500/30 rounded-lg">
-          <Loader2 className="w-4 h-4 animate-spin text-teal-400" />
-          <div className="flex-1">
-            <div className="text-sm text-teal-300">
-              {bulkProgress.total > 0 ? `Processing ${bulkProgress.done}/${bulkProgress.total} pages...` : 'Generating AI rewrites...'}
-            </div>
-            {bulkProgress.total > 0 && (
-              <div className="mt-1.5 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                <div className="h-full bg-teal-500 rounded-full transition-all" style={{ width: `${(bulkProgress.done / bulkProgress.total) * 100}%` }} />
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <BulkOperations
+        filteredPages={filteredPages} approvalSelected={approvalSelected}
+        bulkMode={bulkMode} bulkField={bulkField} patternAction={patternAction}
+        patternText={patternText} bulkPreview={bulkPreview} bulkProgress={bulkProgress}
+        bulkSource={bulkSource} pages={pages}
+        onSelectAll={selectAllForApproval} onSetBulkField={setBulkField}
+        onSetBulkMode={setBulkMode} onSetPatternAction={setPatternAction}
+        onSetPatternText={setPatternText} onPreviewPattern={previewPattern}
+        onApplyPattern={applyPattern} onApplyBulkRewrite={applyBulkRewrite}
+        onBulkAiRewrite={bulkAiRewrite}
+        onClearPreview={() => { setBulkMode('idle'); setBulkPreview([]); }}
+      />
 
       {/* Page list */}
       <div className="space-y-2">
-        {filteredPages.map(page => {
-          const isExpanded = expanded.has(page.id);
-          const edit = edits[page.id];
-          const isSaving = saving.has(page.id);
-          const isSaved = saved.has(page.id);
-          const isAiLoading = aiLoading[page.id];
-          const hasSeoTitle = !!(page.seo?.title);
-          const hasSeoDesc = !!(page.seo?.description);
-          const isSelected = approvalSelected.has(page.id);
-          const pageRecs = recsLoaded ? recsForPage(page.slug) : [];
-          const metaRecs = pageRecs.filter(r => r.type === 'metadata');
-          const hasRecFlag = metaRecs.length > 0;
-          const pageState = getState(page.id);
-          const trackingBorder = statusBorderClass(pageState?.status);
-
-          return (
-            <div key={page.id} id={`seo-editor-page-${page.id}`} className={`bg-zinc-900 rounded-xl border overflow-hidden ${trackingBorder || (hasRecFlag ? 'border-amber-500/30' : isSelected ? 'border-teal-500/40 bg-teal-500/5' : 'border-zinc-800')}`}>
-              <div className="flex items-center">
-                {workspaceId && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); toggleApprovalSelect(page.id); }}
-                    className="pl-4 pr-1 py-3 text-zinc-500 hover:text-teal-400 transition-colors"
-                  >
-                    {isSelected ? <CheckSquare className="w-4 h-4 text-teal-400" /> : <Square className="w-4 h-4" />}
-                  </button>
-                )}
-              <button
-                onClick={() => toggleExpand(page.id)}
-                className="flex-1 flex items-center gap-3 px-4 py-3 hover:bg-zinc-900/50 transition-colors text-left"
-              >
-                {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500" />}
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-zinc-200 truncate">{page.title}</div>
-                  <div className="text-xs text-zinc-500 truncate">/{page.slug}</div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <StatusBadge status={pageState?.status} />
-                  {hasRecFlag && <span className="flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400"><AlertTriangle className="w-3 h-3" />{metaRecs.length} rec{metaRecs.length > 1 ? 's' : ''}</span>}
-                  {!hasSeoTitle && <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">No title</span>}
-                  {!hasSeoDesc && <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400">No desc</span>}
-                  {edit?.dirty && <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400">Unsaved</span>}
-                </div>
-              </button>
-              </div>
-
-              {isExpanded && edit && (
-                <div className="px-4 pb-4 space-y-3 bg-zinc-900/30">
-                  {/* Recommendation banners */}
-                  {metaRecs.map(rec => (
-                    <div key={rec.id} className="flex items-start gap-2.5 px-3 py-2.5 rounded-lg bg-amber-500/5 border border-amber-500/20">
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-medium text-amber-300">{rec.title}</div>
-                        <div className="text-[11px] text-zinc-400 mt-0.5">{rec.insight}</div>
-                        {rec.trafficAtRisk > 0 && (
-                          <div className="text-[11px] text-amber-400/70 mt-1">
-                            {rec.trafficAtRisk.toLocaleString()} clicks at risk · {rec.estimatedGain}
-                          </div>
-                        )}
-                      </div>
-                      <span className={`flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                        rec.priority === 'fix_now' ? 'bg-red-500/15 text-red-400' :
-                        rec.priority === 'fix_soon' ? 'bg-amber-500/15 text-amber-400' :
-                        'bg-zinc-500/15 text-zinc-400'
-                      }`}>
-                        {rec.priority.replace('_', ' ')}
-                      </span>
-                    </div>
-                  ))}
-                  {/* SEO Title */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-xs font-medium text-zinc-400">SEO Title</label>
-                      <div className="flex items-center gap-1">
-                        <span className={`text-[11px] ${(edit.seoTitle.length > 60 || edit.seoTitle.length === 0) ? 'text-red-400' : edit.seoTitle.length > 50 ? 'text-amber-400' : 'text-green-400'}`}>
-                          {edit.seoTitle.length}/60
-                        </span>
-                        <button
-                          onClick={() => aiRewrite(page.id, 'title')}
-                          disabled={!!isAiLoading}
-                          className="flex items-center gap-1 px-1.5 py-0.5 text-[11px] bg-teal-600/50 hover:bg-teal-500/50 rounded transition-colors disabled:opacity-50"
-                          title="AI rewrite"
-                        >
-                          {isAiLoading === 'title' ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Sparkles className="w-2.5 h-2.5" />}
-                          AI
-                        </button>
-                      </div>
-                    </div>
-                    <input
-                      type="text"
-                      value={edit.seoTitle}
-                      onChange={e => updateField(page.id, 'seoTitle', e.target.value)}
-                      placeholder="Enter SEO title..."
-                      className="w-full px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-sm focus:outline-none focus:border-zinc-500"
-                    />
-                    {variations[page.id]?.field === 'title' && variations[page.id].options.length > 1 && (
-                      <div className="mt-1.5 space-y-1">
-                        <div className="text-[11px] text-zinc-500 font-medium">Pick a variation:</div>
-                        {variations[page.id].options.map((v, i) => (
-                          <button
-                            key={i}
-                            onClick={() => { updateField(page.id, 'seoTitle', v); setVariations(prev => { const n = { ...prev }; delete n[page.id]; return n; }); }}
-                            className={`w-full text-left px-3 py-1.5 rounded text-xs border transition-colors ${
-                              edit.seoTitle === v
-                                ? 'bg-teal-600/20 border-teal-500/40 text-teal-300'
-                                : 'bg-zinc-800/60 border-zinc-700/50 text-zinc-300 hover:border-teal-500/30 hover:bg-teal-600/10'
-                            }`}
-                          >
-                            <span className="text-zinc-500 mr-1.5">{i + 1}.</span>{v}
-                            <span className={`ml-2 text-[10px] ${v.length > 60 ? 'text-red-400' : v.length > 50 ? 'text-amber-400' : 'text-green-400'}`}>{v.length}/60</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Meta Description */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-xs font-medium text-zinc-400">Meta Description</label>
-                      <div className="flex items-center gap-1">
-                        <span className={`text-[11px] ${(edit.seoDescription.length > 160 || edit.seoDescription.length === 0) ? 'text-red-400' : edit.seoDescription.length > 150 ? 'text-amber-400' : 'text-green-400'}`}>
-                          {edit.seoDescription.length}/160
-                        </span>
-                        <button
-                          onClick={() => aiRewrite(page.id, 'description')}
-                          disabled={!!isAiLoading}
-                          className="flex items-center gap-1 px-1.5 py-0.5 text-[11px] bg-teal-600/50 hover:bg-teal-500/50 rounded transition-colors disabled:opacity-50"
-                          title="AI rewrite"
-                        >
-                          {isAiLoading === 'description' ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Sparkles className="w-2.5 h-2.5" />}
-                          AI
-                        </button>
-                      </div>
-                    </div>
-                    <textarea
-                      value={edit.seoDescription}
-                      onChange={e => updateField(page.id, 'seoDescription', e.target.value)}
-                      placeholder="Enter meta description..."
-                      rows={2}
-                      className="w-full px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-sm focus:outline-none focus:border-zinc-500 resize-none"
-                    />
-                    {variations[page.id]?.field === 'description' && variations[page.id].options.length > 1 && (
-                      <div className="mt-1.5 space-y-1">
-                        <div className="text-[11px] text-zinc-500 font-medium">Pick a variation:</div>
-                        {variations[page.id].options.map((v, i) => (
-                          <button
-                            key={i}
-                            onClick={() => { updateField(page.id, 'seoDescription', v); setVariations(prev => { const n = { ...prev }; delete n[page.id]; return n; }); }}
-                            className={`w-full text-left px-3 py-1.5 rounded text-xs border transition-colors ${
-                              edit.seoDescription === v
-                                ? 'bg-teal-600/20 border-teal-500/40 text-teal-300'
-                                : 'bg-zinc-800/60 border-zinc-700/50 text-zinc-300 hover:border-teal-500/30 hover:bg-teal-600/10'
-                            }`}
-                          >
-                            <span className="text-zinc-500 mr-1.5">{i + 1}.</span>{v}
-                            <span className={`ml-2 text-[10px] ${v.length > 160 ? 'text-red-400' : v.length > 150 ? 'text-amber-400' : 'text-green-400'}`}>{v.length}/160</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Save button */}
-                  <div className="flex justify-end">
-                    <button
-                      onClick={() => savePage(page.id)}
-                      disabled={!edit.dirty || isSaving}
-                      className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                        isSaved ? 'bg-green-600 text-white' : 'bg-white text-black hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed'
-                      }`}
-                    >
-                      {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : isSaved ? <Check className="w-3 h-3" /> : <Save className="w-3 h-3" />}
-                      {isSaved ? 'Saved!' : isSaving ? 'Saving...' : 'Save to Webflow'}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {filteredPages.map(page => (
+          <PageEditRow
+            key={page.id} page={page} edit={edits[page.id]}
+            expanded={expanded.has(page.id)} isSaving={saving.has(page.id)}
+            isSaved={saved.has(page.id)} isAiLoading={aiLoading[page.id]}
+            isSelected={approvalSelected.has(page.id)}
+            pageRecs={recsLoaded ? recsForPage(page.slug) : []}
+            pageState={getState(page.id)} variations={variations[page.id]}
+            showApprovalCheckbox={!!workspaceId}
+            onToggleExpand={toggleExpand} onToggleApprovalSelect={toggleApprovalSelect}
+            onUpdateField={updateField} onSave={savePage} onAiRewrite={aiRewrite}
+            onSelectVariation={(pageId, field, value) => updateField(pageId, field, value)}
+            onClearVariations={(pageId) => setVariations(prev => { const n = { ...prev }; delete n[pageId]; return n; })}
+          />
+        ))}
       </div>
     </div>
   );
