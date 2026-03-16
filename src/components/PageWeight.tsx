@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Loader2, BarChart3, ChevronDown, ChevronRight, Search, Images, ArrowRight,
 } from 'lucide-react';
+import { pageWeight as pageWeightApi } from '../api/seo';
 
 interface PageAsset {
   id: string;
@@ -65,13 +66,9 @@ function PageWeight({ siteId }: Props) {
     setLoading(true);
     setHasRun(true);
     setError(null);
-    fetch(`/api/webflow/page-weight/${siteId}`)
-      .then(r => {
-        if (!r.ok) throw new Error(`Server error: ${r.status}`);
-        return r.json();
-      })
-      .then(d => setData(d))
-      .catch(e => setError(e.message || 'Page weight analysis failed'))
+    pageWeightApi.webflowPageWeight(siteId)
+      .then(d => setData(d as PageWeightResult))
+      .catch(e => setError(e instanceof Error ? e.message : 'Page weight analysis failed'))
       .finally(() => setLoading(false));
   };
 
@@ -79,9 +76,11 @@ function PageWeight({ siteId }: Props) {
   useEffect(() => {
     let cancelled = false;
     setData(null); setHasRun(false); setError(null);
-    fetch(`/api/webflow/page-weight-snapshot/${siteId}`)
-      .then(r => r.json())
-      .then(snap => { if (!cancelled && snap?.result) { setData(snap.result); setHasRun(true); } })
+    pageWeightApi.webflowPageWeightSnapshot(siteId)
+      .then(snap => {
+        const s = snap as { result?: PageWeightResult } | null;
+        if (!cancelled && s?.result) { setData(s.result); setHasRun(true); }
+      })
       .catch(() => {});
     return () => { cancelled = true; };
   }, [siteId]);

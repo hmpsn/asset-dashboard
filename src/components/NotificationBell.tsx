@@ -5,6 +5,7 @@ import {
   AlertTriangle, X,
 } from 'lucide-react';
 import { adminPath, type Page } from '../routes';
+import { workspaceOverview, anomalies as anomaliesApi, churnSignals } from '../api/misc';
 
 interface NotificationItem {
   id: string;
@@ -54,8 +55,8 @@ export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
   const fetchNotifications = useCallback(async () => {
     try {
       const [overviewRes, anomalyRes] = await Promise.all([
-        fetch('/api/workspace-overview').then(r => r.ok ? r.json() : []),
-        fetch('/api/anomalies').then(r => r.ok ? r.json() : []),
+        workspaceOverview.list().catch(() => []),
+        anomaliesApi.listAll().catch(() => []),
       ]);
 
       const workspaces: WorkspaceSummary[] = Array.isArray(overviewRes) ? overviewRes : [];
@@ -137,7 +138,7 @@ export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
             icon: Clipboard,
             workspaceId: ws.id,
             workspaceName: ws.name,
-            tab: 'seo-briefs',
+            tab: 'content-pipeline',
           });
         }
         if ((ws.workOrders?.pending || 0) > 0) {
@@ -157,8 +158,8 @@ export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
       // Fetch churn signals across all workspaces
       try {
         const churnPromises = workspaces.map(ws =>
-          fetch(`/api/churn-signals/${ws.id}`).then(r => r.ok ? r.json() : []).then((signals: ChurnSignal[]) =>
-            (Array.isArray(signals) ? signals : [])
+          churnSignals.list(ws.id).then((signals) =>
+            (Array.isArray(signals) ? signals as ChurnSignal[] : [])
               .filter(s => s.severity === 'critical' || s.severity === 'warning')
               .map(s => ({ ...s, workspaceId: ws.id, workspaceName: ws.name }))
           ).catch(() => [])

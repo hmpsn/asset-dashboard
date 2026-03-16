@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from 'recharts';
 import { PageHeader, SectionCard, EmptyState, Badge } from './ui';
+import { contentPerformance } from '../api/seo';
 
 interface GscMetrics {
   clicks: number;
@@ -125,10 +126,9 @@ export function ContentPerformance({ workspaceId }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/content-performance/${workspaceId}`)
-      .then(r => r.ok ? r.json() : Promise.reject(new Error('Failed to load')))
-      .then(data => { if (!cancelled) { setItems(data.items || []); setError(null); } })
-      .catch(e => { if (!cancelled) setError(e.message); })
+    contentPerformance.get(workspaceId)
+      .then(data => { if (!cancelled) { setItems((data as { items?: ContentItem[] }).items || []); setError(null); } })
+      .catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [workspaceId]);
@@ -139,11 +139,8 @@ export function ContentPerformance({ workspaceId }: Props) {
     if (!trendData[requestId]) {
       setTrendLoading(requestId);
       try {
-        const r = await fetch(`/api/content-performance/${workspaceId}/${requestId}/trend`);
-        if (r.ok) {
-          const data = await r.json();
-          setTrendData(prev => ({ ...prev, [requestId]: data.trend || [] }));
-        }
+        const data = await contentPerformance.trend(workspaceId, requestId);
+        setTrendData(prev => ({ ...prev, [requestId]: (data as { trend?: TrendPoint[] }).trend || [] }));
       } catch { /* ignore */ }
       setTrendLoading(null);
     }

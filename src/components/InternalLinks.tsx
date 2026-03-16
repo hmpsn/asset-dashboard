@@ -5,6 +5,7 @@ import {
   AlertTriangle, Copy, Check, LayoutList, List,
 } from 'lucide-react';
 import { PageHeader, StatCard } from './ui';
+import { webflow } from '../api/seo';
 
 interface LinkSuggestion {
   fromPage: string;
@@ -63,9 +64,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const url = `/api/webflow/internal-links/${siteId}${workspaceId ? `?workspaceId=${workspaceId}` : ''}`;
-      const res = await fetch(url);
-      const result = await res.json();
+      const result = await webflow.internalLinksWithParams(siteId, workspaceId) as InternalLinkResult & { error?: string };
       if (result.error) {
         setError(result.error);
       } else {
@@ -81,9 +80,11 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
   // Load last saved snapshot on mount
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/webflow/internal-links-snapshot/${siteId}`)
-      .then(r => r.json())
-      .then(snap => { if (!cancelled && snap?.result) setData(snap.result); })
+    webflow.internalLinksSnapshot(siteId)
+      .then(snap => {
+        const s = snap as { result?: InternalLinkResult } | null;
+        if (!cancelled && s?.result) setData(s.result);
+      })
       .catch(() => {});
     return () => { cancelled = true; };
   }, [siteId]);

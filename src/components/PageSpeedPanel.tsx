@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 import { MetricRing } from './ui';
+import { pageWeight, webflow } from '../api/seo';
 
 interface CoreWebVitals {
   LCP: number | null;
@@ -129,21 +130,20 @@ export function PageSpeedPanel({ siteId }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/webflow/pages/${siteId}`)
-      .then(r => r.json())
+    webflow.pages(siteId)
       .then(d => {
         if (cancelled) return;
-        const list = (Array.isArray(d) ? d : []).filter((p: WebflowPage) => !p.title.toLowerCase().includes('password'));
+        const list = (Array.isArray(d) ? d as WebflowPage[] : []).filter((p: WebflowPage) => !p.title.toLowerCase().includes('password'));
         setPages(list);
         if (list.length > 0) setSelectedPage(list[0].id);
       })
       .catch(() => {});
     // Load last saved bulk PageSpeed snapshot
-    fetch(`/api/webflow/pagespeed-snapshot/${siteId}`)
-      .then(r => r.json())
+    pageWeight.pagespeedSnapshot(siteId)
       .then(snap => {
         if (cancelled) return;
-        if (snap?.result) { setData(snap.result); setHasRun(true); }
+        const s = snap as { result?: SiteSpeedResult } | null;
+        if (s?.result) { setData(s.result); setHasRun(true); }
       })
       .catch(() => {});
     return () => { cancelled = true; };
@@ -156,17 +156,14 @@ export function PageSpeedPanel({ siteId }: Props) {
     setData(null);
     setSingleResult(null);
     setError(null);
-    fetch(`/api/webflow/pagespeed/${siteId}?strategy=${strat}&maxPages=3`)
-      .then(r => {
-        if (!r.ok) throw new Error(`Server error: ${r.status}`);
-        return r.json();
-      })
+    pageWeight.pagespeedBulk(siteId, strat, 3)
       .then(d => {
-        if (d.error) { setError(d.error); return; }
-        if (d.pages?.length === 0) { setError('No pages could be tested. The Google PageSpeed API may be rate-limited. Add a GOOGLE_PSI_KEY env variable for higher limits.'); return; }
-        setData(d);
+        const result = d as SiteSpeedResult & { error?: string };
+        if (result.error) { setError(result.error); return; }
+        if ((result as { pages?: unknown[] }).pages?.length === 0) { setError('No pages could be tested. The Google PageSpeed API may be rate-limited. Add a GOOGLE_PSI_KEY env variable for higher limits.'); return; }
+        setData(result);
       })
-      .catch(e => setError(e.message || 'PageSpeed analysis failed'))
+      .catch(e => setError(e instanceof Error ? e.message : 'PageSpeed analysis failed'))
       .finally(() => setLoading(false));
   };
 
@@ -182,17 +179,13 @@ export function PageSpeedPanel({ siteId }: Props) {
     setSingleResult(null);
     setError(null);
 
-    fetch(`/api/webflow/pagespeed-single/${siteId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pageSlug: page.slug, strategy: strat, pageTitle: page.title }),
-    })
-      .then(async r => {
-        const d = await r.json();
-        if (!r.ok || d.error) { setError(d.error || 'Test failed'); return; }
-        setSingleResult(d);
+    pageWeight.pagespeedSingle(siteId, { pageSlug: page.slug, strategy: strat, pageTitle: page.title })
+      .then(d => {
+        const result = d as PageSpeedResult & { error?: string };
+        if (result.error) { setError(result.error); return; }
+        setSingleResult(result);
       })
-      .catch(e => setError(e.message || 'PageSpeed analysis failed'))
+      .catch(e => setError(e instanceof Error ? e.message : 'PageSpeed analysis failed'))
       .finally(() => setLoading(false));
   };
 

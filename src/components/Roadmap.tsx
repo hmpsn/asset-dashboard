@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { PageHeader, SectionCard, Badge, StatCard } from './ui';
+import { roadmap as roadmapApi } from '../api/misc';
 
 /* ── Roadmap data types (from shared types) ── */
 import type { RoadmapItem, SprintData } from '../../shared/types/roadmap.ts';
@@ -134,11 +135,11 @@ export function Roadmap() {
 
   // Load full roadmap from server
   useEffect(() => {
-    fetch('/api/roadmap')
-      .then(r => r.ok ? r.json() : null)
+    roadmapApi.get()
       .then(data => {
-        if (data?.sprints && Array.isArray(data.sprints)) {
-          setRoadmap(data.sprints);
+        const d = data as { sprints?: SprintData[] };
+        if (d?.sprints && Array.isArray(d.sprints)) {
+          setRoadmap(d.sprints);
         }
       })
       .catch(() => {})
@@ -160,11 +161,7 @@ export function Roadmap() {
       }));
     });
     // Persist single item via PATCH
-    fetch(`/api/roadmap/item/${itemId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus }),
-    }).catch(() => {});
+    roadmapApi.updateItem(itemId, { status: newStatus }).catch(() => {});
   };
 
   if (loading) {

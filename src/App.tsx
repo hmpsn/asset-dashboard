@@ -14,11 +14,12 @@ import { BackgroundTaskProvider } from './hooks/useBackgroundTasks';
 import { TaskPanel } from './components/TaskPanel';
 import { AdminChat } from './components/AdminChat';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { WorkspaceDataProvider } from './contexts/WorkspaceDataContext';
 import { NotificationBell } from './components/NotificationBell';
 import { CommandPalette } from './components/CommandPalette';
 import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, Search, FileText,
-  Pencil, Target, Code2, LogOut, TrendingUp, Flag, Link2, MessageSquare,
+  Pencil, Target, Code2, LogOut, TrendingUp, Link2, MessageSquare,
   Sun, Moon, LayoutDashboard, ChevronRight, Sparkles, Activity, Shield,
   Zap, BookOpen, RefreshCw, CalendarDays, DollarSign, ArrowLeft,
 } from 'lucide-react';
@@ -37,7 +38,6 @@ const SeoAudit = lazy(() => import('./components/SeoAudit').then(m => ({ default
 const SearchConsole = lazy(() => import('./components/SearchConsole').then(m => ({ default: m.SearchConsole })));
 const Performance = lazy(() => import('./components/Performance').then(m => ({ default: m.Performance })));
 const GoogleAnalytics = lazy(() => import('./components/GoogleAnalytics').then(m => ({ default: m.GoogleAnalytics })));
-const Annotations = lazy(() => import('./components/Annotations').then(m => ({ default: m.Annotations })));
 const RequestManager = lazy(() => import('./components/RequestManager').then(m => ({ default: m.RequestManager })));
 const SalesReport = lazy(() => import('./components/SalesReport').then(m => ({ default: m.SalesReport })));
 const Roadmap = lazy(() => import('./components/Roadmap').then(m => ({ default: m.Roadmap })));
@@ -56,6 +56,7 @@ const ContentManager = lazy(() => import('./components/ContentManager').then(m =
 const ContentCalendar = lazy(() => import('./components/ContentCalendar').then(m => ({ default: m.ContentCalendar })));
 const BrandHub = lazy(() => import('./components/BrandHub').then(m => ({ default: m.BrandHub })));
 const ContentSubscriptions = lazy(() => import('./components/ContentSubscriptions').then(m => ({ default: m.ContentSubscriptions })));
+const ContentPipeline = lazy(() => import('./components/ContentPipeline').then(m => ({ default: m.ContentPipeline })));
 const RevenueDashboard = lazy(() => import('./components/RevenueDashboard').then(m => ({ default: m.RevenueDashboard })));
 
 function ChunkFallback() {
@@ -204,20 +205,17 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     refreshHealth();
   }, [refreshHealth]);
 
-  // Fetch pending content request count + content item existence when workspace changes
+  // Fetch badge counts via dedicated lightweight endpoint
   useEffect(() => {
     if (!selected) return;
     let cancelled = false;
-    Promise.all([
-      get<Array<{ status: string }>>(`/api/content-requests/${selected.id}`).catch(() => [] as Array<{ status: string }>),
-      get<unknown[]>(`/api/content-briefs/${selected.id}`).catch(() => [] as unknown[]),
-      get<unknown[]>(`/api/content-posts/${selected.id}`).catch(() => [] as unknown[]),
-    ]).then(([reqs, briefs, posts]) => {
-      if (cancelled) return;
-      const reqArr = Array.isArray(reqs) ? reqs : [];
-      setPendingContentRequests(reqArr.filter(r => r.status === 'requested').length);
-      setHasContentItems(reqArr.length > 0 || (Array.isArray(briefs) && briefs.length > 0) || (Array.isArray(posts) && posts.length > 0));
-    });
+    get<{ pendingRequests: number; hasContent: boolean }>(`/api/workspace-badges/${selected.id}`)
+      .then(badges => {
+        if (cancelled) return;
+        setPendingContentRequests(badges.pendingRequests);
+        setHasContentItems(badges.hasContent);
+      })
+      .catch(() => {});
     return () => { cancelled = true; };
   }, [selected]);
 
@@ -357,7 +355,6 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
       { id: 'search', label: 'Search Console', icon: Search, needsSite: true, desc: 'Google Search Console queries, pages, and click data' },
       { id: 'analytics', label: 'Google Analytics', icon: BarChart3, needsSite: true, desc: 'GA4 traffic, events, sources, and user behavior' },
       { id: 'seo-ranks', label: 'Rank Tracker', icon: TrendingUp, needsSite: true, desc: 'Track keyword rankings over time' },
-      { id: 'annotations', label: 'Annotations', icon: Flag, needsSite: true, desc: 'Mark key events on analytics timelines' },
     ]},
     { label: 'SITE HEALTH', groupIcon: Shield, groupColor: 'text-emerald-400',
       activeBg: 'bg-emerald-500/10', activeText: 'text-emerald-300', activeIcon: 'text-emerald-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-emerald-500/5', hoverText: 'hover:text-emerald-300',
@@ -378,10 +375,9 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     { label: 'CONTENT', groupIcon: BookOpen, groupColor: 'text-amber-400',
       activeBg: 'bg-amber-500/10', activeText: 'text-amber-300', activeIcon: 'text-amber-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-amber-500/5', hoverText: 'hover:text-amber-300',
       items: [
-      { id: 'seo-briefs', label: 'Content Briefs', icon: Clipboard, needsSite: true, desc: 'AI-generated content briefs from keyword strategy' },
-      { id: 'content', label: 'Content', icon: FileText, needsSite: true, desc: 'Manage and publish AI-written content' },
+      { id: 'content-pipeline', label: 'Content Pipeline', icon: Clipboard, needsSite: true, desc: 'Briefs, posts, and subscriptions in one view' },
       { id: 'calendar', label: 'Calendar', icon: CalendarDays, needsSite: true, hidden: !hasContentItems, desc: 'Content calendar with briefs, posts, and requests' },
-      { id: 'subscriptions', label: 'Subscriptions', icon: RefreshCw, needsSite: true, desc: 'Recurring content subscription plans' },
+      { id: 'requests', label: 'Requests', icon: MessageSquare, needsSite: true, desc: 'Client content requests and feedback' },
       { id: 'content-perf', label: 'Content Perf', icon: BarChart3, needsSite: true, desc: 'Post-publish content performance metrics' },
     ]},
   ];
@@ -390,7 +386,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   const TAB_LABELS: Record<string, string> = {
     home: 'Home', media: 'Assets', 'seo-audit': 'Site Audit', 'seo-editor': 'SEO Editor',
     links: 'Links', 'seo-strategy': 'Strategy',
-    'seo-schema': 'Schema', 'seo-briefs': 'Content Briefs', content: 'Content', calendar: 'Calendar', subscriptions: 'Subscriptions', brand: 'Brand & AI',
+    'seo-schema': 'Schema', 'seo-briefs': 'Content Briefs', content: 'Content', calendar: 'Calendar', subscriptions: 'Subscriptions', brand: 'Brand & AI', 'content-pipeline': 'Content Pipeline',
     'seo-ranks': 'Rank Tracker', search: 'Search Console', analytics: 'Google Analytics',
     annotations: 'Annotations', performance: 'Performance', 'content-perf': 'Content Performance',
     'workspace-settings': 'Workspace Settings', prospect: 'Prospect', roadmap: 'Roadmap',
@@ -398,8 +394,8 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   };
 
   // ── Content renderer ──
-  const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'links', 'seo-strategy', 'seo-schema', 'seo-briefs', 'seo-ranks', 'content-perf', 'content', 'calendar', 'subscriptions', 'brand']);
-  const needsSite = !!(SEO_TABS.has(tab) || tab === 'search' || tab === 'analytics' || tab === 'annotations' || tab === 'performance');
+  const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'links', 'seo-strategy', 'seo-schema', 'seo-briefs', 'seo-ranks', 'content-perf', 'content', 'calendar', 'subscriptions', 'brand', 'content-pipeline']);
+  const needsSite = !!(SEO_TABS.has(tab) || tab === 'search' || tab === 'analytics' || tab === 'performance');
   const seoNavigate = (t: string, ctx?: FixContext) => { setFixContext(ctx || null); if (selected) navigate(adminPath(selected.id, t as Page)); };
 
   const renderContent = () => {
@@ -440,16 +436,16 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (tab === 'seo-strategy') return <KeywordStrategyPanel key={`strategy-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId!} />;
     if (tab === 'links') return <LinksPanel key={`links-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} />;
     if (tab === 'seo-schema') return <SchemaSuggester key={`schema-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} />;
+    if (tab === 'content-pipeline') return <ContentPipeline key={`pipeline-${selected.id}`} workspaceId={selected.id} onRequestCountChange={setPendingContentRequests} fixContext={fixContext} />;
     if (tab === 'seo-briefs') return <ContentBriefs key={`briefs-${selected.id}`} workspaceId={selected.id} onRequestCountChange={setPendingContentRequests} fixContext={fixContext} />;
     if (tab === 'content') return <ContentManager key={`content-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'calendar') return <ContentCalendar key={`calendar-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'subscriptions') return <ContentSubscriptions key={`subs-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'brand') return <BrandHub key={`brand-${selected.id}`} workspaceId={selected.id} webflowSiteId={selected.webflowSiteId} />;
     if (tab === 'seo-ranks') return <RankTracker key={`ranks-${selected.id}`} workspaceId={selected.id} hasGsc={!!selected.gscPropertyUrl} />;
-    if (tab === 'search') return <SearchConsole key={`search-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} gscPropertyUrl={selected.gscPropertyUrl} />;
+    if (tab === 'search') return <SearchConsole key={`search-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} gscPropertyUrl={selected.gscPropertyUrl} />;
     if (tab === 'performance') return <Performance key={`perf-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
     if (tab === 'analytics') return <GoogleAnalytics key={`ga4-${selected.id}`} workspaceId={selected.id} ga4PropertyId={selected.ga4PropertyId} />;
-    if (tab === 'annotations') return <Annotations key={`ann-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'content-perf') return <ContentPerformance key={`content-perf-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'requests') return <RequestManager key={`requests-${selected.id}`} workspaceId={selected.id} />;
 
@@ -487,7 +483,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
           {navGroups.map((group, gi) => {
             const isCollapsed = !!group.label && collapsedGroups.has(group.label);
             const groupBadgeCount = group.items.reduce((sum, item) =>
-              item.id === 'seo-briefs' ? sum + pendingContentRequests : sum, 0);
+              item.id === 'content-pipeline' ? sum + pendingContentRequests : sum, 0);
 
             return (
               <div key={group.label || `group-${gi}`} className={group.label ? 'mt-3' : ''}>
@@ -528,7 +524,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
                     >
                       <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${active ? (group.activeIcon || 'text-teal-400') : (group.inactiveIcon || '')}`} />
                       <span className="truncate">{item.label}</span>
-                      {item.id === 'seo-briefs' && pendingContentRequests > 0 && (
+                      {item.id === 'content-pipeline' && pendingContentRequests > 0 && (
                         <span className="ml-auto text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 tabular-nums flex-shrink-0 min-w-[20px] text-center leading-tight">
                           {pendingContentRequests}
                         </span>
@@ -668,9 +664,9 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
         <main className="flex-1 overflow-auto p-6">
           {/* max-w-5xl for admin (sidebar present); client uses max-w-6xl (full-width data) */}
           <div className="max-w-5xl mx-auto">
-            {pendingContentRequests > 0 && selected && tab !== 'seo-briefs' && (
+            {pendingContentRequests > 0 && selected && tab !== 'content-pipeline' && (
               <button
-                onClick={() => selected && navigate(adminPath(selected.id, 'seo-briefs'))}
+                onClick={() => selected && navigate(adminPath(selected.id, 'content-pipeline'))}
                 className="w-full mb-4 flex items-center gap-3 px-4 py-3 rounded-xl border transition-all hover:border-amber-400/40"
                 style={{ backgroundColor: 'rgba(245,158,11,0.06)', borderColor: 'rgba(245,158,11,0.2)' }}
               >
@@ -686,7 +682,11 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
             )}
             <ErrorBoundary label={tab}>
               <Suspense fallback={<ChunkFallback />}>
-                {renderContent()}
+                {selected ? (
+                  <WorkspaceDataProvider workspaceId={selected.id}>
+                    {renderContent()}
+                  </WorkspaceDataProvider>
+                ) : renderContent()}
               </Suspense>
             </ErrorBoundary>
           </div>
@@ -708,8 +708,6 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
           <AdminChat
             workspaceId={selected.id}
             workspaceName={selected.webflowSiteName || selected.name}
-            ga4PropertyId={selected.ga4PropertyId}
-            gscPropertyUrl={selected.gscPropertyUrl}
           />
         </ErrorBoundary>
       )}

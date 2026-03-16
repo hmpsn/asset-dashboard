@@ -13,6 +13,7 @@ import { SeoCopyPanel } from './strategy/SeoCopyPanel';
 import { BacklinkProfile } from './strategy/BacklinkProfile';
 import { CompetitiveIntel } from './strategy/CompetitiveIntel';
 import { adminPath } from '../routes';
+import { keywords } from '../api/seo';
 
 interface PageKeywordMap {
   pagePath: string;
@@ -124,8 +125,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
     if (!workspaceId) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/webflow/keyword-strategy/${workspaceId}`);
-      const data = await res.json();
+      const data = await keywords.webflowStrategy(workspaceId) as KeywordStrategy & { siteKeywords?: string[] };
       if (data && data.siteKeywords) {
         setStrategy(data);
       }
@@ -140,8 +140,9 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
 
   // Check SEMRush availability
   useEffect(() => {
-    fetch('/api/semrush/status').then(r => r.json()).then(d => {
-      if (d.configured) setSemrushAvailable(true);
+    keywords.semrushStatus().then(d => {
+      const status = d as { configured?: boolean } | null;
+      if (status?.configured) setSemrushAvailable(true);
     }).catch(() => {});
   }, []);
 
@@ -165,7 +166,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
       const compList = competitors.trim() ? competitors.split(/[,\n]+/).map(s => s.trim()).filter(Boolean) : undefined;
       const res = await fetch(`/api/webflow/keyword-strategy/${workspaceId}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+        headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
         body: JSON.stringify({
           businessContext: businessContext.trim() || undefined,
           semrushMode: semrushAvailable ? semrushMode : 'none',
@@ -240,12 +241,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
       secondaryKeywords: editDraft.secondary.split(',').map(s => s.trim()).filter(Boolean),
     };
     try {
-      const res = await fetch(`/api/webflow/keyword-strategy/${workspaceId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pageMap: updated.pageMap }),
-      });
-      const data = await res.json();
+      const data = await keywords.patchStrategy(workspaceId, { pageMap: updated.pageMap }) as KeywordStrategy;
       if (data.pageMap) setStrategy(data);
       setEditingPage(null);
     } catch {
@@ -320,16 +316,11 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
   const generateSeoCopy = async (page: PageKeywordMap) => {
     setGeneratingCopy(page.pagePath);
     try {
-      const res = await fetch('/api/webflow/seo-copy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pagePath: page.pagePath,
-          pageTitle: page.pageTitle,
-          workspaceId,
-        }),
-      });
-      const data = await res.json();
+      const data = await keywords.seoCopy({
+        pagePath: page.pagePath,
+        pageTitle: page.pageTitle,
+        workspaceId,
+      }) as SeoCopy & { error?: string };
       if (data.error) { console.error(data.error); return; }
       setSeoCopyResults(prev => new Map(prev).set(page.pagePath, data));
     } catch (err) {

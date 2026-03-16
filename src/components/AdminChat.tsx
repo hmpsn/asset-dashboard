@@ -25,8 +25,6 @@ const DEFAULT_H = 550;
 interface AdminChatProps {
   workspaceId: string;
   workspaceName: string;
-  ga4PropertyId?: string;
-  gscPropertyUrl?: string;
 }
 
 export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {

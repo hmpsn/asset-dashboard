@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { Globe, Search, ExternalLink, ChevronDown, ChevronRight, AlertTriangle, CheckCircle, Info, Zap, FileText } from 'lucide-react';
 import { scoreColorClass } from './ui';
+import { salesReport as salesReportApi } from '../api/misc';
 
 interface SalesIssue {
   check: string;
@@ -81,8 +82,8 @@ export function SalesReport() {
 
   const loadHistory = async () => {
     try {
-      const res = await fetch('/api/sales-reports');
-      if (res.ok) setHistory(await res.json());
+      const data = await salesReportApi.list();
+      setHistory(data as ReportSummary[]);
     } catch { /* skip */ }
   };
 
@@ -134,10 +135,9 @@ export function SalesReport() {
 
   const loadReport = async (id: string) => {
     try {
-      const res = await fetch(`/api/sales-report/${id}`);
-      if (res.ok) {
-        const data = await res.json();
-        setReport(data);
+      const data = await salesReportApi.getById(id);
+      if (data) {
+        setReport(data as SalesAuditResult);
         setView('report');
       }
     } catch { /* skip */ }

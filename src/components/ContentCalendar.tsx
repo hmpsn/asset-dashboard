@@ -4,6 +4,7 @@ import {
   Sparkles, PenLine, Eye, CheckCircle2, Clock, Send, Globe,
   Calendar as CalendarIcon,
 } from 'lucide-react';
+import { contentBriefs, contentPosts, contentRequests } from '../api/content';
 
 // ── Types ──
 
@@ -118,55 +119,46 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [briefsRes, postsRes, requestsRes] = await Promise.all([
-        fetch(`/api/content-briefs/${workspaceId}`),
-        fetch(`/api/content-posts/${workspaceId}`),
-        fetch(`/api/content-requests/${workspaceId}`),
+      const [briefsData, postsData, requestsData] = await Promise.all([
+        contentBriefs.list(workspaceId).catch(() => []),
+        contentPosts.list(workspaceId).catch(() => []),
+        contentRequests.list(workspaceId).catch(() => []),
       ]);
 
       const allItems: CalendarItem[] = [];
 
-      if (briefsRes.ok) {
-        const briefs: CalendarBrief[] = await briefsRes.json();
-        for (const b of briefs) {
-          allItems.push({
-            id: b.id,
-            type: 'brief',
-            label: b.suggestedTitle || b.targetKeyword,
-            sublabel: b.targetKeyword,
-            status: 'created',
-            date: b.createdAt,
-          });
-        }
+      for (const b of briefsData as CalendarBrief[]) {
+        allItems.push({
+          id: b.id,
+          type: 'brief',
+          label: b.suggestedTitle || b.targetKeyword,
+          sublabel: b.targetKeyword,
+          status: 'created',
+          date: b.createdAt,
+        });
       }
 
-      if (postsRes.ok) {
-        const posts: CalendarPost[] = await postsRes.json();
-        for (const p of posts) {
-          allItems.push({
-            id: p.id,
-            type: 'post',
-            label: p.title,
-            sublabel: `${p.totalWordCount}w · ${p.targetKeyword}`,
-            status: p.status,
-            date: p.publishedAt || p.createdAt,
-            publishedAt: p.publishedAt,
-          });
-        }
+      for (const p of postsData as CalendarPost[]) {
+        allItems.push({
+          id: p.id,
+          type: 'post',
+          label: p.title,
+          sublabel: `${p.totalWordCount}w · ${p.targetKeyword}`,
+          status: p.status,
+          date: p.publishedAt || p.createdAt,
+          publishedAt: p.publishedAt,
+        });
       }
 
-      if (requestsRes.ok) {
-        const requests: CalendarRequest[] = await requestsRes.json();
-        for (const r of requests) {
-          allItems.push({
-            id: r.id,
-            type: 'request',
-            label: r.topic,
-            sublabel: r.targetKeyword,
-            status: r.status,
-            date: r.requestedAt,
-          });
-        }
+      for (const r of requestsData as CalendarRequest[]) {
+        allItems.push({
+          id: r.id,
+          type: 'request',
+          label: r.topic,
+          sublabel: r.targetKeyword,
+          status: r.status,
+          date: r.requestedAt,
+        });
       }
 
       setItems(allItems);
