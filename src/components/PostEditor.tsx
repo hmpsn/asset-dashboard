@@ -1,11 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Loader2, RefreshCw, Copy, Download, FileText, Check, ChevronDown, ChevronUp,
+  Loader2, Copy, Download, FileText, Check,
   Pencil, X, Eye, Hash, Clock, Sparkles, AlertTriangle, Trash2, Globe, ExternalLink,
-  History, RotateCcw, ClipboardCheck, Square, CheckSquare,
+  History,
 } from 'lucide-react';
 import { contentPosts } from '../api/content';
 import { workspaces as workspacesApi } from '../api/workspaces';
+import { SectionEditor } from './post-editor/SectionEditor';
+import { PostPreview } from './post-editor/PostPreview';
+import { VersionHistory } from './post-editor/VersionHistory';
+import { ReviewChecklist } from './post-editor/ReviewChecklist';
 
 interface PostSection {
   index: number;
@@ -53,23 +57,6 @@ interface ReviewChecklist {
   word_count_target: boolean;
 }
 
-const CHECKLIST_ITEMS: { key: keyof ReviewChecklist; label: string }[] = [
-  { key: 'factual_accuracy', label: 'Factual accuracy verified' },
-  { key: 'brand_voice', label: 'Brand voice match confirmed' },
-  { key: 'internal_links', label: 'Internal links verified and working' },
-  { key: 'no_hallucinations', label: 'No AI hallucinations or fabricated statistics' },
-  { key: 'meta_optimized', label: 'Meta title/description optimized' },
-  { key: 'word_count_target', label: 'Word count within brief target' },
-];
-
-const EMPTY_CHECKLIST: ReviewChecklist = {
-  factual_accuracy: false,
-  brand_voice: false,
-  internal_links: false,
-  no_hallucinations: false,
-  meta_optimized: false,
-  word_count_target: false,
-};
 
 interface PostEditorProps {
   workspaceId: string;
@@ -78,15 +65,7 @@ interface PostEditorProps {
   onDelete?: () => void;
 }
 
-function WordBadge({ actual, target }: { actual: number; target: number }) {
-  const pct = target > 0 ? actual / target : 1;
-  const color = pct >= 0.85 && pct <= 1.15 ? 'text-green-400 bg-green-500/10 border-green-500/20' :
-    pct >= 0.6 ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' :
-    'text-red-400 bg-red-500/10 border-red-500/20';
-  return <span className={`text-[11px] px-1.5 py-0.5 rounded border ${color}`}>{actual}/{target}w</span>;
-}
-
-function StatusBadge({ status }: { status: GeneratedPost['status'] }) {
+function PostStatusBadge({ status }: { status: GeneratedPost['status'] }) {
   const cfg: Record<string, { color: string; label: string }> = {
     generating: { color: 'text-amber-400 bg-amber-500/10 border-amber-500/20', label: 'Generating...' },
     draft: { color: 'text-blue-400 bg-blue-500/10 border-blue-500/20', label: 'Draft' },
@@ -329,7 +308,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
             </div>
           )}
           <div className="flex items-center gap-3 mt-1 flex-wrap">
-            <StatusBadge status={post.status} />
+            <PostStatusBadge status={post.status} />
             <span className="text-[11px] text-zinc-500 flex items-center gap-1"><Hash className="w-3 h-3" />{post.targetKeyword}</span>
             <span className="text-[11px] text-zinc-500 flex items-center gap-1"><FileText className="w-3 h-3" />{post.totalWordCount.toLocaleString()}{post.targetWordCount ? `/${post.targetWordCount.toLocaleString()}` : ''} words</span>
             {post.unificationStatus && post.unificationStatus !== 'pending' && (
@@ -405,154 +384,32 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
       )}
 
       {/* Review Checklist + Status controls */}
-      {!isGenerating && post.status !== 'approved' && (() => {
-        const checklist = post.reviewChecklist ?? EMPTY_CHECKLIST;
-        const checkedCount = CHECKLIST_ITEMS.filter(item => checklist[item.key]).length;
-        const allChecked = checkedCount === CHECKLIST_ITEMS.length;
-
-        const toggleChecklistItem = (key: keyof ReviewChecklist) => {
-          const updated = { ...checklist, [key]: !checklist[key] };
-          saveField({ reviewChecklist: updated });
-        };
-
-        return (
-          <div className="space-y-3">
-            {post.status === 'draft' && (
-              <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-                <button
-                  onClick={() => setShowChecklist(!showChecklist)}
-                  className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-zinc-800/50 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <ClipboardCheck className={`w-3.5 h-3.5 ${allChecked ? 'text-green-400' : 'text-zinc-500'}`} />
-                    <span className="text-xs font-medium text-zinc-300">Review Checklist</span>
-                    <span className={`text-[11px] px-1.5 py-0.5 rounded border ${allChecked ? 'text-green-400 bg-green-500/10 border-green-500/20' : 'text-zinc-500 bg-zinc-800 border-zinc-700'}`}>
-                      {checkedCount}/{CHECKLIST_ITEMS.length}
-                    </span>
-                  </div>
-                  {showChecklist ? <ChevronUp className="w-3 h-3 text-zinc-500" /> : <ChevronDown className="w-3 h-3 text-zinc-500" />}
-                </button>
-                {showChecklist && (
-                  <div className="px-4 pb-3 space-y-1.5 border-t border-zinc-800/50 pt-2.5">
-                    {CHECKLIST_ITEMS.map(item => (
-                      <button
-                        key={item.key}
-                        onClick={() => toggleChecklistItem(item.key)}
-                        className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left hover:bg-zinc-800/50 transition-colors group"
-                      >
-                        {checklist[item.key]
-                          ? <CheckSquare className="w-4 h-4 text-green-400 flex-shrink-0" />
-                          : <Square className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 flex-shrink-0" />}
-                        <span className={`text-[11px] ${checklist[item.key] ? 'text-zinc-300 line-through decoration-zinc-600' : 'text-zinc-400'}`}>
-                          {item.label}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="flex items-center gap-2">
-              {post.status === 'draft' && (
-                <button
-                  onClick={() => saveField({ status: 'review' })}
-                  disabled={!allChecked}
-                  title={allChecked ? 'Send to review' : `Complete all ${CHECKLIST_ITEMS.length} checklist items before sending to review`}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-colors ${
-                    allChecked
-                      ? 'bg-cyan-600/20 border-cyan-500/30 text-cyan-300 hover:bg-cyan-600/30'
-                      : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-600 cursor-not-allowed'
-                  }`}
-                >
-                  <Eye className="w-3 h-3" /> Send to Review
-                </button>
-              )}
-              {post.status === 'review' && (
-                <>
-                  <button onClick={() => saveField({ status: 'approved' })} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-green-600/20 border border-green-500/30 text-green-300 hover:bg-green-600/30 transition-colors">
-                    <Check className="w-3 h-3" /> Approve
-                  </button>
-                  <button onClick={() => saveField({ status: 'draft' })} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors">
-                    Back to Draft
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        );
-      })()}
+      {!isGenerating && post.status !== 'approved' && (
+        <ReviewChecklist
+          postStatus={post.status}
+          reviewChecklist={post.reviewChecklist}
+          showChecklist={showChecklist}
+          onToggleShowChecklist={() => setShowChecklist(!showChecklist)}
+          onToggleItem={(key) => {
+            const checklist = post.reviewChecklist ?? { factual_accuracy: false, brand_voice: false, internal_links: false, no_hallucinations: false, meta_optimized: false, word_count_target: false };
+            saveField({ reviewChecklist: { ...checklist, [key]: !checklist[key] } });
+          }}
+          onChangeStatus={(status) => saveField({ status })}
+        />
+      )}
 
       {/* Version History Panel */}
       {showVersions && (
-        <div className="bg-zinc-900 rounded-xl border border-violet-500/20 overflow-hidden">
-          <div className="px-4 py-3 border-b border-zinc-800/50 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <History className="w-3.5 h-3.5 text-violet-400" />
-              <span className="text-xs font-medium text-zinc-300">Version History</span>
-              <span className="text-[11px] text-zinc-500">{versions.length} version{versions.length !== 1 ? 's' : ''}</span>
-            </div>
-            <button onClick={() => setShowVersions(false)} className="p-1 rounded text-zinc-500 hover:text-zinc-300 transition-colors"><X className="w-3 h-3" /></button>
-          </div>
-          <div className="px-4 py-3 max-h-64 overflow-y-auto">
-            {versionsLoading ? (
-              <div className="flex items-center gap-2 text-xs text-zinc-500 py-2"><Loader2 className="w-3 h-3 animate-spin" /> Loading versions...</div>
-            ) : versions.length === 0 ? (
-              <div className="text-xs text-zinc-500 py-2">No version history yet. Versions are saved automatically when you edit or regenerate content.</div>
-            ) : (
-              <div className="space-y-1.5">
-                {versions.map((v) => {
-                  const triggerLabels: Record<string, string> = {
-                    regenerate_section: 'Regenerated section',
-                    manual_edit: 'Manual edit',
-                    unification: 'Unification pass',
-                    bulk_regenerate: 'Bulk regeneration',
-                  };
-                  const label = triggerLabels[v.trigger] || v.trigger;
-                  const detail = v.triggerDetail
-                    ? v.triggerDetail.startsWith('section:') ? ` — Section ${parseInt(v.triggerDetail.split(':')[1]) + 1}`
-                    : v.triggerDetail.startsWith('field:') ? ` — ${v.triggerDetail.replace('field:', '').split(',').join(', ')}`
-                    : v.triggerDetail.startsWith('revert_to_v') ? ` — ${v.triggerDetail.replace('revert_to_v', 'Revert to v')}`
-                    : ` — ${v.triggerDetail}`
-                    : '';
-                  return (
-                    <div key={v.id} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 transition-colors group">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
-                          <span className="text-[10px] font-semibold text-violet-400">v{v.versionNumber}</span>
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-[11px] text-zinc-300 truncate">{label}{detail}</div>
-                          <div className="text-[10px] text-zinc-500">{new Date(v.createdAt).toLocaleString()} · {v.totalWordCount.toLocaleString()}w</div>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => handleRevert(v.id)}
-                        disabled={reverting === v.id}
-                        className="flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-zinc-500 hover:text-violet-300 hover:bg-violet-500/10 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
-                      >
-                        {reverting === v.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
-                        Revert
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
+        <VersionHistory
+          versions={versions} versionsLoading={versionsLoading}
+          reverting={reverting} onRevert={handleRevert}
+          onClose={() => setShowVersions(false)}
+        />
       )}
 
       {/* Full Preview Mode */}
       {showPreview ? (
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6 prose prose-invert prose-sm max-w-none [&_h2]:text-base [&_h2]:font-semibold [&_h2]:text-zinc-100 [&_h2]:mt-6 [&_h2]:mb-2 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:text-zinc-200 [&_h3]:mt-4 [&_h3]:mb-1 [&_p]:text-xs [&_p]:text-zinc-300 [&_p]:leading-relaxed [&_p]:mb-3 [&_ul]:text-xs [&_ul]:text-zinc-300 [&_ul]:pl-4 [&_ul]:mb-3 [&_ol]:text-xs [&_ol]:text-zinc-300 [&_ol]:pl-4 [&_ol]:mb-3 [&_li]:mb-1 [&_strong]:text-zinc-100 [&_a]:text-teal-400 [&_a]:underline">
-          <h1 className="text-xl font-bold text-zinc-100 mb-4">{post.title}</h1>
-          <div dangerouslySetInnerHTML={{ __html: post.introduction }} />
-          {post.sections.map(s => (
-            <div key={s.index} className="mb-4" dangerouslySetInnerHTML={{ __html: s.content }} />
-          ))}
-          <div dangerouslySetInnerHTML={{ __html: post.conclusion }} />
-        </div>
+        <PostPreview post={post} />
       ) : (
         <>
           {/* Introduction */}
@@ -588,63 +445,20 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
 
           {/* Body Sections */}
           {post.sections.map((section) => (
-            <div key={section.index} className={`bg-zinc-900 rounded-xl border overflow-hidden ${section.status === 'error' ? 'border-red-500/30' : section.status === 'generating' ? 'border-amber-500/20' : 'border-zinc-800'}`}>
-              <button onClick={() => toggleSection(section.index)} className="w-full px-4 py-3 flex items-center justify-between hover:bg-zinc-800/30 transition-colors">
-                <div className="flex items-center gap-2">
-                  {section.status === 'generating' ? <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" /> :
-                   section.status === 'error' ? <AlertTriangle className="w-3.5 h-3.5 text-red-400" /> :
-                   section.status === 'done' ? <Check className="w-3.5 h-3.5 text-green-400" /> :
-                   <Clock className="w-3.5 h-3.5 text-zinc-500" />}
-                  <span className="text-xs font-medium text-zinc-200">{section.heading}</span>
-                  {section.status === 'done' && <WordBadge actual={section.wordCount} target={section.targetWordCount} />}
-                </div>
-                <div className="flex items-center gap-2">
-                  {section.keywords && section.keywords.length > 0 && expandedSections.has(section.index) && (
-                    <div className="hidden sm:flex items-center gap-1">
-                      {section.keywords.slice(0, 3).map((kw, i) => (
-                        <span key={i} className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400/60">{kw}</span>
-                      ))}
-                    </div>
-                  )}
-                  {expandedSections.has(section.index) ? <ChevronUp className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />}
-                </div>
-              </button>
-              {expandedSections.has(section.index) && (
-                <div className="border-t border-zinc-800/50 px-4 py-3">
-                  {section.status === 'pending' && isGenerating ? (
-                    <div className="text-xs text-zinc-500 italic">Waiting to be generated...</div>
-                  ) : section.status === 'generating' ? (
-                    <div className="flex items-center gap-2 text-xs text-amber-400"><Loader2 className="w-3 h-3 animate-spin" /> Writing this section...</div>
-                  ) : section.status === 'error' ? (
-                    <div className="space-y-2">
-                      <div className="text-xs text-red-400">{section.error || 'Generation failed'}</div>
-                      <button onClick={() => handleRegenerate(section.index)} disabled={regenerating === section.index} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50">
-                        {regenerating === section.index ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />} Retry
-                      </button>
-                    </div>
-                  ) : editingSection === section.index ? (
-                    <div className="space-y-2">
-                      <textarea value={editBuffer} onChange={e => setEditBuffer(e.target.value)} className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-300 font-mono focus:border-teal-500/50 focus:outline-none resize-y min-h-[150px]" rows={12} />
-                      <div className="flex items-center gap-2">
-                        <button onClick={saveSectionEdit} className="px-3 py-1.5 rounded-lg text-[11px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors flex items-center gap-1"><Check className="w-3 h-3" /> Save</button>
-                        <button onClick={() => setEditingSection(null)} className="px-3 py-1.5 rounded-lg text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors">Cancel</button>
-                        <span className="text-[11px] text-zinc-500 ml-auto">{editBuffer.split(/\s+/).filter(w => w).length} words</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <div className="text-xs text-zinc-300 leading-relaxed [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:text-zinc-100 [&_h2]:mb-2 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:text-zinc-200 [&_h3]:mt-3 [&_h3]:mb-1 [&_p]:mb-2 [&_ul]:pl-4 [&_ul]:mb-2 [&_ol]:pl-4 [&_ol]:mb-2 [&_li]:mb-1 [&_strong]:text-zinc-100 [&_a]:text-teal-400" dangerouslySetInnerHTML={{ __html: section.content }} />
-                      <div className="flex items-center gap-2 mt-3 pt-2 border-t border-zinc-800/50">
-                        <button onClick={() => { setEditingSection(section.index); setEditBuffer(section.content); }} className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"><Pencil className="w-3 h-3" /> Edit</button>
-                        <button onClick={() => handleRegenerate(section.index)} disabled={regenerating === section.index} className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-teal-300 transition-colors disabled:opacity-50">
-                          {regenerating === section.index ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />} Regenerate
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            <SectionEditor
+              key={section.index} section={section}
+              expanded={expandedSections.has(section.index)}
+              editing={editingSection === section.index}
+              editBuffer={editBuffer}
+              regenerating={regenerating === section.index}
+              isGenerating={isGenerating}
+              onToggleExpand={toggleSection}
+              onStartEdit={(index, content) => { setEditingSection(index); setEditBuffer(content); }}
+              onSaveEdit={saveSectionEdit}
+              onCancelEdit={() => setEditingSection(null)}
+              onRegenerate={handleRegenerate}
+              onChangeBuffer={setEditBuffer}
+            />
           ))}
 
           {/* Conclusion */}
