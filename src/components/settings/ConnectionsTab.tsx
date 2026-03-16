@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import {
-  Globe, Search, BarChart3, Loader2, Check, Unplug, LogIn, LogOut,
+  Globe, Search, BarChart3, Loader2, Check, Unplug, LogIn, LogOut, ExternalLink,
 } from 'lucide-react';
 import SearchableSelect from '../SearchableSelect';
 
@@ -23,12 +24,23 @@ interface ConnectionsTabProps {
   disconnectGoogle: () => void;
   saveGscProperty: (url: string) => void;
   saveGa4Property: (id: string) => void;
+  saveLiveDomain: (domain: string) => void;
 }
 
 export function ConnectionsTab({
   webflowSiteId, webflowSiteName, googleStatus, gscSites, ga4Properties,
-  loadingGoogle, ws, connectGoogle, disconnectGoogle, saveGscProperty, saveGa4Property,
+  loadingGoogle, ws, connectGoogle, disconnectGoogle, saveGscProperty, saveGa4Property, saveLiveDomain,
 }: ConnectionsTabProps) {
+  const currentDomain = (ws?.liveDomain as string) || '';
+  const [domainDraft, setDomainDraft] = useState('');
+  const [domainEditing, setDomainEditing] = useState(false);
+
+  const handleDomainSave = () => {
+    const clean = domainDraft.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    if (clean) saveLiveDomain(clean);
+    setDomainEditing(false);
+  };
+
   return (
     <div className="space-y-5">
       {/* Webflow */}
@@ -51,6 +63,35 @@ export function ConnectionsTab({
             </span>
           )}
         </div>
+        {webflowSiteId && (
+          <div className="px-5 py-3 flex items-center gap-3">
+            <ExternalLink className="w-4 h-4 text-zinc-500" />
+            <span className="text-xs font-medium text-zinc-400 whitespace-nowrap">Live Domain</span>
+            {domainEditing ? (
+              <div className="flex items-center gap-2 flex-1">
+                <input
+                  type="text"
+                  value={domainDraft}
+                  onChange={e => setDomainDraft(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleDomainSave()}
+                  placeholder="www.example.com"
+                  className="flex-1 px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
+                  autoFocus
+                />
+                <button onClick={handleDomainSave} className="px-2.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-[11px] font-medium transition-colors">Save</button>
+                <button onClick={() => setDomainEditing(false)} className="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-[11px] font-medium transition-colors">Cancel</button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 flex-1">
+                <span className="text-xs text-zinc-300 font-mono">{currentDomain || <span className="text-zinc-500 italic">Not set</span>}</span>
+                <button
+                  onClick={() => { setDomainDraft(currentDomain.replace(/^https?:\/\//, '')); setDomainEditing(true); }}
+                  className="text-[11px] text-teal-400 hover:text-teal-300 transition-colors"
+                >Edit</button>
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       {/* Google Auth */}

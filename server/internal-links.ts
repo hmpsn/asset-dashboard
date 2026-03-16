@@ -150,9 +150,14 @@ export async function analyzeInternalLinks(
   // Resolve base URL
   const ws = workspaceId ? getWorkspace(workspaceId) : null;
   const subdomain = await getSiteSubdomain(siteId, token);
-  const baseUrl = ws?.liveDomain
-    ? `https://${ws.liveDomain}`
-    : subdomain ? `https://${subdomain}.webflow.io` : '';
+  let baseUrl = '';
+  if (ws?.liveDomain) {
+    // liveDomain may already include https:// (auto-resolved from Webflow API)
+    const domain = ws.liveDomain.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    baseUrl = `https://${domain}`;
+  } else if (subdomain) {
+    baseUrl = `https://${subdomain}.webflow.io`;
+  }
 
   if (!baseUrl) {
     log.warn('Internal links: no base URL resolved — liveDomain or subdomain required');

@@ -129,6 +129,10 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
           disconnectGoogle={disconnectGoogle}
           saveGscProperty={saveGscProperty}
           saveGa4Property={saveGa4Property}
+          saveLiveDomain={async (domain: string) => {
+            try { await patchWorkspace({ liveDomain: domain }); toast('Live domain saved'); }
+            catch { toast('Failed to save', 'error'); }
+          }}
         />
       )}
 
