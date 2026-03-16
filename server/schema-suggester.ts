@@ -241,12 +241,35 @@ function autoFixSchema(schema: Record<string, unknown>): void {
 }
 
 // Post-processing: inject cross-references the AI consistently omits
-function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string): void {
+function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string, companyName?: string): void {
   const graph = schema['@graph'] as Record<string, unknown>[] | undefined;
   if (!Array.isArray(graph)) return;
 
   const orgId = `${siteUrl}/#organization`;
   const websiteId = `${siteUrl}/#website`;
+
+  // Ensure Organization node exists (referenced by WebSite.publisher, Service.provider, etc.)
+  const hasOrg = graph.some(n => n['@type'] === 'Organization');
+  if (!hasOrg) {
+    graph.unshift({
+      '@type': 'Organization',
+      '@id': orgId,
+      'name': companyName || new URL(siteUrl).hostname.replace('www.', ''),
+      'url': siteUrl,
+    });
+  }
+
+  // Ensure WebSite node exists (referenced by WebPage.isPartOf)
+  const hasWebSite = graph.some(n => n['@type'] === 'WebSite');
+  if (!hasWebSite) {
+    graph.splice(hasOrg ? 1 : 1, 0, {
+      '@type': 'WebSite',
+      '@id': websiteId,
+      'url': siteUrl,
+      'name': companyName || new URL(siteUrl).hostname.replace('www.', ''),
+      'publisher': { '@id': orgId },
+    });
+  }
 
   // Identify the "primary entity" — the first non-structural node for mainEntity
   const structuralTypes = new Set(['Organization', 'WebSite', 'WebPage', 'BreadcrumbList']);
@@ -282,6 +305,39 @@ function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string)
     // Article / BlogPosting → publisher → Organization
     if ((type === 'Article' || type === 'BlogPosting') && !node['publisher']) {
       node['publisher'] = { '@id': orgId };
+    }
+  }
+
+  // Ensure BreadcrumbList exists
+  const hasBreadcrumb = graph.some(n => n['@type'] === 'BreadcrumbList');
+  if (!hasBreadcrumb) {
+    // Find the first WebPage to derive breadcrumb path
+    const webPage = graph.find(n => n['@type'] === 'WebPage') as Record<string, unknown> | undefined;
+    if (webPage) {
+      const pageUrl = (webPage['url'] as string) || siteUrl;
+      try {
+        const parsed = new URL(pageUrl);
+        const pathParts = parsed.pathname.split('/').filter(Boolean);
+        const items: Record<string, unknown>[] = [
+          { '@type': 'ListItem', 'position': 1, 'name': 'Home', 'item': `${siteUrl}/` },
+        ];
+        if (pathParts.length > 0) {
+          // Add the current page as the last breadcrumb
+          const pageName = (webPage['name'] as string || pathParts[pathParts.length - 1])
+            .replace(/\s*[|–-]\s*.+$/, ''); // Strip "| Brand Name" suffix
+          items.push({
+            '@type': 'ListItem',
+            'position': 2,
+            'name': pageName,
+            'item': pageUrl,
+          });
+        }
+        graph.push({
+          '@type': 'BreadcrumbList',
+          '@id': `${pageUrl}/#breadcrumb`,
+          'itemListElement': items,
+        });
+      } catch { /* skip if URL parsing fails */ }
     }
   }
 }
@@ -637,8 +693,8 @@ async function postProcessSchema(
     log.info({ warnings: contentWarnings }, 'Content verification stripped hallucinated values');
   }
 
-  // Step 4: Inject cross-references
-  injectCrossReferences(schema, siteUrl);
+  // Step 4: Inject cross-references + ensure WebSite/Organization nodes exist
+  injectCrossReferences(schema, siteUrl, ctx.companyName);
 
   // Step 5: Clean again after modifications (remove any empty values created by stripping)
   const cleaned = cleanSchema(schema);
@@ -650,8 +706,7 @@ async function postProcessSchema(
 
   // Step 7: Auto-fix loop — if validation errors exist, ask AI to fix them (one attempt)
   const fixableErrors = errors.filter(e =>
-    !e.includes('not found in @graph') && // cross-ref warnings are informational
-    !e.includes('appears malformed') // already auto-fixed
+    !e.includes('appears malformed') // already auto-fixed by autoFixSchema
   );
 
   if (fixableErrors.length > 0 && process.env.OPENAI_API_KEY) {
