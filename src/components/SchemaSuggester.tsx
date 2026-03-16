@@ -750,6 +750,8 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
               showDiff={showDiff.has(page.pageId)}
               schemaRecs={schemaRecs}
               workspaceId={workspaceId}
+              pageType={pageTypes[page.pageId] || 'auto'}
+              onPageTypeChange={(pid, t) => setPageTypes(prev => ({ ...prev, [pid]: t }))}
               onToggleExpand={toggleExpand}
               onRegenerate={regeneratePage}
               onToggleDiff={toggleDiff}

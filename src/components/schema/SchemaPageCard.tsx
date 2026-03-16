@@ -58,6 +58,8 @@ export interface SchemaPageCardProps {
   showDiff: boolean;
   schemaRecs: Recommendation[];
   workspaceId?: string;
+  pageType: string;
+  onPageTypeChange: (pageId: string, type: string) => void;
   // Callbacks
   onToggleExpand: (pageId: string) => void;
   onRegenerate: (pageId: string) => void;
@@ -76,6 +78,7 @@ export function SchemaPageCard({
   published, publishing, publishError, confirmPublish,
   sentPage, sendingPage, editingSchema, editedSchemaJson,
   schemaParseError, showDiff, schemaRecs, workspaceId,
+  pageType, onPageTypeChange,
   onToggleExpand, onRegenerate, onToggleDiff, onToggleSchemaEdit,
   onSchemaJsonChange, onCopyTemplate, onPublish, onConfirmPublish,
   onSendToClient, getEffectiveSchema,
@@ -119,6 +122,27 @@ export function SchemaPageCard({
               <AlertTriangle className="w-3 h-3" /> {schemaRecs.length} rec{schemaRecs.length > 1 ? 's' : ''}
             </span>
           )}
+          <select
+            value={pageType}
+            onChange={e => { e.stopPropagation(); onPageTypeChange(page.pageId, e.target.value); }}
+            onClick={e => e.stopPropagation()}
+            className="px-1.5 py-1 bg-zinc-800 border border-zinc-700 rounded text-[11px] text-zinc-400 focus:outline-none focus:border-teal-500 cursor-pointer"
+            title="Page type hint for schema generation"
+          >
+            <option value="auto">Auto-detect</option>
+            <option value="homepage">Homepage</option>
+            <option value="service">Service</option>
+            <option value="pillar">Pillar / Hub</option>
+            <option value="persona">Persona</option>
+            <option value="blog">Blog Post</option>
+            <option value="about">About / Team</option>
+            <option value="contact">Contact</option>
+            <option value="location">Location</option>
+            <option value="product">Product</option>
+            <option value="landing">Landing Page</option>
+            <option value="faq">FAQ</option>
+            <option value="case-study">Case Study</option>
+          </select>
           <button
             onClick={(e) => { e.stopPropagation(); onRegenerate(page.pageId); }}
             disabled={isRegenLoading}
