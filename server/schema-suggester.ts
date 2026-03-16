@@ -423,6 +423,12 @@ REQUIREMENTS:
     - For procedural how-to content, use "HowTo" with step-by-step instructions extracted from the page
 18. DATASET PAGES: If the page presents data tables, rankings, indexes, or structured data collections, include "Dataset" schema with name, description, distribution (if downloadable), dateModified, and creator referencing the Organization
 19. ENTITY LINKING (sameAs): On the Organization node, include a "sameAs" array with links to the business's verified external profiles (Google Business, LinkedIn, Facebook, Yelp, industry association pages) — but ONLY if these URLs actually appear in the page content or site footer. Never fabricate profile URLs
+20. SAAS / PLATFORM HOMEPAGES: If the homepage presents a software product or platform with multiple features, solutions, or use cases:
+    - Use "SoftwareApplication" instead of (or alongside) "Service" for SaaS products. Include applicationCategory, operatingSystem ("Web"), and offers if pricing is visible
+    - If the page shows MULTIPLE distinct products, solutions, or use cases (e.g. "Solutions for Developers", "Solutions for Executives"), represent each as a separate Service node with its own name, description, url, serviceType, and "audience": {"@type": "Audience", "audienceType": "..."} — link each back to the Organization via "provider"
+    - If the page features CUSTOMER TESTIMONIALS or quotes, include them as "review" on the Organization or relevant Service node using {"@type": "Review", "author": {"@type": "Person", "name": "..."}, "reviewBody": "..."}. Only use quotes that actually appear on the page. Include the reviewer's title/company if visible.
+    - Use "knowsAbout" on the Organization to capture the company's domain expertise areas extracted from the page content
+    - Do NOT collapse a multi-offering page into a single generic Service — if the page presents 3+ distinct solutions with their own URLs, represent them individually
 
 QUALITY RULES — strict:
 17. NEVER include empty arrays or empty strings. If a property has no value (e.g. "sameAs": []), OMIT it entirely.
