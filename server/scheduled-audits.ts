@@ -4,6 +4,7 @@ import { runSeoAudit } from './seo-audit.js';
 import { saveSnapshot, getLatestSnapshotBefore } from './reports.js';
 import { addActivity } from './activity-log.js';
 import { notifyAuditAlert, notifyClientAuditComplete } from './email.js';
+import { applySuppressionsToAudit } from './helpers.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('scheduled-audit');
@@ -130,33 +131,38 @@ async function runScheduledAudit(schedule: AuditSchedule) {
     const audit = await runSeoAudit(ws.webflowSiteId, token);
     const snapshot = saveSnapshot(ws.webflowSiteId, ws.name, audit);
 
-    // Update schedule
+    // Apply suppressions so all client-facing numbers match the dashboard
+    const effectiveAudit = ws.auditSuppressions?.length
+      ? applySuppressionsToAudit(audit, ws.auditSuppressions)
+      : audit;
+
+    // Update schedule with suppressed score
     const oldScore = schedule.lastScore;
     upsertSchedule(schedule.workspaceId, {
       lastRunAt: new Date().toISOString(),
-      lastScore: audit.siteScore,
+      lastScore: effectiveAudit.siteScore,
     });
 
-    // Log activity
+    // Log activity with suppressed numbers
     addActivity(ws.id, 'audit_completed',
-      `Scheduled audit completed — score ${audit.siteScore}`,
-      `${audit.totalPages} pages, ${audit.errors} errors, ${audit.warnings} warnings`,
-      { score: audit.siteScore, previousScore: snapshot.previousScore, scheduled: true });
+      `Scheduled audit completed — score ${effectiveAudit.siteScore}`,
+      `${effectiveAudit.totalPages} pages, ${effectiveAudit.errors} errors, ${effectiveAudit.warnings} warnings`,
+      { score: effectiveAudit.siteScore, previousScore: snapshot.previousScore, scheduled: true });
 
-    // Check for score drop
-    if (oldScore !== undefined && oldScore > audit.siteScore) {
-      const drop = oldScore - audit.siteScore;
+    // Check for score drop using suppressed score
+    if (oldScore !== undefined && oldScore > effectiveAudit.siteScore) {
+      const drop = oldScore - effectiveAudit.siteScore;
       if (drop >= schedule.scoreDropThreshold) {
-        log.info(`Score drop detected: ${oldScore} -> ${audit.siteScore} (-${drop})`);
-        sendScoreDropAlert(ws, oldScore, audit.siteScore);
+        log.info(`Score drop detected: ${oldScore} -> ${effectiveAudit.siteScore} (-${drop})`);
+        sendScoreDropAlert(ws, oldScore, effectiveAudit.siteScore);
       }
     }
 
-    // Send audit completion email to client
+    // Send audit completion email to client using suppressed data
     if (ws.clientEmail) {
       const dashUrl = getClientPortalUrl(ws);
       const allIssues: Array<{ message: string; severity: string }> = [];
-      for (const p of audit.pages) {
+      for (const p of effectiveAudit.pages) {
         for (const iss of p.issues) {
           if (iss.severity === 'error' || iss.severity === 'warning') {
             allIssues.push({ message: iss.message, severity: iss.severity });
@@ -174,22 +180,26 @@ async function runScheduledAudit(schedule: AuditSchedule) {
       uniqueIssues.sort((a, b) => (a.severity === 'error' ? 0 : 1) - (b.severity === 'error' ? 0 : 1));
       const topIssues = uniqueIssues.slice(0, 5);
 
+      // Compare suppressed versions for accurate fixed count
       let fixedCount = 0;
       if (snapshot.previousScore != null) {
         const prev = getLatestSnapshotBefore(ws.webflowSiteId!, snapshot.id);
         if (prev) {
+          const prevAudit = ws.auditSuppressions?.length
+            ? applySuppressionsToAudit(prev.audit, ws.auditSuppressions)
+            : prev.audit;
           const prevKeys = new Set<string>();
-          for (const p of prev.audit.pages) for (const iss of p.issues) prevKeys.add(`${p.pageId}:${iss.check}`);
+          for (const p of prevAudit.pages) for (const iss of p.issues) prevKeys.add(`${p.pageId}:${iss.check}`);
           const curKeys = new Set<string>();
-          for (const p of audit.pages) for (const iss of p.issues) curKeys.add(`${p.pageId}:${iss.check}`);
+          for (const p of effectiveAudit.pages) for (const iss of p.issues) curKeys.add(`${p.pageId}:${iss.check}`);
           for (const k of prevKeys) if (!curKeys.has(k)) fixedCount++;
         }
       }
 
       notifyClientAuditComplete({
         clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: ws.id,
-        score: audit.siteScore, previousScore: snapshot.previousScore,
-        totalPages: audit.totalPages, errors: audit.errors, warnings: audit.warnings,
+        score: effectiveAudit.siteScore, previousScore: snapshot.previousScore,
+        totalPages: effectiveAudit.totalPages, errors: effectiveAudit.errors, warnings: effectiveAudit.warnings,
         topIssues, fixedCount, dashboardUrl: dashUrl,
       });
     }

@@ -94,13 +94,13 @@ router.post('/api/jobs', async (req, res) => {
             const ws = getWorkspace(params.workspaceId as string);
             const siteName = ws?.webflowSiteName || ws?.name || siteId;
             const snapshot = saveSnapshot(siteId, siteName, result);
+            const effectiveResult = ws?.auditSuppressions?.length ? applySuppressionsToAudit(result, ws.auditSuppressions) : result;
             if (ws) {
-              const effectiveResult = ws.auditSuppressions?.length ? applySuppressionsToAudit(result, ws.auditSuppressions) : result;
               addActivity(ws.id, 'audit_completed', `Site audit completed — score ${effectiveResult.siteScore}`,
                 `${effectiveResult.totalPages} pages scanned, ${effectiveResult.errors} errors, ${effectiveResult.warnings} warnings`,
                 { score: effectiveResult.siteScore, previousScore: snapshot.previousScore });
             }
-            updateJob(job.id, { status: 'done', result: { ...result, snapshotId: snapshot.id }, message: `Audit complete — score ${result.siteScore}` });
+            updateJob(job.id, { status: 'done', result: { ...result, snapshotId: snapshot.id }, message: `Audit complete — score ${effectiveResult.siteScore}` });
             // Auto-regenerate recommendations after audit
             if (ws) {
               try {
@@ -118,12 +118,12 @@ router.post('/api/jobs', async (req, res) => {
               } catch (recErr) {
                 log.error({ err: recErr }, 'Failed to regenerate recommendations');
               }
-              // Notify client of audit completion with full details
+              // Notify client of audit completion with suppressed data
               if (ws.clientEmail) {
                 const dashUrl = getClientPortalUrl(ws);
-                // Collect all issues, sorted errors first, then warnings
+                // Collect issues from suppressed audit, sorted errors first
                 const allIssues: Array<{ message: string; severity: string }> = [];
-                for (const p of result.pages) {
+                for (const p of effectiveResult.pages) {
                   for (const iss of p.issues) {
                     if (iss.severity === 'error' || iss.severity === 'warning') {
                       allIssues.push({ message: iss.message, severity: iss.severity });
@@ -142,17 +142,20 @@ router.post('/api/jobs', async (req, res) => {
                 uniqueIssues.sort((a, b) => (a.severity === 'error' ? 0 : 1) - (b.severity === 'error' ? 0 : 1));
                 const topIssues = uniqueIssues.slice(0, 5);
 
-                // Compute fixed count from previous snapshot
+                // Compare suppressed versions for accurate fixed count
                 let fixedCount = 0;
                 if (snapshot.previousScore != null) {
                   const prev = getLatestSnapshotBefore(ws.webflowSiteId!, snapshot.id);
                   if (prev) {
+                    const prevAudit = ws.auditSuppressions?.length
+                      ? applySuppressionsToAudit(prev.audit, ws.auditSuppressions)
+                      : prev.audit;
                     const prevIssueKeys = new Set<string>();
-                    for (const p of prev.audit.pages) {
+                    for (const p of prevAudit.pages) {
                       for (const iss of p.issues) prevIssueKeys.add(`${p.pageId}:${iss.check}`);
                     }
                     const curIssueKeys = new Set<string>();
-                    for (const p of result.pages) {
+                    for (const p of effectiveResult.pages) {
                       for (const iss of p.issues) curIssueKeys.add(`${p.pageId}:${iss.check}`);
                     }
                     for (const k of prevIssueKeys) {
@@ -163,8 +166,8 @@ router.post('/api/jobs', async (req, res) => {
 
                 notifyClientAuditComplete({
                   clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: ws.id,
-                  score: result.siteScore, previousScore: snapshot.previousScore,
-                  totalPages: result.totalPages, errors: result.errors, warnings: result.warnings,
+                  score: effectiveResult.siteScore, previousScore: snapshot.previousScore,
+                  totalPages: effectiveResult.totalPages, errors: effectiveResult.errors, warnings: effectiveResult.warnings,
                   topIssues, fixedCount, dashboardUrl: dashUrl,
                 });
               }
