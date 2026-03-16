@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Download } from 'lucide-react';
+import { Download, Pencil, Check, X } from 'lucide-react';
 import { useToast } from './Toast';
 import { ConnectionsTab } from './settings/ConnectionsTab';
 import { FeaturesTab } from './settings/FeaturesTab';
@@ -52,6 +52,9 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
   const [gscSites, setGscSites] = useState<GscSite[]>([]);
   const [ga4Properties, setGa4Properties] = useState<GA4Property[]>([]);
   const [loadingGoogle, setLoadingGoogle] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState(workspaceName);
+  const [savingName, setSavingName] = useState(false);
 
   useEffect(() => {
     get<WorkspaceData>(`/api/workspaces/${workspaceId}`).then(d => { setWs(d); }).catch(() => {});
@@ -97,9 +100,59 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      {/* Header */}
+      {/* Header with editable name */}
       <div>
-        <h2 className="text-lg font-semibold text-zinc-200">{workspaceName}</h2>
+        {editingName ? (
+          <div className="flex items-center gap-2">
+            <input
+              autoFocus
+              value={nameDraft}
+              onChange={e => setNameDraft(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  (async () => {
+                    if (!nameDraft.trim() || nameDraft === workspaceName) { setEditingName(false); return; }
+                    setSavingName(true);
+                    try {
+                      await patchWorkspace({ name: nameDraft.trim() });
+                      toast('Workspace name updated');
+                      setEditingName(false);
+                    } catch { toast('Failed to rename', 'error'); }
+                    setSavingName(false);
+                  })();
+                }
+                if (e.key === 'Escape') { setNameDraft(workspaceName); setEditingName(false); }
+              }}
+              className="text-lg font-semibold text-zinc-200 bg-zinc-800 border border-zinc-600 rounded px-2 py-0.5 focus:outline-none focus:border-teal-500"
+            />
+            <button
+              disabled={savingName || !nameDraft.trim()}
+              onClick={async () => {
+                if (!nameDraft.trim() || nameDraft === workspaceName) { setEditingName(false); return; }
+                setSavingName(true);
+                try {
+                  await patchWorkspace({ name: nameDraft.trim() });
+                  toast('Workspace name updated');
+                  setEditingName(false);
+                } catch { toast('Failed to rename', 'error'); }
+                setSavingName(false);
+              }}
+              className="p-1 rounded hover:bg-teal-600/20 text-teal-400 transition-colors"
+            >
+              <Check className="w-4 h-4" />
+            </button>
+            <button onClick={() => { setNameDraft(workspaceName); setEditingName(false); }} className="p-1 rounded hover:bg-zinc-700 text-zinc-400 transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 group">
+            <h2 className="text-lg font-semibold text-zinc-200">{workspaceName}</h2>
+            <button onClick={() => { setNameDraft(workspaceName); setEditingName(true); }} className="p-1 rounded hover:bg-zinc-700 text-zinc-500 opacity-0 group-hover:opacity-100 transition-all" title="Rename workspace">
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
         <p className="text-xs text-zinc-500 mt-0.5">
           {webflowSiteName ? `Connected to ${webflowSiteName}` : 'No Webflow site linked'}
         </p>

@@ -28,6 +28,25 @@ export interface SchemaSuggestion {
   template: Record<string, unknown>;
 }
 
+// Page type hints for tailored schema generation
+export type SchemaPageType = 'auto' | 'homepage' | 'service' | 'pillar' | 'persona' | 'blog' | 'about' | 'contact' | 'location' | 'product' | 'landing' | 'faq' | 'case-study';
+
+export const PAGE_TYPE_LABELS: Record<SchemaPageType, string> = {
+  auto: 'Auto-detect',
+  homepage: 'Homepage',
+  service: 'Service Page',
+  pillar: 'Pillar / Hub Page',
+  persona: 'Persona / Audience Page',
+  blog: 'Blog Post',
+  about: 'About / Team Page',
+  contact: 'Contact Page',
+  location: 'Location Page',
+  product: 'Product Page',
+  landing: 'Landing Page',
+  faq: 'FAQ Page',
+  'case-study': 'Case Study',
+};
+
 // Context from the workspace/strategy for richer schema generation
 export interface SchemaContext {
   companyName?: string;
@@ -40,6 +59,7 @@ export interface SchemaContext {
   siteKeywords?: string[];
   workspaceId?: string;
   knowledgeBase?: string;
+  pageType?: SchemaPageType;
 }
 
 // Google required fields per @type (for validation)
@@ -342,6 +362,115 @@ function cleanSchema(obj: Record<string, unknown>): Record<string, unknown> {
   return clean(obj) as Record<string, unknown>;
 }
 
+// Page-type-specific prompt instructions for tailored schema generation
+function getPageTypeInstructions(pageType: SchemaPageType | undefined, siteUrl: string): string {
+  if (!pageType || pageType === 'auto') return '';
+  const instructions: Record<string, string> = {
+    homepage: `PAGE TYPE INSTRUCTIONS (Homepage):
+- MUST include WebSite node with "@id": "${siteUrl}/#website" and potentialAction ONLY if a real search URL exists
+- MUST include Organization with full details: name, url, logo, description, knowsAbout, sameAs (only from page content)
+- If the page presents multiple services/solutions, include each as a separate Service node with provider → Organization
+- If testimonials/reviews appear, include them as Review nodes on the Organization
+- For SaaS/platform homepages, prefer SoftwareApplication alongside or instead of Service
+- Include BreadcrumbList with just Home
+- WebPage should use "mainEntity": {"@id": "${siteUrl}/#organization"}`,
+
+    service: `PAGE TYPE INSTRUCTIONS (Service Page):
+- MUST include a Service node as mainEntity with: name, description, serviceType (1-3 concise types), provider → Organization, url, areaServed (if geographic)
+- If the page describes multiple sub-services, include each as its own Service node
+- Include "audience": {"@type": "Audience", "audienceType": "..."} if the target audience is identifiable
+- Include "hasOfferCatalog" if pricing tiers or packages are listed
+- If there's a clear CTA or pricing, include an Offer node
+- BreadcrumbList: Home → [Parent Category if applicable] → Service Name
+- WebPage.mainEntity should reference the primary Service node`,
+
+    pillar: `PAGE TYPE INSTRUCTIONS (Pillar / Hub Page):
+- This is a comprehensive topic hub linking to related subtopic pages
+- MUST include WebPage with "significantLink" array listing URLs to key subtopic/child pages found in the content
+- Include BreadcrumbList: Home → Topic Category → Pillar Title
+- If the page covers a broad topic with sections, consider an Article or WebPage with "about" describing the core topic
+- Include "speakable" on WebPage targeting the introductory paragraph
+- If the page links to blog posts or guides, do NOT include those as separate Article nodes — just reference via significantLink
+- Focus on comprehensive WebPage + Organization, not fragmented types`,
+
+    persona: `PAGE TYPE INSTRUCTIONS (Persona / Audience Page):
+- This page targets a specific audience segment (e.g. "For Developers", "For Enterprise")
+- MUST include Service or WebPage with "audience": {"@type": "Audience", "audienceType": "[specific audience]"}
+- If multiple offerings are presented for this audience, include each as a Service with audience + provider → Organization
+- Include "about" on WebPage describing who this audience is and what problems are addressed
+- BreadcrumbList: Home → [Solutions/For] → Audience Name`,
+
+    blog: `PAGE TYPE INSTRUCTIONS (Blog Post / Article):
+- MUST include Article or BlogPosting as mainEntity with: headline, author (Person with name + credentials if found), datePublished, dateModified, image, publisher → Organization
+- If medical/health content, add "reviewedBy" Person with credentials if a reviewer is mentioned
+- Include "wordCount" if determinable from content length
+- Include "articleSection" and "about" based on the topic
+- If the post has a clear Q&A format, also include FAQPage
+- BreadcrumbList: Home → Blog → Post Title
+- Include "speakable" targeting the article summary/intro`,
+
+    about: `PAGE TYPE INSTRUCTIONS (About / Team Page):
+- Focus on enriching the Organization node with: name, description, foundingDate (if mentioned), founders (Person nodes), numberOfEmployees, knowsAbout, award, slogan
+- If team members are listed, include each as a Person node with: name, jobTitle, image, sameAs (LinkedIn etc. from page), worksFor → Organization
+- If company history/timeline is present, capture key facts in Organization.description
+- BreadcrumbList: Home → About
+- WebPage.mainEntity should reference the Organization node`,
+
+    contact: `PAGE TYPE INSTRUCTIONS (Contact Page):
+- Include ContactPage as the WebPage @type (use "@type": ["WebPage", "ContactPage"])
+- MUST include ContactPoint on Organization with: contactType, telephone, email, areaServed, availableLanguage — ONLY from page content
+- If a physical address is shown, include PostalAddress
+- If a contact form exists, note it in WebPage description but don't fabricate form URLs
+- If multiple departments/contact methods are listed, include each as a separate ContactPoint
+- BreadcrumbList: Home → Contact`,
+
+    location: `PAGE TYPE INSTRUCTIONS (Location Page):
+- MUST include LocalBusiness (or more specific subtype like Dentist, Restaurant, Store) with: name, address (PostalAddress), telephone, openingHoursSpecification, geo (GeoCoordinates) — ONLY from page content
+- Include "parentOrganization": {"@id": "${siteUrl}/#organization"} to link to the parent brand
+- If multiple locations are listed, include each as its own LocalBusiness node
+- Include "hasMap" if a Google Maps link/embed is present
+- Include "image" of the location if visible
+- BreadcrumbList: Home → Locations → [Location Name]`,
+
+    product: `PAGE TYPE INSTRUCTIONS (Product Page):
+- MUST include Product as mainEntity with: name, description, image, sku/gtin (if shown), brand → Organization
+- Include Offer with: price, priceCurrency, availability, url — ONLY from page content. Use schema.org availability enums (InStock, OutOfStock, PreOrder)
+- If reviews/ratings are shown, include AggregateRating and/or individual Review nodes
+- Include "category" if the product category is identifiable
+- If multiple variants exist, include each as a separate Offer within "offers" array
+- BreadcrumbList: Home → [Category] → Product Name`,
+
+    landing: `PAGE TYPE INSTRUCTIONS (Landing Page):
+- This is a conversion-focused page — schema should support rich snippets that drive clicks
+- Include WebPage with "significantLink" pointing to the primary CTA destination if identifiable
+- Include "speakable" targeting the main headline and value proposition
+- If the page promotes a service, include Service with Offer if pricing is visible
+- If testimonials/social proof appear, include as Review nodes
+- If it's an event landing page, include Event with startDate, location, offers
+- Keep schema focused — don't over-fragment. One strong mainEntity (Service, Product, or Event) is better than many weak nodes
+- BreadcrumbList: Home → [Campaign/Category] → Page Title`,
+
+    faq: `PAGE TYPE INSTRUCTIONS (FAQ Page):
+- MUST include FAQPage as mainEntity with "mainEntity" array of Question nodes
+- Each Question MUST have: "name" (the question text), "acceptedAnswer" with "@type": "Answer" and "text" (the answer)
+- Extract ALL Q&A pairs from the page content — look for headings ending in ?, <details>/<summary> elements, accordion patterns, definition lists
+- Include EVERY question found, not just the first few
+- Answers should be the full text, not truncated
+- BreadcrumbList: Home → [Category] → FAQ
+- Also include the relevant parent entity (Organization, Service, or Product) that the FAQs are about`,
+
+    'case-study': `PAGE TYPE INSTRUCTIONS (Case Study):
+- Use Article with "@type": ["Article", "Report"] or just Article as mainEntity
+- Include: headline, author (Person), datePublished, publisher → Organization
+- Include "about" describing the client/project (use Organization or Thing for the subject)
+- If measurable results are mentioned (e.g. "40% increase in traffic"), capture in the description
+- If the case study includes testimonials from the client, include as Review with author
+- BreadcrumbList: Home → Case Studies → [Client/Project Name]
+- Include "speakable" targeting the results summary`,
+  };
+  return instructions[pageType] || '';
+}
+
 async function aiGenerateUnifiedSchema(
   pageTitle: string,
   slug: string,
@@ -388,6 +517,7 @@ PAGE INFO:
 - Title: ${seoTitle || pageTitle}
 - Meta Description: ${seoDesc || '(none)'}
 - Is Homepage: ${isHomepage}
+- Page Type: ${ctx.pageType && ctx.pageType !== 'auto' ? ctx.pageType : '(auto-detect from content)'}
 - Existing Schemas: ${existingSchemas.length > 0 ? existingSchemas.join(', ') : 'None'}
 ${info.author ? `- Author: ${info.author}` : ''}
 ${info.publishDate ? `- Publish Date: ${info.publishDate}` : ''}
@@ -395,7 +525,7 @@ ${info.emails.length ? `- Emails: ${info.emails.join(', ')}` : ''}
 ${info.phones.length ? `- Phones: ${info.phones.join(', ')}` : ''}
 ${info.images.length ? `- Key Images: ${info.images.slice(0, 3).join(', ')}` : ''}
 ${info.questions.length ? `- FAQ Questions Found: ${info.questions.join(' | ')}` : ''}
-
+${getPageTypeInstructions(ctx.pageType, siteUrl)}
 PAGE CONTENT (excerpt):
 ${pageContent.slice(0, 3000)}
 

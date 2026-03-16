@@ -12,7 +12,7 @@ import { StatusBadge } from './ui/StatusBadge';
 import { CmsTemplatePanel } from './schema/CmsTemplatePanel';
 import { SchemaPageCard } from './schema/SchemaPageCard';
 import { BulkPublishPanel } from './schema/BulkPublishPanel';
-import { PagePicker, InitialPagePicker } from './schema/PagePicker';
+import { PagePicker } from './schema/PagePicker';
 
 interface SchemaSuggestion {
   type: string;
@@ -78,6 +78,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
   const [pageSearch, setPageSearch] = useState('');
   const [loadingPages, setLoadingPages] = useState(false);
   const [generatingSingle, setGeneratingSingle] = useState<string | null>(null);
+  const [pageTypes, setPageTypes] = useState<Record<string, string>>({});
   const { jobs, startJob, cancelJob } = useBackgroundTasks();
   const jobIdRef = useRef<string | null>(null);
 
@@ -131,6 +132,25 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
       } catch { /* no saved data */ }
     })();
   }, [siteId]);
+
+  // Auto-load all pages on mount so user can assign types before generating
+  useEffect(() => {
+    if (availablePages.length > 0) return;
+    (async () => {
+      setLoadingPages(true);
+      try {
+        const pages = await getSafe<Array<{ _id?: string; id?: string; title?: string; slug?: string }>>(`/api/webflow/pages/${siteId}`, []);
+        if (Array.isArray(pages)) {
+          setAvailablePages(pages.map((p: { _id?: string; id?: string; title?: string; slug?: string }) => ({
+            id: p._id || p.id || '',
+            title: p.title || p.slug || 'Untitled',
+            slug: p.slug || '',
+          })));
+        }
+      } catch { /* skip */ }
+      setLoadingPages(false);
+    })();
+  }, [siteId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Stream partial results from background job via WebSocket
   useEffect(() => {
@@ -223,7 +243,8 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
     setShowPagePicker(false);
     setStarted(true);
     try {
-      const result = await post<SchemaPageSuggestion>(`/api/webflow/schema-suggestions/${siteId}/page`, { pageId });
+      const pt = pageTypes[pageId];
+      const result = await post<SchemaPageSuggestion>(`/api/webflow/schema-suggestions/${siteId}/page`, { pageId, pageType: pt && pt !== 'auto' ? pt : undefined });
       setData(prev => {
         if (!prev) return [result];
         const exists = prev.findIndex(p => p.pageId === pageId);
@@ -443,48 +464,53 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
     });
   };
 
+  const PAGE_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
+    { value: 'auto', label: 'Auto-detect' },
+    { value: 'homepage', label: 'Homepage' },
+    { value: 'service', label: 'Service Page' },
+    { value: 'pillar', label: 'Pillar / Hub' },
+    { value: 'persona', label: 'Persona / Audience' },
+    { value: 'blog', label: 'Blog Post' },
+    { value: 'about', label: 'About / Team' },
+    { value: 'contact', label: 'Contact' },
+    { value: 'location', label: 'Location' },
+    { value: 'product', label: 'Product' },
+    { value: 'landing', label: 'Landing Page' },
+    { value: 'faq', label: 'FAQ' },
+    { value: 'case-study', label: 'Case Study' },
+  ];
+
+  const filteredInitialPages = availablePages.filter(
+    p => !pageSearch || p.title.toLowerCase().includes(pageSearch.toLowerCase()) || p.slug.toLowerCase().includes(pageSearch.toLowerCase())
+  );
+
   if (!started) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <div className="w-14 h-14 rounded-2xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center">
-          <Sparkles className="w-7 h-7 text-teal-400" />
+      <div className="space-y-4">
+        <div className="flex flex-col items-center justify-center py-8 gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center">
+            <Sparkles className="w-7 h-7 text-teal-400" />
+          </div>
+          <div className="text-center space-y-1.5">
+            <p className="text-sm font-medium text-zinc-200">Schema Generator</p>
+            <p className="text-xs text-zinc-500 max-w-sm">Generate optimized JSON-LD structured data. Optionally set page types below for more accurate schemas, then generate.</p>
+          </div>
+          <div className="flex items-center gap-3 mt-2">
+            <button
+              onClick={runScan}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors"
+            >
+              <Sparkles className="w-4 h-4" /> Generate All Pages
+            </button>
+            <button
+              onClick={fetchCmsTemplatePages}
+              disabled={loadingCmsPages}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-zinc-800 hover:bg-zinc-700 text-amber-300 border border-amber-500/30 transition-colors disabled:opacity-50"
+            >
+              {loadingCmsPages ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />} CMS Templates
+            </button>
+          </div>
         </div>
-        <div className="text-center space-y-1.5">
-          <p className="text-sm font-medium text-zinc-200">Schema Generator</p>
-          <p className="text-xs text-zinc-500 max-w-sm">Generate optimized JSON-LD structured data with @graph, validated against Google requirements. Schemas can be published directly to Webflow.</p>
-        </div>
-        <div className="flex items-center gap-3 mt-2">
-          <button
-            onClick={runScan}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors"
-          >
-            <Sparkles className="w-4 h-4" /> All Pages
-          </button>
-          <button
-            onClick={fetchPages}
-            disabled={loadingPages}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition-colors disabled:opacity-50"
-          >
-            {loadingPages ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Single Page
-          </button>
-          <button
-            onClick={fetchCmsTemplatePages}
-            disabled={loadingCmsPages}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-zinc-800 hover:bg-zinc-700 text-amber-300 border border-amber-500/30 transition-colors disabled:opacity-50"
-          >
-            {loadingCmsPages ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />} CMS Templates
-          </button>
-        </div>
-        {showPagePicker && (
-          <InitialPagePicker
-            availablePages={availablePages}
-            pageSearch={pageSearch}
-            generatingSingle={generatingSingle}
-            onPageSearchChange={setPageSearch}
-            onSelectPage={generateSinglePage}
-            onClose={() => setShowPagePicker(false)}
-          />
-        )}
         <CmsTemplatePanel
           showCmsPanel={showCmsPanel}
           cmsTemplatePages={cmsTemplatePages}
@@ -500,8 +526,55 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
           onPublishCmsTemplate={publishCmsTemplate}
         />
         {generatingSingle && (
-          <div className="flex items-center gap-2 text-zinc-500 text-sm mt-2">
-            <Loader2 className="w-4 h-4 animate-spin" /> Generating schema...
+          <div className="flex items-center gap-2 px-4 py-2 bg-teal-500/10 border border-teal-500/20 rounded-xl">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400" />
+            <span className="text-xs text-teal-300">Generating schema for page...</span>
+          </div>
+        )}
+        {/* Page list with type selectors */}
+        {loadingPages ? (
+          <div className="flex items-center justify-center py-6 gap-2 text-zinc-500 text-xs">
+            <Loader2 className="w-4 h-4 animate-spin" /> Loading pages...
+          </div>
+        ) : availablePages.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-zinc-500">{availablePages.length} pages — set page types for better AI prompts</span>
+              <input
+                type="text"
+                value={pageSearch}
+                onChange={e => setPageSearch(e.target.value)}
+                placeholder="Filter pages..."
+                className="px-3 py-1 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-300 w-48 focus:outline-none focus:border-zinc-600"
+              />
+            </div>
+            <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden max-h-[400px] overflow-y-auto">
+              {filteredInitialPages.map(p => (
+                <div key={p.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-zinc-800/50 last:border-b-0 hover:bg-zinc-800/30 transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs text-zinc-300 truncate">{p.title}</div>
+                    <div className="text-[11px] text-zinc-500 truncate">/{p.slug}</div>
+                  </div>
+                  <select
+                    value={pageTypes[p.id] || 'auto'}
+                    onChange={e => setPageTypes(prev => ({ ...prev, [p.id]: e.target.value }))}
+                    className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[11px] text-zinc-300 focus:outline-none focus:border-teal-500 cursor-pointer"
+                  >
+                    {PAGE_TYPE_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => generateSinglePage(p.id)}
+                    disabled={generatingSingle === p.id}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] text-teal-300 bg-teal-600/10 border border-teal-500/20 hover:bg-teal-600/20 transition-colors disabled:opacity-50"
+                  >
+                    {generatingSingle === p.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                    Generate
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

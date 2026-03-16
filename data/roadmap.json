@@ -1879,6 +1879,34 @@
           "status": "done",
           "notes": "Shipped — Invalid property detection + auto-strip, cross-reference validation, phone format validation, keyword-stuffing detection, recommended field warnings, 6 new AI prompt rules",
           "shippedAt": "2026-03-16"
+        },
+        {
+          "id": 289,
+          "title": "Brand name resolution fix (getBrandName helper)",
+          "status": "done",
+          "notes": "Shipped — Fixes Webflow internal site name injection in AI prompts. New getBrandName(ws) helper across 6 server files.",
+          "shippedAt": "2026-03-16"
+        },
+        {
+          "id": 290,
+          "title": "SEO Editor per-page Send to Client + label rename",
+          "status": "done",
+          "notes": "Shipped — Per-page Send to Client button in SEO Editor, bulk button renamed to Send to Client for consistency",
+          "shippedAt": "2026-03-16"
+        },
+        {
+          "id": 291,
+          "title": "Editable workspace name in Workspace Settings",
+          "status": "done",
+          "notes": "Shipped — Inline-editable workspace name with pencil icon, Enter/Escape support, PATCH /api/workspaces/:id",
+          "shippedAt": "2026-03-16"
+        },
+        {
+          "id": 292,
+          "title": "Schema Generator: page type selector + auto-load pages on mount",
+          "status": "done",
+          "notes": "Shipped — Pages auto-load on mount with page type dropdowns (13 types). Page type hint passed to AI prompt for tailored schema generation. Initial view replaced with full page list + type selectors + per-page generate buttons.",
+          "shippedAt": "2026-03-16"
         }
       ]
     }

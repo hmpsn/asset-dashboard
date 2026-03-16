@@ -50,6 +50,8 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const [approvalSelected, setApprovalSelected] = useState<Set<string>>(new Set());
   const [sendingApproval, setSendingApproval] = useState(false);
   const [approvalSent, setApprovalSent] = useState(false);
+  const [sendingPage, setSendingPage] = useState<Set<string>>(new Set());
+  const [sentPage, setSentPage] = useState<Set<string>>(new Set());
   const [variations, setVariations] = useState<Record<string, { field: string; options: string[] }>>({});
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
 
@@ -323,6 +325,29 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     finally { setBulkMode('idle'); setBulkPreview([]); setTimeout(() => setBulkResults(null), 5000); }
   };
 
+  const sendPageToClient = async (pageId: string) => {
+    if (!workspaceId) return;
+    const page = pages.find(p => p.id === pageId);
+    const edit = edits[pageId];
+    if (!page || !edit) return;
+    const items: Array<{ pageId: string; pageTitle: string; pageSlug: string; field: 'seoTitle' | 'seoDescription'; currentValue: string; proposedValue: string }> = [];
+    if (edit.seoTitle !== (page.seo?.title || '')) {
+      items.push({ pageId, pageTitle: page.title, pageSlug: page.slug, field: 'seoTitle', currentValue: page.seo?.title || '', proposedValue: edit.seoTitle });
+    }
+    if (edit.seoDescription !== (page.seo?.description || '')) {
+      items.push({ pageId, pageTitle: page.title, pageSlug: page.slug, field: 'seoDescription', currentValue: page.seo?.description || '', proposedValue: edit.seoDescription });
+    }
+    if (items.length === 0) return;
+    setSendingPage(prev => new Set(prev).add(pageId));
+    try {
+      await post(`/api/approvals/${workspaceId}`, { siteId, name: `SEO Review — ${page.title}`, items });
+      setSentPage(prev => new Set(prev).add(pageId));
+      refreshStates();
+      setTimeout(() => setSentPage(prev => { const n = new Set(prev); n.delete(pageId); return n; }), 4000);
+    } catch { /* skip */ }
+    setSendingPage(prev => { const n = new Set(prev); n.delete(pageId); return n; });
+  };
+
   const sendForApproval = async () => {
     if (!workspaceId || approvalSelected.size === 0) return;
     setSendingApproval(true);
@@ -513,6 +538,10 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
             pageRecs={recsLoaded ? recsForPage(page.slug) : []}
             pageState={getState(page.id)} variations={variations[page.id]}
             showApprovalCheckbox={!!workspaceId}
+            isSendingToClient={sendingPage.has(page.id)}
+            isSentToClient={sentPage.has(page.id)}
+            hasChanges={!!(edits[page.id] && (edits[page.id].seoTitle !== (page.seo?.title || '') || edits[page.id].seoDescription !== (page.seo?.description || '')))}
+            onSendToClient={sendPageToClient}
             onToggleExpand={toggleExpand} onToggleApprovalSelect={toggleApprovalSelect}
             onUpdateField={updateField} onSave={savePage} onAiRewrite={aiRewrite}
             onSelectVariation={(pageId, field, value) => updateField(pageId, field, value)}

@@ -4,7 +4,7 @@
  */
 import {
   Loader2, Save, Sparkles, ChevronDown, ChevronRight,
-  Check, AlertTriangle, CheckSquare, Square,
+  Check, AlertTriangle, CheckSquare, Square, Send,
 } from 'lucide-react';
 import { StatusBadge } from '../ui/StatusBadge';
 import { statusBorderClass } from '../ui/statusConfig';
@@ -49,6 +49,10 @@ export interface PageEditRowProps {
   pageState: PageState | undefined;
   variations: { field: string; options: string[] } | undefined;
   showApprovalCheckbox: boolean;
+  isSendingToClient: boolean;
+  isSentToClient: boolean;
+  hasChanges: boolean;
+  onSendToClient: (pageId: string) => void;
   onToggleExpand: (id: string) => void;
   onToggleApprovalSelect: (id: string) => void;
   onUpdateField: (pageId: string, field: 'seoTitle' | 'seoDescription', value: string) => void;
@@ -61,6 +65,7 @@ export interface PageEditRowProps {
 export function PageEditRow({
   page, edit, expanded, isSaving, isSaved, isAiLoading, isSelected,
   pageRecs, pageState, variations, showApprovalCheckbox,
+  isSendingToClient, isSentToClient, hasChanges, onSendToClient,
   onToggleExpand, onToggleApprovalSelect, onUpdateField, onSave,
   onAiRewrite, onSelectVariation, onClearVariations,
 }: PageEditRowProps) {
@@ -218,8 +223,20 @@ export function PageEditRow({
             )}
           </div>
 
-          {/* Save button */}
-          <div className="flex justify-end">
+          {/* Action buttons */}
+          <div className="flex justify-end gap-2">
+            {showApprovalCheckbox && (
+              <button
+                onClick={() => onSendToClient(page.id)}
+                disabled={!hasChanges || isSendingToClient}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  isSentToClient ? 'bg-green-600 text-white' : 'bg-cyan-600/20 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-600/30 disabled:opacity-50 disabled:cursor-not-allowed'
+                }`}
+              >
+                {isSendingToClient ? <Loader2 className="w-3 h-3 animate-spin" /> : isSentToClient ? <Check className="w-3 h-3" /> : <Send className="w-3 h-3" />}
+                {isSentToClient ? 'Sent!' : isSendingToClient ? 'Sending...' : 'Send to Client'}
+              </button>
+            )}
             <button
               onClick={() => onSave(page.id)}
               disabled={!edit.dirty || isSaving}

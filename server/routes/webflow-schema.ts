@@ -43,11 +43,12 @@ router.get('/api/webflow/schema-snapshot/:siteId', (req, res) => {
 });
 
 router.post('/api/webflow/schema-suggestions/:siteId/page', async (req, res) => {
-  const { pageId } = req.body;
+  const { pageId, pageType } = req.body;
   if (!pageId) return res.status(400).json({ error: 'pageId required' });
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
     const { ctx } = buildSchemaContext(req.params.siteId);
+    if (pageType) ctx.pageType = pageType;
     const result = await generateSchemaForPage(req.params.siteId, pageId, token, ctx);
     if (!result) return res.status(404).json({ error: 'Page not found' });
     res.json(result);
