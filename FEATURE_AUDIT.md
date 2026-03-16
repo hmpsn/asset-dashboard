@@ -1496,9 +1496,9 @@ When the user asks to update this document with recent features, follow this pro
 | Architecture | 5 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types |
 | Infrastructure | 7 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3 + integrity verification), E2E tests, job persistence, anomaly deploy guard |
 
-**129 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**130 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **129**. Last updated: March 2026 (bulk ops, competitive intel, internal links enhancements).
+Current feature count: **130**. Last updated: March 2026 (sitemap-based link discovery, live domain UI).
 
 ### Recent Additions (March 2026)
 
@@ -1557,3 +1557,7 @@ Current feature count: **129**. Last updated: March 2026 (bulk ops, competitive 
 **129. AI Internal Linking Engine Enhancements**
 **What it does:** Extends the internal linking analysis with orphan page detection and per-page link health scoring. Each page gets a 0-100 health score based on inbound + outbound link counts. Orphan pages (zero inbound links, excluding homepage) are flagged with a dedicated expandable warning section showing path, title, and outbound count. Frontend adds: 5-column stat bar (High/Medium/Low priority + Orphan Pages + Avg Link Score), collapsible orphan pages panel, list/grouped view toggle (group suggestions by source page for batch implementation), and one-click copy-to-clipboard for HTML link snippets (`<a href="...">anchor</a>`).
 **Files:** `server/internal-links.ts` (`PageLinkHealth` interface, orphan detection, per-page scoring), `src/components/InternalLinks.tsx` (orphan UI, grouped view, copy buttons)
+
+**130. Sitemap-Based Link Discovery + Live Domain UI**
+**What it does:** Rewrites the internal links page discovery to use `/sitemap.xml` as the primary source, catching all CMS collection pages that the Webflow API misses. Falls back to Webflow API + crawl-based discovery if sitemap is unavailable. Caps at 100 pages for cost control. Adds browser-like User-Agent headers so Cloudflare doesn't block fetches from cloud IPs. Fixes double-protocol bug where liveDomain with `https://` prefix got another `https://` prepended. Adds `attemptedPageCount` tracking and context-aware diagnostic messaging (amber warnings for fetch failures vs green "no gaps" for genuine success). Adds editable Live Domain field to Workspace Settings → Connections tab so users can see and correct the domain used for crawling. Extracts real `<title>` tags from fetched pages for better naming.
+**Files:** `server/internal-links.ts` (`fetchSitemapUrls`, `FETCH_HEADERS`, `attemptedPageCount`, baseUrl normalization), `src/components/InternalLinks.tsx` (diagnostic messaging), `src/components/settings/ConnectionsTab.tsx` (Live Domain field), `src/components/WorkspaceSettings.tsx` (saveLiveDomain prop)

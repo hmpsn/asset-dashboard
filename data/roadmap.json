@@ -1816,6 +1816,13 @@
           "title": "Beta client feedback & bug submission",
           "status": "done",
           "shippedAt": "2026"
+        },
+        {
+          "id": 286,
+          "title": "Sitemap-based link discovery + Live Domain UI + diagnostic messaging",
+          "status": "done",
+          "notes": "Shipped — sitemap.xml as primary page source, User-Agent headers for Cloudflare, double-protocol fix, attemptedPageCount diagnostics, Live Domain field in Workspace Settings",
+          "shippedAt": "2026-03-15"
         }
       ]
     }
