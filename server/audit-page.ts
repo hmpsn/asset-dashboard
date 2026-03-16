@@ -3,8 +3,6 @@ import {
   extractImgTags, extractStyleBlocks, extractInlineScripts, countExternalResources,
   stripHiddenElements,
 } from './seo-audit-html.js';
-import { createLogger } from './logger.js';
-const log = createLogger('audit-page');
 
 export type Severity = 'error' | 'warning' | 'info';
 
@@ -139,35 +137,10 @@ export function auditPage(
   if (html) {
     // Strip hidden elements (Webflow conditional visibility, display:none) before content checks
     // to avoid false positives from elements that aren't visible to users or crawlers.
-    const rawH1s = extractTag(html, 'h1');
     const visibleHtml = stripHiddenElements(html);
-    const h1s = extractTag(visibleHtml, 'h1');
-
-    // Diagnostic: log when stripping changes H1 count (or doesn't when multiple exist)
-    if (rawH1s.length > 1) {
-      const hasCondInvis = /w-condition-invisible/i.test(html);
-      const hasDisplayNone = /display\s*:\s*none/i.test(html);
-      const hasVisHidden = /visibility\s*:\s*hidden/i.test(html);
-      // Capture 200 chars of context around each H1 for debugging
-      const h1Contexts = [...html.matchAll(/<h1[^>]*>/gi)].map(m => {
-        const start = Math.max(0, m.index! - 150);
-        const end = Math.min(html.length, m.index! + 200);
-        return html.slice(start, end).replace(/\n/g, '\\n');
-      });
-      log.info({
-        slug,
-        rawH1Count: rawH1s.length,
-        strippedH1Count: h1s.length,
-        hasCondInvis,
-        hasDisplayNone,
-        hasVisHidden,
-        htmlLength: html.length,
-        strippedLength: visibleHtml.length,
-        h1Contexts,
-      }, `H1 diagnostic for page with ${rawH1s.length} raw H1s`);
-    }
 
     // H1 tags
+    const h1s = extractTag(visibleHtml, 'h1');
     if (h1s.length === 0) {
       issues.push({ check: 'h1', severity: 'error', message: 'Missing H1 tag', recommendation: 'Add exactly one H1 tag per page that describes the main content.' });
     } else if (h1s.length > 1) {
