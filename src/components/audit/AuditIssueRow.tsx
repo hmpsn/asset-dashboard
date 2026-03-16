@@ -223,8 +223,8 @@ export function AuditIssueRow({
             onToggle={() => onSetActionMenuKey(menuOpen ? null : taskKey)}
             onFlagForClient={() => { onSetFlaggingKey(taskKey); onSetFlagNote(''); onSetActionMenuKey(null); }}
             onCreateTask={() => { onCreateTask(page, issue); onSetActionMenuKey(null); }}
-            onSuppress={() => onSuppressIssue(issue.check, page.slug)}
-            onSuppressPattern={onSuppressPattern ? () => onSuppressPattern(issue.check, page.slug) : undefined}
+            onSuppress={() => { onSetActionMenuKey(null); onSuppressIssue(issue.check, page.slug); }}
+            onSuppressPattern={onSuppressPattern ? () => { onSetActionMenuKey(null); onSuppressPattern(issue.check, page.slug); } : undefined}
             pageSlug={page.slug}
           />
         )}
@@ -236,8 +236,8 @@ export function AuditIssueRow({
             isCreating={isCreating}
             onToggle={() => onSetActionMenuKey(menuOpen ? null : taskKey)}
             onCreateTask={() => { onCreateTask(page, issue); onSetActionMenuKey(null); }}
-            onSuppress={() => onSuppressIssue(issue.check, page.slug)}
-            onSuppressPattern={onSuppressPattern ? () => onSuppressPattern(issue.check, page.slug) : undefined}
+            onSuppress={() => { onSetActionMenuKey(null); onSuppressIssue(issue.check, page.slug); }}
+            onSuppressPattern={onSuppressPattern ? () => { onSetActionMenuKey(null); onSuppressPattern(issue.check, page.slug); } : undefined}
             pageSlug={page.slug}
           />
         )}
@@ -248,8 +248,8 @@ export function AuditIssueRow({
             isCreating={isCreating}
             onToggle={() => onSetActionMenuKey(menuOpen ? null : taskKey)}
             onFlagForClient={() => { onSetFlaggingKey(taskKey); onSetFlagNote(''); onSetActionMenuKey(null); }}
-            onSuppress={() => onSuppressIssue(issue.check, page.slug)}
-            onSuppressPattern={onSuppressPattern ? () => onSuppressPattern(issue.check, page.slug) : undefined}
+            onSuppress={() => { onSetActionMenuKey(null); onSuppressIssue(issue.check, page.slug); }}
+            onSuppressPattern={onSuppressPattern ? () => { onSetActionMenuKey(null); onSuppressPattern(issue.check, page.slug); } : undefined}
             pageSlug={page.slug}
           />
         )}
@@ -287,7 +287,7 @@ function OverflowMenu({ menuOpen, isCreating, onToggle, onFlagForClient, onCreat
         <div className="absolute right-0 top-full mt-1 w-44 rounded-lg shadow-xl z-50 py-1 bg-zinc-900 border border-zinc-700">
           {onFlagForClient && (
             <button
-              onClick={onFlagForClient}
+              onMouseDown={e => { e.stopPropagation(); onFlagForClient(); }}
               className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-purple-400 hover:bg-purple-500/10 transition-colors"
             >
               <Send className="w-3 h-3" /> Send to Client
@@ -295,7 +295,7 @@ function OverflowMenu({ menuOpen, isCreating, onToggle, onFlagForClient, onCreat
           )}
           {onCreateTask && (
             <button
-              onClick={onCreateTask}
+              onMouseDown={e => { e.stopPropagation(); onCreateTask(); }}
               disabled={isCreating}
               className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 transition-colors disabled:opacity-50"
             >
@@ -303,14 +303,14 @@ function OverflowMenu({ menuOpen, isCreating, onToggle, onFlagForClient, onCreat
             </button>
           )}
           <button
-            onClick={onSuppress}
+            onMouseDown={e => { e.stopPropagation(); onSuppress(); }}
             className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-zinc-500 hover:bg-zinc-800 transition-colors"
           >
             <EyeOff className="w-3 h-3" /> Suppress Issue
           </button>
           {onSuppressPattern && slugPrefix && (
             <button
-              onClick={onSuppressPattern}
+              onMouseDown={e => { e.stopPropagation(); onSuppressPattern(); }}
               className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-zinc-500 hover:bg-zinc-800 transition-colors"
             >
               <Layers className="w-3 h-3" /> Suppress for {slugPrefix}/*

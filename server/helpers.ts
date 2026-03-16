@@ -87,17 +87,17 @@ export function applySuppressionsToAudit(
     });
 
     // Recalculate page score with remaining issues
+    // Weights must mirror audit-page.ts: info=0, softer warning/error deductions
     let score = 100;
     for (const issue of filteredIssues) {
       const isCritical = CRITICAL_CHECKS_SET.has(issue.check);
       const isModerate = MODERATE_CHECKS_SET.has(issue.check);
       if (issue.severity === 'error') {
-        score -= isCritical ? 20 : 12;
+        score -= isCritical ? 15 : 10;
       } else if (issue.severity === 'warning') {
-        score -= isCritical ? 10 : isModerate ? 6 : 4;
-      } else {
-        score -= 1;
+        score -= isCritical ? 5 : isModerate ? 3 : 2;
       }
+      // info severity: no score impact (industry standard)
     }
     score = Math.max(0, Math.min(100, score));
 
@@ -117,8 +117,10 @@ export function applySuppressionsToAudit(
     else totalInfos++;
   }
 
-  const siteScore = filteredPages.length > 0
-    ? Math.round(filteredPages.reduce((s, r) => s + r.score, 0) / filteredPages.length)
+  // Exclude noindex pages from site score — they don't affect search rankings
+  const indexedPages = filteredPages.filter(p => !p.noindex);
+  const siteScore = indexedPages.length > 0
+    ? Math.round(indexedPages.reduce((s, r) => s + r.score, 0) / indexedPages.length)
     : 100;
 
   return {

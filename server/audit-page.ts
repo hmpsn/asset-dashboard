@@ -25,6 +25,7 @@ export interface PageSeoResult {
   url: string;
   score: number;
   issues: SeoIssue[];
+  noindex?: boolean;
 }
 
 interface PageMeta {
@@ -74,6 +75,14 @@ const MODERATE_CHECKS = new Set([
   'duplicate-description', 'img-filesize', 'html-size',
 ]);
 
+// Slug patterns that indicate a content/article page where AEO editorial checks apply
+const CONTENT_PAGE_PATTERNS = /(?:^|\/)(?:blog|articles?|resources?|news|posts?|guides?|learn|insights?|case-stud(?:y|ies)|whitepapers?|reports?)(?:\/|$)/i;
+
+/** Returns true if the slug looks like a content/article page (vs homepage, service page, etc.) */
+export function isContentPage(slug: string): boolean {
+  return CONTENT_PAGE_PATTERNS.test(slug);
+}
+
 export function auditPage(
   pageId: string,
   pageName: string,
@@ -83,6 +92,7 @@ export function auditPage(
   html: string | null,
 ): PageSeoResult {
   const issues: SeoIssue[] = [];
+  let isNoindex = false;
 
   // --- Extract HTML-based values as fallback (Webflow API often returns empty OG/SEO data) ---
   const htmlTitle = html ? (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || '') : '';
@@ -183,8 +193,9 @@ export function auditPage(
 
     // Robots meta
     const robotsMeta = extractMetaContent(html, 'robots');
-    if (robotsMeta && robotsMeta.includes('noindex')) {
-      issues.push({ check: 'robots', severity: 'warning', message: 'Page is set to noindex', recommendation: 'This page will not appear in search results. Remove noindex if this page should be indexed.', value: robotsMeta });
+    isNoindex = !!(robotsMeta && robotsMeta.includes('noindex'));
+    if (isNoindex) {
+      issues.push({ check: 'robots', severity: 'info', message: 'Page is set to noindex', recommendation: 'This page will not appear in search results. Remove noindex if this page should be indexed.', value: robotsMeta || undefined });
     }
 
     // Content length
@@ -321,34 +332,39 @@ export function auditPage(
 
     // --- AEO (Answer Engine Optimization) CHECKS ---
     // These checks help pages get cited by LLMs and AI answer engines.
+    // Content-specific AEO checks only run on blog/article pages.
+    const contentPage = isContentPage(slug);
 
-    // AEO-1: Author/reviewer attribution detection
-    const authorMeta = extractMetaContent(html, 'author');
-    const hasAuthorSchema = /"author"/i.test(html) && /"@type"\s*:\s*"Person"/i.test(html);
-    const hasByline = /<[^>]*class=["'][^"']*(?:author|byline|writer|reviewer)[^"']*["'][^>]*>/i.test(html);
-    const hasReviewedBy = /(?:reviewed|verified|fact[- ]checked)\s+by/i.test(html);
-    if (!authorMeta && !hasAuthorSchema && !hasByline && !hasReviewedBy) {
-      issues.push({
-        check: 'aeo-author', severity: 'info',
-        message: 'No author attribution detected',
-        recommendation: 'Add author information (byline, author meta tag, or Person schema) to improve E-E-A-T trust signals. LLMs and AI answer engines prefer content with clear editorial accountability.',
-      });
+    // AEO-1: Author/reviewer attribution detection (content pages only)
+    if (contentPage) {
+      const authorMeta = extractMetaContent(html, 'author');
+      const hasAuthorSchema = /"author"/i.test(html) && /"@type"\s*:\s*"Person"/i.test(html);
+      const hasByline = /<[^>]*class=["'][^"']*(?:author|byline|writer|reviewer)[^"']*["'][^>]*>/i.test(html);
+      const hasReviewedBy = /(?:reviewed|verified|fact[- ]checked)\s+by/i.test(html);
+      if (!authorMeta && !hasAuthorSchema && !hasByline && !hasReviewedBy) {
+        issues.push({
+          check: 'aeo-author', severity: 'info',
+          message: 'No author attribution detected',
+          recommendation: 'Add author information (byline, author meta tag, or Person schema) to improve E-E-A-T trust signals. LLMs and AI answer engines prefer content with clear editorial accountability.',
+        });
+      }
     }
 
-    // AEO-2: Last-updated / review date detection
-    const hasDateModified = /"dateModified"/i.test(html);
-    const hasVisibleDate = /(?:last\s+(?:updated|modified|reviewed)|published\s+on|updated\s+on|reviewed\s+on)\s*:?\s*\w/i.test(html);
-    const hasTimeDateElement = /<time[^>]*datetime=/i.test(html);
-    if (!hasDateModified && !hasVisibleDate && !hasTimeDateElement) {
-      issues.push({
-        check: 'aeo-date', severity: 'info',
-        message: 'No content date or "last updated" indicator found',
-        recommendation: 'Add a visible "Last updated" or "Reviewed on" date and dateModified in your schema. AI systems trust dated content more — it signals the information is maintained.',
-      });
+    // AEO-2: Last-updated / review date detection (content pages only)
+    if (contentPage) {
+      const hasDateModified = /"dateModified"/i.test(html);
+      const hasVisibleDate = /(?:last\s+(?:updated|modified|reviewed)|published\s+on|updated\s+on|reviewed\s+on)\s*:?\s*\w/i.test(html);
+      const hasTimeDateElement = /<time[^>]*datetime=/i.test(html);
+      if (!hasDateModified && !hasVisibleDate && !hasTimeDateElement) {
+        issues.push({
+          check: 'aeo-date', severity: 'info',
+          message: 'No content date or "last updated" indicator found',
+          recommendation: 'Add a visible "Last updated" or "Reviewed on" date and dateModified in your schema. AI systems trust dated content more — it signals the information is maintained.',
+        });
+      }
     }
 
-    // AEO-3: Answer-first content structure
-    // Extract text after the first H1/H2 and check if it starts with a direct answer
+    // AEO-3: Answer-first content structure (content pages only)
     const bodyText = visibleHtml
       .replace(/<script[\s\S]*?<\/script>/gi, '')
       .replace(/<style[\s\S]*?<\/style>/gi, '')
@@ -360,7 +376,7 @@ export function auditPage(
       const introText = afterH1Match[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
       const introWords = introText.split(/\s+/).slice(0, 40);
       const genericIntroPatterns = /^(?:welcome\s+to|in\s+(?:this|today)|are\s+you\s+looking|if\s+you(?:'re|\s+are)\s+(?:looking|searching|wondering)|(?:we|our\s+team)\s+(?:are|is)\s+(?:here|dedicated|committed|passionate)|at\s+\w+,\s+we)/i;
-      if (genericIntroPatterns.test(introWords.join(' '))) {
+      if (contentPage && genericIntroPatterns.test(introWords.join(' '))) {
         issues.push({
           check: 'aeo-answer-first', severity: 'info',
           message: 'Page opens with generic intro instead of a direct answer',
@@ -394,34 +410,35 @@ export function auditPage(
       }
     }
 
-    // AEO-6: Citation/reference density
-    const allLinks = extractLinks(html);
-    const authorityDomains = /\.gov$|\.edu$|\.org$|pubmed|scholar\.google|doi\.org|ncbi\.nlm|mayoclinic|webmd|clevelandclinic|who\.int|cdc\.gov|ada\.org|nih\.gov/i;
-    const externalCitations = allLinks.filter(l => {
-      if (!l.href.startsWith('http')) return false;
-      try {
-        const host = new URL(l.href).hostname;
-        // Exclude same-domain links and social media
-        if (host.includes('webflow.io') || host.includes('facebook.') || host.includes('twitter.') || host.includes('instagram.') || host.includes('linkedin.') || host.includes('youtube.')) return false;
-        return true;
-      } catch { return false; }
-    });
-    const authorityCitations = externalCitations.filter(l => {
-      try { return authorityDomains.test(new URL(l.href).hostname); } catch { return false; }
-    });
-    const wordCount2 = countWords(html);
-    if (wordCount2 > 500 && externalCitations.length === 0) {
-      issues.push({
-        check: 'aeo-citations', severity: 'info',
-        message: 'No external citations or references found',
-        recommendation: 'Add citations to authoritative sources (journals, .gov, .edu, industry bodies). LLMs prefer pages where claims are grounded in evidence. Target: 1 citation per ~200 words for medical content, 1 per ~400 for business content.',
+    // AEO-6: Citation/reference density (content pages only)
+    if (contentPage) {
+      const allLinks = extractLinks(html);
+      const authorityDomains = /\.gov$|\.edu$|\.org$|pubmed|scholar\.google|doi\.org|ncbi\.nlm|mayoclinic|webmd|clevelandclinic|who\.int|cdc\.gov|ada\.org|nih\.gov/i;
+      const externalCitations = allLinks.filter(l => {
+        if (!l.href.startsWith('http')) return false;
+        try {
+          const host = new URL(l.href).hostname;
+          if (host.includes('webflow.io') || host.includes('facebook.') || host.includes('twitter.') || host.includes('instagram.') || host.includes('linkedin.') || host.includes('youtube.')) return false;
+          return true;
+        } catch { return false; }
       });
-    } else if (wordCount2 > 800 && externalCitations.length > 0 && authorityCitations.length === 0) {
-      issues.push({
-        check: 'aeo-citations', severity: 'info',
-        message: `${externalCitations.length} external link${externalCitations.length > 1 ? 's' : ''} but none to authoritative sources`,
-        recommendation: 'Your page links externally but not to high-authority sources (.gov, .edu, medical journals, professional associations). Adding citations to primary sources significantly increases AI citation trust.',
+      const authorityCitations = externalCitations.filter(l => {
+        try { return authorityDomains.test(new URL(l.href).hostname); } catch { return false; }
       });
+      const wordCount2 = countWords(html);
+      if (wordCount2 > 500 && externalCitations.length === 0) {
+        issues.push({
+          check: 'aeo-citations', severity: 'info',
+          message: 'No external citations or references found',
+          recommendation: 'Add citations to authoritative sources (journals, .gov, .edu, industry bodies). LLMs prefer pages where claims are grounded in evidence. Target: 1 citation per ~200 words for medical content, 1 per ~400 for business content.',
+        });
+      } else if (wordCount2 > 800 && externalCitations.length > 0 && authorityCitations.length === 0) {
+        issues.push({
+          check: 'aeo-citations', severity: 'info',
+          message: `${externalCitations.length} external link${externalCitations.length > 1 ? 's' : ''} but none to authoritative sources`,
+          recommendation: 'Your page links externally but not to high-authority sources (.gov, .edu, medical journals, professional associations). Adding citations to primary sources significantly increases AI citation trust.',
+        });
+      }
     }
 
     // AEO-7: Dark patterns (aggressive popups, auto-play, interstitials)
@@ -449,23 +466,25 @@ export function auditPage(
     issue.category = CHECK_CATEGORY[issue.check] || 'technical';
   }
 
-  // Score: start at 100, deduct per issue with weighted severity
-  // Critical SEO checks get heavier deductions than cosmetic ones
+  // Score: start at 100, deduct per issue with weighted severity.
+  // Weights calibrated to match industry tools (SEMRush, Ahrefs):
+  //   - Errors are meaningful deductions (broken fundamentals)
+  //   - Warnings are mild deductions (improvement opportunities)
+  //   - Info/notices have zero score impact (aspirational recommendations)
   let score = 100;
   for (const issue of issues) {
     const isCritical = CRITICAL_CHECKS.has(issue.check);
     const isModerate = MODERATE_CHECKS.has(issue.check);
     if (issue.severity === 'error') {
-      score -= isCritical ? 20 : 12;
+      score -= isCritical ? 15 : 10;
     } else if (issue.severity === 'warning') {
-      score -= isCritical ? 10 : isModerate ? 6 : 4;
-    } else {
-      score -= 1;
+      score -= isCritical ? 5 : isModerate ? 3 : 2;
     }
+    // info severity: no score impact (industry standard)
   }
   score = Math.max(0, Math.min(100, score));
 
-  return { pageId, page: pageName, slug, url, score, issues };
+  return { pageId, page: pageName, slug, url, score, issues, ...(isNoindex ? { noindex: true } : {}) };
 }
 
 // Slugs / title keywords for pages that should be excluded from SEO audits.

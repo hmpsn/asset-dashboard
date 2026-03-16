@@ -436,6 +436,24 @@
       "shippedAt": "2026-03",
       "items": [
         {
+          "id": 284,
+          "title": "Noindex page awareness: exclude from site score, info severity, visual badge + banner explaining no search impact",
+          "status": "done",
+          "shippedAt": "2026-03-16"
+        },
+        {
+          "id": 283,
+          "title": "Fix intermittent suppress button (onMouseDown + stopPropagation + sync menu close)",
+          "status": "done",
+          "shippedAt": "2026-03-16"
+        },
+        {
+          "id": 282,
+          "title": "Industry-standard audit scoring (SEMRush-like weights, info=0 impact) + page-type-aware AEO checks (content pages only)",
+          "status": "done",
+          "shippedAt": "2026-03-16"
+        },
+        {
           "id": 281,
           "title": "Pattern-based audit suppression (suppress check for all blog/*, resources/*, etc.)",
           "status": "done",

@@ -605,8 +605,10 @@ Respond in this exact JSON format (only include fields that need fixing):
     else totalInfos++;
   }
 
-  const siteScore = results.length > 0
-    ? Math.round(results.reduce((s, r) => s + r.score, 0) / results.length)
+  // Exclude noindex pages from site score — they're intentionally hidden from search
+  const indexedResults = results.filter(r => !r.noindex);
+  const siteScore = indexedResults.length > 0
+    ? Math.round(indexedResults.reduce((s, r) => s + r.score, 0) / indexedResults.length)
     : 100;
 
   return {

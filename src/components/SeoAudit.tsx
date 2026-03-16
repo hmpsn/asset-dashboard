@@ -6,7 +6,7 @@ import {
   Loader2, ChevronDown, ChevronRight,
   CheckCircle, Globe, FileText,
   X, Clock, Share2, Copy, ExternalLink,
-  TrendingDown, Sparkles,
+  TrendingDown, Sparkles, EyeOff,
 } from 'lucide-react';
 import { StatCard, scoreColorClass, scoreBgBarClass } from './ui';
 import { StatusBadge } from './ui/StatusBadge';
@@ -479,9 +479,9 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
       for (const issue of filtered) {
         const isCritical = CRITICAL_CHECKS.has(issue.check);
         const isModerate = MODERATE_CHECKS.has(issue.check);
-        if (issue.severity === 'error') score -= isCritical ? 20 : 12;
-        else if (issue.severity === 'warning') score -= isCritical ? 10 : isModerate ? 6 : 4;
-        else score -= 1;
+        if (issue.severity === 'error') score -= isCritical ? 15 : 10;
+        else if (issue.severity === 'warning') score -= isCritical ? 5 : isModerate ? 3 : 2;
+        // info: no score impact (industry standard)
       }
       score = Math.max(0, Math.min(100, score));
       return { ...page, issues: filtered, score };
@@ -490,7 +490,9 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     const errors = pages.reduce((sum, p) => sum + p.issues.filter(i => i.severity === 'error').length, 0);
     const warnings = pages.reduce((sum, p) => sum + p.issues.filter(i => i.severity === 'warning').length, 0);
     const infos = pages.reduce((sum, p) => sum + p.issues.filter(i => i.severity === 'info').length, 0);
-    const siteScore = pages.length > 0 ? Math.round(pages.reduce((sum, p) => sum + p.score, 0) / pages.length) : 0;
+    // Exclude noindex pages from site score — they don't affect search rankings
+    const indexedPages = pages.filter(p => !p.noindex);
+    const siteScore = indexedPages.length > 0 ? Math.round(indexedPages.reduce((sum, p) => sum + p.score, 0) / indexedPages.length) : 0;
 
     return { ...data, pages, errors, warnings, infos, siteScore };
   }, [data, suppressions]);
@@ -864,7 +866,10 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
                   <ChevronRight className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
                 )}
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-zinc-200 truncate">{page.page}</div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-medium text-zinc-200 truncate">{page.page}</span>
+                    {page.noindex && <span className="text-[10px] px-1 py-px rounded bg-zinc-700 text-zinc-400 border border-zinc-600 flex-shrink-0">noindex</span>}
+                  </div>
                   <div className="text-xs text-zinc-500 truncate">/{page.slug}</div>
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
@@ -883,6 +888,12 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
 
               {isExpanded && (
                 <div className="ml-8 mb-2 space-y-1">
+                  {page.noindex && (
+                    <div className="mx-4 mb-1 px-3 py-1.5 rounded-lg bg-zinc-800/60 border border-zinc-700 text-[11px] text-zinc-400 flex items-center gap-1.5">
+                      <EyeOff className="w-3 h-3 flex-shrink-0" />
+                      This page is marked <span className="font-medium text-zinc-300">noindex</span> — issues listed below won't affect crawlability or search rankings and are excluded from the site health score.
+                    </div>
+                  )}
                   {page.issues.length === 0 ? (
                     <div className="text-xs text-green-500 px-4 py-2">No issues found</div>
                   ) : (
