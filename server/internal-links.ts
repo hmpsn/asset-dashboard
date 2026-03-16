@@ -14,6 +14,11 @@ import { createLogger } from './logger.js';
 
 const log = createLogger('internal-links');
 
+const FETCH_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (compatible; HmpsnStudioBot/1.0; +https://hmpsn.studio)',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+};
+
 /**
  * Fetch and parse sitemap.xml to discover all published URLs.
  * Returns array of {url, path, title} for each <loc> entry.
@@ -21,7 +26,7 @@ const log = createLogger('internal-links');
 async function fetchSitemapUrls(baseUrl: string): Promise<Array<{ url: string; path: string; title: string }>> {
   try {
     const sitemapUrl = `${baseUrl}/sitemap.xml`;
-    const res = await fetch(sitemapUrl, { redirect: 'follow', signal: AbortSignal.timeout(15000) });
+    const res = await fetch(sitemapUrl, { redirect: 'follow', signal: AbortSignal.timeout(15000), headers: FETCH_HEADERS });
     if (!res.ok) return [];
     const xml = await res.text();
 
@@ -89,7 +94,7 @@ export interface InternalLinkResult {
 
 async function fetchPageContent(url: string): Promise<{ content: string; internalLinks: string[]; pageTitle?: string } | null> {
   try {
-    const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(10000) });
+    const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(10000), headers: FETCH_HEADERS });
     if (!res.ok) return null;
     const html = await res.text();
 
