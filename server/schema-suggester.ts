@@ -319,8 +319,17 @@ function extractPageContent(html: string): string {
 }
 
 function extractStructuredInfo(html: string) {
-  const emails = (html.match(/[\w.-]+@[\w.-]+\.\w+/g) || []).slice(0, 3);
-  const phones = (html.match(/(?:\+1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g) || []).slice(0, 2);
+  // Strip scripts, styles, and HTML tags for clean text extraction (emails + phones)
+  const visibleText = html
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<[^>]+>/g, ' ');
+  const emails = (visibleText.match(/[\w.-]+@[\w.-]+\.\w+/g) || [])
+    .filter(e => /\.(com|org|net|edu|gov|io|co|us|uk|ca|au)$/i.test(e))
+    .filter(e => !/[@.](?:npm|pkg|bower|components?|modules?|packages?|plugins?|bundle)/i.test(e))
+    .filter(e => !/\d+\.\d+\.\d+/.test(e))
+    .slice(0, 3);
+  const phones = (visibleText.match(/(?:\+1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g) || []).slice(0, 2);
   const images = (html.match(/src=["']([^"']*(?:jpg|jpeg|png|webp)[^"']*)["']/gi) || []).slice(0, 5).map(m => {
     const s = m.match(/src=["']([^"']+)["']/i);
     return s ? s[1] : '';
