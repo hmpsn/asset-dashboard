@@ -78,7 +78,7 @@ Every completed task — no matter how small — must include these steps:
 | `app.ts` | **Express app factory** (~301 lines) | `createApp()`: helmet, CORS, cookie-parser, request logger, fingerprinting, Stripe webhook (raw body), JSON/static/SPA middleware, all route mounting, Sentry error handler. Extracted from index.ts for testability. |
 | `websocket.ts` | **WebSocket server** (~130 lines) | `initWebSocket(server)`: connection handling, heartbeat, auth, workspace rooms, broadcast helpers. |
 | `startup.ts` | **Scheduler init** (~22 lines) | `startSchedulers()`: kicks off all background schedulers (churn, anomaly, trial reminders, backups, etc.). |
-| `routes/` | **54 Express Router files** | One file per domain: `auth.ts`, `webflow.ts`, `webflow-alt-text.ts`, `webflow-audit.ts`, `webflow-cms.ts`, `webflow-keywords.ts`, `webflow-organize.ts`, `webflow-pagespeed.ts`, `webflow-schema.ts`, `webflow-seo.ts`, `webflow-analysis.ts`, `aeo-review.ts`, `feedback.ts`, `public-feedback.ts`, `content-decay.ts`, `content-publish.ts`, `content-subscriptions.ts`, `seo-change-tracker.ts`, `backlinks.ts`, `brand-docs.ts`, `data-export.ts`, `revenue.ts`, etc. |
+| `routes/` | **56 Express Router files** | One file per domain: `auth.ts`, `webflow.ts`, `webflow-alt-text.ts`, `webflow-audit.ts`, `webflow-cms.ts`, `webflow-keywords.ts`, `webflow-organize.ts`, `webflow-pagespeed.ts`, `webflow-schema.ts`, `webflow-seo.ts`, `webflow-analysis.ts`, `aeo-review.ts`, `feedback.ts`, `public-feedback.ts`, `content-decay.ts`, `content-publish.ts`, `content-subscriptions.ts`, `seo-change-tracker.ts`, `backlinks.ts`, `brand-docs.ts`, `data-export.ts`, `revenue.ts`, `workspace-badges.ts`, `workspace-home.ts`, etc. |
 | `helpers.ts` | Shared pure functions | `sanitizeString`, `validateEnum`, `parseDateRange`, `applySuppressionsToAudit`, `buildSchemaContext`, `getAuditTrafficForWorkspace`, `readEnvFile`, `writeEnvFile` |
 | `middleware.ts` | Shared middleware + auth (single source of truth) | Rate limiters, `signClientSession`/`verifyClientSession`, `signAdminToken`/`verifyAdminToken`, `upload` (multer), `moveUploadedFiles`, `IS_PROD`, `APP_PASSWORD` |
 | `middleware/` | **Extracted middleware modules** | `fingerprint.ts` (request fingerprinting), `request-logger.ts` (pino HTTP request logging), `turnstile.ts` (Cloudflare Turnstile CAPTCHA verification) |
@@ -87,7 +87,9 @@ Every completed task — no matter how small — must include these steps:
 | `seo-context.ts` | `buildSeoContext()`, `buildKeywordMapContext()`, `buildKnowledgeBase()` | Shared AI prompt builders — used by chat, briefs, schema |
 | `chat-memory.ts` | Chat session persistence | `addMessage`, `buildConversationContext`, `generateSessionSummary` |
 | `content-brief.ts` | AI content brief generation | 7 page-type-specific prompts, SEMRush/GSC enrichment, H3 subheadings in outline, full sitemap for internal links, language/quality rules (buzzword bans, case study anonymity, FAQ formatting, industry diversity, section count). Uses GPT-4.1 (structured JSON output). |
-| `content-posts.ts` | AI full post generation from briefs | Hybrid model: Claude (claude-sonnet-4-20250514) for creative prose (intro/sections/conclusion) via `callCreativeAI`, GPT-4.1 for structured tasks (unification, SEO meta). Auto-fallback to GPT if no Anthropic key. Outputs clean HTML. Strict word count budgets. `WRITING_QUALITY_RULES` constant. `getAllSitePages` helper for full sitemap internal links with liveDomain URLs. |
+| `content-posts.ts` | **AI full post orchestration + barrel re-export** | Thin entry point that re-exports from `content-posts-db.ts` and `content-posts-ai.ts`. Contains high-level `generatePost()` orchestration. |
+| `content-posts-ai.ts` | AI prompt construction + generation logic | Hybrid model: Claude (claude-sonnet-4-20250514) for creative prose (intro/sections/conclusion) via `callCreativeAI`, GPT-4.1 for structured tasks (unification, SEO meta). Auto-fallback to GPT if no Anthropic key. Outputs clean HTML. Strict word count budgets. `WRITING_QUALITY_RULES` constant. `getAllSitePages` helper for full sitemap internal links with liveDomain URLs. |
+| `content-posts-db.ts` | Content post DB CRUD + version history | SQLite persistence for generated posts. `savePost`, `getPost`, `listPosts`, `snapshotPostVersion`. Row→model mappers. |
 | `anthropic-helpers.ts` | Anthropic Claude API wrapper | `callAnthropic()` with retry/backoff/timeout, `isAnthropicConfigured()`. Reuses OpenAI token tracker for unified cost reporting. |
 | `brief-export-html.ts` | Branded HTML/PDF brief export | Page type badge in header |
 | `content-requests.ts` | Content topic request CRUD | `ContentTopicRequest` interface (includes `pageType`, `serviceType`) |
@@ -152,6 +154,11 @@ Every completed task — no matter how small — must include these steps:
 | `jobs.ts` | **Background job persistence** (~269 lines) | SQLite-backed job tracking with write-through cache. Jobs survive server restarts. Running jobs marked as interrupted on shutdown. |
 | `internal-links.ts` | Internal link suggestions | AI-powered link opportunity detection, orphan page detection, per-page link health scoring (0-100) |
 | `pagespeed.ts` | PageSpeed Insights wrapper | Google PSI API integration |
+| `webflow.ts` | **Barrel re-export** for Webflow sub-modules | Re-exports from `webflow-assets.ts`, `webflow-pages.ts`, `webflow-cms.ts`. Backward-compatible — existing imports still work. |
+| `webflow-client.ts` | Shared Webflow API fetch helper | `webflowFetch()`, `getToken()`. Used by all webflow sub-modules. |
+| `webflow-assets.ts` | Webflow asset API | Asset CRUD, folders, upload, usage scanning. Extracted from original `webflow.ts`. |
+| `webflow-pages.ts` | Webflow page API | Pages, SEO, publishing, schema, sitemap discovery. Extracted from original `webflow.ts`. |
+| `webflow-cms.ts` | Webflow CMS/collections API | `listCollections`, `listCollectionItems`. Extracted from original `webflow.ts`. |
 
 ### § 2a. SQLite Database (`server/db/`)
 
@@ -214,11 +221,13 @@ Every completed task — no matter how small — must include these steps:
 | `components/MobileGuard.tsx` | Mobile device interstitial | Dismissible guard recommending desktop experience |
 | `components/WorkspaceSettings.tsx` | Admin workspace config | Shell with tab routing; tabs extracted to `settings/` |
 | `components/settings/` | **WorkspaceSettings tab modules** | `ConnectionsTab.tsx` (integrations), `FeaturesTab.tsx` (feature toggles), `ClientDashboardTab.tsx` (client portal config, client users) |
-| `components/audit/` | **SeoAudit extracted modules** | `ScoreTrendChart.tsx`, `ActionItemsPanel.tsx`, `AuditHistory.tsx`, `types.ts` (shared audit interfaces) |
-| `components/briefs/` | **ContentBriefs extracted modules** | `BriefDetail.tsx` (expanded brief view with all fields) |
-| `components/schema/` | **SchemaSuggester extracted modules** | `CmsTemplatePanel.tsx` (CMS template schema UI) |
-| `components/strategy/` | **KeywordStrategy extracted modules** | `SeoCopyPanel.tsx` (SEO copy generation panel), `BacklinkProfile.tsx` (domain backlink overview), `CompetitiveIntel.tsx` (competitive intelligence hub) |
-| `components/assets/` | **AssetBrowser extracted modules** | `OrganizePreview.tsx` (asset organize preview) |
+| `components/audit/` | **SeoAudit extracted modules** | `ScoreTrendChart.tsx`, `ActionItemsPanel.tsx`, `AuditHistory.tsx`, `AuditBatchActions.tsx`, `AuditFilters.tsx`, `AuditIssueRow.tsx`, `AuditReportExport.tsx`, `types.ts` (shared audit interfaces) |
+| `components/briefs/` | **ContentBriefs extracted modules** | `BriefDetail.tsx` (expanded brief view with all fields), `BriefGenerator.tsx` (brief generation form), `BriefList.tsx` (brief listing/status management), `RequestList.tsx` (content request queue) |
+| `components/schema/` | **SchemaSuggester extracted modules** | `CmsTemplatePanel.tsx` (CMS template schema UI), `BulkPublishPanel.tsx` (bulk schema publish), `PagePicker.tsx` (page selection for schema), `SchemaEditor.tsx` (inline schema editor), `SchemaPageCard.tsx` (per-page schema card) |
+| `components/strategy/` | **KeywordStrategy extracted modules** | `SeoCopyPanel.tsx` (SEO copy generation panel), `BacklinkProfile.tsx` (domain backlink overview), `CompetitiveIntel.tsx` (competitive intelligence hub), `ContentGaps.tsx` (content gap analysis), `KeywordGaps.tsx` (keyword gap panel), `LowHangingFruit.tsx` (quick-win keyword targets), `PageKeywordMap.tsx` (page-to-keyword mapping table), `QuickWins.tsx` (quick wins panel) |
+| `components/assets/` | **AssetBrowser extracted modules** | `OrganizePreview.tsx` (asset organize preview), `AssetCard.tsx` (individual asset card), `AssetFilters.tsx` (asset filter controls), `BulkActions.tsx` (bulk asset operations) |
+| `components/editor/` | **SeoEditor extracted modules** | `ApprovalPanel.tsx` (approval workflow panel), `BulkOperations.tsx` (bulk SEO edit operations), `PageEditRow.tsx` (per-page edit row) |
+| `components/post-editor/` | **PostEditor extracted modules** | `PostPreview.tsx` (post HTML preview), `ReviewChecklist.tsx` (human-in-the-loop review), `SectionEditor.tsx` (per-section content editor), `VersionHistory.tsx` (post version history viewer) |
 | `components/workspace-home/` | **WorkspaceHome extracted modules** | `ActiveRequestsAnnotations.tsx`, `ActivityFeed.tsx`, `RankingsSnapshot.tsx`, `SeoWorkStatus.tsx`, `SeoChangeImpact.tsx`, `index.ts` (barrel) |
 | `components/AeoReview.tsx` | AEO page review | AI-powered per-page content change recommendations (lazy-loaded sub-tab in SeoAudit) |
 | `components/AnomalyAlerts.tsx` | Anomaly alert viewer | Displays traffic/ranking anomalies with severity badges |
@@ -236,6 +245,7 @@ Every completed task — no matter how small — must include these steps:
 | `components/ui/` | **16 shared UI primitives** (14 components + 2 config files) | See § 4 below |
 | `components/client/` | **Client tab components** (29 files) | `types.ts`, `helpers.tsx`, `utils.ts`, `index.ts`, `OverviewTab.tsx`, `SearchTab.tsx`, `AnalyticsTab.tsx`, `PerformanceTab.tsx` (merged Search+Analytics), `StrategyTab.tsx`, `ContentTab.tsx`, `ApprovalsTab.tsx`, `RequestsTab.tsx`, `PlansTab.tsx`, `InboxTab.tsx` (composes Approvals+Requests+Content), `HealthTab.tsx`, `InsightsDigest.tsx`, `InsightsEngine.tsx`, `MonthlySummary.tsx`, `DataSnapshots.tsx`, `ROIDashboard.tsx`, `OrderStatus.tsx`, `FixRecommendations.tsx`, `SeoCart.tsx`, `useCart.tsx`, `OnboardingWizard.tsx`, `BetaContext.tsx` (beta mode feature flag), `ClientOnboardingQuestionnaire.tsx`, `FeedbackWidget.tsx`, `SeoGlossary.tsx` |
 | `components/shared/` | **Shared cross-dashboard components** | `RankTable.tsx` (position colors, history chart, rank change indicators) |
+| `contexts/` | **React context providers** | `WorkspaceDataContext.tsx` — cached data fetching for workspace-level data (GSC, GA4, audit, ranks, activity, annotations). Provides `useWorkspaceData()` hook with per-key caching + loading states. |
 | `hooks/` | **Shared React hooks** (15 files) | `useAuth.ts`, `useWebSocket.ts`, `useBackgroundTasks.tsx`, `useAuditSummary.ts`, `useSearchData.ts`, `useGA4Overview.ts`, `usePageEditStates.ts`, `useRecommendations.ts`, `useWorkspaceEvents.ts`, `useChat.ts`, `useClientAuth.ts`, `useClientData.ts`, `useContentRequests.ts`, `usePayments.ts`, `useToast.ts` |
 
 ### Shared (`shared/`)

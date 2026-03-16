@@ -360,12 +360,12 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   useEffect(() => {
     // Check for existing completed or running seo-audit job for this site
     const existingJob = jobs
-      .filter(j => j.type === 'seo-audit' && j.status === 'done' && j.result)
+      .filter(j => j.type === 'seo-audit' && j.status === 'done' && j.result && j.workspaceId === workspaceId)
       .find(j => {
         const r = j.result as SeoAuditResult;
         return r && Array.isArray(r.pages);
       });
-    const runningJob = jobs.find(j => j.type === 'seo-audit' && (j.status === 'running' || j.status === 'pending'));
+    const runningJob = jobs.find(j => j.type === 'seo-audit' && (j.status === 'running' || j.status === 'pending') && j.workspaceId === workspaceId);
 
     if (existingJob && !data) {
       setData(existingJob.result as SeoAuditResult);
