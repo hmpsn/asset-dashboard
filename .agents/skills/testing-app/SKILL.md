@@ -1,68 +1,71 @@
 # Testing asset-dashboard Locally
 
-## Local Development Setup
+## Dev Servers
 
-1. Copy `.env.example` to `.env` (most values are optional for local dev)
-2. Start the backend: `npm run dev:server` (runs on port 3001)
-3. Start the frontend: `npm run dev` (Vite on port 5173)
-4. Or run both: `npm run dev:all` (uses concurrently)
+### Frontend (Vite)
+```bash
+cd ~/repos/asset-dashboard && npm run dev
+```
+Runs on http://localhost:5173
 
-The server creates a SQLite database automatically on first run at `~/.asset-dashboard/`. No external API keys are required to start the app — features that need them (GSC, GA4, Stripe, etc.) will show placeholder states.
+### Backend (Express)
+```bash
+cd ~/repos/asset-dashboard && npm run dev:server
+```
+Runs on http://localhost:3001
 
-## Authentication
+Both servers must be running for the app to function.
 
-- In dev mode with no `APP_PASSWORD` set, the app skips the login screen entirely
-- `JWT_SECRET` falls back to an insecure hardcoded value in dev
-- No credentials needed for local testing
+## Build & Lint Verification
+```bash
+npx tsc --noEmit --skipLibCheck   # typecheck
+npx vite build                     # production build
+npx vitest run                     # unit tests (596 passing, 1 pre-existing failure in users-api.test.ts)
+```
 
-## Creating Test Data
+## Test Workspace
+- The app auto-creates a "Test Workspace" on first backend start
+- Workspace ID: dynamically generated (format: `ws_TIMESTAMP_1`)
+- Site ID: `test-site-123`
+- No real Webflow/OpenAI API keys are configured by default
+- The workspace selector is in the top-left sidebar
 
-- **Create a workspace**: Click the workspace selector dropdown in the sidebar header, then "New workspace" → type a name → click "Add"
-- Many features require a Webflow site to be linked (`needsSite: true` in nav config). Without a linked site, those pages show "Link a Webflow site to use this tool"
-- You can still navigate to these pages directly via URL to verify routing works
+## Navigation to Key Components
 
-## Sidebar Navigation Structure
+After selecting a workspace in the sidebar:
 
-The sidebar groups are defined in `src/App.tsx` in the `navGroups` array (~line 348). Current structure:
+| Sidebar Item | URL Path | Component |
+|---|---|---|
+| Home | `/ws/{id}` | WorkspaceHome |
+| Assets → Browse tab | `/ws/{id}/media` | MediaTab → AssetBrowser |
+| SEO Editor | `/ws/{id}/seo-editor` | SeoEditor (via SeoEditorWrapper) |
+| Strategy | `/ws/{id}/seo-strategy` | KeywordStrategy |
+| Schema | `/ws/{id}/seo-schema` | SchemaSuggester |
+| Content Pipeline | `/ws/{id}/content-pipeline` | ContentPipeline (embeds ContentBriefs) |
+| Site Audit | `/ws/{id}/seo-audit` | SeoAudit |
 
-- **Home** (no group)
-- **ANALYTICS**: Search Console, Google Analytics, Rank Tracker
-- **SITE HEALTH**: Site Audit, Performance, Links, Assets
-- **SEO**: Brand & AI, Strategy, SEO Editor, Schema
-- **CONTENT**: Content Pipeline, Calendar, Requests, Content Perf
+Notes:
+- ContentBriefs is embedded inside ContentPipeline (Briefs tab)
+- PostEditor opens inline when clicking a generated post from ContentBriefs
+- AssetBrowser is under MediaTab's "Browse" sub-tab (not directly in sidebar)
 
-Note: "Annotations" is NOT a separate sidebar item — it's embedded as a collapsible panel inside Search Console.
+## Testing Without API Keys
 
-## Key Routes
+Without Webflow/OpenAI API keys:
+- Components will load but show empty states or error messages about missing tokens
+- This is sufficient to verify component rendering, prop wiring, and layout
+- Backend will log 500 errors for Webflow API calls (expected)
+- For full end-to-end testing (AI generation, asset operations, SEO edits), real API keys are needed
 
-- Workspace home: `/ws/{workspaceId}`
-- Content Pipeline: `/ws/{workspaceId}/content-pipeline` (tabbed wrapper with Briefs/Posts/Subscriptions)
-- Requests: `/ws/{workspaceId}/requests`
-- All routes defined in `src/routes.ts` as the `Page` type union
-- Route rendering in `src/App.tsx` `renderContent()` function (~line 401)
+## Common Issues
 
-## Aggregated Endpoints
-
-- `GET /api/workspace-home/:id` — returns all WorkspaceHome data in a single response (ranks, requests, contentRequests, activity, annotations, churnSignals, workOrders, searchData, ga4Data, comparison)
-- `GET /api/workspace-badges/:id` — lightweight badge counts for sidebar
-- Server routes in `server/routes/workspace-home.ts` and `server/routes/workspace-badges.ts`
-
-## Testing Network Requests
-
-To verify API call consolidation:
-1. Open Chrome DevTools Network tab
-2. Filter by "Fetch/XHR"
-3. Navigate to workspace Home
-4. Filter for "workspace-home" — should see exactly 1 aggregated call
-5. Filter for "activity", "annotations", "rank-tracking" — should see 0 results (no redundant individual fetches)
-
-## Running Checks
-
-- TypeScript: `npx tsc --noEmit --skipLibCheck`
-- Build: `npx vite build`
-- Tests: `npx vitest run` (597+ tests)
-- No separate lint command configured
+- **Backend script name**: Use `npm run dev:server` (not `npm run server`)
+- **WebSocket warnings in console**: Pre-existing, safe to ignore
+- **CSS @import warnings from Vite**: Pre-existing postcss warning about @import ordering, does not affect functionality
+- **Prop mismatch bugs after extraction**: When components are extracted into sub-modules, callback prop names may not match between parent and child. TypeScript catches data prop mismatches but callbacks typed as `(value: string) => void` can silently accept wrong names. Always verify interactive elements work after extraction.
 
 ## Devin Secrets Needed
 
-None required for basic local testing. External integrations (Webflow, Google, Stripe) need their respective API keys from `.env.example` but are optional.
+None required for basic component rendering tests. For full E2E testing:
+- `WEBFLOW_API_TOKEN` - Webflow API token for asset/page operations
+- `OPENAI_API_KEY` - OpenAI key for AI generation features
