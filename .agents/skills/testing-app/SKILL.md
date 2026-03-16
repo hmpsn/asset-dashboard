@@ -1,84 +1,68 @@
-# Testing asset-dashboard
+# Testing asset-dashboard Locally
 
-## Dev Server
+## Local Development Setup
 
-```bash
-cd ~/repos/asset-dashboard
-npm run dev:all  # Starts Vite frontend + tsx backend concurrently
-```
+1. Copy `.env.example` to `.env` (most values are optional for local dev)
+2. Start the backend: `npm run dev:server` (runs on port 3001)
+3. Start the frontend: `npm run dev` (Vite on port 5173)
+4. Or run both: `npm run dev:all` (uses concurrently)
 
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:5173/api/* (proxied through Vite)
-- WebSocket: ws://localhost:5173/ws
-- Health endpoint: http://localhost:5173/api/health
+The server creates a SQLite database automatically on first run at `~/.asset-dashboard/`. No external API keys are required to start the app — features that need them (GSC, GA4, Stripe, etc.) will show placeholder states.
 
-## Running Tests
+## Authentication
 
-```bash
-npx vitest run           # Unit + integration tests
-npx tsc --noEmit --skipLibCheck  # Type check
-npx vite build           # Production build verification
-```
+- In dev mode with no `APP_PASSWORD` set, the app skips the login screen entirely
+- `JWT_SECRET` falls back to an insecure hardcoded value in dev
+- No credentials needed for local testing
 
-## Testing Public API Features
+## Creating Test Data
 
-### Rate Limit Headers
-All `/api/public/*` endpoints return rate limit headers. Verify with:
-```bash
-curl -sI http://localhost:5173/api/public/auth-mode/<workspaceId> | grep -i ratelimit
-```
-Expect: `x-ratelimit-limit`, `x-ratelimit-remaining`, `x-ratelimit-reset`
+- **Create a workspace**: Click the workspace selector dropdown in the sidebar header, then "New workspace" → type a name → click "Add"
+- Many features require a Webflow site to be linked (`needsSite: true` in nav config). Without a linked site, those pages show "Link a Webflow site to use this tool"
+- You can still navigate to these pages directly via URL to verify routing works
 
-### Credential Stuffing Protection
-The `clientLoginLimiter` (5/min per IP) fires before the per-email credential stuffing check (5 failures → 15-min lockout). When testing locally, both layers share the same localhost IP, so the IP rate limiter will fire first after ~5 requests in a 1-minute window.
+## Sidebar Navigation Structure
 
-To test credential stuffing specifically, you may need to wait 60s between batches for the IP rate limiter to reset.
+The sidebar groups are defined in `src/App.tsx` in the `navGroups` array (~line 348). Current structure:
 
-```bash
-curl -s -X POST http://localhost:5173/api/public/client-login/<workspaceId> \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"test@example.com","password":"wrong"}'
-```
+- **Home** (no group)
+- **ANALYTICS**: Search Console, Google Analytics, Rank Tracker
+- **SITE HEALTH**: Site Audit, Performance, Links, Assets
+- **SEO**: Brand & AI, Strategy, SEO Editor, Schema
+- **CONTENT**: Content Pipeline, Calendar, Requests, Content Perf
 
-### Turnstile CAPTCHA
-Turnstile only activates when `VITE_TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` env vars are set. Without them, the widget doesn't render and server-side verification is skipped. To test the full Turnstile flow, you need real Cloudflare Turnstile credentials.
+Note: "Annotations" is NOT a separate sidebar item — it's embedded as a collapsible panel inside Search Console.
 
-### Structured Logging
-Server logs use pino-pretty in development. Look for structured fields:
-- `module` — which server module handled the request
-- `requestId` — unique per-request UUID
-- `method`, `path`, `status`, `duration` — HTTP request metadata
-- `fingerprint` — SHA-256 hash (only on endpoints with fingerprinting middleware)
+## Key Routes
 
-## Client Dashboard Testing
+- Workspace home: `/ws/{workspaceId}`
+- Content Pipeline: `/ws/{workspaceId}/content-pipeline` (tabbed wrapper with Briefs/Posts/Subscriptions)
+- Requests: `/ws/{workspaceId}/requests`
+- All routes defined in `src/routes.ts` as the `Page` type union
+- Route rendering in `src/App.tsx` `renderContent()` function (~line 401)
 
-URL: `http://localhost:5173/client/<workspaceId>`
+## Aggregated Endpoints
 
-To create a test workspace and client user:
-```bash
-# Create workspace (if none exists)
-curl -s -X POST http://localhost:5173/api/workspaces \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"Test Workspace"}'
+- `GET /api/workspace-home/:id` — returns all WorkspaceHome data in a single response (ranks, requests, contentRequests, activity, annotations, churnSignals, workOrders, searchData, ga4Data, comparison)
+- `GET /api/workspace-badges/:id` — lightweight badge counts for sidebar
+- Server routes in `server/routes/workspace-home.ts` and `server/routes/workspace-badges.ts`
 
-# Create client user
-curl -s -X POST http://localhost:5173/api/workspaces/<workspaceId>/client-users \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"test@example.com","password":"TestPass123!","name":"Test User","role":"client_member"}'
-```
+## Testing Network Requests
 
-The client dashboard auto-authenticates from session storage. To reset and see the login form, clear session storage and cookies in the browser.
+To verify API call consolidation:
+1. Open Chrome DevTools Network tab
+2. Filter by "Fetch/XHR"
+3. Navigate to workspace Home
+4. Filter for "workspace-home" — should see exactly 1 aggregated call
+5. Filter for "activity", "annotations", "rank-tracking" — should see 0 results (no redundant individual fetches)
 
-## Common Gotchas
+## Running Checks
 
-- **Browser session persists**: The client dashboard stores auth in `sessionStorage`. Clearing via DevTools console is needed to get back to the login form. The `browser_console` tool may report "Chrome is not in the foreground" — try clicking directly on the Chrome tab first.
-- **Rate limiter state is in-memory**: Restarting the server resets all rate limit counters and credential stuffing lockouts.
-- **No external API keys in dev**: Most features (GA4, GSC, Webflow, Stripe, OpenAI, Sentry) return errors/empty data without credentials. This is expected — the 400 errors in the console from `/api/public/aud-*` endpoints are normal.
-- **Vite HMR picks up frontend changes automatically**: No need to restart the dev server for frontend code changes. Backend changes are picked up by tsx watch mode.
+- TypeScript: `npx tsc --noEmit --skipLibCheck`
+- Build: `npx vite build`
+- Tests: `npx vitest run` (597+ tests)
+- No separate lint command configured
 
 ## Devin Secrets Needed
 
-No secrets are required for basic local testing. Optional secrets for full integration testing:
-- `VITE_TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` — for Turnstile CAPTCHA testing
-- `OPENAI_API_KEY` — for AI chat and content generation
-- `STRIPE_SECRET_KEY` + `STRIPE_PUBLISHABLE_KEY` — for payment flow testing
+None required for basic local testing. External integrations (Webflow, Google, Stripe) need their respective API keys from `.env.example` but are optional.
