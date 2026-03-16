@@ -1,6 +1,5 @@
 import {
-  ChevronDown, ChevronUp, FileText, Copy, Download, Trash2, Search, X, ArrowUpDown,
-  Clipboard,
+  ChevronDown, ChevronUp, FileText, Copy, Download, Trash2, Search,
 } from 'lucide-react';
 import { BriefDetail } from './BriefDetail';
 
@@ -106,42 +105,6 @@ export function BriefList({
 
   return (
     <>
-      {/* Header */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Clipboard className="w-5 h-5 text-teal-400" />
-            <h2 className="text-sm font-semibold text-zinc-200">Content Briefs</h2>
-            <span className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{briefs.length} total</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                value={briefSearch}
-                onChange={e => onSetBriefSearch(e.target.value)}
-                placeholder="Search briefs..."
-                className="w-48 pl-8 pr-7 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 focus:border-zinc-700 focus:outline-none"
-              />
-              {briefSearch && (
-                <button onClick={() => onSetBriefSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-400">
-                  <X className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-            <div className="flex items-center gap-1 text-[11px] text-zinc-500">
-              <ArrowUpDown className="w-3 h-3" />
-              <select value={briefSort} onChange={e => onSetBriefSort(e.target.value as 'date' | 'keyword' | 'difficulty')} className="bg-zinc-900 border border-zinc-800 rounded px-1.5 py-1 text-[11px] text-zinc-400 focus:outline-none cursor-pointer">
-                <option value="date">Newest</option>
-                <option value="keyword">Keyword A-Z</option>
-                <option value="difficulty">Difficulty</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Briefs list */}
       {standaloneBriefs.length === 0 && !briefSearch.trim() ? (
         <div className="text-center py-12">
