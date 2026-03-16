@@ -28,6 +28,7 @@ interface PageLinkHealth {
 interface InternalLinkResult {
   suggestions: LinkSuggestion[];
   pageCount: number;
+  attemptedPageCount?: number;
   existingLinkCount: number;
   analyzedAt: string;
   pageHealth?: PageLinkHealth[];
@@ -155,7 +156,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
       {/* Header */}
       <PageHeader
         title="Internal Linking Suggestions"
-        subtitle={`Analyzed ${data.pageCount} pages · ${data.existingLinkCount} existing internal links · ${data.suggestions.length} suggestions`}
+        subtitle={`Analyzed ${data.pageCount}${data.attemptedPageCount && data.attemptedPageCount !== data.pageCount ? `/${data.attemptedPageCount}` : ''} pages · ${data.existingLinkCount} existing internal links · ${data.suggestions.length} suggestions`}
         actions={
           <button onClick={runAnalysis} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium transition-colors">
             <RefreshCw className="w-3 h-3" /> Reanalyze
@@ -368,12 +369,27 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
         </div>
       )}
 
-      {data.suggestions.length === 0 && (
+      {data.suggestions.length === 0 && data.attemptedPageCount && data.pageCount < data.attemptedPageCount * 0.5 ? (
+        <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg px-4 py-3 text-xs text-amber-400 flex items-center gap-2">
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+          <div>
+            <strong>Content fetch issue:</strong> Only {data.pageCount} of {data.attemptedPageCount} pages could be loaded.
+            {data.pageCount === 0
+              ? ' Your site may be password-protected, behind a staging gate, or unreachable. Check that the live domain is set in Workspace Settings.'
+              : ' Some pages may be password-protected or returning errors. Results may be incomplete.'}
+          </div>
+        </div>
+      ) : data.suggestions.length === 0 && data.pageCount < 2 ? (
+        <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg px-4 py-3 text-xs text-amber-400 flex items-center gap-2">
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+          Not enough pages to analyze. At least 2 published pages with fetchable content are required.
+        </div>
+      ) : data.suggestions.length === 0 ? (
         <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg px-4 py-3 text-xs text-emerald-400 flex items-center gap-2">
           <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
           Your site has good internal linking coverage. No major gaps detected.
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

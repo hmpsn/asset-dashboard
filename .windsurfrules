@@ -78,7 +78,7 @@ Every completed task — no matter how small — must include these steps:
 | `app.ts` | **Express app factory** (~301 lines) | `createApp()`: helmet, CORS, cookie-parser, request logger, fingerprinting, Stripe webhook (raw body), JSON/static/SPA middleware, all route mounting, Sentry error handler. Extracted from index.ts for testability. |
 | `websocket.ts` | **WebSocket server** (~130 lines) | `initWebSocket(server)`: connection handling, heartbeat, auth, workspace rooms, broadcast helpers. |
 | `startup.ts` | **Scheduler init** (~22 lines) | `startSchedulers()`: kicks off all background schedulers (churn, anomaly, trial reminders, backups, etc.). |
-| `routes/` | **48 Express Router files** | One file per domain: `auth.ts`, `webflow.ts`, `webflow-alt-text.ts`, `webflow-audit.ts`, `webflow-cms.ts`, `webflow-keywords.ts`, `webflow-organize.ts`, `aeo-review.ts`, `feedback.ts`, `public-feedback.ts`, `content-decay.ts`, `seo-change-tracker.ts`, etc. |
+| `routes/` | **54 Express Router files** | One file per domain: `auth.ts`, `webflow.ts`, `webflow-alt-text.ts`, `webflow-audit.ts`, `webflow-cms.ts`, `webflow-keywords.ts`, `webflow-organize.ts`, `webflow-pagespeed.ts`, `webflow-schema.ts`, `webflow-seo.ts`, `webflow-analysis.ts`, `aeo-review.ts`, `feedback.ts`, `public-feedback.ts`, `content-decay.ts`, `content-publish.ts`, `content-subscriptions.ts`, `seo-change-tracker.ts`, `backlinks.ts`, `brand-docs.ts`, `data-export.ts`, `revenue.ts`, etc. |
 | `helpers.ts` | Shared pure functions | `sanitizeString`, `validateEnum`, `parseDateRange`, `applySuppressionsToAudit`, `buildSchemaContext`, `getAuditTrafficForWorkspace`, `readEnvFile`, `writeEnvFile` |
 | `middleware.ts` | Shared middleware + auth (single source of truth) | Rate limiters, `signClientSession`/`verifyClientSession`, `signAdminToken`/`verifyAdminToken`, `upload` (multer), `moveUploadedFiles`, `IS_PROD`, `APP_PASSWORD` |
 | `middleware/` | **Extracted middleware modules** | `fingerprint.ts` (request fingerprinting), `request-logger.ts` (pino HTTP request logging), `turnstile.ts` (Cloudflare Turnstile CAPTCHA verification) |
@@ -91,6 +91,19 @@ Every completed task — no matter how small — must include these steps:
 | `anthropic-helpers.ts` | Anthropic Claude API wrapper | `callAnthropic()` with retry/backoff/timeout, `isAnthropicConfigured()`. Reuses OpenAI token tracker for unified cost reporting. |
 | `brief-export-html.ts` | Branded HTML/PDF brief export | Page type badge in header |
 | `content-requests.ts` | Content topic request CRUD | `ContentTopicRequest` interface (includes `pageType`, `serviceType`) |
+| `content-subscriptions.ts` | Recurring content subscriptions | Stripe subscription lifecycle, renewal tracking |
+| `content-image.ts` | Content image handling | Hero image generation/selection for posts |
+| `admin-chat-context.ts` | Admin chat context builder | Aggregates workspace data for AI chat context |
+| `html-to-richtext.ts` | HTML→Webflow RichText converter | For CMS publishing |
+| `performance-store.ts` | PageSpeed snapshot persistence | Stores PSI results over time |
+| `redirect-store.ts` | Redirect scan persistence | Stores redirect scan snapshots |
+| `schema-store.ts` | Schema snapshot persistence | Stores schema generation results |
+| `reports.ts` | Report generation | Monthly/custom report data aggregation |
+| `sales-audit.ts` | Sales audit engine | Prospect site analysis for sales outreach |
+| `sales-report-html.ts` | Sales report HTML renderer | Branded HTML export for prospects |
+| `scheduled-audits.ts` | Scheduled audit runner | Cron-based automatic site audits |
+| `approval-reminders.ts` | Approval reminder emails | Nudges for pending approvals |
+| `annotations.ts` | Timeline annotations | Manual event markers on analytics charts |
 | `stripe.ts` | Lazy-init Stripe SDK, 14-product map, checkout, webhooks | Re-creates SDK when keys change |
 | `stripe-config.ts` | Encrypted on-disk Stripe config (AES-256-GCM) | Env vars as fallback |
 | `payments.ts` | Payment record CRUD (SQLite) | Per-workspace payment history |
@@ -100,7 +113,7 @@ Every completed task — no matter how small — must include these steps:
 | `openai-helpers.ts` | `callOpenAI` wrapper | Retry/backoff/timeout, `parseAIJson`, token tracking |
 | `google-analytics.ts` | GA4 API | All functions accept optional `dateRange?: CustomDateRange` |
 | `search-console.ts` | GSC API | All functions accept optional `dateRange?: CustomDateRange` |
-| `semrush.ts` | SEMRush API | Keyword overview, domain organic, gaps, related |
+| `semrush.ts` | SEMRush API | Keyword overview, domain organic, gaps, related, domain overview (`getDomainOverview`), backlinks overview, referring domains |
 | `seo-audit.ts` | Site health audit engine | Crawl + scoring. Per-page logic extracted to `audit-page.ts`. |
 | `audit-page.ts` | Per-page audit check runner | Extracted from `seo-audit.ts` — runs individual page checks |
 | `seo-audit-html.ts` | Audit HTML report rendering | Extracted from `seo-audit.ts` |
@@ -137,12 +150,12 @@ Every completed task — no matter how small — must include these steps:
 | `redirect-scanner.ts` | Redirect chain detection | Scans for redirect loops and chains |
 | `processor.ts` | Background job processor | Queue-based processing for long-running tasks |
 | `jobs.ts` | **Background job persistence** (~269 lines) | SQLite-backed job tracking with write-through cache. Jobs survive server restarts. Running jobs marked as interrupted on shutdown. |
-| `internal-links.ts` | Internal link suggestions | AI-powered link opportunity detection |
+| `internal-links.ts` | Internal link suggestions | AI-powered link opportunity detection, orphan page detection, per-page link health scoring (0-100) |
 | `pagespeed.ts` | PageSpeed Insights wrapper | Google PSI API integration |
 
 ### § 2a. SQLite Database (`server/db/`)
 
-**All 30+ server modules** now use SQLite via `better-sqlite3` (all 5 migration PRs merged).
+**All 30+ server modules** now use SQLite via `better-sqlite3` (10 migrations merged).
 
 | File | Purpose |
 |------|---------|
@@ -154,6 +167,10 @@ Every completed task — no matter how small — must include these steps:
 | `db/migrations/004-per-site-and-config.sql` | `audit_snapshots`, `schema_snapshots`, `redirect_snapshots`, `performance_snapshots`, `chat_sessions`, `google_tokens`, `usage_tracking` |
 | `db/migrations/005-workspaces.sql` | `workspaces` (30+ columns), `page_edit_states`, `seo_edit_tracking` |
 | `db/migrations/006-jobs.sql` | `jobs` table (id, type, status, progress, total, message, result JSON, error, workspace_id, timestamps). Indexes on workspace_id, status, composite (type, workspace_id, status). |
+| `db/migrations/007-content-publish.sql` | `content_publish_log` table for tracking CMS publish history |
+| `db/migrations/008-content-subscriptions.sql` | `content_subscriptions` table for recurring content plans |
+| `db/migrations/009-content-versions.sql` | `content_versions` table for post version history |
+| `db/migrations/010-review-checklist.sql` | `review_checklists` table for human-in-the-loop review tracking |
 
 **Key patterns (follow these when writing new DB code):**
 - **Lazy prepared statements:** `let _stmt: ... | null = null;` cached at module level
@@ -175,6 +192,11 @@ Every completed task — no matter how small — must include these steps:
 | `components/ContentBriefs.tsx` | Admin content brief management | Brief preview, status management |
 | `components/ContentManager.tsx` | Admin content review & management | Lists all generated posts, status workflow (draft→review→approved), search/sort/filter, inline editing via PostEditor |
 | `components/ContentPerformance.tsx` | Content performance tracking | GSC + GA4 metrics per published content piece. Recharts line charts. |
+| `components/ContentCalendar.tsx` | Content calendar view | Visual scheduling of content pipeline |
+| `components/ContentSubscriptions.tsx` | Content subscription management | Recurring content plan admin UI |
+| `components/PublishSettings.tsx` | CMS publish settings | Webflow CMS publishing configuration |
+| `components/RevenueDashboard.tsx` | Revenue analytics | Total revenue, trends, per-client, per-product breakdowns |
+| `components/TurnstileWidget.tsx` | Cloudflare Turnstile CAPTCHA | Reusable CAPTCHA widget for client forms |
 | `components/BrandHub.tsx` | Brand & AI Hub | Consolidates Brand Voice, Knowledge Base, Audience Personas. Three "Generate from Website" buttons. |
 | `components/PostEditor.tsx` | Content post inline editor | Section-by-section editing, HTML preview, export |
 | `components/SeoAudit.tsx` | Site health audit viewer | Main admin panel host for many sub-views |
@@ -195,9 +217,9 @@ Every completed task — no matter how small — must include these steps:
 | `components/audit/` | **SeoAudit extracted modules** | `ScoreTrendChart.tsx`, `ActionItemsPanel.tsx`, `AuditHistory.tsx`, `types.ts` (shared audit interfaces) |
 | `components/briefs/` | **ContentBriefs extracted modules** | `BriefDetail.tsx` (expanded brief view with all fields) |
 | `components/schema/` | **SchemaSuggester extracted modules** | `CmsTemplatePanel.tsx` (CMS template schema UI) |
-| `components/strategy/` | **KeywordStrategy extracted modules** | `SeoCopyPanel.tsx` (SEO copy generation panel) |
+| `components/strategy/` | **KeywordStrategy extracted modules** | `SeoCopyPanel.tsx` (SEO copy generation panel), `BacklinkProfile.tsx` (domain backlink overview), `CompetitiveIntel.tsx` (competitive intelligence hub) |
 | `components/assets/` | **AssetBrowser extracted modules** | `OrganizePreview.tsx` (asset organize preview) |
-| `components/workspace-home/` | **WorkspaceHome extracted modules** | `ActiveRequestsAnnotations.tsx`, `ActivityFeed.tsx`, `RankingsSnapshot.tsx`, `SeoWorkStatus.tsx`, `index.ts` (barrel) |
+| `components/workspace-home/` | **WorkspaceHome extracted modules** | `ActiveRequestsAnnotations.tsx`, `ActivityFeed.tsx`, `RankingsSnapshot.tsx`, `SeoWorkStatus.tsx`, `SeoChangeImpact.tsx`, `index.ts` (barrel) |
 | `components/AeoReview.tsx` | AEO page review | AI-powered per-page content change recommendations (lazy-loaded sub-tab in SeoAudit) |
 | `components/AnomalyAlerts.tsx` | Anomaly alert viewer | Displays traffic/ranking anomalies with severity badges |
 | `components/ContentDecay.tsx` | Content decay dashboard | Identifies declining pages, refresh recommendations |
@@ -212,7 +234,7 @@ Every completed task — no matter how small — must include these steps:
 | `components/LoginScreen.tsx` | Admin login UI | Setup flow + email/password |
 | `components/Styleguide.tsx` | Design system reference page | Color swatches, component demos |
 | `components/ui/` | **16 shared UI primitives** (14 components + 2 config files) | See § 4 below |
-| `components/client/` | **Client tab components** (28 files) | `types.ts`, `helpers.tsx`, `utils.ts`, `index.ts`, `OverviewTab.tsx`, `SearchTab.tsx`, `AnalyticsTab.tsx`, `PerformanceTab.tsx` (merged Search+Analytics), `StrategyTab.tsx`, `ContentTab.tsx`, `ApprovalsTab.tsx`, `RequestsTab.tsx`, `PlansTab.tsx`, `InboxTab.tsx` (composes Approvals+Requests+Content), `HealthTab.tsx`, `InsightsDigest.tsx`, `InsightsEngine.tsx`, `MonthlySummary.tsx`, `DataSnapshots.tsx`, `ROIDashboard.tsx`, `OrderStatus.tsx`, `FixRecommendations.tsx`, `SeoCart.tsx`, `useCart.tsx`, `OnboardingWizard.tsx`, `BetaContext.tsx` (beta mode feature flag), `ClientOnboardingQuestionnaire.tsx`, `FeedbackWidget.tsx`, `SeoGlossary.tsx` |
+| `components/client/` | **Client tab components** (29 files) | `types.ts`, `helpers.tsx`, `utils.ts`, `index.ts`, `OverviewTab.tsx`, `SearchTab.tsx`, `AnalyticsTab.tsx`, `PerformanceTab.tsx` (merged Search+Analytics), `StrategyTab.tsx`, `ContentTab.tsx`, `ApprovalsTab.tsx`, `RequestsTab.tsx`, `PlansTab.tsx`, `InboxTab.tsx` (composes Approvals+Requests+Content), `HealthTab.tsx`, `InsightsDigest.tsx`, `InsightsEngine.tsx`, `MonthlySummary.tsx`, `DataSnapshots.tsx`, `ROIDashboard.tsx`, `OrderStatus.tsx`, `FixRecommendations.tsx`, `SeoCart.tsx`, `useCart.tsx`, `OnboardingWizard.tsx`, `BetaContext.tsx` (beta mode feature flag), `ClientOnboardingQuestionnaire.tsx`, `FeedbackWidget.tsx`, `SeoGlossary.tsx` |
 | `components/shared/` | **Shared cross-dashboard components** | `RankTable.tsx` (position colors, history chart, rank change indicators) |
 | `hooks/` | **Shared React hooks** (15 files) | `useAuth.ts`, `useWebSocket.ts`, `useBackgroundTasks.tsx`, `useAuditSummary.ts`, `useSearchData.ts`, `useGA4Overview.ts`, `usePageEditStates.ts`, `useRecommendations.ts`, `useWorkspaceEvents.ts`, `useChat.ts`, `useClientAuth.ts`, `useClientData.ts`, `useContentRequests.ts`, `usePayments.ts`, `useToast.ts` |
 
@@ -265,7 +287,7 @@ Every completed task — no matter how small — must include these steps:
 ### Feature work
 | Priority | Doc | What it tells you |
 |----------|-----|-------------------|
-| 1 | `FEATURE_AUDIT.md` | 82+ feature inventory with agency/client/mutual value, Future Additions backlog |
+| 1 | `FEATURE_AUDIT.md` | 129-feature inventory with agency/client/mutual value, Future Additions backlog |
 | 2 | `.windsurf/workflows/feature-integration.md` | How to connect features (cross-links, client dashboard, approvals) |
 | 3 | `.windsurf/workflows/wiring-patterns.md` | How to wire data into chat, strategy, briefs, reports |
 | 4 | `data/roadmap.json` | Sprint tracking — check what's done/pending before starting work |
@@ -352,17 +374,30 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 | `/wiring-patterns` | Adding new data sources to chat, strategy, briefs, or reports |
 | `/stripe-integration` | Payment architecture, checkout flow, webhook handling |
 | `/auth-system` | Auth architecture, protecting routes, client login flows |
+| `/deploy` | Commit, push, and verify a deploy to Render |
+| `/staging-environment` | Set up and manage the Render staging environment |
+| `/new-feature-checklist` | Checklist before/during/after implementing any feature |
+| `/client-debug` | Investigate and fix a client-reported bug or issue |
+| `/full-stack-features` | Ensure every backend feature has a matching frontend |
 
 ---
 
 ## 6. Known Issues to Ignore
 
-These pre-existing lint warnings in `ClientDashboard.tsx` are **not caused by current work** and should be ignored to avoid unproductive loops:
+These pre-existing lint warnings are **not caused by current work** and should be ignored to avoid unproductive loops:
 
+**`ClientDashboard.tsx`:**
 - `'requestingTopic' is declared but its value is never read` (line ~57)
 - `'searchDevices' is declared but its value is never read` (line ~96)
 - `'upgradingReqId' is assigned a value but never used` (line ~147)
 - `React Hook useEffect has missing dependencies` (lines ~225, ~241)
+
+**`KeywordStrategy.tsx`:**
+- `'Wand2' is defined but never used`
+- `'Copy' is defined but never used`
+- `'Link' is defined but never used`
+- `'MessageSquare' is defined but never used`
+- `React Hook useEffect has missing dependencies` (fetchStrategy, businessContext)
 
 These will be addressed in a dedicated cleanup pass. **Do not attempt to fix them during unrelated tasks.**
 

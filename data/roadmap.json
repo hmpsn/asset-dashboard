@@ -63,90 +63,6 @@
       ]
     },
     {
-      "id": "sprint-seo-intel",
-      "name": "SEO Intelligence & Revenue",
-      "hours": "35-46",
-      "rationale": "Deeper competitive and technical SEO capabilities that differentiate the platform. Revenue dashboard for admin business visibility. Backlink and content gap analysis justify premium pricing.",
-      "items": [
-        {
-          "id": 177,
-          "title": "Platform revenue dashboard in Command Center",
-          "source": "Platform Audit Mar 2026",
-          "est": "3-4h",
-          "priority": "P1",
-          "notes": "Shipped — RevenueDashboard component with total revenue, MoM growth, revenue by workspace, revenue by product type, recent transactions table. Accessible via /revenue route + Command Center header button + sidebar utility bar. Only shows webhook-confirmed paid transactions.",
-          "status": "done",
-          "shippedAt": "2026-03-15"
-        },
-        {
-          "id": 199,
-          "title": "Competitive intelligence hub (in Strategy tab)",
-          "source": "Sidebar cleanup Mar 2026 — consolidates #24, #39, #40, #29",
-          "est": "10-14h",
-          "priority": "P2",
-          "notes": "Phased: (1) Keyword Gap Analysis via SEMRush getKeywordGap() — 3-4h, (2) Content Gap Analysis via sitemap comparison — 2-3h, (3) Competitive Monitoring via automated audits — 2-3h, (4) SERP Overlap Dashboard — 2-3h. Reuses existing infrastructure.",
-          "status": "pending"
-        },
-        {
-          "id": 107,
-          "title": "AI-powered internal linking engine",
-          "source": "FEATURE_VISION #2",
-          "est": "8-10h",
-          "priority": "P2",
-          "notes": "Scan all pages → AI identifies contextual linking opportunities → generate anchor text → preview → one-click implement via Webflow API. Ongoing orphan page detection.",
-          "status": "pending"
-        },
-        {
-          "id": 204,
-          "title": "Bulk page operations in SEO Editor",
-          "source": "Workflow optimization",
-          "est": "4-6h",
-          "priority": "P2",
-          "notes": "Select multiple pages → apply same fix pattern (e.g., append brand name to all titles). Checkbox multi-select, bulk AI rewrite, preview diff, one-click apply.",
-          "status": "pending"
-        },
-        {
-          "id": 213,
-          "title": "Lightweight backlink profile overview",
-          "source": "Roadmap review Mar 2026",
-          "est": "2-3h",
-          "priority": "P2",
-          "notes": "Shipped — BacklinkProfile component in Strategy tab via SEMRush backlinks_overview + backlinks_refdomains APIs. Shows total backlinks, referring domains, follow/nofollow ratio, link types, top 15 referring domains table. Cached 48h. Graceful fallback when SEMRush not configured.",
-          "status": "done",
-          "shippedAt": "2026-03-15"
-        },
-        {
-          "id": 36,
-          "title": "GSC 404 import for redirect scanner",
-          "source": "FEATURE_AUDIT",
-          "est": "2-3h",
-          "priority": "P3",
-          "notes": "Shipped — Already implemented via getAllGscPages() ghost URL cross-referencing in redirect scanner. GSC pages that don't exist on site are added with source:'gsc', shown with amber badges in UI, and get redirect recommendations.",
-          "status": "done",
-          "shippedAt": "2026-03-15"
-        },
-        {
-          "id": 37,
-          "title": "Audit historical trend charts",
-          "source": "FEATURE_AUDIT",
-          "est": "3-4h",
-          "priority": "P3",
-          "notes": "Track audit score over time per-page, not just site-wide.",
-          "status": "pending"
-        },
-        {
-          "id": 51,
-          "title": "Heavy dependency audit / tree-shaking",
-          "source": "FEATURE_AUDIT",
-          "est": "2h",
-          "priority": "P3",
-          "notes": "Shipped — Lucide tree-shaking verified (individual icon code-splitting). Added manualChunks in vite.config.ts: react-vendor (React/ReactDOM/Router) + stripe (lazy). Lazy-loaded StripePaymentForm in ClientDashboard. Main bundle split 366→188 kB + 190 kB react-vendor. ClientDashboard 379→359 kB. Stripe 13 kB lazy chunk.",
-          "status": "done",
-          "shippedAt": "2026-03-15"
-        }
-      ]
-    },
-    {
       "id": "sprint-team",
       "name": "Team & Collaboration",
       "hours": "20-26",
@@ -297,12 +213,13 @@
         },
         {
           "id": 90,
-          "title": "Schema generator → gpt-4o upgrade",
+          "title": "Schema generator → gpt-4.1-mini upgrade",
           "source": "FEATURE_AUDIT",
           "est": "15m",
           "priority": "P3",
-          "notes": "CONDITIONAL: Blocked by 30K TPM limit.",
-          "status": "pending"
+          "notes": "Shipped — all AI models upgraded to GPT-4.1 series (Mar 2026). Schema uses gpt-4.1-mini.",
+          "status": "done",
+          "shippedAt": "2026-03"
         },
         {
           "id": 45,
@@ -337,8 +254,9 @@
           "source": "FEATURE_AUDIT",
           "est": "3-4h",
           "priority": "P4",
-          "notes": "Downloadable prospect reports with agency branding.",
-          "status": "pending"
+          "notes": "Shipped — sales-report-html.ts generates branded HTML export for prospects.",
+          "status": "done",
+          "shippedAt": "2026"
         },
         {
           "id": 49,
@@ -422,6 +340,95 @@
           "status": "pending"
         }
       ]
+    },
+    {
+      "id": "sprint-seo-intel",
+      "name": "✅ SHIPPED — SEO Intelligence & Revenue",
+      "hours": "35-46",
+      "rationale": "Deeper competitive and technical SEO capabilities that differentiate the platform. Revenue dashboard for admin business visibility. Backlink and content gap analysis justify premium pricing.",
+      "items": [
+        {
+          "id": 177,
+          "title": "Platform revenue dashboard in Command Center",
+          "source": "Platform Audit Mar 2026",
+          "est": "3-4h",
+          "priority": "P1",
+          "notes": "Shipped — RevenueDashboard component with total revenue, MoM growth, revenue by workspace, revenue by product type, recent transactions table. Accessible via /revenue route + Command Center header button + sidebar utility bar. Only shows webhook-confirmed paid transactions.",
+          "status": "done",
+          "shippedAt": "2026-03-15"
+        },
+        {
+          "id": 199,
+          "title": "Competitive intelligence hub (in Strategy tab)",
+          "source": "Sidebar cleanup Mar 2026 — consolidates #24, #39, #40, #29",
+          "est": "10-14h",
+          "priority": "P2",
+          "notes": "Shipped — SEMRush domain overview, keyword gaps, backlinks, top keywords comparison for up to 3 competitors. CompetitiveIntel component in Strategy tab.",
+          "status": "done",
+          "shippedAt": "2026-03"
+        },
+        {
+          "id": 107,
+          "title": "AI-powered internal linking engine",
+          "source": "FEATURE_VISION #2",
+          "est": "8-10h",
+          "priority": "P2",
+          "notes": "Shipped — AI link suggestions + orphan page detection + per-page health scoring (0-100) + grouped view + copy-to-clipboard HTML links.",
+          "status": "done",
+          "shippedAt": "2026-03"
+        },
+        {
+          "id": 204,
+          "title": "Bulk page operations in SEO Editor",
+          "source": "Workflow optimization",
+          "est": "4-6h",
+          "priority": "P2",
+          "notes": "Shipped — multi-select toolbar, pattern append/prepend, concurrent AI rewrite with dry-run preview.",
+          "status": "done",
+          "shippedAt": "2026-03"
+        },
+        {
+          "id": 213,
+          "title": "Lightweight backlink profile overview",
+          "source": "Roadmap review Mar 2026",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Shipped — BacklinkProfile component in Strategy tab via SEMRush backlinks_overview + backlinks_refdomains APIs. Shows total backlinks, referring domains, follow/nofollow ratio, link types, top 15 referring domains table. Cached 48h. Graceful fallback when SEMRush not configured.",
+          "status": "done",
+          "shippedAt": "2026-03-15"
+        },
+        {
+          "id": 36,
+          "title": "GSC 404 import for redirect scanner",
+          "source": "FEATURE_AUDIT",
+          "est": "2-3h",
+          "priority": "P3",
+          "notes": "Shipped — Already implemented via getAllGscPages() ghost URL cross-referencing in redirect scanner. GSC pages that don't exist on site are added with source:'gsc', shown with amber badges in UI, and get redirect recommendations.",
+          "status": "done",
+          "shippedAt": "2026-03-15"
+        },
+        {
+          "id": 37,
+          "title": "Audit historical trend charts",
+          "source": "FEATURE_AUDIT",
+          "est": "3-4h",
+          "priority": "P3",
+          "notes": "Shipped — ScoreTrendChart component in audit/ module, Recharts line charts for audit score over time.",
+          "status": "done",
+          "shippedAt": "2026"
+        },
+        {
+          "id": 51,
+          "title": "Heavy dependency audit / tree-shaking",
+          "source": "FEATURE_AUDIT",
+          "est": "2h",
+          "priority": "P3",
+          "notes": "Shipped — Lucide tree-shaking verified (individual icon code-splitting). Added manualChunks in vite.config.ts: react-vendor (React/ReactDOM/Router) + stripe (lazy). Lazy-loaded StripePaymentForm in ClientDashboard. Main bundle split 366→188 kB + 190 kB react-vendor. ClientDashboard 379→359 kB. Stripe 13 kB lazy chunk.",
+          "status": "done",
+          "shippedAt": "2026-03-15"
+        }
+      ],
+      "shippedAt": "2026-03-15"
     },
     {
       "id": "shipped-mar-2026",
@@ -999,25 +1006,25 @@
           "shippedAt": "2026-03"
         },
         {
-          "id": 231,
+          "id": 282,
           "title": "Recharts migration (all custom SVG charts)",
           "status": "done",
           "shippedAt": "2026-03"
         },
         {
-          "id": 232,
+          "id": 283,
           "title": "AI Usage Dashboard in Command Center",
           "status": "done",
           "shippedAt": "2026-03"
         },
         {
-          "id": 233,
+          "id": 284,
           "title": "Mobile Guard interstitial",
           "status": "done",
           "shippedAt": "2026-03"
         },
         {
-          "id": 234,
+          "id": 285,
           "title": "Client Onboarding Questionnaire",
           "status": "done",
           "shippedAt": "2026-03"
@@ -1793,7 +1800,7 @@
           "shippedAt": "2026"
         },
         {
-          "id": 222,
+          "id": 281,
           "title": "Revenue analytics dashboard",
           "status": "done",
           "shippedAt": "2026"
@@ -1809,27 +1816,6 @@
           "title": "Beta client feedback & bug submission",
           "status": "done",
           "shippedAt": "2026"
-        },
-        {
-          "id": 204,
-          "title": "Bulk page operations in SEO Editor (pattern apply + bulk AI rewrite)",
-          "status": "done",
-          "shippedAt": "2026-03",
-          "notes": "Shipped — multi-select toolbar, pattern append/prepend, concurrent AI rewrite with dry-run preview"
-        },
-        {
-          "id": 199,
-          "title": "Competitive Intelligence Hub in Strategy tab",
-          "status": "done",
-          "shippedAt": "2026-03",
-          "notes": "Shipped — SEMRush domain overview, keyword gaps, backlinks, top keywords comparison for up to 3 competitors"
-        },
-        {
-          "id": 107,
-          "title": "AI internal linking engine enhancements",
-          "status": "done",
-          "shippedAt": "2026-03",
-          "notes": "Shipped — orphan page detection, per-page link health scoring, grouped view, copy-to-clipboard HTML links"
         }
       ]
     }

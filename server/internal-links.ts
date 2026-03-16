@@ -43,6 +43,7 @@ export interface PageLinkHealth {
 export interface InternalLinkResult {
   suggestions: LinkSuggestion[];
   pageCount: number;
+  attemptedPageCount: number;
   existingLinkCount: number;
   analyzedAt: string;
   pageHealth?: PageLinkHealth[];
@@ -108,7 +109,8 @@ export async function analyzeInternalLinks(
     : subdomain ? `https://${subdomain}.webflow.io` : '';
 
   if (!baseUrl) {
-    return { suggestions: [], pageCount: 0, existingLinkCount: 0, analyzedAt: new Date().toISOString() };
+    log.warn('Internal links: no base URL resolved — liveDomain or subdomain required');
+    return { suggestions: [], pageCount: 0, attemptedPageCount: 0, existingLinkCount: 0, analyzedAt: new Date().toISOString() };
   }
 
   // Gather all pages
@@ -138,6 +140,7 @@ export async function analyzeInternalLinks(
 
   // Fetch content for all pages
   const pages: PageContent[] = [];
+  let fetchFailures = 0;
   const batchSize = 5;
   for (let i = 0; i < pageUrls.length; i += batchSize) {
     const chunk = pageUrls.slice(i, i + batchSize);
@@ -151,8 +154,14 @@ export async function analyzeInternalLinks(
           contentSnippet: result.content,
           existingInternalLinks: result.internalLinks,
         });
+      } else {
+        fetchFailures++;
       }
     }
+  }
+
+  if (fetchFailures > 0) {
+    log.warn(`Internal links: ${fetchFailures}/${pageUrls.length} page fetches failed (site may be password-protected or unreachable at ${baseUrl})`);
   }
 
   const existingLinkCount = pages.reduce((sum, p) => sum + p.existingInternalLinks.length, 0);
@@ -189,7 +198,9 @@ export async function analyzeInternalLinks(
   log.info(`Internal links: ${orphanCount} orphan pages detected`);
 
   if (!openaiKey || pages.length < 2) {
-    return { suggestions: [], pageCount: pages.length, existingLinkCount, analyzedAt: new Date().toISOString(), pageHealth, orphanCount };
+    if (!openaiKey) log.warn('Internal links: OPENAI_API_KEY not set — skipping AI analysis');
+    if (pages.length < 2) log.warn(`Internal links: only ${pages.length} pages fetched (${pageUrls.length} attempted) — need at least 2 for analysis`);
+    return { suggestions: [], pageCount: pages.length, attemptedPageCount: pageUrls.length, existingLinkCount, analyzedAt: new Date().toISOString(), pageHealth, orphanCount };
   }
 
   // Enrich with brand voice for better anchor text quality
@@ -296,6 +307,7 @@ Return ONLY valid JSON array, no markdown fences, no explanation.`;
     return {
       suggestions,
       pageCount: pages.length,
+      attemptedPageCount: pageUrls.length,
       existingLinkCount,
       analyzedAt: new Date().toISOString(),
       pageHealth,
@@ -303,6 +315,6 @@ Return ONLY valid JSON array, no markdown fences, no explanation.`;
     };
   } catch (err) {
     log.error({ err: err }, 'Internal links analysis error');
-    return { suggestions: [], pageCount: pages.length, existingLinkCount, analyzedAt: new Date().toISOString(), pageHealth, orphanCount };
+    return { suggestions: [], pageCount: pages.length, attemptedPageCount: pageUrls.length, existingLinkCount, analyzedAt: new Date().toISOString(), pageHealth, orphanCount };
   }
 }
