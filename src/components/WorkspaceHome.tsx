@@ -19,6 +19,7 @@ import { rankTracking, activity as activityApi, annotations as annotationsApi, c
 import { contentRequests as contentRequestsApi } from '../api/content';
 import { requests as requestsApi } from '../api/misc';
 import { gsc, ga4 } from '../api/analytics';
+import { useWorkspaceData } from '../contexts/WorkspaceDataContext';
 
 interface WorkspaceHomeProps {
   workspaceId: string;
@@ -47,6 +48,10 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   const navigate = useNavigate();
   const { summary: seoStatus } = usePageEditStates(workspaceId);
   const { audit } = useAuditSummary(workspaceId);
+  const wsActivity = useWorkspaceData<ActivityEntry[]>('activity');
+  const wsAnnotations = useWorkspaceData<Array<{ id: string; date: string; label: string; color?: string }>>('annotations');
+  const wsRanks = useWorkspaceData<Array<{ query: string; position: number; previousPosition?: number; change?: number }>>('ranks');
+  const wsGscOverview = useWorkspaceData<{ totalClicks: number; totalImpressions: number; avgCtr: number; avgPosition: number }>('gsc-overview');
   const [loading, setLoading] = useState(true);
   const [searchData, setSearchData] = useState<{ totalClicks: number; totalImpressions: number; avgCtr: number; avgPosition: number } | null>(null);
   const [ga4Data, setGa4Data] = useState<{ totalUsers: number; totalSessions: number; totalPageviews: number; newUserPercentage: number } | null>(null);

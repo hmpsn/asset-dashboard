@@ -14,6 +14,7 @@ import { BackgroundTaskProvider } from './hooks/useBackgroundTasks';
 import { TaskPanel } from './components/TaskPanel';
 import { AdminChat } from './components/AdminChat';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { WorkspaceDataProvider } from './contexts/WorkspaceDataContext';
 import { NotificationBell } from './components/NotificationBell';
 import { CommandPalette } from './components/CommandPalette';
 import {
@@ -684,7 +685,11 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
             )}
             <ErrorBoundary label={tab}>
               <Suspense fallback={<ChunkFallback />}>
-                {renderContent()}
+                {selected ? (
+                  <WorkspaceDataProvider workspaceId={selected.id}>
+                    {renderContent()}
+                  </WorkspaceDataProvider>
+                ) : renderContent()}
               </Suspense>
             </ErrorBoundary>
           </div>
