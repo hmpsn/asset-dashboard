@@ -62,22 +62,114 @@ const REQUIRED_FIELDS: Record<string, string[]> = {
   Person: ['name'],
 };
 
-function validateGraphNode(node: Record<string, unknown>): string[] {
+// Recommended fields that improve rich result eligibility
+const RECOMMENDED_FIELDS: Record<string, string[]> = {
+  Organization: ['logo', 'sameAs', 'url'],
+  Service: ['provider'],
+  WebPage: ['isPartOf'],
+  Article: ['publisher'],
+  BlogPosting: ['publisher'],
+  Product: ['offers', 'image'],
+  LocalBusiness: ['telephone', 'openingHoursSpecification'],
+};
+
+// Cross-reference rules: { type → field → expected target @type }
+const CROSS_REF_RULES: Record<string, Record<string, string>> = {
+  Service: { provider: 'Organization' },
+  WebPage: { isPartOf: 'WebSite' },
+  Article: { publisher: 'Organization' },
+  BlogPosting: { publisher: 'Organization' },
+  WebSite: { publisher: 'Organization' },
+};
+
+// Properties that are NOT valid Schema.org and commonly hallucinated by AI
+const INVALID_PROPERTIES: Record<string, string[]> = {
+  Organization: ['industry', 'founded', 'headquarters', 'employeeCount', 'products', 'services'],
+  Service: ['features', 'benefits', 'pricing'],
+  WebPage: ['keywords', 'category'],
+  Person: ['title', 'company'],
+};
+
+// Phone number format: must look like a real number (digits, dashes, parens, spaces, +)
+const PHONE_REGEX = /^\+?[\d\s().-]{7,20}$/;
+function isValidPhone(val: string): boolean {
+  const digits = val.replace(/\D/g, '');
+  return PHONE_REGEX.test(val) && digits.length >= 7 && digits.length <= 15;
+}
+
+function validateGraphNode(node: Record<string, unknown>, allNodes: Record<string, unknown>[]): string[] {
   const errors: string[] = [];
   const type = node['@type'] as string;
   if (!type) { errors.push('Missing @type'); return errors; }
+
+  // 1. Required fields
   const required = REQUIRED_FIELDS[type];
-  if (!required) return []; // unknown type, skip validation
-  for (const field of required) {
-    const val = node[field];
-    if (val === undefined || val === null || val === '' || val === '[') {
-      errors.push(`${type}: missing required field "${field}"`);
-    }
-    // Check for unfilled placeholders
-    if (typeof val === 'string' && val.startsWith('[') && val.endsWith(']')) {
-      errors.push(`${type}: placeholder not filled for "${field}"`);
+  if (required) {
+    for (const field of required) {
+      const val = node[field];
+      if (val === undefined || val === null || val === '' || val === '[') {
+        errors.push(`${type}: missing required field "${field}"`);
+      }
+      if (typeof val === 'string' && val.startsWith('[') && val.endsWith(']')) {
+        errors.push(`${type}: placeholder not filled for "${field}"`);
+      }
     }
   }
+
+  // 2. Recommended fields (warnings, not errors)
+  const recommended = RECOMMENDED_FIELDS[type];
+  if (recommended) {
+    for (const field of recommended) {
+      if (node[field] === undefined || node[field] === null) {
+        errors.push(`${type}: recommended field "${field}" is missing (improves rich results)`);
+      }
+    }
+  }
+
+  // 3. Invalid properties (hallucinated by AI)
+  const invalid = INVALID_PROPERTIES[type];
+  if (invalid) {
+    for (const field of invalid) {
+      if (node[field] !== undefined) {
+        errors.push(`${type}: "${field}" is not a valid Schema.org property — remove it`);
+      }
+    }
+  }
+
+  // 4. Cross-reference validation
+  const crossRefs = CROSS_REF_RULES[type];
+  if (crossRefs) {
+    for (const [field, expectedType] of Object.entries(crossRefs)) {
+      const val = node[field];
+      if (val && typeof val === 'object' && !Array.isArray(val)) {
+        const ref = val as Record<string, unknown>;
+        if (ref['@id']) {
+          // Check if referenced node exists in @graph
+          const target = allNodes.find(n => n['@id'] === ref['@id']);
+          if (!target) {
+            errors.push(`${type}.${field}: references "${ref['@id']}" but no matching node found in @graph`);
+          }
+        } else if (ref['@type'] && ref['@type'] !== expectedType) {
+          errors.push(`${type}.${field}: expected @type "${expectedType}" but got "${ref['@type']}"`);
+        }
+      }
+    }
+  }
+
+  // 5. Phone number format validation
+  const telephone = node['telephone'] as string | undefined;
+  if (telephone && typeof telephone === 'string') {
+    if (!isValidPhone(telephone)) {
+      errors.push(`${type}: "telephone" value "${telephone}" appears malformed — use E.164 format (+1234567890) or standard format`);
+    }
+  }
+
+  // 6. Keyword-stuffed serviceType detection
+  const serviceType = node['serviceType'];
+  if (Array.isArray(serviceType) && serviceType.length > 3) {
+    errors.push(`${type}: "serviceType" has ${serviceType.length} entries — keep to 1-3 concise types to avoid keyword stuffing`);
+  }
+
   return errors;
 }
 
@@ -87,9 +179,45 @@ function validateUnifiedSchema(schema: Record<string, unknown>): string[] {
   const graph = schema['@graph'] as Record<string, unknown>[];
   if (!Array.isArray(graph)) { errors.push('Missing @graph array'); return errors; }
   for (const node of graph) {
-    errors.push(...validateGraphNode(node));
+    errors.push(...validateGraphNode(node, graph));
   }
   return errors;
+}
+
+// Auto-fix: strip invalid properties and fix common AI hallucinations
+function autoFixSchema(schema: Record<string, unknown>): void {
+  const graph = schema['@graph'] as Record<string, unknown>[] | undefined;
+  if (!Array.isArray(graph)) return;
+
+  for (const node of graph) {
+    const type = node['@type'] as string;
+    if (!type) continue;
+
+    // Strip invalid properties for this type
+    const invalid = INVALID_PROPERTIES[type];
+    if (invalid) {
+      for (const field of invalid) {
+        if (node[field] !== undefined) {
+          log.info(`Auto-fix: removed invalid "${field}" from ${type}`);
+          delete node[field];
+        }
+      }
+    }
+
+    // Fix malformed telephone — strip if clearly invalid
+    const tel = node['telephone'] as string | undefined;
+    if (tel && typeof tel === 'string' && !isValidPhone(tel)) {
+      log.info(`Auto-fix: removed malformed telephone "${tel}" from ${type}`);
+      delete node['telephone'];
+    }
+
+    // Trim keyword-stuffed serviceType arrays down to 3
+    const st = node['serviceType'];
+    if (Array.isArray(st) && st.length > 3) {
+      log.info(`Auto-fix: trimmed serviceType from ${st.length} to 3 entries on ${type}`);
+      node['serviceType'] = st.slice(0, 3);
+    }
+  }
 }
 
 interface PageMeta {
@@ -311,6 +439,19 @@ QUALITY RULES — strict:
 20. For openingHours, prefer the OpeningHoursSpecification format:
     "openingHoursSpecification": [{"@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday","Tuesday",...], "opens": "08:00", "closes": "17:00"}]
 
+CROSS-REFERENCE & PROPERTY RULES — these are enforced by automated validation:
+21. Every Service node MUST include "provider": {"@id": "${siteUrl}/#organization"} linking back to the Organization
+22. Every WebPage node MUST include "isPartOf": {"@id": "${siteUrl}/#website"} linking to the WebSite (even on subpages where WebSite isn't in the @graph — the @id reference is still valid)
+23. Article/BlogPosting MUST include "publisher": {"@id": "${siteUrl}/#organization"}
+24. NEVER use these INVALID Schema.org properties — they are commonly hallucinated but do not exist:
+    - Organization: "industry", "founded", "headquarters", "employeeCount", "products", "services"
+    - Service: "features", "benefits", "pricing"
+    - WebPage: "keywords", "category"
+    - Person: "title", "company"
+    Instead of "industry", use "knowsAbout": ["topic1", "topic2"] on Organization
+25. "telephone" values MUST be properly formatted — use "+1-555-123-4567" or "(555) 123-4567" format. Never output malformed numbers like "5551234567" without separators
+26. "serviceType" should be 1-3 CONCISE types (e.g. "Context Engineering", "AI Development Tools"). Do NOT keyword-stuff with long phrases — move detailed descriptions to the "description" field instead
+
 Return ONLY the JSON-LD object. No markdown, no explanation, no wrapping.`;
 
   try {
@@ -333,6 +474,9 @@ Return ONLY the JSON-LD object. No markdown, no explanation, no wrapping.`;
 
     const rawSchema = JSON.parse(jsonStr) as Record<string, unknown>;
     const schema = cleanSchema(rawSchema);
+
+    // Auto-fix: strip invalid properties that AI sometimes hallucinates
+    autoFixSchema(schema);
 
     // Ensure it has @graph structure
     if (!schema['@graph'] && schema['@type']) {

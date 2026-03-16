@@ -1872,6 +1872,13 @@
           "status": "done",
           "notes": "Shipped — Two-pane layout (chat + page content), GPT-4.1 with full workspace context, rewriting playbook in BrandHub, sidebar nav entry, conversation memory",
           "shippedAt": "2026-03-16"
+        },
+        {
+          "id": 288,
+          "title": "Schema generator: enhanced validation, auto-fix, and improved prompting",
+          "status": "done",
+          "notes": "Shipped — Invalid property detection + auto-strip, cross-reference validation, phone format validation, keyword-stuffing detection, recommended field warnings, 6 new AI prompt rules",
+          "shippedAt": "2026-03-16"
         }
       ]
     }
