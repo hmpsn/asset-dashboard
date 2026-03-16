@@ -8,10 +8,11 @@ export interface SchemaEditorProps {
   pageId: string;
   schemaJson: string;
   parseError: string | undefined;
+  hasEdits: boolean;
   onChange: (pageId: string, value: string) => void;
 }
 
-export function SchemaEditor({ pageId, schemaJson, parseError, onChange }: SchemaEditorProps) {
+export function SchemaEditor({ pageId, schemaJson, parseError, hasEdits, onChange }: SchemaEditorProps) {
   return (
     <div className="relative">
       <textarea
@@ -26,7 +27,7 @@ export function SchemaEditor({ pageId, schemaJson, parseError, onChange }: Schem
           {parseError}
         </div>
       )}
-      {schemaJson && !parseError && (
+      {hasEdits && !parseError && (
         <div className="flex items-center gap-1.5 mt-1.5 text-[11px] text-teal-400">
           <CheckCircle className="w-3 h-3" />
           Valid JSON — edits will be used for copy &amp; publish

@@ -263,6 +263,7 @@ export function SchemaPageCard({
                 pageId={page.pageId}
                 schemaJson={editedSchemaJson || JSON.stringify(schema.template, null, 2)}
                 parseError={schemaParseError}
+                hasEdits={!!editedSchemaJson}
                 onChange={onSchemaJsonChange}
               />
             ) : (
