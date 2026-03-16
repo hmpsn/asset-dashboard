@@ -5,6 +5,7 @@ import {
   CornerDownRight, Ban, Link2, Download, Copy, Check, Sparkles, Edit3, X,
 } from 'lucide-react';
 import { PageHeader, StatCard } from './ui';
+import { redirects } from '../api/misc';
 
 interface RedirectHop {
   url: string;
@@ -78,11 +79,10 @@ export function RedirectManager({ siteId }: Props) {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`/api/webflow/redirect-snapshot/${siteId}`);
-        const snapshot = await res.json();
-        if (snapshot && snapshot.result) {
+        const snapshot = await redirects.snapshot(siteId) as { result?: RedirectScanResult; createdAt?: string } | null;
+        if (snapshot?.result) {
           setData(snapshot.result);
-          setSnapshotDate(snapshot.createdAt);
+          setSnapshotDate(snapshot.createdAt ?? null);
           // Build rules from recommendations
           const newRules: RedirectRule[] = [];
           for (const ps of snapshot.result.pageStatuses) {
@@ -106,8 +106,7 @@ export function RedirectManager({ siteId }: Props) {
     setError(null);
     setRules([]);
     try {
-      const res = await fetch(`/api/webflow/redirect-scan/${siteId}`);
-      const result = await res.json();
+      const result = await redirects.scan(siteId) as RedirectScanResult & { error?: string };
       if (result.error) {
         setError(result.error);
       } else {

@@ -83,6 +83,21 @@ export const keywords = {
 
   updateStrategy: (wsId: string, body: Record<string, unknown>) =>
     patch<unknown>(`/api/keyword-strategy/${wsId}`, body),
+
+  webflowStrategy: (wsId: string) =>
+    get<unknown>(`/api/webflow/keyword-strategy/${wsId}`),
+
+  generateStrategy: (wsId: string, body: Record<string, unknown>) =>
+    post<unknown>(`/api/webflow/keyword-strategy/${wsId}`, body),
+
+  patchStrategy: (wsId: string, body: Record<string, unknown>) =>
+    patch<unknown>(`/api/webflow/keyword-strategy/${wsId}`, body),
+
+  semrushStatus: () =>
+    getOptional<unknown>('/api/semrush/status'),
+
+  seoCopy: (body: Record<string, unknown>) =>
+    post<unknown>('/api/webflow/seo-copy', body),
 };
 
 // ── Rank tracking ───────────────────────────────────────────────
@@ -179,15 +194,24 @@ export const webflow = {
 
   internalLinksAnalyze: (siteId: string) =>
     post<unknown>(`/api/webflow/internal-links/${siteId}/analyze`),
+
+  internalLinksWithParams: (siteId: string, workspaceId?: string) =>
+    get<unknown>(`/api/webflow/internal-links/${siteId}${workspaceId ? `?workspaceId=${workspaceId}` : ''}`),
+
+  internalLinksSnapshot: (siteId: string) =>
+    getOptional<unknown>(`/api/webflow/internal-links-snapshot/${siteId}`),
 };
 
 // ── Content performance ─────────────────────────────────────────
 export const contentPerformance = {
-  get: (wsId: string, days: number) =>
-    get<unknown>(`/api/content-performance/${wsId}?days=${days}`),
+  get: (wsId: string, days?: number) =>
+    get<unknown>(`/api/content-performance/${wsId}${days ? `?days=${days}` : ''}`),
 
   refresh: (wsId: string) =>
     post<unknown>(`/api/content-performance/${wsId}/refresh`),
+
+  trend: (wsId: string, requestId: string) =>
+    get<unknown>(`/api/content-performance/${wsId}/${requestId}/trend`),
 };
 
 // ── AEO Review ──────────────────────────────────────────────────
@@ -200,6 +224,12 @@ export const aeoReview = {
 
   pageDetail: (wsId: string, path: string) =>
     get<unknown>(`/api/aeo-review/${wsId}/page?path=${encodeURIComponent(path)}`),
+
+  siteReview: (wsId: string, body: Record<string, unknown>) =>
+    post<unknown>(`/api/aeo-review/${wsId}/site`, body),
+
+  pageReview: (wsId: string, body: Record<string, unknown>) =>
+    post<unknown>(`/api/aeo-review/${wsId}/page`, body),
 };
 
 // ── Competitor analysis ─────────────────────────────────────────
@@ -227,4 +257,19 @@ export const pageWeight = {
 
   analyze: (wsId: string) =>
     post<unknown>(`/api/pagespeed/${wsId}/analyze`),
+
+  webflowPageWeight: (siteId: string) =>
+    get<unknown>(`/api/webflow/page-weight/${siteId}`),
+
+  webflowPageWeightSnapshot: (siteId: string) =>
+    getOptional<unknown>(`/api/webflow/page-weight-snapshot/${siteId}`),
+
+  pagespeedBulk: (siteId: string, strategy: string, maxPages?: number) =>
+    get<unknown>(`/api/webflow/pagespeed/${siteId}?strategy=${strategy}&maxPages=${maxPages ?? 3}`),
+
+  pagespeedSingle: (siteId: string, body: Record<string, unknown>) =>
+    post<unknown>(`/api/webflow/pagespeed-single/${siteId}`, body),
+
+  pagespeedSnapshot: (siteId: string) =>
+    getOptional<unknown>(`/api/webflow/pagespeed-snapshot/${siteId}`),
 };

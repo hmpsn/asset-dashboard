@@ -152,9 +152,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
 
   const fetchPost = useCallback(async () => {
     try {
-      const res = await fetch(`/api/content-posts/${workspaceId}/${postId}`);
-      if (!res.ok) throw new Error('Failed to load post');
-      const data = await res.json();
+      const data = await contentPosts.getById(workspaceId, postId) as GeneratedPost;
       setPost(data);
       // Auto-expand all done sections on first load
       if (loading) {
@@ -182,30 +180,16 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   const saveField = async (updates: Record<string, unknown>) => {
     if (!post) return;
     try {
-      const res = await fetch(`/api/content-posts/${workspaceId}/${postId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates),
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setPost(updated);
-      }
+      const updated = await contentPosts.update(workspaceId, postId, updates) as GeneratedPost;
+      setPost(updated);
     } catch { /* skip */ }
   };
 
   const handleRegenerate = async (sectionIndex: number) => {
     setRegenerating(sectionIndex);
     try {
-      const res = await fetch(`/api/content-posts/${workspaceId}/${postId}/regenerate-section`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sectionIndex }),
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setPost(updated);
-      }
+      const updated = await contentPosts.regenerateSection(workspaceId, postId, { sectionIndex }) as GeneratedPost;
+      setPost(updated);
     } catch { /* skip */ }
     setRegenerating(null);
   };
@@ -257,7 +241,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   };
 
   const handleDelete = async () => {
-    await fetch(`/api/content-posts/${workspaceId}/${postId}`, { method: 'DELETE' });
+    await contentPosts.remove(workspaceId, postId);
     onDelete?.();
     onClose();
   };
@@ -265,8 +249,8 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   const fetchVersions = useCallback(async () => {
     setVersionsLoading(true);
     try {
-      const res = await fetch(`/api/content-posts/${workspaceId}/${postId}/versions`);
-      if (res.ok) setVersions(await res.json());
+      const data = await contentPosts.versions(workspaceId, postId);
+      setVersions(data as Array<{ id: string; versionNumber: number; trigger: string; triggerDetail?: string; totalWordCount: number; createdAt: string }>);
     } catch { /* skip */ }
     setVersionsLoading(false);
   }, [workspaceId, postId]);
@@ -274,12 +258,9 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   const handleRevert = async (versionId: string) => {
     setReverting(versionId);
     try {
-      const res = await fetch(`/api/content-posts/${workspaceId}/${postId}/versions/${versionId}/revert`, { method: 'POST' });
-      if (res.ok) {
-        const reverted = await res.json();
-        setPost(reverted);
-        fetchVersions();
-      }
+      const reverted = await contentPosts.revertVersion(workspaceId, postId, versionId) as GeneratedPost;
+      setPost(reverted);
+      fetchVersions();
     } catch { /* skip */ }
     setReverting(null);
   };

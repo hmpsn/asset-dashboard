@@ -48,11 +48,8 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
 
   const fetchPosts = useCallback(async () => {
     try {
-      const res = await fetch(`/api/content-posts/${workspaceId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setPosts(Array.isArray(data) ? data : []);
-      }
+      const data = await contentPosts.list(workspaceId);
+      setPosts(Array.isArray(data) ? data as PostSummary[] : []);
     } catch { /* ignore */ }
     setLoading(false);
   }, [workspaceId]);
@@ -86,22 +83,15 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
   const updateStatus = async (postId: string, status: string) => {
     setUpdatingStatus(postId);
     try {
-      const res = await fetch(`/api/content-posts/${workspaceId}/${postId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setPosts(prev => prev.map(p => p.id === postId ? { ...p, ...updated } : p));
-      }
+      const updated = await contentPosts.update(workspaceId, postId, { status }) as PostSummary;
+      setPosts(prev => prev.map(p => p.id === postId ? { ...p, ...updated } : p));
     } catch { /* ignore */ }
     setUpdatingStatus(null);
   };
 
   const deletePost = async (postId: string) => {
     try {
-      await fetch(`/api/content-posts/${workspaceId}/${postId}`, { method: 'DELETE' });
+      await contentPosts.remove(workspaceId, postId);
       setPosts(prev => prev.filter(p => p.id !== postId));
       setDeleteConfirm(null);
     } catch { /* ignore */ }

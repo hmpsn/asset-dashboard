@@ -9,6 +9,7 @@ import {
   BookOpen, EyeOff, RefreshCw,
 } from 'lucide-react';
 import { aeoScoreColorClass, aeoScoreBgBarClass } from './ui';
+import { aeoReview as aeoReviewApi } from '../api/seo';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -99,9 +100,8 @@ export function AeoReview({ workspaceId }: Props) {
 
   // Load saved review on mount
   useEffect(() => {
-    fetch(`/api/aeo-review/${workspaceId}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d && d.pages) setReview(d); })
+    aeoReviewApi.get(workspaceId)
+      .then(d => { const r = d as AeoSiteReview | null; if (r && r.pages) setReview(r); })
       .catch(() => {});
   }, [workspaceId]);
 
@@ -109,17 +109,8 @@ export function AeoReview({ workspaceId }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/aeo-review/${workspaceId}/site`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ maxPages: 15 }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Request failed' }));
-        throw new Error(err.error || `HTTP ${res.status}`);
-      }
-      const data = await res.json();
-      setReview(data);
+      const data = await aeoReviewApi.siteReview(workspaceId, { maxPages: 15 });
+      setReview(data as AeoSiteReview);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -130,13 +121,7 @@ export function AeoReview({ workspaceId }: Props) {
   const runSinglePageReview = useCallback(async (pageUrl: string) => {
     setLoadingPage(pageUrl);
     try {
-      const res = await fetch(`/api/aeo-review/${workspaceId}/page`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pageUrl }),
-      });
-      if (!res.ok) throw new Error('Review failed');
-      const pageReview: AeoPageReview = await res.json();
+      const pageReview = await aeoReviewApi.pageReview(workspaceId, { pageUrl }) as AeoPageReview;
       // Merge into existing review
       setReview(prev => {
         if (!prev) {

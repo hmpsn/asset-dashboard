@@ -399,16 +399,11 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
     setPublishingCmsTemplate(true);
     setCmsError(null);
     try {
-      const res = await fetch(`/api/webflow/schema-cms-template/${siteId}/publish`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pageId: cmsSelectedPage.pageId,
-          templateString: cmsTemplateResult.templateString,
-          publishAfter: true,
-        }),
+      await post(`/api/webflow/schema-cms-template/${siteId}/publish`, {
+        pageId: cmsSelectedPage.pageId,
+        templateString: cmsTemplateResult.templateString,
+        publishAfter: true,
       });
-      if (!res.ok) throw new Error('Publish failed');
       setCmsPublished(true);
     } catch (err) {
       setCmsError(err instanceof Error ? err.message : 'Publish failed');

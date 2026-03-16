@@ -77,6 +77,9 @@ export const annotations = {
 
 // ── Anomalies ───────────────────────────────────────────────────
 export const anomalies = {
+  listAll: () =>
+    getSafe<unknown[]>('/api/anomalies', []),
+
   list: (wsId: string) =>
     getSafe<unknown[]>(`/api/anomalies/${wsId}`, []),
 
@@ -129,6 +132,9 @@ export const roadmap = {
 
   update: (itemId: number, body: Record<string, unknown>) =>
     patch<unknown>(`/api/roadmap/${itemId}`, body),
+
+  updateItem: (itemId: number, body: Record<string, unknown>) =>
+    patch<unknown>(`/api/roadmap/item/${itemId}`, body),
 };
 
 // ── Recommendations ─────────────────────────────────────────────
@@ -166,6 +172,11 @@ export const notifications = {
     post<unknown>('/api/notifications/mark-all-read'),
 };
 
+// ── Workspace overview (notification aggregation) ───────────────
+export const workspaceOverview = {
+  list: () => getSafe<unknown[]>('/api/workspace-overview', []),
+};
+
 // ── Upload ──────────────────────────────────────────────────────
 export const upload = {
   clipboard: (folder: string, formData: FormData) =>
@@ -185,6 +196,8 @@ export const settings = {
 export const salesReport = {
   get: () => get<unknown>('/api/sales-report'),
   refresh: () => post<unknown>('/api/sales-report/refresh'),
+  list: () => getSafe<unknown[]>('/api/sales-reports', []),
+  getById: (id: string) => getOptional<unknown>(`/api/sales-report/${id}`),
 };
 
 // ── Rank tracking ──────────────────────────────────────────────
@@ -206,6 +219,12 @@ export const redirects = {
 
   save: (siteId: string, body: Record<string, unknown>) =>
     post<unknown>(`/api/webflow/redirects/${siteId}`, body),
+
+  scan: (siteId: string) =>
+    get<unknown>(`/api/webflow/redirect-scan/${siteId}`),
+
+  snapshot: (siteId: string) =>
+    getOptional<unknown>(`/api/webflow/redirect-snapshot/${siteId}`),
 };
 
 // ── Content subscriptions ──────────────────────────────────────

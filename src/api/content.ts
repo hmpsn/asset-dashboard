@@ -28,8 +28,20 @@ export const contentPosts = {
   remove: (wsId: string, postId: string) =>
     del(`/api/content-posts/${wsId}/${postId}`),
 
+  getById: (wsId: string, postId: string) =>
+    get<unknown>(`/api/content-posts/${wsId}/${postId}`),
+
+  regenerateSection: (wsId: string, postId: string, body: Record<string, unknown>) =>
+    post<unknown>(`/api/content-posts/${wsId}/${postId}/regenerate-section`, body),
+
+  versions: (wsId: string, postId: string) =>
+    getSafe<unknown[]>(`/api/content-posts/${wsId}/${postId}/versions`, []),
+
+  revertVersion: (wsId: string, postId: string, versionId: string) =>
+    post<unknown>(`/api/content-posts/${wsId}/${postId}/versions/${versionId}/revert`),
+
   publishToWebflow: (wsId: string, postId: string, body?: { generateImage?: boolean }) =>
-    post<{ success: boolean; itemId?: string; slug?: string; isUpdate?: boolean; error?: string }>(
+    post<{ success: boolean; itemId?: string; slug?: string; isUpdate?: boolean; error?: string; post?: unknown }>(
       `/api/content-posts/${wsId}/${postId}/publish-to-webflow`, body,
     ),
 };

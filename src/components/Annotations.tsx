@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Flag, Plus, Trash2, Loader2 } from 'lucide-react';
+import { annotations as annotationsApi } from '../api/misc';
 
 interface Annotation {
   id: string;
@@ -19,8 +20,7 @@ export function Annotations({ workspaceId }: { workspaceId: string }) {
   const [newAnn, setNewAnn] = useState({ date: '', label: '', description: '', color: '#2dd4bf' });
 
   useEffect(() => {
-    fetch(`/api/annotations/${workspaceId}`)
-      .then(r => r.json())
+    annotationsApi.list(workspaceId)
       .then(d => { if (Array.isArray(d)) setAnnotations(d); })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -29,21 +29,16 @@ export function Annotations({ workspaceId }: { workspaceId: string }) {
   const addAnnotation = async () => {
     if (!newAnn.date || !newAnn.label) return;
     try {
-      const res = await fetch(`/api/annotations/${workspaceId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newAnn),
-      });
-      if (res.ok) {
-        const entry = await res.json();
-        setAnnotations(prev => [entry, ...prev]);
-        setNewAnn({ date: '', label: '', description: '', color: '#2dd4bf' });
-      }
+      const entry = await annotationsApi.create(workspaceId, newAnn);
+      setAnnotations(prev => [entry as Annotation, ...prev]);
+      setNewAnn({ date: '', label: '', description: '', color: '#2dd4bf' });
     } catch { /* skip */ }
   };
 
   const deleteAnnotation = async (id: string) => {
-    await fetch(`/api/annotations/${workspaceId}/${id}`, { method: 'DELETE' });
+    try {
+      await annotationsApi.remove(workspaceId, id);
+    } catch { /* skip */ }
     setAnnotations(prev => prev.filter(a => a.id !== id));
   };
 

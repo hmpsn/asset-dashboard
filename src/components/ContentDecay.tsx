@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { TrendingDown, RefreshCw, AlertTriangle, AlertCircle, Eye, Sparkles, ArrowDown, ArrowUp } from 'lucide-react';
+import { contentDecay } from '../api/content';
 
 interface DecayingPage {
   page: string;
@@ -50,9 +51,8 @@ export default function ContentDecay({ workspaceId }: Props) {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/content-decay/${workspaceId}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(setAnalysis)
+    contentDecay.get(workspaceId)
+      .then(d => setAnalysis(d as DecayAnalysis | null))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [workspaceId]);
@@ -60,8 +60,8 @@ export default function ContentDecay({ workspaceId }: Props) {
   const runAnalysis = async () => {
     setAnalyzing(true);
     try {
-      const res = await fetch(`/api/content-decay/${workspaceId}/analyze`, { method: 'POST' });
-      if (res.ok) setAnalysis(await res.json());
+      const result = await contentDecay.analyze(workspaceId);
+      setAnalysis(result as DecayAnalysis);
     } catch { /* silent */ }
     finally { setAnalyzing(false); }
   };
@@ -69,12 +69,8 @@ export default function ContentDecay({ workspaceId }: Props) {
   const generateRecommendations = async () => {
     setGeneratingRecs(true);
     try {
-      const res = await fetch(`/api/content-decay/${workspaceId}/recommendations`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ maxPages: 5 }),
-      });
-      if (res.ok) setAnalysis(await res.json());
+      const result = await contentDecay.recommendations(workspaceId, { maxPages: 5 });
+      setAnalysis(result as DecayAnalysis);
     } catch { /* silent */ }
     finally { setGeneratingRecs(false); }
   };
