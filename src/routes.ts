@@ -8,6 +8,7 @@ export type Page =
   | 'search' | 'analytics' | 'annotations'
   | 'performance'
   | 'content-perf'
+  | 'rewrite'
   | 'workspace-settings'
   | 'prospect'
   | 'roadmap'

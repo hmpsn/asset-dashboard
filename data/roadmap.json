@@ -1865,6 +1865,13 @@
           "status": "done",
           "notes": "Shipped — sitemap.xml as primary page source, User-Agent headers for Cloudflare, double-protocol fix, attemptedPageCount diagnostics, Live Domain field in Workspace Settings",
           "shippedAt": "2026-03-15"
+        },
+        {
+          "id": 287,
+          "title": "AI Page Rewriter — full-page split chat with rewriting playbook",
+          "status": "done",
+          "notes": "Shipped — Two-pane layout (chat + page content), GPT-4.1 with full workspace context, rewriting playbook in BrandHub, sidebar nav entry, conversation memory",
+          "shippedAt": "2026-03-16"
         }
       ]
     }

@@ -124,6 +124,7 @@ export interface Workspace {
   // Branding
   brandVoice?: string;           // brand voice guidelines, tone description, style notes
   knowledgeBase?: string;          // business knowledge: services, capabilities, FAQs, platform info
+  rewritePlaybook?: string;        // instructions for AI-assisted page rewriting (AEO, tone, structure)
   brandLogoUrl?: string;
   brandAccentColor?: string;
   // Monetization

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from './Toast';
 import {
   Loader2, Save, Sparkles, BookOpen, Users, MessageSquare,
-  Plus, Pencil, Trash2, Check, Upload, FileText, X,
+  Plus, Pencil, Trash2, Check, Upload, FileText, X, ScrollText,
 } from 'lucide-react';
 import { PageHeader } from './ui';
 import { get, patch, post, del } from '../api/client';
@@ -29,6 +29,7 @@ interface WorkspaceData {
   webflowSiteId?: string;
   knowledgeBase?: string;
   brandVoice?: string;
+  rewritePlaybook?: string;
   personas?: AudiencePersona[];
 }
 
@@ -51,6 +52,10 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
   // Knowledge Base state
   const [kbDraft, setKbDraft] = useState<string | null>(null);
   const [generatingKB, setGeneratingKB] = useState(false);
+
+  // Rewriting Playbook state
+  const [playbookDraft, setPlaybookDraft] = useState<string | null>(null);
+  const [savingPlaybook, setSavingPlaybook] = useState(false);
 
   // Personas state
   const [showPersonas, setShowPersonas] = useState(false);
@@ -305,6 +310,55 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
           <p className="text-[11px] text-zinc-500">
             This context is shared with both the client Insights Engine and Admin Insights chatbots.
             You can also place <code className="text-zinc-400">.txt</code> or <code className="text-zinc-400">.md</code> files in the <code className="text-zinc-400">knowledge-docs/</code> folder for longer documents.
+          </p>
+        </div>
+      </section>
+
+      {/* ═══ REWRITING PLAYBOOK ═══ */}
+      <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+        <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
+          <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
+            <ScrollText className="w-4 h-4 text-orange-400" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-zinc-200">Rewriting Playbook</h3>
+            <p className="text-xs text-zinc-500">
+              Instructions for the AI Page Rewriter — how to structure rewrites, AEO rules, formatting preferences
+            </p>
+          </div>
+          {ws?.rewritePlaybook && <span className="text-[11px] text-emerald-400 font-medium">(configured)</span>}
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          <textarea
+            value={playbookDraft !== null ? playbookDraft : (ws?.rewritePlaybook || '')}
+            onChange={(e) => setPlaybookDraft(e.target.value)}
+            rows={8}
+            placeholder={"Example:\n- Always lead with a direct answer to the page's implied question\n- Use H2s for major sections, H3s for sub-topics\n- Include an FAQ section with 3-5 questions at the bottom\n- Add a definition-style opening sentence for key terms\n- Keep paragraphs under 3 sentences\n- Include data points and statistics where possible\n- End each section with a clear transition to the next"}
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-teal-500 resize-y font-mono leading-relaxed min-h-[80px]"
+          />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={async () => {
+                setSavingPlaybook(true);
+                try {
+                  const val = (playbookDraft !== null ? playbookDraft : (ws?.rewritePlaybook || '')).trim();
+                  await patchWorkspace({ rewritePlaybook: val });
+                  toast('Rewriting playbook saved');
+                  setPlaybookDraft(null);
+                } catch { toast('Failed to save playbook', 'error'); }
+                finally { setSavingPlaybook(false); }
+              }}
+              disabled={savingPlaybook}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-[11px] font-medium"
+            >
+              {savingPlaybook ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save Playbook
+            </button>
+            {playbookDraft !== null && playbookDraft !== (ws?.rewritePlaybook || '') && (
+              <span className="text-[11px] text-amber-400">Unsaved changes</span>
+            )}
+          </div>
+          <p className="text-[11px] text-zinc-500">
+            These instructions are injected into the AI Page Rewriter's system prompt. Use them to enforce consistent rewriting standards across all pages.
           </p>
         </div>
       </section>

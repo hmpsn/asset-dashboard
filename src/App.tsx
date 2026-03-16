@@ -28,6 +28,7 @@ import {
 const ClientDashboard = lazy(() => import('./components/ClientDashboard').then(m => ({ default: m.ClientDashboard })));
 const Styleguide = lazy(() => import('./components/Styleguide').then(m => ({ default: m.Styleguide })));
 const LandingPage = lazy(() => import('./components/LandingPage').then(m => ({ default: m.LandingPage })));
+const PageRewriteChat = lazy(() => import('./components/PageRewriteChat').then(m => ({ default: m.PageRewriteChat })));
 
 // ── Lazy-loaded admin tab chunks ──
 const SettingsPanel = lazy(() => import('./components/SettingsPanel').then(m => ({ default: m.SettingsPanel })));
@@ -146,6 +147,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   }, [location.pathname, GLOBAL_TABS]);
 
   const [fixContext, setFixContext] = useState<FixContext | null>(null);
+  const [rewritePageUrl, setRewritePageUrl] = useState<string | null>(null);
 
   // Read fixContext from router state (set by SeoAudit / KeywordStrategy navigate calls)
   useEffect(() => {
@@ -371,6 +373,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
       { id: 'seo-strategy', label: 'Strategy', icon: Target, needsSite: true, desc: 'Keyword strategy with page-keyword mapping' },
       { id: 'seo-editor', label: 'SEO Editor', icon: Pencil, needsSite: true, desc: 'Edit titles, descriptions, and meta tags' },
       { id: 'seo-schema', label: 'Schema', icon: Code2, needsSite: true, desc: 'Structured data and schema markup' },
+      { id: 'rewrite', label: 'Page Rewriter', icon: Pencil, needsSite: true, desc: 'AI-assisted page rewriting with playbook instructions' },
     ]},
     { label: 'CONTENT', groupIcon: BookOpen, groupColor: 'text-amber-400',
       activeBg: 'bg-amber-500/10', activeText: 'text-amber-300', activeIcon: 'text-amber-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-amber-500/5', hoverText: 'hover:text-amber-300',
@@ -389,7 +392,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     'seo-schema': 'Schema', 'seo-briefs': 'Content Briefs', content: 'Content', calendar: 'Calendar', subscriptions: 'Subscriptions', brand: 'Brand & AI', 'content-pipeline': 'Content Pipeline',
     'seo-ranks': 'Rank Tracker', search: 'Search Console', analytics: 'Google Analytics',
     annotations: 'Annotations', performance: 'Performance', 'content-perf': 'Content Performance',
-    'workspace-settings': 'Workspace Settings', prospect: 'Prospect', roadmap: 'Roadmap',
+    rewrite: 'Page Rewriter', 'workspace-settings': 'Workspace Settings', prospect: 'Prospect', roadmap: 'Roadmap',
     'ai-usage': 'AI Usage', requests: 'Requests', settings: 'Settings', revenue: 'Revenue',
   };
 
@@ -448,6 +451,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (tab === 'analytics') return <GoogleAnalytics key={`ga4-${selected.id}`} workspaceId={selected.id} ga4PropertyId={selected.ga4PropertyId} />;
     if (tab === 'content-perf') return <ContentPerformance key={`content-perf-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'requests') return <RequestManager key={`requests-${selected.id}`} workspaceId={selected.id} />;
+    if (tab === 'rewrite') return <PageRewriteChat key={`rewrite-${selected.id}`} workspaceId={selected.id} initialPageUrl={rewritePageUrl || undefined} onBack={() => { setRewritePageUrl(null); navigate(adminPath(selected.id, 'seo-audit')); }} />;
 
     return null;
   };

@@ -39,6 +39,7 @@ interface WorkspaceRow {
   auto_report_frequency: string | null;
   brand_voice: string | null;
   knowledge_base: string | null;
+  rewrite_playbook: string | null;
   brand_logo_url: string | null;
   brand_accent_color: string | null;
   tier: string | null;
@@ -106,6 +107,7 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   if (row.auto_report_frequency) ws.autoReportFrequency = row.auto_report_frequency as 'weekly' | 'monthly';
   if (row.brand_voice) ws.brandVoice = row.brand_voice;
   if (row.knowledge_base) ws.knowledgeBase = row.knowledge_base;
+  if (row.rewrite_playbook) ws.rewritePlaybook = row.rewrite_playbook;
   if (row.brand_logo_url) ws.brandLogoUrl = row.brand_logo_url;
   if (row.brand_accent_color) ws.brandAccentColor = row.brand_accent_color;
   if (row.tier) ws.tier = row.tier as 'free' | 'growth' | 'premium';
@@ -417,7 +419,7 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
     clientPortalEnabled: 'client_portal_enabled', seoClientView: 'seo_client_view',
     analyticsClientView: 'analytics_client_view', autoReports: 'auto_reports',
     autoReportFrequency: 'auto_report_frequency', brandVoice: 'brand_voice',
-    knowledgeBase: 'knowledge_base', brandLogoUrl: 'brand_logo_url',
+    knowledgeBase: 'knowledge_base', rewritePlaybook: 'rewrite_playbook', brandLogoUrl: 'brand_logo_url',
     brandAccentColor: 'brand_accent_color', contentPricing: 'content_pricing',
     stripeCustomerId: 'stripe_customer_id', stripeSubscriptionId: 'stripe_subscription_id',
     tier: 'tier', trialEndsAt: 'trial_ends_at',
