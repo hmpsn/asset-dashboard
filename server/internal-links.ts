@@ -14,6 +14,43 @@ import { createLogger } from './logger.js';
 
 const log = createLogger('internal-links');
 
+/**
+ * Fetch and parse sitemap.xml to discover all published URLs.
+ * Returns array of {url, path, title} for each <loc> entry.
+ */
+async function fetchSitemapUrls(baseUrl: string): Promise<Array<{ url: string; path: string; title: string }>> {
+  try {
+    const sitemapUrl = `${baseUrl}/sitemap.xml`;
+    const res = await fetch(sitemapUrl, { redirect: 'follow', signal: AbortSignal.timeout(15000) });
+    if (!res.ok) return [];
+    const xml = await res.text();
+
+    // Parse <loc> entries from sitemap XML
+    const locRegex = /<loc>\s*(.*?)\s*<\/loc>/gi;
+    const urls: Array<{ url: string; path: string; title: string }> = [];
+    let match;
+    while ((match = locRegex.exec(xml)) !== null) {
+      const loc = match[1].trim();
+      try {
+        const parsed = new URL(loc);
+        const path = parsed.pathname || '/';
+        // Derive a readable title from the path
+        const lastSegment = path.replace(/\/$/, '').split('/').pop() || '';
+        const title = lastSegment
+          ? lastSegment.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+          : 'Home';
+        urls.push({ url: loc, path, title });
+      } catch { /* skip malformed URLs */ }
+    }
+
+    log.info(`Sitemap: found ${urls.length} URLs from ${sitemapUrl}`);
+    return urls;
+  } catch (err) {
+    log.info({ detail: err instanceof Error ? err.message : String(err) }, 'Sitemap fetch failed — will fall back to Webflow API');
+    return [];
+  }
+}
+
 export interface PageContent {
   path: string;
   title: string;
@@ -50,11 +87,15 @@ export interface InternalLinkResult {
   orphanCount?: number;
 }
 
-async function fetchPageContent(url: string): Promise<{ content: string; internalLinks: string[] } | null> {
+async function fetchPageContent(url: string): Promise<{ content: string; internalLinks: string[]; pageTitle?: string } | null> {
   try {
     const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(10000) });
     if (!res.ok) return null;
     const html = await res.text();
+
+    // Extract <title> for better page naming (sitemap doesn't include titles)
+    const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
+    const pageTitle = titleMatch ? titleMatch[1].replace(/\s*[|–—]\s*.*$/, '').trim() : undefined;
 
     // Extract body text — strip nav/header/footer so we only see page content
     const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
@@ -87,7 +128,7 @@ async function fetchPageContent(url: string): Promise<{ content: string; interna
       }
     }
 
-    return { content: content.slice(0, 1200), internalLinks: [...new Set(internalLinks)] };
+    return { content: content.slice(0, 1200), internalLinks: [...new Set(internalLinks)], pageTitle };
   } catch {
     return null;
   }
@@ -113,28 +154,39 @@ export async function analyzeInternalLinks(
     return { suggestions: [], pageCount: 0, attemptedPageCount: 0, existingLinkCount: 0, analyzedAt: new Date().toISOString() };
   }
 
-  // Gather all pages
-  const allPages = await listPages(siteId, tokenOverride);
-  const published = filterPublishedPages(allPages);
+  // Primary: fetch sitemap for complete URL list (includes CMS collection pages)
+  let pageUrls = await fetchSitemapUrls(baseUrl);
 
-  const pageUrls: Array<{ url: string; path: string; title: string }> = published.map(p => {
-    // Use publishedPath for full URL (handles nested pages like /about/team)
-    const pagePath = p.publishedPath || (p.slug ? `/${p.slug}` : '');
-    return {
-      url: pagePath ? `${baseUrl}${pagePath}` : baseUrl,
-      path: pagePath || '/',
-      title: p.title || p.slug || 'Home',
-    };
-  });
+  // Fallback: if sitemap is empty/unavailable, use Webflow API + CMS discovery
+  if (pageUrls.length === 0) {
+    log.info('No sitemap URLs — falling back to Webflow API page discovery');
+    const allPages = await listPages(siteId, tokenOverride);
+    const published = filterPublishedPages(allPages);
 
-  // Also discover CMS pages (limit to 30 for performance)
-  const staticPaths = buildStaticPathSet(published);
-  try {
-    const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, 30);
-    for (const cms of cmsUrls) {
-      pageUrls.push({ url: cms.url, path: cms.path, title: cms.pageName });
-    }
-  } catch { /* skip */ }
+    pageUrls = published.map(p => {
+      const pagePath = p.publishedPath || (p.slug ? `/${p.slug}` : '');
+      return {
+        url: pagePath ? `${baseUrl}${pagePath}` : baseUrl,
+        path: pagePath || '/',
+        title: p.title || p.slug || 'Home',
+      };
+    });
+
+    // Also discover CMS pages (limit to 30 for performance)
+    const staticPaths = buildStaticPathSet(published);
+    try {
+      const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, 30);
+      for (const cms of cmsUrls) {
+        pageUrls.push({ url: cms.url, path: cms.path, title: cms.pageName });
+      }
+    } catch { /* skip */ }
+  }
+
+  // Cap at 100 pages to keep fetch + AI costs reasonable
+  if (pageUrls.length > 100) {
+    log.info(`Capping page list from ${pageUrls.length} to 100 for performance`);
+    pageUrls = pageUrls.slice(0, 100);
+  }
 
   log.info(`Internal links: fetching content for ${pageUrls.length} pages`);
 
@@ -150,7 +202,7 @@ export async function analyzeInternalLinks(
       if (result) {
         pages.push({
           path: chunk[j].path,
-          title: chunk[j].title,
+          title: result.pageTitle || chunk[j].title,
           contentSnippet: result.content,
           existingInternalLinks: result.internalLinks,
         });
