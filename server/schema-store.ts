@@ -3,6 +3,7 @@
  * Saves per-site schema snapshots to SQLite.
  */
 import type { SchemaPageSuggestion } from './schema-suggester.js';
+import type { SchemaSitePlan, CanonicalEntity, PageRoleAssignment } from '../shared/types/schema-plan.ts';
 import db from './db/index.js';
 import { createLogger } from './logger.js';
 
@@ -252,6 +253,105 @@ export function getOrSeedSiteTemplate(siteId: string, workspaceId?: string): Sch
  * Update specific fields on the site template (e.g. logo URL).
  * Merges the provided patches into the existing Organization and WebSite nodes.
  */
+// ── Schema Site Plan storage ──
+
+interface PlanRow {
+  id: string;
+  site_id: string;
+  workspace_id: string;
+  site_url: string;
+  canonical_entities: string;
+  page_roles: string;
+  status: string;
+  client_preview_batch_id: string | null;
+  generated_at: string;
+  updated_at: string;
+}
+
+let _planUpsert: ReturnType<typeof db.prepare> | null = null;
+function planUpsertStmt() {
+  if (!_planUpsert) {
+    _planUpsert = db.prepare(`
+      INSERT OR REPLACE INTO schema_site_plans
+        (id, site_id, workspace_id, site_url, canonical_entities, page_roles, status, client_preview_batch_id, generated_at, updated_at)
+      VALUES (@id, @site_id, @workspace_id, @site_url, @canonical_entities, @page_roles, @status, @client_preview_batch_id, @generated_at, @updated_at)
+    `);
+  }
+  return _planUpsert;
+}
+
+let _planGetBySite: ReturnType<typeof db.prepare> | null = null;
+function planGetBySiteStmt() {
+  if (!_planGetBySite) {
+    _planGetBySite = db.prepare('SELECT * FROM schema_site_plans WHERE site_id = ? ORDER BY updated_at DESC LIMIT 1');
+  }
+  return _planGetBySite;
+}
+
+function rowToPlan(row: PlanRow): SchemaSitePlan {
+  return {
+    id: row.id,
+    siteId: row.site_id,
+    workspaceId: row.workspace_id,
+    siteUrl: row.site_url,
+    canonicalEntities: JSON.parse(row.canonical_entities) as CanonicalEntity[],
+    pageRoles: JSON.parse(row.page_roles) as PageRoleAssignment[],
+    status: row.status as SchemaSitePlan['status'],
+    clientPreviewBatchId: row.client_preview_batch_id || undefined,
+    generatedAt: row.generated_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function saveSchemaPlan(plan: SchemaSitePlan): SchemaSitePlan {
+  planUpsertStmt().run({
+    id: plan.id,
+    site_id: plan.siteId,
+    workspace_id: plan.workspaceId,
+    site_url: plan.siteUrl,
+    canonical_entities: JSON.stringify(plan.canonicalEntities),
+    page_roles: JSON.stringify(plan.pageRoles),
+    status: plan.status,
+    client_preview_batch_id: plan.clientPreviewBatchId || null,
+    generated_at: plan.generatedAt,
+    updated_at: plan.updatedAt,
+  });
+  log.info(`Saved schema plan ${plan.id} for site ${plan.siteId} (${plan.pageRoles.length} pages, ${plan.canonicalEntities.length} entities)`);
+  return plan;
+}
+
+export function getSchemaPlan(siteId: string): SchemaSitePlan | null {
+  const row = planGetBySiteStmt().get(siteId) as PlanRow | undefined;
+  if (!row) return null;
+  return rowToPlan(row);
+}
+
+export function updateSchemaPlanStatus(
+  siteId: string,
+  status: SchemaSitePlan['status'],
+  clientPreviewBatchId?: string,
+): SchemaSitePlan | null {
+  const plan = getSchemaPlan(siteId);
+  if (!plan) return null;
+  plan.status = status;
+  if (clientPreviewBatchId) plan.clientPreviewBatchId = clientPreviewBatchId;
+  plan.updatedAt = new Date().toISOString();
+  return saveSchemaPlan(plan);
+}
+
+export function updateSchemaPlanRoles(
+  siteId: string,
+  pageRoles: PageRoleAssignment[],
+  canonicalEntities?: CanonicalEntity[],
+): SchemaSitePlan | null {
+  const plan = getSchemaPlan(siteId);
+  if (!plan) return null;
+  plan.pageRoles = pageRoles;
+  if (canonicalEntities) plan.canonicalEntities = canonicalEntities;
+  plan.updatedAt = new Date().toISOString();
+  return saveSchemaPlan(plan);
+}
+
 export function patchSiteTemplate(
   siteId: string,
   orgPatch?: Record<string, unknown>,

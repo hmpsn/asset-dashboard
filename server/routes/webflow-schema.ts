@@ -7,8 +7,13 @@ const router = Router();
 
 import { addActivity } from '../activity-log.js';
 import { buildSchemaContext } from '../helpers.js';
-import { getSchemaSnapshot, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot } from '../schema-store.js';
+import { getSchemaSnapshot, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, getSchemaPlan, updateSchemaPlanStatus, updateSchemaPlanRoles } from '../schema-store.js';
 import { generateSchemaSuggestions, generateSchemaForPage, generateCmsTemplateSchema } from '../schema-suggester.js';
+import { generateSchemaPlan } from '../schema-plan.js';
+import { createBatch } from '../approvals.js';
+import { SCHEMA_ROLE_CLIENT_DESC } from '../../shared/types/schema-plan.ts';
+import { broadcastToWorkspace } from '../broadcast.js';
+import { notifyApprovalReady } from '../email.js';
 import {
   listCollections,
   listPages,
@@ -16,7 +21,7 @@ import {
   publishSchemaToPage,
   publishRawSchemaToPage,
 } from '../webflow.js';
-import { listWorkspaces, getTokenForSite, updatePageState } from '../workspaces.js';
+import { listWorkspaces, getTokenForSite, updatePageState, getWorkspace, getClientPortalUrl } from '../workspaces.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { createLogger } from '../logger.js';
 
@@ -241,6 +246,107 @@ router.patch('/api/webflow/schema-template/:siteId', (req, res) => {
     log.error({ err }, 'Patch site template error');
     res.status(500).json({ error: 'Failed to patch site template' });
   }
+});
+
+// ── Schema Site Plan endpoints ──
+
+// POST: generate a new schema plan for the site
+router.post('/api/webflow/schema-plan/:siteId', async (req, res) => {
+  try {
+    const { ctx } = buildSchemaContext(req.params.siteId);
+    const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+    if (!ws) return res.status(404).json({ error: 'No workspace found for this site' });
+
+    const plan = await generateSchemaPlan({
+      siteId: req.params.siteId,
+      workspaceId: ws.id,
+      siteUrl: ctx.liveDomain ? `https://${ctx.liveDomain}` : '',
+      companyName: ctx.companyName,
+      businessContext: ctx.businessContext,
+      strategy: ws.keywordStrategy,
+      tokenOverride: getTokenForSite(req.params.siteId) || undefined,
+    });
+
+    addActivity(ws.id, 'schema_plan_generated', 'Schema site plan generated', `${plan.pageRoles.length} pages, ${plan.canonicalEntities.length} entities`);
+    res.json(plan);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log.error({ detail: msg, err }, 'Schema plan generation error');
+    res.status(500).json({ error: `Schema plan generation failed: ${msg}` });
+  }
+});
+
+// GET: retrieve the current plan for a site
+router.get('/api/webflow/schema-plan/:siteId', (req, res) => {
+  const plan = getSchemaPlan(req.params.siteId);
+  if (!plan) return res.json(null);
+  res.json(plan);
+});
+
+// PUT: update page roles / canonical entities on the plan
+router.put('/api/webflow/schema-plan/:siteId', (req, res) => {
+  const { pageRoles, canonicalEntities } = req.body;
+  if (!pageRoles) return res.status(400).json({ error: 'pageRoles required' });
+  const plan = updateSchemaPlanRoles(req.params.siteId, pageRoles, canonicalEntities);
+  if (!plan) return res.status(404).json({ error: 'No plan found for this site' });
+  res.json(plan);
+});
+
+// POST: send plan preview to client for approval
+router.post('/api/webflow/schema-plan/:siteId/send-to-client', (req, res) => {
+  try {
+    const plan = getSchemaPlan(req.params.siteId);
+    if (!plan) return res.status(404).json({ error: 'No plan found. Generate one first.' });
+
+    const ws = getWorkspace(plan.workspaceId);
+    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+    // Build approval items from page roles — translated to client-friendly descriptions
+    const items = plan.pageRoles.map(pr => ({
+      id: `plan_${pr.pagePath.replace(/\//g, '_') || 'home'}`,
+      pageId: pr.pagePath,
+      pageTitle: pr.pageTitle,
+      pageSlug: pr.pagePath,
+      field: 'schema-plan',
+      currentValue: '',
+      proposedValue: SCHEMA_ROLE_CLIENT_DESC[pr.role] || 'Basic page info',
+      status: 'pending' as const,
+      reason: pr.notes || undefined,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }));
+
+    const batch = createBatch(ws.id, plan.siteId, 'Schema Strategy Preview', items);
+    updateSchemaPlanStatus(req.params.siteId, 'sent_to_client', batch.id);
+
+    // Notify client
+    if (ws.clientEmail) {
+      const dashUrl = getClientPortalUrl(ws);
+      notifyApprovalReady({
+        clientEmail: ws.clientEmail,
+        workspaceName: ws.name,
+        workspaceId: ws.id,
+        batchName: 'Schema Strategy Preview',
+        itemCount: items.length,
+        dashboardUrl: dashUrl,
+      });
+    }
+
+    broadcastToWorkspace(ws.id, 'approval:update', { batchId: batch.id, action: 'created' });
+    addActivity(ws.id, 'schema_plan_sent', 'Schema strategy preview sent to client', `${items.length} pages for review`);
+    res.json({ plan, batch });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log.error({ detail: msg, err }, 'Send schema plan to client error');
+    res.status(500).json({ error: `Failed to send plan: ${msg}` });
+  }
+});
+
+// POST: mark plan as active (approved or admin-confirmed)
+router.post('/api/webflow/schema-plan/:siteId/activate', (req, res) => {
+  const plan = updateSchemaPlanStatus(req.params.siteId, 'active');
+  if (!plan) return res.status(404).json({ error: 'No plan found' });
+  res.json(plan);
 });
 
 export default router;

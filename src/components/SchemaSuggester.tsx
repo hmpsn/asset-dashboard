@@ -13,6 +13,7 @@ import { CmsTemplatePanel } from './schema/CmsTemplatePanel';
 import { SchemaPageCard } from './schema/SchemaPageCard';
 import { BulkPublishPanel } from './schema/BulkPublishPanel';
 import { PagePicker } from './schema/PagePicker';
+import { SchemaPlanPanel } from './schema/SchemaPlanPanel';
 
 interface SchemaSuggestion {
   type: string;
@@ -126,7 +127,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
         const snapshot = await get<{ results?: SchemaPageSuggestion[]; createdAt?: string }>(`/api/webflow/schema-snapshot/${siteId}`);
         if (snapshot && snapshot.results && snapshot.results.length > 0) {
           setData(snapshot.results);
-          setSnapshotDate(snapshot.createdAt);
+          setSnapshotDate(snapshot.createdAt ?? null);
           setStarted(true);
         }
       } catch { /* no saved data */ }
@@ -535,6 +536,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
             </button>
           </div>
         </div>
+        <SchemaPlanPanel siteId={siteId} />
         <CmsTemplatePanel
           showCmsPanel={showCmsPanel}
           cmsTemplatePages={cmsTemplatePages}
@@ -653,6 +655,9 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
 
   return (
     <div className="space-y-4">
+      {/* Schema site plan */}
+      <SchemaPlanPanel siteId={siteId} />
+
       {/* Progress banner while streaming */}
       {loading && (
         <div className="flex items-center gap-2.5 px-4 py-2.5 bg-teal-500/10 border border-teal-500/20 rounded-xl">

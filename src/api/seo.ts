@@ -1,5 +1,6 @@
 // ── SEO API (audit, schema, keywords, webflow, etc.) ──────────────
 import { get, post, put, patch, del, getSafe, getOptional } from './client';
+import type { SchemaSitePlan, PageRoleAssignment, CanonicalEntity } from '../../shared/types/schema-plan';
 
 // ── Audit ───────────────────────────────────────────────────────
 export const audit = {
@@ -71,6 +72,24 @@ export const schema = {
 
   deployHistory: (wsId: string) =>
     getSafe<unknown[]>(`/api/schema/${wsId}/deploy-history`, []),
+};
+
+// ── Schema Site Plan ────────────────────────────────────────────
+export const schemaPlan = {
+  get: (siteId: string) =>
+    getOptional<SchemaSitePlan>(`/api/webflow/schema-plan/${siteId}`),
+
+  generate: (siteId: string) =>
+    post<SchemaSitePlan>(`/api/webflow/schema-plan/${siteId}`),
+
+  update: (siteId: string, pageRoles: PageRoleAssignment[], canonicalEntities?: CanonicalEntity[]) =>
+    put<SchemaSitePlan>(`/api/webflow/schema-plan/${siteId}`, { pageRoles, canonicalEntities }),
+
+  sendToClient: (siteId: string) =>
+    post<{ plan: SchemaSitePlan; batch: unknown }>(`/api/webflow/schema-plan/${siteId}/send-to-client`),
+
+  activate: (siteId: string) =>
+    post<SchemaSitePlan>(`/api/webflow/schema-plan/${siteId}/activate`),
 };
 
 // ── Keywords / Strategy ─────────────────────────────────────────

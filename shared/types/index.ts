@@ -9,3 +9,4 @@ export type * from './users.ts';
 export type * from './analytics.ts';
 export type * from './roadmap.ts';
 export type * from './approvals.ts';
+export type * from './schema-plan.ts';

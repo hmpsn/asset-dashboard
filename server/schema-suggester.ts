@@ -1,7 +1,8 @@
 import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet, getCollectionSchema, listCollections } from './webflow.js';
 import { callOpenAI } from './openai-helpers.js';
 import { createLogger } from './logger.js';
-import { saveSiteTemplate, getOrSeedSiteTemplate } from './schema-store.js';
+import { saveSiteTemplate, getOrSeedSiteTemplate, getSchemaPlan } from './schema-store.js';
+import { buildPlanContextForPage } from './schema-plan.js';
 
 const log = createLogger('schema');
 
@@ -62,6 +63,7 @@ export interface SchemaContext {
   knowledgeBase?: string;
   pageType?: SchemaPageType;
   _siteId?: string;  // Internal: passed through for site template storage
+  _planContext?: string;  // Internal: plan-based role/entity context for this page
 }
 
 // Google required fields per @type (for validation)
@@ -869,6 +871,37 @@ async function postProcessSchema(
   // Step 4: Inject cross-references + ensure WebSite/Organization nodes exist
   injectCrossReferences(schema, siteUrl, ctx.companyName);
 
+  // Step 4b: Plan validation — strip entities that shouldn't exist per the site plan
+  if (ctx._planContext && Array.isArray(schema['@graph'])) {
+    const planGraph = schema['@graph'] as Record<string, unknown>[];
+    const planCtx = ctx._planContext;
+    // If plan says "REFERENCE ONLY" for a type, remove any full node the AI created
+    // and ensure a {"@id": "..."} reference exists in WebPage.about or mentions
+    const isReferenceOnly = (type: string) =>
+      planCtx.includes(`${type}:`) && planCtx.includes('REFERENCE ONLY');
+    const isLeadGen = planCtx.includes('Page Role: LEAD-GEN');
+    const isAudiencePage = planCtx.includes('Page Role: AUDIENCE');
+
+    for (let i = planGraph.length - 1; i >= 0; i--) {
+      const node = planGraph[i];
+      const nodeType = String(node['@type'] || '');
+      // Lead-gen pages: strip Service/SoftwareApplication nodes
+      if (isLeadGen && (nodeType === 'Service' || nodeType === 'SoftwareApplication')) {
+        log.info(`Plan validation: removed ${nodeType} from lead-gen page`);
+        planGraph.splice(i, 1);
+        continue;
+      }
+      // Audience pages: strip Service/SoftwareApplication — should only reference, not create
+      if (isAudiencePage && (nodeType === 'Service' || nodeType === 'SoftwareApplication')) {
+        if (isReferenceOnly(nodeType)) {
+          log.info(`Plan validation: removed ${nodeType} from audience page (should be reference only)`);
+          planGraph.splice(i, 1);
+          continue;
+        }
+      }
+    }
+  }
+
   // Step 5: Clean again after modifications (remove any empty values created by stripping)
   const cleaned = cleanSchema(schema);
 
@@ -1006,6 +1039,7 @@ ${info.phones.length ? `- Phones: ${info.phones.join(', ')}` : ''}
 ${info.images.length ? `- Key Images: ${info.images.slice(0, 3).join(', ')}` : ''}
 ${info.questions.length ? `- FAQ Questions Found: ${info.questions.join(' | ')}` : ''}
 ${getPageTypeInstructions(ctx.pageType, siteUrl)}
+${ctx._planContext || ''}
 PAGE CONTENT (excerpt):
 ${pageContent.slice(0, 3000)}
 
@@ -1200,6 +1234,13 @@ export async function generateSchemaForPage(
   const seoDesc = meta.seo?.description || '';
   const { types: existingSchemas, json: existingSchemaJson } = html ? extractExistingSchemas(html) : { types: [], json: [] };
 
+  // Inject plan context if a site plan exists
+  const sitePlan = getSchemaPlan(siteId);
+  if (sitePlan && !ctx._planContext) {
+    const pagePath = isHomepage ? '/' : (slug ? `/${slug}` : '/');
+    ctx._planContext = buildPlanContextForPage(sitePlan, pagePath) || undefined;
+  }
+
   // Try AI unified schema first
   const aiResult = await aiGenerateUnifiedSchema(
     meta.title, slug, seoTitle, seoDesc,
@@ -1273,6 +1314,9 @@ export async function generateSchemaSuggestions(
   // gpt-4.1-mini has 4M TPM at Tier 3 — batch 8 AI calls at a time safely
   const batch = hasAI ? 8 : 5;
 
+  // Look up active schema plan for site-aware generation
+  const sitePlan = getSchemaPlan(siteId);
+
   // Helper: find keyword context for a page path (supports nested paths like /about/team)
   const getPageKeywords = (pathOrSlug: string): SchemaContext['pageKeywords'] => {
     if (!pageKeywordMap) return undefined;
@@ -1311,10 +1355,12 @@ export async function generateSchemaSuggestions(
 
         // Build page-specific context (use full path for nested pages)
         const lookupPath = pagePath || `/${page.slug}`;
+        const planContext = sitePlan ? buildPlanContextForPage(sitePlan, isHomepage ? '/' : lookupPath) : '';
         const pageCtx: SchemaContext = {
           ...ctx,
           pageKeywords: getPageKeywords(lookupPath),
           searchIntent: getPageIntent(lookupPath),
+          _planContext: planContext || undefined,
         };
 
         let suggestedSchemas: SchemaSuggestion[];

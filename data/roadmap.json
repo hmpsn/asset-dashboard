@@ -2010,6 +2010,16 @@
           "notes": "Shipped — Auto-dedup Organization nodes (removes /#organization-stub duplicates). Auto-normalize Service @id to match canonical url field. 37 AI prompt rules: lead-gen page detection (skip Service on /demo, /contact), consistent @id across pages for same product, description length guidance, WebPage desc mirrors meta desc.",
           "status": "done",
           "shippedAt": "2026-03-16"
+        },
+        {
+          "id": 304,
+          "title": "Schema: Site-aware schema plan with page roles, entity registry, and client approval",
+          "source": "Schema site plan feature",
+          "est": "4-5h",
+          "priority": "P0",
+          "notes": "Shipped — AI-driven site-wide schema plan analyzes all pages + keyword strategy to assign page roles (homepage, pillar, audience, lead-gen, blog, etc.) and identify canonical entities with consistent @id references. Plan stored in SQLite (migration 013), injected as context into per-page AI prompts, enforced by post-processing validation. Admin SchemaPlanPanel with role dropdowns and entity registry. Send to Client creates approval batch with plain-English descriptions. 5 API endpoints: generate, get, update, send-to-client, activate.",
+          "status": "done",
+          "shippedAt": "2026-03-16"
         }
       ]
     }

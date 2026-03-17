@@ -29,6 +29,8 @@ export type ActivityType =
   | 'content_upgraded'
   | 'schema_generated'
   | 'schema_published'
+  | 'schema_plan_generated'
+  | 'schema_plan_sent'
   | 'redirects_scanned'
   | 'strategy_generated'
   | 'rank_snapshot'
