@@ -9,7 +9,7 @@ import type { KeywordStrategy, PageKeywordMap } from '../shared/types/workspace.
 import { callOpenAI } from './openai-helpers.js';
 import { createLogger } from './logger.js';
 import { saveSchemaPlan } from './schema-store.js';
-import { listPages, filterPublishedPages } from './webflow.js';
+import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from './webflow.js';
 
 const log = createLogger('schema-plan');
 
@@ -38,8 +38,8 @@ export async function generateSchemaPlan(ctx: PlanContext): Promise<SchemaSitePl
       !(p.slug || '').toLowerCase().includes('password'),
   );
 
-  // Build page list with strategy enrichment
-  const pageList = pages.map((p) => {
+  // Build page list with strategy enrichment — static pages first
+  const pageList: PageListItem[] = pages.map((p) => {
     const pagePath = (p.publishedPath || '') || (p.slug ? `/${p.slug}` : '/');
     const isHomepage = !p.slug || p.slug === '' || p.slug === 'home' || p.slug === 'index';
     const strategyMatch = strategy?.pageMap?.find(
@@ -55,7 +55,35 @@ export async function generateSchemaPlan(ctx: PlanContext): Promise<SchemaSitePl
     };
   });
 
-  log.info(`Generating schema plan for ${pageList.length} pages on ${siteUrl}`);
+  // Discover CMS/collection pages from the sitemap
+  if (siteUrl) {
+    try {
+      const staticPaths = buildStaticPathSet(pages);
+      const { cmsUrls, totalFound } = await discoverCmsUrls(siteUrl, staticPaths, 500);
+      log.info(`Discovered ${cmsUrls.length} CMS pages (${totalFound} total in sitemap) for schema plan`);
+      for (const cms of cmsUrls) {
+        // Skip utility/legal pages
+        const lp = cms.path.toLowerCase();
+        if (/\/(password|404|thank|success)/.test(lp)) continue;
+
+        const strategyMatch = strategy?.pageMap?.find(
+          (pm: PageKeywordMap) => pm.pagePath === cms.path || pm.pagePath === cms.path.replace(/\/$/, ''),
+        );
+
+        pageList.push({
+          path: cms.path,
+          title: cms.pageName || '(CMS page)',
+          isHomepage: false,
+          primaryKeyword: strategyMatch?.primaryKeyword || '',
+          searchIntent: strategyMatch?.searchIntent || '',
+        });
+      }
+    } catch (err) {
+      log.warn({ err }, 'CMS page discovery failed — plan will only include static pages');
+    }
+  }
+
+  log.info(`Generating schema plan for ${pageList.length} pages (static + CMS) on ${siteUrl}`);
 
   // Try AI-generated plan first
   const aiPlan = await aiGeneratePlan(pageList, siteUrl, companyName, businessContext, strategy, workspaceId);
@@ -97,12 +125,69 @@ async function aiGeneratePlan(
 ): Promise<{ canonicalEntities: CanonicalEntity[]; pageRoles: PageRoleAssignment[] } | null> {
   if (!process.env.OPENAI_API_KEY) return null;
 
-  const pageTable = pages.map(p => {
-    const parts = [p.path, p.title];
-    if (p.primaryKeyword) parts.push(`keyword: "${p.primaryKeyword}"`);
-    if (p.searchIntent) parts.push(`intent: ${p.searchIntent}`);
-    return parts.join(' | ');
-  }).join('\n');
+  // Group CMS collection pages to keep prompt manageable for large sites
+  // Show all static pages individually, but summarize CMS collections with >5 pages
+  const MAX_INDIVIDUAL_PAGES = 150;
+  let pageTable: string;
+  let collectionSummary = '';
+
+  if (pages.length <= MAX_INDIVIDUAL_PAGES) {
+    // Small enough — list every page
+    pageTable = pages.map(p => {
+      const parts = [p.path, p.title];
+      if (p.primaryKeyword) parts.push(`keyword: "${p.primaryKeyword}"`);
+      if (p.searchIntent) parts.push(`intent: ${p.searchIntent}`);
+      return parts.join(' | ');
+    }).join('\n');
+  } else {
+    // Large site — group CMS pages by collection prefix, show samples
+    const collections = new Map<string, PageListItem[]>();
+    const staticPages: PageListItem[] = [];
+
+    for (const p of pages) {
+      // Detect collection prefix: 2+ pages sharing the same first path segment
+      const segments = p.path.split('/').filter(Boolean);
+      if (segments.length >= 2) {
+        const prefix = `/${segments[0]}`;
+        if (!collections.has(prefix)) collections.set(prefix, []);
+        collections.get(prefix)!.push(p);
+      } else {
+        staticPages.push(p);
+      }
+    }
+
+    // List all static/top-level pages individually
+    const lines = staticPages.map(p => {
+      const parts = [p.path, p.title];
+      if (p.primaryKeyword) parts.push(`keyword: "${p.primaryKeyword}"`);
+      if (p.searchIntent) parts.push(`intent: ${p.searchIntent}`);
+      return parts.join(' | ');
+    });
+
+    // For collections: show prefix + count + 3 samples
+    const collectionParts: string[] = [];
+    for (const [prefix, items] of collections.entries()) {
+      if (items.length <= 5) {
+        // Small collection — list individually
+        for (const p of items) {
+          const parts = [p.path, p.title];
+          if (p.primaryKeyword) parts.push(`keyword: "${p.primaryKeyword}"`);
+          if (p.searchIntent) parts.push(`intent: ${p.searchIntent}`);
+          lines.push(parts.join(' | '));
+        }
+      } else {
+        // Large collection — summarize
+        const samples = items.slice(0, 3).map(p => `  ${p.path} | ${p.title}`).join('\n');
+        lines.push(`${prefix}/* (${items.length} CMS pages — samples below)`);
+        collectionParts.push(`Collection "${prefix}/" — ${items.length} pages:\n${samples}\n  ... and ${items.length - 3} more`);
+      }
+    }
+
+    pageTable = lines.join('\n');
+    if (collectionParts.length > 0) {
+      collectionSummary = `\nCMS COLLECTIONS (assign the same role to all pages in each collection):\n${collectionParts.join('\n\n')}`;
+    }
+  }
 
   const prompt = `You are a Google Structured Data strategist. Analyze this site's pages and produce a schema site plan.
 
@@ -110,8 +195,8 @@ SITE: ${companyName || '(unknown)'} — ${siteUrl}
 ${businessContext ? `BUSINESS: ${businessContext}` : ''}
 ${strategy?.siteKeywords?.length ? `SITE KEYWORDS: ${strategy.siteKeywords.slice(0, 10).join(', ')}` : ''}
 
-PAGES (${pages.length}):
-${pageTable}
+PAGES (${pages.length} total):
+${pageTable}${collectionSummary}
 
 TASK: Assign each page a ROLE and identify CANONICAL ENTITIES for the site.
 
@@ -141,11 +226,15 @@ RULES:
 2. There should be 0-3 pillar pages (most sites have 1)
 3. Pages that describe the SAME product for different audiences are "audience", not "pillar"
 4. /demo, /contact, /request-demo, /get-started, /pricing, /signup, /book → "lead-gen"
-5. Blog posts → "blog"
+5. Blog posts → "blog" — this includes CMS collection pages under /blog/*, /posts/*, /articles/*, /news/*
 6. /about, /team, /careers → "about"
 7. /faq only if it's a dedicated FAQ page, not a product page with a FAQ section
 8. Comparison pages (/vs-*, /compare-*, /alternative-*) → "comparison"
 9. Partnership pages (/partner-name, /integrations/partner) → "partnership"
+10. CMS collection pages (e.g. /customers/*, /case-studies/*) → "case-study" if they are customer stories
+11. CMS collection pages under /integrations/* or /partners/* → "partnership"
+12. Resource/guide pages → "blog" (Article schema)
+13. You MUST assign a role to EVERY page in the list — do not skip any
 
 Return JSON with this exact structure:
 {
@@ -164,13 +253,14 @@ IMPORTANT:
 - The pillar page that OWNS an entity should have an empty entityRefs for that entity (it creates it)
 - The homepage should reference all canonical entities
 - primaryType is the main schema @type for the page's content (not Organization/WebSite — those are handled separately)
+- For CMS collections with many pages, you may use a WILDCARD entry like { "pagePath": "/blog/*", ... } to assign the same role to all pages in that collection. The system will expand it to individual pages.
 - Return ONLY valid JSON, no markdown`;
 
   try {
     const result = await callOpenAI({
       model: 'gpt-4.1-mini',
       messages: [{ role: 'user', content: prompt }],
-      maxTokens: 2000,
+      maxTokens: 4000,
       temperature: 0.1,
       feature: 'schema-plan',
       workspaceId,
@@ -193,7 +283,7 @@ IMPORTANT:
       'location', 'product', 'partnership', 'faq', 'case-study', 'comparison', 'generic',
     ]);
 
-    const pageRoles: PageRoleAssignment[] = parsed.pageRoles.map((pr: Record<string, unknown>) => ({
+    const rawRoles: PageRoleAssignment[] = parsed.pageRoles.map((pr: Record<string, unknown>) => ({
       pagePath: String(pr.pagePath || ''),
       pageTitle: String(pr.pageTitle || ''),
       role: validRoles.has(String(pr.role)) ? String(pr.role) as SchemaPageRole : 'generic',
@@ -201,6 +291,43 @@ IMPORTANT:
       entityRefs: Array.isArray(pr.entityRefs) ? pr.entityRefs.map(String) : [],
       notes: pr.notes ? String(pr.notes) : undefined,
     }));
+
+    // Expand wildcard entries (e.g. "/blog/*") to individual page entries
+    const pageRoles: PageRoleAssignment[] = [];
+    const assignedPaths = new Set<string>();
+
+    for (const pr of rawRoles) {
+      if (pr.pagePath.endsWith('/*')) {
+        // Wildcard — expand to all pages matching the prefix
+        const prefix = pr.pagePath.slice(0, -1); // "/blog/*" → "/blog/"
+        const matching = pages.filter(p => p.path.startsWith(prefix) && p.path !== prefix.replace(/\/$/, ''));
+        for (const p of matching) {
+          if (!assignedPaths.has(p.path)) {
+            assignedPaths.add(p.path);
+            pageRoles.push({
+              ...pr,
+              pagePath: p.path,
+              pageTitle: p.title,
+            });
+          }
+        }
+        log.info(`Expanded wildcard ${pr.pagePath} → ${matching.length} pages (role: ${pr.role})`);
+      } else {
+        if (!assignedPaths.has(pr.pagePath)) {
+          assignedPaths.add(pr.pagePath);
+          pageRoles.push(pr);
+        }
+      }
+    }
+
+    // Catch any pages the AI missed — assign via fallback
+    for (const p of pages) {
+      if (!assignedPaths.has(p.path)) {
+        const fallback = buildFallbackRoles([p])[0];
+        pageRoles.push(fallback);
+        assignedPaths.add(p.path);
+      }
+    }
 
     const canonicalEntities: CanonicalEntity[] = parsed.canonicalEntities.map((ce: Record<string, unknown>) => ({
       type: String(ce.type || 'Service'),
@@ -210,7 +337,7 @@ IMPORTANT:
       description: ce.description ? String(ce.description) : undefined,
     }));
 
-    log.info(`AI plan: ${canonicalEntities.length} entities, ${pageRoles.length} roles`);
+    log.info(`AI plan: ${canonicalEntities.length} entities, ${pageRoles.length} roles (${rawRoles.length} from AI, expanded from wildcards + fallback)`);
     return { canonicalEntities, pageRoles };
   } catch (err) {
     log.error({ err }, 'AI schema plan generation failed');
@@ -230,7 +357,7 @@ function buildFallbackRoles(pages: PageListItem[]): PageRoleAssignment[] {
       primaryType = 'Organization';
     } else if (/^\/(demo|contact|request-demo|get-started|pricing|signup|book)/.test(slug)) {
       role = 'lead-gen';
-    } else if (/^\/(blog|posts?|articles?|news)\//.test(slug) || /^\/(blog|posts?|articles?|news)$/.test(slug)) {
+    } else if (/^\/(blog|posts?|articles?|news|resources?|guides?)\//.test(slug) || /^\/(blog|posts?|articles?|news)$/.test(slug)) {
       role = 'blog';
       primaryType = 'Article';
     } else if (/^\/(about|team|careers?)/.test(slug)) {
@@ -243,6 +370,11 @@ function buildFallbackRoles(pages: PageListItem[]): PageRoleAssignment[] {
       primaryType = 'SoftwareApplication';
     } else if (/vs-|compare|alternative/.test(slug)) {
       role = 'comparison';
+    } else if (/^\/(customers?|case-stud(y|ies)|success-stor(y|ies))\//.test(slug)) {
+      role = 'case-study';
+      primaryType = 'Article';
+    } else if (/^\/(integrations?|partners?)\//.test(slug)) {
+      role = 'partnership';
     }
 
     return {

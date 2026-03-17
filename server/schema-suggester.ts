@@ -31,22 +31,24 @@ export interface SchemaSuggestion {
 }
 
 // Page type hints for tailored schema generation
-export type SchemaPageType = 'auto' | 'homepage' | 'service' | 'pillar' | 'persona' | 'blog' | 'about' | 'contact' | 'location' | 'product' | 'landing' | 'faq' | 'case-study';
+export type SchemaPageType = 'auto' | 'homepage' | 'pillar' | 'audience' | 'lead-gen' | 'blog' | 'about' | 'contact' | 'location' | 'product' | 'partnership' | 'faq' | 'case-study' | 'comparison' | 'generic';
 
 export const PAGE_TYPE_LABELS: Record<SchemaPageType, string> = {
   auto: 'Auto-detect',
   homepage: 'Homepage',
-  service: 'Service Page',
-  pillar: 'Pillar / Hub Page',
-  persona: 'Persona / Audience Page',
+  pillar: 'Pillar / Product Page',
+  audience: 'Audience / Persona Page',
+  'lead-gen': 'Lead-Gen / Conversion',
   blog: 'Blog Post',
-  about: 'About / Team Page',
-  contact: 'Contact Page',
-  location: 'Location Page',
-  product: 'Product Page',
-  landing: 'Landing Page',
-  faq: 'FAQ Page',
+  about: 'About / Team',
+  contact: 'Contact',
+  location: 'Location',
+  product: 'Product',
+  partnership: 'Partnership',
+  faq: 'FAQ',
   'case-study': 'Case Study',
+  comparison: 'Comparison',
+  generic: 'General Page',
 };
 
 // Context from the workspace/strategy for richer schema generation
@@ -681,29 +683,25 @@ function getPageTypeInstructions(pageType: SchemaPageType | undefined, siteUrl: 
 - Include BreadcrumbList with just Home
 - WebPage MUST include "isPartOf": {"@id": "${siteUrl}/#website"} and "mainEntity": {"@id": "${siteUrl}/#organization"} (or reference the primary SoftwareApplication/Service)`,
 
-    service: `PAGE TYPE INSTRUCTIONS (Service Page):
-- MUST include a Service node as mainEntity with: name, description, serviceType (1-3 concise types), provider → Organization, url, areaServed (if geographic)
-- If the page describes multiple sub-services, include each as its own Service node
+    pillar: `PAGE TYPE INSTRUCTIONS (Pillar / Product Page):
+- This is the canonical page for a product or service — it OWNS the primary SoftwareApplication or Service entity
+- For SaaS/platform: MUST include SoftwareApplication as mainEntity with: name, description, url, applicationCategory, operatingSystem "Web", provider → Organization, featureList
+- For service businesses: MUST include Service as mainEntity with: name, description, serviceType (1-3 concise types), provider → Organization, url, areaServed (if geographic)
+- If the page describes multiple sub-services, include each as its own Service node with provider → Organization
+- Include "hasOfferCatalog" if pricing tiers or packages are listed; include Offer node if pricing is visible
 - Include "audience": {"@type": "Audience", "audienceType": "..."} if the target audience is identifiable
-- Include "hasOfferCatalog" if pricing tiers or packages are listed
-- If there's a clear CTA or pricing, include an Offer node
-- BreadcrumbList: Home → [Parent Category if applicable] → Service Name
-- WebPage.mainEntity should reference the primary Service node`,
-
-    pillar: `PAGE TYPE INSTRUCTIONS (Pillar / Hub Page):
-- This is a comprehensive topic hub linking to related subtopic pages
-- MUST include WebPage with "significantLink" array listing URLs to key subtopic/child pages found in the content
-- Include BreadcrumbList: Home → Topic Category → Pillar Title
-- If the page covers a broad topic with sections, consider an Article or WebPage with "about" describing the core topic
+- Include "significantLink" array listing URLs to key subtopic/child pages found in the content
+- Include BreadcrumbList: Home → [Category] → Product/Service Name
 - Include "speakable" on WebPage targeting the introductory paragraph
-- If the page links to blog posts or guides, do NOT include those as separate Article nodes — just reference via significantLink
-- Focus on comprehensive WebPage + Organization, not fragmented types`,
+- Do NOT create separate entities for features of the same product — use featureList or description instead
+- WebPage.mainEntity should reference the primary product/service node`,
 
-    persona: `PAGE TYPE INSTRUCTIONS (Persona / Audience Page):
+    audience: `PAGE TYPE INSTRUCTIONS (Audience / Persona Page):
 - This page targets a specific audience segment (e.g. "For Developers", "For Enterprise")
-- MUST include Service or WebPage with "audience": {"@type": "Audience", "audienceType": "[specific audience]"}
-- If multiple offerings are presented for this audience, include each as a Service with audience + provider → Organization
+- Use WebPage with "audience": {"@type": "Audience", "audienceType": "[specific audience]"}
+- Reference the canonical product entity via "about": {"@id": "..."} — do NOT create your own Service or SoftwareApplication node
 - Include "about" on WebPage describing who this audience is and what problems are addressed
+- If the page links to multiple product features, use "significantLink" to reference them — but do NOT create separate Service nodes
 - BreadcrumbList: Home → [Solutions/For] → Audience Name`,
 
     blog: `PAGE TYPE INSTRUCTIONS (Blog Post / Article):
@@ -746,15 +744,15 @@ function getPageTypeInstructions(pageType: SchemaPageType | undefined, siteUrl: 
 - If multiple variants exist, include each as a separate Offer within "offers" array
 - BreadcrumbList: Home → [Category] → Product Name`,
 
-    landing: `PAGE TYPE INSTRUCTIONS (Landing Page):
-- This is a conversion-focused page — schema should support rich snippets that drive clicks
+    'lead-gen': `PAGE TYPE INSTRUCTIONS (Lead-Gen / Conversion Page):
+- This is a conversion-focused page (/demo, /contact, /pricing, /signup, /get-started)
+- Use ONLY WebPage + BreadcrumbList — no Service, SoftwareApplication, or product entity nodes
 - Include WebPage with "significantLink" pointing to the primary CTA destination if identifiable
 - Include "speakable" targeting the main headline and value proposition
-- If the page promotes a service, include Service with Offer if pricing is visible
-- If testimonials/social proof appear, include as Review nodes
-- If it's an event landing page, include Event with startDate, location, offers
-- Keep schema focused — don't over-fragment. One strong mainEntity (Service, Product, or Event) is better than many weak nodes
-- BreadcrumbList: Home → [Campaign/Category] → Page Title`,
+- If testimonials/social proof appear, include as Review nodes on the WebPage
+- If it is an event landing page, include Event with startDate, location, offers
+- BreadcrumbList: Home → [Category] → Page Title
+- Keep schema minimal — this page should NOT own or duplicate any product entities`,
 
     faq: `PAGE TYPE INSTRUCTIONS (FAQ Page):
 - MUST include FAQPage as mainEntity with "mainEntity" array of Question nodes
@@ -773,6 +771,24 @@ function getPageTypeInstructions(pageType: SchemaPageType | undefined, siteUrl: 
 - If the case study includes testimonials from the client, include as Review with author
 - BreadcrumbList: Home → Case Studies → [Client/Project Name]
 - Include "speakable" targeting the results summary`,
+
+    partnership: `PAGE TYPE INSTRUCTIONS (Partnership Page):
+- This page describes a partnership or integration with another company/product
+- Use WebPage with "mentions": {"@id": "..."} referencing the canonical product entity — do NOT create your own Service or SoftwareApplication node
+- If the partner company is described, include an Organization node for them (separate from the site's main Organization)
+- BreadcrumbList: Home → [Integrations/Partners] → Partner Name`,
+
+    comparison: `PAGE TYPE INSTRUCTIONS (Comparison Page):
+- This page compares the site's product against competitors (e.g. /vs-competitor, /alternative-to-X)
+- Use WebPage with "about": {"@id": "..."} referencing the canonical product entity — do NOT create a duplicate Service/SoftwareApplication
+- Include "mentions" for competitor products if named, using minimal Thing or SoftwareApplication nodes with just name + url
+- BreadcrumbList: Home → [Comparisons] → Page Title`,
+
+    generic: `PAGE TYPE INSTRUCTIONS (General Page):
+- Use WebPage + BreadcrumbList as the baseline
+- Include any structured data that's clearly supported by the page content
+- Do NOT fabricate entities — only include schema types if the content warrants them
+- BreadcrumbList: Home → Page Title`,
   };
   return instructions[pageType] || '';
 }

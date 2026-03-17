@@ -492,17 +492,19 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
   const PAGE_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
     { value: 'auto', label: 'Auto-detect' },
     { value: 'homepage', label: 'Homepage' },
-    { value: 'service', label: 'Service Page' },
-    { value: 'pillar', label: 'Pillar / Hub' },
-    { value: 'persona', label: 'Persona / Audience' },
+    { value: 'pillar', label: 'Pillar / Product Page' },
+    { value: 'audience', label: 'Audience / Persona Page' },
+    { value: 'lead-gen', label: 'Lead-Gen / Conversion' },
     { value: 'blog', label: 'Blog Post' },
     { value: 'about', label: 'About / Team' },
     { value: 'contact', label: 'Contact' },
     { value: 'location', label: 'Location' },
     { value: 'product', label: 'Product' },
-    { value: 'landing', label: 'Landing Page' },
+    { value: 'partnership', label: 'Partnership' },
     { value: 'faq', label: 'FAQ' },
     { value: 'case-study', label: 'Case Study' },
+    { value: 'comparison', label: 'Comparison' },
+    { value: 'generic', label: 'General Page' },
   ];
 
   const filteredInitialPages = availablePages.filter(
