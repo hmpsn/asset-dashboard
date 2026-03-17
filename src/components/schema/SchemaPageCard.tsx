@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronRight, Copy, CheckCircle,
   AlertCircle, Sparkles, RefreshCw, Upload, Send,
   ArrowRight, GitCompareArrows, Pencil, AlertTriangle,
-  Loader2,
+  Loader2, Save,
 } from 'lucide-react';
 import { StatusBadge } from '../ui/StatusBadge';
 import { statusBorderClass } from '../ui/statusConfig';
@@ -59,6 +59,9 @@ export interface SchemaPageCardProps {
   schemaRecs: Recommendation[];
   workspaceId?: string;
   pageType: string;
+  isHomepage: boolean;
+  savingTemplate: boolean;
+  templateSaved: boolean;
   onPageTypeChange: (pageId: string, type: string) => void;
   // Callbacks
   onToggleExpand: (pageId: string) => void;
@@ -70,6 +73,7 @@ export interface SchemaPageCardProps {
   onPublish: (pageId: string, schema: Record<string, unknown>) => void;
   onConfirmPublish: (pageId: string | null) => void;
   onSendToClient: (page: SchemaPageSuggestion) => void;
+  onSaveAsTemplate: (pageId: string) => void;
   getEffectiveSchema: (pageId: string, original: Record<string, unknown>) => Record<string, unknown>;
 }
 
@@ -78,10 +82,11 @@ export function SchemaPageCard({
   published, publishing, publishError, confirmPublish,
   sentPage, sendingPage, editingSchema, editedSchemaJson,
   schemaParseError, showDiff, schemaRecs, workspaceId,
-  pageType, onPageTypeChange,
+  pageType, isHomepage, savingTemplate, templateSaved,
+  onPageTypeChange,
   onToggleExpand, onRegenerate, onToggleDiff, onToggleSchemaEdit,
   onSchemaJsonChange, onCopyTemplate, onPublish, onConfirmPublish,
-  onSendToClient, getEffectiveSchema,
+  onSendToClient, onSaveAsTemplate, getEffectiveSchema,
 }: SchemaPageCardProps) {
   const hasErrors = (page.validationErrors?.length || 0) > 0;
   const schema = page.suggestedSchemas[0];
@@ -331,6 +336,26 @@ export function SchemaPageCard({
                       <><Loader2 className="w-3 h-3 animate-spin" /> Publishing...</>
                     ) : (
                       <><Upload className="w-3.5 h-3.5" /> Publish to Webflow</>
+                    )}
+                  </button>
+                )
+              )}
+              {isHomepage && (
+                templateSaved ? (
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
+                    <CheckCircle className="w-3.5 h-3.5" /> Template Saved
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => onSaveAsTemplate(page.pageId)}
+                    disabled={savingTemplate}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                    title="Save Organization + WebSite nodes as the site-wide template for subpages"
+                  >
+                    {savingTemplate ? (
+                      <><Loader2 className="w-3 h-3 animate-spin" /> Saving...</>
+                    ) : (
+                      <><Save className="w-3.5 h-3.5" /> Save as Site Template</>
                     )}
                   </button>
                 )

@@ -78,6 +78,26 @@ router.post('/api/webflow/schema-publish/:siteId', async (req, res) => {
       }
     }
 
+    // Auto-save site template if this is a homepage publish
+    const isHomepage = req.body.isHomepage || false;
+    if (isHomepage && schema?.['@graph']) {
+      try {
+        const graph = schema['@graph'] as Record<string, unknown>[];
+        const orgNode = graph.find((n: Record<string, unknown>) => n['@type'] === 'Organization');
+        const wsNode = graph.find((n: Record<string, unknown>) => n['@type'] === 'WebSite');
+        if (orgNode) {
+          const { ctx } = buildSchemaContext(req.params.siteId);
+          const websiteNode = wsNode || {
+            '@type': 'WebSite', '@id': `${orgNode['url']}/#website`,
+            'url': orgNode['url'], 'name': orgNode['name'],
+            'publisher': { '@id': `${orgNode['url']}/#organization` },
+          };
+          saveSiteTemplate(req.params.siteId, ctx.workspaceId || '', orgNode, websiteNode);
+          log.info('Auto-saved site template from homepage publish');
+        }
+      } catch { /* best-effort */ }
+    }
+
     // Log to activity feed + track edit status
     const pubWs = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
     if (pubWs) {

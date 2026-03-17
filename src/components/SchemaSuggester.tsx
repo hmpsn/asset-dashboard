@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { get, post, getSafe } from '../api/client';
+import { get, post, put, getSafe } from '../api/client';
 import type { FixContext } from '../App';
 import {
   Loader2, CheckCircle,
@@ -289,7 +289,9 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
     setPublishError(prev => { const n = { ...prev }; delete n[pageId]; return n; });
     setConfirmPublish(null);
     try {
-      await post(`/api/webflow/schema-publish/${siteId}`, { pageId, schema, publishAfter: true });
+      const pageData = data?.find(p => p.pageId === pageId);
+      const isHomepage = !pageData?.slug || pageData.slug === '/' || pageData.slug === 'index' || pageData.slug === 'home';
+      await post(`/api/webflow/schema-publish/${siteId}`, { pageId, schema, publishAfter: true, isHomepage });
       setPublished(prev => new Set(prev).add(pageId));
       refreshStates();
     } catch (err) {
@@ -386,6 +388,28 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
       next.delete(page.pageId);
       return next;
     });
+  };
+
+  // Save schema as site template (extracts Org + WebSite from edited/original schema)
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [templateSaved, setTemplateSaved] = useState(false);
+  const saveAsTemplate = async (pageId: string) => {
+    const page = data?.find(p => p.pageId === pageId);
+    if (!page?.suggestedSchemas[0]) return;
+    const schema = getEffectiveSchema(pageId, page.suggestedSchemas[0].template);
+    const graph = schema?.['@graph'] as Record<string, unknown>[] | undefined;
+    if (!Array.isArray(graph)) return;
+    const orgNode = graph.find(n => n['@type'] === 'Organization');
+    const wsNode = graph.find(n => n['@type'] === 'WebSite');
+    if (!orgNode) return;
+    const websiteNode = wsNode || { '@type': 'WebSite', '@id': `${orgNode['url']}/#website`, 'url': orgNode['url'], 'name': orgNode['name'], 'publisher': { '@id': `${orgNode['url']}/#organization` } };
+    setSavingTemplate(true);
+    try {
+      await put(`/api/webflow/schema-template/${siteId}`, { organizationNode: orgNode, websiteNode });
+      setTemplateSaved(true);
+      setTimeout(() => setTemplateSaved(false), 3000);
+    } catch { /* skip */ }
+    setSavingTemplate(false);
   };
 
   // CMS template functions
@@ -751,6 +775,9 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
               schemaRecs={schemaRecs}
               workspaceId={workspaceId}
               pageType={pageTypes[page.pageId] || 'auto'}
+              isHomepage={!page.slug || page.slug === '/' || page.slug === 'index' || page.slug === 'home'}
+              savingTemplate={savingTemplate}
+              templateSaved={templateSaved}
               onPageTypeChange={(pid, t) => setPageTypes(prev => ({ ...prev, [pid]: t }))}
               onToggleExpand={toggleExpand}
               onRegenerate={regeneratePage}
@@ -761,6 +788,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
               onPublish={publishToWebflow}
               onConfirmPublish={setConfirmPublish}
               onSendToClient={sendSingleSchemaToClient}
+              onSaveAsTemplate={saveAsTemplate}
               getEffectiveSchema={getEffectiveSchema}
             />
           );
