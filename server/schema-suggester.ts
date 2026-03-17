@@ -75,7 +75,8 @@ const REQUIRED_FIELDS: Record<string, string[]> = {
   WebSite: ['name', 'url'],
   WebPage: ['name'],
   BreadcrumbList: ['itemListElement'],
-  Service: ['name'],
+  Service: ['name', 'url'],
+  SoftwareApplication: ['name', 'url'],
   Product: ['name'],
   Event: ['name', 'startDate', 'location'],
   HowTo: ['name', 'step'],
@@ -98,6 +99,7 @@ const RECOMMENDED_FIELDS: Record<string, string[]> = {
 // Cross-reference rules: { type → field → expected target @type }
 const CROSS_REF_RULES: Record<string, Record<string, string>> = {
   Service: { provider: 'Organization' },
+  SoftwareApplication: { provider: 'Organization' },
   WebPage: { isPartOf: 'WebSite' },
   Article: { publisher: 'Organization' },
   BlogPosting: { publisher: 'Organization' },
@@ -299,9 +301,18 @@ function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string,
       node['mainEntity'] = { '@id': primaryEntity['@id'] };
     }
 
-    // Service / SoftwareApplication → provider → Organization
-    if ((type === 'Service' || type === 'SoftwareApplication') && !node['provider']) {
-      node['provider'] = { '@id': orgId };
+    // Service / SoftwareApplication → provider → Organization + ensure url
+    if (type === 'Service' || type === 'SoftwareApplication') {
+      if (!node['provider']) {
+        node['provider'] = { '@id': orgId };
+      }
+      // Auto-fill url from WebPage if missing
+      if (!node['url']) {
+        const webPage = graph.find(n => n['@type'] === 'WebPage');
+        if (webPage?.['url']) {
+          node['url'] = webPage['url'];
+        }
+      }
     }
 
     // Article / BlogPosting → publisher → Organization
@@ -935,7 +946,7 @@ REQUIREMENTS:
 8. Fill ALL values from actual page content — ZERO placeholders, ZERO fabricated data
 9. CRITICAL: NEVER invent or fabricate addresses, phone numbers, email addresses, opening hours, geo coordinates, or any contact information. Only include these fields if the EXACT data appears in the page content above. If a LocalBusiness is appropriate but the page lacks an address, include the LocalBusiness with only the fields you can confirm from the content (name, url, description). Omit address/telephone/openingHours/geo entirely if not found.
 10. For images, use full absolute URLs (prefix with ${siteUrl} if relative). Only use image URLs found in the page content.
-11. FAQPage: extract REAL questions and answers from the page content. Never fabricate Q&A pairs.
+11. FAQPage: ONLY use FAQPage schema if the page has a DEDICATED FAQ section with clearly labeled questions and answers (e.g. an accordion, a "Frequently Asked Questions" heading, or a visible Q&A list). Section headings like "What's under the hood?" or "How it works" followed by feature descriptions are NOT FAQs — they are rhetorical headings. When in doubt, do NOT include FAQPage. Never fabricate Q&A pairs.
 12. Article/BlogPosting: use real author name, real dates, real headline from the content. ALWAYS include "author" with "@type": "Person" and real credentials if found. If a medical/health reviewer is mentioned, add "reviewedBy" with "@type": "Person" and their credentials.
 13. BreadcrumbList: use the FLAT format — each ListItem has "name" and "item" (URL string) directly, NOT nested inside an "item" object. Example: {"@type":"ListItem","position":1,"name":"Home","item":"${siteUrl}/"}
 14. LocalBusiness for multi-location/region pages: include "parentOrganization": {"@id": "${siteUrl}/#organization"} to link the location to the parent brand
