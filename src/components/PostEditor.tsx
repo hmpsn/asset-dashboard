@@ -220,7 +220,13 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   };
 
   const exportPDF = () => {
-    window.open(`/api/content-posts/${workspaceId}/${postId}/export/pdf`, '_blank');
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write('<p style="font-family:sans-serif;padding:40px">Loading PDF preview…</p>');
+    fetch(`/api/content-posts/${workspaceId}/${postId}/export/pdf`)
+      .then(r => r.text())
+      .then(html => { w.document.open(); w.document.write(html); w.document.close(); })
+      .catch(() => { w.location.href = `/api/content-posts/${workspaceId}/${postId}/export/pdf`; });
   };
 
   const handleDelete = async () => {

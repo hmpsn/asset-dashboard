@@ -193,7 +193,7 @@ export function renderBriefHTML(brief: ContentBrief): string {
     <span class="info">HMPSN Studio &mdash; Content Brief</span>
     <span class="tip">Tip: Use &ldquo;Save as PDF&rdquo; in the print dialog for best results</span>
   </div>
-  <button onclick="window.print()">Save as PDF</button>
+  <button id="print-btn">Save as PDF</button>
 </div>
 <div class="page">
   <!-- Header -->
@@ -342,6 +342,7 @@ export function renderBriefHTML(brief: ContentBrief): string {
     <div class="disclaimer">This content brief is proprietary and prepared exclusively for the intended recipient. It contains strategic recommendations based on current search data and competitive analysis. Results may vary based on implementation quality and market conditions.</div>
   </div>
 </div>
+<script>document.getElementById('print-btn').addEventListener('click',function(){window.print()});</script>
 </body>
 </html>`;
 }

@@ -215,9 +215,14 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
     navigator.clipboard.writeText(lines.join('\n'));
   };
 
-  const exportClientHTML = async (b: ContentBrief) => {
-    // Open in new tab with print-ready branded view (has "Save as PDF" button)
-    window.open(`/api/content-briefs/${workspaceId}/${b.id}/export`, '_blank');
+  const exportClientHTML = (b: ContentBrief) => {
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write('<p style="font-family:sans-serif;padding:40px">Loading PDF preview…</p>');
+    fetch(`/api/content-briefs/${workspaceId}/${b.id}/export`)
+      .then(r => r.text())
+      .then(html => { w.document.open(); w.document.write(html); w.document.close(); })
+      .catch(() => { w.location.href = `/api/content-briefs/${workspaceId}/${b.id}/export`; });
   };
 
   const handleSendToClient = async (b: ContentBrief) => {

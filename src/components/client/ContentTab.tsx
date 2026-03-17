@@ -470,7 +470,7 @@ export function ContentTab({
 
                     {/* Export */}
                     <div className="flex items-center gap-2 pt-1">
-                      <button onClick={() => window.open(`/api/content-briefs/${workspaceId}/${brief.id}/export`, '_blank')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors">
+                      <button onClick={() => { const w = window.open('', '_blank'); if (!w) return; w.document.write('<p style="font-family:sans-serif;padding:40px">Loading…</p>'); fetch(`/api/content-briefs/${workspaceId}/${brief.id}/export`).then(r => r.text()).then(html => { w.document.open(); w.document.write(html); w.document.close(); }).catch(() => { w.location.href = `/api/content-briefs/${workspaceId}/${brief.id}/export`; }); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors">
                         <Download className="w-3 h-3" /> Download PDF
                       </button>
                     </div>

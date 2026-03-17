@@ -151,7 +151,7 @@ export function renderPostHTML(post: GeneratedPost): string {
     <span class="info">HMPSN Studio &mdash; Content Post</span>
     <span class="tip">Tip: Use &ldquo;Save as PDF&rdquo; in the print dialog for best results</span>
   </div>
-  <button onclick="window.print()">Save as PDF</button>
+  <button id="print-btn">Save as PDF</button>
 </div>
 <div class="page">
   <!-- Header -->
@@ -219,6 +219,7 @@ export function renderPostHTML(post: GeneratedPost): string {
     <div class="disclaimer">This content is proprietary and prepared exclusively for the intended recipient. It has been crafted with SEO best practices and optimized for search performance. Please review all content for accuracy before publishing.</div>
   </div>
 </div>
+<script>document.getElementById('print-btn').addEventListener('click',function(){window.print()});</script>
 </body>
 </html>`;
 }
