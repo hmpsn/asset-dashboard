@@ -213,6 +213,18 @@ function autoFixSchema(schema: Record<string, unknown>): void {
   const graph = schema['@graph'] as Record<string, unknown>[] | undefined;
   if (!Array.isArray(graph)) return;
 
+  // Deduplicate Organization nodes — keep the first one with canonical @id (/#organization)
+  const orgNodes = graph.filter(n => n['@type'] === 'Organization');
+  if (orgNodes.length > 1) {
+    const canonical = orgNodes.find(n => String(n['@id'] || '').endsWith('/#organization')) || orgNodes[0];
+    for (let i = graph.length - 1; i >= 0; i--) {
+      if (graph[i]['@type'] === 'Organization' && graph[i] !== canonical) {
+        log.info(`Auto-fix: removed duplicate Organization node with @id "${graph[i]['@id']}"`);
+        graph.splice(i, 1);
+      }
+    }
+  }
+
   for (const node of graph) {
     const type = node['@type'] as string;
     if (!type) continue;
@@ -240,6 +252,28 @@ function autoFixSchema(schema: Record<string, unknown>): void {
     if (Array.isArray(st) && st.length > 3) {
       log.info(`Auto-fix: trimmed serviceType from ${st.length} to 3 entries on ${type}`);
       node['serviceType'] = st.slice(0, 3);
+    }
+
+    // Normalize Service/SoftwareApplication @id to use canonical product URL
+    // If the node has a url field different from the @id base, fix @id to match
+    if ((type === 'Service' || type === 'SoftwareApplication') && node['url'] && node['@id']) {
+      const nodeUrl = node['url'] as string;
+      const nodeId = node['@id'] as string;
+      const idBase = nodeId.replace(/#.*$/, '');
+      if (idBase !== nodeUrl && nodeUrl !== idBase) {
+        const suffix = nodeId.includes('#') ? nodeId.replace(/^[^#]+/, '') : '#service';
+        const newId = `${nodeUrl}${suffix}`;
+        log.info(`Auto-fix: normalized ${type} @id from "${nodeId}" to "${newId}" (canonical url: ${nodeUrl})`);
+        // Update all @id references in the graph
+        for (const other of graph) {
+          for (const [, val] of Object.entries(other)) {
+            if (val && typeof val === 'object' && (val as Record<string, unknown>)['@id'] === nodeId) {
+              (val as Record<string, unknown>)['@id'] = newId;
+            }
+          }
+        }
+        node['@id'] = newId;
+      }
     }
 
     // Auto-fix BreadcrumbList: truncate long item names
