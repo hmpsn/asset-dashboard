@@ -16,7 +16,7 @@ interface Props {
 }
 
 const ROLE_OPTIONS: SchemaPageRole[] = [
-  'homepage', 'pillar', 'audience', 'lead-gen', 'blog', 'about',
+  'homepage', 'pillar', 'service', 'audience', 'lead-gen', 'blog', 'about',
   'contact', 'location', 'product', 'partnership', 'faq', 'case-study',
   'comparison', 'generic',
 ];
@@ -24,6 +24,7 @@ const ROLE_OPTIONS: SchemaPageRole[] = [
 const ROLE_COLORS: Record<SchemaPageRole, string> = {
   homepage: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
   pillar: 'bg-teal-500/15 text-teal-300 border-teal-500/30',
+  service: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
   audience: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
   'lead-gen': 'bg-orange-500/15 text-orange-300 border-orange-500/30',
   blog: 'bg-purple-500/15 text-purple-300 border-purple-500/30',

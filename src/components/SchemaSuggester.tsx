@@ -493,6 +493,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
     { value: 'auto', label: 'Auto-detect' },
     { value: 'homepage', label: 'Homepage' },
     { value: 'pillar', label: 'Pillar / Product Page' },
+    { value: 'service', label: 'Service Page' },
     { value: 'audience', label: 'Audience / Persona Page' },
     { value: 'lead-gen', label: 'Lead-Gen / Conversion' },
     { value: 'blog', label: 'Blog Post' },

@@ -202,7 +202,8 @@ TASK: Assign each page a ROLE and identify CANONICAL ENTITIES for the site.
 
 ROLES (choose exactly one per page):
 - homepage: The main page — gets full Organization + WebSite + product entity
-- pillar: The canonical product/service page — owns the primary SoftwareApplication or Service entity
+- pillar: The canonical product page for SaaS — owns the primary SoftwareApplication entity
+- service: Service business pages — owns a Service entity with serviceType, areaServed, pricing
 - audience: Persona/use-case pages that describe the same product for a specific audience — reference the pillar's entity, don't create their own
 - lead-gen: Conversion pages (/demo, /contact, /pricing, /signup) — WebPage + BreadcrumbList only, no product entity
 - blog: Blog/article content — Article schema with author
@@ -279,7 +280,7 @@ IMPORTANT:
 
     // Validate and normalize roles
     const validRoles = new Set<string>([
-      'homepage', 'pillar', 'audience', 'lead-gen', 'blog', 'about', 'contact',
+      'homepage', 'pillar', 'service', 'audience', 'lead-gen', 'blog', 'about', 'contact',
       'location', 'product', 'partnership', 'faq', 'case-study', 'comparison', 'generic',
     ]);
 
@@ -368,6 +369,9 @@ function buildFallbackRoles(pages: PageListItem[]): PageRoleAssignment[] {
     } else if (/^\/(platform|product|solution)s?$/.test(slug)) {
       role = 'pillar';
       primaryType = 'SoftwareApplication';
+    } else if (/^\/(services?)/.test(slug)) {
+      role = 'service';
+      primaryType = 'Service';
     } else if (/vs-|compare|alternative/.test(slug)) {
       role = 'comparison';
     } else if (/^\/(customers?|case-stud(y|ies)|success-stor(y|ies))\//.test(slug)) {
@@ -430,7 +434,10 @@ export function buildPlanContextForPage(
       lines.push('\nINSTRUCTION: As the homepage, include FULL Organization (with logo, description, knowsAbout, sameAs) + WebSite + product entities.');
       break;
     case 'pillar':
-      lines.push('\nINSTRUCTION: As the pillar page, create the FULL product entity (SoftwareApplication or Service) with all details. This is the canonical source for this product.');
+      lines.push('\nINSTRUCTION: As the pillar page, create the FULL product entity (SoftwareApplication) with all details. This is the canonical source for this product.');
+      break;
+    case 'service':
+      lines.push('\nINSTRUCTION: As a service page, create the FULL Service entity with serviceType, areaServed, pricing details. This is the canonical source for this service.');
       break;
     case 'audience':
       lines.push('\nINSTRUCTION: As an audience page, use WebPage with "about": {"@id": "..."} referencing the canonical product. Do NOT create your own Service or SoftwareApplication node.');

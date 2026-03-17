@@ -3,6 +3,7 @@
 export type SchemaPageRole =
   | 'homepage'
   | 'pillar'
+  | 'service'
   | 'audience'
   | 'lead-gen'
   | 'blog'
@@ -19,6 +20,7 @@ export type SchemaPageRole =
 export const SCHEMA_ROLE_LABELS: Record<SchemaPageRole, string> = {
   homepage: 'Homepage',
   pillar: 'Pillar / Product Page',
+  service: 'Service Page',
   audience: 'Audience / Persona Page',
   'lead-gen': 'Lead-Gen / Conversion',
   blog: 'Blog Post',
@@ -37,6 +39,7 @@ export const SCHEMA_ROLE_LABELS: Record<SchemaPageRole, string> = {
 export const SCHEMA_ROLE_CLIENT_DESC: Record<SchemaPageRole, string> = {
   homepage: 'Company info, logo, social links, and product details for Google knowledge panel',
   pillar: 'Full product listing eligible for software/service rich results in Google',
+  service: 'Service listing with details, pricing, and area served — eligible for service rich results',
   audience: 'Page info with link to main product — breadcrumb navigation in search',
   'lead-gen': 'Basic page info only (conversion page) — breadcrumb navigation in search',
   blog: 'Article markup with author and dates — eligible for article rich results',

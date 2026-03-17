@@ -31,12 +31,13 @@ export interface SchemaSuggestion {
 }
 
 // Page type hints for tailored schema generation
-export type SchemaPageType = 'auto' | 'homepage' | 'pillar' | 'audience' | 'lead-gen' | 'blog' | 'about' | 'contact' | 'location' | 'product' | 'partnership' | 'faq' | 'case-study' | 'comparison' | 'generic';
+export type SchemaPageType = 'auto' | 'homepage' | 'pillar' | 'service' | 'audience' | 'lead-gen' | 'blog' | 'about' | 'contact' | 'location' | 'product' | 'partnership' | 'faq' | 'case-study' | 'comparison' | 'generic';
 
 export const PAGE_TYPE_LABELS: Record<SchemaPageType, string> = {
   auto: 'Auto-detect',
   homepage: 'Homepage',
   pillar: 'Pillar / Product Page',
+  service: 'Service Page',
   audience: 'Audience / Persona Page',
   'lead-gen': 'Lead-Gen / Conversion',
   blog: 'Blog Post',
@@ -695,6 +696,15 @@ function getPageTypeInstructions(pageType: SchemaPageType | undefined, siteUrl: 
 - Include "speakable" on WebPage targeting the introductory paragraph
 - Do NOT create separate entities for features of the same product — use featureList or description instead
 - WebPage.mainEntity should reference the primary product/service node`,
+
+    service: `PAGE TYPE INSTRUCTIONS (Service Page):
+- MUST include a Service node as mainEntity with: name, description, serviceType (1-3 concise types), provider \u2192 Organization, url, areaServed (if geographic)
+- If the page describes multiple sub-services, include each as its own Service node with provider \u2192 Organization
+- Include "audience": {"@type": "Audience", "audienceType": "..."} if the target audience is identifiable
+- Include "hasOfferCatalog" if pricing tiers or packages are listed
+- If there's a clear CTA or pricing, include an Offer node
+- BreadcrumbList: Home \u2192 [Parent Category if applicable] \u2192 Service Name
+- WebPage.mainEntity should reference the primary Service node`,
 
     audience: `PAGE TYPE INSTRUCTIONS (Audience / Persona Page):
 - This page targets a specific audience segment (e.g. "For Developers", "For Enterprise")
