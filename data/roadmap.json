@@ -1961,6 +1961,15 @@
           "priority": "P0",
           "notes": "Shipped — 7-step postProcessSchema pipeline: autoFix → content verification (strips hallucinated emails/phones/addresses/hours/geo/sameAs) → cross-reference injection → clean → validate → AI auto-fix loop → final output. Also hardened extractStructuredInfo to use visible text only, added anti-fragmentation prompt rules for SaaS sites.",
           "status": "done"
+        },
+        {
+          "id": 299,
+          "title": "Unified Site Template: Consistent Organization/WebSite across all pages",
+          "source": "Schema quality improvements",
+          "est": "2h",
+          "priority": "P0",
+          "notes": "Shipped — Two-phase schema generation per Google best practices. Homepage saves full Organization + WebSite as site template (SQLite migration 012). Subpages load template and use minimal stubs (@id, name, url only). Missing Org/WebSite/BreadcrumbList nodes auto-injected. Prompt requirements 3-4 updated for homepage/subpage split.",
+          "status": "done"
         }
       ]
     }
