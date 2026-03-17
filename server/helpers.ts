@@ -148,6 +148,7 @@ export function buildSchemaContext(siteId: string): { ctx: SchemaContext; pageKe
     ctx.siteKeywords = ws.keywordStrategy?.siteKeywords;
     ctx.logoUrl = ws.brandLogoUrl;
     ctx.workspaceId = ws.id;
+    ctx._siteId = siteId;
 
     // Build knowledge base for schema enrichment (credentials, locations, sameAs URLs, etc.)
     const kbParts: string[] = [];

@@ -1,6 +1,7 @@
 import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet, getCollectionSchema, listCollections } from './webflow.js';
 import { callOpenAI } from './openai-helpers.js';
 import { createLogger } from './logger.js';
+import { saveSiteTemplate, getSiteTemplate } from './schema-store.js';
 
 const log = createLogger('schema');
 
@@ -60,6 +61,7 @@ export interface SchemaContext {
   workspaceId?: string;
   knowledgeBase?: string;
   pageType?: SchemaPageType;
+  _siteId?: string;  // Internal: passed through for site template storage
 }
 
 // Google required fields per @type (for validation)
@@ -669,13 +671,15 @@ function getPageTypeInstructions(pageType: SchemaPageType | undefined, siteUrl: 
   return instructions[pageType] || '';
 }
 
-// Full post-processing pipeline: fix → verify content → inject refs → validate → auto-fix loop
+// Full post-processing pipeline: fix → verify content → template → inject refs → validate → auto-fix loop
 async function postProcessSchema(
   schema: Record<string, unknown>,
   siteUrl: string,
   pageContent: string,
   html: string | null,
   ctx: SchemaContext,
+  isHomepage: boolean,
+  siteId?: string,
 ): Promise<{ schema: Record<string, unknown>; reason: string; errors: string[] }> {
   // Step 1: Auto-fix invalid properties and malformed values
   autoFixSchema(schema);
@@ -693,6 +697,56 @@ async function postProcessSchema(
     log.info({ warnings: contentWarnings }, 'Content verification stripped hallucinated values');
   }
 
+  // Step 3b: Site template — unified Organization/WebSite across pages
+  const graph = schema['@graph'] as Record<string, unknown>[] | undefined;
+  if (Array.isArray(graph) && siteId && ctx.workspaceId) {
+    if (isHomepage) {
+      // Homepage: extract full Org + WebSite and save as template for future subpages
+      const orgNode = graph.find(n => n['@type'] === 'Organization');
+      const wsNode = graph.find(n => n['@type'] === 'WebSite');
+      if (orgNode) {
+        const websiteNode = wsNode || {
+          '@type': 'WebSite',
+          '@id': `${siteUrl}/#website`,
+          'url': siteUrl,
+          'name': (orgNode['name'] as string) || ctx.companyName || '',
+          'publisher': { '@id': `${siteUrl}/#organization` },
+        };
+        saveSiteTemplate(siteId, ctx.workspaceId, orgNode, websiteNode);
+        log.info(`Saved site template from homepage for site ${siteId}`);
+      }
+    } else {
+      // Subpage: load saved template and use minimal stubs
+      const template = getSiteTemplate(siteId);
+      if (template) {
+        // Replace AI-generated Organization with minimal stub (Google says full Org only needed on homepage)
+        const orgIdx = graph.findIndex(n => n['@type'] === 'Organization');
+        const orgStub = {
+          '@type': 'Organization',
+          '@id': `${siteUrl}/#organization`,
+          'name': (template.organizationNode['name'] as string) || ctx.companyName || '',
+          'url': (template.organizationNode['url'] as string) || siteUrl,
+        };
+        if (orgIdx >= 0) {
+          graph[orgIdx] = orgStub;
+        }
+        // Replace AI-generated WebSite with minimal stub (avoids dangling isPartOf references)
+        const wsIdx = graph.findIndex(n => n['@type'] === 'WebSite');
+        const wsStub = {
+          '@type': 'WebSite',
+          '@id': `${siteUrl}/#website`,
+          'url': (template.websiteNode['url'] as string) || siteUrl,
+          'name': (template.websiteNode['name'] as string) || ctx.companyName || '',
+          'publisher': { '@id': `${siteUrl}/#organization` },
+        };
+        if (wsIdx >= 0) {
+          graph[wsIdx] = wsStub;
+        }
+        log.info(`Applied site template (minimal stubs) for subpage on site ${siteId}`);
+      }
+    }
+  }
+
   // Step 4: Inject cross-references + ensure WebSite/Organization nodes exist
   injectCrossReferences(schema, siteUrl, ctx.companyName);
 
@@ -701,8 +755,8 @@ async function postProcessSchema(
 
   // Step 6: Validate
   const errors = validateUnifiedSchema(cleaned);
-  const graph = cleaned['@graph'] as Record<string, unknown>[];
-  const types = graph?.map(n => n['@type']).filter(Boolean) || [];
+  const cleanedGraph = cleaned['@graph'] as Record<string, unknown>[];
+  const types = cleanedGraph?.map(n => n['@type']).filter(Boolean) || [];
 
   // Step 7: Auto-fix loop — if validation errors exist, ask AI to fix them (one attempt)
   const fixableErrors = errors.filter(e =>
@@ -839,8 +893,8 @@ ${pageContent.slice(0, 3000)}
 REQUIREMENTS:
 1. Return ONE JSON-LD object with "@context": "https://schema.org" and an "@graph" array
 2. The @graph MUST include a WebPage node on every page
-3. Include an Organization node with "@id": "${siteUrl}/#organization" on every page
-4. ONLY add a WebSite node on the HOMEPAGE (isHomepage=true). NEVER include WebSite on subpages.
+3. On the HOMEPAGE: include a FULL Organization node (name, url, description, logo, knowsAbout, sameAs) and a WebSite node. These will be saved as the site-wide template.
+4. On SUBPAGES: include only a MINIMAL Organization stub with @id, name, url — no description, logo, knowsAbout, or sameAs. Do NOT include a WebSite node. Focus your tokens on the page-specific entities (Service, Article, FAQPage, etc.).
 5. NEVER include a SearchAction unless the site has a real, confirmed search endpoint. Do NOT use "?s={search_term_string}" — that is a WordPress convention.
 6. Add page-specific types based on content (Article, FAQPage, Service, Product, BreadcrumbList, HowTo, Event, LocalBusiness, Dataset, etc.)
 7. Use "@id" cross-references between nodes (e.g. Organization "@id": "${siteUrl}/#organization")
@@ -924,8 +978,8 @@ Return ONLY the JSON-LD object. No markdown, no explanation, no wrapping.`;
     const rawSchema = JSON.parse(jsonStr) as Record<string, unknown>;
     const schema = cleanSchema(rawSchema);
 
-    // Post-processing pipeline: fix → verify → inject refs → validate → auto-fix loop
-    const finalSchema = await postProcessSchema(schema, siteUrl, pageContent, html, ctx);
+    // Post-processing pipeline: fix → verify → template → inject refs → validate → auto-fix loop
+    const finalSchema = await postProcessSchema(schema, siteUrl, pageContent, html, ctx, isHomepage, ctx._siteId);
     return finalSchema;
   } catch (err: unknown) {
     log.error({ err: err }, 'AI unified generation error');

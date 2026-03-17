@@ -84,3 +84,83 @@ export function getSchemaSnapshot(siteId: string): SchemaSnapshot | null {
   const row = getBySiteStmt().get(siteId) as SchemaRow | undefined;
   return row ? rowToSnapshot(row) : null;
 }
+
+// ── Site template: canonical Organization + WebSite nodes ──
+
+export interface SchemaSiteTemplate {
+  siteId: string;
+  workspaceId: string;
+  organizationNode: Record<string, unknown>;
+  websiteNode: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface TemplateRow {
+  site_id: string;
+  workspace_id: string;
+  organization_node: string;
+  website_node: string;
+  created_at: string;
+  updated_at: string;
+}
+
+let _upsertTemplate: ReturnType<typeof db.prepare> | null = null;
+function upsertTemplateStmt() {
+  if (!_upsertTemplate) {
+    _upsertTemplate = db.prepare(`
+      INSERT OR REPLACE INTO schema_site_templates
+        (site_id, workspace_id, organization_node, website_node, created_at, updated_at)
+      VALUES (@site_id, @workspace_id, @organization_node, @website_node, @created_at, @updated_at)
+    `);
+  }
+  return _upsertTemplate;
+}
+
+let _getTemplate: ReturnType<typeof db.prepare> | null = null;
+function getTemplateStmt() {
+  if (!_getTemplate) {
+    _getTemplate = db.prepare(`SELECT * FROM schema_site_templates WHERE site_id = ?`);
+  }
+  return _getTemplate;
+}
+
+export function saveSiteTemplate(
+  siteId: string,
+  workspaceId: string,
+  organizationNode: Record<string, unknown>,
+  websiteNode: Record<string, unknown>,
+): SchemaSiteTemplate {
+  const now = new Date().toISOString();
+  const existing = getTemplateStmt().get(siteId) as TemplateRow | undefined;
+  upsertTemplateStmt().run({
+    site_id: siteId,
+    workspace_id: workspaceId,
+    organization_node: JSON.stringify(organizationNode),
+    website_node: JSON.stringify(websiteNode),
+    created_at: existing?.created_at || now,
+    updated_at: now,
+  });
+  log.info(`Saved site template for ${siteId}`);
+  return {
+    siteId,
+    workspaceId,
+    organizationNode,
+    websiteNode,
+    createdAt: existing?.created_at || now,
+    updatedAt: now,
+  };
+}
+
+export function getSiteTemplate(siteId: string): SchemaSiteTemplate | null {
+  const row = getTemplateStmt().get(siteId) as TemplateRow | undefined;
+  if (!row) return null;
+  return {
+    siteId: row.site_id,
+    workspaceId: row.workspace_id,
+    organizationNode: JSON.parse(row.organization_node),
+    websiteNode: JSON.parse(row.website_node),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
