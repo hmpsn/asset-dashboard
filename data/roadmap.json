@@ -2020,6 +2020,25 @@
           "notes": "Shipped — AI-driven site-wide schema plan analyzes all pages + keyword strategy to assign page roles (homepage, pillar, audience, lead-gen, blog, etc.) and identify canonical entities with consistent @id references. Plan stored in SQLite (migration 013), injected as context into per-page AI prompts, enforced by post-processing validation. Admin SchemaPlanPanel with role dropdowns and entity registry. Send to Client creates approval batch with plain-English descriptions. 5 API endpoints: generate, get, update, send-to-client, activate.",
           "status": "done",
           "shippedAt": "2026-03-16"
+        },
+        {
+          "id": 305,
+          "title": "Schema: CMS page discovery + unified page type vocabulary + Page Type Guide",
+          "source": "Schema plan refinement",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped — Plan now discovers CMS collection pages from sitemap (up to 500). Unified 16 page types across plan + generator (added service, partnership, comparison, generic; renamed audience). Wildcard expansion for CMS collections. Page Type Guide index with descriptions + URL examples in both SchemaPlanPanel and SchemaSuggester.",
+          "status": "done",
+          "shippedAt": "2026-03-16"
+        },
+        {
+          "id": 306,
+          "title": "Schema: Write generated schema to CMS collection field",
+          "source": "Schema bulk generation discussion",
+          "est": "3-4h",
+          "priority": "P1",
+          "notes": "Allow writing generated schema JSON to a designated CMS collection field (e.g. 'schema-markup' rich text or plain text field) via Webflow CMS API. Would enable CMS-driven schema injection without Webflow custom code embeds. Also consider: cap CMS pages in bulk gen, add overall timeout/token budget, skip CMS pages matching existing CMS template.",
+          "status": "pending"
         }
       ]
     }
