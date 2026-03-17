@@ -23,6 +23,7 @@ import {
   getPostVersion,
   revertToVersion,
 } from '../content-posts.js';
+import { renderPostHTML } from '../post-export-html.js';
 import { assemblePostHtml, generateSlug } from '../html-to-richtext.js';
 import {
   createCollectionItem,
@@ -31,6 +32,7 @@ import {
 import { getWorkspace, getTokenForSite } from '../workspaces.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { createLogger } from '../logger.js';
+import { callOpenAI, parseAIJson } from '../openai-helpers.js';
 
 const log = createLogger('content-posts');
 
@@ -203,6 +205,79 @@ router.get('/api/content-posts/:workspaceId/:postId/export/html', (req, res) => 
   const html = exportPostHTML(post);
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(html);
+});
+
+// Export post as branded PDF-ready HTML (matching content brief export style)
+router.get('/api/content-posts/:workspaceId/:postId/export/pdf', (req, res) => {
+  const post = getPost(req.params.workspaceId, req.params.postId);
+  if (!post) return res.status(404).json({ error: 'Post not found' });
+  const html = renderPostHTML(post);
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(html);
+});
+
+// AI auto-review checklist — runs AI against post content to pre-check each item
+router.post('/api/content-posts/:workspaceId/:postId/ai-review', async (req, res) => {
+  const post = getPost(req.params.workspaceId, req.params.postId);
+  if (!post) return res.status(404).json({ error: 'Post not found' });
+
+  const ws = getWorkspace(req.params.workspaceId);
+
+  // Build a text summary of the post content for AI analysis
+  const allContent = [
+    post.introduction || '',
+    ...post.sections.map(s => s.content || ''),
+    post.conclusion || '',
+  ].join('\n').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+
+  // Truncate to ~8000 chars to stay within token limits
+  const contentSnippet = allContent.slice(0, 8000);
+
+  const prompt = `You are a content quality reviewer. Analyze this blog post and evaluate each checklist item.
+Return a JSON object with these keys, each with a boolean "pass" and a brief "reason" string:
+
+1. "factual_accuracy" — Does the content appear factually accurate? Flag any suspicious claims, made-up statistics, or unverifiable statements.
+2. "brand_voice" — Does the content match a professional ${ws?.name ? `brand voice for "${ws.name}"` : 'business brand voice'}? Is the tone consistent?
+3. "internal_links" — Does the content include internal links (href attributes pointing to site pages)?
+4. "no_hallucinations" — Are there any signs of AI hallucination? Made-up studies, fake quotes, invented statistics, or fabricated expert names?
+5. "meta_optimized" — Is the meta title "${post.seoTitle || post.title}" (${(post.seoTitle || post.title).length} chars) and meta description "${post.seoMetaDescription || post.metaDescription}" (${(post.seoMetaDescription || post.metaDescription).length} chars) well-optimized? Title should be 50-60 chars, description 150-160 chars, both should include the target keyword "${post.targetKeyword}".
+6. "word_count_target" — The post is ${post.totalWordCount} words. The target was ${post.targetWordCount} words. Is it within 15% of the target?
+
+Post content:
+${contentSnippet}
+
+Return ONLY valid JSON like:
+{
+  "factual_accuracy": { "pass": true, "reason": "..." },
+  "brand_voice": { "pass": true, "reason": "..." },
+  "internal_links": { "pass": false, "reason": "..." },
+  "no_hallucinations": { "pass": true, "reason": "..." },
+  "meta_optimized": { "pass": false, "reason": "..." },
+  "word_count_target": { "pass": true, "reason": "..." }
+}`;
+
+  try {
+    const result = await callOpenAI({
+      model: 'gpt-4.1-mini',
+      messages: [{ role: 'user', content: prompt }],
+      maxTokens: 1000,
+      temperature: 0.3,
+      feature: 'content-review',
+      workspaceId: req.params.workspaceId,
+    });
+
+    const parsed = parseAIJson<Record<string, { pass: boolean; reason: string }>>(result.text);
+    if (!parsed) {
+      return res.status(500).json({ error: 'Failed to parse AI review response' });
+    }
+
+    log.info(`AI review completed for post ${post.id}`);
+    res.json({ review: parsed });
+  } catch (err) {
+    log.error({ err }, 'AI review failed');
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: `AI review failed: ${msg}` });
+  }
 });
 
 // --- Version History ---

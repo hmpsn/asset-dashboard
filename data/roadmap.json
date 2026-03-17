@@ -2039,6 +2039,36 @@
           "priority": "P1",
           "notes": "Allow writing generated schema JSON to a designated CMS collection field (e.g. 'schema-markup' rich text or plain text field) via Webflow CMS API. Would enable CMS-driven schema injection without Webflow custom code embeds. Also consider: cap CMS pages in bulk gen, add overall timeout/token budget, skip CMS pages matching existing CMS template.",
           "status": "pending"
+        },
+        {
+          "id": 307,
+          "title": "Send to Client for standalone content briefs",
+          "source": "Content pipeline UX",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped — Send to Client button on standalone briefs creates linked content request with client_review status and sends email notification.",
+          "status": "done",
+          "shippedAt": "2026-03-17"
+        },
+        {
+          "id": 308,
+          "title": "Professional branded blog post PDF export",
+          "source": "Content pipeline UX",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — Branded print-ready HTML export for blog posts with HMPSN Studio branding, metrics strip, SEO preview, TOC, review checklist, and @page rules. Export PDF button in PostEditor toolbar.",
+          "status": "done",
+          "shippedAt": "2026-03-17"
+        },
+        {
+          "id": 309,
+          "title": "AI auto-review checklist for blog posts",
+          "source": "Content pipeline UX",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — AI Pre-Check button in review checklist runs GPT-4.1-mini against post content to evaluate all 6 checklist items. Auto-checks passing items, shows pass/fail badges with AI reasoning.",
+          "status": "done",
+          "shippedAt": "2026-03-17"
         }
       ]
     }

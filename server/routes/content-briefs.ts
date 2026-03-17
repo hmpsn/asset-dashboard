@@ -14,6 +14,8 @@ import {
   generateBrief,
   regenerateBrief,
 } from '../content-brief.js';
+import { createContentRequest, updateContentRequest } from '../content-requests.js';
+import { notifyClientBriefReady } from '../email.js';
 import { getSearchOverview } from '../search-console.js';
 import { isSemrushConfigured, getKeywordOverview, getRelatedKeywords } from '../semrush.js';
 import { getWorkspace } from '../workspaces.js';
@@ -168,6 +170,51 @@ router.get('/api/content-briefs/:workspaceId/:briefId/export', (req, res) => {
   const html = renderBriefHTML(brief);
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(html);
+});
+
+// Send a standalone brief to client for review
+// Creates a content request linked to this brief and sets status to client_review
+router.post('/api/content-briefs/:workspaceId/:briefId/send-to-client', (req, res) => {
+  const brief = getBrief(req.params.workspaceId, req.params.briefId);
+  if (!brief) return res.status(404).json({ error: 'Brief not found' });
+
+  const ws = getWorkspace(req.params.workspaceId);
+
+  // Create a content request linked to this brief
+  const request = createContentRequest(req.params.workspaceId, {
+    topic: brief.suggestedTitle,
+    targetKeyword: brief.targetKeyword,
+    intent: brief.intent || 'informational',
+    priority: 'medium',
+    rationale: brief.executiveSummary || `Content brief for "${brief.targetKeyword}"`,
+    source: 'strategy',
+    serviceType: 'brief_only',
+    pageType: (brief.pageType as 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource') || 'blog',
+    initialStatus: 'requested',
+  });
+
+  // Link the brief and set to client_review
+  updateContentRequest(req.params.workspaceId, request.id, {
+    briefId: brief.id,
+    status: 'client_review',
+  });
+
+  // Send email notification
+  if (ws?.clientEmail) {
+    const origin = req.get('origin') || req.get('referer')?.replace(/\/[^/]*$/, '') || '';
+    const dashUrl = origin ? `${origin}/dashboard/${req.params.workspaceId}?tab=content` : undefined;
+    notifyClientBriefReady({
+      clientEmail: ws.clientEmail,
+      workspaceName: ws.name,
+      workspaceId: req.params.workspaceId,
+      topic: brief.suggestedTitle,
+      targetKeyword: brief.targetKeyword,
+      dashboardUrl: dashUrl,
+    });
+  }
+
+  log.info(`Brief ${brief.id} sent to client via request ${request.id}`);
+  res.json({ ok: true, requestId: request.id });
 });
 
 // Delete a brief

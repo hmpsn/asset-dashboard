@@ -97,6 +97,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
   const [activePostId, setActivePostId] = useState<string | null>(null);
   const [generatingPostFor, setGeneratingPostFor] = useState<string | null>(null);
   const [regeneratingBrief, setRegeneratingBrief] = useState<string | null>(null);
+  const [sendingToClient, setSendingToClient] = useState<string | null>(null);
   interface PostSummary { id: string; briefId: string; targetKeyword: string; title: string; totalWordCount: number; status: string; createdAt: string; updatedAt: string }
   const [posts, setPosts] = useState<PostSummary[]>([]);
   const [deliveringReqId, setDeliveringReqId] = useState<string | null>(null);
@@ -217,6 +218,22 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
   const exportClientHTML = async (b: ContentBrief) => {
     // Open in new tab with print-ready branded view (has "Save as PDF" button)
     window.open(`/api/content-briefs/${workspaceId}/${b.id}/export`, '_blank');
+  };
+
+  const handleSendToClient = async (b: ContentBrief) => {
+    setSendingToClient(b.id);
+    try {
+      const result = await post<{ ok: boolean; requestId: string }>(`/api/content-briefs/${workspaceId}/${b.id}/send-to-client`);
+      if (result.ok) {
+        // Refresh requests list to show the new request
+        const reqs = await getSafe<ContentTopicRequest[]>(`/api/content-requests/${workspaceId}`, []);
+        if (Array.isArray(reqs)) {
+          setClientRequests(reqs);
+          onRequestCountChange?.(reqs.filter(r => r.status === 'requested').length);
+        }
+      }
+    } catch { /* skip */ }
+    setSendingToClient(null);
   };
 
   const fetchPosts = () => {
@@ -508,6 +525,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
         editingBrief={editingBrief}
         generatingPostFor={generatingPostFor}
         regeneratingBrief={regeneratingBrief}
+        sendingToClient={sendingToClient}
         onSetExpanded={setExpanded}
         onSetBriefSearch={setBriefSearch}
         onSetBriefSort={setBriefSort}
@@ -517,6 +535,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
         onRegenerate={handleRegenerateBrief}
         onCopyAsMarkdown={copyAsMarkdown}
         onExportClientHTML={exportClientHTML}
+        onSendToClient={handleSendToClient}
         onConfirmDeleteBrief={confirmDeleteBrief}
       />
     </div>

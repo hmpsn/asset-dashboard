@@ -44,6 +44,11 @@ export const contentPosts = {
     post<{ success: boolean; itemId?: string; slug?: string; isUpdate?: boolean; error?: string; post?: unknown }>(
       `/api/content-posts/${wsId}/${postId}/publish-to-webflow`, body,
     ),
+
+  aiReview: (wsId: string, postId: string) =>
+    post<{ review: Record<string, { pass: boolean; reason: string }> }>(
+      `/api/content-posts/${wsId}/${postId}/ai-review`,
+    ),
 };
 
 export const contentRequests = {

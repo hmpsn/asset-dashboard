@@ -42,19 +42,21 @@ interface BriefDetailProps {
   editingBrief: string | null;
   generatingPostFor: string | null;
   regeneratingBrief: string | null;
+  sendingToClient: string | null;
   onSaveBriefField: (briefId: string, updates: Partial<ContentBrief>) => void;
   onSetEditingBrief: (id: string | null) => void;
   onGeneratePost: (briefId: string) => void;
   onRegenerate: (briefId: string, feedback: string) => void;
   onCopyAsMarkdown: (brief: ContentBrief) => void;
   onExportClientHTML: (brief: ContentBrief) => void;
+  onSendToClient: (brief: ContentBrief) => void;
   onConfirmDelete: (brief: ContentBrief) => void;
 }
 
 export function BriefDetail({
-  brief, editingBrief, generatingPostFor, regeneratingBrief,
+  brief, editingBrief, generatingPostFor, regeneratingBrief, sendingToClient,
   onSaveBriefField, onSetEditingBrief, onGeneratePost, onRegenerate,
-  onCopyAsMarkdown, onExportClientHTML, onConfirmDelete,
+  onCopyAsMarkdown, onExportClientHTML, onSendToClient, onConfirmDelete,
 }: BriefDetailProps) {
   const [showRegenerate, setShowRegenerate] = useState(false);
   const [regenFeedback, setRegenFeedback] = useState('');
@@ -75,6 +77,10 @@ export function BriefDetail({
         </button>
         <button onClick={() => onExportClientHTML(brief)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
           <Download className="w-3 h-3" /> Export PDF
+        </button>
+        <button onClick={() => onSendToClient(brief)} disabled={sendingToClient === brief.id} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-cyan-600/20 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-600/30 transition-colors disabled:opacity-50">
+          {sendingToClient === brief.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+          {sendingToClient === brief.id ? 'Sending...' : 'Send to Client'}
         </button>
         <button onClick={() => { navigator.clipboard.writeText(JSON.stringify(brief, null, 2)); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors">
           <Copy className="w-3 h-3" /> Copy JSON

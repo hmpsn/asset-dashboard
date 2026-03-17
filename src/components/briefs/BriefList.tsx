@@ -50,11 +50,13 @@ export interface BriefListProps {
   editingBrief: string | null;
   generatingPostFor: string | null;
   regeneratingBrief: string | null;
+  sendingToClient: string | null;
   onSetExpanded: (id: string | null) => void;
   onSetBriefSearch: (value: string) => void;
   onSetBriefSort: (value: 'date' | 'keyword' | 'difficulty') => void;
   onCopyAsMarkdown: (brief: ContentBrief) => void;
   onExportClientHTML: (brief: ContentBrief) => void;
+  onSendToClient: (brief: ContentBrief) => void;
   onConfirmDeleteBrief: (brief: ContentBrief) => void;
   onSaveBriefField: (briefId: string, updates: Partial<ContentBrief>) => void;
   onSetEditingBrief: (id: string | null) => void;
@@ -71,11 +73,13 @@ export function BriefList({
   editingBrief,
   generatingPostFor,
   regeneratingBrief,
+  sendingToClient,
   onSetExpanded,
   onSetBriefSearch,
   onSetBriefSort,
   onCopyAsMarkdown,
   onExportClientHTML,
+  onSendToClient,
   onConfirmDeleteBrief,
   onSaveBriefField,
   onSetEditingBrief,
@@ -168,12 +172,14 @@ export function BriefList({
                   editingBrief={editingBrief}
                   generatingPostFor={generatingPostFor}
                   regeneratingBrief={regeneratingBrief}
+                  sendingToClient={sendingToClient}
                   onSaveBriefField={onSaveBriefField}
                   onSetEditingBrief={onSetEditingBrief}
                   onGeneratePost={onGeneratePost}
                   onRegenerate={onRegenerateBrief}
                   onCopyAsMarkdown={onCopyAsMarkdown}
                   onExportClientHTML={onExportClientHTML}
+                  onSendToClient={onSendToClient}
                   onConfirmDelete={onConfirmDeleteBrief}
                 />
               )}
