@@ -7,7 +7,7 @@ const router = Router();
 
 import { addActivity } from '../activity-log.js';
 import { buildSchemaContext } from '../helpers.js';
-import { getSchemaSnapshot } from '../schema-store.js';
+import { getSchemaSnapshot, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate } from '../schema-store.js';
 import { generateSchemaSuggestions, generateSchemaForPage, generateCmsTemplateSchema } from '../schema-suggester.js';
 import {
   listCollections,
@@ -163,6 +163,60 @@ router.get('/api/webflow/cms-template-pages/:siteId', async (req, res) => {
   } catch (err) {
     log.error({ err: err }, 'CMS template pages error');
     res.json([]);
+  }
+});
+
+// ── Site template endpoints ──
+
+// GET: retrieve the site template (auto-seeds from existing snapshot if needed)
+router.get('/api/webflow/schema-template/:siteId', (req, res) => {
+  try {
+    const { ctx } = buildSchemaContext(req.params.siteId);
+    const template = getOrSeedSiteTemplate(req.params.siteId, ctx.workspaceId);
+    if (!template) {
+      res.status(404).json({ error: 'No site template found. Generate the homepage schema first.' });
+      return;
+    }
+    res.json(template);
+  } catch (err) {
+    log.error({ err }, 'Get site template error');
+    res.status(500).json({ error: 'Failed to get site template' });
+  }
+});
+
+// PUT: replace the full site template (Organization + WebSite nodes)
+router.put('/api/webflow/schema-template/:siteId', (req, res) => {
+  try {
+    const { organizationNode, websiteNode } = req.body;
+    if (!organizationNode || !websiteNode) {
+      res.status(400).json({ error: 'Both organizationNode and websiteNode are required' });
+      return;
+    }
+    const { ctx } = buildSchemaContext(req.params.siteId);
+    const template = saveSiteTemplate(req.params.siteId, ctx.workspaceId || '', organizationNode, websiteNode);
+    res.json(template);
+  } catch (err) {
+    log.error({ err }, 'Save site template error');
+    res.status(500).json({ error: 'Failed to save site template' });
+  }
+});
+
+// PATCH: update specific fields on the template (e.g. logo URL)
+router.patch('/api/webflow/schema-template/:siteId', (req, res) => {
+  try {
+    const { organizationNode, websiteNode } = req.body;
+    // Auto-seed first if no template exists
+    const { ctx } = buildSchemaContext(req.params.siteId);
+    const existing = getOrSeedSiteTemplate(req.params.siteId, ctx.workspaceId);
+    if (!existing) {
+      res.status(404).json({ error: 'No site template found to patch. Generate the homepage schema first.' });
+      return;
+    }
+    const template = patchSiteTemplate(req.params.siteId, organizationNode, websiteNode);
+    res.json(template);
+  } catch (err) {
+    log.error({ err }, 'Patch site template error');
+    res.status(500).json({ error: 'Failed to patch site template' });
   }
 });
 

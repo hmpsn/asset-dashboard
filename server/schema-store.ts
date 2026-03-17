@@ -164,3 +164,71 @@ export function getSiteTemplate(siteId: string): SchemaSiteTemplate | null {
     updatedAt: row.updated_at,
   };
 }
+
+/**
+ * Get site template, auto-seeding from the latest homepage schema snapshot if none saved.
+ * This allows previously-generated schemas to populate the template without regeneration.
+ */
+export function getOrSeedSiteTemplate(siteId: string, workspaceId?: string): SchemaSiteTemplate | null {
+  const existing = getSiteTemplate(siteId);
+  if (existing) return existing;
+
+  // Try to extract from latest schema snapshot
+  const snapshot = getSchemaSnapshot(siteId);
+  if (!snapshot || !snapshot.results.length) return null;
+
+  // Find homepage result (slug is empty, 'index', 'home', or '/')
+  const homepage = snapshot.results.find(r =>
+    !r.slug || r.slug === '/' || r.slug === 'index' || r.slug === 'home'
+  );
+  if (!homepage?.suggestedSchemas?.[0]?.schema) return null;
+
+  // Parse the schema and extract Organization + WebSite nodes
+  try {
+    const schemaObj = typeof homepage.suggestedSchemas[0].schema === 'string'
+      ? JSON.parse(homepage.suggestedSchemas[0].schema)
+      : homepage.suggestedSchemas[0].schema;
+    const graph = schemaObj?.['@graph'] as Record<string, unknown>[] | undefined;
+    if (!Array.isArray(graph)) return null;
+
+    const orgNode = graph.find(n => n['@type'] === 'Organization');
+    const wsNode = graph.find(n => n['@type'] === 'WebSite');
+    if (!orgNode) return null;
+
+    const websiteNode = wsNode || {
+      '@type': 'WebSite',
+      '@id': `${(orgNode['url'] as string) || ''}/#website`,
+      'url': orgNode['url'] || '',
+      'name': orgNode['name'] || '',
+      'publisher': { '@id': `${(orgNode['url'] as string) || ''}/#organization` },
+    };
+
+    const wsId = workspaceId || snapshot.workspaceId;
+    log.info(`Auto-seeded site template from existing homepage snapshot for site ${siteId}`);
+    return saveSiteTemplate(siteId, wsId, orgNode, websiteNode as Record<string, unknown>);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Update specific fields on the site template (e.g. logo URL).
+ * Merges the provided patches into the existing Organization and WebSite nodes.
+ */
+export function patchSiteTemplate(
+  siteId: string,
+  orgPatch?: Record<string, unknown>,
+  wsPatch?: Record<string, unknown>,
+): SchemaSiteTemplate | null {
+  const existing = getSiteTemplate(siteId);
+  if (!existing) return null;
+
+  const updatedOrg = orgPatch
+    ? { ...existing.organizationNode, ...orgPatch }
+    : existing.organizationNode;
+  const updatedWs = wsPatch
+    ? { ...existing.websiteNode, ...wsPatch }
+    : existing.websiteNode;
+
+  return saveSiteTemplate(siteId, existing.workspaceId, updatedOrg, updatedWs);
+}

@@ -1,7 +1,7 @@
 import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet, getCollectionSchema, listCollections } from './webflow.js';
 import { callOpenAI } from './openai-helpers.js';
 import { createLogger } from './logger.js';
-import { saveSiteTemplate, getSiteTemplate } from './schema-store.js';
+import { saveSiteTemplate, getOrSeedSiteTemplate } from './schema-store.js';
 
 const log = createLogger('schema');
 
@@ -717,7 +717,7 @@ async function postProcessSchema(
       }
     } else {
       // Subpage: load saved template and use minimal stubs
-      const template = getSiteTemplate(siteId);
+      const template = getOrSeedSiteTemplate(siteId, ctx.workspaceId);
       if (template) {
         // Replace AI-generated Organization with minimal stub (Google says full Org only needed on homepage)
         const orgIdx = graph.findIndex(n => n['@type'] === 'Organization');
