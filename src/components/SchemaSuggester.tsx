@@ -3,7 +3,7 @@ import { get, post, put, getSafe } from '../api/client';
 import type { FixContext } from '../App';
 import {
   Loader2, CheckCircle,
-  AlertCircle, Info, Sparkles, RefreshCw, Plus, Database,
+  AlertCircle, Info, Sparkles, RefreshCw, Plus, Database, HelpCircle,
 } from 'lucide-react';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { useRecommendations } from '../hooks/useRecommendations';
@@ -14,6 +14,7 @@ import { SchemaPageCard } from './schema/SchemaPageCard';
 import { BulkPublishPanel } from './schema/BulkPublishPanel';
 import { PagePicker } from './schema/PagePicker';
 import { SchemaPlanPanel } from './schema/SchemaPlanPanel';
+import { SCHEMA_ROLE_INDEX } from '../../shared/types/schema-plan';
 
 interface SchemaSuggestion {
   type: string;
@@ -98,6 +99,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
 
   // CMS template schema state
   const [showCmsPanel, setShowCmsPanel] = useState(false);
+  const [showTypeGuide, setShowTypeGuide] = useState(false);
   const [cmsTemplatePages, setCmsTemplatePages] = useState<CmsTemplatePage[]>([]);
   const [loadingCmsPages, setLoadingCmsPages] = useState(false);
   const [generatingCmsTemplate, setGeneratingCmsTemplate] = useState<string | null>(null);
@@ -494,7 +496,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
     { value: 'homepage', label: 'Homepage' },
     { value: 'pillar', label: 'Pillar / Product Page' },
     { value: 'service', label: 'Service Page' },
-    { value: 'audience', label: 'Audience / Persona Page' },
+    { value: 'audience', label: 'Audience / Use Case' },
     { value: 'lead-gen', label: 'Lead-Gen / Conversion' },
     { value: 'blog', label: 'Blog Post' },
     { value: 'about', label: 'About / Team' },
@@ -568,7 +570,17 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
         ) : availablePages.length > 0 && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
               <span className="text-xs text-zinc-500">{availablePages.length} pages — set page types for better AI prompts</span>
+              <button
+                onClick={() => setShowTypeGuide(v => !v)}
+                className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors"
+                title="Page Type Guide"
+              >
+                <HelpCircle className="w-3 h-3" />
+                Guide
+              </button>
+            </div>
               <input
                 type="text"
                 value={pageSearch}
@@ -577,6 +589,25 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
                 className="px-3 py-1 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-300 w-48 focus:outline-none focus:border-zinc-600"
               />
             </div>
+            {showTypeGuide && (
+              <div className="bg-zinc-950/50 rounded-lg border border-zinc-800 overflow-hidden max-h-[280px] overflow-y-auto">
+                {PAGE_TYPE_OPTIONS.filter(o => o.value !== 'auto').map(opt => {
+                  const info = SCHEMA_ROLE_INDEX[opt.value as keyof typeof SCHEMA_ROLE_INDEX];
+                  if (!info) return null;
+                  return (
+                    <div key={opt.value} className="px-3 py-2 border-b border-zinc-800/50 last:border-b-0">
+                      <span className="text-[11px] font-medium text-zinc-300">{opt.label}</span>
+                      <p className="text-[11px] text-zinc-500 leading-relaxed">{info.description}</p>
+                      <div className="flex flex-wrap gap-1 mt-0.5">
+                        {info.examples.map((ex: string) => (
+                          <code key={ex} className="text-[9px] text-zinc-600 bg-zinc-800/60 px-1 py-0.5 rounded font-mono">{ex}</code>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden max-h-[400px] overflow-y-auto">
               {filteredInitialPages.map(p => (
                 <div key={p.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-zinc-800/50 last:border-b-0 hover:bg-zinc-800/30 transition-colors">

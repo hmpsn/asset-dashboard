@@ -38,7 +38,7 @@ export const PAGE_TYPE_LABELS: Record<SchemaPageType, string> = {
   homepage: 'Homepage',
   pillar: 'Pillar / Product Page',
   service: 'Service Page',
-  audience: 'Audience / Persona Page',
+  audience: 'Audience / Use Case',
   'lead-gen': 'Lead-Gen / Conversion',
   blog: 'Blog Post',
   about: 'About / Team',

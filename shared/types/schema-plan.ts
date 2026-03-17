@@ -21,7 +21,7 @@ export const SCHEMA_ROLE_LABELS: Record<SchemaPageRole, string> = {
   homepage: 'Homepage',
   pillar: 'Pillar / Product Page',
   service: 'Service Page',
-  audience: 'Audience / Persona Page',
+  audience: 'Audience / Use Case',
   'lead-gen': 'Lead-Gen / Conversion',
   blog: 'Blog Post',
   about: 'About / Team',
@@ -52,6 +52,70 @@ export const SCHEMA_ROLE_CLIENT_DESC: Record<SchemaPageRole, string> = {
   'case-study': 'Article markup with client details — breadcrumb in search',
   comparison: 'Page info with product reference — breadcrumb in search',
   generic: 'Basic page info — breadcrumb navigation in search',
+};
+
+/** Page type index — describes what each role is for, with URL examples */
+export const SCHEMA_ROLE_INDEX: Record<SchemaPageRole, { description: string; examples: string[] }> = {
+  homepage: {
+    description: 'The main landing page of the site. Gets full Organization, WebSite, and product entity markup for Google knowledge panel.',
+    examples: ['/'],
+  },
+  pillar: {
+    description: 'The canonical page for a SaaS product or platform. Owns the primary SoftwareApplication entity with full details.',
+    examples: ['/platform', '/product', '/solutions'],
+  },
+  service: {
+    description: 'A page describing a specific service offering. Owns a Service entity with serviceType, pricing, and area served.',
+    examples: ['/services/web-design', '/services/seo-consulting', '/managed-services'],
+  },
+  audience: {
+    description: 'Pages targeting a specific audience, persona, feature, or use case. References the pillar product — does not create its own entity.',
+    examples: ['/for-developers', '/features/analytics', '/use-cases/healthcare', '/industries/fintech'],
+  },
+  'lead-gen': {
+    description: 'Conversion-focused pages with CTAs. Gets minimal WebPage + BreadcrumbList only — no product or service entities.',
+    examples: ['/demo', '/pricing', '/get-started', '/signup', '/book-a-call'],
+  },
+  blog: {
+    description: 'Blog posts, articles, news, guides, and other editorial content. Gets Article schema with author and dates.',
+    examples: ['/blog/post-title', '/news/announcement', '/resources/guide-name'],
+  },
+  about: {
+    description: 'Company information, team bios, culture, and careers pages.',
+    examples: ['/about', '/about/team', '/careers'],
+  },
+  contact: {
+    description: 'Contact page with phone, email, or form. Gets ContactPage schema with contact details.',
+    examples: ['/contact', '/contact-us', '/support'],
+  },
+  location: {
+    description: 'Location-specific pages for physical businesses. Gets LocalBusiness schema with address, hours, and map.',
+    examples: ['/locations/new-york', '/offices/london'],
+  },
+  product: {
+    description: 'Individual product pages (e-commerce or distinct offerings). Gets Product schema with pricing, availability, and reviews.',
+    examples: ['/shop/widget-pro', '/products/starter-kit'],
+  },
+  partnership: {
+    description: 'Integration or partner pages. References the main product entity — focuses on the partnership context.',
+    examples: ['/integrations/slack', '/partners/acme-corp'],
+  },
+  faq: {
+    description: 'Dedicated FAQ pages with clearly labeled Q&A pairs. Gets FAQPage schema eligible for Google FAQ rich results.',
+    examples: ['/faq', '/help/frequently-asked-questions'],
+  },
+  'case-study': {
+    description: 'Customer stories and case studies. Gets Article schema with client details and measurable results.',
+    examples: ['/customers/acme-corp', '/case-studies/50-percent-growth'],
+  },
+  comparison: {
+    description: 'Competitor comparison pages. References the main product entity — mentions competitor products.',
+    examples: ['/vs-competitor', '/compare/us-vs-them', '/alternatives/competitor-name'],
+  },
+  generic: {
+    description: 'Pages that don\'t fit another category. Gets basic WebPage + BreadcrumbList markup.',
+    examples: ['/privacy-policy', '/terms', '/thank-you'],
+  },
 };
 
 export interface CanonicalEntity {

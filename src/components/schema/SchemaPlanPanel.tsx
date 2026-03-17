@@ -5,11 +5,11 @@
 import { useState, useEffect } from 'react';
 import {
   Loader2, Sparkles, Send, CheckCircle, AlertCircle,
-  ChevronDown, ChevronRight, Globe, Zap,
+  ChevronDown, ChevronRight, Globe, Zap, HelpCircle,
 } from 'lucide-react';
 import { schemaPlan } from '../../api/seo';
 import type { SchemaSitePlan, SchemaPageRole } from '../../../shared/types/schema-plan';
-import { SCHEMA_ROLE_LABELS } from '../../../shared/types/schema-plan';
+import { SCHEMA_ROLE_LABELS, SCHEMA_ROLE_INDEX } from '../../../shared/types/schema-plan';
 
 interface Props {
   siteId: string;
@@ -51,6 +51,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [showEntities, setShowEntities] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -278,6 +279,40 @@ export function SchemaPlanPanel({ siteId }: Props) {
                 {SCHEMA_ROLE_LABELS[role as SchemaPageRole] || role} ({count})
               </span>
             ))}
+          </div>
+
+          {/* Page Type Guide */}
+          <div>
+            <button
+              onClick={() => setShowGuide(!showGuide)}
+              className="flex items-center gap-1.5 text-[11px] text-zinc-400 hover:text-zinc-300 transition-colors"
+            >
+              <HelpCircle className="w-3 h-3" />
+              {showGuide ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+              Page Type Guide
+            </button>
+            {showGuide && (
+              <div className="mt-2 bg-zinc-950/50 rounded-lg border border-zinc-800 overflow-hidden max-h-[320px] overflow-y-auto">
+                {ROLE_OPTIONS.map(role => {
+                  const info = SCHEMA_ROLE_INDEX[role];
+                  return (
+                    <div key={role} className="px-3 py-2 border-b border-zinc-800/50 last:border-b-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border ${ROLE_COLORS[role]}`}>
+                          {SCHEMA_ROLE_LABELS[role]}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-zinc-400 leading-relaxed">{info.description}</p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {info.examples.map(ex => (
+                          <code key={ex} className="text-[9px] text-zinc-500 bg-zinc-800/60 px-1 py-0.5 rounded font-mono">{ex}</code>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Canonical entities */}
