@@ -412,6 +412,25 @@ function verifySchemaContent(schema: Record<string, unknown>, pageText: string, 
       }
     }
 
+    // Check FAQPage — verify each question text actually appears on the page
+    if (type === 'FAQPage') {
+      const mainEntity = node['mainEntity'] as Record<string, unknown>[] | undefined;
+      if (Array.isArray(mainEntity)) {
+        const verified = mainEntity.filter((q: Record<string, unknown>) => {
+          const name = (q['name'] as string || '').toLowerCase().trim();
+          // Match if the question text (or a substantial substring) appears in the page
+          return name.length > 5 && (lowerText.includes(name) || lowerHtml.includes(name));
+        });
+        if (verified.length === 0) {
+          stripped.push(`${type}: removed entire FAQPage — none of the ${mainEntity.length} question(s) found in page content (likely hallucinated)`);
+          node['_remove'] = true;
+        } else if (verified.length < mainEntity.length) {
+          stripped.push(`${type}: removed ${mainEntity.length - verified.length} hallucinated FAQ question(s) not found in page content`);
+          node['mainEntity'] = verified;
+        }
+      }
+    }
+
     // Check sameAs URLs — filter to only URLs that appear in the HTML
     const sameAs = node['sameAs'] as string[] | undefined;
     if (Array.isArray(sameAs)) {
@@ -697,6 +716,17 @@ async function postProcessSchema(
     log.info({ warnings: contentWarnings }, 'Content verification stripped hallucinated values');
   }
 
+  // Step 3a: Remove nodes flagged for removal by content verification (e.g. hallucinated FAQPage)
+  const graphBeforeFilter = schema['@graph'] as Record<string, unknown>[] | undefined;
+  if (Array.isArray(graphBeforeFilter)) {
+    const before = graphBeforeFilter.length;
+    schema['@graph'] = graphBeforeFilter.filter(n => !n['_remove']);
+    const after = (schema['@graph'] as Record<string, unknown>[]).length;
+    if (after < before) {
+      log.info(`Removed ${before - after} hallucinated node(s) flagged by content verification`);
+    }
+  }
+
   // Step 3b: Site template — unified Organization/WebSite across pages
   const graph = schema['@graph'] as Record<string, unknown>[] | undefined;
   if (Array.isArray(graph) && siteId && ctx.workspaceId) {
@@ -719,14 +749,18 @@ async function postProcessSchema(
       // Subpage: load saved template and use minimal stubs
       const template = getOrSeedSiteTemplate(siteId, ctx.workspaceId);
       if (template) {
-        // Replace AI-generated Organization with minimal stub (Google says full Org only needed on homepage)
+        // Replace AI-generated Organization with stub from template (includes logo for consistency)
         const orgIdx = graph.findIndex(n => n['@type'] === 'Organization');
-        const orgStub = {
+        const orgStub: Record<string, unknown> = {
           '@type': 'Organization',
           '@id': `${siteUrl}/#organization`,
           'name': (template.organizationNode['name'] as string) || ctx.companyName || '',
           'url': (template.organizationNode['url'] as string) || siteUrl,
         };
+        // Carry logo from template so subpages have consistent branding
+        if (template.organizationNode['logo']) {
+          orgStub['logo'] = template.organizationNode['logo'];
+        }
         if (orgIdx >= 0) {
           graph[orgIdx] = orgStub;
         }

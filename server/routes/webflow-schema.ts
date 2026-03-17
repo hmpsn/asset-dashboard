@@ -7,7 +7,7 @@ const router = Router();
 
 import { addActivity } from '../activity-log.js';
 import { buildSchemaContext } from '../helpers.js';
-import { getSchemaSnapshot, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate } from '../schema-store.js';
+import { getSchemaSnapshot, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot } from '../schema-store.js';
 import { generateSchemaSuggestions, generateSchemaForPage, generateCmsTemplateSchema } from '../schema-suggester.js';
 import {
   listCollections,
@@ -77,6 +77,9 @@ router.post('/api/webflow/schema-publish/:siteId', async (req, res) => {
         log.error({ detail: pubResult.error }, 'Site publish failed');
       }
     }
+
+    // Persist edited schema back to snapshot so it survives reload
+    updatePageSchemaInSnapshot(req.params.siteId, pageId, schema);
 
     // Auto-save site template if this is a homepage publish
     const isHomepage = req.body.isHomepage || false;

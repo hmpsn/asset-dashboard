@@ -85,6 +85,43 @@ export function getSchemaSnapshot(siteId: string): SchemaSnapshot | null {
   return row ? rowToSnapshot(row) : null;
 }
 
+/**
+ * Update a single page's schema within an existing snapshot.
+ * Used when user edits a schema and publishes — persists the edit so it
+ * appears on reload and is used by auto-seed template extraction.
+ */
+export function updatePageSchemaInSnapshot(
+  siteId: string,
+  pageId: string,
+  updatedSchema: Record<string, unknown>,
+): boolean {
+  const snapshot = getSchemaSnapshot(siteId);
+  if (!snapshot) return false;
+
+  const pageIdx = snapshot.results.findIndex(r => r.pageId === pageId);
+  if (pageIdx < 0) return false;
+
+  // Update the first suggested schema's template
+  if (snapshot.results[pageIdx].suggestedSchemas?.[0]) {
+    snapshot.results[pageIdx].suggestedSchemas[0].template = updatedSchema;
+  }
+
+  // Re-save the full snapshot with updated results
+  const row = getBySiteStmt().get(siteId) as SchemaRow | undefined;
+  if (!row) return false;
+
+  upsertStmt().run({
+    id: row.id,
+    site_id: siteId,
+    workspace_id: row.workspace_id,
+    created_at: row.created_at,
+    results: JSON.stringify(snapshot.results),
+    page_count: snapshot.results.length,
+  });
+  log.info(`Updated schema for page ${pageId} in snapshot for site ${siteId}`);
+  return true;
+}
+
 // ── Site template: canonical Organization + WebSite nodes ──
 
 export interface SchemaSiteTemplate {
@@ -181,13 +218,13 @@ export function getOrSeedSiteTemplate(siteId: string, workspaceId?: string): Sch
   const homepage = snapshot.results.find(r =>
     !r.slug || r.slug === '/' || r.slug === 'index' || r.slug === 'home'
   );
-  if (!homepage?.suggestedSchemas?.[0]?.schema) return null;
+  if (!homepage?.suggestedSchemas?.[0]?.template) return null;
 
   // Parse the schema and extract Organization + WebSite nodes
   try {
-    const schemaObj = typeof homepage.suggestedSchemas[0].schema === 'string'
-      ? JSON.parse(homepage.suggestedSchemas[0].schema)
-      : homepage.suggestedSchemas[0].schema;
+    const schemaObj = typeof homepage.suggestedSchemas[0].template === 'string'
+      ? JSON.parse(homepage.suggestedSchemas[0].template as unknown as string)
+      : homepage.suggestedSchemas[0].template;
     const graph = schemaObj?.['@graph'] as Record<string, unknown>[] | undefined;
     if (!Array.isArray(graph)) return null;
 
