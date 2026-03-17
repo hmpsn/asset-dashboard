@@ -988,10 +988,13 @@ REQUIREMENTS:
 10. For images, use full absolute URLs (prefix with ${siteUrl} if relative). Only use image URLs found in the page content.
 11. FAQPage: ONLY use FAQPage schema if the page has a DEDICATED FAQ section with clearly labeled questions and answers (e.g. an accordion, a "Frequently Asked Questions" heading, or a visible Q&A list). Section headings like "What's under the hood?" or "How it works" followed by feature descriptions are NOT FAQs — they are rhetorical headings. When in doubt, do NOT include FAQPage. Never fabricate Q&A pairs.
 12. Article/BlogPosting: use real author name, real dates, real headline from the content. ALWAYS include "author" with "@type": "Person" and real credentials if found. If a medical/health reviewer is mentioned, add "reviewedBy" with "@type": "Person" and their credentials.
-13. BreadcrumbList: use the FLAT format — each ListItem has "name" and "item" (URL string) directly, NOT nested inside an "item" object. Example: {"@type":"ListItem","position":1,"name":"Home","item":"${siteUrl}/"}
+13. BreadcrumbList: use the FLAT format — each ListItem has "name" and "item" (URL string) directly, NOT nested inside an "item" object. Use SHORT navigational labels for "name" (e.g. "Platform", "Clara", "Pricing", "Blog"), NOT the full page title. Example: {"@type":"ListItem","position":1,"name":"Home","item":"${siteUrl}/"}
 14. LocalBusiness for multi-location/region pages: include "parentOrganization": {"@id": "${siteUrl}/#organization"} to link the location to the parent brand
 15. Every @type must have all Google-required fields filled with REAL data from the page
 16. If you cannot determine a required value from the content, OMIT that @type entirely rather than using a placeholder or fabricating data
+16b. LEAD-GEN / CONVERSION PAGES (slugs like /demo, /contact, /request-demo, /get-started, /pricing, /signup, /book): Do NOT create a Service or SoftwareApplication node as mainEntity. These pages are about taking an action, not describing a product. Use only WebPage + Organization stub + BreadcrumbList.
+16c. EVERY Service and SoftwareApplication MUST include a "url" field pointing to the canonical product page (e.g. "${siteUrl}/platform"), NOT to the current page if the current page is a comparison, demo, or landing page.
+16d. If multiple pages describe the SAME product, use a CONSISTENT @id for the Service/SoftwareApplication across all of them (e.g. "${siteUrl}/platform/#service" or "${siteUrl}/#software"). Do NOT create page-specific @ids like "${siteUrl}/faros-vs-dx/#service" for the same product.
 17. HEALTHCARE / MEDICAL SITES: If the business context or page content indicates a healthcare provider (dental, medical, clinic, hospital, therapy, etc.):
     - Use "MedicalBusiness" or more specific subtypes ("Dentist", "Physician", "Optician", etc.) instead of generic "LocalBusiness"
     - For treatment/procedure pages, use "MedicalProcedure" with procedureType, howPerformed, preparation, followup if found in content
@@ -1039,6 +1042,8 @@ PROPERTY RULES — enforced by automated validation:
 28. "telephone" values MUST be properly formatted — use "+1-555-123-4567" or "(555) 123-4567" format. Never output malformed numbers like "5551234567" without separators
 29. "serviceType" should be 1-3 CONCISE types (e.g. "Context Engineering", "AI Development Tools"). Do NOT keyword-stuff with long phrases — move detailed descriptions to the "description" field instead
 30. "knowsAbout" should contain 3-5 concise domain expertise terms, not 10+ verbose phrases
+31. Keep "description" fields concise — aim for 1-3 sentences (50-200 words). Move detailed feature lists to other properties (featureList, serviceType) rather than cramming them into description.
+32. WebPage "description" should closely mirror the page's meta description when available — do not rewrite or heavily embellish it.
 
 Return ONLY the JSON-LD object. No markdown, no explanation, no wrapping.`;
 
