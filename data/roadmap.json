@@ -1970,6 +1970,46 @@
           "priority": "P0",
           "notes": "Shipped — Two-phase schema generation per Google best practices. Homepage saves full Organization + WebSite as site template (SQLite migration 012). Subpages load template and use minimal stubs (@id, name, url only). Missing Org/WebSite/BreadcrumbList nodes auto-injected. Prompt requirements 3-4 updated for homepage/subpage split.",
           "status": "done"
+        },
+        {
+          "id": 300,
+          "title": "Schema: Save as Site Template UI + auto-save on homepage publish",
+          "source": "Schema template debugging session",
+          "est": "1h",
+          "priority": "P0",
+          "notes": "Shipped — 'Save as Site Template' button on SchemaPageCard for homepage. PUT /api/schema-template/:siteId endpoint. Auto-saves Org + WebSite on homepage publish. getOrSeedSiteTemplate auto-seeds from existing snapshot if no template saved.",
+          "status": "done",
+          "shippedAt": "2026-03-16"
+        },
+        {
+          "id": 301,
+          "title": "Schema: Logo propagation + edit persistence + FAQ content verification",
+          "source": "Schema template debugging session",
+          "est": "1.5h",
+          "priority": "P0",
+          "notes": "Shipped — Logo carried from template to subpage Organization stubs. updatePageSchemaInSnapshot persists edited schema to SQLite on publish. FAQ content verification strips FAQPage when questions not in page text.",
+          "status": "done",
+          "shippedAt": "2026-03-16"
+        },
+        {
+          "id": 302,
+          "title": "Schema: Structural FAQ detection + breadcrumb auto-trim + Service url injection",
+          "source": "Schema quality hardening",
+          "est": "1.5h",
+          "priority": "P0",
+          "notes": "Shipped — FAQ verification requires structural evidence (FAQ heading, accordion markup, FAQ CSS classes). Breadcrumb names auto-trimmed (strip brand suffixes, cap ~50 chars). Service/SoftwareApplication url auto-injected from WebPage. SoftwareApplication added to CROSS_REF_RULES and REQUIRED_FIELDS.",
+          "status": "done",
+          "shippedAt": "2026-03-16"
+        },
+        {
+          "id": 303,
+          "title": "Schema: Organization dedup + Service @id normalization + 37 prompt rules",
+          "source": "Schema quality hardening",
+          "est": "1h",
+          "priority": "P0",
+          "notes": "Shipped — Auto-dedup Organization nodes (removes /#organization-stub duplicates). Auto-normalize Service @id to match canonical url field. 37 AI prompt rules: lead-gen page detection (skip Service on /demo, /contact), consistent @id across pages for same product, description length guidance, WebPage desc mirrors meta desc.",
+          "status": "done",
+          "shippedAt": "2026-03-16"
         }
       ]
     }

@@ -803,8 +803,12 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - ~~CMS template schemas~~: ✅ Shipped — Dynamic schemas for collection pages using Webflow `{{wf}}` template syntax.
 - ~~Prompt tightening~~: ✅ Shipped — No empty arrays/objects, consistent `@id`, omit empty properties.
 - ~~Schema diff view~~: ✅ Shipped — Side-by-side comparison of existing vs. suggested JSON-LD with toggle button. Shows full existing schema JSON extracted from published HTML.
-- **Auto-schedule**: Re-generate schemas on a cadence (e.g., weekly) and flag pages where content changed but schema is stale.
 - ~~Bulk publish all~~: ✅ Shipped — One-click "Publish All" button with sequential publishing and live progress counter.
+- ~~Site template system~~: ✅ Shipped (March 2026) — "Save as Site Template" button on homepage. Organization + WebSite nodes saved to SQLite and reused as consistent stubs (with logo) on all subpages. Auto-seeds from homepage snapshot. Auto-saves when homepage schema is published.
+- ~~Content verification v2~~: ✅ Shipped (March 2026) — Structural FAQ detection (requires FAQ heading, accordion markup, or FAQ CSS classes — rejects section headings like "What's under the hood?"). Hallucinated FAQPage nodes auto-stripped. Individual questions verified against page text.
+- ~~Schema edit persistence~~: ✅ Shipped (March 2026) — Edited schemas persist to SQLite snapshot on publish via `updatePageSchemaInSnapshot()`. No longer lost on reload.
+- ~~Post-processing hardening~~: ✅ Shipped (March 2026) — Auto-dedup Organization nodes (removes `/#organization-stub` duplicates). Auto-normalize Service/SoftwareApplication `@id` to canonical product URL. Auto-inject `url` on Service from WebPage. Auto-trim breadcrumb names (strip brand suffixes, cap ~50 chars). 37 prompt rules including lead-gen page detection, consistent `@id` across pages, description length guidance.
+- **Auto-schedule**: Re-generate schemas on a cadence (e.g., weekly) and flag pages where content changed but schema is stale.
 
 ### Redirect Manager Enhancements
 - ~~GSC ghost URL detection~~: ✅ Shipped — Identifies old/renamed pages Google still indexes but no longer exist on site.
