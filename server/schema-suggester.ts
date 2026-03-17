@@ -241,6 +241,25 @@ function autoFixSchema(schema: Record<string, unknown>): void {
       log.info(`Auto-fix: trimmed serviceType from ${st.length} to 3 entries on ${type}`);
       node['serviceType'] = st.slice(0, 3);
     }
+
+    // Auto-fix BreadcrumbList: truncate long item names
+    if (type === 'BreadcrumbList') {
+      const items = node['itemListElement'] as Record<string, unknown>[] | undefined;
+      if (Array.isArray(items)) {
+        for (const item of items) {
+          let name = item['name'] as string | undefined;
+          if (!name || typeof name !== 'string') continue;
+          // Strip "| Brand Name" or "— Brand Name" suffixes
+          name = name.replace(/\s*[|–—-]\s*[^|–—-]+$/, '').trim();
+          // If still over 50 chars, truncate at last word boundary
+          if (name.length > 50) {
+            const truncated = name.slice(0, 50).replace(/\s+\S*$/, '').trim();
+            name = truncated || name.slice(0, 50);
+          }
+          item['name'] = name;
+        }
+      }
+    }
   }
 }
 
@@ -423,21 +442,42 @@ function verifySchemaContent(schema: Record<string, unknown>, pageText: string, 
       }
     }
 
-    // Check FAQPage — verify each question text actually appears on the page
+    // Check FAQPage — require REAL FAQ structural patterns on the page
+    // A section heading like "What's under the hood?" is NOT an FAQ — it's a rhetorical heading.
+    // We need evidence of a dedicated FAQ section before allowing FAQPage schema.
     if (type === 'FAQPage') {
-      const mainEntity = node['mainEntity'] as Record<string, unknown>[] | undefined;
-      if (Array.isArray(mainEntity)) {
-        const verified = mainEntity.filter((q: Record<string, unknown>) => {
-          const name = (q['name'] as string || '').toLowerCase().trim();
-          // Match if the question text (or a substantial substring) appears in the page
-          return name.length > 5 && (lowerText.includes(name) || lowerHtml.includes(name));
-        });
-        if (verified.length === 0) {
-          stripped.push(`${type}: removed entire FAQPage — none of the ${mainEntity.length} question(s) found in page content (likely hallucinated)`);
-          node['_remove'] = true;
-        } else if (verified.length < mainEntity.length) {
-          stripped.push(`${type}: removed ${mainEntity.length - verified.length} hallucinated FAQ question(s) not found in page content`);
-          node['mainEntity'] = verified;
+      const hasFaqStructure =
+        // Dedicated FAQ heading
+        /(?:faq|frequently\s+asked|common\s+questions|questions?\s+(?:&|and)\s+answers?)/i.test(lowerText) ||
+        // Accordion / collapsible markup patterns
+        lowerHtml.includes('aria-expanded') ||
+        lowerHtml.includes('<details') ||
+        lowerHtml.includes('accordion') ||
+        lowerHtml.includes('faq-item') ||
+        lowerHtml.includes('faq_item') ||
+        lowerHtml.includes('faq-question') ||
+        lowerHtml.includes('faq_question');
+
+      if (!hasFaqStructure) {
+        const mainEntity = node['mainEntity'] as Record<string, unknown>[] | undefined;
+        const qCount = Array.isArray(mainEntity) ? mainEntity.length : 0;
+        stripped.push(`FAQPage: removed — no FAQ section structure found on page (${qCount} question(s) were likely derived from section headings, not a real FAQ)`);
+        node['_remove'] = true;
+      } else {
+        // Has FAQ structure — still verify individual questions appear in content
+        const mainEntity = node['mainEntity'] as Record<string, unknown>[] | undefined;
+        if (Array.isArray(mainEntity)) {
+          const verified = mainEntity.filter((q: Record<string, unknown>) => {
+            const name = (q['name'] as string || '').toLowerCase().trim();
+            return name.length > 5 && (lowerText.includes(name) || lowerHtml.includes(name));
+          });
+          if (verified.length === 0) {
+            stripped.push(`FAQPage: removed — none of the ${mainEntity.length} question(s) found in page content`);
+            node['_remove'] = true;
+          } else if (verified.length < mainEntity.length) {
+            stripped.push(`FAQPage: removed ${mainEntity.length - verified.length} hallucinated question(s) not found in page content`);
+            node['mainEntity'] = verified;
+          }
         }
       }
     }
