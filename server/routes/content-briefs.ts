@@ -223,4 +223,125 @@ router.delete('/api/content-briefs/:workspaceId/:briefId', (req, res) => {
   res.json({ ok: true });
 });
 
+// Validate a keyword via SEMRush before locking it for brief generation
+router.post('/api/content-briefs/:workspaceId/validate-keyword', async (req, res) => {
+  const { keyword } = req.body;
+  if (!keyword) return res.status(400).json({ error: 'keyword is required' });
+
+  if (!isSemrushConfigured()) {
+    // No SEMRush — return a stub validation so the flow isn't blocked
+    return res.json({
+      keyword,
+      valid: true,
+      source: 'manual' as const,
+      metrics: null,
+      message: 'SEMRush not configured — keyword accepted without validation',
+    });
+  }
+
+  try {
+    const metrics = await getKeywordOverview([keyword], req.params.workspaceId);
+    const kw = metrics[0];
+
+    if (!kw) {
+      return res.json({
+        keyword,
+        valid: true,
+        source: 'semrush' as const,
+        metrics: null,
+        message: 'No SEMRush data found — keyword accepted without metrics',
+      });
+    }
+
+    // Flag low-volume or very high difficulty keywords as warnings (not blocking)
+    const warnings: string[] = [];
+    if (kw.volume < 10) warnings.push(`Very low search volume (${kw.volume}/mo)`);
+    if (kw.difficulty > 85) warnings.push(`Very high keyword difficulty (${kw.difficulty}/100)`);
+
+    res.json({
+      keyword,
+      valid: true,
+      source: 'semrush' as const,
+      metrics: {
+        volume: kw.volume,
+        difficulty: kw.difficulty,
+        cpc: kw.cpc,
+        validatedAt: new Date().toISOString(),
+      },
+      warnings: warnings.length ? warnings : undefined,
+    });
+  } catch (err) {
+    log.error({ err, keyword, workspaceId: req.params.workspaceId }, 'Keyword validation failed');
+    // Don't block workflow on SEMRush failure
+    res.json({
+      keyword,
+      valid: true,
+      source: 'manual' as const,
+      metrics: null,
+      message: 'SEMRush lookup failed — keyword accepted without validation',
+    });
+  }
+});
+
+// Bulk validate keywords (for matrix pre-assignment)
+router.post('/api/content-briefs/:workspaceId/validate-keywords', async (req, res) => {
+  const { keywords } = req.body;
+  if (!Array.isArray(keywords) || !keywords.length) {
+    return res.status(400).json({ error: 'keywords array is required' });
+  }
+
+  if (!isSemrushConfigured()) {
+    return res.json({
+      results: keywords.map((kw: string) => ({
+        keyword: kw,
+        valid: true,
+        source: 'manual' as const,
+        metrics: null,
+      })),
+      message: 'SEMRush not configured — all keywords accepted without validation',
+    });
+  }
+
+  try {
+    // SEMRush getKeywordOverview already handles batching
+    const metrics = await getKeywordOverview(keywords.slice(0, 50), req.params.workspaceId);
+    const metricsMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m]));
+
+    const results = keywords.slice(0, 50).map((kw: string) => {
+      const m = metricsMap.get(kw.toLowerCase());
+      if (!m) {
+        return { keyword: kw, valid: true, source: 'semrush' as const, metrics: null };
+      }
+      const warnings: string[] = [];
+      if (m.volume < 10) warnings.push(`Very low volume (${m.volume}/mo)`);
+      if (m.difficulty > 85) warnings.push(`Very high KD (${m.difficulty}/100)`);
+      return {
+        keyword: kw,
+        valid: true,
+        source: 'semrush' as const,
+        metrics: {
+          volume: m.volume,
+          difficulty: m.difficulty,
+          cpc: m.cpc,
+          validatedAt: new Date().toISOString(),
+        },
+        warnings: warnings.length ? warnings : undefined,
+      };
+    });
+
+    res.json({ results });
+  } catch (err) {
+    log.error({ err, workspaceId: req.params.workspaceId }, 'Bulk keyword validation failed');
+    res.json({
+      results: keywords.map((kw: string) => ({
+        keyword: kw,
+        valid: true,
+        source: 'manual' as const,
+        metrics: null,
+      })),
+      message: 'SEMRush lookup failed — all keywords accepted without validation',
+    });
+  }
+});
+
 export default router;
