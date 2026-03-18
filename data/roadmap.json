@@ -176,6 +176,24 @@
           "status": "done"
         },
         {
+          "id": 407,
+          "title": "Site Architecture Planner",
+          "source": "CONTENT_PLANNER_PLAN",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Shipped — URL tree from Webflow pages + CMS sitemap + matrix planned pages + keyword strategy. Gap detection for missing hub pages. Depth distribution + orphan analysis.",
+          "status": "done"
+        },
+        {
+          "id": 408,
+          "title": "LLMs.txt Generator",
+          "source": "Feature request",
+          "est": "1-2h",
+          "priority": "P2",
+          "notes": "Shipped — Generates LLMs.txt from site pages, keyword strategy, and planned content. JSON preview + .txt download endpoint.",
+          "status": "done"
+        },
+        {
           "id": 406,
           "title": "Client Review Flow (Tiered Content Plan Review)",
           "source": "CONTENT_PLANNER_PLAN",

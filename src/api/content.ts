@@ -212,6 +212,23 @@ export const contentPlanReview = {
     post<{ ok: boolean; approvedCount: number; totalCells: number }>(`/api/content-plan/${wsId}/${matrixId}/batch-approve`, {}),
 };
 
+// ── Site Architecture Planner ────────────────────────────────────
+
+export const siteArchitecture = {
+  get: (wsId: string) =>
+    get<unknown>(`/api/site-architecture/${wsId}`),
+};
+
+// ── LLMs.txt Generator ──────────────────────────────────────────
+
+export const llmsTxt = {
+  generate: (wsId: string) =>
+    get<{ content: string; pageCount: number; generatedAt: string }>(`/api/llms-txt/${wsId}`),
+
+  downloadUrl: (wsId: string) =>
+    `/api/llms-txt/${wsId}/download`,
+};
+
 // ── Content decay ───────────────────────────────────────────────
 export const contentDecay = {
   get: (wsId: string) =>

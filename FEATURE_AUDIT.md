@@ -1560,13 +1560,37 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 150. Site Architecture Planner
+**What it does:** Builds a complete URL tree for a workspace by combining three data sources: existing pages (Webflow API static + CMS sitemap discovery), planned pages (content matrix cells), and strategy pages (keyword map assignments). Each node tracks source type (existing/planned/strategy/gap), keyword, SEO metadata, and matrix linkage. Detects architecture gaps — intermediate URL paths with child pages but no hub/landing page (e.g., `/services/` has children but no page). Reports depth distribution, orphan pages, and gap priority. Single GET endpoint returns the full tree structure for frontend visualization.
+**Files:** `server/site-architecture.ts`, `server/routes/site-architecture.ts`
+
+**Agency value:** Instant bird's-eye view of the site's URL hierarchy showing where content exists, what's planned, and where gaps need filling — replaces manual spreadsheet URL planning.
+
+**Client value:** Visual proof that the content plan covers the full site architecture with no orphan pages or missing hub pages.
+
+**Mutual:** Ensures every planned page fits into a coherent URL hierarchy before any content is written.
+
+---
+
+### 151. LLMs.txt Generator
+**What it does:** Generates an LLMs.txt file — a machine-readable site overview following the emerging standard for AI consumption. Pulls data from workspace config (name, domain, business context), all published pages (Webflow static + CMS), keyword strategy enrichment, and planned content from matrices. Groups pages by URL section, includes descriptions and keywords, and adds an "Upcoming Content" section for planned-but-unpublished pages. Two endpoints: JSON preview (`GET /api/llms-txt/:wsId`) and direct `.txt` file download (`GET /api/llms-txt/:wsId/download`) with Content-Disposition attachment header.
+**Files:** `server/llms-txt-generator.ts`, `server/routes/llms-txt.ts`
+
+**Agency value:** One-click generation of a site's LLMs.txt — a differentiator for SEO-forward clients who want their sites optimized for AI search engines (Perplexity, ChatGPT, Google AI Overviews).
+
+**Client value:** Downloadable `.txt` file they can add to their site root, instantly improving discoverability by AI systems.
+
+**Mutual:** Positions the platform at the frontier of AI-era SEO tooling.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
 |----------|:---:|---|
-| SEO & Technical | 15 | Audit, fix, and optimize faster than manual tools + AEO trust signals + change impact tracking + content decay detection |
+| SEO & Technical | 16 | Audit, fix, and optimize faster than manual tools + AEO trust signals + change impact tracking + content decay detection + site architecture planner |
 | Analytics & Tracking | 7 | Unified data view replaces platform-hopping + AI time-saved tracking |
-| Content & Strategy | 19 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar + content templates + keyword pre-assignment + content matrices + keyword recommendations + cannibalization detection + content planner export + client review flow |
+| Content & Strategy | 20 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar + content templates + keyword pre-assignment + content matrices + keyword recommendations + cannibalization detection + content planner export + client review flow + LLMs.txt generator |
 | Client Communication | 10 | Structured workflows + automated reports + expanded notifications + feedback widget + email capture funnel + audit completion email |
 | Client Self-Service | 15 | 24/7 data access, onboarding, plans, cart, order tracking, glossary, questionnaire, ROI upgrade prompts, shareable report permalinks, content pipeline status cards + post-publish performance |
 | AI & Intelligence | 7 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine + context completeness + usage dashboard + AEO page review |
@@ -1578,9 +1602,9 @@ When the user asks to update this document with recent features, follow this pro
 | Architecture | 5 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types |
 | Infrastructure | 7 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3 + integrity verification), E2E tests, job persistence, anomaly deploy guard |
 
-**149 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**151 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **149**. Last updated: March 2026 (content planner: templates, matrices, keyword recommendations, cannibalization detection, export, client review flow).
+Current feature count: **151**. Last updated: March 2026 (content planner + site architecture planner + LLMs.txt generator).
 
 ### Recent Additions (March 2026)
 
