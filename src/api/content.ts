@@ -174,6 +174,18 @@ export const contentMatrices = {
       `/api/content-matrices/${wsId}/check-cannibalization`,
       { keyword },
     ),
+
+  exportMatricesCsv: (wsId: string) =>
+    `/api/export/${wsId}/matrices?format=csv`,
+
+  exportMatricesJson: (wsId: string) =>
+    `/api/export/${wsId}/matrices?format=json`,
+
+  exportTemplatesCsv: (wsId: string) =>
+    `/api/export/${wsId}/templates?format=csv`,
+
+  exportTemplatesJson: (wsId: string) =>
+    `/api/export/${wsId}/templates?format=json`,
 };
 
 // ── Content decay ───────────────────────────────────────────────
