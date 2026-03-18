@@ -10,6 +10,8 @@ import {
   updateMatrixCell,
   deleteMatrix,
 } from '../content-matrices.js';
+import { getKeywordRecommendations } from '../keyword-recommendations.js';
+import { detectMatrixCannibalization, checkKeywordCannibalization } from '../cannibalization-detection.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('routes:content-matrices');
@@ -85,6 +87,69 @@ router.patch('/api/content-matrices/:workspaceId/:matrixId/cells/:cellId', (req,
   } catch (err) {
     log.error({ err }, 'Failed to update matrix cell');
     res.status(500).json({ error: 'Failed to update matrix cell' });
+  }
+});
+
+// Get keyword recommendations for a cell's seed keyword
+router.post('/api/content-matrices/:workspaceId/:matrixId/cells/:cellId/recommend-keywords', async (req, res) => {
+  try {
+    const matrix = getMatrix(req.params.workspaceId, req.params.matrixId);
+    if (!matrix) return res.status(404).json({ error: 'Matrix not found' });
+
+    const cell = matrix.cells.find(c => c.id === req.params.cellId);
+    if (!cell) return res.status(404).json({ error: 'Cell not found' });
+
+    const seedKeyword = req.body.seedKeyword || cell.targetKeyword;
+    const result = await getKeywordRecommendations(req.params.workspaceId, seedKeyword, {
+      useAI: req.body.useAI ?? false,
+      maxCandidates: req.body.maxCandidates ?? 15,
+    });
+    res.json(result);
+  } catch (err) {
+    log.error({ err }, 'Failed to get keyword recommendations');
+    res.status(500).json({ error: 'Failed to get keyword recommendations' });
+  }
+});
+
+// Standalone keyword recommendations (not tied to a specific cell)
+router.post('/api/content-matrices/:workspaceId/recommend-keywords', async (req, res) => {
+  const { seedKeyword } = req.body;
+  if (!seedKeyword) return res.status(400).json({ error: 'seedKeyword is required' });
+
+  try {
+    const result = await getKeywordRecommendations(req.params.workspaceId, seedKeyword, {
+      useAI: req.body.useAI ?? false,
+      maxCandidates: req.body.maxCandidates ?? 15,
+    });
+    res.json(result);
+  } catch (err) {
+    log.error({ err }, 'Failed to get keyword recommendations');
+    res.status(500).json({ error: 'Failed to get keyword recommendations' });
+  }
+});
+
+// Run cannibalization detection for all cells in a matrix
+router.get('/api/content-matrices/:workspaceId/:matrixId/cannibalization', (req, res) => {
+  try {
+    const report = detectMatrixCannibalization(req.params.workspaceId, req.params.matrixId);
+    res.json(report);
+  } catch (err) {
+    log.error({ err }, 'Failed to run cannibalization detection');
+    res.status(500).json({ error: 'Failed to run cannibalization detection' });
+  }
+});
+
+// Check a single keyword for cannibalization (standalone)
+router.post('/api/content-matrices/:workspaceId/check-cannibalization', (req, res) => {
+  const { keyword } = req.body;
+  if (!keyword) return res.status(400).json({ error: 'keyword is required' });
+
+  try {
+    const conflicts = checkKeywordCannibalization(req.params.workspaceId, keyword);
+    res.json({ keyword, conflicts, total: conflicts.length });
+  } catch (err) {
+    log.error({ err }, 'Failed to check keyword cannibalization');
+    res.status(500).json({ error: 'Failed to check keyword cannibalization' });
   }
 });
 

@@ -1,6 +1,6 @@
 // ── Content API (briefs, posts, content requests) ─────────────────
 import { get, post, patch, put, del, getSafe, getOptional } from './client';
-import type { ContentTemplate, ContentMatrix } from '../../shared/types/content';
+import type { ContentTemplate, ContentMatrix, KeywordCandidate } from '../../shared/types/content';
 
 export const contentBriefs = {
   list: (wsId: string) =>
@@ -151,6 +151,29 @@ export const contentMatrices = {
 
   remove: (wsId: string, matrixId: string) =>
     del(`/api/content-matrices/${wsId}/${matrixId}`),
+
+  recommendKeywords: (wsId: string, seedKeyword: string, opts?: { useAI?: boolean; maxCandidates?: number }) =>
+    post<{ seedKeyword: string; candidates: KeywordCandidate[]; recommended: string | null; message?: string }>(
+      `/api/content-matrices/${wsId}/recommend-keywords`,
+      { seedKeyword, ...opts },
+    ),
+
+  recommendKeywordsForCell: (wsId: string, matrixId: string, cellId: string, opts?: { seedKeyword?: string; useAI?: boolean; maxCandidates?: number }) =>
+    post<{ seedKeyword: string; candidates: KeywordCandidate[]; recommended: string | null; message?: string }>(
+      `/api/content-matrices/${wsId}/${matrixId}/cells/${cellId}/recommend-keywords`,
+      opts ?? {},
+    ),
+
+  getCannibalization: (wsId: string, matrixId: string) =>
+    get<{ workspaceId: string; matrixId: string; conflicts: unknown[]; checkedAt: string; summary: { high: number; medium: number; low: number; total: number } }>(
+      `/api/content-matrices/${wsId}/${matrixId}/cannibalization`,
+    ),
+
+  checkKeywordCannibalization: (wsId: string, keyword: string) =>
+    post<{ keyword: string; conflicts: unknown[]; total: number }>(
+      `/api/content-matrices/${wsId}/check-cannibalization`,
+      { keyword },
+    ),
 };
 
 // ── Content decay ───────────────────────────────────────────────
