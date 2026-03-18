@@ -51,7 +51,7 @@ const VAR_COLORS = [
   { bg: 'bg-blue-500/20', text: 'text-blue-300', border: 'border-blue-500/30' },
   { bg: 'bg-green-500/20', text: 'text-green-300', border: 'border-green-500/30' },
   { bg: 'bg-amber-500/20', text: 'text-amber-300', border: 'border-amber-500/30' },
-  { bg: 'bg-purple-500/20', text: 'text-purple-300', border: 'border-purple-500/30' },
+  { bg: 'bg-teal-500/20', text: 'text-teal-300', border: 'border-teal-500/30' },
   { bg: 'bg-cyan-500/20', text: 'text-cyan-300', border: 'border-cyan-500/30' },
 ];
 

@@ -164,7 +164,7 @@ export function MatrixBuilder({ workspaceId, templates, onComplete, onCancel }: 
       return {
         id: cellId,
         variableValues: vars,
-        targetKeyword: cellKeywordOverrides[cellId] ?? keyword,
+        targetKeyword: cellKeywordOverrides[cellId] || keyword,
         plannedUrl: url,
         status: 'planned' as const,
       };
