@@ -6,6 +6,7 @@
 import db from './db/index.js';
 import { getWorkspace } from './workspaces.js';
 import { listContentRequests } from './content-requests.js';
+import { listMatrices } from './content-matrices.js';
 
 // ── SQLite row shape ──
 
@@ -131,6 +132,7 @@ export interface ContentItemROI {
   clicks: number;
   impressions: number;
   trafficValue: number;
+  source?: 'request' | 'matrix';
 }
 
 /**
@@ -202,6 +204,8 @@ export function computeROI(workspaceId: string): ROIData | null {
   const contentItems: ContentItemROI[] = [];
   let totalContentValue = 0;
 
+  const seenKeywords = new Set<string>();
+
   for (const req of deliveredReqs) {
     // Try to match by targetPageSlug or targetPageId
     const slug = req.targetPageSlug;
@@ -211,6 +215,7 @@ export function computeROI(workspaceId: string): ROIData | null {
     const cpc = traffic?.cpc || avgCPC;
     const value = clicks * cpc;
     totalContentValue += value;
+    if (req.targetKeyword) seenKeywords.add(req.targetKeyword.toLowerCase());
 
     contentItems.push({
       requestId: req.id,
@@ -222,8 +227,42 @@ export function computeROI(workspaceId: string): ROIData | null {
       clicks,
       impressions,
       trafficValue: Math.round(value * 100) / 100,
+      source: 'request',
     });
   }
+
+  // Include published matrix cells not already covered by content requests
+  try {
+    const matrices = listMatrices(workspaceId);
+    for (const matrix of matrices) {
+      for (const cell of (matrix.cells || [])) {
+        if (cell.status !== 'published' || !cell.targetKeyword) continue;
+        if (seenKeywords.has(cell.targetKeyword.toLowerCase())) continue;
+        seenKeywords.add(cell.targetKeyword.toLowerCase());
+
+        const slug = cell.plannedUrl;
+        const traffic = slug ? pathTraffic.get(slug) || pathTraffic.get(`/${slug}`) : undefined;
+        const clicks = traffic?.clicks || 0;
+        const impressions = traffic?.impressions || 0;
+        const cpc = traffic?.cpc || avgCPC;
+        const value = clicks * cpc;
+        totalContentValue += value;
+
+        contentItems.push({
+          requestId: cell.id,
+          topic: cell.variableValues ? Object.values(cell.variableValues).join(' × ') : cell.targetKeyword,
+          targetKeyword: cell.targetKeyword,
+          targetPageId: cell.id,
+          targetPageSlug: slug,
+          status: 'published',
+          clicks,
+          impressions,
+          trafficValue: Math.round(value * 100) / 100,
+          source: 'matrix',
+        });
+      }
+    }
+  } catch { /* matrices not available — skip */ }
 
   // Sort by traffic value descending
   contentItems.sort((a, b) => b.trafficValue - a.trafficValue);

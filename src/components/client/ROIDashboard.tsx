@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   DollarSign, BarChart3, Target, TrendingUp,
-  Loader2, Lock, Shield, MousePointerClick, Eye,
+  Loader2, Lock, Shield, MousePointerClick, Eye, Layers,
 } from 'lucide-react';
 import { EmptyState } from '../ui';
 import { fmtMoney, fmtMoneyFull } from '../../utils/formatNumbers';
@@ -28,6 +28,7 @@ interface ContentItemROI {
   clicks: number;
   impressions: number;
   trafficValue: number;
+  source?: 'request' | 'matrix';
 }
 
 interface ROIData {
@@ -251,6 +252,11 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${item.status === 'published' ? 'bg-teal-500/10 text-teal-400' : 'bg-green-500/10 text-green-400'}`}>
                         {item.status === 'published' ? 'Published' : 'Delivered'}
                       </span>
+                      {item.source === 'matrix' && (
+                        <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-400">
+                          <Layers className="w-2.5 h-2.5" /> Content Plan
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
