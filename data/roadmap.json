@@ -181,8 +181,8 @@
           "source": "TOOL_AUDIT §1d",
           "est": "2h",
           "priority": "P2",
-          "notes": "Purple 'Planned' source badge for matrix cell URLs not yet published. Gap analysis subtracts planned URLs.",
-          "status": "pending"
+          "notes": "Shipped — Purple 'Planned' badge, source priority enforcement, published cells excluded from planned. Feature #161.",
+          "status": "done"
         },
         {
           "id": 421,
@@ -190,8 +190,8 @@
           "source": "TOOL_AUDIT §1e",
           "est": "2h",
           "priority": "P2",
-          "notes": "Include matrix cells with status:published + targetPageSlug in content performance view alongside content requests.",
-          "status": "pending"
+          "notes": "Shipped — Published matrix cells included in performance view, deduped by keyword, violet 'Content Plan' badge. Feature #162.",
+          "status": "done"
         },
         {
           "id": 422,
@@ -208,8 +208,8 @@
           "source": "TOOL_AUDIT §3c",
           "est": "2h",
           "priority": "P2",
-          "notes": "Add 'Content Plan' filter to Inbox or fold flagged/review cells into existing Content filter.",
-          "status": "pending"
+          "notes": "Shipped — 'Content Plan' filter in Inbox showing review/flagged cells with flag action. Feature #163.",
+          "status": "done"
         },
         {
           "id": 424,

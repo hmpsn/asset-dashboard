@@ -46,8 +46,8 @@ interface SiteArchitectureResult {
 
 const SOURCE_BADGE: Record<string, { label: string; color: 'green' | 'blue' | 'purple' | 'zinc' }> = {
   existing: { label: 'Live', color: 'green' },
-  planned: { label: 'Planned', color: 'blue' },
-  strategy: { label: 'Strategy', color: 'purple' },
+  planned: { label: 'Planned', color: 'purple' },
+  strategy: { label: 'Strategy', color: 'blue' },
   gap: { label: 'Gap', color: 'zinc' },
 };
 

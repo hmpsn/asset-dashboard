@@ -8,6 +8,7 @@ const router = Router();
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { generateBrief } from '../content-brief.js';
+import { listMatrices } from '../content-matrices.js';
 import {
   listContentRequests,
   getContentRequest,
@@ -225,6 +226,7 @@ export async function handleContentPerformance(workspaceId: string): Promise<{
     daysSincePublish: number;
     gsc: { clicks: number; impressions: number; ctr: number; position: number } | null;
     ga4: { sessions: number; users: number; bounceRate: number; avgEngagementTime: number; conversions: number } | null;
+    source?: 'request' | 'matrix';
   }>;
 }> {
   const ws = getWorkspace(workspaceId);
@@ -232,7 +234,6 @@ export async function handleContentPerformance(workspaceId: string): Promise<{
 
   const requests = listContentRequests(workspaceId);
   const published = requests.filter(r => r.status === 'delivered' || r.status === 'published');
-  if (published.length === 0) return { items: [] };
 
   // Batch-fetch GSC page data (one API call)
   const gscPages: Map<string, { clicks: number; impressions: number; ctr: number; position: number }> = new Map();
@@ -263,9 +264,17 @@ export async function handleContentPerformance(workspaceId: string): Promise<{
   }
 
   const now = Date.now();
-  const items = published.map(r => {
+  const seenKeywords = new Set<string>();
+  const items: Array<{
+    requestId: string; topic: string; targetKeyword: string; targetPageSlug?: string;
+    pageType?: string; status: string; publishedAt?: string; daysSincePublish: number;
+    gsc: { clicks: number; impressions: number; ctr: number; position: number } | null;
+    ga4: { sessions: number; users: number; bounceRate: number; avgEngagementTime: number; conversions: number } | null;
+    source?: 'request' | 'matrix';
+  }> = published.map(r => {
     const slug = r.targetPageSlug;
     const path = slug ? (slug.startsWith('/') ? slug : `/${slug}`) : undefined;
+    if (r.targetKeyword) seenKeywords.add(r.targetKeyword.toLowerCase());
 
     // Match GSC data by slug path
     const gsc = path ? (gscPages.get(path) || null) : null;
@@ -287,8 +296,40 @@ export async function handleContentPerformance(workspaceId: string): Promise<{
       daysSincePublish,
       gsc,
       ga4,
+      source: 'request' as const,
     };
   });
+
+  // Include published matrix cells not already covered by content requests
+  try {
+    const matrices = listMatrices(workspaceId);
+    for (const matrix of matrices) {
+      for (const cell of (matrix.cells || [])) {
+        if (cell.status !== 'published' || !cell.targetKeyword) continue;
+        if (seenKeywords.has(cell.targetKeyword.toLowerCase())) continue;
+        seenKeywords.add(cell.targetKeyword.toLowerCase());
+
+        const slug = cell.plannedUrl;
+        const path = slug ? (slug.startsWith('/') ? slug : `/${slug}`) : undefined;
+        const gsc = path ? (gscPages.get(path) || null) : null;
+        const ga4 = path ? (ga4Pages.get(path) || null) : null;
+
+        items.push({
+          requestId: cell.id,
+          topic: cell.variableValues ? Object.values(cell.variableValues).join(' × ') : cell.targetKeyword,
+          targetKeyword: cell.targetKeyword,
+          targetPageSlug: slug,
+          pageType: undefined,
+          status: 'published',
+          publishedAt: matrix.updatedAt,
+          daysSincePublish: Math.floor((now - new Date(matrix.updatedAt).getTime()) / (1000 * 60 * 60 * 24)),
+          gsc,
+          ga4,
+          source: 'matrix' as const,
+        });
+      }
+    }
+  } catch { /* matrices not available — skip */ }
 
   // Sort by GSC clicks descending, then by days since publish
   items.sort((a, b) => (b.gsc?.clicks || 0) - (a.gsc?.clicks || 0) || a.daysSincePublish - b.daysSincePublish);

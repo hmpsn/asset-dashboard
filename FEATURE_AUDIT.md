@@ -1668,6 +1668,30 @@ When the user asks to update this document with recent features, follow this pro
 
 **Client value:** No confusing empty tabs or blank sections. The portal adapts to what's actually configured.
 
+### 161. Site Architecture — Planned URLs from Matrices
+**What it does:** The Site Architecture Planner now correctly displays planned URLs from content matrices with a purple "Planned" badge. Bug fixes: (1) published matrix cells no longer show as "Planned" — they're already captured as "existing" from Webflow/sitemap; (2) source priority enforced so "existing" pages can't be overwritten by lower-priority sources (planned/strategy/gap).
+**Files:** `server/site-architecture.ts`, `src/components/SiteArchitecture.tsx`
+
+**Agency value:** Site architecture tree shows the full picture — live pages and planned content together.
+
+**Client value:** Visual confirmation that content gaps are being addressed by planned content.
+
+### 162. Content Performance — Matrix-Published Content Tracking
+**What it does:** The Content Performance view now includes published matrix cells alongside content requests. Deduplicates by keyword. Matrix-sourced items show a violet "Content Plan" badge and include GSC/GA4 metrics. Both admin and public (client) endpoints return the combined data.
+**Files:** `server/routes/content-requests.ts` (`handleContentPerformance`), `src/components/ContentPerformance.tsx`
+
+**Agency value:** Performance tracking covers all published content — not just ordered briefs.
+
+**Client value:** See how all published content is performing in search, including content plan pages.
+
+### 163. Inbox — Content Plan Reviews
+**What it does:** The client Inbox now includes a "Content Plan" filter section showing matrix cells with status 'review' or 'flagged'. Clients can flag cells for changes with a comment (calls existing flag endpoint). Review cells show keyword, planned URL, matrix name, variable values, and status badge. Filter button shows count badge when items need attention.
+**Files:** `src/hooks/useClientData.ts` (`ContentPlanReviewCell` type + state), `src/components/client/InboxTab.tsx`, `src/components/ClientDashboard.tsx`
+
+**Agency value:** Content plan reviews surface in the Inbox alongside other action items — no separate workflow needed.
+
+**Client value:** Review and flag content plan items from the same Inbox used for SEO changes and requests.
+
 ---
 
 ## Summary
@@ -1676,7 +1700,7 @@ When the user asks to update this document with recent features, follow this pro
 |----------|:---:|---|
 | SEO & Technical | 16 | Audit, fix, and optimize faster than manual tools + AEO trust signals + change impact tracking + content decay detection + site architecture planner |
 | Analytics & Tracking | 7 | Unified data view replaces platform-hopping + AI time-saved tracking |
-| Content & Strategy | 24 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar + content templates + keyword pre-assignment + content matrices + keyword recommendations + cannibalization detection + content planner export + client review flow + LLMs.txt generator |
+| Content & Strategy | 27 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar + content templates + keyword pre-assignment + content matrices + keyword recommendations + cannibalization detection + content planner export + client review flow + LLMs.txt generator |
 | Client Communication | 10 | Structured workflows + automated reports + expanded notifications + feedback widget + email capture funnel + audit completion email |
 | Client Self-Service | 18 | 24/7 data access, onboarding, plans, cart, order tracking, glossary, questionnaire, ROI upgrade prompts, shareable report permalinks, content pipeline status cards + post-publish performance |
 | AI & Intelligence | 7 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine + context completeness + usage dashboard + AEO page review |
@@ -1688,9 +1712,9 @@ When the user asks to update this document with recent features, follow this pro
 | Architecture | 5 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types |
 | Infrastructure | 7 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3 + integrity verification), E2E tests, job persistence, anomaly deploy guard |
 
-**160 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**163 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **160**. Last updated: March 2026 (content planner integration P1s + client portal noise reduction).
+Current feature count: **163**. Last updated: March 2026 (content planner integration P2s — site architecture, content performance, inbox reviews).
 
 ### Recent Additions (March 2026)
 

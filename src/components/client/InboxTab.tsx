@@ -1,15 +1,17 @@
 import { useState } from 'react';
-import { Inbox, ClipboardCheck, MessageSquare, FileText } from 'lucide-react';
+import { Inbox, ClipboardCheck, MessageSquare, FileText, Layers, Flag, ExternalLink } from 'lucide-react';
 import { EmptyState } from '../ui';
 import { ApprovalsTab } from './ApprovalsTab';
 import { RequestsTab } from './RequestsTab';
 import { ContentTab } from './ContentTab';
 import type { Tier } from '../ui';
-import type { ClientContentRequest, ClientRequest, ApprovalBatch, ClientTab } from './types';
+import type { ClientContentRequest, ClientRequest, ApprovalBatch } from './types';
+import type { ContentPlanReviewCell } from '../../hooks/useClientData';
 import { useBetaMode } from './BetaContext';
 import { STUDIO_NAME } from '../../constants';
+import { post } from '../../api/client';
 
-type InboxFilter = 'all' | 'approvals' | 'requests' | 'content';
+type InboxFilter = 'all' | 'approvals' | 'requests' | 'content' | 'content-plan';
 
 interface InboxTabProps {
   workspaceId: string;
@@ -46,6 +48,8 @@ interface InboxTabProps {
   pricingConfirming: boolean;
   // Shared
   setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
+  // Content Plan review cells
+  contentPlanReviewCells?: ContentPlanReviewCell[];
   // Which section to show initially (for deep-linking from Overview actions)
   initialFilter?: InboxFilter;
 }
@@ -56,24 +60,45 @@ export function InboxTab({
   requests, requestsLoading, clientUser, loadRequests,
   contentRequests, setContentRequests, briefPrice, fullPostPrice, fmtPrice, setPricingModal, pricingConfirming,
   setToast,
+  contentPlanReviewCells = [],
   initialFilter,
 }: InboxTabProps) {
   const betaMode = useBetaMode();
   const [filter, setFilter] = useState<InboxFilter>(initialFilter || 'all');
+  const [flaggingCell, setFlaggingCell] = useState<string | null>(null);
+  const [flagComment, setFlagComment] = useState('');
+  const [flagSubmitting, setFlagSubmitting] = useState(false);
 
   const pendingRequests = requests.filter(r => r.status !== 'completed' && r.status !== 'closed').length;
   const contentReviews = contentRequests.filter(r => r.status === 'client_review').length;
+  const planReviewCount = contentPlanReviewCells.length;
 
   const filters: { id: InboxFilter; label: string; icon: typeof Inbox; count?: number }[] = [
     { id: 'all', label: 'All', icon: Inbox },
     { id: 'approvals', label: 'SEO Changes', icon: ClipboardCheck, count: pendingApprovals || undefined },
     { id: 'requests', label: 'Requests', icon: MessageSquare, count: pendingRequests || undefined },
     ...(!betaMode ? [{ id: 'content' as InboxFilter, label: 'Content', icon: FileText, count: contentReviews || undefined }] : []),
+    ...(planReviewCount > 0 ? [{ id: 'content-plan' as InboxFilter, label: 'Content Plan', icon: Layers, count: planReviewCount }] : []),
   ];
 
   const showApprovals = filter === 'all' || filter === 'approvals';
   const showRequests = filter === 'all' || filter === 'requests';
   const showContent = !betaMode && (filter === 'all' || filter === 'content');
+  const showContentPlan = filter === 'all' || filter === 'content-plan';
+
+  const handleFlagCell = async (cell: ContentPlanReviewCell) => {
+    if (!flagComment.trim()) return;
+    setFlagSubmitting(true);
+    try {
+      await post(`/api/public/content-plan/${workspaceId}/${cell.matrixId}/cells/${cell.cellId}/flag`, { comment: flagComment.trim() });
+      setToast({ message: 'Feedback submitted — your team will review it.', type: 'success' });
+      setFlaggingCell(null);
+      setFlagComment('');
+    } catch {
+      setToast({ message: 'Failed to submit feedback. Please try again.', type: 'error' });
+    }
+    setFlagSubmitting(false);
+  };
 
   const hasApprovals = approvalBatches.length > 0;
   const hasRequests = requests.length > 0;
@@ -161,6 +186,93 @@ export function InboxTab({
         </div>
       )}
 
+      {/* Content Plan review section */}
+      {showContentPlan && planReviewCount > 0 && (
+        <div>
+          {filter === 'all' && (
+            <div className="flex items-center gap-2 mb-3 mt-2">
+              <Layers className="w-4 h-4 text-violet-400" />
+              <span className="text-sm font-medium text-zinc-300">Content Plan</span>
+              <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20">{planReviewCount} needs review</span>
+            </div>
+          )}
+          <div className="space-y-2">
+            {contentPlanReviewCells.map(cell => {
+              const isFlagging = flaggingCell === cell.cellId;
+              const isFlagged = cell.status === 'flagged';
+              return (
+                <div key={cell.cellId} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+                  <div className="px-5 py-4">
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-medium text-zinc-200">{cell.targetKeyword}</span>
+                          <span className={`text-[11px] px-1.5 py-0.5 rounded border ${
+                            isFlagged
+                              ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                              : 'bg-violet-500/10 border-violet-500/30 text-violet-400'
+                          }`}>
+                            {isFlagged ? 'Flagged' : 'Needs Review'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 text-[11px] text-zinc-500">
+                          <span className="text-zinc-400">{cell.matrixName}</span>
+                          {cell.plannedUrl && (
+                            <span className="flex items-center gap-0.5 text-zinc-500">
+                              <ExternalLink className="w-2.5 h-2.5" /> {cell.plannedUrl}
+                            </span>
+                          )}
+                          {cell.variableValues && (
+                            <span>{Object.values(cell.variableValues).join(' × ')}</span>
+                          )}
+                        </div>
+                      </div>
+                      {!isFlagged && !isFlagging && (
+                        <button
+                          onClick={() => setFlaggingCell(cell.cellId)}
+                          className="flex items-center gap-1 px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-[11px] font-medium text-zinc-300 transition-colors"
+                        >
+                          <Flag className="w-3 h-3" /> Request Changes
+                        </button>
+                      )}
+                    </div>
+                    {isFlagging && (
+                      <div className="mt-3 space-y-2">
+                        <textarea
+                          value={flagComment}
+                          onChange={e => setFlagComment(e.target.value)}
+                          placeholder="Describe what you'd like changed..."
+                          rows={2}
+                          className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-violet-500 resize-none"
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleFlagCell(cell)}
+                            disabled={flagSubmitting || !flagComment.trim()}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 rounded-lg text-[11px] font-medium transition-colors"
+                          >
+                            {flagSubmitting ? 'Submitting...' : 'Submit Feedback'}
+                          </button>
+                          <button
+                            onClick={() => { setFlaggingCell(null); setFlagComment(''); }}
+                            className="px-3 py-1.5 text-[11px] text-zinc-400 hover:text-zinc-200 transition-colors"
+                          >Cancel</button>
+                        </div>
+                      </div>
+                    )}
+                    {isFlagged && (
+                      <div className="mt-2 text-[11px] text-amber-400/70 flex items-center gap-1">
+                        <Flag className="w-3 h-3" /> You've flagged this — your team is reviewing your feedback.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Content section */}
       {showContent && (hasContent || filter !== 'all') && (
         <div>
@@ -197,7 +309,10 @@ export function InboxTab({
       {!betaMode && filter === 'content' && contentRequests.length === 0 && (
         <EmptyState icon={FileText} title="No content requests yet." description={effectiveTier === 'free' ? 'Upgrade to Growth to request content briefs and blog posts.' : `Request content from the Strategy tab or ask ${STUDIO_NAME}.`} />
       )}
-      {filter === 'all' && !hasApprovals && !hasRequests && contentRequests.length === 0 && !approvalsLoading && !requestsLoading && (
+      {filter === 'content-plan' && planReviewCount === 0 && (
+        <EmptyState icon={Layers} title="No content plan items to review." description="When your team sends content for review, items will appear here." />
+      )}
+      {filter === 'all' && !hasApprovals && !hasRequests && contentRequests.length === 0 && planReviewCount === 0 && !approvalsLoading && !requestsLoading && (
         <EmptyState icon={Inbox} title="Your inbox is empty." description={betaMode ? `SEO changes and requests will appear here as ${STUDIO_NAME} works on your site.` : `SEO changes, requests, and content items will appear here as ${STUDIO_NAME} works on your site.`} />
       )}
     </div>

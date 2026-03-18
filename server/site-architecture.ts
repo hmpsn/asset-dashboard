@@ -92,10 +92,13 @@ function insertIntoTree(
     }
 
     if (isLast) {
-      // Merge data into existing node
+      // Merge data into existing node — 'existing' source always wins
       child.name = data.name || child.name;
       child.pageType = data.pageType || child.pageType;
-      child.source = data.source || child.source;
+      const SOURCE_RANK: Record<string, number> = { existing: 0, planned: 1, strategy: 2, gap: 3 };
+      const currentRank = SOURCE_RANK[child.source] ?? 3;
+      const newRank = SOURCE_RANK[data.source || 'gap'] ?? 3;
+      if (newRank < currentRank) child.source = data.source || child.source;
       child.keyword = data.keyword || child.keyword;
       child.seoTitle = data.seoTitle || child.seoTitle;
       child.seoDescription = data.seoDescription || child.seoDescription;
@@ -235,11 +238,11 @@ export async function buildSiteArchitecture(workspaceId: string): Promise<SiteAr
     }
   }
 
-  // 2. Planned pages from content matrices
+  // 2. Planned pages from content matrices (only non-published — published cells are already 'existing')
   const matrices = listMatrices(workspaceId);
   for (const matrix of matrices) {
     for (const cell of matrix.cells) {
-      if (cell.plannedUrl) {
+      if (cell.plannedUrl && cell.status !== 'published') {
         const urlPath = cell.plannedUrl.startsWith('/') ? cell.plannedUrl : `/${cell.plannedUrl}`;
         insertIntoTree(root, urlPath, {
           name: cell.targetKeyword || segmentToName(urlPath.split('/').pop() || ''),

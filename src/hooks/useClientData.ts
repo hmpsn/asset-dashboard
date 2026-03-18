@@ -9,6 +9,16 @@ import type {
   SearchComparison, GA4Comparison, GA4NewVsReturning, GA4OrganicOverview, GA4LandingPage,
 } from '../components/client/types';
 
+export interface ContentPlanReviewCell {
+  cellId: string;
+  matrixId: string;
+  matrixName: string;
+  targetKeyword: string;
+  plannedUrl?: string;
+  status: string;
+  variableValues?: Record<string, string>;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function useClientData(_workspaceId: string) {
   const [ws, setWs] = useState<WorkspaceInfo | null>(null);
@@ -50,6 +60,7 @@ export function useClientData(_workspaceId: string) {
   const [sectionErrors, setSectionErrors] = useState<Record<string, string>>({});
   const [contentPlanSummary, setContentPlanSummary] = useState<{ totalCells: number; publishedCells: number; reviewCells: number; approvedCells: number; inProgressCells: number; matrixCount: number } | null>(null);
   const [contentPlanKeywords, setContentPlanKeywords] = useState<Map<string, string>>(new Map());
+  const [contentPlanReviewCells, setContentPlanReviewCells] = useState<ContentPlanReviewCell[]>([]);
 
   const setSectionError = useCallback((key: string, msg: string) => {
     setSectionErrors(prev => ({ ...prev, [key]: msg }));
@@ -167,7 +178,7 @@ export function useClientData(_workspaceId: string) {
         setRequestedTopics(new Set(reqs.map(r => r.targetKeyword)));
       }
     }).catch(() => setSectionError('content', 'Unable to load content requests'));
-    getSafe<Array<{ cells?: Array<{ status: string; targetKeyword?: string }> }>>(`/api/public/content-plan/${data.id}`, []).then((plans) => {
+    getSafe<Array<{ id: string; name: string; cells?: Array<{ id: string; status: string; targetKeyword?: string; plannedUrl?: string; variableValues?: Record<string, string> }> }>>(`/api/public/content-plan/${data.id}`, []).then((plans) => {
       if (Array.isArray(plans)) {
         const allCells = plans.flatMap(p => p.cells || []);
         setContentPlanSummary({
@@ -183,6 +194,24 @@ export function useClientData(_workspaceId: string) {
           if (c.targetKeyword) kwMap.set(c.targetKeyword.toLowerCase(), c.status);
         }
         setContentPlanKeywords(kwMap);
+        // Store review/flagged cells for Inbox
+        const reviewCells: ContentPlanReviewCell[] = [];
+        for (const plan of plans) {
+          for (const c of (plan.cells || [])) {
+            if (c.status === 'review' || c.status === 'flagged') {
+              reviewCells.push({
+                cellId: c.id,
+                matrixId: plan.id,
+                matrixName: plan.name,
+                targetKeyword: c.targetKeyword || '',
+                plannedUrl: c.plannedUrl,
+                status: c.status,
+                variableValues: c.variableValues,
+              });
+            }
+          }
+        }
+        setContentPlanReviewCells(reviewCells);
       }
     }).catch(() => {});
   }, [loadSearchData, loadGA4Data, loadApprovals, loadRequests, clearSectionError, setSectionError]);
@@ -260,6 +289,7 @@ export function useClientData(_workspaceId: string) {
     sectionErrors, setSectionErrors,
     contentPlanSummary, setContentPlanSummary,
     contentPlanKeywords, setContentPlanKeywords,
+    contentPlanReviewCells, setContentPlanReviewCells,
     setSectionError,
     clearSectionError,
     loadDashboardData,

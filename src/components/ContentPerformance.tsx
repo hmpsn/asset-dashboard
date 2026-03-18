@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   BarChart3, MousePointer, Eye, Target,
-  Clock, FileText, Loader2, ChevronDown, ChevronRight, Users,
+  Clock, FileText, Loader2, ChevronDown, ChevronRight, Users, Layers,
 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from 'recharts';
 import { PageHeader, SectionCard, EmptyState, Badge } from './ui';
@@ -33,6 +33,7 @@ interface ContentItem {
   daysSincePublish: number;
   gsc: GscMetrics | null;
   ga4: GA4Metrics | null;
+  source?: 'request' | 'matrix';
 }
 
 interface TrendPoint {
@@ -270,6 +271,11 @@ export function ContentPerformance({ workspaceId }: Props) {
                           </span>
                         )}
                         <Badge label={item.status} color={item.status === 'published' ? 'emerald' : 'blue'} />
+                        {item.source === 'matrix' && (
+                          <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20">
+                            <Layers className="w-2.5 h-2.5" /> Content Plan
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-3 mt-0.5">
                         <span className="text-[11px] text-zinc-500">{item.targetKeyword}</span>
