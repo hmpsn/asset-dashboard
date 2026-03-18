@@ -67,7 +67,7 @@ export interface MatrixCell {
   plannedUrl: string;
   briefId?: string;
   postId?: string;
-  status: 'planned' | 'keyword_optimized' | 'brief_generated' | 'client_review' | 'approved' | 'draft' | 'published';
+  status: 'planned' | 'keyword_validated' | 'brief_generated' | 'review' | 'approved' | 'draft' | 'published';
   keywordValidation?: {
     volume: number;
     difficulty: number;

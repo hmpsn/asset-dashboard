@@ -29,7 +29,7 @@ const SERVICES = ['Roofing', 'Plumbing', 'HVAC', 'Electrical', 'Painting', 'Land
 
 function makeCells(): MatrixCell[] {
   const cells: MatrixCell[] = [];
-  const statuses: MatrixCell['status'][] = ['planned', 'keyword_optimized', 'brief_generated', 'client_review', 'approved', 'draft', 'published'];
+  const statuses: MatrixCell['status'][] = ['planned', 'keyword_validated', 'brief_generated', 'review', 'approved', 'draft', 'published'];
   let idx = 0;
   for (const service of SERVICES) {
     for (const city of CITIES) {
@@ -76,7 +76,7 @@ export const MOCK_MATRIX: ContentMatrix = {
     planned: cells.filter(c => c.status === 'planned').length,
     briefGenerated: cells.filter(c => c.status === 'brief_generated').length,
     drafted: cells.filter(c => c.status === 'draft').length,
-    reviewed: cells.filter(c => ['client_review', 'approved'].includes(c.status)).length,
+    reviewed: cells.filter(c => ['review', 'approved'].includes(c.status)).length,
     published: cells.filter(c => c.status === 'published').length,
   },
   createdAt: new Date().toISOString(),

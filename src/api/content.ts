@@ -122,7 +122,7 @@ export const contentTemplates = {
     post<ContentTemplate>(`/api/content-templates/${wsId}`, body),
 
   update: (wsId: string, templateId: string, body: Partial<ContentTemplate>) =>
-    patch<ContentTemplate>(`/api/content-templates/${wsId}/${templateId}`, body),
+    put<ContentTemplate>(`/api/content-templates/${wsId}/${templateId}`, body),
 
   remove: (wsId: string, templateId: string) =>
     del(`/api/content-templates/${wsId}/${templateId}`),

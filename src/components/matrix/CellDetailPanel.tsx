@@ -17,9 +17,9 @@ interface CellDetailPanelProps {
 
 const STATUS_CONFIG: Record<MatrixCell['status'], { label: string; color: 'zinc' | 'blue' | 'amber' | 'purple' | 'teal' | 'orange' | 'green'; icon: string }> = {
   planned: { label: 'Planned', color: 'zinc', icon: '\u25CB' },
-  keyword_optimized: { label: 'Keyword Optimized', color: 'blue', icon: '\u25D0' },
+  keyword_validated: { label: 'Keyword Optimized', color: 'blue', icon: '\u25D0' },
   brief_generated: { label: 'Brief Generated', color: 'amber', icon: '\u25D1' },
-  client_review: { label: 'Client Review', color: 'blue', icon: '\u25D1' },
+  review: { label: 'Client Review', color: 'blue', icon: '\u25D1' },
   approved: { label: 'Approved', color: 'teal', icon: '\u2713' },
   draft: { label: 'Draft', color: 'orange', icon: '\u25D0' },
   published: { label: 'Published', color: 'green', icon: '\u25CF' },
@@ -212,7 +212,7 @@ export function CellDetailPanel({
             </button>
           )}
 
-          {onSendReview && cell.briefId && cell.status !== 'client_review' && cell.status !== 'published' && (
+          {onSendReview && cell.briefId && cell.status !== 'review' && cell.status !== 'published' && (
             <button
               onClick={() => onSendReview(cell.id)}
               className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-teal-600/20 border border-teal-500/30 text-xs text-teal-300 hover:bg-teal-600/30 transition-colors font-medium"

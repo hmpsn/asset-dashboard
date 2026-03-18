@@ -16,9 +16,9 @@ interface MatrixProgressViewProps {
 
 const STATUS_DISPLAY: Record<MatrixCell['status'], { label: string; icon: typeof CheckCircle2; color: string; badgeColor: 'zinc' | 'blue' | 'amber' | 'purple' | 'teal' | 'orange' | 'green' }> = {
   planned:           { label: 'Planned',       icon: Clock,        color: 'text-zinc-500',   badgeColor: 'zinc' },
-  keyword_optimized: { label: 'In Progress',   icon: Clock,        color: 'text-blue-400',   badgeColor: 'blue' },
+  keyword_validated:  { label: 'In Progress',   icon: Clock,        color: 'text-blue-400',   badgeColor: 'blue' },
   brief_generated:   { label: 'Brief Ready',   icon: FileText,     color: 'text-amber-400',  badgeColor: 'amber' },
-  client_review:     { label: 'Your Review',   icon: Eye,          color: 'text-blue-400',   badgeColor: 'blue' },
+  review:            { label: 'Your Review',   icon: Eye,          color: 'text-blue-400',   badgeColor: 'blue' },
   approved:          { label: 'Approved',       icon: CheckCircle2, color: 'text-teal-400',   badgeColor: 'teal' },
   draft:             { label: 'In Production',  icon: PenTool,      color: 'text-orange-400', badgeColor: 'orange' },
   published:         { label: 'Published',      icon: CheckCircle2, color: 'text-green-400',  badgeColor: 'green' },
@@ -111,7 +111,7 @@ export function MatrixProgressView({ matrix, onCellPreview, onFlagCell, onDownlo
 
   const completedCount = matrix.cells.filter(c => ['approved', 'draft', 'published'].includes(c.status)).length;
   const publishedCount = matrix.cells.filter(c => c.status === 'published').length;
-  const reviewCount = matrix.cells.filter(c => c.status === 'client_review').length;
+  const reviewCount = matrix.cells.filter(c => c.status === 'review').length;
   const progressPercent = matrix.cells.length > 0 ? Math.round((completedCount / matrix.cells.length) * 100) : 0;
 
   const dim0 = matrix.dimensions[0];
