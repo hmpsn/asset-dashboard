@@ -65,8 +65,8 @@ export const MOCK_MATRIX: ContentMatrix = {
   name: 'Houston Area Service Pages',
   templateId: 'tpl_001',
   dimensions: [
-    { name: 'service', label: 'Service', values: SERVICES },
-    { name: 'city', label: 'City', values: CITIES },
+    { variableName: 'service', label: 'Service', values: SERVICES },
+    { variableName: 'city', label: 'City', values: CITIES },
   ],
   urlPattern: '/services/{city}/{service}',
   keywordPattern: '{service} in {city}',

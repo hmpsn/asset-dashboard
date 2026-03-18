@@ -54,8 +54,8 @@ export interface ContentMatrix {
 }
 
 export interface MatrixDimension {
-  name: string;
-  label: string;
+  variableName: string;
+  label?: string;
   values: string[];
 }
 
@@ -76,8 +76,8 @@ export interface MatrixCell {
   };
   keywordCandidates?: KeywordCandidate[];
   recommendedKeyword?: string;
-  flagged?: boolean;
-  flagComment?: string;
+  clientFlag?: string;
+  clientFlaggedAt?: string;
 }
 
 export interface KeywordCandidate {

@@ -78,7 +78,7 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
     for (const row of dim0.values) {
       for (const col of dim1.values) {
         const cell = filteredCells.find(c =>
-          c.variableValues[dim0.name] === row && c.variableValues[dim1.name] === col
+          c.variableValues[dim0.variableName] === row && c.variableValues[dim1.variableName] === col
         );
         ids.push(cell ? cell.id : null);
       }
@@ -116,7 +116,7 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
   const getCellForGrid = (rowVal: string, colVal: string): MatrixCell | undefined => {
     if (!dim0 || !dim1) return undefined;
     return filteredCells.find(c =>
-      c.variableValues[dim0.name] === rowVal && c.variableValues[dim1.name] === colVal
+      c.variableValues[dim0.variableName] === rowVal && c.variableValues[dim1.variableName] === colVal
     );
   };
 
@@ -146,7 +146,7 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
               </span>
             </div>
           )}
-          {cell.flagged && (
+          {cell.clientFlag && (
             <Flag className="w-2.5 h-2.5 text-amber-400 mt-0.5" />
           )}
         </div>
@@ -284,7 +284,7 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
               <thead>
                 <tr>
                   <th className="px-3 py-2 text-[11px] font-semibold text-zinc-500 uppercase tracking-wider border-b border-zinc-800 bg-zinc-950 sticky left-0 z-10">
-                    {dim0.label} / {dim1.label}
+                    {dim0.label ?? dim0.variableName} / {dim1.label ?? dim1.variableName}
                   </th>
                   {dim1.values.map(col => (
                     <th key={col} className="px-3 py-2 text-[11px] font-semibold text-zinc-300 border-b border-zinc-800 bg-zinc-950 text-center min-w-[120px]">
@@ -339,7 +339,7 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
                       </span>
                     </div>
                   )}
-                  {cell.flagged && <Flag className="w-3 h-3 text-amber-400" />}
+                  {cell.clientFlag && <Flag className="w-3 h-3 text-amber-400" />}
                 </div>
               );
             })}

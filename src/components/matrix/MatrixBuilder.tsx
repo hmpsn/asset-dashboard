@@ -134,19 +134,19 @@ export function MatrixBuilder({ workspaceId, templates, onComplete, onCancel }: 
     if (vars.length === 0) return [];
 
     const dimensions = vars.map(v => ({
-      name: v.name,
+      variableName: v.name,
       values: dimensionValues[v.name] ?? [],
     }));
 
     // Cross-product
-    function crossProduct(dims: { name: string; values: string[] }[]): Record<string, string>[] {
+    function crossProduct(dims: { variableName: string; values: string[] }[]): Record<string, string>[] {
       if (dims.length === 0) return [{}];
       const [first, ...rest] = dims;
       const restCombos = crossProduct(rest);
       const results: Record<string, string>[] = [];
       for (const val of first.values) {
         for (const combo of restCombos) {
-          results.push({ [first.name]: val, ...combo });
+          results.push({ [first.variableName]: val, ...combo });
         }
       }
       return results;
@@ -196,7 +196,7 @@ export function MatrixBuilder({ workspaceId, templates, onComplete, onCancel }: 
     if (!selectedTemplate || !matrixName.trim()) return;
 
     const dimensions: MatrixDimension[] = selectedTemplate.variables.map(v => ({
-      name: v.name,
+      variableName: v.name,
       label: v.label,
       values: dimensionValues[v.name] ?? [],
     }));
