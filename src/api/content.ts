@@ -14,6 +14,16 @@ export const contentBriefs = {
 
   remove: (wsId: string, briefId: string) =>
     del(`/api/content-briefs/${wsId}/${briefId}`),
+
+  validateKeyword: (wsId: string, keyword: string) =>
+    post<{ keyword: string; valid: boolean; source: string; metrics: { volume: number; difficulty: number; cpc: number; validatedAt: string } | null; warnings?: string[]; message?: string }>(
+      `/api/content-briefs/${wsId}/validate-keyword`, { keyword },
+    ),
+
+  validateKeywords: (wsId: string, keywords: string[]) =>
+    post<{ results: { keyword: string; valid: boolean; source: string; metrics: { volume: number; difficulty: number; cpc: number; validatedAt: string } | null; warnings?: string[] }[]; message?: string }>(
+      `/api/content-briefs/${wsId}/validate-keywords`, { keywords },
+    ),
 };
 
 export const contentPosts = {

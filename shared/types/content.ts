@@ -35,6 +35,16 @@ export interface ContentBrief {
   // Real SERP data (v5) — actual PAA questions and top results from Google
   realPeopleAlsoAsk?: string[];
   realTopResults?: { position: number; title: string; url: string }[];
+  // Keyword pre-assignment (v6) — template/matrix keyword locking
+  keywordLocked?: boolean;
+  keywordSource?: 'manual' | 'semrush' | 'gsc' | 'matrix' | 'template';
+  keywordValidation?: {
+    volume: number;
+    difficulty: number;
+    cpc: number;
+    validatedAt: string;
+  };
+  templateId?: string;
 }
 
 export interface PostSection {
