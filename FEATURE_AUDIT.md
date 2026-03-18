@@ -1483,13 +1483,114 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 143. Content Templates (Scalable Content Planning)
+**What it does:** Reusable page structure templates with named variables, ordered sections (heading pattern + guidance + word count target), URL/keyword patterns, CMS field mapping, and tone/style overrides. Full CRUD backend with SQLite persistence (migration 014). Templates define page types (blog, landing, service, location, product, pillar, resource, provider-profile, procedure-guide, pricing-page). Duplicate existing templates as starting points for new ones.
+
+**Agency value:** Define a page structure once (e.g., "Service Page" or "Location Page"), then stamp out dozens of briefs that follow the same proven outline. Ensures consistency across content at scale.
+
+**Client value:** Content deliverables follow a professional, repeatable structure. Every page type meets the same quality standard regardless of who writes it.
+
+**Mutual:** Templates eliminate the "blank page" problem for content production. The agency builds faster; the client gets more consistent results.
+
+---
+
+### 144. Keyword Pre-Assignment & Validation
+**What it does:** Extends brief generation to accept pre-locked keywords from templates or matrices. Keywords validated against SEMRush — returning volume, difficulty, CPC with warnings for low volume (<10/mo) or high difficulty (>85). Single and bulk validation endpoints. Non-blocking: if SEMRush unavailable, keywords accepted without validation. Brief tracks keyword source (manual, semrush, gsc, matrix, template) and validation metadata. Template constraints (section structure, tone override, title/meta patterns) injected into AI brief prompt.
+
+**Agency value:** No more guessing whether a keyword is worth targeting. SEMRush validation surfaces volume/difficulty before committing to a brief. Pre-locked keywords from matrices guarantee every piece targets a deliberate keyword.
+
+**Client value:** Every content brief is backed by real keyword data. Validation metrics build confidence in the content strategy.
+
+**Mutual:** Keyword validation catches bad targets before production starts. One API call prevents hours of wasted content work on zero-volume keywords.
+
+---
+
+### 145. Content Matrices (Bulk Content Planning Grids)
+**What it does:** Matrices connect a template to concrete content cells via cartesian product of dimensions (e.g., Service × City = 6 cells for 2 services × 3 cities). Each cell gets auto-generated target keyword and planned URL from patterns with variable substitution. Per-cell status tracking: planned → keyword_validated → brief_generated → draft → review → approved → published. Cells individually updatable. Matrix stats auto-computed. Full CRUD backend with SQLite persistence (migration 016). 12 integration tests.
+
+**Agency value:** Plan 50+ pages in one action instead of creating 50 separate briefs. The matrix is the production manifest — see at a glance which pages exist, which need briefs, which are in review, and which are published.
+
+**Client value:** Transparent view of the entire content plan with clear status per page. No wondering "did they write the Dallas plumbing page yet?"
+
+**Mutual:** Turns content production from ad-hoc requests into a structured, trackable manufacturing pipeline.
+
+---
+
+### 146. Smart Keyword Recommendations
+**What it does:** Given a seed keyword (from a matrix cell pattern or manual input), fetches SEMRush related keywords, scores each by opportunity (40% log-scaled volume + 60% inverse difficulty), and returns ranked candidates with a recommended pick. Optional AI re-ranking via GPT-4.1-nano that considers business context, commercial intent, and specificity. Non-blocking fallback when SEMRush is unconfigured. Two endpoints: standalone (any seed keyword) and per-cell (auto-uses cell's target keyword as seed).
+
+**Agency value:** No more guessing which keyword variant to target. The system surfaces the best option from real SEMRush data, ranked by achievability. AI ranking adds business-relevance awareness when keyword strategy context exists.
+
+**Client value:** Every content page targets an evidence-backed keyword with the best volume-to-difficulty ratio for their business.
+
+**Mutual:** Removes the manual research step from keyword selection. What used to take 15 minutes per keyword is now a one-click API call.
+
+---
+
+### 147. Cannibalization Detection
+**What it does:** Detects keyword overlap between matrix cells and existing pages (from keyword strategy pageMap), within the same matrix, and across different matrices. Three severity levels: high (exact match after normalization), medium (word subset overlap — all words of one keyword appear in the other), low (60%+ Jaccard word overlap). Symmetric deduplication prevents A↔B duplicates. Full matrix report endpoint returns conflict list with summary counts. Single-keyword check endpoint for pre-validation before adding to a cell.
+
+**Agency value:** Catches the #1 SEO mistake in scaled content — two pages targeting the same keyword. Detects it before a single brief is generated, saving hours of wasted production work.
+
+**Client value:** No duplicate content competing against itself in search results. Every page has a unique keyword lane.
+
+**Mutual:** Automated quality gate that prevents the most common content strategy error at scale.
+
+---
+
+### 148. Content Planner Export (CSV/JSON)
+**What it does:** Adds matrix cells and content template export to the existing data export system. Matrix export flattens all cells across all matrices into one CSV/JSON with columns: matrix name, cell keyword, planned URL, status, variable values, SEMRush metrics (volume/difficulty/CPC), linked brief and post IDs. Template export includes metadata: page type, URL/keyword patterns, section count, variable count. Both formats available via `?format=csv` or `?format=json` query parameter.
+
+**Agency value:** Export the content plan as a CSV to share with writers, clients, or import into project management tools. Template export documents the content architecture.
+
+**Client value:** Downloadable content plan they can review offline or share with stakeholders.
+
+**Mutual:** Makes the content planner's data portable and audit-friendly.
+
+---
+
+### 149. Client Review Flow (Tiered Content Plan Review)
+**What it does:** Three-layer review system for scaled content plans. Layer 1: Admin sends template for client approval via approval batch — client sees page type, sections, tone, and URL patterns. Layer 2: Admin selects 2-3 sample cells to send for client review — cells move to "review" status. Layer 3: After samples approved, batch-approve all remaining cells in one click. Clients get a read-only matrix progress view showing every cell's status, keyword, planned URL, and whether briefs/posts exist. Clients can flag individual cells for changes with comments (sets `clientFlag` + `clientFlaggedAt` on the cell). Six API endpoints: 3 public (progress view, single matrix detail, cell flagging) and 3 admin (send template review, send samples, batch approve).
+
+**Agency value:** Review 54 pages in ~30 minutes instead of ~5 hours. Template approval + sample review + batch approve eliminates per-page review overhead while maintaining quality control.
+
+**Client value:** Clear visibility into the entire content plan with the ability to spot-check any page and flag specific concerns without blocking production on the rest.
+
+**Mutual:** Scales the review process proportionally — more pages don't mean more review time. The 80/20 rule: review the template and a few samples, trust the system for the rest.
+
+---
+
+### 150. Site Architecture Planner
+**What it does:** Builds a complete URL tree for a workspace by combining three data sources: existing pages (Webflow API static + CMS sitemap discovery), planned pages (content matrix cells), and strategy pages (keyword map assignments). Each node tracks source type (existing/planned/strategy/gap), keyword, SEO metadata, and matrix linkage. Detects architecture gaps — intermediate URL paths with child pages but no hub/landing page (e.g., `/services/` has children but no page). Reports depth distribution, orphan pages, and gap priority. Single GET endpoint returns the full tree structure for frontend visualization.
+**Files:** `server/site-architecture.ts`, `server/routes/site-architecture.ts`
+
+**Agency value:** Instant bird's-eye view of the site's URL hierarchy showing where content exists, what's planned, and where gaps need filling — replaces manual spreadsheet URL planning.
+
+**Client value:** Visual proof that the content plan covers the full site architecture with no orphan pages or missing hub pages.
+
+**Mutual:** Ensures every planned page fits into a coherent URL hierarchy before any content is written.
+
+---
+
+### 151. LLMs.txt Generator
+**What it does:** Generates an LLMs.txt file — a machine-readable site overview following the emerging standard for AI consumption. Pulls data from workspace config (name, domain, business context), all published pages (Webflow static + CMS), keyword strategy enrichment, and planned content from matrices. Groups pages by URL section, includes descriptions and keywords, and adds an "Upcoming Content" section for planned-but-unpublished pages. Two endpoints: JSON preview (`GET /api/llms-txt/:wsId`) and direct `.txt` file download (`GET /api/llms-txt/:wsId/download`) with Content-Disposition attachment header.
+**Files:** `server/llms-txt-generator.ts`, `server/routes/llms-txt.ts`
+
+**Agency value:** One-click generation of a site's LLMs.txt — a differentiator for SEO-forward clients who want their sites optimized for AI search engines (Perplexity, ChatGPT, Google AI Overviews).
+
+**Client value:** Downloadable `.txt` file they can add to their site root, instantly improving discoverability by AI systems.
+
+**Mutual:** Positions the platform at the frontier of AI-era SEO tooling.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
 |----------|:---:|---|
-| SEO & Technical | 15 | Audit, fix, and optimize faster than manual tools + AEO trust signals + change impact tracking + content decay detection |
+| SEO & Technical | 16 | Audit, fix, and optimize faster than manual tools + AEO trust signals + change impact tracking + content decay detection + site architecture planner |
 | Analytics & Tracking | 7 | Unified data view replaces platform-hopping + AI time-saved tracking |
-| Content & Strategy | 12 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar |
+| Content & Strategy | 20 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar + content templates + keyword pre-assignment + content matrices + keyword recommendations + cannibalization detection + content planner export + client review flow + LLMs.txt generator |
 | Client Communication | 10 | Structured workflows + automated reports + expanded notifications + feedback widget + email capture funnel + audit completion email |
 | Client Self-Service | 15 | 24/7 data access, onboarding, plans, cart, order tracking, glossary, questionnaire, ROI upgrade prompts, shareable report permalinks, content pipeline status cards + post-publish performance |
 | AI & Intelligence | 7 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine + context completeness + usage dashboard + AEO page review |
@@ -1501,9 +1602,9 @@ When the user asks to update this document with recent features, follow this pro
 | Architecture | 5 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types |
 | Infrastructure | 7 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3 + integrity verification), E2E tests, job persistence, anomaly deploy guard |
 
-**130 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**151 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **130**. Last updated: March 2026 (sitemap-based link discovery, live domain UI).
+Current feature count: **151**. Last updated: March 2026 (content planner + site architecture planner + LLMs.txt generator).
 
 ### Recent Additions (March 2026)
 

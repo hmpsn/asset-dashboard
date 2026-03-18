@@ -7,6 +7,8 @@ import { listContentRequests } from '../content-requests.js';
 import { listActivity } from '../activity-log.js';
 import { listPayments } from '../payments.js';
 import { getWorkspace } from '../workspaces.js';
+import { listMatrices } from '../content-matrices.js';
+import { listTemplates } from '../content-templates.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('data-export');
@@ -91,6 +93,53 @@ router.get('/api/export/:workspaceId/payments', (req, res) => {
   log.info(`EXPORT payments ${req.params.workspaceId}: ${payments.length} items as ${format}`);
   const headers = ['id', 'productType', 'amount', 'currency', 'status', 'createdAt', 'paidAt'];
   sendExport(res, payments, headers, `payments-${req.params.workspaceId}`, format);
+});
+
+// --- Content Matrices Export (flattened cells) ---
+router.get('/api/export/:workspaceId/matrices', (req, res) => {
+  const { format = 'json' } = req.query as { format?: string };
+  const matrices = listMatrices(req.params.workspaceId);
+  // Flatten: one row per cell across all matrices
+  const rows = matrices.flatMap(m =>
+    m.cells.map(c => ({
+      matrixId: m.id,
+      matrixName: m.name,
+      templateId: m.templateId,
+      cellId: c.id,
+      targetKeyword: c.targetKeyword,
+      plannedUrl: c.plannedUrl,
+      status: c.status,
+      variableValues: c.variableValues ? Object.entries(c.variableValues).map(([k, v]) => `${k}=${v}`).join('; ') : '',
+      volume: c.keywordValidation?.volume ?? '',
+      difficulty: c.keywordValidation?.difficulty ?? '',
+      cpc: c.keywordValidation?.cpc ?? '',
+      briefId: c.briefId || '',
+      postId: c.postId || '',
+    })),
+  );
+  log.info(`EXPORT matrices ${req.params.workspaceId}: ${rows.length} cells as ${format}`);
+  const headers = ['matrixId', 'matrixName', 'templateId', 'cellId', 'targetKeyword', 'plannedUrl', 'status', 'variableValues', 'volume', 'difficulty', 'cpc', 'briefId', 'postId'];
+  sendExport(res, rows, headers, `matrices-${req.params.workspaceId}`, format);
+});
+
+// --- Content Templates Export ---
+router.get('/api/export/:workspaceId/templates', (req, res) => {
+  const { format = 'json' } = req.query as { format?: string };
+  const templates = listTemplates(req.params.workspaceId);
+  log.info(`EXPORT templates ${req.params.workspaceId}: ${templates.length} items as ${format}`);
+  const rows = templates.map(t => ({
+    id: t.id,
+    name: t.name,
+    pageType: t.pageType,
+    urlPattern: t.urlPattern,
+    keywordPattern: t.keywordPattern,
+    sectionCount: t.sections?.length || 0,
+    variableCount: t.variables?.length || 0,
+    createdAt: t.createdAt,
+    updatedAt: t.updatedAt,
+  }));
+  const headers = ['id', 'name', 'pageType', 'urlPattern', 'keywordPattern', 'sectionCount', 'variableCount', 'createdAt', 'updatedAt'];
+  sendExport(res, rows, headers, `templates-${req.params.workspaceId}`, format);
 });
 
 export default router;
