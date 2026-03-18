@@ -127,8 +127,8 @@
           "source": "TOOL_AUDIT §1b",
           "est": "3h",
           "priority": "P1",
-          "notes": "Add content plan progress, pending reviews, and recently published insights to InsightsDigest.tsx. Add Content Plan stat card to OverviewTab.",
-          "status": "pending"
+          "notes": "Shipped — InsightsDigest: 3 insight variants (review needed, progress %, complete). OverviewTab action banner includes content plan review items.",
+          "status": "done"
         },
         {
           "id": 415,
@@ -136,8 +136,8 @@
           "source": "TOOL_AUDIT §1a",
           "est": "2h",
           "priority": "P1",
-          "notes": "5th stat card showing template/matrix counts + completion %. Action items for pending reviews and near-complete plans.",
-          "status": "pending"
+          "notes": "Shipped — 5th stat card with published/total %, action item for review cells. Data derived in workspace-home.ts.",
+          "status": "done"
         },
         {
           "id": 416,
@@ -145,8 +145,8 @@
           "source": "TOOL_AUDIT §3a",
           "est": "30m",
           "priority": "P1",
-          "notes": "Show count of cells with status:review as badge on client Content Plan nav tab.",
-          "status": "pending"
+          "notes": "Shipped — Blue badge on Content Plan tab showing review+flagged cell count.",
+          "status": "done"
         },
         {
           "id": 417,
@@ -154,8 +154,8 @@
           "source": "TOOL_AUDIT §3d",
           "est": "2h",
           "priority": "P1",
-          "notes": "If a content gap keyword matches a matrix cell, show 'Planned' badge instead of 'Request This Topic'. Reduces duplicate requests.",
-          "status": "pending"
+          "notes": "Shipped — Violet Planned/In Progress/Approved/Published badges on content gaps matching matrix cells.",
+          "status": "done"
         },
         {
           "id": 418,
@@ -163,8 +163,8 @@
           "source": "TOOL_AUDIT §1f",
           "est": "1h",
           "priority": "P1",
-          "notes": "Backend roi.ts includes published matrix cells in contentItems array. Frontend already handles display.",
-          "status": "pending"
+          "notes": "Shipped — Published matrix cells included in contentItems with violet 'Content Plan' badge. Deduped by keyword.",
+          "status": "done"
         },
         {
           "id": 419,
@@ -199,8 +199,8 @@
           "source": "TOOL_AUDIT §3b",
           "est": "1h",
           "priority": "P2",
-          "notes": "When matrix cells need review, show action card on Overview: 'X content pages need your review → View Content Plan'.",
-          "status": "pending"
+          "notes": "Shipped — Implemented as part of #414 (action-needed banner + InsightsDigest cards).",
+          "status": "done"
         },
         {
           "id": 423,

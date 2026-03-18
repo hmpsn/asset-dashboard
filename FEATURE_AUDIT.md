@@ -1618,6 +1618,48 @@ When the user asks to update this document with recent features, follow this pro
 
 **Mutual:** Closes the loop between admin content planning and client transparency.
 
+### 155. Content Plan Badge Count
+**What it does:** Blue badge on the client dashboard "Content Plan" tab showing the number of matrix cells awaiting client review (status `review` or `flagged`). Data fetched via `/api/public/content-plan/:wsId` and aggregated in `useClientData`.
+**Files:** `src/hooks/useClientData.ts`, `src/components/ClientDashboard.tsx`
+
+**Agency value:** Clients immediately see pending actions — reduces follow-up nudges.
+
+**Client value:** Clear visual cue that content needs their attention.
+
+### 156. Workspace Home Content Pipeline Stat Card
+**What it does:** 5th stat card on the admin Workspace Home showing content pipeline completion percentage (published/total cells), with a "Needs Attention" action item when review cells exist. Data derived server-side from content matrices and templates in the aggregated `/api/workspace-home/:id` endpoint.
+**Files:** `server/routes/workspace-home.ts`, `src/components/WorkspaceHome.tsx`, `src/api/misc.ts`
+
+**Agency value:** At-a-glance content pipeline health on the workspace overview — no need to navigate into content tools.
+
+**Client value:** N/A (admin-only).
+
+### 157. Client Overview Content Plan Insights
+**What it does:** Content plan data surfaced in two places on the client Overview tab: (1) action-needed banner showing review cell count with navigation to Content Plan tab, (2) InsightsDigest card with 3 variants — review needed (priority 1), progress percentage (priority 3), or fully published celebration (priority 5).
+**Files:** `src/hooks/useClientData.ts`, `src/components/ClientDashboard.tsx`, `src/components/client/OverviewTab.tsx`, `src/components/client/InsightsDigest.tsx`
+
+**Agency value:** Content plan status surfaces automatically in the client overview — no manual reporting.
+
+**Client value:** Proactive insight about their content pipeline progress without navigating away from Overview.
+
+**Mutual:** Keeps content plan front-of-mind for both parties.
+
+### 158. Strategy Tab Planned Coverage
+**What it does:** Content gaps on the client Strategy tab now show a violet "Planned" badge (with Layers icon) when the keyword already exists in a content plan matrix cell. Shows status-specific labels: Planned, In Progress, Approved, Published. Prevents duplicate orders for already-planned content.
+**Files:** `src/hooks/useClientData.ts`, `src/components/ClientDashboard.tsx`, `src/components/client/StrategyTab.tsx`
+
+**Agency value:** Clients won't order briefs for topics that are already in the content plan pipeline.
+
+**Client value:** Clear visibility that a gap is already being addressed by the content plan.
+
+### 159. ROI Dashboard Matrix Content
+**What it does:** Published matrix cells are now included in the ROI Dashboard's "Content ROI Attribution" section. Deduplicates against content requests by keyword. Matrix-sourced items show a violet "Content Plan" badge. Traffic value attributed via GSC clicks × SEMRush CPC.
+**Files:** `server/roi.ts`, `src/components/client/ROIDashboard.tsx`
+
+**Agency value:** ROI calculations include all content — not just ordered briefs — giving a more complete picture.
+
+**Client value:** See the full ROI of their content investment including planned content.
+
 ---
 
 ## Summary
@@ -1626,21 +1668,21 @@ When the user asks to update this document with recent features, follow this pro
 |----------|:---:|---|
 | SEO & Technical | 16 | Audit, fix, and optimize faster than manual tools + AEO trust signals + change impact tracking + content decay detection + site architecture planner |
 | Analytics & Tracking | 7 | Unified data view replaces platform-hopping + AI time-saved tracking |
-| Content & Strategy | 22 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar + content templates + keyword pre-assignment + content matrices + keyword recommendations + cannibalization detection + content planner export + client review flow + LLMs.txt generator |
+| Content & Strategy | 24 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar + content templates + keyword pre-assignment + content matrices + keyword recommendations + cannibalization detection + content planner export + client review flow + LLMs.txt generator |
 | Client Communication | 10 | Structured workflows + automated reports + expanded notifications + feedback widget + email capture funnel + audit completion email |
-| Client Self-Service | 16 | 24/7 data access, onboarding, plans, cart, order tracking, glossary, questionnaire, ROI upgrade prompts, shareable report permalinks, content pipeline status cards + post-publish performance |
+| Client Self-Service | 18 | 24/7 data access, onboarding, plans, cart, order tracking, glossary, questionnaire, ROI upgrade prompts, shareable report permalinks, content pipeline status cards + post-publish performance |
 | AI & Intelligence | 7 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine + context completeness + usage dashboard + AEO page review |
 | Auth & Access Control | 3 | Internal user accounts, workspace ACL, client user accounts |
 | Security | 2 | Helmet, HTTPS, rate limiting, input sanitization, Turnstile CAPTCHA, credential stuffing protection, weekly npm audit |
 | Monetization | 3 | Stripe Checkout + Subscriptions, admin settings, payment tracking, trials, encrypted config, billing portal, recurring content subscriptions |
-| Platform & UX | 18 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home, page state model, work orders, request linkage, admin UX overhaul, landing page, mobile guard, Recharts, portal OG/favicon, sidebar color accents, AI Usage standalone page, Growth Opportunities reframe |
+| Platform & UX | 19 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home, page state model, work orders, request linkage, admin UX overhaul, landing page, mobile guard, Recharts, portal OG/favicon, sidebar color accents, AI Usage standalone page, Growth Opportunities reframe |
 | Data Architecture | 3 | PageEditState model, cross-store writes, activity feed for client actions |
 | Architecture | 5 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types |
 | Infrastructure | 7 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3 + integrity verification), E2E tests, job persistence, anomaly deploy guard |
 
-**154 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**159 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **154**. Last updated: March 2026 (content planner orchestrator + client content plan tab + site architecture planner UI + LLMs.txt generator UI + content pipeline export dropdown).
+Current feature count: **159**. Last updated: March 2026 (content planner integration P1s: badge count, pipeline stat card, overview insights, strategy planned coverage, ROI matrix content).
 
 ### Recent Additions (March 2026)
 
