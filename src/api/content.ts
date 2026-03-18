@@ -188,6 +188,30 @@ export const contentMatrices = {
     `/api/export/${wsId}/templates?format=json`,
 };
 
+// ── Content Plan Review (client-facing + admin) ─────────────────
+
+export const contentPlanReview = {
+  // Public (client portal)
+  getPlans: (wsId: string) =>
+    get<unknown[]>(`/api/public/content-plan/${wsId}`),
+
+  getPlan: (wsId: string, matrixId: string) =>
+    get<unknown>(`/api/public/content-plan/${wsId}/${matrixId}`),
+
+  flagCell: (wsId: string, matrixId: string, cellId: string, comment: string) =>
+    post<{ ok: boolean }>(`/api/public/content-plan/${wsId}/${matrixId}/cells/${cellId}/flag`, { comment }),
+
+  // Admin
+  sendTemplateReview: (wsId: string, matrixId: string) =>
+    post<{ batchId: string; batch: unknown }>(`/api/content-plan/${wsId}/${matrixId}/send-template-review`, {}),
+
+  sendSamples: (wsId: string, matrixId: string, cellIds: string[]) =>
+    post<{ batchId: string; batch: unknown; cellsSent: number }>(`/api/content-plan/${wsId}/${matrixId}/send-samples`, { cellIds }),
+
+  batchApprove: (wsId: string, matrixId: string) =>
+    post<{ ok: boolean; approvedCount: number; totalCells: number }>(`/api/content-plan/${wsId}/${matrixId}/batch-approve`, {}),
+};
+
 // ── Content decay ───────────────────────────────────────────────
 export const contentDecay = {
   get: (wsId: string) =>

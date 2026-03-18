@@ -247,6 +247,8 @@ export interface MatrixCell {
   };
   keywordCandidates?: KeywordCandidate[];
   recommendedKeyword?: string;
+  clientFlag?: string;
+  clientFlaggedAt?: string;
 }
 
 export interface ContentMatrix {

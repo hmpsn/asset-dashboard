@@ -85,6 +85,7 @@ import workspaceBadgesRoutes from './routes/workspace-badges.js';
 import rewriteChatRoutes from './routes/rewrite-chat.js';
 import contentTemplatesRoutes from './routes/content-templates.js';
 import contentMatricesRoutes from './routes/content-matrices.js';
+import contentPlanReviewRoutes from './routes/content-plan-review.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -306,6 +307,7 @@ export function createApp(): express.Express {
   app.use(rewriteChatRoutes);
   app.use(contentTemplatesRoutes);
   app.use(contentMatricesRoutes);
+  app.use(contentPlanReviewRoutes);
 
   // --- Sentry error handler (must be after all route mounts, before frontend catch-all) ---
   setupSentryErrorHandler(app);

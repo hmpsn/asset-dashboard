@@ -286,7 +286,7 @@ export function updateMatrixCell(
   workspaceId: string,
   matrixId: string,
   cellId: string,
-  updates: Partial<Pick<MatrixCell, 'targetKeyword' | 'customKeyword' | 'status' | 'briefId' | 'postId' | 'keywordValidation' | 'keywordCandidates' | 'recommendedKeyword'>>,
+  updates: Partial<Pick<MatrixCell, 'targetKeyword' | 'customKeyword' | 'status' | 'briefId' | 'postId' | 'keywordValidation' | 'keywordCandidates' | 'recommendedKeyword' | 'clientFlag' | 'clientFlaggedAt'>>,
 ): ContentMatrix | undefined {
   const existing = getMatrix(workspaceId, matrixId);
   if (!existing) return undefined;
