@@ -1561,8 +1561,8 @@ When the user asks to update this document with recent features, follow this pro
 ---
 
 ### 150. Site Architecture Planner
-**What it does:** Builds a complete URL tree for a workspace by combining three data sources: existing pages (Webflow API static + CMS sitemap discovery), planned pages (content matrix cells), and strategy pages (keyword map assignments). Each node tracks source type (existing/planned/strategy/gap), keyword, SEO metadata, and matrix linkage. Detects architecture gaps — intermediate URL paths with child pages but no hub/landing page (e.g., `/services/` has children but no page). Reports depth distribution, orphan pages, and gap priority. Single GET endpoint returns the full tree structure for frontend visualization.
-**Files:** `server/site-architecture.ts`, `server/routes/site-architecture.ts`
+**What it does:** Builds a complete URL tree for a workspace by combining three data sources: existing pages (Webflow API static + CMS sitemap discovery), planned pages (content matrix cells), and strategy pages (keyword map assignments). Each node tracks source type (existing/planned/strategy/gap), keyword, SEO metadata, and matrix linkage. Detects architecture gaps — intermediate URL paths with child pages but no hub/landing page (e.g., `/services/` has children but no page). Reports depth distribution, orphan pages, and gap priority. Admin UI shows interactive collapsible tree with source badges, search/filter, stat cards (total/live/planned/strategy/gaps), gap list with priority badges, orphan page warnings, and depth distribution bar chart. Accessible via "Architecture" sub-tab in Content Pipeline.
+**Files:** `server/site-architecture.ts`, `server/routes/site-architecture.ts`, `src/components/SiteArchitecture.tsx`, `src/components/ContentPipeline.tsx`
 
 **Agency value:** Instant bird's-eye view of the site's URL hierarchy showing where content exists, what's planned, and where gaps need filling — replaces manual spreadsheet URL planning.
 
@@ -1573,8 +1573,8 @@ When the user asks to update this document with recent features, follow this pro
 ---
 
 ### 151. LLMs.txt Generator
-**What it does:** Generates an LLMs.txt file — a machine-readable site overview following the emerging standard for AI consumption. Pulls data from workspace config (name, domain, business context), all published pages (Webflow static + CMS), keyword strategy enrichment, and planned content from matrices. Groups pages by URL section, includes descriptions and keywords, and adds an "Upcoming Content" section for planned-but-unpublished pages. Two endpoints: JSON preview (`GET /api/llms-txt/:wsId`) and direct `.txt` file download (`GET /api/llms-txt/:wsId/download`) with Content-Disposition attachment header.
-**Files:** `server/llms-txt-generator.ts`, `server/routes/llms-txt.ts`
+**What it does:** Generates an LLMs.txt file — a machine-readable site overview following the emerging standard for AI consumption. Pulls data from workspace config (name, domain, business context), all published pages (Webflow static + CMS), keyword strategy enrichment, and planned content from matrices. Groups pages by URL section, includes descriptions and keywords, and adds an "Upcoming Content" section for planned-but-unpublished pages. Admin UI shows one-click generate, copy-to-clipboard, download as .txt, stat cards (pages/sections/lines/file size), scrollable preview, and educational info card. Accessible via "LLMs.txt" sub-tab in Content Pipeline.
+**Files:** `server/llms-txt-generator.ts`, `server/routes/llms-txt.ts`, `src/components/LlmsTxtGenerator.tsx`, `src/components/ContentPipeline.tsx`
 
 **Agency value:** One-click generation of a site's LLMs.txt — a differentiator for SEO-forward clients who want their sites optimized for AI search engines (Perplexity, ChatGPT, Google AI Overviews).
 
@@ -1584,13 +1584,25 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 152. Content Pipeline Data Export Dropdown
+**What it does:** Adds a unified "Export" dropdown button to the Content Pipeline tab bar. Admin can export content briefs, content requests, content matrices, content templates, and keyword strategy as either CSV or JSON. Downloads open in a new tab via the existing `/api/export/:workspaceId/:dataset` endpoints. Click-outside dismissal.
+**Files:** `src/components/ContentPipeline.tsx`, `server/routes/data-export.ts` (existing)
+
+**Agency value:** Quick data portability for reporting, client handoffs, and audit trails — no need to navigate to workspace settings.
+
+**Client value:** N/A (admin-only feature).
+
+**Mutual:** Ensures all content pipeline data is always exportable from the place it's managed.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
 |----------|:---:|---|
 | SEO & Technical | 16 | Audit, fix, and optimize faster than manual tools + AEO trust signals + change impact tracking + content decay detection + site architecture planner |
 | Analytics & Tracking | 7 | Unified data view replaces platform-hopping + AI time-saved tracking |
-| Content & Strategy | 20 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar + content templates + keyword pre-assignment + content matrices + keyword recommendations + cannibalization detection + content planner export + client review flow + LLMs.txt generator |
+| Content & Strategy | 21 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar + content templates + keyword pre-assignment + content matrices + keyword recommendations + cannibalization detection + content planner export + client review flow + LLMs.txt generator |
 | Client Communication | 10 | Structured workflows + automated reports + expanded notifications + feedback widget + email capture funnel + audit completion email |
 | Client Self-Service | 15 | 24/7 data access, onboarding, plans, cart, order tracking, glossary, questionnaire, ROI upgrade prompts, shareable report permalinks, content pipeline status cards + post-publish performance |
 | AI & Intelligence | 7 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine + context completeness + usage dashboard + AEO page review |
@@ -1602,9 +1614,9 @@ When the user asks to update this document with recent features, follow this pro
 | Architecture | 5 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types |
 | Infrastructure | 7 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3 + integrity verification), E2E tests, job persistence, anomaly deploy guard |
 
-**151 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**152 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **151**. Last updated: March 2026 (content planner + site architecture planner + LLMs.txt generator).
+Current feature count: **152**. Last updated: March 2026 (content planner + site architecture planner UI + LLMs.txt generator UI + content pipeline export dropdown).
 
 ### Recent Additions (March 2026)
 

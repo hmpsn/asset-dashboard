@@ -194,6 +194,33 @@
           "status": "done"
         },
         {
+          "id": 409,
+          "title": "Site Architecture Planner UI",
+          "source": "CONTENT_PLANNER_PLAN",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — Interactive collapsible URL tree with source badges, search/filter, stat cards, gap list, orphan warnings, depth chart. Wired as Architecture sub-tab in Content Pipeline.",
+          "status": "done"
+        },
+        {
+          "id": 410,
+          "title": "LLMs.txt Generator UI",
+          "source": "Feature request",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped — One-click generate, copy, download .txt, stat cards, scrollable preview, info card. Wired as LLMs.txt sub-tab in Content Pipeline.",
+          "status": "done"
+        },
+        {
+          "id": 411,
+          "title": "Content Pipeline Data Export Dropdown",
+          "source": "UI audit",
+          "est": "30m",
+          "priority": "P2",
+          "notes": "Shipped — Unified Export button in Content Pipeline tab bar. CSV/JSON for briefs, requests, matrices, templates, strategy.",
+          "status": "done"
+        },
+        {
           "id": 406,
           "title": "Client Review Flow (Tiered Content Plan Review)",
           "source": "CONTENT_PLANNER_PLAN",
