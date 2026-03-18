@@ -31,7 +31,8 @@ type SortKey = 'status' | 'volume' | 'difficulty' | 'alphabetical';
 
 export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: MatrixGridProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [detailCell, setDetailCell] = useState<MatrixCell | null>(null);
+  const [detailCellId, setDetailCellId] = useState<string | null>(null);
+  const detailCell = detailCellId ? matrix.cells.find(c => c.id === detailCellId) ?? null : null;
   const [filterStatus, setFilterStatus] = useState<MatrixCell['status'] | 'all'>('all');
   const [sortKey, setSortKey] = useState<SortKey>('status');
   const [showFilter, setShowFilter] = useState(false);
@@ -108,7 +109,7 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
   }, [gridOrderedCellIds]);
 
   const handleCellOpen = useCallback((cell: MatrixCell) => {
-    setDetailCell(cell);
+    setDetailCellId(cell.id);
     onCellClick(cell);
   }, [onCellClick]);
 
@@ -365,7 +366,7 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
       {detailCell && (
         <CellDetailPanel
           cell={detailCell}
-          onClose={() => setDetailCell(null)}
+          onClose={() => setDetailCellId(null)}
           onCellUpdate={onCellUpdate}
           onGenerateBrief={id => onBulkAction('generate_briefs', [id])}
           onSendReview={id => onBulkAction('send_review', [id])}
