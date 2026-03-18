@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, lazy, Suspense } from 'react';
-import { Clipboard, FileText, RefreshCw, Map, Bot, Download, ChevronDown } from 'lucide-react';
+import { Clipboard, FileText, RefreshCw, Map, Bot, Download, ChevronDown, Layers } from 'lucide-react';
 import { ContentBriefs } from './ContentBriefs';
 import { ContentManager } from './ContentManager';
 import { ContentSubscriptions } from './ContentSubscriptions';
@@ -7,6 +7,7 @@ import type { FixContext } from '../App';
 
 const SiteArchitecture = lazy(() => import('./SiteArchitecture').then(m => ({ default: m.SiteArchitecture })));
 const LlmsTxtGenerator = lazy(() => import('./LlmsTxtGenerator').then(m => ({ default: m.LlmsTxtGenerator })));
+const ContentPlanner = lazy(() => import('./ContentPlanner').then(m => ({ default: m.ContentPlanner })));
 
 interface Props {
   workspaceId: string;
@@ -15,6 +16,7 @@ interface Props {
 }
 
 const TABS = [
+  { id: 'planner' as const, label: 'Planner', icon: Layers },
   { id: 'briefs' as const, label: 'Briefs', icon: Clipboard },
   { id: 'posts' as const, label: 'Posts', icon: FileText },
   { id: 'subscriptions' as const, label: 'Subscriptions', icon: RefreshCw },
@@ -101,6 +103,11 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext 
       </div>
 
       {/* Tab content */}
+      {activeTab === 'planner' && (
+        <Suspense fallback={<div className="flex items-center justify-center py-24"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>}>
+          <ContentPlanner key={`planner-${workspaceId}`} workspaceId={workspaceId} />
+        </Suspense>
+      )}
       {activeTab === 'briefs' && (
         <ContentBriefs key={`briefs-${workspaceId}`} workspaceId={workspaceId} onRequestCountChange={onRequestCountChange} fixContext={fixContext} />
       )}

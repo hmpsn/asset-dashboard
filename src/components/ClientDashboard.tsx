@@ -7,7 +7,7 @@ import {
   Loader2,
   Sparkles, Send, AlertTriangle,
   Target, Zap, Shield, MessageSquare, X,
-  CheckCircle2, LineChart, Lock, Trophy, Check,
+  CheckCircle2, LineChart, Lock, Trophy, Check, Layers,
   Sun, Moon, Plus, FileText, Calendar, Clock, CreditCard, Mail,
 } from 'lucide-react';
 const LazyStripePaymentModal = lazy(() => import('./StripePaymentForm').then(m => ({ default: m.StripePaymentModal })));
@@ -23,6 +23,7 @@ import { ClientOnboardingQuestionnaire, type OnboardingData } from './client/Cli
 import { ROIDashboard } from './client/ROIDashboard';
 import { FeedbackWidget } from './client/FeedbackWidget';
 import { PlansTab } from './client/PlansTab';
+import { ContentPlanTab } from './client/ContentPlanTab';
 import { StrategyTab } from './client/StrategyTab';
 import { PerformanceTab } from './client/PerformanceTab';
 import { InboxTab } from './client/InboxTab';
@@ -139,7 +140,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   const tab: ClientTab = (() => {
     const t = initialTab;
     if (t === 'search' || t === 'analytics') return 'performance' as ClientTab;
-    if (t && ['overview','performance','health','strategy','inbox','approvals','requests','content','plans','roi'].includes(t)) return t as ClientTab;
+    if (t && ['overview','performance','health','strategy','inbox','approvals','requests','content','plans','roi','content-plan'].includes(t)) return t as ClientTab;
     return 'overview';
   })();
   const setTab = (t: ClientTab) => {
@@ -624,6 +625,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     ] : []),
     { id: 'health' as ClientTab, label: 'Site Health', icon: Shield, locked: false },
     ...(isPaid ? [{ id: 'strategy' as ClientTab, label: 'SEO Strategy', icon: Target, locked: strategyLocked }] : []),
+    ...(isPaid ? [{ id: 'content-plan' as ClientTab, label: 'Content Plan', icon: Layers, locked: false }] : []),
     ...(isPaid ? [{ id: 'inbox' as ClientTab, label: 'Inbox', icon: Zap, locked: false }] : []),
     ...(!betaMode ? [{ id: 'plans' as ClientTab, label: 'Plans', icon: CreditCard, locked: false }] : []),
     ...(isPaid && !betaMode ? [{ id: 'roi' as ClientTab, label: 'ROI', icon: Trophy, locked: false }] : []),
@@ -977,6 +979,13 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         )}
       </>)}
 
+
+        {/* ════════════ CONTENT PLAN TAB ════════════ */}
+        {tab === 'content-plan' && (
+          <ErrorBoundary label="Content Plan">
+            <ContentPlanTab workspaceId={workspaceId} setToast={setToast} />
+          </ErrorBoundary>
+        )}
 
         {/* ════════════ PLANS TAB ════════════ */}
         {tab === 'plans' && (

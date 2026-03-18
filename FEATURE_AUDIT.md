@@ -1596,15 +1596,39 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 153. Content Planner Admin Orchestrator
+**What it does:** Lazy-loaded "Planner" sub-tab in Content Pipeline that orchestrates Devin's matrix UI components. Shows a list view of all templates and matrices with progress bars and badges. Navigates between three views: TemplateEditor (create/edit content templates), MatrixBuilder (step-by-step matrix creation wizard), and MatrixGrid (cell management with bulk actions). Fetches data via `contentTemplates` and `contentMatrices` API client. Handles template save (create/update), matrix creation, cell updates, and CSV export.
+**Files:** `src/components/ContentPlanner.tsx` (new), `src/components/ContentPipeline.tsx` (Planner tab added), `src/components/matrix/` (Devin's components)
+
+**Agency value:** Single admin interface for the entire template → matrix → cell pipeline. No context-switching between different tools.
+
+**Client value:** N/A (admin-only).
+
+**Mutual:** Completes the admin side of the content planner system.
+
+---
+
+### 154. Client Content Plan Tab
+**What it does:** New "Content Plan" tab in the client portal (paid tiers only) showing matrix progress via MatrixProgressView. Fetches plans from public API (`/api/public/content-plan/:wsId`). Auto-selects if only one plan; shows a list picker for multiple. Clients can preview cells, flag cells with comments (feedback submitted to admin), and download exports. Wrapped in ErrorBoundary.
+**Files:** `src/components/client/ContentPlanTab.tsx` (new), `src/components/ClientDashboard.tsx` (tab wired), `src/components/client/types.ts` (`content-plan` added to ClientTab)
+
+**Agency value:** Clients can self-serve content plan status — fewer "where are we?" emails.
+
+**Client value:** Real-time visibility into their content pipeline with per-page status, progress tracking, and the ability to flag concerns.
+
+**Mutual:** Closes the loop between admin content planning and client transparency.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
 |----------|:---:|---|
 | SEO & Technical | 16 | Audit, fix, and optimize faster than manual tools + AEO trust signals + change impact tracking + content decay detection + site architecture planner |
 | Analytics & Tracking | 7 | Unified data view replaces platform-hopping + AI time-saved tracking |
-| Content & Strategy | 21 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar + content templates + keyword pre-assignment + content matrices + keyword recommendations + cannibalization detection + content planner export + client review flow + LLMs.txt generator |
+| Content & Strategy | 22 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar + content templates + keyword pre-assignment + content matrices + keyword recommendations + cannibalization detection + content planner export + client review flow + LLMs.txt generator |
 | Client Communication | 10 | Structured workflows + automated reports + expanded notifications + feedback widget + email capture funnel + audit completion email |
-| Client Self-Service | 15 | 24/7 data access, onboarding, plans, cart, order tracking, glossary, questionnaire, ROI upgrade prompts, shareable report permalinks, content pipeline status cards + post-publish performance |
+| Client Self-Service | 16 | 24/7 data access, onboarding, plans, cart, order tracking, glossary, questionnaire, ROI upgrade prompts, shareable report permalinks, content pipeline status cards + post-publish performance |
 | AI & Intelligence | 7 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine + context completeness + usage dashboard + AEO page review |
 | Auth & Access Control | 3 | Internal user accounts, workspace ACL, client user accounts |
 | Security | 2 | Helmet, HTTPS, rate limiting, input sanitization, Turnstile CAPTCHA, credential stuffing protection, weekly npm audit |
@@ -1614,9 +1638,9 @@ When the user asks to update this document with recent features, follow this pro
 | Architecture | 5 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types |
 | Infrastructure | 7 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3 + integrity verification), E2E tests, job persistence, anomaly deploy guard |
 
-**152 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**154 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **152**. Last updated: March 2026 (content planner + site architecture planner UI + LLMs.txt generator UI + content pipeline export dropdown).
+Current feature count: **154**. Last updated: March 2026 (content planner orchestrator + client content plan tab + site architecture planner UI + LLMs.txt generator UI + content pipeline export dropdown).
 
 ### Recent Additions (March 2026)
 

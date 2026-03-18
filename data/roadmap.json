@@ -221,6 +221,24 @@
           "status": "done"
         },
         {
+          "id": 412,
+          "title": "Content Planner Admin Orchestrator",
+          "source": "CONTENT_PLANNER_PLAN",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — ContentPlanner.tsx orchestrates TemplateEditor, MatrixBuilder, MatrixGrid. Lazy-loaded Planner sub-tab in ContentPipeline. List view with template/matrix cards, progress bars, badges.",
+          "status": "done"
+        },
+        {
+          "id": 413,
+          "title": "Client Content Plan Tab",
+          "source": "CONTENT_PLANNER_PLAN",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped — ContentPlanTab in client portal (paid tiers). Fetches plans from public API, auto-selects single plan, shows MatrixProgressView with cell flagging + downloads.",
+          "status": "done"
+        },
+        {
           "id": 406,
           "title": "Client Review Flow (Tiered Content Plan Review)",
           "source": "CONTENT_PLANNER_PLAN",
