@@ -204,3 +204,68 @@ export interface ContentTemplate {
   createdAt: string;
   updatedAt: string;
 }
+
+// ── Content Matrix (bulk content planning grid) ─────────────────
+
+export interface MatrixDimension {
+  variableName: string;
+  values: string[];
+}
+
+export type MatrixCellStatus =
+  | 'planned'
+  | 'keyword_validated'
+  | 'brief_generated'
+  | 'draft'
+  | 'review'
+  | 'approved'
+  | 'published';
+
+export interface KeywordCandidate {
+  keyword: string;
+  volume: number;
+  difficulty: number;
+  cpc: number;
+  source: 'pattern' | 'semrush_related' | 'ai_suggested';
+  isRecommended: boolean;
+}
+
+export interface MatrixCell {
+  id: string;
+  variableValues: Record<string, string>;
+  targetKeyword: string;
+  customKeyword?: string;
+  plannedUrl: string;
+  briefId?: string;
+  postId?: string;
+  status: MatrixCellStatus;
+  keywordValidation?: {
+    volume: number;
+    difficulty: number;
+    cpc: number;
+    validatedAt: string;
+  };
+  keywordCandidates?: KeywordCandidate[];
+  recommendedKeyword?: string;
+}
+
+export interface ContentMatrix {
+  id: string;
+  workspaceId: string;
+  name: string;
+  templateId: string;
+  dimensions: MatrixDimension[];
+  urlPattern: string;
+  keywordPattern: string;
+  cells: MatrixCell[];
+  stats: {
+    total: number;
+    planned: number;
+    briefGenerated: number;
+    drafted: number;
+    reviewed: number;
+    published: number;
+  };
+  createdAt: string;
+  updatedAt: string;
+}

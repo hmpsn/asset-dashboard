@@ -1,6 +1,6 @@
 // ── Content API (briefs, posts, content requests) ─────────────────
-import { get, post, patch, del, getSafe, getOptional } from './client';
-import type { ContentTemplate } from '../../shared/types/content';
+import { get, post, patch, put, del, getSafe, getOptional } from './client';
+import type { ContentTemplate, ContentMatrix } from '../../shared/types/content';
 
 export const contentBriefs = {
   list: (wsId: string) =>
@@ -129,6 +129,28 @@ export const contentTemplates = {
 
   duplicate: (wsId: string, templateId: string, name?: string) =>
     post<ContentTemplate>(`/api/content-templates/${wsId}/${templateId}/duplicate`, { name }),
+};
+
+// ── Content Matrices (bulk content planning grids) ──────────────
+
+export const contentMatrices = {
+  list: (wsId: string) =>
+    get<ContentMatrix[]>(`/api/content-matrices/${wsId}`),
+
+  getById: (wsId: string, matrixId: string) =>
+    get<ContentMatrix>(`/api/content-matrices/${wsId}/${matrixId}`),
+
+  create: (wsId: string, body: { name: string; templateId: string; dimensions: ContentMatrix['dimensions']; urlPattern: string; keywordPattern: string }) =>
+    post<ContentMatrix>(`/api/content-matrices/${wsId}`, body),
+
+  update: (wsId: string, matrixId: string, body: Partial<Pick<ContentMatrix, 'name' | 'dimensions' | 'urlPattern' | 'keywordPattern' | 'cells'>>) =>
+    put<ContentMatrix>(`/api/content-matrices/${wsId}/${matrixId}`, body),
+
+  updateCell: (wsId: string, matrixId: string, cellId: string, body: Record<string, unknown>) =>
+    patch<ContentMatrix>(`/api/content-matrices/${wsId}/${matrixId}/cells/${cellId}`, body),
+
+  remove: (wsId: string, matrixId: string) =>
+    del(`/api/content-matrices/${wsId}/${matrixId}`),
 };
 
 // ── Content decay ───────────────────────────────────────────────
