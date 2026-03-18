@@ -1660,6 +1660,14 @@ When the user asks to update this document with recent features, follow this pro
 
 **Client value:** See the full ROI of their content investment including planned content.
 
+### 160. Client Portal Noise Reduction
+**What it does:** Tabs and UI elements that have no data are now hidden from the client portal navigation instead of showing empty states. Content Plan tab only appears when matrices exist. ROI tab only appears when keyword strategy data is loaded (prerequisite for ROI calculation). All overview sections (stat cards, action banners, insights, activity timeline, content opportunities) already return null when no data — verified and confirmed.
+**Files:** `src/components/ClientDashboard.tsx`
+
+**Agency value:** Cleaner portal presentation — clients only see features that are active and relevant to their workspace.
+
+**Client value:** No confusing empty tabs or blank sections. The portal adapts to what's actually configured.
+
 ---
 
 ## Summary
@@ -1675,14 +1683,14 @@ When the user asks to update this document with recent features, follow this pro
 | Auth & Access Control | 3 | Internal user accounts, workspace ACL, client user accounts |
 | Security | 2 | Helmet, HTTPS, rate limiting, input sanitization, Turnstile CAPTCHA, credential stuffing protection, weekly npm audit |
 | Monetization | 3 | Stripe Checkout + Subscriptions, admin settings, payment tracking, trials, encrypted config, billing portal, recurring content subscriptions |
-| Platform & UX | 19 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home, page state model, work orders, request linkage, admin UX overhaul, landing page, mobile guard, Recharts, portal OG/favicon, sidebar color accents, AI Usage standalone page, Growth Opportunities reframe |
+| Platform & UX | 20 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home, page state model, work orders, request linkage, admin UX overhaul, landing page, mobile guard, Recharts, portal OG/favicon, sidebar color accents, AI Usage standalone page, Growth Opportunities reframe |
 | Data Architecture | 3 | PageEditState model, cross-store writes, activity feed for client actions |
 | Architecture | 5 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types |
 | Infrastructure | 7 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3 + integrity verification), E2E tests, job persistence, anomaly deploy guard |
 
-**159 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**160 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **159**. Last updated: March 2026 (content planner integration P1s: badge count, pipeline stat card, overview insights, strategy planned coverage, ROI matrix content).
+Current feature count: **160**. Last updated: March 2026 (content planner integration P1s + client portal noise reduction).
 
 ### Recent Additions (March 2026)
 
