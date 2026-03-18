@@ -12,6 +12,8 @@ import { listActivity } from '../activity-log.js';
 import { listAnnotations } from '../annotations.js';
 import { listChurnSignals } from '../churn-signals.js';
 import { listWorkOrders } from '../work-orders.js';
+import { listMatrices } from '../content-matrices.js';
+import { listTemplates } from '../content-templates.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('workspace-home');
@@ -44,6 +46,8 @@ router.get('/api/workspace-home/:id', async (req, res) => {
     searchData,
     ga4Data,
     comparison,
+    matrices,
+    templates,
   ] = await Promise.all([
     safe(Promise.resolve(getLatestRanks(req.params.id)), []),
     safe(Promise.resolve(listRequests(req.params.id)), []),
@@ -61,7 +65,21 @@ router.get('/api/workspace-home/:id', async (req, res) => {
     ws.ga4PropertyId
       ? safe(getGA4PeriodComparison(ws.ga4PropertyId, days), null)
       : Promise.resolve(null),
+    safe(Promise.resolve(listMatrices(req.params.id)), []),
+    safe(Promise.resolve(listTemplates(req.params.id)), []),
   ]);
+
+  // Derive content pipeline summary
+  const allCells = (matrices as Array<{ cells?: Array<{ status: string }> }>).flatMap(m => m.cells || []);
+  const contentPipeline = {
+    templateCount: (templates as unknown[]).length,
+    matrixCount: (matrices as unknown[]).length,
+    totalCells: allCells.length,
+    publishedCells: allCells.filter(c => c.status === 'published').length,
+    reviewCells: allCells.filter(c => c.status === 'review' || c.status === 'flagged').length,
+    approvedCells: allCells.filter(c => c.status === 'approved').length,
+    inProgressCells: allCells.filter(c => c.status === 'brief_generated' || c.status === 'in_progress').length,
+  };
 
   res.json({
     ranks,
@@ -74,6 +92,7 @@ router.get('/api/workspace-home/:id', async (req, res) => {
     searchData,
     ga4Data,
     comparison,
+    contentPipeline,
   });
 });
 

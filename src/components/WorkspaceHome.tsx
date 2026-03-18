@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Shield, Search, BarChart3, TrendingUp, TrendingDown, ArrowUpRight,
   Loader2, Bell, FileText, AlertTriangle,
-  Globe, Clipboard, Flag, Clock, RefreshCw,
+  Globe, Clipboard, Flag, Clock, RefreshCw, Layers,
 } from 'lucide-react';
 import { StatCard, SectionCard, PageHeader } from './ui';
 import { InsightsEngine } from './client/InsightsEngine';
@@ -56,6 +56,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   const [annotations, setAnnotations] = useState<Array<{ id: string; date: string; label: string; color?: string }>>([]);
   const [churnSignals, setChurnSignals] = useState<Array<{ id: string; type: string; severity: string; title: string; description: string; detectedAt: string }>>([]);
   const [workOrders, setWorkOrders] = useState<Array<{ id: string; status: string; productType: string }>>([]);
+  const [contentPipeline, setContentPipeline] = useState<{ templateCount: number; matrixCount: number; totalCells: number; publishedCells: number; reviewCells: number; approvedCells: number; inProgressCells: number } | null>(null);
   const [lastFetched, setLastFetched] = useState<Date | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => new Date());
@@ -108,6 +109,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       if (d.searchData) setSearchData(d.searchData);
       if (d.ga4Data) setGa4Data(d.ga4Data);
       if (d.comparison) setComparison(d.comparison);
+      if (d.contentPipeline) setContentPipeline(d.contentPipeline);
       setLoading(false);
       setLastFetched(new Date());
     }).catch(() => { if (!cancelled) setLoading(false); });
@@ -143,6 +145,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   if (!webflowSiteId) actions.push({ label: 'No Webflow site linked', sub: 'Link a site to enable SEO tools', color: 'amber', icon: Globe, tab: 'workspace-settings' });
   if (!gscPropertyUrl) actions.push({ label: 'Google Search Console not connected', sub: 'Connect GSC for search data', color: 'amber', icon: Search, tab: 'workspace-settings' });
   if (!ga4PropertyId) actions.push({ label: 'Google Analytics not connected', sub: 'Connect GA4 for traffic data', color: 'amber', icon: BarChart3, tab: 'workspace-settings' });
+  if (contentPipeline && contentPipeline.reviewCells > 0) actions.push({ label: `${contentPipeline.reviewCells} content plan page${contentPipeline.reviewCells > 1 ? 's' : ''} need${contentPipeline.reviewCells === 1 ? 's' : ''} review`, sub: 'Client flagged or awaiting approval', color: 'teal', icon: Layers, tab: 'content-pipeline' });
 
   // Data freshness
   const ageMs = lastFetched ? now.getTime() - lastFetched.getTime() : 0;
@@ -163,6 +166,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       if (d.searchData) setSearchData(d.searchData);
       if (d.ga4Data) setGa4Data(d.ga4Data);
       if (d.comparison) setComparison(d.comparison);
+      if (d.contentPipeline) setContentPipeline(d.contentPipeline);
       setLastFetched(new Date());
     } catch { /* ignore */ }
     setRefreshing(false);
@@ -214,7 +218,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       />
 
       {/* ── Metric Cards ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className={`grid grid-cols-2 ${contentPipeline && contentPipeline.totalCells > 0 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-3`}>
         {audit ? (
           <StatCard
             label="Site Health"
@@ -266,6 +270,20 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
           sub={ranks.length > 0 ? `${rankUp} ↑ · ${rankDown} ↓ · ${ranks.length - rankUp - rankDown} =` : 'No keywords tracked'}
           onClick={ranks.length > 0 ? () => navigate(adminPath(workspaceId, 'seo-ranks')) : undefined}
         />
+
+        {contentPipeline && contentPipeline.totalCells > 0 && (() => {
+          const pct = Math.round((contentPipeline.publishedCells / contentPipeline.totalCells) * 100);
+          return (
+            <StatCard
+              label="Content Pipeline"
+              value={`${pct}%`}
+              icon={Layers}
+              iconColor={pct >= 80 ? '#4ade80' : pct >= 40 ? '#22d3ee' : '#a78bfa'}
+              sub={`${contentPipeline.publishedCells}/${contentPipeline.totalCells} pages · ${contentPipeline.matrixCount} plan${contentPipeline.matrixCount !== 1 ? 's' : ''}`}
+              onClick={() => navigate(adminPath(workspaceId, 'content-pipeline'))}
+            />
+          );
+        })()}
       </div>
 
       {/* ── Anomaly Alerts ── */}

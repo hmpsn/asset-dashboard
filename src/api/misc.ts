@@ -224,6 +224,7 @@ export interface WorkspaceHomeData {
   searchData: { totalClicks: number; totalImpressions: number; avgCtr: number; avgPosition: number } | null;
   ga4Data: { totalUsers: number; totalSessions: number; totalPageviews: number; newUserPercentage: number } | null;
   comparison: { users?: { current: number; previous: number }; sessions?: { current: number; previous: number } } | null;
+  contentPipeline?: { templateCount: number; matrixCount: number; totalCells: number; publishedCells: number; reviewCells: number; approvedCells: number; inProgressCells: number };
 }
 
 export const workspaceHome = {
