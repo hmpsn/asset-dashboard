@@ -625,7 +625,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     ] : []),
     { id: 'health' as ClientTab, label: 'Site Health', icon: Shield, locked: false },
     ...(isPaid ? [{ id: 'strategy' as ClientTab, label: 'SEO Strategy', icon: Target, locked: strategyLocked }] : []),
-    ...(isPaid ? [{ id: 'content-plan' as ClientTab, label: 'Content Plan', icon: Layers, locked: false }] : []),
+    ...(isPaid && contentPlanSummary && contentPlanSummary.totalCells > 0 ? [{ id: 'content-plan' as ClientTab, label: 'Content Plan', icon: Layers, locked: false }] : []),
     ...(isPaid ? [{ id: 'inbox' as ClientTab, label: 'Inbox', icon: Zap, locked: false }] : []),
     ...(!betaMode ? [{ id: 'plans' as ClientTab, label: 'Plans', icon: CreditCard, locked: false }] : []),
     ...(isPaid && !betaMode ? [{ id: 'roi' as ClientTab, label: 'ROI', icon: Trophy, locked: false }] : []),
@@ -756,7 +756,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
               const hasData = (t.id === 'overview') ||
                 (t.id === 'performance' && !!(overview || ga4Overview)) ||
                 (t.id === 'health' && !!audit) ||
-                (t.id === 'inbox');
+                (t.id === 'inbox') ||
+                (t.id === 'content-plan' && !!contentPlanSummary && contentPlanSummary.totalCells > 0);
               const pendingReviews = contentRequests.filter(r => r.status === 'client_review').length;
               return (
                 <button key={t.id} role="tab" aria-selected={active} tabIndex={active ? 0 : -1}
