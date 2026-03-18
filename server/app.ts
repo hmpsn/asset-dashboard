@@ -83,6 +83,7 @@ import backlinksRoutes from './routes/backlinks.js';
 import workspaceHomeRoutes from './routes/workspace-home.js';
 import workspaceBadgesRoutes from './routes/workspace-badges.js';
 import rewriteChatRoutes from './routes/rewrite-chat.js';
+import contentTemplatesRoutes from './routes/content-templates.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -302,6 +303,7 @@ export function createApp(): express.Express {
   app.use(workspaceHomeRoutes);
   app.use(workspaceBadgesRoutes);
   app.use(rewriteChatRoutes);
+  app.use(contentTemplatesRoutes);
 
   // --- Sentry error handler (must be after all route mounts, before frontend catch-all) ---
   setupSentryErrorHandler(app);

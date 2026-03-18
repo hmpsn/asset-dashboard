@@ -154,3 +154,43 @@ export interface ContentSubscription {
   createdAt: string;
   updatedAt: string;
 }
+
+// ── Content Templates (scalable content planning) ──────────────
+
+export interface TemplateVariable {
+  name: string;
+  label: string;
+  description?: string;
+}
+
+export interface TemplateSection {
+  id: string;
+  name: string;
+  headingTemplate: string;
+  guidance: string;
+  wordCountTarget: number;
+  order: number;
+  cmsFieldSlug?: string;
+}
+
+export type ContentPageType =
+  | 'blog' | 'landing' | 'service' | 'location' | 'product'
+  | 'pillar' | 'resource' | 'provider-profile' | 'procedure-guide' | 'pricing-page';
+
+export interface ContentTemplate {
+  id: string;
+  workspaceId: string;
+  name: string;
+  description?: string;
+  pageType: ContentPageType;
+  variables: TemplateVariable[];
+  sections: TemplateSection[];
+  urlPattern: string;
+  keywordPattern: string;
+  titlePattern?: string;
+  metaDescPattern?: string;
+  cmsFieldMap?: Record<string, string>;
+  toneAndStyle?: string;
+  createdAt: string;
+  updatedAt: string;
+}

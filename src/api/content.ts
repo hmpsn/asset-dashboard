@@ -1,5 +1,6 @@
 // ── Content API (briefs, posts, content requests) ─────────────────
 import { get, post, patch, del, getSafe, getOptional } from './client';
+import type { ContentTemplate } from '../../shared/types/content';
 
 export const contentBriefs = {
   list: (wsId: string) =>
@@ -96,6 +97,28 @@ export const publicContent = {
 
   briefPreview: (wsId: string, briefId: string) =>
     getOptional<unknown>(`/api/public/content-brief/${wsId}/${briefId}`),
+};
+
+// ── Content Templates (scalable content planning) ──────────────
+
+export const contentTemplates = {
+  list: (wsId: string) =>
+    get<ContentTemplate[]>(`/api/content-templates/${wsId}`),
+
+  getById: (wsId: string, templateId: string) =>
+    get<ContentTemplate>(`/api/content-templates/${wsId}/${templateId}`),
+
+  create: (wsId: string, body: Partial<ContentTemplate>) =>
+    post<ContentTemplate>(`/api/content-templates/${wsId}`, body),
+
+  update: (wsId: string, templateId: string, body: Partial<ContentTemplate>) =>
+    patch<ContentTemplate>(`/api/content-templates/${wsId}/${templateId}`, body),
+
+  remove: (wsId: string, templateId: string) =>
+    del(`/api/content-templates/${wsId}/${templateId}`),
+
+  duplicate: (wsId: string, templateId: string, name?: string) =>
+    post<ContentTemplate>(`/api/content-templates/${wsId}/${templateId}/duplicate`, { name }),
 };
 
 // ── Content decay ───────────────────────────────────────────────
