@@ -19,7 +19,7 @@ const STATUS_CONFIG: Record<MatrixCell['status'], { label: string; bg: string; t
   planned:            { label: 'Planned',           bg: 'bg-zinc-800',       text: 'text-zinc-500',   border: '',                    icon: '\u25CB' },
   keyword_optimized:  { label: 'Keyword Optimized', bg: 'bg-blue-500/10',    text: 'text-blue-400',   border: 'border-blue-500/20',  icon: '\u25D0' },
   brief_generated:    { label: 'Brief Generated',   bg: 'bg-amber-500/10',   text: 'text-amber-400',  border: 'border-amber-500/20', icon: '\u25D1' },
-  client_review:      { label: 'Client Review',     bg: 'bg-purple-500/10',  text: 'text-purple-400', border: 'border-purple-500/20',icon: '\u25D1' },
+  client_review:      { label: 'Client Review',     bg: 'bg-blue-500/10',    text: 'text-blue-400',   border: 'border-blue-500/20', icon: '\u25D1' },
   approved:           { label: 'Approved',           bg: 'bg-teal-500/10',   text: 'text-teal-400',   border: 'border-teal-500/20',  icon: '\u2713' },
   draft:              { label: 'Draft',              bg: 'bg-orange-500/10',  text: 'text-orange-400', border: 'border-orange-500/20',icon: '\u25D0' },
   published:          { label: 'Published',          bg: 'bg-green-500/10',   text: 'text-green-400',  border: 'border-green-500/20', icon: '\u25CF' },
@@ -68,16 +68,18 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
   const completedCount = matrix.cells.filter(c => c.status === 'published' || c.status === 'approved' || c.status === 'draft').length;
   const progressPercent = matrix.cells.length > 0 ? Math.round((completedCount / matrix.cells.length) * 100) : 0;
 
-  // Build an ordered cell ID list for each view mode so shift-click works correctly
+  // Build ordered cell ID lists for shift-click selection in each view mode.
+  // Grid view: include null placeholders for empty slots so indices match flatIndex.
+  // List view: use sortedCells order directly.
   const gridOrderedCellIds = useMemo(() => {
     if (!dim0 || !dim1) return sortedCells.map(c => c.id);
-    const ids: string[] = [];
+    const ids: (string | null)[] = [];
     for (const row of dim0.values) {
       for (const col of dim1.values) {
         const cell = filteredCells.find(c =>
           c.variableValues[dim0.name] === row && c.variableValues[dim1.name] === col
         );
-        if (cell) ids.push(cell.id);
+        ids.push(cell ? cell.id : null);
       }
     }
     return ids;
@@ -93,7 +95,8 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
         const start = Math.min(lastSelectedIndex.current, flatIndex);
         const end = Math.max(lastSelectedIndex.current, flatIndex);
         for (let i = start; i <= end; i++) {
-          if (gridOrderedCellIds[i]) next.add(gridOrderedCellIds[i]);
+          const id = gridOrderedCellIds[i];
+          if (id) next.add(id);
         }
       } else {
         next.clear();

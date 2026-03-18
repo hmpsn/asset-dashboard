@@ -19,7 +19,7 @@ const STATUS_CONFIG: Record<MatrixCell['status'], { label: string; color: 'zinc'
   planned: { label: 'Planned', color: 'zinc', icon: '\u25CB' },
   keyword_optimized: { label: 'Keyword Optimized', color: 'blue', icon: '\u25D0' },
   brief_generated: { label: 'Brief Generated', color: 'amber', icon: '\u25D1' },
-  client_review: { label: 'Client Review', color: 'purple', icon: '\u25D1' },
+  client_review: { label: 'Client Review', color: 'blue', icon: '\u25D1' },
   approved: { label: 'Approved', color: 'teal', icon: '\u2713' },
   draft: { label: 'Draft', color: 'orange', icon: '\u25D0' },
   published: { label: 'Published', color: 'green', icon: '\u25CF' },
