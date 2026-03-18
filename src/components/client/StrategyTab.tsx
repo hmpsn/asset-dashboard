@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Zap, FileText, Sparkles, Target, Search, CheckCircle2,
-  TrendingUp, ChevronDown, Shield, BookOpen,
+  TrendingUp, ChevronDown, Shield, BookOpen, Layers,
 } from 'lucide-react';
 import { TierGate, StatCard, EmptyState, type Tier } from '../ui';
 import type { ClientKeywordStrategy, ClientContentRequest } from './types';
@@ -30,9 +30,10 @@ interface StrategyTabProps {
   fullPostPrice: number | null;
   fmtPrice: (n: number) => string;
   setPricingModal: (modal: PricingModalState | null) => void;
+  contentPlanKeywords?: Map<string, string>;
 }
 
-export function StrategyTab({ strategyData, requestedTopics, contentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal }: StrategyTabProps) {
+export function StrategyTab({ strategyData, requestedTopics, contentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal, contentPlanKeywords }: StrategyTabProps) {
   const betaMode = useBetaMode();
   const [mapSearch, setMapSearch] = useState('');
   const [mapSort, setMapSort] = useState<'default' | 'position' | 'impressions' | 'clicks'>('default');
@@ -99,6 +100,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               {strategyData.contentGaps.map((gap, i) => {
                 const matchingReq = contentRequests?.find(r => r.targetKeyword === gap.targetKeyword && r.status !== 'declined');
                 const alreadyRequested = matchingReq != null || requestedTopics.has(gap.targetKeyword);
+                const planStatus = contentPlanKeywords?.get(gap.targetKeyword.toLowerCase());
                 const pageType = gap.suggestedPageType || 'blog';
                 const pageTypeLabel = ({ blog: 'Blog Post', landing: 'Landing Page', service: 'Service Page', location: 'Location Page', product: 'Product Page', pillar: 'Pillar Page', resource: 'Resource Guide' } as Record<string, string>)[pageType] || 'Blog Post';
                 const keywordDiffers = gap.targetKeyword.toLowerCase().replace(/[^a-z0-9]/g, '') !== gap.topic.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -124,6 +126,11 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                           if (s === 'brief_generated' || s === 'client_review') return <span className="flex items-center gap-1 text-[11px] text-amber-400 bg-amber-500/10 px-2.5 py-1.5 rounded-lg border border-amber-500/20 flex-shrink-0"><FileText className="w-3.5 h-3.5" /> In Review</span>;
                           return <span className="flex items-center gap-1 text-[11px] text-blue-400 bg-blue-500/10 px-2.5 py-1.5 rounded-lg border border-blue-500/20 flex-shrink-0"><CheckCircle2 className="w-3.5 h-3.5" /> Brief Ordered</span>;
                         })()
+                      ) : planStatus ? (
+                        <span className="flex items-center gap-1 text-[11px] text-violet-400 bg-violet-500/10 px-2.5 py-1.5 rounded-lg border border-violet-500/20 flex-shrink-0">
+                          <Layers className="w-3.5 h-3.5" />
+                          {planStatus === 'published' ? 'Published' : planStatus === 'approved' ? 'Approved' : planStatus === 'in_progress' || planStatus === 'brief_generated' ? 'In Progress' : 'Planned'}
+                        </span>
                       ) : (
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <button

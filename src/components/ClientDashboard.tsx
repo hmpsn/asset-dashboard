@@ -73,7 +73,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     approvalBatches, setApprovalBatches, approvalsLoading,
     activityLog, rankHistory, latestRanks, annotations,
     requests, requestsLoading, contentRequests, setContentRequests,
-    sectionErrors, contentPlanSummary,
+    sectionErrors, contentPlanSummary, contentPlanKeywords,
     loadDashboardData, loadRequests, loadApprovals,
     changeDays, applyCustomRange, refetchClient,
   } = useClientData(workspaceId);
@@ -839,7 +839,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
         {/* ════════════ SEO STRATEGY TAB ════════════ */}
         {tab === 'strategy' && (
-          <StrategyTab strategyData={strategyData} requestedTopics={requestedTopics} contentRequests={contentRequests} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} />
+          <StrategyTab strategyData={strategyData} requestedTopics={requestedTopics} contentRequests={contentRequests} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} contentPlanKeywords={contentPlanKeywords} />
         )}
 
 

@@ -49,6 +49,7 @@ export function useClientData(_workspaceId: string) {
   const [contentRequests, setContentRequests] = useState<ClientContentRequest[]>([]);
   const [sectionErrors, setSectionErrors] = useState<Record<string, string>>({});
   const [contentPlanSummary, setContentPlanSummary] = useState<{ totalCells: number; publishedCells: number; reviewCells: number; approvedCells: number; inProgressCells: number; matrixCount: number } | null>(null);
+  const [contentPlanKeywords, setContentPlanKeywords] = useState<Map<string, string>>(new Map());
 
   const setSectionError = useCallback((key: string, msg: string) => {
     setSectionErrors(prev => ({ ...prev, [key]: msg }));
@@ -166,7 +167,7 @@ export function useClientData(_workspaceId: string) {
         setRequestedTopics(new Set(reqs.map(r => r.targetKeyword)));
       }
     }).catch(() => setSectionError('content', 'Unable to load content requests'));
-    getSafe<Array<{ cells?: Array<{ status: string }> }>>(`/api/public/content-plan/${data.id}`, []).then((plans) => {
+    getSafe<Array<{ cells?: Array<{ status: string; targetKeyword?: string }> }>>(`/api/public/content-plan/${data.id}`, []).then((plans) => {
       if (Array.isArray(plans)) {
         const allCells = plans.flatMap(p => p.cells || []);
         setContentPlanSummary({
@@ -177,6 +178,11 @@ export function useClientData(_workspaceId: string) {
           inProgressCells: allCells.filter(c => c.status === 'brief_generated' || c.status === 'in_progress').length,
           matrixCount: plans.length,
         });
+        const kwMap = new Map<string, string>();
+        for (const c of allCells) {
+          if (c.targetKeyword) kwMap.set(c.targetKeyword.toLowerCase(), c.status);
+        }
+        setContentPlanKeywords(kwMap);
       }
     }).catch(() => {});
   }, [loadSearchData, loadGA4Data, loadApprovals, loadRequests, clearSectionError, setSectionError]);
@@ -253,6 +259,7 @@ export function useClientData(_workspaceId: string) {
     contentRequests, setContentRequests,
     sectionErrors, setSectionErrors,
     contentPlanSummary, setContentPlanSummary,
+    contentPlanKeywords, setContentPlanKeywords,
     setSectionError,
     clearSectionError,
     loadDashboardData,
