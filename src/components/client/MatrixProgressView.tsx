@@ -18,7 +18,7 @@ const STATUS_DISPLAY: Record<MatrixCell['status'], { label: string; icon: typeof
   planned:           { label: 'Planned',       icon: Clock,        color: 'text-zinc-500',   badgeColor: 'zinc' },
   keyword_optimized: { label: 'In Progress',   icon: Clock,        color: 'text-blue-400',   badgeColor: 'blue' },
   brief_generated:   { label: 'Brief Ready',   icon: FileText,     color: 'text-amber-400',  badgeColor: 'amber' },
-  client_review:     { label: 'Your Review',   icon: Eye,          color: 'text-purple-400', badgeColor: 'purple' },
+  client_review:     { label: 'Your Review',   icon: Eye,          color: 'text-blue-400',   badgeColor: 'blue' },
   approved:          { label: 'Approved',       icon: CheckCircle2, color: 'text-teal-400',   badgeColor: 'teal' },
   draft:             { label: 'In Production',  icon: PenTool,      color: 'text-orange-400', badgeColor: 'orange' },
   published:         { label: 'Published',      icon: CheckCircle2, color: 'text-green-400',  badgeColor: 'green' },
@@ -175,7 +175,7 @@ export function MatrixProgressView({ matrix, onCellPreview, onFlagCell, onDownlo
         <div className="flex items-center gap-4 mt-3 flex-wrap">
           <span className="text-[11px] text-zinc-500">{matrix.stats.planned} planned</span>
           <span className="text-[11px] text-amber-400">{matrix.stats.briefGenerated} briefs</span>
-          {reviewCount > 0 && <span className="text-[11px] text-purple-400">{reviewCount} awaiting review</span>}
+          {reviewCount > 0 && <span className="text-[11px] text-blue-400">{reviewCount} awaiting review</span>}
           <span className="text-[11px] text-orange-400">{matrix.stats.drafted} drafts</span>
           <span className="text-[11px] text-green-400">{publishedCount} published</span>
         </div>

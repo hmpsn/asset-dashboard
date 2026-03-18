@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import {
   Filter, ArrowUpDown, Sparkles, FileText, Send, Download,
   FileDown, CheckSquare, Square, BarChart3, Flag,
@@ -68,6 +68,21 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
   const completedCount = matrix.cells.filter(c => c.status === 'published' || c.status === 'approved' || c.status === 'draft').length;
   const progressPercent = matrix.cells.length > 0 ? Math.round((completedCount / matrix.cells.length) * 100) : 0;
 
+  // Build an ordered cell ID list for each view mode so shift-click works correctly
+  const gridOrderedCellIds = useMemo(() => {
+    if (!dim0 || !dim1) return sortedCells.map(c => c.id);
+    const ids: string[] = [];
+    for (const row of dim0.values) {
+      for (const col of dim1.values) {
+        const cell = filteredCells.find(c =>
+          c.variableValues[dim0.name] === row && c.variableValues[dim1.name] === col
+        );
+        if (cell) ids.push(cell.id);
+      }
+    }
+    return ids;
+  }, [dim0, dim1, filteredCells, sortedCells]);
+
   const handleCellSelect = useCallback((cellId: string, e: React.MouseEvent, flatIndex: number) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -78,7 +93,7 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
         const start = Math.min(lastSelectedIndex.current, flatIndex);
         const end = Math.max(lastSelectedIndex.current, flatIndex);
         for (let i = start; i <= end; i++) {
-          if (sortedCells[i]) next.add(sortedCells[i].id);
+          if (gridOrderedCellIds[i]) next.add(gridOrderedCellIds[i]);
         }
       } else {
         next.clear();
@@ -87,7 +102,7 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
       return next;
     });
     lastSelectedIndex.current = flatIndex;
-  }, [sortedCells]);
+  }, [gridOrderedCellIds]);
 
   const handleCellOpen = useCallback((cell: MatrixCell) => {
     setDetailCell(cell);
