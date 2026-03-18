@@ -1516,13 +1516,46 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 146. Smart Keyword Recommendations
+**What it does:** Given a seed keyword (from a matrix cell pattern or manual input), fetches SEMRush related keywords, scores each by opportunity (40% log-scaled volume + 60% inverse difficulty), and returns ranked candidates with a recommended pick. Optional AI re-ranking via GPT-4.1-nano that considers business context, commercial intent, and specificity. Non-blocking fallback when SEMRush is unconfigured. Two endpoints: standalone (any seed keyword) and per-cell (auto-uses cell's target keyword as seed).
+
+**Agency value:** No more guessing which keyword variant to target. The system surfaces the best option from real SEMRush data, ranked by achievability. AI ranking adds business-relevance awareness when keyword strategy context exists.
+
+**Client value:** Every content page targets an evidence-backed keyword with the best volume-to-difficulty ratio for their business.
+
+**Mutual:** Removes the manual research step from keyword selection. What used to take 15 minutes per keyword is now a one-click API call.
+
+---
+
+### 147. Cannibalization Detection
+**What it does:** Detects keyword overlap between matrix cells and existing pages (from keyword strategy pageMap), within the same matrix, and across different matrices. Three severity levels: high (exact match after normalization), medium (word subset overlap — all words of one keyword appear in the other), low (60%+ Jaccard word overlap). Symmetric deduplication prevents A↔B duplicates. Full matrix report endpoint returns conflict list with summary counts. Single-keyword check endpoint for pre-validation before adding to a cell.
+
+**Agency value:** Catches the #1 SEO mistake in scaled content — two pages targeting the same keyword. Detects it before a single brief is generated, saving hours of wasted production work.
+
+**Client value:** No duplicate content competing against itself in search results. Every page has a unique keyword lane.
+
+**Mutual:** Automated quality gate that prevents the most common content strategy error at scale.
+
+---
+
+### 148. Content Planner Export (CSV/JSON)
+**What it does:** Adds matrix cells and content template export to the existing data export system. Matrix export flattens all cells across all matrices into one CSV/JSON with columns: matrix name, cell keyword, planned URL, status, variable values, SEMRush metrics (volume/difficulty/CPC), linked brief and post IDs. Template export includes metadata: page type, URL/keyword patterns, section count, variable count. Both formats available via `?format=csv` or `?format=json` query parameter.
+
+**Agency value:** Export the content plan as a CSV to share with writers, clients, or import into project management tools. Template export documents the content architecture.
+
+**Client value:** Downloadable content plan they can review offline or share with stakeholders.
+
+**Mutual:** Makes the content planner's data portable and audit-friendly.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
 |----------|:---:|---|
 | SEO & Technical | 15 | Audit, fix, and optimize faster than manual tools + AEO trust signals + change impact tracking + content decay detection |
 | Analytics & Tracking | 7 | Unified data view replaces platform-hopping + AI time-saved tracking |
-| Content & Strategy | 15 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar + content templates + keyword pre-assignment + content matrices |
+| Content & Strategy | 18 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar + content templates + keyword pre-assignment + content matrices + keyword recommendations + cannibalization detection + content planner export |
 | Client Communication | 10 | Structured workflows + automated reports + expanded notifications + feedback widget + email capture funnel + audit completion email |
 | Client Self-Service | 15 | 24/7 data access, onboarding, plans, cart, order tracking, glossary, questionnaire, ROI upgrade prompts, shareable report permalinks, content pipeline status cards + post-publish performance |
 | AI & Intelligence | 7 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine + context completeness + usage dashboard + AEO page review |
@@ -1534,9 +1567,9 @@ When the user asks to update this document with recent features, follow this pro
 | Architecture | 5 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types |
 | Infrastructure | 7 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3 + integrity verification), E2E tests, job persistence, anomaly deploy guard |
 
-**133 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**148 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **145**. Last updated: March 2026 (content templates, keyword pre-assignment, content matrices).
+Current feature count: **148**. Last updated: March 2026 (content templates, keyword pre-assignment, content matrices).
 
 ### Recent Additions (March 2026)
 

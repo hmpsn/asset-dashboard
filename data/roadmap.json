@@ -149,6 +149,33 @@
           "status": "done"
         },
         {
+          "id": 403,
+          "title": "Smart Keyword Recommendations (SEMRush + AI scoring)",
+          "source": "CONTENT_PLANNER_PLAN",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — Phase 2b: Opportunity scoring (volume/difficulty), SEMRush related keywords, optional AI re-ranking via GPT-4.1-nano. Standalone + per-cell endpoints.",
+          "status": "done"
+        },
+        {
+          "id": 404,
+          "title": "Cannibalization Detection",
+          "source": "CONTENT_PLANNER_PLAN",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — Phase 2c: Keyword overlap detection against existing pages, same-matrix cells, cross-matrix cells. Three severity levels. Full matrix report + single keyword check endpoints.",
+          "status": "done"
+        },
+        {
+          "id": 405,
+          "title": "Content Planner Export (CSV/JSON)",
+          "source": "CONTENT_PLANNER_PLAN",
+          "est": "1-2h",
+          "priority": "P2",
+          "notes": "Shipped — Phase 3: Matrix cells flattened CSV/JSON export + template metadata export. Added to existing data-export routes.",
+          "status": "done"
+        },
+        {
           "id": 76,
           "title": "Strategy & implementation hours system",
           "source": "Tier audit discussion",
