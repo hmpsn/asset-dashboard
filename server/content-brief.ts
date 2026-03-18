@@ -40,6 +40,10 @@ interface BriefRow {
   reference_urls: string | null;
   real_people_also_ask: string | null;
   real_top_results: string | null;
+  keyword_locked: number | null;
+  keyword_source: string | null;
+  keyword_validation: string | null;
+  template_id: string | null;
 }
 
 interface BriefStmts {
@@ -62,7 +66,8 @@ function stmts(): BriefStmts {
             executive_summary, content_format, tone_and_style, people_also_ask,
             topical_entities, serp_analysis, difficulty_score, traffic_potential,
             cta_recommendations, eeat_guidance, content_checklist, schema_recommendations,
-            page_type, reference_urls, real_people_also_ask, real_top_results)
+            page_type, reference_urls, real_people_also_ask, real_top_results,
+            keyword_locked, keyword_source, keyword_validation, template_id)
          VALUES
            (@id, @workspace_id, @target_keyword, @secondary_keywords, @suggested_title,
             @suggested_meta_desc, @outline, @word_count_target, @intent, @audience,
@@ -70,7 +75,8 @@ function stmts(): BriefStmts {
             @executive_summary, @content_format, @tone_and_style, @people_also_ask,
             @topical_entities, @serp_analysis, @difficulty_score, @traffic_potential,
             @cta_recommendations, @eeat_guidance, @content_checklist, @schema_recommendations,
-            @page_type, @reference_urls, @real_people_also_ask, @real_top_results)`,
+            @page_type, @reference_urls, @real_people_also_ask, @real_top_results,
+            @keyword_locked, @keyword_source, @keyword_validation, @template_id)`,
       ),
       selectByWorkspace: db.prepare(
         `SELECT * FROM content_briefs WHERE workspace_id = ? ORDER BY created_at DESC`,
@@ -92,7 +98,9 @@ function stmts(): BriefStmts {
            cta_recommendations = @cta_recommendations, eeat_guidance = @eeat_guidance,
            content_checklist = @content_checklist, schema_recommendations = @schema_recommendations,
            page_type = @page_type, reference_urls = @reference_urls,
-           real_people_also_ask = @real_people_also_ask, real_top_results = @real_top_results
+           real_people_also_ask = @real_people_also_ask, real_top_results = @real_top_results,
+           keyword_locked = @keyword_locked, keyword_source = @keyword_source,
+           keyword_validation = @keyword_validation, template_id = @template_id
          WHERE id = @id`,
       ),
       deleteById: db.prepare(
@@ -134,6 +142,10 @@ function rowToBrief(row: BriefRow): ContentBrief {
     referenceUrls: row.reference_urls ? JSON.parse(row.reference_urls) : undefined,
     realPeopleAlsoAsk: row.real_people_also_ask ? JSON.parse(row.real_people_also_ask) : undefined,
     realTopResults: row.real_top_results ? JSON.parse(row.real_top_results) : undefined,
+    keywordLocked: row.keyword_locked ? true : undefined,
+    keywordSource: (row.keyword_source as ContentBrief['keywordSource']) ?? undefined,
+    keywordValidation: row.keyword_validation ? JSON.parse(row.keyword_validation) : undefined,
+    templateId: row.template_id ?? undefined,
   };
 }
 
@@ -167,6 +179,10 @@ function briefToParams(brief: ContentBrief): Record<string, unknown> {
     reference_urls: brief.referenceUrls ? JSON.stringify(brief.referenceUrls) : null,
     real_people_also_ask: brief.realPeopleAlsoAsk ? JSON.stringify(brief.realPeopleAlsoAsk) : null,
     real_top_results: brief.realTopResults ? JSON.stringify(brief.realTopResults) : null,
+    keyword_locked: brief.keywordLocked ? 1 : 0,
+    keyword_source: brief.keywordSource ?? null,
+    keyword_validation: brief.keywordValidation ? JSON.stringify(brief.keywordValidation) : null,
+    template_id: brief.templateId ?? null,
   };
 }
 
@@ -545,6 +561,16 @@ export async function generateBrief(
     scrapedReferences?: ScrapedPage[];
     serpData?: { peopleAlsoAsk: string[]; organicResults: { position: number; title: string; url: string }[] };
     styleExamples?: ScrapedPage[];
+    // Template constraints (Phase 1b — keyword pre-assignment)
+    templateId?: string;
+    templateSections?: { name: string; headingTemplate: string; guidance: string; wordCountTarget: number }[];
+    templateToneOverride?: string;
+    templateTitlePattern?: string;
+    templateMetaDescPattern?: string;
+    // Keyword tracking
+    keywordLocked?: boolean;
+    keywordSource?: ContentBrief['keywordSource'];
+    keywordValidation?: ContentBrief['keywordValidation'];
   }
 ): Promise<ContentBrief> {
   const openaiKey = process.env.OPENAI_API_KEY;
@@ -615,6 +641,25 @@ export async function generateBrief(
     ga4Block += `\n\nUse this data to:\n- Identify which existing pages perform well (low bounce, high engagement) and why\n- Spot underperforming pages that a content refresh could improve\n- Recommend internal links to high-traffic pages\n- Set realistic traffic expectations based on current performance`;
   }
 
+  // Template constraint block (when generating from a content template)
+  let templateBlock = '';
+  if (context.templateSections?.length) {
+    templateBlock = `\n\nTEMPLATE STRUCTURE (REQUIRED — you MUST follow this exact section structure):
+The outline sections MUST match the following template sections in order. You may add 1-2 supplementary sections (FAQ, conclusion) but the core structure is fixed:`;
+    for (const s of context.templateSections) {
+      templateBlock += `\n- Section "${s.name}": heading pattern "${s.headingTemplate}" — ${s.guidance} (target ~${s.wordCountTarget} words)`;
+    }
+    if (context.templateToneOverride) {
+      templateBlock += `\n\nTONE OVERRIDE: Use this specific tone and style instead of your default: ${context.templateToneOverride}`;
+    }
+    if (context.templateTitlePattern) {
+      templateBlock += `\nTITLE PATTERN: The suggestedTitle MUST follow this pattern: ${context.templateTitlePattern} — substitute variable values with SEO-optimized text.`;
+    }
+    if (context.templateMetaDescPattern) {
+      templateBlock += `\nMETA DESC PATTERN: The suggestedMetaDesc MUST follow this pattern: ${context.templateMetaDescPattern}`;
+    }
+  }
+
   // Page-type-specific instructions and configuration
   const ptConfig = getPageTypeConfig(context.pageType);
   const pageTypeBlock = context.pageType && PAGE_TYPE_CONFIGS[context.pageType]
@@ -629,7 +674,7 @@ Related search queries from Google Search Console:
 ${relatedStr}
 
 Existing pages on the site:
-${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${semrushBlock}${ga4Block}${referenceBlock}${serpBlock}${styleBlock}
+${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${semrushBlock}${ga4Block}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}
 
 Generate a content brief in the following JSON format:
 {
@@ -764,6 +809,11 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
       ? context.serpData.organicResults.map(r => ({ position: r.position, title: r.title, url: r.url }))
       : undefined,
     referenceUrls: context.referenceUrls,
+    // Keyword pre-assignment tracking
+    keywordLocked: context.keywordLocked || undefined,
+    keywordSource: context.keywordSource || undefined,
+    keywordValidation: context.keywordValidation || undefined,
+    templateId: context.templateId || undefined,
   };
 
   stmts().insert.run({
@@ -796,6 +846,10 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     reference_urls: brief.referenceUrls ? JSON.stringify(brief.referenceUrls) : null,
     real_people_also_ask: brief.realPeopleAlsoAsk ? JSON.stringify(brief.realPeopleAlsoAsk) : null,
     real_top_results: brief.realTopResults ? JSON.stringify(brief.realTopResults) : null,
+    keyword_locked: brief.keywordLocked ? 1 : 0,
+    keyword_source: brief.keywordSource ?? null,
+    keyword_validation: brief.keywordValidation ? JSON.stringify(brief.keywordValidation) : null,
+    template_id: brief.templateId ?? null,
   });
 
   return brief;

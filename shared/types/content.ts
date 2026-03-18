@@ -35,6 +35,16 @@ export interface ContentBrief {
   // Real SERP data (v5) — actual PAA questions and top results from Google
   realPeopleAlsoAsk?: string[];
   realTopResults?: { position: number; title: string; url: string }[];
+  // Keyword pre-assignment (v6) — template/matrix keyword locking
+  keywordLocked?: boolean;
+  keywordSource?: 'manual' | 'semrush' | 'gsc' | 'matrix' | 'template';
+  keywordValidation?: {
+    volume: number;
+    difficulty: number;
+    cpc: number;
+    validatedAt: string;
+  };
+  templateId?: string;
 }
 
 export interface PostSection {
@@ -151,6 +161,113 @@ export interface ContentSubscription {
   topicSource: 'strategy_gaps' | 'manual' | 'ai_recommended';
   preferredPageTypes?: string[];
   notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── Content Templates (scalable content planning) ──────────────
+
+export interface TemplateVariable {
+  name: string;
+  label: string;
+  description?: string;
+}
+
+export interface TemplateSection {
+  id: string;
+  name: string;
+  headingTemplate: string;
+  guidance: string;
+  wordCountTarget: number;
+  order: number;
+  cmsFieldSlug?: string;
+}
+
+export type ContentPageType =
+  | 'blog' | 'landing' | 'service' | 'location' | 'product'
+  | 'pillar' | 'resource' | 'provider-profile' | 'procedure-guide' | 'pricing-page';
+
+export interface ContentTemplate {
+  id: string;
+  workspaceId: string;
+  name: string;
+  description?: string;
+  pageType: ContentPageType;
+  variables: TemplateVariable[];
+  sections: TemplateSection[];
+  urlPattern: string;
+  keywordPattern: string;
+  titlePattern?: string;
+  metaDescPattern?: string;
+  cmsFieldMap?: Record<string, string>;
+  toneAndStyle?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── Content Matrix (bulk content planning grid) ─────────────────
+
+export interface MatrixDimension {
+  variableName: string;
+  values: string[];
+}
+
+export type MatrixCellStatus =
+  | 'planned'
+  | 'keyword_validated'
+  | 'brief_generated'
+  | 'draft'
+  | 'review'
+  | 'approved'
+  | 'published';
+
+export interface KeywordCandidate {
+  keyword: string;
+  volume: number;
+  difficulty: number;
+  cpc: number;
+  source: 'pattern' | 'semrush_related' | 'ai_suggested';
+  isRecommended: boolean;
+}
+
+export interface MatrixCell {
+  id: string;
+  variableValues: Record<string, string>;
+  targetKeyword: string;
+  customKeyword?: string;
+  plannedUrl: string;
+  briefId?: string;
+  postId?: string;
+  status: MatrixCellStatus;
+  keywordValidation?: {
+    volume: number;
+    difficulty: number;
+    cpc: number;
+    validatedAt: string;
+  };
+  keywordCandidates?: KeywordCandidate[];
+  recommendedKeyword?: string;
+  clientFlag?: string;
+  clientFlaggedAt?: string;
+}
+
+export interface ContentMatrix {
+  id: string;
+  workspaceId: string;
+  name: string;
+  templateId: string;
+  dimensions: MatrixDimension[];
+  urlPattern: string;
+  keywordPattern: string;
+  cells: MatrixCell[];
+  stats: {
+    total: number;
+    planned: number;
+    briefGenerated: number;
+    drafted: number;
+    reviewed: number;
+    published: number;
+  };
   createdAt: string;
   updatedAt: string;
 }
