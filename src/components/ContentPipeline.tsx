@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, lazy, Suspense } from 'react';
-import { Clipboard, FileText, RefreshCw, Map, Bot, Download, ChevronDown, Layers } from 'lucide-react';
+import { Clipboard, FileText, RefreshCw, Map, Bot, Download, ChevronDown, Layers, HelpCircle } from 'lucide-react';
 import { ContentBriefs } from './ContentBriefs';
 import { ContentManager } from './ContentManager';
 import { ContentSubscriptions } from './ContentSubscriptions';
@@ -8,6 +8,7 @@ import type { FixContext } from '../App';
 const SiteArchitecture = lazy(() => import('./SiteArchitecture').then(m => ({ default: m.SiteArchitecture })));
 const LlmsTxtGenerator = lazy(() => import('./LlmsTxtGenerator').then(m => ({ default: m.LlmsTxtGenerator })));
 const ContentPlanner = lazy(() => import('./ContentPlanner').then(m => ({ default: m.ContentPlanner })));
+const ContentPipelineGuide = lazy(() => import('./ContentPipelineGuide').then(m => ({ default: m.ContentPipelineGuide })));
 
 interface Props {
   workspaceId: string;
@@ -22,6 +23,7 @@ const TABS = [
   { id: 'subscriptions' as const, label: 'Subscriptions', icon: RefreshCw },
   { id: 'architecture' as const, label: 'Architecture', icon: Map },
   { id: 'llms-txt' as const, label: 'LLMs.txt', icon: Bot },
+  { id: 'guide' as const, label: 'Guide', icon: HelpCircle },
 ];
 
 type PipelineTab = typeof TABS[number]['id'];
@@ -125,6 +127,11 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext 
       {activeTab === 'llms-txt' && (
         <Suspense fallback={<div className="flex items-center justify-center py-24"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>}>
           <LlmsTxtGenerator key={`llms-${workspaceId}`} workspaceId={workspaceId} />
+        </Suspense>
+      )}
+      {activeTab === 'guide' && (
+        <Suspense fallback={<div className="flex items-center justify-center py-24"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>}>
+          <ContentPipelineGuide />
         </Suspense>
       )}
     </div>
