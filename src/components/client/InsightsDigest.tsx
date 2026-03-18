@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   TrendingUp, TrendingDown, Users, MousePointer, Shield, Zap,
-  Target, FileText, Globe, Sparkles, CheckCircle2,
+  Target, FileText, Globe, Sparkles, CheckCircle2, Layers,
   ArrowRight, ChevronDown, type LucideIcon,
 } from 'lucide-react';
 import { clientPath } from '../../routes';
@@ -43,6 +43,7 @@ interface InsightsDigestProps {
   eventDisplayName: (name: string) => string;
   isEventPinned: (name: string) => boolean;
   workspaceId: string;
+  contentPlanSummary?: { totalCells: number; publishedCells: number; reviewCells: number; approvedCells: number; inProgressCells: number; matrixCount: number } | null;
 }
 
 // ─── Helpers ───
@@ -275,7 +276,47 @@ function generateInsights(props: InsightsDigestProps): DigestInsight[] {
     }
   }
 
-  // 11. Position improvement alert
+  // 11. Content plan progress
+  if (props.contentPlanSummary && props.contentPlanSummary.totalCells > 0) {
+    const cp = props.contentPlanSummary;
+    const pct = Math.round((cp.publishedCells / cp.totalCells) * 100);
+    if (cp.reviewCells > 0) {
+      cards.push({
+        id: 'content-plan-review',
+        icon: Layers,
+        color: 'blue',
+        headline: `${cp.reviewCells} content plan page${cp.reviewCells > 1 ? 's' : ''} need your review`,
+        body: `Your content plan has ${cp.totalCells} planned pages. ${cp.publishedCells} published, ${cp.approvedCells} approved, ${cp.inProgressCells} in progress. Review flagged items to keep the pipeline moving.`,
+        action: { label: 'Review content plan', tab: 'content-plan' },
+        priority: 1,
+        sentiment: 'opportunity',
+      });
+    } else if (pct < 100) {
+      cards.push({
+        id: 'content-plan-progress',
+        icon: Layers,
+        color: pct >= 80 ? 'green' : pct >= 40 ? 'teal' : 'blue',
+        headline: `Content plan is ${pct}% complete`,
+        body: `${cp.publishedCells} of ${cp.totalCells} pages published across ${cp.matrixCount} plan${cp.matrixCount !== 1 ? 's' : ''}.${cp.inProgressCells > 0 ? ` ${cp.inProgressCells} currently in progress.` : ''}${cp.approvedCells > 0 ? ` ${cp.approvedCells} approved and queued.` : ''}`,
+        action: { label: 'View content plan', tab: 'content-plan' },
+        priority: 3,
+        sentiment: pct >= 80 ? 'positive' : 'neutral',
+      });
+    } else {
+      cards.push({
+        id: 'content-plan-complete',
+        icon: Layers,
+        color: 'green',
+        headline: 'Content plan fully published',
+        body: `All ${cp.totalCells} planned pages are live across ${cp.matrixCount} plan${cp.matrixCount !== 1 ? 's' : ''}. Great work!`,
+        action: { label: 'View content plan', tab: 'content-plan' },
+        priority: 5,
+        sentiment: 'positive',
+      });
+    }
+  }
+
+  // 12. Position improvement alert
   if (searchComparison && searchComparison.change.position < -2) {
     // Big position improvement — call it out
     cards.push({

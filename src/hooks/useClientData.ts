@@ -48,7 +48,7 @@ export function useClientData(_workspaceId: string) {
   const [requestsLoading, setRequestsLoading] = useState(false);
   const [contentRequests, setContentRequests] = useState<ClientContentRequest[]>([]);
   const [sectionErrors, setSectionErrors] = useState<Record<string, string>>({});
-  const [contentPlanReviewCount, setContentPlanReviewCount] = useState(0);
+  const [contentPlanSummary, setContentPlanSummary] = useState<{ totalCells: number; publishedCells: number; reviewCells: number; approvedCells: number; inProgressCells: number; matrixCount: number } | null>(null);
 
   const setSectionError = useCallback((key: string, msg: string) => {
     setSectionErrors(prev => ({ ...prev, [key]: msg }));
@@ -168,8 +168,15 @@ export function useClientData(_workspaceId: string) {
     }).catch(() => setSectionError('content', 'Unable to load content requests'));
     getSafe<Array<{ cells?: Array<{ status: string }> }>>(`/api/public/content-plan/${data.id}`, []).then((plans) => {
       if (Array.isArray(plans)) {
-        const count = plans.reduce((sum, p) => sum + (p.cells?.filter(c => c.status === 'review' || c.status === 'flagged').length || 0), 0);
-        setContentPlanReviewCount(count);
+        const allCells = plans.flatMap(p => p.cells || []);
+        setContentPlanSummary({
+          totalCells: allCells.length,
+          publishedCells: allCells.filter(c => c.status === 'published').length,
+          reviewCells: allCells.filter(c => c.status === 'review' || c.status === 'flagged').length,
+          approvedCells: allCells.filter(c => c.status === 'approved').length,
+          inProgressCells: allCells.filter(c => c.status === 'brief_generated' || c.status === 'in_progress').length,
+          matrixCount: plans.length,
+        });
       }
     }).catch(() => {});
   }, [loadSearchData, loadGA4Data, loadApprovals, loadRequests, clearSectionError, setSectionError]);
@@ -245,7 +252,7 @@ export function useClientData(_workspaceId: string) {
     requestsLoading, setRequestsLoading,
     contentRequests, setContentRequests,
     sectionErrors, setSectionErrors,
-    contentPlanReviewCount, setContentPlanReviewCount,
+    contentPlanSummary, setContentPlanSummary,
     setSectionError,
     clearSectionError,
     loadDashboardData,

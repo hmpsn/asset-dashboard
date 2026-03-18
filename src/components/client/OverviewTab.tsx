@@ -63,6 +63,8 @@ interface OverviewTabProps {
   // AI Insight
   proactiveInsight: string | null;
   proactiveInsightLoading: boolean;
+  // Content Plan
+  contentPlanSummary?: { totalCells: number; publishedCells: number; reviewCells: number; approvedCells: number; inProgressCells: number; matrixCount: number } | null;
 }
 
 export function OverviewTab({
@@ -74,7 +76,7 @@ export function OverviewTab({
   pendingApprovals, unreadTeamNotes,
   eventDisplayName, isEventPinned,
   workspaceId, onAskAi, onOpenChat,
-  clientUser,
+  clientUser, contentPlanSummary,
 }: OverviewTabProps) {
   const navigate = useNavigate();
   const betaMode = useBetaMode();
@@ -152,6 +154,7 @@ export function OverviewTab({
       const contentReviews = contentRequests.filter(r => r.status === 'client_review').length;
       if (!betaMode && contentReviews > 0) actions.push({ label: `${contentReviews} content brief${contentReviews > 1 ? 's' : ''} ready for review`, count: contentReviews, tab: 'inbox', color: 'text-blue-400', icon: 'content' });
       if (unreadTeamNotes > 0) actions.push({ label: `${unreadTeamNotes} request${unreadTeamNotes > 1 ? 's' : ''} with new team replies`, count: unreadTeamNotes, tab: 'inbox', color: 'text-teal-400', icon: 'reply' });
+      if (contentPlanSummary && contentPlanSummary.reviewCells > 0) actions.push({ label: `${contentPlanSummary.reviewCells} content plan page${contentPlanSummary.reviewCells > 1 ? 's' : ''} to review`, count: contentPlanSummary.reviewCells, tab: 'content-plan', color: 'text-blue-400', icon: 'content-plan' });
       if (actions.length === 0) return null;
       const total = actions.reduce((s, a) => s + a.count, 0);
       return (
@@ -193,6 +196,7 @@ export function OverviewTab({
             eventDisplayName={eventDisplayName}
             isEventPinned={isEventPinned}
             workspaceId={workspaceId}
+            contentPlanSummary={contentPlanSummary}
           />
         </ErrorBoundary>
 

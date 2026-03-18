@@ -73,7 +73,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     approvalBatches, setApprovalBatches, approvalsLoading,
     activityLog, rankHistory, latestRanks, annotations,
     requests, requestsLoading, contentRequests, setContentRequests,
-    sectionErrors, contentPlanReviewCount,
+    sectionErrors, contentPlanSummary,
     loadDashboardData, loadRequests, loadApprovals,
     changeDays, applyCustomRange, refetchClient,
   } = useClientData(workspaceId);
@@ -769,7 +769,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                   <Icon className="w-3.5 h-3.5" /> {t.label}
                   {t.locked && <Lock className="w-3 h-3 ml-0.5 text-zinc-500" />}
                   {t.id === 'inbox' && (pendingApprovals + pendingReviews + unreadTeamNotes) > 0 && <span className="ml-1 px-1.5 py-0.5 text-[11px] font-bold rounded-full bg-teal-500 text-white flex-shrink-0 min-w-[20px] text-center leading-tight">{pendingApprovals + pendingReviews + unreadTeamNotes}</span>}
-                  {t.id === 'content-plan' && contentPlanReviewCount > 0 && <span className="ml-1 px-1.5 py-0.5 text-[11px] font-bold rounded-full bg-blue-500 text-white flex-shrink-0 min-w-[20px] text-center leading-tight">{contentPlanReviewCount}</span>}
+                  {t.id === 'content-plan' && contentPlanSummary && contentPlanSummary.reviewCells > 0 && <span className="ml-1 px-1.5 py-0.5 text-[11px] font-bold rounded-full bg-blue-500 text-white flex-shrink-0 min-w-[20px] text-center leading-tight">{contentPlanSummary.reviewCells}</span>}
                   {!t.locked && hasData && !active && t.id !== 'inbox' && <span className="w-2 h-2 rounded-full bg-emerald-400/60" title="Data available" />}
                 </button>
               );
@@ -815,7 +815,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
         {/* ════════════ OVERVIEW TAB ════════════ */}
         {tab === 'overview' && (
-          <OverviewTab ws={ws!} overview={overview} searchComparison={searchComparison} trend={trend} ga4Overview={ga4Overview} ga4Trend={ga4Trend} ga4Comparison={ga4Comparison} ga4Organic={ga4Organic} ga4Conversions={ga4Conversions} ga4NewVsReturning={ga4NewVsReturning} audit={audit} auditDetail={auditDetail} strategyData={strategyData} insights={insights} contentRequests={contentRequests} requests={requests} approvalBatches={approvalBatches} activityLog={activityLog} pendingApprovals={pendingApprovals} unreadTeamNotes={unreadTeamNotes} eventDisplayName={eventDisplayName} isEventPinned={isEventPinned} workspaceId={workspaceId} onAskAi={askAi} onOpenChat={() => setChatOpen(true)} clientUser={clientUser} proactiveInsight={proactiveInsight} proactiveInsightLoading={proactiveInsightLoading} />
+          <OverviewTab ws={ws!} overview={overview} searchComparison={searchComparison} trend={trend} ga4Overview={ga4Overview} ga4Trend={ga4Trend} ga4Comparison={ga4Comparison} ga4Organic={ga4Organic} ga4Conversions={ga4Conversions} ga4NewVsReturning={ga4NewVsReturning} audit={audit} auditDetail={auditDetail} strategyData={strategyData} insights={insights} contentRequests={contentRequests} requests={requests} approvalBatches={approvalBatches} activityLog={activityLog} pendingApprovals={pendingApprovals} unreadTeamNotes={unreadTeamNotes} eventDisplayName={eventDisplayName} isEventPinned={isEventPinned} workspaceId={workspaceId} onAskAi={askAi} onOpenChat={() => setChatOpen(true)} clientUser={clientUser} proactiveInsight={proactiveInsight} proactiveInsightLoading={proactiveInsightLoading} contentPlanSummary={contentPlanSummary} />
         )}
 
         {/* ════════════ PERFORMANCE TAB (Search + Analytics) ════════════ */}
