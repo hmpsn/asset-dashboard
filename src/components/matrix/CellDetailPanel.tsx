@@ -221,7 +221,7 @@ export function CellDetailPanel({
             </button>
           )}
 
-          {showFlagForm ? (
+          {onFlag && (showFlagForm ? (
             <div className="space-y-2">
               <textarea
                 value={flagComment}
@@ -253,7 +253,7 @@ export function CellDetailPanel({
             >
               <Flag className="w-3 h-3" /> Flag for Changes
             </button>
-          )}
+          ))}
         </div>
       </div>
     </div>
