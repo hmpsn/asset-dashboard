@@ -1483,13 +1483,46 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 143. Content Templates (Scalable Content Planning)
+**What it does:** Reusable page structure templates with named variables, ordered sections (heading pattern + guidance + word count target), URL/keyword patterns, CMS field mapping, and tone/style overrides. Full CRUD backend with SQLite persistence (migration 014). Templates define page types (blog, landing, service, location, product, pillar, resource, provider-profile, procedure-guide, pricing-page). Duplicate existing templates as starting points for new ones.
+
+**Agency value:** Define a page structure once (e.g., "Service Page" or "Location Page"), then stamp out dozens of briefs that follow the same proven outline. Ensures consistency across content at scale.
+
+**Client value:** Content deliverables follow a professional, repeatable structure. Every page type meets the same quality standard regardless of who writes it.
+
+**Mutual:** Templates eliminate the "blank page" problem for content production. The agency builds faster; the client gets more consistent results.
+
+---
+
+### 144. Keyword Pre-Assignment & Validation
+**What it does:** Extends brief generation to accept pre-locked keywords from templates or matrices. Keywords validated against SEMRush — returning volume, difficulty, CPC with warnings for low volume (<10/mo) or high difficulty (>85). Single and bulk validation endpoints. Non-blocking: if SEMRush unavailable, keywords accepted without validation. Brief tracks keyword source (manual, semrush, gsc, matrix, template) and validation metadata. Template constraints (section structure, tone override, title/meta patterns) injected into AI brief prompt.
+
+**Agency value:** No more guessing whether a keyword is worth targeting. SEMRush validation surfaces volume/difficulty before committing to a brief. Pre-locked keywords from matrices guarantee every piece targets a deliberate keyword.
+
+**Client value:** Every content brief is backed by real keyword data. Validation metrics build confidence in the content strategy.
+
+**Mutual:** Keyword validation catches bad targets before production starts. One API call prevents hours of wasted content work on zero-volume keywords.
+
+---
+
+### 145. Content Matrices (Bulk Content Planning Grids)
+**What it does:** Matrices connect a template to concrete content cells via cartesian product of dimensions (e.g., Service × City = 6 cells for 2 services × 3 cities). Each cell gets auto-generated target keyword and planned URL from patterns with variable substitution. Per-cell status tracking: planned → keyword_validated → brief_generated → draft → review → approved → published. Cells individually updatable. Matrix stats auto-computed. Full CRUD backend with SQLite persistence (migration 016). 12 integration tests.
+
+**Agency value:** Plan 50+ pages in one action instead of creating 50 separate briefs. The matrix is the production manifest — see at a glance which pages exist, which need briefs, which are in review, and which are published.
+
+**Client value:** Transparent view of the entire content plan with clear status per page. No wondering "did they write the Dallas plumbing page yet?"
+
+**Mutual:** Turns content production from ad-hoc requests into a structured, trackable manufacturing pipeline.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
 |----------|:---:|---|
 | SEO & Technical | 15 | Audit, fix, and optimize faster than manual tools + AEO trust signals + change impact tracking + content decay detection |
 | Analytics & Tracking | 7 | Unified data view replaces platform-hopping + AI time-saved tracking |
-| Content & Strategy | 12 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar |
+| Content & Strategy | 15 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar + content templates + keyword pre-assignment + content matrices |
 | Client Communication | 10 | Structured workflows + automated reports + expanded notifications + feedback widget + email capture funnel + audit completion email |
 | Client Self-Service | 15 | 24/7 data access, onboarding, plans, cart, order tracking, glossary, questionnaire, ROI upgrade prompts, shareable report permalinks, content pipeline status cards + post-publish performance |
 | AI & Intelligence | 7 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine + context completeness + usage dashboard + AEO page review |
@@ -1501,9 +1534,9 @@ When the user asks to update this document with recent features, follow this pro
 | Architecture | 5 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types |
 | Infrastructure | 7 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3 + integrity verification), E2E tests, job persistence, anomaly deploy guard |
 
-**130 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**133 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **130**. Last updated: March 2026 (sitemap-based link discovery, live domain UI).
+Current feature count: **145**. Last updated: March 2026 (content templates, keyword pre-assignment, content matrices).
 
 ### Recent Additions (March 2026)
 

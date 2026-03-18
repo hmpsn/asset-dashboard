@@ -122,6 +122,33 @@
       "rationale": "Revisit quarterly. Prioritize when a specific client need, revenue opportunity, or scale threshold justifies it.",
       "items": [
         {
+          "id": 400,
+          "title": "Content Templates backend (CRUD + migration 014)",
+          "source": "CONTENT_PLANNER_PLAN",
+          "est": "3-4h",
+          "priority": "P1",
+          "notes": "Shipped — Phase 1a: Reusable page structure templates with variables, sections, URL/keyword patterns. SQLite migration 014, CRUD, routes, API client, 10 integration tests.",
+          "status": "done"
+        },
+        {
+          "id": 401,
+          "title": "Keyword Pre-Assignment & SEMRush Validation",
+          "source": "CONTENT_PLANNER_PLAN",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — Phase 1b: Brief generation accepts template constraints + pre-locked keywords. SEMRush validation endpoints (single + bulk). Migration 015 for keyword tracking columns.",
+          "status": "done"
+        },
+        {
+          "id": 402,
+          "title": "Content Matrices backend (CRUD + migration 016)",
+          "source": "CONTENT_PLANNER_PLAN",
+          "est": "3-4h",
+          "priority": "P1",
+          "notes": "Shipped — Phase 2a: Bulk content planning grids with cartesian product cell generation. Per-cell status tracking, SQLite migration 016, routes, API client, 12 integration tests.",
+          "status": "done"
+        },
+        {
           "id": 76,
           "title": "Strategy & implementation hours system",
           "source": "Tier audit discussion",
