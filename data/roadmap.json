@@ -176,6 +176,15 @@
           "status": "done"
         },
         {
+          "id": 406,
+          "title": "Client Review Flow (Tiered Content Plan Review)",
+          "source": "CONTENT_PLANNER_PLAN",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — Tiered review: template approval via batch, sample cell review, batch-approve remaining. Public matrix progress view + cell flagging. 6 API endpoints (3 public + 3 admin).",
+          "status": "done"
+        },
+        {
           "id": 76,
           "title": "Strategy & implementation hours system",
           "source": "Tier audit discussion",

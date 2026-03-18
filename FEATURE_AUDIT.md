@@ -1549,13 +1549,24 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 149. Client Review Flow (Tiered Content Plan Review)
+**What it does:** Three-layer review system for scaled content plans. Layer 1: Admin sends template for client approval via approval batch — client sees page type, sections, tone, and URL patterns. Layer 2: Admin selects 2-3 sample cells to send for client review — cells move to "review" status. Layer 3: After samples approved, batch-approve all remaining cells in one click. Clients get a read-only matrix progress view showing every cell's status, keyword, planned URL, and whether briefs/posts exist. Clients can flag individual cells for changes with comments (sets `clientFlag` + `clientFlaggedAt` on the cell). Six API endpoints: 3 public (progress view, single matrix detail, cell flagging) and 3 admin (send template review, send samples, batch approve).
+
+**Agency value:** Review 54 pages in ~30 minutes instead of ~5 hours. Template approval + sample review + batch approve eliminates per-page review overhead while maintaining quality control.
+
+**Client value:** Clear visibility into the entire content plan with the ability to spot-check any page and flag specific concerns without blocking production on the rest.
+
+**Mutual:** Scales the review process proportionally — more pages don't mean more review time. The 80/20 rule: review the template and a few samples, trust the system for the rest.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
 |----------|:---:|---|
 | SEO & Technical | 15 | Audit, fix, and optimize faster than manual tools + AEO trust signals + change impact tracking + content decay detection |
 | Analytics & Tracking | 7 | Unified data view replaces platform-hopping + AI time-saved tracking |
-| Content & Strategy | 18 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar + content templates + keyword pre-assignment + content matrices + keyword recommendations + cannibalization detection + content planner export |
+| Content & Strategy | 19 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar + content templates + keyword pre-assignment + content matrices + keyword recommendations + cannibalization detection + content planner export + client review flow |
 | Client Communication | 10 | Structured workflows + automated reports + expanded notifications + feedback widget + email capture funnel + audit completion email |
 | Client Self-Service | 15 | 24/7 data access, onboarding, plans, cart, order tracking, glossary, questionnaire, ROI upgrade prompts, shareable report permalinks, content pipeline status cards + post-publish performance |
 | AI & Intelligence | 7 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine + context completeness + usage dashboard + AEO page review |
@@ -1567,9 +1578,9 @@ When the user asks to update this document with recent features, follow this pro
 | Architecture | 5 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types |
 | Infrastructure | 7 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3 + integrity verification), E2E tests, job persistence, anomaly deploy guard |
 
-**148 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**149 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **148**. Last updated: March 2026 (content templates, keyword pre-assignment, content matrices).
+Current feature count: **149**. Last updated: March 2026 (content planner: templates, matrices, keyword recommendations, cannibalization detection, export, client review flow).
 
 ### Recent Additions (March 2026)
 
