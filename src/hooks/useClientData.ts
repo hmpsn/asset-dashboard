@@ -48,6 +48,7 @@ export function useClientData(_workspaceId: string) {
   const [requestsLoading, setRequestsLoading] = useState(false);
   const [contentRequests, setContentRequests] = useState<ClientContentRequest[]>([]);
   const [sectionErrors, setSectionErrors] = useState<Record<string, string>>({});
+  const [contentPlanReviewCount, setContentPlanReviewCount] = useState(0);
 
   const setSectionError = useCallback((key: string, msg: string) => {
     setSectionErrors(prev => ({ ...prev, [key]: msg }));
@@ -165,6 +166,12 @@ export function useClientData(_workspaceId: string) {
         setRequestedTopics(new Set(reqs.map(r => r.targetKeyword)));
       }
     }).catch(() => setSectionError('content', 'Unable to load content requests'));
+    getSafe<Array<{ cells?: Array<{ status: string }> }>>(`/api/public/content-plan/${data.id}`, []).then((plans) => {
+      if (Array.isArray(plans)) {
+        const count = plans.reduce((sum, p) => sum + (p.cells?.filter(c => c.status === 'review' || c.status === 'flagged').length || 0), 0);
+        setContentPlanReviewCount(count);
+      }
+    }).catch(() => {});
   }, [loadSearchData, loadGA4Data, loadApprovals, loadRequests, clearSectionError, setSectionError]);
 
   const changeDays = useCallback((d: number, currentWs: WorkspaceInfo | null) => {
@@ -238,6 +245,7 @@ export function useClientData(_workspaceId: string) {
     requestsLoading, setRequestsLoading,
     contentRequests, setContentRequests,
     sectionErrors, setSectionErrors,
+    contentPlanReviewCount, setContentPlanReviewCount,
     setSectionError,
     clearSectionError,
     loadDashboardData,

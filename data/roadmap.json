@@ -116,6 +116,203 @@
       ]
     },
     {
+      "id": "sprint-planner-integration",
+      "name": "Content Planner Integration",
+      "hours": "35-40",
+      "rationale": "Wire content planner data into every existing tool so the platform feels unified. New features are isolated — this sprint connects them.",
+      "items": [
+        {
+          "id": 414,
+          "title": "Client Overview — content plan insights in InsightsDigest",
+          "source": "TOOL_AUDIT §1b",
+          "est": "3h",
+          "priority": "P1",
+          "notes": "Add content plan progress, pending reviews, and recently published insights to InsightsDigest.tsx. Add Content Plan stat card to OverviewTab.",
+          "status": "pending"
+        },
+        {
+          "id": 415,
+          "title": "Workspace Home — content pipeline stat card + action items",
+          "source": "TOOL_AUDIT §1a",
+          "est": "2h",
+          "priority": "P1",
+          "notes": "5th stat card showing template/matrix counts + completion %. Action items for pending reviews and near-complete plans.",
+          "status": "pending"
+        },
+        {
+          "id": 416,
+          "title": "Content Plan tab badge count",
+          "source": "TOOL_AUDIT §3a",
+          "est": "30m",
+          "priority": "P1",
+          "notes": "Show count of cells with status:review as badge on client Content Plan nav tab.",
+          "status": "pending"
+        },
+        {
+          "id": 417,
+          "title": "Strategy tab — show planned coverage badges",
+          "source": "TOOL_AUDIT §3d",
+          "est": "2h",
+          "priority": "P1",
+          "notes": "If a content gap keyword matches a matrix cell, show 'Planned' badge instead of 'Request This Topic'. Reduces duplicate requests.",
+          "status": "pending"
+        },
+        {
+          "id": 418,
+          "title": "ROI Dashboard — include matrix-planned content",
+          "source": "TOOL_AUDIT §1f",
+          "est": "1h",
+          "priority": "P1",
+          "notes": "Backend roi.ts includes published matrix cells in contentItems array. Frontend already handles display.",
+          "status": "pending"
+        },
+        {
+          "id": 419,
+          "title": "Strategy → Content Planner action bridge",
+          "source": "TOOL_AUDIT §1c",
+          "est": "3h",
+          "priority": "P2",
+          "notes": "Admin: 'Add to Matrix' button on strategy content gaps. Client: callout linking to Content Plan when matrices exist.",
+          "status": "pending"
+        },
+        {
+          "id": 420,
+          "title": "Site Architecture — show planned URLs from matrices",
+          "source": "TOOL_AUDIT §1d",
+          "est": "2h",
+          "priority": "P2",
+          "notes": "Purple 'Planned' source badge for matrix cell URLs not yet published. Gap analysis subtracts planned URLs.",
+          "status": "pending"
+        },
+        {
+          "id": 421,
+          "title": "Content Performance — track matrix-published content",
+          "source": "TOOL_AUDIT §1e",
+          "est": "2h",
+          "priority": "P2",
+          "notes": "Include matrix cells with status:published + targetPageSlug in content performance view alongside content requests.",
+          "status": "pending"
+        },
+        {
+          "id": 422,
+          "title": "Client Overview → Content Plan quick action card",
+          "source": "TOOL_AUDIT §3b",
+          "est": "1h",
+          "priority": "P2",
+          "notes": "When matrix cells need review, show action card on Overview: 'X content pages need your review → View Content Plan'.",
+          "status": "pending"
+        },
+        {
+          "id": 423,
+          "title": "Inbox — include content plan reviews",
+          "source": "TOOL_AUDIT §3c",
+          "est": "2h",
+          "priority": "P2",
+          "notes": "Add 'Content Plan' filter to Inbox or fold flagged/review cells into existing Content filter.",
+          "status": "pending"
+        },
+        {
+          "id": 424,
+          "title": "Notification bell — content plan review alerts",
+          "source": "TOOL_AUDIT §2c",
+          "est": "1h",
+          "priority": "P2",
+          "notes": "Surface cell flagging and matrix approval events in NotificationBell.",
+          "status": "pending"
+        },
+        {
+          "id": 425,
+          "title": "Content Calendar — matrix cell entries",
+          "source": "TOOL_AUDIT §1g",
+          "est": "2h",
+          "priority": "P2",
+          "notes": "Render matrix cells on calendar (by targetDate/publishedAt). Unscheduled cells in sidebar.",
+          "status": "pending"
+        },
+        {
+          "id": 426,
+          "title": "Content Pipeline — health summary bar",
+          "source": "TOOL_AUDIT §4b",
+          "est": "2h",
+          "priority": "P2",
+          "notes": "Thin summary bar at top: 'X briefs · Y posts · Z matrices · N cells (X% published)' — instant pipeline context.",
+          "status": "pending"
+        },
+        {
+          "id": 427,
+          "title": "Matrix cell status timeline",
+          "source": "TOOL_AUDIT §4a",
+          "est": "2h",
+          "priority": "P3",
+          "notes": "Mini timeline per cell showing when it moved through each status. 'Brief generated 3 days ago' style timestamps.",
+          "status": "pending"
+        },
+        {
+          "id": 428,
+          "title": "Admin Chat — content plan context",
+          "source": "TOOL_AUDIT §1i",
+          "est": "1h",
+          "priority": "P3",
+          "notes": "Include template/matrix counts and pipeline status in AI chat context for content-plan-aware answers.",
+          "status": "pending"
+        },
+        {
+          "id": 429,
+          "title": "Client Chat — content plan context",
+          "source": "TOOL_AUDIT §3e",
+          "est": "1h",
+          "priority": "P3",
+          "notes": "Include content plan summary in client chat context for 'What's my content status?' queries.",
+          "status": "pending"
+        },
+        {
+          "id": 430,
+          "title": "Content Briefs — template cross-reference",
+          "source": "TOOL_AUDIT §2d",
+          "est": "2h",
+          "priority": "P3",
+          "notes": "When generating a brief for a keyword matching a matrix cell, show callout and pre-fill from template sections.",
+          "status": "pending"
+        },
+        {
+          "id": 431,
+          "title": "Workspace Home — content velocity metric",
+          "source": "TOOL_AUDIT §4c",
+          "est": "2h",
+          "priority": "P3",
+          "notes": "Track pages published per month as a trend. Leading indicator for ranking momentum.",
+          "status": "pending"
+        },
+        {
+          "id": 432,
+          "title": "LLMs.txt — include planned/approved content",
+          "source": "TOOL_AUDIT §1h",
+          "est": "1h",
+          "priority": "P3",
+          "notes": "Include matrix cells with status >= approved as 'upcoming content' in LLMs.txt output.",
+          "status": "pending"
+        },
+        {
+          "id": 433,
+          "title": "Move Guide tab to floating help button",
+          "source": "TOOL_AUDIT §2a",
+          "est": "1h",
+          "priority": "P3",
+          "notes": "Content Pipeline has 7 sub-tabs. Move Guide to a floating ? button to reduce tab clutter.",
+          "status": "pending"
+        },
+        {
+          "id": 434,
+          "title": "Command Palette — content planner quick actions",
+          "source": "TOOL_AUDIT §2b",
+          "est": "30m",
+          "priority": "P4",
+          "notes": "Add 'Create Content Template', 'Build Content Matrix', 'View Content Plan' to CommandPalette.",
+          "status": "pending"
+        }
+      ]
+    },
+    {
       "id": "backlog",
       "name": "Backlog",
       "hours": "80+",
