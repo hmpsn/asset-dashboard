@@ -333,8 +333,8 @@
           "source": "ARCHITECTURE_SCHEMA_PLAN",
           "est": "3h",
           "priority": "P1",
-          "notes": "Refactor generateSchemaPlan() to consume SiteArchitectureResult instead of rebuilding page list. flattenTree() helper. Eliminates duplicate API calls, includes planned pages.",
-          "status": "pending"
+          "notes": "Shipped — PlanContext.architectureResult + flattenTree()-based page list with pageType/depth enrichment. Route loads cached architecture. Falls back to direct API+sitemap when tree unavailable. Feature #170.",
+          "status": "done"
         },
         {
           "id": 502,

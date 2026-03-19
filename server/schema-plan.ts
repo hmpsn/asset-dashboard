@@ -10,6 +10,8 @@ import { callOpenAI } from './openai-helpers.js';
 import { createLogger } from './logger.js';
 import { saveSchemaPlan } from './schema-store.js';
 import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from './webflow.js';
+import type { SiteArchitectureResult } from './site-architecture.js';
+import { flattenTree } from './site-architecture.js';
 
 const log = createLogger('schema-plan');
 
@@ -21,6 +23,7 @@ export interface PlanContext {
   businessContext?: string;
   strategy?: KeywordStrategy;
   tokenOverride?: string;
+  architectureResult?: SiteArchitectureResult;
 }
 
 /**
@@ -28,62 +31,88 @@ export interface PlanContext {
  * Returns a plan with canonical entities and page role assignments.
  */
 export async function generateSchemaPlan(ctx: PlanContext): Promise<SchemaSitePlan> {
-  const { siteId, workspaceId, siteUrl, companyName, businessContext, strategy, tokenOverride } = ctx;
+  const { siteId, workspaceId, siteUrl, companyName, businessContext, strategy, tokenOverride, architectureResult } = ctx;
 
-  // Fetch all published pages
-  const allPages = await listPages(siteId, tokenOverride);
-  const pages = filterPublishedPages(allPages).filter(
-    (p: { title: string; slug: string }) =>
-      !(p.title || '').toLowerCase().includes('password') &&
-      !(p.slug || '').toLowerCase().includes('password'),
-  );
+  let pageList: PageListItem[];
 
-  // Build page list with strategy enrichment — static pages first
-  const pageList: PageListItem[] = pages.map((p) => {
-    const pagePath = (p.publishedPath || '') || (p.slug ? `/${p.slug}` : '/');
-    const isHomepage = !p.slug || p.slug === '' || p.slug === 'home' || p.slug === 'index';
-    const strategyMatch = strategy?.pageMap?.find(
-      (pm: PageKeywordMap) => pm.pagePath === pagePath || pm.pagePath === `/${p.slug}`,
+  if (architectureResult) {
+    // ── Architecture tree available — derive page list from tree (no duplicate API calls) ──
+    const nodes = flattenTree(architectureResult.tree, true);
+    pageList = nodes
+      .filter(n => n.source === 'existing') // Only include published pages for schema assignment
+      .filter(n => {
+        const lp = n.path.toLowerCase();
+        return !/\/(password|404|thank|success)/.test(lp);
+      })
+      .map(n => {
+        const isHomepage = n.path === '/' || n.depth === 0;
+        const strategyMatch = strategy?.pageMap?.find(
+          (pm: PageKeywordMap) => pm.pagePath === n.path || pm.pagePath === n.path.replace(/\/$/, ''),
+        );
+        return {
+          path: n.path,
+          title: n.name || '(untitled)',
+          isHomepage,
+          primaryKeyword: n.keyword || strategyMatch?.primaryKeyword || '',
+          searchIntent: strategyMatch?.searchIntent || '',
+          pageType: n.pageType,
+          depth: n.depth,
+        };
+      });
+    log.info(`Schema plan using architecture tree: ${pageList.length} existing pages (tree has ${nodes.length} total nodes)`);
+  } else {
+    // ── Fallback: fetch pages directly from Webflow API + sitemap ──
+    const allPages = await listPages(siteId, tokenOverride);
+    const pages = filterPublishedPages(allPages).filter(
+      (p: { title: string; slug: string }) =>
+        !(p.title || '').toLowerCase().includes('password') &&
+        !(p.slug || '').toLowerCase().includes('password'),
     );
 
-    return {
-      path: isHomepage ? '/' : pagePath,
-      title: p.title || '(untitled)',
-      isHomepage,
-      primaryKeyword: strategyMatch?.primaryKeyword || '',
-      searchIntent: strategyMatch?.searchIntent || '',
-    };
-  });
+    pageList = pages.map((p) => {
+      const pagePath = (p.publishedPath || '') || (p.slug ? `/${p.slug}` : '/');
+      const isHomepage = !p.slug || p.slug === '' || p.slug === 'home' || p.slug === 'index';
+      const strategyMatch = strategy?.pageMap?.find(
+        (pm: PageKeywordMap) => pm.pagePath === pagePath || pm.pagePath === `/${p.slug}`,
+      );
 
-  // Discover CMS/collection pages from the sitemap
-  if (siteUrl) {
-    try {
-      const staticPaths = buildStaticPathSet(pages);
-      const { cmsUrls, totalFound } = await discoverCmsUrls(siteUrl, staticPaths, 500);
-      log.info(`Discovered ${cmsUrls.length} CMS pages (${totalFound} total in sitemap) for schema plan`);
-      for (const cms of cmsUrls) {
-        // Skip utility/legal pages
-        const lp = cms.path.toLowerCase();
-        if (/\/(password|404|thank|success)/.test(lp)) continue;
+      return {
+        path: isHomepage ? '/' : pagePath,
+        title: p.title || '(untitled)',
+        isHomepage,
+        primaryKeyword: strategyMatch?.primaryKeyword || '',
+        searchIntent: strategyMatch?.searchIntent || '',
+      };
+    });
 
-        const strategyMatch = strategy?.pageMap?.find(
-          (pm: PageKeywordMap) => pm.pagePath === cms.path || pm.pagePath === cms.path.replace(/\/$/, ''),
-        );
+    // Discover CMS/collection pages from the sitemap
+    if (siteUrl) {
+      try {
+        const staticPaths = buildStaticPathSet(pages);
+        const { cmsUrls, totalFound } = await discoverCmsUrls(siteUrl, staticPaths, 500);
+        log.info(`Discovered ${cmsUrls.length} CMS pages (${totalFound} total in sitemap) for schema plan`);
+        for (const cms of cmsUrls) {
+          const lp = cms.path.toLowerCase();
+          if (/\/(password|404|thank|success)/.test(lp)) continue;
 
-        pageList.push({
-          path: cms.path,
-          title: cms.pageName || '(CMS page)',
-          isHomepage: false,
-          primaryKeyword: strategyMatch?.primaryKeyword || '',
-          searchIntent: strategyMatch?.searchIntent || '',
-        });
+          const strategyMatch = strategy?.pageMap?.find(
+            (pm: PageKeywordMap) => pm.pagePath === cms.path || pm.pagePath === cms.path.replace(/\/$/, ''),
+          );
+
+          pageList.push({
+            path: cms.path,
+            title: cms.pageName || '(CMS page)',
+            isHomepage: false,
+            primaryKeyword: strategyMatch?.primaryKeyword || '',
+            searchIntent: strategyMatch?.searchIntent || '',
+          });
+        }
+      } catch (err) {
+        log.warn({ err }, 'CMS page discovery failed — plan will only include static pages');
       }
-    } catch (err) {
-      log.warn({ err }, 'CMS page discovery failed — plan will only include static pages');
     }
+    log.info(`Generating schema plan for ${pageList.length} pages (static + CMS) on ${siteUrl}`);
   }
-
-  log.info(`Generating schema plan for ${pageList.length} pages (static + CMS) on ${siteUrl}`);
 
   // Try AI-generated plan first
   const aiPlan = await aiGeneratePlan(pageList, siteUrl, companyName, businessContext, strategy, workspaceId);
@@ -113,6 +142,8 @@ interface PageListItem {
   isHomepage: boolean;
   primaryKeyword: string;
   searchIntent: string;
+  pageType?: string;   // From architecture tree (e.g. 'blog', 'service', 'landing')
+  depth?: number;      // Tree depth — useful for AI context
 }
 
 async function aiGeneratePlan(
@@ -135,6 +166,7 @@ async function aiGeneratePlan(
     // Small enough — list every page
     pageTable = pages.map(p => {
       const parts = [p.path, p.title];
+      if (p.pageType) parts.push(`type: ${p.pageType}`);
       if (p.primaryKeyword) parts.push(`keyword: "${p.primaryKeyword}"`);
       if (p.searchIntent) parts.push(`intent: ${p.searchIntent}`);
       return parts.join(' | ');
@@ -159,6 +191,7 @@ async function aiGeneratePlan(
     // List all static/top-level pages individually
     const lines = staticPages.map(p => {
       const parts = [p.path, p.title];
+      if (p.pageType) parts.push(`type: ${p.pageType}`);
       if (p.primaryKeyword) parts.push(`keyword: "${p.primaryKeyword}"`);
       if (p.searchIntent) parts.push(`intent: ${p.searchIntent}`);
       return parts.join(' | ');

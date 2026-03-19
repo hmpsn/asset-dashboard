@@ -272,6 +272,12 @@ router.post('/api/webflow/schema-plan/:siteId', async (req, res) => {
     const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
     if (!ws) return res.status(404).json({ error: 'No workspace found for this site' });
 
+    // Load architecture tree to avoid duplicate Webflow API + sitemap calls
+    let architectureResult;
+    try {
+      architectureResult = await getCachedArchitecture(ws.id);
+    } catch { /* proceed without — plan will fall back to direct API calls */ }
+
     const plan = await generateSchemaPlan({
       siteId: req.params.siteId,
       workspaceId: ws.id,
@@ -280,6 +286,7 @@ router.post('/api/webflow/schema-plan/:siteId', async (req, res) => {
       businessContext: ctx.businessContext,
       strategy: ws.keywordStrategy,
       tokenOverride: getTokenForSite(req.params.siteId) || undefined,
+      architectureResult,
     });
 
     addActivity(ws.id, 'schema_plan_generated', 'Schema site plan generated', `${plan.pageRoles.length} pages, ${plan.canonicalEntities.length} entities`);

@@ -1730,6 +1730,12 @@ When the user asks to update this document with recent features, follow this pro
 
 **Agency value:** Deterministic, accurate breadcrumbs without AI token cost. Deep pages get full ancestor chains instead of flat Home → Page. Foundation for architecture→schema integration (coverage dashboard, priority queue, competitive intelligence).
 
+### 170. Unified Schema Plan with Architecture Tree
+**What it does:** `generateSchemaPlan()` now accepts an optional `architectureResult` via `PlanContext`. When the architecture tree is available, the plan derives its page list from `flattenTree()` instead of making duplicate Webflow API + sitemap calls. The page list is enriched with `pageType` and `depth` from the tree, giving the AI better hints for role assignment (e.g., `type: service` in the prompt). Falls back to the original direct-fetch behavior when architecture data isn't available. The schema plan route handler loads the cached architecture tree and passes it through.
+**Files:** `server/schema-plan.ts` (`PlanContext.architectureResult`, `PageListItem.pageType/depth`, tree-based page list generation), `server/routes/webflow-schema.ts` (architecture loading for plan endpoint)
+
+**Agency value:** Eliminates redundant Webflow API + sitemap calls during plan generation (reuses cached architecture tree). Richer AI context from tree metadata produces more accurate role assignments.
+
 ---
 
 ## Summary
