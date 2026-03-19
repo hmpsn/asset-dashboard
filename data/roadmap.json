@@ -342,8 +342,8 @@
           "source": "DEVIN_SCHEMA_SPECS",
           "est": "3h",
           "priority": "P1",
-          "notes": "PAGE_TYPE_SCHEMA_MAP constant + inject suggestedSchemaTypes into AI prompt when pageType is known. Devin task — no C1/C2 dependency.",
-          "status": "pending"
+          "notes": "Shipped — PAGE_TYPE_SCHEMA_MAP constant mapping all 16 page types to primary/secondary Schema.org types. SCHEMA TYPE GUIDANCE block injected into AI prompt when pageType is set (not 'auto'). Exported for D2/D3 consumption. Feature #143.",
+          "status": "done"
         },
         {
           "id": 503,
