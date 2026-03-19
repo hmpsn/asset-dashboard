@@ -1742,6 +1742,18 @@ When the user asks to update this document with recent features, follow this pro
 
 **Agency value:** Homepage schema gains structured navigation data that Google uses for sitelinks. Fully automatic — no manual configuration needed. Updates when architecture tree changes.
 
+### 172. Schema Coverage Dashboard
+**What it does:** Cross-references the site architecture tree with the latest schema snapshot to show which pages have schema markup and which don't. Server endpoint `GET /api/site-architecture/:wsId/schema-coverage` returns per-page coverage data including schema types and plan roles. Frontend adds: (1) a "Schema Coverage" stat card with percentage + color-coded icon, (2) per-node schema badges in the URL tree (green checkmark with type count or gray X), (3) a "Missing Schema" sidebar panel listing uncovered pages for quick action.
+**Files:** `server/routes/site-architecture.ts` (coverage endpoint), `src/api/content.ts` (API client), `src/components/SiteArchitecture.tsx` (stat card, tree badges, missing-schema panel)
+
+**Agency value:** Instant visibility into schema gaps across the site. Admins can see at a glance which pages need schema work, prioritize accordingly, and track progress as coverage increases.
+
+### 173. Internal Link Health → Schema Priority Queue
+**What it does:** Enriches the schema coverage endpoint with internal link health data (`PageLinkHealth` from `performance-store.ts`) and computes a per-page schema priority score. Priority tiers: **Critical** (orphan + no schema), **High** (< 3 inbound links + no schema), **Medium** (no schema but decent links), **Low** (has schema but poor link health). The API returns a `priorityQueue` array sorted critical → high → medium → low. Frontend displays a "Schema Priority Queue" sidebar panel in the SiteArchitecture view with priority badges, orphan indicators, and inbound link counts.
+**Files:** `server/routes/site-architecture.ts` (link health cross-reference + priority scoring), `src/api/content.ts` (updated types), `src/components/SiteArchitecture.tsx` (priority queue panel with Zap icon, priority badges, orphan tags)
+
+**Agency value:** Answers "which page should I add schema to next?" by combining two signals — pages that are both poorly linked AND missing schema are the highest priority. Eliminates guesswork in schema deployment order.
+
 ---
 
 ## Summary
@@ -1907,3 +1919,7 @@ Current feature count: **163**. Last updated: March 2026 (content planner integr
 **144. Hub Page → CollectionPage/ItemList Auto-Suggest (D3)**
 **What it does:** Automatically detects hub pages (pages with 2+ existing child pages in the architecture tree) and injects `CollectionPage` schema with an `ItemList` of child page references. Adds a `getChildNodes()` helper to `site-architecture.ts` that finds a node by path and returns its direct children with content. In `injectCrossReferences()`, when the architecture tree is available, the current page's children are counted — if there are 2 or more existing child pages, a `CollectionPage` node is added to the `@graph` with `hasPart` listing each child as a `ListItem` with position, URL, and name. Only existing pages (not planned) are included. Gracefully skips if no architecture tree is available or if CollectionPage/ItemList already exists.
 **Files:** `server/site-architecture.ts` (`getChildNodes()` helper), `server/schema-suggester.ts` (hub page detection + CollectionPage injection in `injectCrossReferences()`)
+
+**145. Template → Schema Template Binding (D2)**
+**What it does:** Binds Schema.org types to content templates so matrix cells inherit expected schema types. Adds `schemaTypes?: string[]` to `ContentTemplate` and `expectedSchemaTypes?: string[]` to `MatrixCell`. When a template is created or updated, `schemaTypes` is auto-populated from `PAGE_TYPE_SCHEMA_MAP` based on the template's `pageType` (unless explicitly overridden). When matrix cells are generated, they inherit the template's schema types as `expectedSchemaTypes`. The CellDetailPanel UI displays purple badges for each expected schema type. A new `getSchemaTypesForTemplate()` helper is exported for use by D7 (pre-generation). A DB migration (017) adds the `schema_types` column to `content_templates`.
+**Files:** `shared/types/content.ts`, `src/components/matrix/types.ts`, `server/content-matrices.ts` (`getSchemaTypesForTemplate`, `generateCells` schema inheritance), `server/content-templates.ts` (auto-populate on create/update), `src/components/matrix/CellDetailPanel.tsx` (schema badge display), `server/db/migrations/017-template-schema-types.sql`

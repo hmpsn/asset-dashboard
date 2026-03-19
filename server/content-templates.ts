@@ -12,6 +12,7 @@ import type {
   TemplateSection,
 } from '../shared/types/content.ts';
 import { createLogger } from './logger.js';
+import { getSchemaTypesForTemplate } from './content-matrices.js';
 
 const log = createLogger('content-templates');
 
@@ -31,6 +32,7 @@ interface TemplateRow {
   meta_desc_pattern: string | null;
   cms_field_map: string | null;   // JSON
   tone_and_style: string | null;
+  schema_types: string | null;    // JSON — auto-populated from pageType via PAGE_TYPE_SCHEMA_MAP
   created_at: string;
   updated_at: string;
 }
@@ -53,11 +55,11 @@ function stmts(): TemplateStmts {
         `INSERT INTO content_templates
            (id, workspace_id, name, description, page_type, variables, sections,
             url_pattern, keyword_pattern, title_pattern, meta_desc_pattern,
-            cms_field_map, tone_and_style, created_at, updated_at)
+            cms_field_map, tone_and_style, schema_types, created_at, updated_at)
          VALUES
            (@id, @workspace_id, @name, @description, @page_type, @variables, @sections,
             @url_pattern, @keyword_pattern, @title_pattern, @meta_desc_pattern,
-            @cms_field_map, @tone_and_style, @created_at, @updated_at)`,
+            @cms_field_map, @tone_and_style, @schema_types, @created_at, @updated_at)`,
       ),
       selectByWorkspace: db.prepare(
         `SELECT * FROM content_templates WHERE workspace_id = ? ORDER BY created_at DESC`,
@@ -72,7 +74,7 @@ function stmts(): TemplateStmts {
            url_pattern = @url_pattern, keyword_pattern = @keyword_pattern,
            title_pattern = @title_pattern, meta_desc_pattern = @meta_desc_pattern,
            cms_field_map = @cms_field_map, tone_and_style = @tone_and_style,
-           updated_at = @updated_at
+           schema_types = @schema_types, updated_at = @updated_at
          WHERE id = @id AND workspace_id = @workspace_id`,
       ),
       deleteById: db.prepare(
@@ -100,6 +102,7 @@ function rowToTemplate(row: TemplateRow): ContentTemplate {
     metaDescPattern: row.meta_desc_pattern ?? undefined,
     cmsFieldMap: row.cms_field_map ? JSON.parse(row.cms_field_map) as Record<string, string> : undefined,
     toneAndStyle: row.tone_and_style ?? undefined,
+    schemaTypes: row.schema_types ? JSON.parse(row.schema_types) as string[] : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -131,17 +134,22 @@ export function createTemplate(
     metaDescPattern?: string;
     cmsFieldMap?: Record<string, string>;
     toneAndStyle?: string;
+    schemaTypes?: string[];
   },
 ): ContentTemplate {
   const now = new Date().toISOString();
   const id = `tpl_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+
+  // Auto-populate schemaTypes from pageType if not explicitly provided
+  const resolvedPageType = data.pageType || 'service';
+  const schemaTypes = data.schemaTypes ?? getSchemaTypesForTemplate(resolvedPageType);
 
   const template: ContentTemplate = {
     id,
     workspaceId,
     name: data.name,
     description: data.description,
-    pageType: data.pageType || 'service',
+    pageType: resolvedPageType,
     variables: data.variables || [],
     sections: data.sections || [],
     urlPattern: data.urlPattern || '',
@@ -150,6 +158,7 @@ export function createTemplate(
     metaDescPattern: data.metaDescPattern,
     cmsFieldMap: data.cmsFieldMap,
     toneAndStyle: data.toneAndStyle,
+    schemaTypes: schemaTypes.length > 0 ? schemaTypes : undefined,
     createdAt: now,
     updatedAt: now,
   };
@@ -168,6 +177,7 @@ export function createTemplate(
     meta_desc_pattern: template.metaDescPattern ?? null,
     cms_field_map: template.cmsFieldMap ? JSON.stringify(template.cmsFieldMap) : null,
     tone_and_style: template.toneAndStyle ?? null,
+    schema_types: template.schemaTypes ? JSON.stringify(template.schemaTypes) : null,
     created_at: template.createdAt,
     updated_at: template.updatedAt,
   });
@@ -184,9 +194,16 @@ export function updateTemplate(
   const existing = getTemplate(workspaceId, templateId);
   if (!existing) return null;
 
+  // Re-derive schemaTypes from new pageType if pageType changed and schemaTypes not explicitly set
+  const effectiveUpdates = { ...updates };
+  if (effectiveUpdates.pageType && effectiveUpdates.pageType !== existing.pageType && !effectiveUpdates.schemaTypes) {
+    const derived = getSchemaTypesForTemplate(effectiveUpdates.pageType);
+    effectiveUpdates.schemaTypes = derived.length > 0 ? derived : undefined;
+  }
+
   const merged: ContentTemplate = {
     ...existing,
-    ...updates,
+    ...effectiveUpdates,
     updatedAt: new Date().toISOString(),
   };
 
@@ -204,6 +221,7 @@ export function updateTemplate(
     meta_desc_pattern: merged.metaDescPattern ?? null,
     cms_field_map: merged.cmsFieldMap ? JSON.stringify(merged.cmsFieldMap) : null,
     tone_and_style: merged.toneAndStyle ?? null,
+    schema_types: merged.schemaTypes ? JSON.stringify(merged.schemaTypes) : null,
     updated_at: merged.updatedAt,
   });
 
@@ -236,5 +254,6 @@ export function duplicateTemplate(workspaceId: string, templateId: string, newNa
     metaDescPattern: existing.metaDescPattern,
     cmsFieldMap: existing.cmsFieldMap,
     toneAndStyle: existing.toneAndStyle,
+    schemaTypes: existing.schemaTypes,
   });
 }

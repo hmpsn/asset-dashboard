@@ -201,6 +201,7 @@ export interface ContentTemplate {
   metaDescPattern?: string;
   cmsFieldMap?: Record<string, string>;
   toneAndStyle?: string;
+  schemaTypes?: string[];  // e.g. ['BlogPosting', 'BreadcrumbList'] — auto-populated from pageType via PAGE_TYPE_SCHEMA_MAP
   createdAt: string;
   updatedAt: string;
 }
@@ -256,6 +257,7 @@ export interface MatrixCell {
   recommendedKeyword?: string;
   clientFlag?: string;
   clientFlaggedAt?: string;
+  expectedSchemaTypes?: string[];  // Inherited from template's schemaTypes when cells are generated
 }
 
 export interface ContentMatrix {

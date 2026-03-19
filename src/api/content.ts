@@ -217,6 +217,40 @@ export const contentPlanReview = {
 export const siteArchitecture = {
   get: (wsId: string) =>
     get<unknown>(`/api/site-architecture/${wsId}`),
+  schemaCoverage: (wsId: string) =>
+    get<{
+      totalExisting: number;
+      withSchema: number;
+      withoutSchema: number;
+      coveragePct: number;
+      snapshotDate: string | null;
+      hasPlan: boolean;
+      hasLinkData: boolean;
+      pages: Array<{
+        path: string;
+        name: string;
+        hasSchema: boolean;
+        schemaTypes: string[];
+        role: string | null;
+        depth: number;
+        pageType: string | null;
+        inboundLinks: number | null;
+        outboundLinks: number | null;
+        isOrphan: boolean | null;
+        linkScore: number | null;
+        priority: 'critical' | 'high' | 'medium' | 'low' | 'done';
+      }>;
+      priorityQueue: Array<{
+        path: string;
+        name: string;
+        hasSchema: boolean;
+        schemaTypes: string[];
+        priority: 'critical' | 'high' | 'medium' | 'low' | 'done';
+        inboundLinks: number | null;
+        isOrphan: boolean | null;
+        linkScore: number | null;
+      }>;
+    }>(`/api/site-architecture/${wsId}/schema-coverage`),
 };
 
 // ── LLMs.txt Generator ──────────────────────────────────────────
