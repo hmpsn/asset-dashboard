@@ -88,6 +88,7 @@ import contentMatricesRoutes from './routes/content-matrices.js';
 import contentPlanReviewRoutes from './routes/content-plan-review.js';
 import siteArchitectureRoutes from './routes/site-architecture.js';
 import llmsTxtRoutes from './routes/llms-txt.js';
+import competitorSchemaRoutes from './routes/competitor-schema.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -312,6 +313,7 @@ export function createApp(): express.Express {
   app.use(contentPlanReviewRoutes);
   app.use(siteArchitectureRoutes);
   app.use(llmsTxtRoutes);
+  app.use(competitorSchemaRoutes);
 
   // --- Sentry error handler (must be after all route mounts, before frontend catch-all) ---
   setupSentryErrorHandler(app);
