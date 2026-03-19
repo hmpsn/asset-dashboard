@@ -286,7 +286,7 @@ export function updateMatrixCell(
   workspaceId: string,
   matrixId: string,
   cellId: string,
-  updates: Partial<Pick<MatrixCell, 'targetKeyword' | 'customKeyword' | 'status' | 'briefId' | 'postId' | 'keywordValidation' | 'keywordCandidates' | 'recommendedKeyword' | 'clientFlag' | 'clientFlaggedAt'>>,
+  updates: Partial<Pick<MatrixCell, 'targetKeyword' | 'customKeyword' | 'status' | 'statusHistory' | 'briefId' | 'postId' | 'keywordValidation' | 'keywordCandidates' | 'recommendedKeyword' | 'clientFlag' | 'clientFlaggedAt'>>,
 ): ContentMatrix | undefined {
   const existing = getMatrix(workspaceId, matrixId);
   if (!existing) return undefined;
@@ -295,6 +295,14 @@ export function updateMatrixCell(
   if (cellIdx === -1) return undefined;
 
   const cell = existing.cells[cellIdx];
+
+  // Record status transition in history
+  if (updates.status && updates.status !== cell.status) {
+    const history = cell.statusHistory || [];
+    history.push({ from: cell.status, to: updates.status, at: new Date().toISOString() });
+    updates = { ...updates, statusHistory: history } as typeof updates;
+  }
+
   existing.cells[cellIdx] = { ...cell, ...updates };
 
   return updateMatrix(workspaceId, matrixId, { cells: existing.cells });

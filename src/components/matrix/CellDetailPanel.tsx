@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   X, ExternalLink, FileText, PenTool, Flag, Check,
-  TrendingUp, Search, ArrowRight, ChevronRight,
+  TrendingUp, Search, ArrowRight, ChevronRight, Clock,
 } from 'lucide-react';
 import { Badge } from '../ui';
 import type { MatrixCell } from './types';
@@ -13,6 +13,21 @@ interface CellDetailPanelProps {
   onGenerateBrief?: (cellId: string) => void;
   onSendReview?: (cellId: string) => void;
   onFlag?: (cellId: string, comment: string) => void;
+}
+
+function relativeTime(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return 'just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `${diffH}h ago`;
+  const diffD = Math.floor(diffH / 24);
+  if (diffD === 1) return 'yesterday';
+  if (diffD < 30) return `${diffD}d ago`;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 const STATUS_CONFIG: Record<MatrixCell['status'], { label: string; color: 'zinc' | 'blue' | 'amber' | 'purple' | 'teal' | 'orange' | 'green'; icon: string }> = {
@@ -195,6 +210,31 @@ export function CellDetailPanel({
             <p className="text-[11px] text-zinc-500">No post created yet</p>
           )}
         </div>
+
+        {/* Status Timeline */}
+        {cell.statusHistory && cell.statusHistory.length > 0 && (
+          <div className="pt-2 border-t border-zinc-800 space-y-2">
+            <div className="flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-zinc-500" />
+              <span className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider">Timeline</span>
+            </div>
+            <div className="relative pl-3">
+              <div className="absolute left-[5px] top-1 bottom-1 w-px bg-zinc-800" />
+              {[...cell.statusHistory].reverse().map((entry, i) => {
+                const toCfg = STATUS_CONFIG[entry.to];
+                return (
+                  <div key={i} className="relative flex items-start gap-2.5 pb-2.5 last:pb-0">
+                    <div className={`w-2 h-2 rounded-full mt-1 flex-shrink-0 -ml-[3.5px] ring-2 ring-zinc-900 ${toCfg ? `bg-${toCfg.color}-400` : 'bg-zinc-500'}`} style={{ backgroundColor: toCfg?.color === 'green' ? '#4ade80' : toCfg?.color === 'teal' ? '#2dd4bf' : toCfg?.color === 'amber' ? '#fbbf24' : toCfg?.color === 'blue' ? '#60a5fa' : toCfg?.color === 'orange' ? '#fb923c' : toCfg?.color === 'purple' ? '#a78bfa' : '#71717a' }} />
+                    <div className="min-w-0">
+                      <span className="text-[11px] text-zinc-300 font-medium">{toCfg?.label || entry.to}</span>
+                      <span className="text-[10px] text-zinc-600 ml-1.5">{relativeTime(entry.at)}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Actions */}
         <div className="pt-2 border-t border-zinc-800 space-y-2">

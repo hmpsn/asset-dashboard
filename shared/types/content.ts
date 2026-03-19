@@ -230,6 +230,12 @@ export interface KeywordCandidate {
   isRecommended: boolean;
 }
 
+export interface StatusHistoryEntry {
+  from: MatrixCellStatus;
+  to: MatrixCellStatus;
+  at: string;
+}
+
 export interface MatrixCell {
   id: string;
   variableValues: Record<string, string>;
@@ -239,6 +245,7 @@ export interface MatrixCell {
   briefId?: string;
   postId?: string;
   status: MatrixCellStatus;
+  statusHistory?: StatusHistoryEntry[];
   keywordValidation?: {
     volume: number;
     difficulty: number;

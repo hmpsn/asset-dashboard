@@ -1718,6 +1718,12 @@ When the user asks to update this document with recent features, follow this pro
 
 **Agency value:** Instant pipeline context without navigating into individual tabs.
 
+### 168. Matrix Cell Status Timeline
+**What it does:** Each content matrix cell now records a `statusHistory` array tracking every status transition with timestamps. When a cell's status changes via `updateMatrixCell()`, the server automatically appends `{ from, to, at }` to the history. The CellDetailPanel renders a vertical mini timeline (newest-first) with color-coded dots per status, human-readable relative timestamps ("3d ago", "yesterday"), and the vertical connector line between entries.
+**Files:** `shared/types/content.ts` (`StatusHistoryEntry`), `src/components/matrix/types.ts` (mirror), `server/content-matrices.ts` (auto-record), `src/components/matrix/CellDetailPanel.tsx` (timeline UI)
+
+**Agency value:** Full audit trail of cell progression — see at a glance when each cell moved through planned → keyword validated → brief generated → review → published.
+
 ---
 
 ## Summary

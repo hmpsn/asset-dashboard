@@ -59,6 +59,14 @@ export interface MatrixDimension {
   values: string[];
 }
 
+export type MatrixCellStatus = 'planned' | 'keyword_validated' | 'brief_generated' | 'review' | 'approved' | 'draft' | 'published';
+
+export interface StatusHistoryEntry {
+  from: MatrixCellStatus;
+  to: MatrixCellStatus;
+  at: string;
+}
+
 export interface MatrixCell {
   id: string;
   variableValues: Record<string, string>;
@@ -67,7 +75,8 @@ export interface MatrixCell {
   plannedUrl: string;
   briefId?: string;
   postId?: string;
-  status: 'planned' | 'keyword_validated' | 'brief_generated' | 'review' | 'approved' | 'draft' | 'published';
+  status: MatrixCellStatus;
+  statusHistory?: StatusHistoryEntry[];
   keywordValidation?: {
     volume: number;
     difficulty: number;

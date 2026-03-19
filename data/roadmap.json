@@ -244,8 +244,8 @@
           "source": "TOOL_AUDIT §4a",
           "est": "2h",
           "priority": "P3",
-          "notes": "Mini timeline per cell showing when it moved through each status. 'Brief generated 3 days ago' style timestamps.",
-          "status": "pending"
+          "notes": "Shipped — StatusHistoryEntry type + auto-record in updateMatrixCell + vertical timeline in CellDetailPanel with relative timestamps. Feature #168.",
+          "status": "done"
         },
         {
           "id": 428,
