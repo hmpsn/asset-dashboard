@@ -12,6 +12,7 @@ export interface ContentTemplate {
   metaDescPattern?: string;
   cmsFieldMap?: Record<string, string>;
   toneAndStyle?: string;
+  schemaTypes?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -87,6 +88,7 @@ export interface MatrixCell {
   recommendedKeyword?: string;
   clientFlag?: string;
   clientFlaggedAt?: string;
+  expectedSchemaTypes?: string[];
 }
 
 export interface KeywordCandidate {

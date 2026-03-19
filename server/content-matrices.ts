@@ -12,6 +12,17 @@ import type {
   MatrixDimension,
 } from '../shared/types/content.ts';
 import { createLogger } from './logger.js';
+import { PAGE_TYPE_SCHEMA_MAP, type SchemaPageType } from './schema-suggester.js';
+
+/**
+ * Resolve the combined primary + secondary Schema.org types for a template's pageType.
+ * Used by D2 (template→schema binding) and downstream D7 (pre-generation).
+ */
+export function getSchemaTypesForTemplate(templatePageType: string): string[] {
+  const mapped = PAGE_TYPE_SCHEMA_MAP[templatePageType as SchemaPageType];
+  if (!mapped) return [];
+  return [...mapped.primary, ...mapped.secondary];
+}
 
 const log = createLogger('content-matrices');
 
@@ -127,6 +138,7 @@ function generateCells(
   dimensions: MatrixDimension[],
   urlPattern: string,
   keywordPattern: string,
+  expectedSchemaTypes?: string[],
 ): MatrixCell[] {
   if (!dimensions.length) return [];
 
@@ -143,7 +155,7 @@ function generateCells(
     combos.push(...next);
   }
 
-  return combos.map((variableValues) => {
+  return combos.map<MatrixCell>((variableValues) => {
     // Substitute variable placeholders in patterns
     let url = urlPattern;
     let keyword = keywordPattern;
@@ -158,7 +170,8 @@ function generateCells(
       targetKeyword: keyword,
       plannedUrl: url,
       status: 'planned' as MatrixCellStatus,
-    };
+      ...(expectedSchemaTypes?.length ? { expectedSchemaTypes } : {}),
+    } as MatrixCell;
   });
 }
 
@@ -182,11 +195,12 @@ export function createMatrix(
     dimensions: MatrixDimension[];
     urlPattern: string;
     keywordPattern: string;
+    expectedSchemaTypes?: string[];
   },
 ): ContentMatrix {
   const id = `mtx_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
   const now = new Date().toISOString();
-  const cells = generateCells(data.dimensions, data.urlPattern, data.keywordPattern);
+  const cells = generateCells(data.dimensions, data.urlPattern, data.keywordPattern, data.expectedSchemaTypes);
   const stats = computeStats(cells);
 
   stmts().insert.run({
