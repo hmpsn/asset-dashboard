@@ -3,7 +3,7 @@ import { callOpenAI } from './openai-helpers.js';
 import { createLogger } from './logger.js';
 import { saveSiteTemplate, getOrSeedSiteTemplate, getSchemaPlan } from './schema-store.js';
 import { buildPlanContextForPage } from './schema-plan.js';
-import { getAncestorChain } from './site-architecture.js';
+import { getAncestorChain, getChildNodes } from './site-architecture.js';
 
 const log = createLogger('schema');
 
@@ -486,6 +486,37 @@ function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string,
         log.info({ navCount: navItems.length }, 'Injected SiteNavigationElement from architecture tree');
       }
     }
+  }
+
+  // D3: Hub page → CollectionPage/ItemList auto-suggest
+  // When a page has 2+ children in the architecture tree, inject CollectionPage schema
+  const hubTree = ctx?._architectureTree;
+  if (hubTree) {
+    const webPage = graph.find(n => n['@type'] === 'WebPage') as Record<string, unknown> | undefined;
+    const pageUrl = (webPage?.['url'] as string) || siteUrl;
+    try {
+      const pagePath = new URL(pageUrl).pathname.replace(/\/$/, '') || '/';
+      const children = getChildNodes(hubTree, pagePath)
+        .filter(c => c.source === 'existing');  // Only existing pages, not planned
+      if (children.length >= 2) {
+        const hasCollection = graph.some(n => n['@type'] === 'CollectionPage' || n['@type'] === 'ItemList');
+        if (!hasCollection) {
+          const webPageName = (webPage?.['name'] as string) || 'Collection';
+          graph.push({
+            '@type': 'CollectionPage',
+            '@id': `${pageUrl}/#collection`,
+            'name': webPageName,
+            'hasPart': children.map((child, i) => ({
+              '@type': 'ListItem',
+              'position': i + 1,
+              'url': `${siteUrl}${child.path}`,
+              'name': child.name,
+            })),
+          });
+          log.info({ pagePath, childCount: children.length }, 'Injected CollectionPage for hub page');
+        }
+      }
+    } catch { /* skip if URL parsing fails */ }
   }
 }
 

@@ -205,6 +205,23 @@ export function getAncestorChain(tree: SiteNode, targetPath: string): SiteNode[]
 }
 
 /**
+ * Find the node at parentPath and return its direct children that have content.
+ * Used by D3 hub page detection to identify pages with 2+ child pages.
+ */
+export function getChildNodes(tree: SiteNode, parentPath: string): SiteNode[] {
+  function find(node: SiteNode): SiteNode | null {
+    if (node.path === parentPath) return node;
+    for (const child of node.children) {
+      const found = find(child);
+      if (found) return found;
+    }
+    return null;
+  }
+  const parent = find(tree);
+  return parent ? parent.children.filter(c => c.hasContent) : [];
+}
+
+/**
  * Flatten the tree into a depth-first array of all nodes (excluding root if desired).
  */
 export function flattenTree(tree: SiteNode, includeRoot = false): SiteNode[] {
