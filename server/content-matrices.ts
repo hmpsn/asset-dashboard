@@ -320,12 +320,10 @@ export function updateMatrixCell(
 
   existing.cells[cellIdx] = { ...cell, ...updates };
 
-  // D7: Queue schema pre-generation on status transition to brief_generated or approved
-  if (updates.status === 'brief_generated' || updates.status === 'approved') {
-    void queueSchemaPreGeneration(workspaceId, matrixId, cellId);
-  }
+  // Save to DB first so async reads see updated data
+  const result = updateMatrix(workspaceId, matrixId, { cells: existing.cells });
 
-  // D7: Mark pending schemas as stale if keyword or URL changes after pre-generation
+  // D7: Mark pending schemas as stale if keyword changes after pre-generation
   if (updates.targetKeyword && updates.targetKeyword !== cell.targetKeyword) {
     markSchemaStale(cellId);
   }
@@ -333,7 +331,13 @@ export function updateMatrixCell(
     markSchemaStale(cellId);
   }
 
-  return updateMatrix(workspaceId, matrixId, { cells: existing.cells });
+  // D7: Queue schema pre-generation on status transition to brief_generated or approved
+  // Runs after DB save so the async function reads correct cell data
+  if (updates.status === 'brief_generated' || updates.status === 'approved') {
+    void queueSchemaPreGeneration(workspaceId, matrixId, cellId);
+  }
+
+  return result;
 }
 
 export function deleteMatrix(workspaceId: string, matrixId: string): boolean {
