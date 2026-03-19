@@ -414,8 +414,8 @@
           "source": "ARCHITECTURE_SCHEMA_PLAN",
           "est": "4h",
           "priority": "P3",
-          "notes": "Correlate recordSeoChange() timestamps with GSC data. 14-day before/after comparison. Schema ROI cards in UI.",
-          "status": "pending"
+          "notes": "Shipped — sourceFilter on getSeoChangeImpact(), getSchemaImpactSummary() with aggregate deltas, /api/schema-impact endpoint, collapsible impact panel in SchemaSuggester with per-deployment GSC before/after. Feature #174.",
+          "status": "done"
         },
         {
           "id": 511,

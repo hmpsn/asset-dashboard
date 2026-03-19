@@ -1754,6 +1754,12 @@ When the user asks to update this document with recent features, follow this pro
 
 **Agency value:** Answers "which page should I add schema to next?" by combining two signals — pages that are both poorly linked AND missing schema are the highest priority. Eliminates guesswork in schema deployment order.
 
+### 174. Schema Impact Tracking via GSC Before/After
+**What it does:** Tracks the performance impact of schema deployments by correlating `recordSeoChange()` timestamps with Google Search Console data. Added `sourceFilter` param to `getSeoChangeImpact()` so it can filter to schema-only changes. New `getSchemaImpactSummary()` function aggregates schema deployments into avg deltas for clicks, impressions, CTR, and position. New endpoint `GET /api/schema-impact/:workspaceId` returns the summary. Frontend adds a collapsible "Schema Impact" panel in SchemaSuggester between summary cards and the page list — shows aggregate delta stats, plus per-deployment before/after comparison with trend indicators. Changes < 7 days old show "Too recent" since GSC data has a ~3 day delay.
+**Files:** `server/seo-change-tracker.ts` (`getSchemaImpactSummary`, `SchemaImpactSummary`, source filter on `getSeoChangeImpact`), `server/routes/seo-change-tracker.ts` (new `/api/schema-impact/:wsId` endpoint, `?source=` filter on existing impact endpoint), `src/api/seo.ts` (`schemaImpact` API client, typed interfaces), `src/components/SchemaSuggester.tsx` (impact panel with aggregate stats, per-deployment list, trend indicators)
+
+**Agency value:** Proves schema ROI to clients with real GSC data. Shows avg click/position deltas across all schema deployments, plus per-page breakdowns. Converts "did schema help?" from a guess into a measurable metric.
+
 ---
 
 ## Summary

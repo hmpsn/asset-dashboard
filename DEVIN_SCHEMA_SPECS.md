@@ -30,25 +30,21 @@ D4 ─────────────────────────�
 
 ### Batch Schedule — You'll Receive Tasks in 3 Batches
 
-**Batch 1 (now):** `D1` only
-- No dependencies. Start immediately.
-- Cascade is working on C1 + C2 in parallel.
-- PR and merge D1 when ready.
+**Batch 1 — COMPLETE:** `D1` ✅ Shipped #143
+**Batch 2 — COMPLETE:** `D2` ✅ #144, `D3` ✅ #145, `D5` ✅ #146
 
-**Batch 2 (after C1 + C2 + D1 are merged to main):** `D2`, `D3`, `D5`
-- Pull latest main before starting — it will contain:
-  - `getCachedArchitecture()` in `server/site-architecture.ts`
-  - `getAncestorChain()`, `flattenTree()` helpers in `server/site-architecture.ts`
-  - `SchemaContext._architectureTree`, `._pageNode`, `._ancestors` in `server/schema-suggester.ts`
-  - `PAGE_TYPE_SCHEMA_MAP` from your D1 PR
-- D2 imports from D1's `PAGE_TYPE_SCHEMA_MAP` → start D2 first, then D3 + D5 can run in parallel.
-- Cascade is working on C3, C4, C5 in parallel with this batch.
-
-**Batch 3 (after Batch 2 merges):** `D4`, `D6`, `D7`
-- These are independent of each other — work in any order.
-- D4 (competitor schema) has zero dependencies and could technically start earlier, but it's lower priority.
-- D7 depends on D2 being merged (needs `getSchemaTypesForTemplate()`).
-- Cascade is working on C6 in parallel with this batch.
+**Batch 3 (NOW — ready to start):** `D4`, `D6`, `D7`
+- Pull latest main before starting — it now contains ALL Cascade tasks (C1–C5) and Devin batch 1+2.
+- Available in main since batch 2:
+  - `getParentNode()`, `getSiblingNodes()`, `getChildNodes()` in `server/site-architecture.ts`
+  - `getSchemaTypesForTemplate()` in `server/content-matrices.ts` (needed by D7)
+  - `expectedSchemaTypes` on `MatrixCell` (from D2)
+  - CollectionPage injection (D3) and relationship enrichment (D5) in `injectCrossReferences()`
+- **D4** (competitor schema intel) has zero dependencies — can start first.
+- **D6** (brief E-E-A-T enrichment) depends on C1+C2 (available).
+- **D7** (planned page pre-generation) depends on D1+D2 (available).
+- These are independent of each other — work in any order or in parallel.
+- Cascade is working on C6 (schema impact tracking) in parallel with this batch.
 
 ### Sync Points
 

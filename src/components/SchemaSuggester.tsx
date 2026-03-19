@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { get, post, put, getSafe } from '../api/client';
+import { schemaImpact as schemaImpactApi, type SchemaImpactData, type SchemaDeploymentImpact } from '../api/seo';
 import type { FixContext } from '../App';
 import {
   Loader2, CheckCircle,
   AlertCircle, Info, Sparkles, RefreshCw, Plus, Database, HelpCircle,
+  TrendingUp, TrendingDown, Clock, BarChart3,
 } from 'lucide-react';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { useRecommendations } from '../hooks/useRecommendations';
@@ -491,6 +493,19 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
     });
   };
 
+  // ── Schema Impact Tracking (C6) ──
+  const [impactData, setImpactData] = useState<SchemaImpactData | null>(null);
+  const [showImpactDetail, setShowImpactDetail] = useState(false);
+
+  useEffect(() => {
+    if (!workspaceId) return;
+    let cancelled = false;
+    schemaImpactApi.get(workspaceId)
+      .then(d => { if (!cancelled) setImpactData(d); })
+      .catch(() => { /* GSC not connected or no schema changes — silent */ });
+    return () => { cancelled = true; };
+  }, [workspaceId]);
+
   const PAGE_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
     { value: 'auto', label: 'Auto-detect' },
     { value: 'homepage', label: 'Homepage' },
@@ -775,6 +790,95 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
           <div className="text-xs text-zinc-500">pages already have JSON-LD</div>
         </div>
       </div>
+
+      {/* Schema Impact Panel (C6) */}
+      {impactData && impactData.totalDeployments > 0 && (
+        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+          <button
+            onClick={() => setShowImpactDetail(v => !v)}
+            className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/30 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-teal-400" />
+              <span className="text-xs font-medium text-zinc-200">Schema Impact</span>
+              <span className="text-[10px] text-zinc-500">{impactData.totalDeployments} deployments tracked</span>
+            </div>
+            <div className="flex items-center gap-3">
+              {impactData.avgClicksDelta !== null && (
+                <span className={`text-xs font-medium ${impactData.avgClicksDelta >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {impactData.avgClicksDelta >= 0 ? '+' : ''}{impactData.avgClicksDelta} clicks
+                </span>
+              )}
+              {impactData.avgPositionDelta !== null && (
+                <span className={`text-xs font-medium ${impactData.avgPositionDelta <= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {impactData.avgPositionDelta <= 0 ? '' : '+'}{impactData.avgPositionDelta} pos
+                </span>
+              )}
+              {impactData.tooRecent > 0 && (
+                <span className="flex items-center gap-1 text-[10px] text-zinc-500">
+                  <Clock className="w-3 h-3" /> {impactData.tooRecent} pending
+                </span>
+              )}
+            </div>
+          </button>
+          {showImpactDetail && (
+            <div className="border-t border-zinc-800">
+              {/* Aggregate stat cards */}
+              <div className="grid grid-cols-4 gap-px bg-zinc-800">
+                {[
+                  { label: 'Avg Clicks', value: impactData.avgClicksDelta, suffix: '', positive: (v: number) => v >= 0 },
+                  { label: 'Avg Impressions', value: impactData.avgImpressionsDelta, suffix: '', positive: (v: number) => v >= 0 },
+                  { label: 'Avg CTR', value: impactData.avgCtrDelta, suffix: '%', positive: (v: number) => v >= 0 },
+                  { label: 'Avg Position', value: impactData.avgPositionDelta, suffix: '', positive: (v: number) => v <= 0 },
+                ].map(stat => (
+                  <div key={stat.label} className="bg-zinc-900 px-3 py-2.5">
+                    <div className="text-[10px] text-zinc-500">{stat.label}</div>
+                    {stat.value !== null ? (
+                      <div className={`text-sm font-bold ${stat.positive(stat.value) ? 'text-green-400' : 'text-red-400'}`}>
+                        {stat.value >= 0 && stat.label !== 'Avg Position' ? '+' : ''}{stat.value}{stat.suffix}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-zinc-600">—</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {/* Per-deployment list */}
+              <div className="max-h-[240px] overflow-y-auto divide-y divide-zinc-800/50">
+                {impactData.deployments.map((d: SchemaDeploymentImpact) => (
+                  <div key={d.change.id} className="flex items-center gap-3 px-4 py-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs text-zinc-300 truncate">{d.change.pageTitle || d.change.pageSlug || 'Unknown page'}</div>
+                      <div className="text-[10px] text-zinc-600">
+                        {new Date(d.change.changedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        {' · '}{d.daysSinceChange}d ago
+                      </div>
+                    </div>
+                    {d.tooRecent ? (
+                      <span className="flex items-center gap-1 text-[10px] text-zinc-500"><Clock className="w-3 h-3" /> Too recent</span>
+                    ) : d.before && d.after ? (
+                      <div className="flex items-center gap-3 text-[11px]">
+                        <span className={d.after.clicks >= d.before.clicks ? 'text-green-400' : 'text-red-400'}>
+                          {d.after.clicks >= d.before.clicks ? <TrendingUp className="w-3 h-3 inline" /> : <TrendingDown className="w-3 h-3 inline" />}
+                          {' '}{d.after.clicks - d.before.clicks >= 0 ? '+' : ''}{d.after.clicks - d.before.clicks} clicks
+                        </span>
+                        <span className={d.after.position <= d.before.position ? 'text-green-400' : 'text-red-400'}>
+                          pos {d.after.position.toFixed(1)}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-zinc-600">No GSC data</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="px-4 py-2 border-t border-zinc-800 text-[11px] text-zinc-500">
+                Compares 28-day GSC metrics before vs after each schema deployment. Changes &lt; 7 days old are marked pending.
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Edit status summary bar */}
       {summary.total > 0 && (
