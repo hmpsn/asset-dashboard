@@ -1748,6 +1748,12 @@ When the user asks to update this document with recent features, follow this pro
 
 **Agency value:** Instant visibility into schema gaps across the site. Admins can see at a glance which pages need schema work, prioritize accordingly, and track progress as coverage increases.
 
+### 173. Internal Link Health → Schema Priority Queue
+**What it does:** Enriches the schema coverage endpoint with internal link health data (`PageLinkHealth` from `performance-store.ts`) and computes a per-page schema priority score. Priority tiers: **Critical** (orphan + no schema), **High** (< 3 inbound links + no schema), **Medium** (no schema but decent links), **Low** (has schema but poor link health). The API returns a `priorityQueue` array sorted critical → high → medium → low. Frontend displays a "Schema Priority Queue" sidebar panel in the SiteArchitecture view with priority badges, orphan indicators, and inbound link counts.
+**Files:** `server/routes/site-architecture.ts` (link health cross-reference + priority scoring), `src/api/content.ts` (updated types), `src/components/SiteArchitecture.tsx` (priority queue panel with Zap icon, priority badges, orphan tags)
+
+**Agency value:** Answers "which page should I add schema to next?" by combining two signals — pages that are both poorly linked AND missing schema are the highest priority. Eliminates guesswork in schema deployment order.
+
 ---
 
 ## Summary

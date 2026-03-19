@@ -378,8 +378,8 @@
           "source": "ARCHITECTURE_SCHEMA_PLAN",
           "est": "2h",
           "priority": "P2",
-          "notes": "Cross-reference PageLinkHealth orphan/inbound data with schema coverage. Priority scoring: critical (orphan+no schema) → high → normal → done.",
-          "status": "pending"
+          "notes": "Shipped — schema coverage endpoint enriched with PageLinkHealth data. Priority scoring: critical (orphan+no schema) → high (< 3 inbound) → medium → low (has schema, poor links). Frontend priority queue panel with badges + orphan tags. Feature #173.",
+          "status": "done"
         },
         {
           "id": 507,
