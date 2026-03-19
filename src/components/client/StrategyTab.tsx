@@ -31,9 +31,10 @@ interface StrategyTabProps {
   fmtPrice: (n: number) => string;
   setPricingModal: (modal: PricingModalState | null) => void;
   contentPlanKeywords?: Map<string, string>;
+  onTabChange?: (tab: string) => void;
 }
 
-export function StrategyTab({ strategyData, requestedTopics, contentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal, contentPlanKeywords }: StrategyTabProps) {
+export function StrategyTab({ strategyData, requestedTopics, contentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal, contentPlanKeywords, onTabChange }: StrategyTabProps) {
   const betaMode = useBetaMode();
   const [mapSearch, setMapSearch] = useState('');
   const [mapSort, setMapSort] = useState<'default' | 'position' | 'impressions' | 'clicks'>('default');
@@ -127,10 +128,14 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                           return <span className="flex items-center gap-1 text-[11px] text-blue-400 bg-blue-500/10 px-2.5 py-1.5 rounded-lg border border-blue-500/20 flex-shrink-0"><CheckCircle2 className="w-3.5 h-3.5" /> Brief Ordered</span>;
                         })()
                       ) : planStatus ? (
-                        <span className="flex items-center gap-1 text-[11px] text-violet-400 bg-violet-500/10 px-2.5 py-1.5 rounded-lg border border-violet-500/20 flex-shrink-0">
+                        <button
+                          onClick={() => onTabChange?.('content-plan')}
+                          className="flex items-center gap-1 text-[11px] text-violet-400 bg-violet-500/10 px-2.5 py-1.5 rounded-lg border border-violet-500/20 flex-shrink-0 hover:bg-violet-500/20 transition-colors"
+                          title="View in Content Plan"
+                        >
                           <Layers className="w-3.5 h-3.5" />
                           {planStatus === 'published' ? 'Published' : planStatus === 'approved' ? 'Approved' : planStatus === 'in_progress' || planStatus === 'brief_generated' ? 'In Progress' : 'Planned'}
-                        </span>
+                        </button>
                       ) : (
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <button

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Bell, TrendingDown, Flag, MessageSquare, ClipboardCheck, Clipboard,
-  AlertTriangle, X,
+  AlertTriangle, X, Layers,
 } from 'lucide-react';
 import { adminPath, type Page } from '../routes';
 import { workspaceOverview, anomalies as anomaliesApi, churnSignals } from '../api/misc';
@@ -25,6 +25,7 @@ interface WorkspaceSummary {
   approvals: { pending: number };
   contentRequests?: { pending: number };
   workOrders?: { pending: number };
+  contentPlan?: { review: number };
 }
 
 interface AnomalySummary {
@@ -151,6 +152,18 @@ export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
             workspaceId: ws.id,
             workspaceName: ws.name,
             tab: 'workspace-settings',
+          });
+        }
+        if ((ws.contentPlan?.review || 0) > 0) {
+          notifications.push({
+            id: `content-plan-${ws.id}`,
+            label: `${ws.contentPlan!.review} content plan cell${ws.contentPlan!.review > 1 ? 's' : ''} need${ws.contentPlan!.review === 1 ? 's' : ''} review`,
+            sub: ws.name,
+            color: 'text-violet-400',
+            icon: Layers,
+            workspaceId: ws.id,
+            workspaceName: ws.name,
+            tab: 'content-pipeline',
           });
         }
       }

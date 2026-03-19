@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   ChevronLeft, ChevronRight, FileText, Clipboard, MessageSquare,
   Sparkles, PenLine, Eye, CheckCircle2, Clock, Send, Globe,
-  Calendar as CalendarIcon,
+  Calendar as CalendarIcon, Layers,
 } from 'lucide-react';
-import { contentBriefs, contentPosts, contentRequests } from '../api/content';
+import { contentBriefs, contentPosts, contentRequests, contentMatrices } from '../api/content';
 
 // ── Types ──
 
@@ -37,7 +37,7 @@ interface CalendarRequest {
   updatedAt: string;
 }
 
-type ItemType = 'brief' | 'post' | 'request';
+type ItemType = 'brief' | 'post' | 'request' | 'matrix';
 
 interface CalendarItem {
   id: string;
@@ -55,6 +55,7 @@ const TYPE_CONFIG: Record<ItemType, { icon: typeof FileText; color: string; bg: 
   brief:   { icon: Clipboard,      color: 'text-teal-400',  bg: 'bg-teal-500/10',  border: 'border-teal-500/20', label: 'Brief' },
   post:    { icon: FileText,       color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', label: 'Post' },
   request: { icon: MessageSquare,  color: 'text-blue-400',  bg: 'bg-blue-500/10',  border: 'border-blue-500/20', label: 'Request' },
+  matrix:  { icon: Layers,         color: 'text-violet-400', bg: 'bg-violet-500/10', border: 'border-violet-500/20', label: 'Matrix Cell' },
 };
 
 const STATUS_ICONS: Record<string, { icon: typeof Clock; color: string }> = {
@@ -119,15 +120,18 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [briefsData, postsData, requestsData] = await Promise.all([
+      const [briefsData, postsData, requestsData, matricesData] = await Promise.all([
         contentBriefs.list(workspaceId).catch(() => []),
         contentPosts.list(workspaceId).catch(() => []),
         contentRequests.list(workspaceId).catch(() => []),
+        contentMatrices.list(workspaceId).catch(() => []),
       ]);
 
       const allItems: CalendarItem[] = [];
 
+      const briefDateMap = new Map<string, string>();
       for (const b of briefsData as CalendarBrief[]) {
+        briefDateMap.set(b.id, b.createdAt);
         allItems.push({
           id: b.id,
           type: 'brief',
@@ -138,7 +142,9 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
         });
       }
 
+      const postDateMap = new Map<string, string>();
       for (const p of postsData as CalendarPost[]) {
+        postDateMap.set(p.id, p.publishedAt || p.createdAt);
         allItems.push({
           id: p.id,
           type: 'post',
@@ -159,6 +165,22 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
           status: r.status,
           date: r.requestedAt,
         });
+      }
+
+      // Matrix cells — use linked post/brief dates, or matrix updatedAt as fallback
+      const matrices = Array.isArray(matricesData) ? matricesData as { id: string; name: string; cells: { id: string; targetKeyword: string; plannedUrl: string; status: string; briefId?: string; postId?: string }[]; updatedAt: string }[] : [];
+      for (const matrix of matrices) {
+        for (const cell of matrix.cells || []) {
+          const cellDate = (cell.postId && postDateMap.get(cell.postId)) || (cell.briefId && briefDateMap.get(cell.briefId)) || matrix.updatedAt;
+          allItems.push({
+            id: `matrix-${cell.id}`,
+            type: 'matrix',
+            label: cell.targetKeyword || 'Untitled',
+            sublabel: `${matrix.name} · ${cell.plannedUrl || ''}`,
+            status: cell.status,
+            date: cellDate,
+          });
+        }
       }
 
       setItems(allItems);
@@ -230,7 +252,8 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
       briefs: inMonth.filter(i => i.type === 'brief').length,
       posts: inMonth.filter(i => i.type === 'post').length,
       requests: inMonth.filter(i => i.type === 'request').length,
-      published: inMonth.filter(i => i.publishedAt).length,
+      matrixCells: inMonth.filter(i => i.type === 'matrix').length,
+      published: inMonth.filter(i => i.publishedAt || (i.type === 'matrix' && i.status === 'published')).length,
     };
   }, [items, currentMonth]);
 
@@ -262,7 +285,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
         </div>
         <div className="flex items-center gap-2">
           {/* Type filter pills */}
-          {(['all', 'brief', 'post', 'request'] as const).map(t => (
+          {(['all', 'brief', 'post', 'request', 'matrix'] as const).map(t => (
             <button
               key={t}
               onClick={() => setTypeFilter(t)}
@@ -279,11 +302,12 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
       </div>
 
       {/* Month stats */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-5 gap-3">
         {[
           { label: 'Briefs', value: stats.briefs, color: 'text-teal-400', bg: 'bg-teal-500/10', border: 'border-teal-500/20' },
           { label: 'Posts', value: stats.posts, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
           { label: 'Requests', value: stats.requests, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
+          { label: 'Matrix Cells', value: stats.matrixCells, color: 'text-violet-400', bg: 'bg-violet-500/10', border: 'border-violet-500/20' },
           { label: 'Published', value: stats.published, color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
         ].map(s => (
           <div key={s.label} className={`rounded-xl border ${s.border} ${s.bg} px-4 py-3`}>

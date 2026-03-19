@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Clipboard, FileText, RefreshCw, Map, Bot, Download, ChevronDown, Layers, HelpCircle } from 'lucide-react';
+import { contentBriefs, contentPosts, contentMatrices } from '../api/content';
 import { ContentBriefs } from './ContentBriefs';
 import { ContentManager } from './ContentManager';
 import { ContentSubscriptions } from './ContentSubscriptions';
@@ -36,10 +37,42 @@ const EXPORTS = [
   { key: 'strategy', label: 'Keyword Strategy' },
 ] as const;
 
+interface PipelineSummary {
+  briefs: number;
+  posts: number;
+  matrices: number;
+  cells: number;
+  published: number;
+}
+
 export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext }: Props) {
   const [activeTab, setActiveTab] = useState<PipelineTab>('briefs');
   const [exportOpen, setExportOpen] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
+  const [summary, setSummary] = useState<PipelineSummary | null>(null);
+
+  const fetchSummary = useCallback(async () => {
+    try {
+      const [briefs, posts, matrices] = await Promise.all([
+        contentBriefs.list(workspaceId).catch(() => []),
+        contentPosts.list(workspaceId).catch(() => []),
+        contentMatrices.list(workspaceId).catch(() => []),
+      ]);
+      const briefArr = Array.isArray(briefs) ? briefs : [];
+      const postArr = Array.isArray(posts) ? posts : [];
+      const matrixArr = Array.isArray(matrices) ? matrices as { cells?: { status?: string }[] }[] : [];
+      const allCells = matrixArr.flatMap(m => m.cells || []);
+      setSummary({
+        briefs: briefArr.length,
+        posts: postArr.length,
+        matrices: matrixArr.length,
+        cells: allCells.length,
+        published: allCells.filter(c => c.status === 'published').length,
+      });
+    } catch { /* silent */ }
+  }, [workspaceId]);
+
+  useEffect(() => { void fetchSummary(); }, [fetchSummary]);
 
   useEffect(() => {
     if (!exportOpen) return;
@@ -57,6 +90,16 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext 
 
   return (
     <div className="space-y-4">
+      {/* Health summary bar */}
+      {summary && (summary.briefs > 0 || summary.matrices > 0) && (
+        <div className="flex items-center gap-3 px-4 py-2 bg-zinc-900 rounded-xl border border-zinc-800 text-[11px] text-zinc-400">
+          {summary.briefs > 0 && <span className="flex items-center gap-1"><Clipboard className="w-3 h-3 text-teal-400" /><span className="font-medium text-zinc-300">{summary.briefs}</span> brief{summary.briefs !== 1 ? 's' : ''}</span>}
+          {summary.posts > 0 && <><span className="text-zinc-700">&middot;</span><span className="flex items-center gap-1"><FileText className="w-3 h-3 text-amber-400" /><span className="font-medium text-zinc-300">{summary.posts}</span> post{summary.posts !== 1 ? 's' : ''}</span></>}
+          {summary.matrices > 0 && <><span className="text-zinc-700">&middot;</span><span className="flex items-center gap-1"><Layers className="w-3 h-3 text-violet-400" /><span className="font-medium text-zinc-300">{summary.matrices}</span> matri{summary.matrices !== 1 ? 'ces' : 'x'}</span></>}
+          {summary.cells > 0 && <><span className="text-zinc-700">&middot;</span><span className="flex items-center gap-1"><span className="font-medium text-zinc-300">{summary.cells}</span> cell{summary.cells !== 1 ? 's' : ''}</span>{summary.published > 0 && <span className="text-green-400 ml-0.5">({Math.round(summary.published / summary.cells * 100)}% published)</span>}</>}
+        </div>
+      )}
+
       {/* Sub-tab bar */}
       <div className="flex items-center gap-1 border-b border-zinc-800 pb-0">
         {TABS.map(t => {

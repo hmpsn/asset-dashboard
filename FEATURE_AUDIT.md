@@ -1692,6 +1692,32 @@ When the user asks to update this document with recent features, follow this pro
 
 **Client value:** Review and flag content plan items from the same Inbox used for SEO changes and requests.
 
+### 164. Strategy → Content Planner Action Bridge
+**What it does:** Two-way navigation between Keyword Strategy and Content Planner. Admin: "Add to Planner" button on content gaps navigates to Content Pipeline with keyword pre-filled. Client: "Planned" badges on strategy content gaps are now clickable buttons that switch to the Content Plan tab.
+**Files:** `src/components/strategy/ContentGaps.tsx`, `src/components/client/StrategyTab.tsx`, `src/components/ClientDashboard.tsx`
+
+**Agency value:** One-click from strategy gap to content planner — no copy-paste or context switching.
+
+**Client value:** Clickable badges confirm planned content and navigate directly to the content plan.
+
+### 165. Notification Bell — Content Plan Review Alerts
+**What it does:** The admin notification bell now surfaces content plan cells that need review (status 'review' or 'flagged'). Workspace overview endpoint includes `contentPlan.review` count. Notification shows violet Layers icon with cell count and links to Content Pipeline.
+**Files:** `server/routes/workspaces.ts`, `src/components/NotificationBell.tsx`
+
+**Agency value:** Flagged content plan cells surface alongside other action items — nothing falls through the cracks.
+
+### 166. Content Calendar — Matrix Cell Entries
+**What it does:** Matrix cells now appear on the Content Calendar alongside briefs, posts, and requests. Cells are dated using linked post/brief dates when available, or matrix updatedAt as fallback. New violet "Matrix Cell" type with Layers icon. Filter pill, stat card, and status icons added. Published matrix cells count toward the "Published" stat.
+**Files:** `src/components/ContentCalendar.tsx`
+
+**Agency value:** Calendar shows the full content picture — briefs, posts, requests, and matrix cells together.
+
+### 167. Content Pipeline — Health Summary Bar
+**What it does:** Thin summary bar at the top of the Content Pipeline page showing aggregate stats: brief count, post count, matrix count, cell count with publish percentage. Conditionally rendered when any content exists. Uses existing API data with no new endpoints.
+**Files:** `src/components/ContentPipeline.tsx`
+
+**Agency value:** Instant pipeline context without navigating into individual tabs.
+
 ---
 
 ## Summary
@@ -1700,7 +1726,7 @@ When the user asks to update this document with recent features, follow this pro
 |----------|:---:|---|
 | SEO & Technical | 16 | Audit, fix, and optimize faster than manual tools + AEO trust signals + change impact tracking + content decay detection + site architecture planner |
 | Analytics & Tracking | 7 | Unified data view replaces platform-hopping + AI time-saved tracking |
-| Content & Strategy | 27 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar + content templates + keyword pre-assignment + content matrices + keyword recommendations + cannibalization detection + content planner export + client review flow + LLMs.txt generator |
+| Content & Strategy | 31 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar + content templates + keyword pre-assignment + content matrices + keyword recommendations + cannibalization detection + content planner export + client review flow + LLMs.txt generator |
 | Client Communication | 10 | Structured workflows + automated reports + expanded notifications + feedback widget + email capture funnel + audit completion email |
 | Client Self-Service | 18 | 24/7 data access, onboarding, plans, cart, order tracking, glossary, questionnaire, ROI upgrade prompts, shareable report permalinks, content pipeline status cards + post-publish performance |
 | AI & Intelligence | 7 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine + context completeness + usage dashboard + AEO page review |

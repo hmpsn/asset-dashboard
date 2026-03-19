@@ -30,6 +30,7 @@ import {
   discoverSitemapUrls,
 } from '../webflow.js';
 import { listWorkOrders } from '../work-orders.js';
+import { listMatrices } from '../content-matrices.js';
 import {
   listWorkspaces,
   createWorkspace,
@@ -89,6 +90,10 @@ router.get('/api/workspace-overview', (_req, res) => {
     const workOrders = listWorkOrders(ws.id);
     const pendingWorkOrders = workOrders.filter(o => o.status === 'pending' || o.status === 'in_progress').length;
 
+    // Content plan review/flagged cells
+    const matrices = listMatrices(ws.id);
+    const reviewCells = matrices.reduce((sum, m) => sum + (m.cells || []).filter((c: { status?: string }) => c.status === 'review' || c.status === 'flagged').length, 0);
+
     // Page edit states summary
     const allStates = getAllPageStates(ws.id);
     const stateVals = Object.values(allStates);
@@ -121,6 +126,7 @@ router.get('/api/workspace-overview', (_req, res) => {
       approvals: { pending: pendingApprovals, total: totalApprovalItems },
       contentRequests: { pending: pendingContentReqs, inProgress: inProgressContentReqs, delivered: deliveredContentReqs, total: contentReqs.length },
       workOrders: { pending: pendingWorkOrders, total: workOrders.length },
+      contentPlan: { review: reviewCells },
       pageStates,
     };
   });

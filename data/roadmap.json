@@ -172,8 +172,8 @@
           "source": "TOOL_AUDIT §1c",
           "est": "3h",
           "priority": "P2",
-          "notes": "Admin: 'Add to Matrix' button on strategy content gaps. Client: callout linking to Content Plan when matrices exist.",
-          "status": "pending"
+          "notes": "Shipped — Admin 'Add to Planner' button on content gaps → Content Pipeline. Client 'Planned' badges are clickable → Content Plan tab. Feature #164.",
+          "status": "done"
         },
         {
           "id": 420,
@@ -217,8 +217,8 @@
           "source": "TOOL_AUDIT §2c",
           "est": "1h",
           "priority": "P2",
-          "notes": "Surface cell flagging and matrix approval events in NotificationBell.",
-          "status": "pending"
+          "notes": "Shipped — Workspace overview includes contentPlan.review count. NotificationBell shows violet alert for review/flagged cells. Feature #165.",
+          "status": "done"
         },
         {
           "id": 425,
@@ -226,8 +226,8 @@
           "source": "TOOL_AUDIT §1g",
           "est": "2h",
           "priority": "P2",
-          "notes": "Render matrix cells on calendar (by targetDate/publishedAt). Unscheduled cells in sidebar.",
-          "status": "pending"
+          "notes": "Shipped — Matrix cells on calendar with violet 'Matrix Cell' type, filter pill, stat card. Dates from linked posts/briefs or matrix updatedAt. Feature #166.",
+          "status": "done"
         },
         {
           "id": 426,
@@ -235,8 +235,8 @@
           "source": "TOOL_AUDIT §4b",
           "est": "2h",
           "priority": "P2",
-          "notes": "Thin summary bar at top: 'X briefs · Y posts · Z matrices · N cells (X% published)' — instant pipeline context.",
-          "status": "pending"
+          "notes": "Shipped — Summary bar above tabs: briefs, posts, matrices, cells with publish %. Feature #167.",
+          "status": "done"
         },
         {
           "id": 427,
