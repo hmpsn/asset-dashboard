@@ -205,6 +205,48 @@ export function getAncestorChain(tree: SiteNode, targetPath: string): SiteNode[]
 }
 
 /**
+ * Find the parent of the node at targetPath in the tree.
+ * Returns null if the target is the root or not found.
+ */
+export function getParentNode(tree: SiteNode, targetPath: string): SiteNode | null {
+  function walk(node: SiteNode, parent: SiteNode | null): SiteNode | null {
+    if (node.path === targetPath) return parent;
+    for (const child of node.children) {
+      const found = walk(child, node);
+      if (found !== null) return found;
+    }
+    return null;
+  }
+  return walk(tree, null);
+}
+
+/**
+ * Find the siblings of the node at targetPath (same parent, excluding the target itself).
+ * Only returns siblings that have content.
+ */
+export function getSiblingNodes(tree: SiteNode, targetPath: string): SiteNode[] {
+  const parent = getParentNode(tree, targetPath);
+  if (!parent) return [];
+  return parent.children.filter(c => c.path !== targetPath && c.hasContent);
+}
+
+/**
+ * Find the node at parentPath and return its direct children that have content.
+ */
+export function getChildNodes(tree: SiteNode, parentPath: string): SiteNode[] {
+  function find(node: SiteNode): SiteNode | null {
+    if (node.path === parentPath) return node;
+    for (const child of node.children) {
+      const found = find(child);
+      if (found) return found;
+    }
+    return null;
+  }
+  const parent = find(tree);
+  return parent ? parent.children.filter(c => c.hasContent) : [];
+}
+
+/**
  * Flatten the tree into a depth-first array of all nodes (excluding root if desired).
  */
 export function flattenTree(tree: SiteNode, includeRoot = false): SiteNode[] {

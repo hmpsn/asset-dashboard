@@ -3,7 +3,7 @@ import { callOpenAI } from './openai-helpers.js';
 import { createLogger } from './logger.js';
 import { saveSiteTemplate, getOrSeedSiteTemplate, getSchemaPlan } from './schema-store.js';
 import { buildPlanContextForPage } from './schema-plan.js';
-import { getAncestorChain } from './site-architecture.js';
+import { getAncestorChain, getParentNode, getSiblingNodes, getChildNodes } from './site-architecture.js';
 
 const log = createLogger('schema');
 
@@ -485,6 +485,59 @@ function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string,
         });
         log.info({ navCount: navItems.length }, 'Injected SiteNavigationElement from architecture tree');
       }
+    }
+  }
+
+  // D5: Sibling/Parent-Child Relationship Enrichment
+  // When architecture tree is available, add isPartOf (→ parent page), relatedLink (→ siblings),
+  // and hasPart (→ children) to WebPage nodes.
+  const relTree = ctx?._architectureTree;
+  if (relTree) {
+    const webPage = graph.find(n => n['@type'] === 'WebPage') as Record<string, unknown> | undefined;
+    if (webPage) {
+      const pageUrl = (webPage['url'] as string) || siteUrl;
+      try {
+        const pagePath = new URL(pageUrl).pathname.replace(/\/$/, '') || '/';
+
+        // isPartOf → actual parent page (not just WebSite)
+        const parentNode = getParentNode(relTree, pagePath);
+        if (parentNode && parentNode.depth > 0 && parentNode.hasContent) {
+          // Override the generic WebSite isPartOf with the actual parent page
+          webPage['isPartOf'] = {
+            '@type': 'WebPage',
+            '@id': `${siteUrl}${parentNode.path}`,
+            'name': parentNode.name,
+            'url': `${siteUrl}${parentNode.path}`,
+          };
+          log.info({ pagePath, parent: parentNode.path }, 'Enriched isPartOf with parent page');
+        }
+
+        // relatedLink → sibling pages (max 5 to avoid bloat)
+        if (!webPage['relatedLink']) {
+          const siblings = getSiblingNodes(relTree, pagePath)
+            .filter(s => s.source === 'existing')
+            .slice(0, 5);
+          if (siblings.length > 0) {
+            webPage['relatedLink'] = siblings.map(s => `${siteUrl}${s.path}`);
+            log.info({ pagePath, siblingCount: siblings.length }, 'Enriched relatedLink with siblings');
+          }
+        }
+
+        // hasPart → child pages
+        if (!webPage['hasPart']) {
+          const children = getChildNodes(relTree, pagePath)
+            .filter(c => c.source === 'existing');
+          if (children.length > 0) {
+            webPage['hasPart'] = children.map(c => ({
+              '@type': 'WebPage',
+              '@id': `${siteUrl}${c.path}`,
+              'name': c.name,
+              'url': `${siteUrl}${c.path}`,
+            }));
+            log.info({ pagePath, childCount: children.length }, 'Enriched hasPart with child pages');
+          }
+        }
+      } catch { /* skip if URL parsing fails */ }
     }
   }
 }
