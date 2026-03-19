@@ -1766,23 +1766,23 @@ When the user asks to update this document with recent features, follow this pro
 
 | Category | Feature Count | Primary Value Driver |
 |----------|:---:|---|
-| SEO & Technical | 16 | Audit, fix, and optimize faster than manual tools + AEO trust signals + change impact tracking + content decay detection + site architecture planner |
+| SEO & Technical | 22 | Audit, fix, and optimize faster than manual tools + AEO trust signals + change impact tracking + content decay detection + site architecture planner + schema coverage/priority/impact tracking |
 | Analytics & Tracking | 7 | Unified data view replaces platform-hopping + AI time-saved tracking |
-| Content & Strategy | 31 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar + content templates + keyword pre-assignment + content matrices + keyword recommendations + cannibalization detection + content planner export + client review flow + LLMs.txt generator |
-| Client Communication | 10 | Structured workflows + automated reports + expanded notifications + feedback widget + email capture funnel + audit completion email |
+| Content & Strategy | 34 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar + content templates + keyword pre-assignment + content matrices + keyword recommendations + cannibalization detection + content planner export + client review flow + LLMs.txt generator + matrix status timeline |
+| Client Communication | 11 | Structured workflows + automated reports + expanded notifications + feedback widget + email capture funnel + audit completion email + content plan review alerts |
 | Client Self-Service | 18 | 24/7 data access, onboarding, plans, cart, order tracking, glossary, questionnaire, ROI upgrade prompts, shareable report permalinks, content pipeline status cards + post-publish performance |
 | AI & Intelligence | 7 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine + context completeness + usage dashboard + AEO page review |
 | Auth & Access Control | 3 | Internal user accounts, workspace ACL, client user accounts |
 | Security | 2 | Helmet, HTTPS, rate limiting, input sanitization, Turnstile CAPTCHA, credential stuffing protection, weekly npm audit |
 | Monetization | 3 | Stripe Checkout + Subscriptions, admin settings, payment tracking, trials, encrypted config, billing portal, recurring content subscriptions |
-| Platform & UX | 20 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home, page state model, work orders, request linkage, admin UX overhaul, landing page, mobile guard, Recharts, portal OG/favicon, sidebar color accents, AI Usage standalone page, Growth Opportunities reframe |
+| Platform & UX | 21 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home, page state model, work orders, request linkage, admin UX overhaul, landing page, mobile guard, Recharts, portal OG/favicon, sidebar color accents, AI Usage standalone page, Growth Opportunities reframe, strategy→planner bridge |
 | Data Architecture | 3 | PageEditState model, cross-store writes, activity feed for client actions |
 | Architecture | 5 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types |
 | Infrastructure | 7 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3 + integrity verification), E2E tests, job persistence, anomaly deploy guard |
 
-**163 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**174 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **163**. Last updated: March 2026 (content planner integration P2s — site architecture, content performance, inbox reviews).
+Current feature count: **174**. Last updated: March 2026 (schema integration sprint — C1–C6 + D1–D7 all shipped).
 
 ### Recent Additions (March 2026)
 

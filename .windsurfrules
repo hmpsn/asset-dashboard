@@ -54,8 +54,8 @@ Every completed task — no matter how small — must include these steps:
 
 - **Routing** — **React Router DOM 7** (`src/routes.ts` defines `Page` + `ClientTab` types, `adminPath()` + `clientPath()` helpers). Admin: `/ws/:workspaceId/:tab?`, Client: `/client/:workspaceId/:tab?`, global tabs: `/settings`, `/roadmap`, `/prospect`, `/ai-usage`.
 - **API Client** — Typed fetch wrappers in `src/api/` (9 modules). All components import from `src/api/` — no raw `fetch()` calls in components. `ApiError` class with `.status` for error handling.
-- **Shared Types** — `shared/types/` (10 modules) shared between client and server. Canonical interfaces for workspace, analytics, content, payments, approvals, etc.
-- **Storage** — **SQLite** via `better-sqlite3` (WAL mode, foreign keys ON) at `DATA_BASE/dashboard.db`. All 5 migration PRs merged to `main` — 30+ modules now use SQLite. See § 2a below.
+- **Shared Types** — `shared/types/` (11 modules) shared between client and server. Canonical interfaces for workspace, analytics, content, payments, approvals, schema-plan, etc.
+- **Storage** — **SQLite** via `better-sqlite3` (WAL mode, foreign keys ON) at `DATA_BASE/dashboard.db`. 17 migrations merged to `main` — 90+ server modules use SQLite. See § 2a below.
 - **AI** — OpenAI GPT-4.1/4.1-mini/4.1-nano via `server/openai-helpers.ts` (`callOpenAI`), Anthropic Claude via `server/anthropic-helpers.ts` (`callAnthropic`) for creative prose
 - **Payments** — Stripe Checkout (not Payment Intents). Config encrypted on disk (AES-256-GCM). Admin UI for keys + products.
 - **Auth** — Dual system: internal JWT (7-day, admin) + client JWT (24h, per-workspace). Legacy shared-password still supported. Turnstile CAPTCHA on client login/forgot-password (optional).
@@ -78,7 +78,7 @@ Every completed task — no matter how small — must include these steps:
 | `app.ts` | **Express app factory** (~301 lines) | `createApp()`: helmet, CORS, cookie-parser, request logger, fingerprinting, Stripe webhook (raw body), JSON/static/SPA middleware, all route mounting, Sentry error handler. Extracted from index.ts for testability. |
 | `websocket.ts` | **WebSocket server** (~130 lines) | `initWebSocket(server)`: connection handling, heartbeat, auth, workspace rooms, broadcast helpers. |
 | `startup.ts` | **Scheduler init** (~22 lines) | `startSchedulers()`: kicks off all background schedulers (churn, anomaly, trial reminders, backups, etc.). |
-| `routes/` | **56 Express Router files** | One file per domain: `auth.ts`, `webflow.ts`, `webflow-alt-text.ts`, `webflow-audit.ts`, `webflow-cms.ts`, `webflow-keywords.ts`, `webflow-organize.ts`, `webflow-pagespeed.ts`, `webflow-schema.ts`, `webflow-seo.ts`, `webflow-analysis.ts`, `aeo-review.ts`, `feedback.ts`, `public-feedback.ts`, `content-decay.ts`, `content-publish.ts`, `content-subscriptions.ts`, `seo-change-tracker.ts`, `backlinks.ts`, `brand-docs.ts`, `data-export.ts`, `revenue.ts`, `workspace-badges.ts`, `workspace-home.ts`, etc. |
+| `routes/` | **62 Express Router files** | One file per domain: `auth.ts`, `webflow.ts`, `webflow-alt-text.ts`, `webflow-audit.ts`, `webflow-cms.ts`, `webflow-keywords.ts`, `webflow-organize.ts`, `webflow-pagespeed.ts`, `webflow-schema.ts`, `webflow-seo.ts`, `webflow-analysis.ts`, `aeo-review.ts`, `feedback.ts`, `public-feedback.ts`, `content-decay.ts`, `content-publish.ts`, `content-subscriptions.ts`, `content-templates.ts`, `content-matrices.ts`, `content-plan-review.ts`, `seo-change-tracker.ts`, `site-architecture.ts`, `backlinks.ts`, `brand-docs.ts`, `data-export.ts`, `revenue.ts`, `workspace-badges.ts`, `workspace-home.ts`, `keyword-strategy.ts`, `google.ts`, `health.ts`, `llms-txt.ts`, `rewrite-chat.ts`, etc. |
 | `helpers.ts` | Shared pure functions | `sanitizeString`, `validateEnum`, `parseDateRange`, `applySuppressionsToAudit`, `buildSchemaContext`, `getAuditTrafficForWorkspace`, `readEnvFile`, `writeEnvFile` |
 | `middleware.ts` | Shared middleware + auth (single source of truth) | Rate limiters, `signClientSession`/`verifyClientSession`, `signAdminToken`/`verifyAdminToken`, `upload` (multer), `moveUploadedFiles`, `IS_PROD`, `APP_PASSWORD` |
 | `middleware/` | **Extracted middleware modules** | `fingerprint.ts` (request fingerprinting), `request-logger.ts` (pino HTTP request logging), `turnstile.ts` (Cloudflare Turnstile CAPTCHA verification) |
@@ -99,7 +99,15 @@ Every completed task — no matter how small — must include these steps:
 | `html-to-richtext.ts` | HTML→Webflow RichText converter | For CMS publishing |
 | `performance-store.ts` | PageSpeed snapshot persistence | Stores PSI results over time |
 | `redirect-store.ts` | Redirect scan persistence | Stores redirect scan snapshots |
-| `schema-store.ts` | Schema snapshot persistence | Stores schema generation results |
+| `schema-store.ts` | Schema snapshot + template + plan persistence | Stores schema snapshots, site templates (012), site plans (013) |
+| `schema-plan.ts` | Site-aware schema plan generation | AI assigns page roles + canonical entities. `generateSchemaPlan()`, `buildPlanContextForPage()` |
+| `site-architecture.ts` | Site architecture tree builder | `buildSiteArchitecture()` — merges Webflow pages, sitemap, strategy, matrices into unified tree. Schema coverage + priority queue endpoints. |
+| `content-matrices.ts` | Content matrix engine | Template-based content planning. `getSchemaTypesForTemplate()`, matrix CRUD, cell lifecycle |
+| `content-templates.ts` | Content template CRUD | Reusable content templates with variable schemas |
+| `keyword-recommendations.ts` | AI keyword recommendations | Auto-generated keyword suggestions per workspace |
+| `cannibalization-detection.ts` | Keyword cannibalization detection | Identifies pages competing for same keywords |
+| `llms-txt-generator.ts` | LLMs.txt generator | Generates LLMs.txt file for AI crawler guidance |
+| `post-export-html.ts` | Post HTML export renderer | Branded HTML export for generated posts |
 | `reports.ts` | Report generation | Monthly/custom report data aggregation |
 | `sales-audit.ts` | Sales audit engine | Prospect site analysis for sales outreach |
 | `sales-report-html.ts` | Sales report HTML renderer | Branded HTML export for prospects |
@@ -162,7 +170,7 @@ Every completed task — no matter how small — must include these steps:
 
 ### § 2a. SQLite Database (`server/db/`)
 
-**All 30+ server modules** now use SQLite via `better-sqlite3` (10 migrations merged).
+**All 90+ server modules** now use SQLite via `better-sqlite3` (17 migrations merged).
 
 | File | Purpose |
 |------|---------|
@@ -178,6 +186,13 @@ Every completed task — no matter how small — must include these steps:
 | `db/migrations/008-content-subscriptions.sql` | `content_subscriptions` table for recurring content plans |
 | `db/migrations/009-content-versions.sql` | `content_versions` table for post version history |
 | `db/migrations/010-review-checklist.sql` | `review_checklists` table for human-in-the-loop review tracking |
+| `db/migrations/011-rewrite-playbook.sql` | Rewrite playbook storage |
+| `db/migrations/012-schema-site-template.sql` | `schema_site_templates` table (site_id PK, organization_node JSON, website_node JSON) |
+| `db/migrations/013-schema-site-plan.sql` | `schema_site_plans` table (site_id PK, canonical_entities, page_roles, status) |
+| `db/migrations/014-content-templates.sql` | `content_templates` table for reusable content templates |
+| `db/migrations/015-brief-keyword-tracking.sql` | Brief keyword tracking for content pipeline |
+| `db/migrations/016-content-matrices.sql` | `content_matrices`, `matrix_cells` tables for content planning |
+| `db/migrations/017-template-schema-types.sql` | `expectedSchemaTypes` on template→schema type mapping (D2) |
 
 **Key patterns (follow these when writing new DB code):**
 - **Lazy prepared statements:** `let _stmt: ... | null = null;` cached at module level
@@ -252,7 +267,7 @@ Every completed task — no matter how small — must include these steps:
 
 | File | Purpose |
 |------|---------|
-| `shared/types/` | **10 shared type modules** between client and server: `workspace.ts`, `analytics.ts`, `content.ts`, `payments.ts`, `approvals.ts`, `requests.ts`, `recommendations.ts`, `users.ts`, `roadmap.ts`, `index.ts` (barrel) |
+| `shared/types/` | **11 shared type modules** between client and server: `workspace.ts`, `analytics.ts`, `content.ts`, `payments.ts`, `approvals.ts`, `requests.ts`, `recommendations.ts`, `users.ts`, `roadmap.ts`, `schema-plan.ts`, `index.ts` (barrel) |
 
 ### Tests
 
@@ -297,7 +312,7 @@ Every completed task — no matter how small — must include these steps:
 ### Feature work
 | Priority | Doc | What it tells you |
 |----------|-----|-------------------|
-| 1 | `FEATURE_AUDIT.md` | 129-feature inventory with agency/client/mutual value, Future Additions backlog |
+| 1 | `FEATURE_AUDIT.md` | 174-feature inventory with agency/client/mutual value, Future Additions backlog |
 | 2 | `.windsurf/workflows/feature-integration.md` | How to connect features (cross-links, client dashboard, approvals) |
 | 3 | `.windsurf/workflows/wiring-patterns.md` | How to wire data into chat, strategy, briefs, reports |
 | 4 | `data/roadmap.json` | Sprint tracking — check what's done/pending before starting work |
@@ -408,6 +423,9 @@ These pre-existing lint warnings are **not caused by current work** and should b
 - `'Link' is defined but never used`
 - `'MessageSquare' is defined but never used`
 - `React Hook useEffect has missing dependencies` (fetchStrategy, businessContext)
+
+**`ContentPipeline.tsx`:**
+- `Calling setState synchronously within an effect can trigger cascading renders` (line ~75, `fetchSummary`)
 
 These will be addressed in a dedicated cleanup pass. **Do not attempt to fix them during unrelated tasks.**
 
