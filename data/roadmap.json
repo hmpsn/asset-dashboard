@@ -396,8 +396,8 @@
           "source": "DEVIN_SCHEMA_SPECS",
           "est": "3h",
           "priority": "P2",
-          "notes": "getParentNode() + getSiblingNodes() helpers. Inject isPartOf→parent, relatedLink→siblings, hasPart→children into schema. Depends on C1+C2.",
-          "status": "pending"
+          "notes": "Shipped — getParentNode(), getSiblingNodes(), getChildNodes() helpers. isPartOf→parent page, relatedLink→siblings (max 5), hasPart→children injected into WebPage nodes. Feature #144.",
+          "status": "done"
         },
         {
           "id": 509,
