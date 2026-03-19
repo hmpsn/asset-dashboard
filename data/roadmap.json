@@ -405,8 +405,8 @@
           "source": "DEVIN_SCHEMA_SPECS",
           "est": "4h",
           "priority": "P3",
-          "notes": "Crawl competitor homepages + sitemap pages, extract JSON-LD, compare coverage. New server/competitor-schema.ts + route + UI card. 24h cache.",
-          "status": "pending"
+          "notes": "Shipped — crawlCompetitorSchemas() + compareSchemas() with 24h file cache, rate-limited fetcher (2 concurrent, 500ms delay, 10s timeout). GET /api/competitor-schema/:workspaceId. Feature #147.",
+          "status": "done"
         },
         {
           "id": 510,
@@ -414,8 +414,8 @@
           "source": "ARCHITECTURE_SCHEMA_PLAN",
           "est": "4h",
           "priority": "P3",
-          "notes": "Correlate recordSeoChange() timestamps with GSC data. 14-day before/after comparison. Schema ROI cards in UI.",
-          "status": "pending"
+          "notes": "Shipped — sourceFilter on getSeoChangeImpact(), getSchemaImpactSummary() with aggregate deltas, /api/schema-impact endpoint, collapsible impact panel in SchemaSuggester with per-deployment GSC before/after. Feature #174.",
+          "status": "done"
         },
         {
           "id": 511,

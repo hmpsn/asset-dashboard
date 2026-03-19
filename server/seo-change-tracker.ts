@@ -47,6 +47,7 @@ interface ChangeRow {
 interface Stmts {
   insert: ReturnType<typeof db.prepare>;
   selectByWorkspace: ReturnType<typeof db.prepare>;
+  selectByWorkspaceSource: ReturnType<typeof db.prepare>;
   selectRecentByPage: ReturnType<typeof db.prepare>;
   updateById: ReturnType<typeof db.prepare>;
   countByWorkspace: ReturnType<typeof db.prepare>;
@@ -63,6 +64,9 @@ function stmts(): Stmts {
       ),
       selectByWorkspace: db.prepare(
         `SELECT * FROM seo_changes WHERE workspace_id = ? ORDER BY changed_at ASC`,
+      ),
+      selectByWorkspaceSource: db.prepare(
+        `SELECT * FROM seo_changes WHERE workspace_id = ? AND source LIKE ? ORDER BY changed_at ASC`,
       ),
       selectRecentByPage: db.prepare(
         `SELECT * FROM seo_changes WHERE workspace_id = ? AND page_id = ? AND changed_at > ? ORDER BY changed_at DESC LIMIT 1`,
@@ -218,8 +222,11 @@ export async function getSeoChangeImpact(
   gscSiteUrl: string,
   siteId: string,
   limit = 50,
+  sourceFilter?: string,
 ): Promise<PageImpact[]> {
-  const allChanges = stmts().selectByWorkspace.all(workspaceId) as ChangeRow[];
+  const allChanges = sourceFilter
+    ? stmts().selectByWorkspaceSource.all(workspaceId, `${sourceFilter}%`) as ChangeRow[]
+    : stmts().selectByWorkspace.all(workspaceId) as ChangeRow[];
   if (allChanges.length === 0) return [];
 
   const token = await getValidToken(siteId);
@@ -290,4 +297,62 @@ export async function getSeoChangeImpact(
   }
 
   return results;
+}
+
+// ── Schema Impact Summary ──
+
+export interface SchemaImpactSummary {
+  totalDeployments: number;
+  pagesWithData: number;
+  tooRecent: number;
+  avgClicksDelta: number | null;
+  avgImpressionsDelta: number | null;
+  avgCtrDelta: number | null;
+  avgPositionDelta: number | null;
+  deployments: PageImpact[];
+}
+
+export async function getSchemaImpactSummary(
+  workspaceId: string,
+  gscSiteUrl: string,
+  siteId: string,
+  limit = 30,
+): Promise<SchemaImpactSummary> {
+  const impacts = await getSeoChangeImpact(workspaceId, gscSiteUrl, siteId, limit, 'schema');
+
+  const withData = impacts.filter(i => !i.tooRecent && i.before && i.after);
+  const tooRecent = impacts.filter(i => i.tooRecent).length;
+
+  let avgClicksDelta: number | null = null;
+  let avgImpressionsDelta: number | null = null;
+  let avgCtrDelta: number | null = null;
+  let avgPositionDelta: number | null = null;
+
+  if (withData.length > 0) {
+    const sum = withData.reduce(
+      (acc, i) => {
+        acc.clicks += i.after!.clicks - i.before!.clicks;
+        acc.impressions += i.after!.impressions - i.before!.impressions;
+        acc.ctr += i.after!.ctr - i.before!.ctr;
+        acc.position += i.after!.position - i.before!.position;
+        return acc;
+      },
+      { clicks: 0, impressions: 0, ctr: 0, position: 0 },
+    );
+    avgClicksDelta = +(sum.clicks / withData.length).toFixed(1);
+    avgImpressionsDelta = +(sum.impressions / withData.length).toFixed(1);
+    avgCtrDelta = +(sum.ctr / withData.length).toFixed(2);
+    avgPositionDelta = +(sum.position / withData.length).toFixed(1);
+  }
+
+  return {
+    totalDeployments: impacts.length,
+    pagesWithData: withData.length,
+    tooRecent,
+    avgClicksDelta,
+    avgImpressionsDelta,
+    avgCtrDelta,
+    avgPositionDelta,
+    deployments: impacts,
+  };
 }
