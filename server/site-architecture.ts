@@ -232,6 +232,7 @@ export function getSiblingNodes(tree: SiteNode, targetPath: string): SiteNode[] 
 
 /**
  * Find the node at parentPath and return its direct children that have content.
+ * Used by D3 hub page detection and D5 relationship enrichment.
  */
 export function getChildNodes(tree: SiteNode, parentPath: string): SiteNode[] {
   function find(node: SiteNode): SiteNode | null {

@@ -488,6 +488,37 @@ function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string,
     }
   }
 
+  // D3: Hub page → CollectionPage/ItemList auto-suggest
+  // When a page has 2+ children in the architecture tree, inject CollectionPage schema
+  const hubTree = ctx?._architectureTree;
+  if (hubTree) {
+    const webPage = graph.find(n => n['@type'] === 'WebPage') as Record<string, unknown> | undefined;
+    const pageUrl = (webPage?.['url'] as string) || siteUrl;
+    try {
+      const pagePath = new URL(pageUrl).pathname.replace(/\/$/, '') || '/';
+      const children = getChildNodes(hubTree, pagePath)
+        .filter(c => c.source === 'existing');  // Only existing pages, not planned
+      if (children.length >= 2) {
+        const hasCollection = graph.some(n => n['@type'] === 'CollectionPage' || n['@type'] === 'ItemList');
+        if (!hasCollection) {
+          const webPageName = (webPage?.['name'] as string) || 'Collection';
+          graph.push({
+            '@type': 'CollectionPage',
+            '@id': `${pageUrl}/#collection`,
+            'name': webPageName,
+            'hasPart': children.map((child, i) => ({
+              '@type': 'ListItem',
+              'position': i + 1,
+              'url': `${siteUrl}${child.path}`,
+              'name': child.name,
+            })),
+          });
+          log.info({ pagePath, childCount: children.length }, 'Injected CollectionPage for hub page');
+        }
+      }
+    } catch { /* skip if URL parsing fails */ }
+  }
+
   // D5: Sibling/Parent-Child Relationship Enrichment
   // When architecture tree is available, add isPartOf (→ parent page), relatedLink (→ siblings),
   // and hasPart (→ children) to WebPage nodes.

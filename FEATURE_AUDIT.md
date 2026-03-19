@@ -1748,6 +1748,12 @@ When the user asks to update this document with recent features, follow this pro
 
 **Agency value:** Instant visibility into schema gaps across the site. Admins can see at a glance which pages need schema work, prioritize accordingly, and track progress as coverage increases.
 
+### 173. Internal Link Health → Schema Priority Queue
+**What it does:** Enriches the schema coverage endpoint with internal link health data (`PageLinkHealth` from `performance-store.ts`) and computes a per-page schema priority score. Priority tiers: **Critical** (orphan + no schema), **High** (< 3 inbound links + no schema), **Medium** (no schema but decent links), **Low** (has schema but poor link health). The API returns a `priorityQueue` array sorted critical → high → medium → low. Frontend displays a "Schema Priority Queue" sidebar panel in the SiteArchitecture view with priority badges, orphan indicators, and inbound link counts.
+**Files:** `server/routes/site-architecture.ts` (link health cross-reference + priority scoring), `src/api/content.ts` (updated types), `src/components/SiteArchitecture.tsx` (priority queue panel with Zap icon, priority badges, orphan tags)
+
+**Agency value:** Answers "which page should I add schema to next?" by combining two signals — pages that are both poorly linked AND missing schema are the highest priority. Eliminates guesswork in schema deployment order.
+
 ---
 
 ## Summary
@@ -1910,6 +1916,14 @@ Current feature count: **163**. Last updated: March 2026 (content planner integr
 **What it does:** Adds a deterministic `PAGE_TYPE_SCHEMA_MAP` constant that maps each `SchemaPageType` (homepage, service, blog, location, etc.) to recommended primary and secondary Schema.org types. When a page's type is known (not `'auto'`), the mapping is injected into the AI prompt as a `SCHEMA TYPE GUIDANCE` block, directing the model to focus on populating the recommended types with accurate properties rather than guessing which types to use. The `'auto'` mode remains unchanged — the AI decides types as before. The map is exported so other modules (D2, D3) can import it for template binding and hub page detection.
 **Files:** `server/schema-suggester.ts` (`PAGE_TYPE_SCHEMA_MAP` constant, `schemaTypeGuidance` injection in `aiGenerateUnifiedSchema()`)
 
-**144. Sibling/Parent-Child Relationship Enrichment (D5)**
+**144. Template → Schema Template Binding (D2)**
+**What it does:** Binds Schema.org types to content templates so matrix cells inherit expected schema types. Adds `schemaTypes?: string[]` to `ContentTemplate` and `expectedSchemaTypes?: string[]` to `MatrixCell`. When a template is created or updated, `schemaTypes` is auto-populated from `PAGE_TYPE_SCHEMA_MAP` based on the template's `pageType` (unless explicitly overridden). When matrix cells are generated, they inherit the template's schema types as `expectedSchemaTypes`. The CellDetailPanel UI displays purple badges for each expected schema type. A new `getSchemaTypesForTemplate()` helper is exported for use by D7 (pre-generation). A DB migration (017) adds the `schema_types` column to `content_templates`.
+**Files:** `shared/types/content.ts`, `src/components/matrix/types.ts`, `server/content-matrices.ts` (`getSchemaTypesForTemplate`, `generateCells` schema inheritance), `server/content-templates.ts` (auto-populate on create/update), `src/components/matrix/CellDetailPanel.tsx` (schema badge display), `server/db/migrations/017-template-schema-types.sql`
+
+**145. Hub Page → CollectionPage/ItemList Auto-Suggest (D3)**
+**What it does:** Automatically detects hub pages (pages with 2+ existing child pages in the architecture tree) and injects `CollectionPage` schema with an `ItemList` of child page references. Adds a `getChildNodes()` helper to `site-architecture.ts` that finds a node by path and returns its direct children with content. In `injectCrossReferences()`, when the architecture tree is available, the current page's children are counted — if there are 2 or more existing child pages, a `CollectionPage` node is added to the `@graph` with `hasPart` listing each child as a `ListItem` with position, URL, and name. Only existing pages (not planned) are included. Gracefully skips if no architecture tree is available or if CollectionPage/ItemList already exists.
+**Files:** `server/site-architecture.ts` (`getChildNodes()` helper), `server/schema-suggester.ts` (hub page detection + CollectionPage injection in `injectCrossReferences()`)
+
+**146. Sibling/Parent-Child Relationship Enrichment (D5)**
 **What it does:** Uses the architecture tree to enrich WebPage schema nodes with structural relationships. Adds `getParentNode()`, `getSiblingNodes()`, and `getChildNodes()` helpers to `site-architecture.ts`. In `injectCrossReferences()`, when the architecture tree is available: (1) `isPartOf` is set to the actual parent page (overriding the generic WebSite reference) with full `@type`, `@id`, `name`, and `url`; (2) `relatedLink` is populated with up to 5 sibling page URLs; (3) `hasPart` lists child pages as `WebPage` references. Only existing pages are included. All enrichment is a graceful no-op when no tree data is available and never overrides existing values (except `isPartOf` which upgrades from WebSite to parent page).
 **Files:** `server/site-architecture.ts` (`getParentNode()`, `getSiblingNodes()`, `getChildNodes()` helpers), `server/schema-suggester.ts` (relationship injection in `injectCrossReferences()`)

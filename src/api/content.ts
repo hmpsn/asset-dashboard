@@ -225,6 +225,7 @@ export const siteArchitecture = {
       coveragePct: number;
       snapshotDate: string | null;
       hasPlan: boolean;
+      hasLinkData: boolean;
       pages: Array<{
         path: string;
         name: string;
@@ -233,6 +234,21 @@ export const siteArchitecture = {
         role: string | null;
         depth: number;
         pageType: string | null;
+        inboundLinks: number | null;
+        outboundLinks: number | null;
+        isOrphan: boolean | null;
+        linkScore: number | null;
+        priority: 'critical' | 'high' | 'medium' | 'low' | 'done';
+      }>;
+      priorityQueue: Array<{
+        path: string;
+        name: string;
+        hasSchema: boolean;
+        schemaTypes: string[];
+        priority: 'critical' | 'high' | 'medium' | 'low' | 'done';
+        inboundLinks: number | null;
+        isOrphan: boolean | null;
+        linkScore: number | null;
       }>;
     }>(`/api/site-architecture/${wsId}/schema-coverage`),
 };

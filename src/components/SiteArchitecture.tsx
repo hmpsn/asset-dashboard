@@ -2,11 +2,14 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Loader2, ChevronRight, ChevronDown, Globe, FileText, Target,
   AlertTriangle, Map, RefreshCw, ArrowUpRight, Layers, Code2, CheckCircle2, XCircle,
+  Zap, Link2,
 } from 'lucide-react';
 import { SectionCard, StatCard, Badge, EmptyState, PageHeader } from './ui';
 import { siteArchitecture } from '../api/content';
 
 // ── Schema coverage types ──
+
+type SchemaPriority = 'critical' | 'high' | 'medium' | 'low' | 'done';
 
 interface SchemaCoveragePage {
   path: string;
@@ -16,6 +19,22 @@ interface SchemaCoveragePage {
   role: string | null;
   depth: number;
   pageType: string | null;
+  inboundLinks: number | null;
+  outboundLinks: number | null;
+  isOrphan: boolean | null;
+  linkScore: number | null;
+  priority: SchemaPriority;
+}
+
+interface PriorityQueueItem {
+  path: string;
+  name: string;
+  hasSchema: boolean;
+  schemaTypes: string[];
+  priority: SchemaPriority;
+  inboundLinks: number | null;
+  isOrphan: boolean | null;
+  linkScore: number | null;
 }
 
 interface SchemaCoverageData {
@@ -25,8 +44,18 @@ interface SchemaCoverageData {
   coveragePct: number;
   snapshotDate: string | null;
   hasPlan: boolean;
+  hasLinkData: boolean;
   pages: SchemaCoveragePage[];
+  priorityQueue: PriorityQueueItem[];
 }
+
+const PRIORITY_BADGE: Record<SchemaPriority, { label: string; color: 'red' | 'amber' | 'blue' | 'zinc' | 'green' }> = {
+  critical: { label: 'Critical', color: 'red' },
+  high: { label: 'High', color: 'amber' },
+  medium: { label: 'Medium', color: 'blue' },
+  low: { label: 'Low', color: 'zinc' },
+  done: { label: 'Done', color: 'green' },
+};
 
 // ── Types (mirrors server/site-architecture.ts) ──
 
@@ -412,22 +441,42 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
 
         {/* Sidebar: Coverage + Depth */}
         <div className="space-y-4">
-        {coverage && coverage.withoutSchema > 0 && (
+        {coverage && coverage.priorityQueue.length > 0 && (
           <SectionCard
-            title="Missing Schema"
-            titleIcon={<XCircle className="w-4 h-4 text-amber-400" />}
-            titleExtra={<Badge label={`${coverage.withoutSchema}`} color="amber" />}
+            title="Schema Priority Queue"
+            titleIcon={<Zap className="w-4 h-4 text-amber-400" />}
+            titleExtra={<Badge label={`${coverage.priorityQueue.length}`} color="amber" />}
             noPadding
           >
-            <div className="max-h-[200px] overflow-y-auto divide-y divide-zinc-800/50">
-              {coverage.pages.filter(p => !p.hasSchema).map(p => (
-                <div key={p.path} className="flex items-center gap-2 px-4 py-2">
-                  <XCircle className="w-3 h-3 text-zinc-600 flex-shrink-0" />
-                  <span className="text-xs text-zinc-300 truncate flex-1" title={p.path}>{p.name}</span>
-                  <span className="text-[10px] text-zinc-600 font-mono truncate max-w-[100px]">{p.path}</span>
-                </div>
-              ))}
+            <div className="max-h-[280px] overflow-y-auto divide-y divide-zinc-800/50">
+              {coverage.priorityQueue.map(p => {
+                const pb = PRIORITY_BADGE[p.priority];
+                return (
+                  <div key={p.path} className="flex items-center gap-2 px-4 py-2">
+                    {p.hasSchema ? (
+                      <Link2 className="w-3 h-3 text-zinc-600 flex-shrink-0" />
+                    ) : (
+                      <XCircle className="w-3 h-3 text-zinc-600 flex-shrink-0" />
+                    )}
+                    <span className="text-xs text-zinc-300 truncate flex-1" title={p.path}>{p.name}</span>
+                    <Badge label={pb.label} color={pb.color} />
+                    {p.isOrphan && (
+                      <span className="text-[10px] text-red-400" title="Orphan page — no inbound links">orphan</span>
+                    )}
+                    {p.inboundLinks !== null && !p.isOrphan && (
+                      <span className="text-[10px] text-zinc-600" title={`${p.inboundLinks} inbound links`}>
+                        {p.inboundLinks} in
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
+            {coverage.hasLinkData && (
+              <div className="px-4 py-2 border-t border-zinc-800 text-[11px] text-zinc-500">
+                Priority based on schema coverage + internal link health. Critical = orphan + no schema.
+              </div>
+            )}
           </SectionCard>
         )}
 
