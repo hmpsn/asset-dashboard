@@ -369,8 +369,8 @@
           "source": "DEVIN_SCHEMA_SPECS",
           "est": "2h",
           "priority": "P2",
-          "notes": "Detect pages with 2+ children in architecture tree, auto-inject CollectionPage + ItemList schema. getChildNodes() helper. Depends on C1+C2.",
-          "status": "pending"
+          "notes": "Shipped — getChildNodes() helper + CollectionPage injection in injectCrossReferences() for pages with 2+ existing children. Feature #144.",
+          "status": "done"
         },
         {
           "id": 506,
