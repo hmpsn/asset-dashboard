@@ -181,6 +181,18 @@ export function CellDetailPanel({
           )}
         </div>
 
+        {/* Expected Schema Types */}
+        {cell.expectedSchemaTypes && cell.expectedSchemaTypes.length > 0 && (
+          <div className="pt-2 border-t border-zinc-800 space-y-2">
+            <span className="text-[11px] text-zinc-500 font-medium">Expected Schema</span>
+            <div className="flex items-center gap-1 flex-wrap">
+              {cell.expectedSchemaTypes.map(t => (
+                <Badge key={t} label={t} color="purple" />
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Content section */}
         <div className="pt-2 border-t border-zinc-800 space-y-2">
           <div className="flex items-center gap-1.5">

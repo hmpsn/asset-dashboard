@@ -360,8 +360,8 @@
           "source": "DEVIN_SCHEMA_SPECS",
           "est": "3h",
           "priority": "P2",
-          "notes": "Add schemaTypes to ContentTemplate, auto-populate from PAGE_TYPE_SCHEMA_MAP, inherit to matrix cells, display in CellDetailPanel. Depends on D1.",
-          "status": "pending"
+          "notes": "Shipped — schemaTypes on ContentTemplate auto-populated from PAGE_TYPE_SCHEMA_MAP, expectedSchemaTypes inherited by MatrixCell on generation, purple badges in CellDetailPanel. Feature #144.",
+          "status": "done"
         },
         {
           "id": 505,
