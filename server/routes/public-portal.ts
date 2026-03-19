@@ -36,7 +36,7 @@ router.get('/api/public/workspace/:id', (req, res) => {
     // Feature toggles
     clientPortalEnabled: ws.clientPortalEnabled != null ? !!ws.clientPortalEnabled : true,
     seoClientView: !!ws.seoClientView,
-    analyticsClientView: !!ws.analyticsClientView,
+    analyticsClientView: ws.analyticsClientView != null ? !!ws.analyticsClientView : true,
     autoReports: !!ws.autoReports,
     // Branding
     brandLogoUrl: ws.brandLogoUrl || '',
