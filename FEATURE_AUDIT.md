@@ -1742,6 +1742,12 @@ When the user asks to update this document with recent features, follow this pro
 
 **Agency value:** Homepage schema gains structured navigation data that Google uses for sitelinks. Fully automatic — no manual configuration needed. Updates when architecture tree changes.
 
+### 172. Schema Coverage Dashboard
+**What it does:** Cross-references the site architecture tree with the latest schema snapshot to show which pages have schema markup and which don't. Server endpoint `GET /api/site-architecture/:wsId/schema-coverage` returns per-page coverage data including schema types and plan roles. Frontend adds: (1) a "Schema Coverage" stat card with percentage + color-coded icon, (2) per-node schema badges in the URL tree (green checkmark with type count or gray X), (3) a "Missing Schema" sidebar panel listing uncovered pages for quick action.
+**Files:** `server/routes/site-architecture.ts` (coverage endpoint), `src/api/content.ts` (API client), `src/components/SiteArchitecture.tsx` (stat card, tree badges, missing-schema panel)
+
+**Agency value:** Instant visibility into schema gaps across the site. Admins can see at a glance which pages need schema work, prioritize accordingly, and track progress as coverage increases.
+
 ---
 
 ## Summary

@@ -1,10 +1,32 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Loader2, ChevronRight, ChevronDown, Globe, FileText, Target,
-  AlertTriangle, Map, RefreshCw, ArrowUpRight, Layers,
+  AlertTriangle, Map, RefreshCw, ArrowUpRight, Layers, Code2, CheckCircle2, XCircle,
 } from 'lucide-react';
 import { SectionCard, StatCard, Badge, EmptyState, PageHeader } from './ui';
 import { siteArchitecture } from '../api/content';
+
+// ── Schema coverage types ──
+
+interface SchemaCoveragePage {
+  path: string;
+  name: string;
+  hasSchema: boolean;
+  schemaTypes: string[];
+  role: string | null;
+  depth: number;
+  pageType: string | null;
+}
+
+interface SchemaCoverageData {
+  totalExisting: number;
+  withSchema: number;
+  withoutSchema: number;
+  coveragePct: number;
+  snapshotDate: string | null;
+  hasPlan: boolean;
+  pages: SchemaCoveragePage[];
+}
 
 // ── Types (mirrors server/site-architecture.ts) ──
 
@@ -59,10 +81,11 @@ const PRIORITY_COLOR: Record<string, 'red' | 'amber' | 'zinc'> = {
 
 // ── Tree node component ──
 
-function TreeNode({ node, defaultExpanded }: { node: SiteNode; defaultExpanded?: boolean }) {
+function TreeNode({ node, defaultExpanded, coverageMap }: { node: SiteNode; defaultExpanded?: boolean; coverageMap?: Record<string, SchemaCoveragePage> }) {
   const [expanded, setExpanded] = useState(defaultExpanded ?? node.depth < 2);
   const hasChildren = node.children.length > 0;
   const badge = SOURCE_BADGE[node.source] || SOURCE_BADGE.gap;
+  const cov = coverageMap?.[node.path];
 
   return (
     <div>
@@ -89,6 +112,19 @@ function TreeNode({ node, defaultExpanded }: { node: SiteNode; defaultExpanded?:
 
         <Badge label={badge.label} color={badge.color} />
 
+        {cov && (
+          cov.hasSchema ? (
+            <span className="flex items-center gap-0.5 text-[10px] text-emerald-400" title={`Schema: ${cov.schemaTypes.join(', ')}`}>
+              <CheckCircle2 className="w-3 h-3" />
+              <span className="hidden lg:inline">{cov.schemaTypes.length}</span>
+            </span>
+          ) : (
+            <span className="flex items-center gap-0.5 text-[10px] text-zinc-600" title="No schema">
+              <XCircle className="w-3 h-3" />
+            </span>
+          )
+        )}
+
         <span className="text-[10px] text-zinc-600 font-mono min-w-0 truncate hidden md:block max-w-[160px]" title={node.path}>
           {node.path}
         </span>
@@ -103,7 +139,7 @@ function TreeNode({ node, defaultExpanded }: { node: SiteNode; defaultExpanded?:
       {expanded && hasChildren && (
         <div>
           {node.children.map(child => (
-            <TreeNode key={child.path} node={child} />
+            <TreeNode key={child.path} node={child} coverageMap={coverageMap} />
           ))}
         </div>
       )}
@@ -147,6 +183,21 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'existing' | 'planned' | 'strategy' | 'gap'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [coverage, setCoverage] = useState<SchemaCoverageData | null>(null);
+
+  const loadCoverage = useCallback(async () => {
+    try {
+      const result = await siteArchitecture.schemaCoverage(workspaceId);
+      setCoverage(result);
+    } catch { /* silently skip — coverage is supplementary */ }
+  }, [workspaceId]);
+
+  const coverageMap = useMemo((): Record<string, SchemaCoveragePage> | undefined => {
+    if (!coverage) return undefined;
+    const m: Record<string, SchemaCoveragePage> = {};
+    for (const p of coverage.pages) m[p.path] = p;
+    return m;
+  }, [coverage]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -161,7 +212,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
   }, [workspaceId]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, [workspaceId]);
+  useEffect(() => { load(); loadCoverage(); }, [workspaceId]);
 
   // Filter tree nodes recursively
   const filteredTree = useMemo(() => {
@@ -255,6 +306,15 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
           iconColor={data.gaps.length > 0 ? '#fbbf24' : '#71717a'}
           sub={data.orphanPaths.length > 0 ? `${data.orphanPaths.length} orphan${data.orphanPaths.length !== 1 ? 's' : ''}` : 'No orphans'}
         />
+        {coverage && (
+          <StatCard
+            label="Schema Coverage"
+            value={`${coverage.coveragePct}%`}
+            icon={Code2}
+            iconColor={coverage.coveragePct >= 80 ? '#4ade80' : coverage.coveragePct >= 50 ? '#fbbf24' : '#ef4444'}
+            sub={`${coverage.withSchema}/${coverage.totalExisting} pages`}
+          />
+        )}
       </div>
 
       {/* Gaps alert */}
@@ -338,7 +398,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
               filteredTree.children.length > 0 ? (
                 <div className="py-1">
                   {filteredTree.children.map((child: SiteNode) => (
-                    <TreeNode key={child.path} node={child} defaultExpanded={child.depth < 2} />
+                    <TreeNode key={child.path} node={child} defaultExpanded={child.depth < 2} coverageMap={coverageMap} />
                   ))}
                 </div>
               ) : (
@@ -350,7 +410,27 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
           </div>
         </SectionCard>
 
-        {/* Depth distribution */}
+        {/* Sidebar: Coverage + Depth */}
+        <div className="space-y-4">
+        {coverage && coverage.withoutSchema > 0 && (
+          <SectionCard
+            title="Missing Schema"
+            titleIcon={<XCircle className="w-4 h-4 text-amber-400" />}
+            titleExtra={<Badge label={`${coverage.withoutSchema}`} color="amber" />}
+            noPadding
+          >
+            <div className="max-h-[200px] overflow-y-auto divide-y divide-zinc-800/50">
+              {coverage.pages.filter(p => !p.hasSchema).map(p => (
+                <div key={p.path} className="flex items-center gap-2 px-4 py-2">
+                  <XCircle className="w-3 h-3 text-zinc-600 flex-shrink-0" />
+                  <span className="text-xs text-zinc-300 truncate flex-1" title={p.path}>{p.name}</span>
+                  <span className="text-[10px] text-zinc-600 font-mono truncate max-w-[100px]">{p.path}</span>
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+        )}
+
         <SectionCard
           title="Depth Distribution"
           titleIcon={<Layers className="w-4 h-4 text-teal-400" />}
@@ -368,6 +448,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
             </div>
           )}
         </SectionCard>
+        </div>
       </div>
     </div>
   );

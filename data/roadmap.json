@@ -351,8 +351,8 @@
           "source": "ARCHITECTURE_SCHEMA_PLAN",
           "est": "4h",
           "priority": "P2",
-          "notes": "Coverage endpoint cross-referencing architecture tree with schema snapshot. Summary bar + color-coded tree badges + filter for uncovered pages.",
-          "status": "pending"
+          "notes": "Shipped — GET /api/site-architecture/:wsId/schema-coverage endpoint, coverage stat card with %, per-node tree badges (checkmark/X), Missing Schema sidebar panel. Feature #172.",
+          "status": "done"
         },
         {
           "id": 504,
