@@ -313,6 +313,131 @@
       ]
     },
     {
+      "id": "sprint-arch-schema",
+      "name": "Architecture → Schema Integration",
+      "hours": "38h",
+      "rationale": "Bridge site architecture tree with schema generation. Deterministic breadcrumbs, unified schema plan, coverage dashboard, priority queue, competitive intelligence, and full pipeline automation.",
+      "items": [
+        {
+          "id": 500,
+          "title": "[C1] Deterministic BreadcrumbList from architecture tree",
+          "source": "ARCHITECTURE_SCHEMA_PLAN",
+          "est": "2h",
+          "priority": "P1",
+          "notes": "Shipped — getAncestorChain() + flattenTree() + getCachedArchitecture() in site-architecture.ts. SchemaContext._architectureTree extension. Architecture loaded in routes (webflow-schema + jobs). injectCrossReferences() builds full breadcrumb chain from tree with URL-segment fallback. Feature #169.",
+          "status": "done"
+        },
+        {
+          "id": 501,
+          "title": "[C2] Unify schema plan with architecture tree input",
+          "source": "ARCHITECTURE_SCHEMA_PLAN",
+          "est": "3h",
+          "priority": "P1",
+          "notes": "Refactor generateSchemaPlan() to consume SiteArchitectureResult instead of rebuilding page list. flattenTree() helper. Eliminates duplicate API calls, includes planned pages.",
+          "status": "pending"
+        },
+        {
+          "id": 502,
+          "title": "[D1] Page type → schema type mapping + prompt injection",
+          "source": "DEVIN_SCHEMA_SPECS",
+          "est": "3h",
+          "priority": "P1",
+          "notes": "PAGE_TYPE_SCHEMA_MAP constant + inject suggestedSchemaTypes into AI prompt when pageType is known. Devin task — no C1/C2 dependency.",
+          "status": "pending"
+        },
+        {
+          "id": 503,
+          "title": "[C3] Schema coverage dashboard in SiteArchitecture UI",
+          "source": "ARCHITECTURE_SCHEMA_PLAN",
+          "est": "4h",
+          "priority": "P2",
+          "notes": "Coverage endpoint cross-referencing architecture tree with schema snapshot. Summary bar + color-coded tree badges + filter for uncovered pages.",
+          "status": "pending"
+        },
+        {
+          "id": 504,
+          "title": "[D2] Template → schema template binding",
+          "source": "DEVIN_SCHEMA_SPECS",
+          "est": "3h",
+          "priority": "P2",
+          "notes": "Add schemaTypes to ContentTemplate, auto-populate from PAGE_TYPE_SCHEMA_MAP, inherit to matrix cells, display in CellDetailPanel. Depends on D1.",
+          "status": "pending"
+        },
+        {
+          "id": 505,
+          "title": "[D3] Hub page → CollectionPage/ItemList auto-suggest",
+          "source": "DEVIN_SCHEMA_SPECS",
+          "est": "2h",
+          "priority": "P2",
+          "notes": "Detect pages with 2+ children in architecture tree, auto-inject CollectionPage + ItemList schema. getChildNodes() helper. Depends on C1+C2.",
+          "status": "pending"
+        },
+        {
+          "id": 506,
+          "title": "[C4] Internal link health → schema priority queue",
+          "source": "ARCHITECTURE_SCHEMA_PLAN",
+          "est": "2h",
+          "priority": "P2",
+          "notes": "Cross-reference PageLinkHealth orphan/inbound data with schema coverage. Priority scoring: critical (orphan+no schema) → high → normal → done.",
+          "status": "pending"
+        },
+        {
+          "id": 507,
+          "title": "[C5] SiteNavigationElement auto-gen for homepage",
+          "source": "ARCHITECTURE_SCHEMA_PLAN",
+          "est": "1h",
+          "priority": "P2",
+          "notes": "Extract depth-1 children from architecture tree, generate SiteNavigationElement JSON-LD, auto-include in homepage schema.",
+          "status": "pending"
+        },
+        {
+          "id": 508,
+          "title": "[D5] Sibling/parent-child relationship enrichment",
+          "source": "DEVIN_SCHEMA_SPECS",
+          "est": "3h",
+          "priority": "P2",
+          "notes": "getParentNode() + getSiblingNodes() helpers. Inject isPartOf→parent, relatedLink→siblings, hasPart→children into schema. Depends on C1+C2.",
+          "status": "pending"
+        },
+        {
+          "id": 509,
+          "title": "[D4] Competitor schema intelligence",
+          "source": "DEVIN_SCHEMA_SPECS",
+          "est": "4h",
+          "priority": "P3",
+          "notes": "Crawl competitor homepages + sitemap pages, extract JSON-LD, compare coverage. New server/competitor-schema.ts + route + UI card. 24h cache.",
+          "status": "pending"
+        },
+        {
+          "id": 510,
+          "title": "[C6] Schema impact tracking via GSC before/after",
+          "source": "ARCHITECTURE_SCHEMA_PLAN",
+          "est": "4h",
+          "priority": "P3",
+          "notes": "Correlate recordSeoChange() timestamps with GSC data. 14-day before/after comparison. Schema ROI cards in UI.",
+          "status": "pending"
+        },
+        {
+          "id": 511,
+          "title": "[D6] Brief E-E-A-T → author/publisher schema enrichment",
+          "source": "DEVIN_SCHEMA_SPECS",
+          "est": "3h",
+          "priority": "P3",
+          "notes": "Extract author/expertise from linked content brief E-E-A-T sections, pre-populate Person schema nodes. Depends on C1+C2.",
+          "status": "pending"
+        },
+        {
+          "id": 512,
+          "title": "[D7] Planned page schema pre-generation",
+          "source": "DEVIN_SCHEMA_SPECS",
+          "est": "4h",
+          "priority": "P3",
+          "notes": "Auto-generate schema skeleton on cell status transition to brief_generated/approved. pending_schemas table. Ready-to-apply on publish. Depends on D1+D2.",
+          "status": "pending"
+        }
+      ]
+    },
+    {
       "id": "backlog",
       "name": "Backlog",
       "hours": "80+",

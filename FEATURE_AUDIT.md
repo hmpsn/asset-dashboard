@@ -1724,6 +1724,12 @@ When the user asks to update this document with recent features, follow this pro
 
 **Agency value:** Full audit trail of cell progression — see at a glance when each cell moved through planned → keyword validated → brief generated → review → published.
 
+### 169. Architecture-Aware Schema Breadcrumbs
+**What it does:** Schema BreadcrumbList generation now uses the site architecture tree instead of naive URL-segment guessing. When the architecture tree is available, `injectCrossReferences()` calls `getAncestorChain()` to build a full breadcrumb chain (e.g., Home → Services → SEO → Local SEO) with correct page names from the tree. Falls back to the previous 2-item breadcrumb (Home → Page) when architecture data isn't available. Architecture results are cached for 10 minutes via `getCachedArchitecture()` to avoid duplicate Webflow API + sitemap calls. Also adds `flattenTree()` and `invalidateArchitectureCache()` helpers used by downstream features.
+**Files:** `server/site-architecture.ts` (`getAncestorChain`, `flattenTree`, `getCachedArchitecture`, `invalidateArchitectureCache`), `server/schema-suggester.ts` (`SchemaContext._architectureTree`, breadcrumb logic), `server/routes/webflow-schema.ts` (architecture loading), `server/routes/jobs.ts` (bulk schema architecture loading)
+
+**Agency value:** Deterministic, accurate breadcrumbs without AI token cost. Deep pages get full ancestor chains instead of flat Home → Page. Foundation for architecture→schema integration (coverage dashboard, priority queue, competitive intelligence).
+
 ---
 
 ## Summary

@@ -3,6 +3,7 @@ import { callOpenAI } from './openai-helpers.js';
 import { createLogger } from './logger.js';
 import { saveSiteTemplate, getOrSeedSiteTemplate, getSchemaPlan } from './schema-store.js';
 import { buildPlanContextForPage } from './schema-plan.js';
+import { getAncestorChain } from './site-architecture.js';
 
 const log = createLogger('schema');
 
@@ -67,6 +68,9 @@ export interface SchemaContext {
   pageType?: SchemaPageType;
   _siteId?: string;  // Internal: passed through for site template storage
   _planContext?: string;  // Internal: plan-based role/entity context for this page
+  _architectureTree?: import('./site-architecture.js').SiteNode;    // Full site tree for breadcrumb + nav generation
+  _pageNode?: import('./site-architecture.js').SiteNode;            // Current page's node in the tree
+  _ancestors?: import('./site-architecture.js').SiteNode[];         // Ancestor chain [root, ..., parent, target]
 }
 
 // Google required fields per @type (for validation)
@@ -303,7 +307,7 @@ function autoFixSchema(schema: Record<string, unknown>): void {
 }
 
 // Post-processing: inject cross-references the AI consistently omits
-function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string, companyName?: string): void {
+function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string, companyName?: string, ctx?: SchemaContext): void {
   const graph = schema['@graph'] as Record<string, unknown>[] | undefined;
   if (!Array.isArray(graph)) return;
 
@@ -382,32 +386,53 @@ function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string,
   // Ensure BreadcrumbList exists
   const hasBreadcrumb = graph.some(n => n['@type'] === 'BreadcrumbList');
   if (!hasBreadcrumb) {
-    // Find the first WebPage to derive breadcrumb path
     const webPage = graph.find(n => n['@type'] === 'WebPage') as Record<string, unknown> | undefined;
     if (webPage) {
       const pageUrl = (webPage['url'] as string) || siteUrl;
       try {
         const parsed = new URL(pageUrl);
-        const pathParts = parsed.pathname.split('/').filter(Boolean);
-        const items: Record<string, unknown>[] = [
-          { '@type': 'ListItem', 'position': 1, 'name': 'Home', 'item': `${siteUrl}/` },
-        ];
-        if (pathParts.length > 0) {
-          // Add the current page as the last breadcrumb
-          const pageName = (webPage['name'] as string || pathParts[pathParts.length - 1])
-            .replace(/\s*[|–-]\s*.+$/, ''); // Strip "| Brand Name" suffix
-          items.push({
+        const pagePath = parsed.pathname === '/' ? '/' : parsed.pathname.replace(/\/$/, '');
+
+        // Try architecture-tree-aware breadcrumbs first
+        const tree = ctx?._architectureTree;
+        const ancestors = tree ? getAncestorChain(tree, pagePath) : [];
+
+        if (ancestors.length >= 2) {
+          // Architecture tree available — build full breadcrumb chain from ancestor nodes
+          const items: Record<string, unknown>[] = ancestors.map((node, i) => ({
             '@type': 'ListItem',
-            'position': 2,
-            'name': pageName,
-            'item': pageUrl,
+            'position': i + 1,
+            'name': node.depth === 0 ? 'Home' : node.name,
+            'item': node.depth === 0 ? `${siteUrl}/` : `${siteUrl}${node.path}`,
+          }));
+          graph.push({
+            '@type': 'BreadcrumbList',
+            '@id': `${pageUrl}/#breadcrumb`,
+            'itemListElement': items,
+          });
+          log.info({ pagePath, depth: ancestors.length }, 'Built breadcrumb from architecture tree');
+        } else {
+          // Fallback: naive URL-segment breadcrumb (Home → Page)
+          const pathParts = parsed.pathname.split('/').filter(Boolean);
+          const items: Record<string, unknown>[] = [
+            { '@type': 'ListItem', 'position': 1, 'name': 'Home', 'item': `${siteUrl}/` },
+          ];
+          if (pathParts.length > 0) {
+            const pageName = (webPage['name'] as string || pathParts[pathParts.length - 1])
+              .replace(/\s*[|–-]\s*.+$/, '');
+            items.push({
+              '@type': 'ListItem',
+              'position': 2,
+              'name': pageName,
+              'item': pageUrl,
+            });
+          }
+          graph.push({
+            '@type': 'BreadcrumbList',
+            '@id': `${pageUrl}/#breadcrumb`,
+            'itemListElement': items,
           });
         }
-        graph.push({
-          '@type': 'BreadcrumbList',
-          '@id': `${pageUrl}/#breadcrumb`,
-          'itemListElement': items,
-        });
       } catch { /* skip if URL parsing fails */ }
     }
   }
@@ -895,7 +920,7 @@ async function postProcessSchema(
   }
 
   // Step 4: Inject cross-references + ensure WebSite/Organization nodes exist
-  injectCrossReferences(schema, siteUrl, ctx.companyName);
+  injectCrossReferences(schema, siteUrl, ctx.companyName, ctx);
 
   // Step 4b: Plan validation — strip entities that shouldn't exist per the site plan
   if (ctx._planContext && Array.isArray(schema['@graph'])) {
@@ -979,7 +1004,7 @@ RULES:
 
         // Re-run auto-fix and cross-references on the fixed version
         autoFixSchema(fixedSchema);
-        injectCrossReferences(fixedSchema, siteUrl);
+        injectCrossReferences(fixedSchema, siteUrl, ctx.companyName, ctx);
 
         // Re-validate
         const fixedErrors = validateUnifiedSchema(fixedSchema);

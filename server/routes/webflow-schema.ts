@@ -7,6 +7,7 @@ const router = Router();
 
 import { addActivity } from '../activity-log.js';
 import { buildSchemaContext } from '../helpers.js';
+import { getCachedArchitecture } from '../site-architecture.js';
 import { getSchemaSnapshot, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, getSchemaPlan, updateSchemaPlanStatus, updateSchemaPlanRoles } from '../schema-store.js';
 import { generateSchemaSuggestions, generateSchemaForPage, generateCmsTemplateSchema } from '../schema-suggester.js';
 import { generateSchemaPlan } from '../schema-plan.js';
@@ -31,6 +32,13 @@ router.get('/api/webflow/schema-suggestions/:siteId', async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
     const { ctx, pageKeywordMap } = buildSchemaContext(req.params.siteId);
+    // Enrich with architecture tree (best-effort — don't block if unavailable)
+    if (ctx.workspaceId) {
+      try {
+        const arch = await getCachedArchitecture(ctx.workspaceId);
+        ctx._architectureTree = arch.tree;
+      } catch { /* architecture not available — proceed without */ }
+    }
     const result = await generateSchemaSuggestions(req.params.siteId, token, ctx, pageKeywordMap);
     res.json(result);
   } catch (err) {
@@ -54,6 +62,13 @@ router.post('/api/webflow/schema-suggestions/:siteId/page', async (req, res) => 
     const token = getTokenForSite(req.params.siteId) || undefined;
     const { ctx } = buildSchemaContext(req.params.siteId);
     if (pageType) ctx.pageType = pageType;
+    // Enrich with architecture tree for deterministic breadcrumbs
+    if (ctx.workspaceId) {
+      try {
+        const arch = await getCachedArchitecture(ctx.workspaceId);
+        ctx._architectureTree = arch.tree;
+      } catch { /* proceed without architecture */ }
+    }
     const result = await generateSchemaForPage(req.params.siteId, pageId, token, ctx);
     if (!result) return res.status(404).json({ error: 'Page not found' });
     res.json(result);

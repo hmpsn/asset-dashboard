@@ -183,6 +183,62 @@ function detectGaps(root: SiteNode): ArchitectureGap[] {
   return gaps;
 }
 
+// ── Tree query helpers ──
+
+/**
+ * Walk the tree and return the ancestor chain [root, ..., parent, target] for a given path.
+ * Returns empty array if path not found.
+ */
+export function getAncestorChain(tree: SiteNode, targetPath: string): SiteNode[] {
+  const chain: SiteNode[] = [];
+  function walk(node: SiteNode): boolean {
+    chain.push(node);
+    if (node.path === targetPath) return true;
+    for (const child of node.children) {
+      if (walk(child)) return true;
+    }
+    chain.pop();
+    return false;
+  }
+  walk(tree);
+  return chain;
+}
+
+/**
+ * Flatten the tree into a depth-first array of all nodes (excluding root if desired).
+ */
+export function flattenTree(tree: SiteNode, includeRoot = false): SiteNode[] {
+  const nodes: SiteNode[] = [];
+  function walk(node: SiteNode) {
+    if (node.depth > 0 || includeRoot) nodes.push(node);
+    for (const child of node.children) walk(child);
+  }
+  walk(tree);
+  return nodes;
+}
+
+// ── Architecture cache (10-minute TTL) ──
+
+const archCache: Map<string, { result: SiteArchitectureResult; ts: number }> = new Map();
+const CACHE_TTL = 10 * 60 * 1000;
+
+/**
+ * Load architecture with caching — avoids duplicate Webflow API + sitemap calls
+ * within a 10-minute window.
+ */
+export async function getCachedArchitecture(workspaceId: string): Promise<SiteArchitectureResult> {
+  const cached = archCache.get(workspaceId);
+  if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.result;
+  const result = await buildSiteArchitecture(workspaceId);
+  archCache.set(workspaceId, { result, ts: Date.now() });
+  return result;
+}
+
+/** Invalidate architecture cache for a workspace (e.g. after page changes). */
+export function invalidateArchitectureCache(workspaceId: string): void {
+  archCache.delete(workspaceId);
+}
+
 // ── Main entry point ──
 
 export async function buildSiteArchitecture(workspaceId: string): Promise<SiteArchitectureResult> {

@@ -13,6 +13,7 @@ import { generateAltText } from '../alttext.js';
 import { getDataDir } from '../data-dir.js';
 import { notifyClientRecommendationsReady, notifyClientAuditComplete } from '../email.js';
 import { applySuppressionsToAudit, buildSchemaContext } from '../helpers.js';
+import { getCachedArchitecture } from '../site-architecture.js';
 import {
   createJob,
   updateJob,
@@ -512,6 +513,13 @@ router.post('/api/jobs', async (req, res) => {
             updateJob(job.id, { status: 'running', message: 'Scanning pages and generating unified schemas...' });
             const { ctx, pageKeywordMap } = buildSchemaContext(schemaSiteId);
             const schemaWsId = (params.workspaceId as string) || '';
+            // Enrich with architecture tree for deterministic breadcrumbs
+            if (ctx.workspaceId) {
+              try {
+                const arch = await getCachedArchitecture(ctx.workspaceId);
+                ctx._architectureTree = arch.tree;
+              } catch { /* proceed without architecture */ }
+            }
             // Debounced incremental save — persist partial results every 10s
             let lastSaveTime = 0;
             const SAVE_INTERVAL = 10_000;
