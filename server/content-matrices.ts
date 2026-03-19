@@ -13,6 +13,7 @@ import type {
 } from '../shared/types/content.ts';
 import { createLogger } from './logger.js';
 import { PAGE_TYPE_SCHEMA_MAP, type SchemaPageType } from './schema-suggester.js';
+import { queueSchemaPreGeneration, markSchemaStale } from './schema-queue.js';
 
 /**
  * Resolve the combined primary + secondary Schema.org types for a template's pageType.
@@ -318,6 +319,19 @@ export function updateMatrixCell(
   }
 
   existing.cells[cellIdx] = { ...cell, ...updates };
+
+  // D7: Queue schema pre-generation on status transition to brief_generated or approved
+  if (updates.status === 'brief_generated' || updates.status === 'approved') {
+    void queueSchemaPreGeneration(workspaceId, matrixId, cellId);
+  }
+
+  // D7: Mark pending schemas as stale if keyword or URL changes after pre-generation
+  if (updates.targetKeyword && updates.targetKeyword !== cell.targetKeyword) {
+    markSchemaStale(cellId);
+  }
+  if (updates.customKeyword && updates.customKeyword !== cell.customKeyword) {
+    markSchemaStale(cellId);
+  }
 
   return updateMatrix(workspaceId, matrixId, { cells: existing.cells });
 }

@@ -432,8 +432,8 @@
           "source": "DEVIN_SCHEMA_SPECS",
           "est": "4h",
           "priority": "P3",
-          "notes": "Auto-generate schema skeleton on cell status transition to brief_generated/approved. pending_schemas table. Ready-to-apply on publish. Depends on D1+D2.",
-          "status": "pending"
+          "notes": "Shipped — generateSchemaSkeleton() builds deterministic JSON-LD from cell + template. pending_schemas SQLite table with pending/applied/stale lifecycle. Triggered async from updateMatrixCell() on brief_generated/approved. GET /api/pending-schemas/:workspaceId endpoint. Feature #149.",
+          "status": "done"
         }
       ]
     },
