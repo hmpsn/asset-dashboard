@@ -53,6 +53,26 @@ export const PAGE_TYPE_LABELS: Record<SchemaPageType, string> = {
   generic: 'General Page',
 };
 
+// Deterministic mapping: page type → recommended Schema.org types
+export const PAGE_TYPE_SCHEMA_MAP: Record<SchemaPageType, { primary: string[]; secondary: string[] }> = {
+  auto: { primary: [], secondary: [] },
+  homepage: { primary: ['Organization', 'WebSite'], secondary: ['SiteNavigationElement'] },
+  pillar: { primary: ['Article', 'CollectionPage'], secondary: ['BreadcrumbList'] },
+  service: { primary: ['Service'], secondary: ['Offer', 'BreadcrumbList'] },
+  audience: { primary: ['WebPage'], secondary: ['BreadcrumbList'] },
+  'lead-gen': { primary: ['WebPage'], secondary: ['BreadcrumbList'] },
+  blog: { primary: ['BlogPosting'], secondary: ['BreadcrumbList', 'speakable'] },
+  about: { primary: ['AboutPage', 'Organization'], secondary: ['Person', 'BreadcrumbList'] },
+  contact: { primary: ['ContactPage'], secondary: ['Organization', 'BreadcrumbList'] },
+  location: { primary: ['LocalBusiness'], secondary: ['Place', 'GeoCoordinates', 'BreadcrumbList'] },
+  product: { primary: ['Product'], secondary: ['Offer', 'AggregateRating', 'BreadcrumbList'] },
+  partnership: { primary: ['WebPage'], secondary: ['Organization', 'BreadcrumbList'] },
+  faq: { primary: ['FAQPage'], secondary: ['BreadcrumbList'] },
+  'case-study': { primary: ['Article'], secondary: ['CreativeWork', 'BreadcrumbList'] },
+  comparison: { primary: ['WebPage'], secondary: ['ItemList', 'BreadcrumbList'] },
+  generic: { primary: ['WebPage'], secondary: ['BreadcrumbList'] },
+};
+
 // Context from the workspace/strategy for richer schema generation
 export interface SchemaContext {
   companyName?: string;
@@ -1066,6 +1086,15 @@ async function aiGenerateUnifiedSchema(
     keywordBlock += `\nSITE-LEVEL KEYWORDS: ${ctx.siteKeywords.slice(0, 10).join(', ')}`;
   }
 
+  // Build page-type schema guidance
+  let schemaTypeGuidance = '';
+  if (ctx.pageType && ctx.pageType !== 'auto') {
+    const mapped = PAGE_TYPE_SCHEMA_MAP[ctx.pageType];
+    if (mapped && mapped.primary.length > 0) {
+      schemaTypeGuidance = `\nSCHEMA TYPE GUIDANCE (based on page type "${ctx.pageType}"):\n- Primary: ${mapped.primary.join(', ')}\n- Secondary (if applicable): ${mapped.secondary.join(', ')}\nFocus on populating these types with accurate properties from the page content.\nDo not add other types unless the page content strongly warrants it.`;
+    }
+  }
+
   const prompt = `You are a Google Structured Data expert. Generate ONE production-ready JSON-LD schema for this page using the @graph pattern. The schema must pass Google's Rich Results Test with zero errors.
 
 SITE INFO:
@@ -1073,7 +1102,7 @@ SITE INFO:
 - Site URL: ${siteUrl}
 - Logo: ${ctx.logoUrl || '(not available)'}
 ${ctx.businessContext ? `- Business Context: ${ctx.businessContext}` : ''}
-${keywordBlock}
+${keywordBlock}${schemaTypeGuidance}
 ${ctx.knowledgeBase ? `\nBUSINESS KNOWLEDGE BASE (use ONLY confirmed facts from this for schema fields like credentials, locations, sameAs URLs, specialties — never fabricate):\n${ctx.knowledgeBase.slice(0, 2000)}` : ''}
 
 PAGE INFO:
