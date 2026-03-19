@@ -22,6 +22,33 @@ cd ~/repos/asset-dashboard && npx vitest run
 - Pre-existing failure: `TabBar.test.tsx` or `users-api.test.ts` may fail — unrelated to backend changes
 - Expected: ~37-38/38 test files pass, ~464-596 tests pass (count grows over time)
 
+## Testing Schema Module (D1-D5)
+
+### Exported Pure Functions (can be unit tested directly)
+- `server/site-architecture.ts`: `getParentNode()`, `getSiblingNodes()`, `getChildNodes()`, `getAncestorChain()`, `flattenTree()`
+- `server/content-matrices.ts`: `getSchemaTypesForTemplate(pageType)` — returns combined primary+secondary schema types
+- `server/schema-suggester.ts`: `PAGE_TYPE_SCHEMA_MAP` (exported constant with 16 page type entries)
+
+### Private Functions (code inspection only)
+- `injectCrossReferences()` in `schema-suggester.ts` — contains D3 hub page logic and D5 relationship enrichment. Not exported, so test via unit testing the building blocks + code reading.
+
+### Testing Pattern for Schema Features
+```bash
+# Write tests in tests/unit/ using vitest
+# Import functions directly:
+import { getParentNode, getSiblingNodes, getChildNodes } from '../../server/site-architecture';
+import { getSchemaTypesForTemplate } from '../../server/content-matrices';
+import { PAGE_TYPE_SCHEMA_MAP } from '../../server/schema-suggester';
+
+# Run specific test file:
+npx vitest run tests/unit/your-test.test.ts
+```
+
+### API Keys Required for Full Schema Testing
+- Schema generation (`generateSchemaForPage`, `generateSchemaSuggestions`) requires `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`
+- Site architecture fetching requires `WEBFLOW_API_TOKEN`
+- Without these, test pure functions and verify builds only
+
 ## Testing Backup Verification
 
 The backup system runs automatically 30 seconds after server startup (`server/backup.ts`).
@@ -32,7 +59,7 @@ The backup system runs automatically 30 seconds after server startup (`server/ba
 3. Check server logs for `Backup verified` with `tableCount` and `totalRows`
 4. Inspect the manifest:
 ```bash
-cat ~/.asset-dashboard/backups/backup-*/\_manifest.json
+cat ~/.asset-dashboard/backups/backup-*/_manifest.json
 ```
 5. Verify manifest contains:
    - `verified: true`
