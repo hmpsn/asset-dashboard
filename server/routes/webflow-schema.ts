@@ -24,6 +24,7 @@ import {
 } from '../webflow.js';
 import { listWorkspaces, getTokenForSite, updatePageState, getWorkspace, getClientPortalUrl } from '../workspaces.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
+import { listPendingSchemas } from '../schema-queue.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('webflow-schema');
@@ -369,6 +370,18 @@ router.post('/api/webflow/schema-plan/:siteId/activate', (req, res) => {
   const plan = updateSchemaPlanStatus(req.params.siteId, 'active');
   if (!plan) return res.status(404).json({ error: 'No plan found' });
   res.json(plan);
+});
+
+// ── Pending Schemas (D7: pre-generated schema skeletons) ──
+
+router.get('/api/pending-schemas/:workspaceId', (req, res) => {
+  try {
+    const pendingSchemas = listPendingSchemas(req.params.workspaceId);
+    res.json({ pendingSchemas });
+  } catch (err) {
+    log.error({ err }, 'Pending schemas error');
+    res.status(500).json({ error: 'Failed to list pending schemas' });
+  }
 });
 
 export default router;
