@@ -2,6 +2,8 @@ import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet, g
 import { callOpenAI } from './openai-helpers.js';
 import { createLogger } from './logger.js';
 import { saveSiteTemplate, getOrSeedSiteTemplate, getSchemaPlan } from './schema-store.js';
+import { getBrief } from './content-brief.js';
+import type { ContentBrief } from '../shared/types/content.ts';
 import { buildPlanContextForPage } from './schema-plan.js';
 import { getAncestorChain, getParentNode, getSiblingNodes, getChildNodes } from './site-architecture.js';
 
@@ -91,6 +93,74 @@ export interface SchemaContext {
   _architectureTree?: import('./site-architecture.js').SiteNode;    // Full site tree for breadcrumb + nav generation
   _pageNode?: import('./site-architecture.js').SiteNode;            // Current page's node in the tree
   _ancestors?: import('./site-architecture.js').SiteNode[];         // Ancestor chain [root, ..., parent, target]
+  _briefId?: string;  // Internal: linked content brief ID for E-E-A-T enrichment
+}
+
+// ── E-E-A-T extraction from content briefs ─────────────────────────
+interface EeatData {
+  authorName?: string;
+  authorTitle?: string;
+  expertiseTopics?: string[];
+}
+
+/**
+ * Extract author/expertise data from a content brief's eeatGuidance field.
+ * Returns null if the brief has no usable E-E-A-T data.
+ */
+export function extractEeatFromBrief(brief: ContentBrief): EeatData | null {
+  const g = brief.eeatGuidance;
+  if (!g) return null;
+
+  const result: EeatData = {};
+
+  // Try to extract an author name from the expertise or experience fields
+  // Common patterns: "Written by Dr. Jane Smith", "Author: John Doe, MD", "Expert: ..."
+  const namePatterns = [
+    /(?:written by|author[:\s]+|by\s+)([A-Z][a-z]+(?: [A-Z][a-z'.]+){1,3})/i,
+    /(?:expert[:\s]+|reviewed by[:\s]+)([A-Z][a-z]+(?: [A-Z][a-z'.]+){1,3})/i,
+  ];
+
+  const allText = [g.expertise, g.experience, g.authority, g.trust].filter(Boolean).join(' ');
+  for (const pattern of namePatterns) {
+    const match = allText.match(pattern);
+    if (match) {
+      result.authorName = match[1].trim();
+      break;
+    }
+  }
+
+  // Extract author title/credentials from expertise field
+  const titlePatterns = [
+    /(?:credentials?|title|role)[:\s]+([^.]+)/i,
+    /\b((?:Dr|MD|PhD|CPA|RN|DDS|DMD|DO|JD|Esq)\b[^.]*)/i,
+    /\b((?:certified|licensed|board-certified)[^.]+)/i,
+  ];
+  for (const pattern of titlePatterns) {
+    const match = (g.expertise || '').match(pattern);
+    if (match) {
+      result.authorTitle = match[1].trim();
+      break;
+    }
+  }
+
+  // Extract expertise topics from the expertise field
+  if (g.expertise) {
+    // Look for comma-separated or "and"-separated topic lists
+    const topicMatch = g.expertise.match(/(?:expertise in|specializ(?:es?|ing) in|expert in|covers?|topics?[:\s]+)([^.]+)/i);
+    if (topicMatch) {
+      result.expertiseTopics = topicMatch[1]
+        .split(/,\s*|\s+and\s+/)
+        .map(t => t.trim())
+        .filter(t => t.length > 1 && t.length < 60);
+    }
+  }
+
+  // Return null if nothing useful was extracted
+  if (!result.authorName && !result.authorTitle && !result.expertiseTopics?.length) {
+    return null;
+  }
+
+  return result;
 }
 
 // Google required fields per @type (for validation)
@@ -1088,6 +1158,34 @@ async function postProcessSchema(
     }
   }
 
+  // Step 4c: E-E-A-T author enrichment — pre-populate author on Article/BlogPosting from brief
+  if (ctx._briefId && ctx.workspaceId && Array.isArray(schema['@graph'])) {
+    try {
+      const brief = getBrief(ctx.workspaceId, ctx._briefId);
+      if (brief) {
+        const eeat = extractEeatFromBrief(brief);
+        if (eeat) {
+          const eeatGraph = schema['@graph'] as Record<string, unknown>[];
+          for (const node of eeatGraph) {
+            const nodeType = String(node['@type'] || '');
+            if ((nodeType === 'Article' || nodeType === 'BlogPosting' || nodeType === 'NewsArticle') && !node['author']) {
+              const authorNode: Record<string, unknown> = { '@type': 'Person' };
+              if (eeat.authorName) authorNode['name'] = eeat.authorName;
+              if (eeat.authorTitle) authorNode['jobTitle'] = eeat.authorTitle;
+              if (eeat.expertiseTopics?.length) authorNode['knowsAbout'] = eeat.expertiseTopics;
+              if (authorNode['name']) {
+                node['author'] = authorNode;
+                log.info({ nodeType, authorName: eeat.authorName }, 'E-E-A-T: pre-populated author on article node from brief');
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      log.warn({ err, briefId: ctx._briefId }, 'E-E-A-T post-processing failed — skipping');
+    }
+  }
+
   // Step 5: Clean again after modifications (remove any empty values created by stripping)
   const cleaned = cleanSchema(schema);
 
@@ -1210,6 +1308,27 @@ async function aiGenerateUnifiedSchema(
     }
   }
 
+  // Build E-E-A-T author/expertise context from linked brief
+  let eeatBlock = '';
+  if (ctx._briefId && ctx.workspaceId) {
+    try {
+      const brief = getBrief(ctx.workspaceId, ctx._briefId);
+      if (brief) {
+        const eeat = extractEeatFromBrief(brief);
+        if (eeat) {
+          const parts: string[] = [];
+          if (eeat.authorName) parts.push(`Author Name: ${eeat.authorName}`);
+          if (eeat.authorTitle) parts.push(`Author Credentials: ${eeat.authorTitle}`);
+          if (eeat.expertiseTopics?.length) parts.push(`Expertise Topics: ${eeat.expertiseTopics.join(', ')}`);
+          eeatBlock = `\nAUTHOR / E-E-A-T CREDENTIALS (from content brief):\nThe content brief recommends the following author credentials:\n${parts.join('\n')}\nIf this page uses Article or BlogPosting, populate the "author" field with a Person node using this data.`;
+          log.info({ briefId: ctx._briefId, eeat }, 'Injected E-E-A-T data from brief into schema prompt');
+        }
+      }
+    } catch (err) {
+      log.warn({ err, briefId: ctx._briefId }, 'Failed to load brief for E-E-A-T extraction — skipping');
+    }
+  }
+
   const prompt = `You are a Google Structured Data expert. Generate ONE production-ready JSON-LD schema for this page using the @graph pattern. The schema must pass Google's Rich Results Test with zero errors.
 
 SITE INFO:
@@ -1218,7 +1337,7 @@ SITE INFO:
 - Logo: ${ctx.logoUrl || '(not available)'}
 ${ctx.businessContext ? `- Business Context: ${ctx.businessContext}` : ''}
 ${keywordBlock}${schemaTypeGuidance}
-${ctx.knowledgeBase ? `\nBUSINESS KNOWLEDGE BASE (use ONLY confirmed facts from this for schema fields like credentials, locations, sameAs URLs, specialties — never fabricate):\n${ctx.knowledgeBase.slice(0, 2000)}` : ''}
+${ctx.knowledgeBase ? `\nBUSINESS KNOWLEDGE BASE (use ONLY confirmed facts from this for schema fields like credentials, locations, sameAs URLs, specialties — never fabricate):\n${ctx.knowledgeBase.slice(0, 2000)}` : ''}${eeatBlock}
 
 PAGE INFO:
 - URL: ${pageUrl}

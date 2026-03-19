@@ -423,8 +423,8 @@
           "source": "DEVIN_SCHEMA_SPECS",
           "est": "3h",
           "priority": "P3",
-          "notes": "Extract author/expertise from linked content brief E-E-A-T sections, pre-populate Person schema nodes. Depends on C1+C2.",
-          "status": "pending"
+          "notes": "Shipped — extractEeatFromBrief() extracts author name, credentials, expertise topics from brief eeatGuidance. Injected into AI prompt + post-processing populates Person author on Article/BlogPosting. Feature #148.",
+          "status": "done"
         },
         {
           "id": 512,
