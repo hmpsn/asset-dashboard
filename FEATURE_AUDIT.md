@@ -1736,6 +1736,12 @@ When the user asks to update this document with recent features, follow this pro
 
 **Agency value:** Eliminates redundant Webflow API + sitemap calls during plan generation (reuses cached architecture tree). Richer AI context from tree metadata produces more accurate role assignments.
 
+### 171. SiteNavigationElement Auto-Gen for Homepage
+**What it does:** When generating schema for the homepage and the architecture tree is available, automatically injects a `SiteNavigationElement` JSON-LD node listing the top-level navigation items (depth-1 children of the tree root). Only includes existing pages with content, capped at 10 items. Skips injection if a `SiteNavigationElement` already exists in the schema. Zero AI token cost — purely deterministic from the tree structure.
+**Files:** `server/schema-suggester.ts` (SiteNavigationElement injection in `injectCrossReferences()`)
+
+**Agency value:** Homepage schema gains structured navigation data that Google uses for sitelinks. Fully automatic — no manual configuration needed. Updates when architecture tree changes.
+
 ---
 
 ## Summary

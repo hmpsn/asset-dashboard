@@ -387,8 +387,8 @@
           "source": "ARCHITECTURE_SCHEMA_PLAN",
           "est": "1h",
           "priority": "P2",
-          "notes": "Extract depth-1 children from architecture tree, generate SiteNavigationElement JSON-LD, auto-include in homepage schema.",
-          "status": "pending"
+          "notes": "Shipped — injectCrossReferences() auto-injects SiteNavigationElement for homepage from depth-1 tree children (existing + hasContent, capped at 10). Feature #171.",
+          "status": "done"
         },
         {
           "id": 508,

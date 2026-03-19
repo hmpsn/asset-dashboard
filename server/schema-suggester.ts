@@ -456,6 +456,37 @@ function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string,
       } catch { /* skip if URL parsing fails */ }
     }
   }
+
+  // Auto-generate SiteNavigationElement for homepage when architecture tree is available
+  const tree = ctx?._architectureTree;
+  if (tree) {
+    const webPage = graph.find(n => n['@type'] === 'WebPage') as Record<string, unknown> | undefined;
+    const pageUrl = (webPage?.['url'] as string) || siteUrl;
+    const isHomepage = pageUrl === siteUrl || pageUrl === `${siteUrl}/` || new URL(pageUrl).pathname === '/';
+    const hasNav = graph.some(n => n['@type'] === 'SiteNavigationElement');
+
+    if (isHomepage && !hasNav && tree.children.length > 0) {
+      const navItems = tree.children
+        .filter(n => n.source === 'existing' && n.hasContent)
+        .slice(0, 10) // Cap at 10 top-level nav items
+        .map((n, i) => ({
+          '@type': 'SiteNavigationElement',
+          'position': i + 1,
+          'name': n.name,
+          'url': `${siteUrl}${n.path}`,
+        }));
+
+      if (navItems.length > 0) {
+        graph.push({
+          '@type': 'SiteNavigationElement',
+          '@id': `${siteUrl}/#navigation`,
+          'name': 'Main Navigation',
+          'hasPart': navItems,
+        });
+        log.info({ navCount: navItems.length }, 'Injected SiteNavigationElement from architecture tree');
+      }
+    }
+  }
 }
 
 // Content verification: cross-check schema values against actual page content
