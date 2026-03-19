@@ -7,6 +7,7 @@
  */
 import db from './db/index.js';
 import { getMatrix, getSchemaTypesForTemplate } from './content-matrices.js';
+import { getWorkspace } from './workspaces.js';
 import { createLogger } from './logger.js';
 import type { MatrixCell, ContentTemplate } from '../shared/types/content.ts';
 
@@ -209,11 +210,18 @@ export async function queueSchemaPreGeneration(
     }
 
     // Use liveDomain from workspace config if available, fallback to placeholder
-    const siteUrl = 'https://example.com'; // Will be overridden on publish with actual site URL
+    const ws = getWorkspace(workspaceId);
+    const siteUrl = ws?.liveDomain ? `https://${ws.liveDomain}` : 'https://example.com';
 
     const skeleton = generateSchemaSkeleton(cell, template, siteUrl);
     const now = new Date().toISOString();
     const id = `ps_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    // Mark any existing pending schemas for this cell as stale before inserting new one
+    stmts().markStaleByCellId.run({
+      cell_id: cellId,
+      updated_at: now,
+    });
 
     stmts().insert.run({
       id,
