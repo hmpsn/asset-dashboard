@@ -269,6 +269,38 @@ export const seoChangeTracker = {
     getSafe<unknown[]>(`/api/seo-changes/${wsId}/impact`, []),
 };
 
+// ── Schema impact tracking ──────────────────────────────────────
+export interface SchemaDeploymentImpact {
+  change: {
+    id: string;
+    pageSlug: string;
+    pageTitle: string;
+    fields: string[];
+    source: string;
+    changedAt: string;
+  };
+  before: { clicks: number; impressions: number; ctr: number; position: number } | null;
+  after: { clicks: number; impressions: number; ctr: number; position: number } | null;
+  daysSinceChange: number;
+  tooRecent: boolean;
+}
+
+export interface SchemaImpactData {
+  totalDeployments: number;
+  pagesWithData: number;
+  tooRecent: number;
+  avgClicksDelta: number | null;
+  avgImpressionsDelta: number | null;
+  avgCtrDelta: number | null;
+  avgPositionDelta: number | null;
+  deployments: SchemaDeploymentImpact[];
+}
+
+export const schemaImpact = {
+  get: (wsId: string) =>
+    get<SchemaImpactData>(`/api/schema-impact/${wsId}`),
+};
+
 // ── Page weight ─────────────────────────────────────────────────
 export const pageWeight = {
   get: (wsId: string) =>
