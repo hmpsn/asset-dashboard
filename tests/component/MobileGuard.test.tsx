@@ -70,7 +70,7 @@ describe('MobileGuard', () => {
       </MobileGuard>
     );
 
-    fireEvent.click(screen.getByText('Continue anyway'));
+    fireEvent.click(screen.getByLabelText('Dismiss mobile warning'));
     expect(sessionStorage.getItem('mobile_guard_dismissed')).toBe('1');
   });
 
