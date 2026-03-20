@@ -131,6 +131,7 @@ export function applySuppressionsToAudit(
     infos: audit.infos !== undefined ? totalInfos : totalInfos,
     pages: filteredPages,
     siteWideIssues: audit.siteWideIssues,
+    cwvSummary: audit.cwvSummary,
   };
 }
 

@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { AlertTriangle, Info, CheckCircle2, ChevronDown, Shield, FileEdit, Share2, Link2, ExternalLink, FileText, BarChart3, Check } from 'lucide-react';
+import { AlertTriangle, Info, CheckCircle2, ChevronDown, Shield, FileEdit, Share2, Link2, ExternalLink, FileText, BarChart3, Check, Globe } from 'lucide-react';
 import { MetricRing } from '../ui';
 import { scoreColorClass } from '../ui/constants';
 import { ScoreHistoryChart } from './helpers';
 import { toLiveUrl } from './utils';
 import { SEV, CAT_LABELS } from './types';
-import type { AuditSummary, AuditDetail } from './types';
+import type { AuditSummary, AuditDetail, CwvStrategyResult } from './types';
 import { FixRecommendations } from './FixRecommendations';
 import { OrderStatus } from './OrderStatus';
 import { STUDIO_NAME } from '../../constants';
@@ -211,6 +211,68 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, tie
           </div>
         </div>
       </div>
+
+      {/* Core Web Vitals — Google's page experience ranking signal */}
+      {auditDetail.audit.cwvSummary && (auditDetail.audit.cwvSummary.mobile || auditDetail.audit.cwvSummary.desktop) && (() => {
+        const ratingColor = (r: CwvStrategyResult['metrics']['LCP']['rating']) =>
+          r === 'good' ? 'text-emerald-400' : r === 'needs-improvement' ? 'text-amber-400' : r === 'poor' ? 'text-red-400' : 'text-zinc-500';
+        const ratingBg = (r: CwvStrategyResult['metrics']['LCP']['rating']) =>
+          r === 'good' ? 'bg-emerald-500/10 border-emerald-500/20' : r === 'needs-improvement' ? 'bg-amber-500/10 border-amber-500/20' : r === 'poor' ? 'bg-red-500/10 border-red-500/20' : 'bg-zinc-800/50 border-zinc-700/30';
+        const assessBadge = (a: CwvStrategyResult['assessment']) =>
+          a === 'good' ? { text: 'Passed', cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' }
+          : a === 'needs-improvement' ? { text: 'Needs Work', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/30' }
+          : a === 'poor' ? { text: 'Failed', cls: 'bg-red-500/15 text-red-400 border-red-500/30' }
+          : { text: 'No Data', cls: 'bg-zinc-800/50 text-zinc-500 border-zinc-700/30' };
+
+        const renderStrategy = (label: string, s: CwvStrategyResult) => {
+          const badge = assessBadge(s.assessment);
+          return (
+            <div key={label} className="flex-1 min-w-[240px]">
+              <div className="flex items-center justify-between mb-2.5">
+                <span className="text-xs font-medium text-zinc-400 uppercase tracking-wider">{label}</span>
+                <span className={`text-[11px] px-2 py-0.5 rounded border font-medium ${badge.cls}`}>{badge.text}</span>
+              </div>
+              <div className="space-y-1.5">
+                {[
+                  { key: 'LCP' as const, label: 'Loading Speed', fmt: (v: number) => `${(v / 1000).toFixed(1)}s`, desc: 'How fast content appears' },
+                  { key: 'INP' as const, label: 'Responsiveness', fmt: (v: number) => `${Math.round(v)}ms`, desc: 'How fast the page reacts' },
+                  { key: 'CLS' as const, label: 'Visual Stability', fmt: (v: number) => v.toFixed(2), desc: 'How much the layout shifts' },
+                ].map(m => {
+                  const metric = s.metrics[m.key];
+                  return (
+                    <div key={m.key} className={`flex items-center justify-between px-3 py-2 rounded-lg border ${ratingBg(metric.rating)}`}>
+                      <div>
+                        <span className="text-xs font-medium text-zinc-300">{m.label}</span>
+                        <span className="text-[10px] text-zinc-500 ml-1.5">{m.desc}</span>
+                      </div>
+                      <span className={`text-sm font-mono font-medium ${ratingColor(metric.rating)}`}>
+                        {metric.value !== null ? m.fmt(metric.value) : '—'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              {!s.fieldDataAvailable && (
+                <div className="mt-1.5 text-[10px] text-zinc-500 italic px-1">Based on lab simulation — real visitor data not yet available</div>
+              )}
+            </div>
+          );
+        };
+
+        return (
+          <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Globe className="w-4 h-4 text-teal-400" />
+              <span className="text-xs font-medium text-zinc-300">Page Speed &amp; Core Web Vitals</span>
+              <span className="text-[10px] text-zinc-500 ml-1">Google uses these to rank your site</span>
+            </div>
+            <div className="flex gap-4 flex-wrap">
+              {auditDetail.audit.cwvSummary!.mobile && renderStrategy('Mobile', auditDetail.audit.cwvSummary!.mobile)}
+              {auditDetail.audit.cwvSummary!.desktop && renderStrategy('Desktop', auditDetail.audit.cwvSummary!.desktop)}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Fix recommendations with cart CTAs */}
       <FixRecommendations auditDetail={auditDetail} tier={tier} workspaceId={workspaceId} />

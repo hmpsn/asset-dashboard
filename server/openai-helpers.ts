@@ -23,10 +23,7 @@ export interface TokenUsage {
 }
 
 const USAGE_DIR = getDataDir('ai-usage');
-const MAX_MEMORY_LOG = 1000;
-let usageLog: TokenUsage[] = [];
 
-// Load today's usage from disk on startup
 function getUsageFilePath(date: string): string {
   return path.join(USAGE_DIR, `${date}.json`);
 }
@@ -34,18 +31,6 @@ function getUsageFilePath(date: string): string {
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
-
-// Load existing usage files into memory (last 30 days)
-(function loadRecentUsage() {
-  try {
-    const files = fs.readdirSync(USAGE_DIR).filter(f => f.endsWith('.json')).sort().slice(-30);
-    for (const f of files) {
-      const data = JSON.parse(fs.readFileSync(path.join(USAGE_DIR, f), 'utf-8'));
-      if (Array.isArray(data)) usageLog.push(...data);
-    }
-    if (usageLog.length > MAX_MEMORY_LOG) usageLog = usageLog.slice(-MAX_MEMORY_LOG);
-  } catch { /* first run or corrupt files */ }
-})();
 
 // Flush buffer: append to today's file periodically
 let pendingWrites: TokenUsage[] = [];
@@ -64,8 +49,6 @@ export function flushToDisk(): void {
 
 export function logTokenUsage(usage: Omit<TokenUsage, 'timestamp'>): void {
   const entry = { ...usage, timestamp: new Date().toISOString() };
-  usageLog.push(entry);
-  if (usageLog.length > MAX_MEMORY_LOG) usageLog.splice(0, usageLog.length - MAX_MEMORY_LOG);
   pendingWrites.push(entry);
   // Debounce disk writes (flush every 5s or after 20 entries)
   if (pendingWrites.length >= 20) { flushToDisk(); return; }
@@ -74,6 +57,33 @@ export function logTokenUsage(usage: Omit<TokenUsage, 'timestamp'>): void {
 
 // Flush on normal process exit (graceful shutdown handles SIGTERM/SIGINT)
 process.on('beforeExit', flushToDisk);
+
+/**
+ * Load ALL usage entries from disk files for the given time range, plus any pending writes.
+ * This is the authoritative data source — no truncation.
+ */
+function loadEntriesFromDisk(since?: string, days?: number): TokenUsage[] {
+  // Flush pending writes first so disk is up-to-date
+  flushToDisk();
+  const cutoffDate = since
+    ? since.slice(0, 10)
+    : days
+      ? (() => { const d = new Date(); d.setDate(d.getDate() - days); return d.toISOString().slice(0, 10); })()
+      : '0000'; // no filter = load everything
+  try {
+    const files = fs.readdirSync(USAGE_DIR)
+      .filter(f => f.endsWith('.json') && f.replace('.json', '') >= cutoffDate)
+      .sort();
+    const entries: TokenUsage[] = [];
+    for (const f of files) {
+      try {
+        const data = JSON.parse(fs.readFileSync(path.join(USAGE_DIR, f), 'utf-8'));
+        if (Array.isArray(data)) entries.push(...data);
+      } catch { /* skip corrupt file */ }
+    }
+    return entries;
+  } catch { return []; }
+}
 
 // --- Cost estimation per model ---
 
@@ -102,7 +112,7 @@ function getProvider(model: string): 'openai' | 'anthropic' {
 
 /** Get recent token usage, optionally filtered by workspace */
 export function getTokenUsage(workspaceId?: string, since?: string): { entries: TokenUsage[]; totalTokens: number; estimatedCost: number } {
-  let entries = usageLog;
+  let entries = loadEntriesFromDisk(since);
   if (workspaceId) entries = entries.filter(e => e.workspaceId === workspaceId);
   if (since) entries = entries.filter(e => e.timestamp >= since);
   const totalTokens = entries.reduce((s, e) => s + e.totalTokens, 0);
@@ -127,7 +137,7 @@ export function getUsageByDay(workspaceId?: string, days = 30): Array<{
   cutoff.setDate(cutoff.getDate() - days);
   const since = cutoff.toISOString();
 
-  let entries = usageLog.filter(e => e.timestamp >= since);
+  let entries = loadEntriesFromDisk(since, days);
   if (workspaceId) entries = entries.filter(e => e.workspaceId === workspaceId);
 
   const byDay = new Map<string, {
@@ -175,7 +185,7 @@ export function getUsageByDay(workspaceId?: string, days = 30): Array<{
 export function getUsageByFeature(workspaceId?: string, since?: string): Array<{
   feature: string; calls: number; totalTokens: number; cost: number; provider: string;
 }> {
-  let entries = usageLog;
+  let entries = loadEntriesFromDisk(since);
   if (workspaceId) entries = entries.filter(e => e.workspaceId === workspaceId);
   if (since) entries = entries.filter(e => e.timestamp >= since);
 
@@ -340,7 +350,7 @@ export function getTimeSaved(workspaceId?: string, since?: string): {
   operationCount: number;
   byFeature: Record<string, { count: number; minutesSaved: number }>;
 } {
-  let entries = usageLog;
+  let entries = loadEntriesFromDisk(since);
   if (workspaceId) entries = entries.filter(e => e.workspaceId === workspaceId);
   if (since) entries = entries.filter(e => e.timestamp >= since);
 

@@ -2708,6 +2708,71 @@
           "notes": "Shipped — CWV data moved out of siteWideIssues into dedicated cwvSummary on audit response. Frontend renders as a prominent card with mobile + desktop columns, per-metric ratings (LCP/INP/CLS), pass/fail badges, and Lighthouse lab score as secondary. Only Lighthouse lab score remains in siteWideIssues as info. Updated CSV/HTML report exports and client portal types.",
           "status": "done",
           "shippedAt": "2026-03-19"
+        },
+        {
+          "id": 311,
+          "title": "Fix AI + SEMRush usage data loss on restart — disk-based queries",
+          "source": "BUG",
+          "est": "30m",
+          "priority": "P0",
+          "notes": "Shipped — Both openai-helpers.ts and semrush.ts had a MAX_MEMORY_LOG=1000 cap that truncated usage data on startup. Query functions (getTokenUsage, getUsageByDay, getUsageByFeature, getSemrushUsage, getSemrushByDay, getTimeSaved) only read from the truncated in-memory array, so data appeared to vanish after restarts even though disk files were intact. Fix: removed in-memory array entirely, all query functions now read directly from disk JSON files via loadEntriesFromDisk()/loadCreditsFromDisk(). Write buffer (pendingWrites) kept for debounced disk writes only.",
+          "status": "done",
+          "shippedAt": "2026-03-19"
+        },
+        {
+          "id": 312,
+          "title": "Surface CWV summary card in client portal HealthTab",
+          "source": "FEATURE",
+          "est": "30m",
+          "priority": "P1",
+          "notes": "Shipped — CWV summary card (mobile + desktop pass/fail, LCP/INP/CLS with plain-language labels and color-coded ratings) now renders in the client HealthTab between the score grid and fix recommendations. Also fixed applySuppressionsToAudit() in server/helpers.ts which was dropping cwvSummary from the filtered audit result — the return object explicitly listed fields but omitted cwvSummary.",
+          "status": "done",
+          "shippedAt": "2026-03-19"
+        }
+      ]
+    },
+    {
+      "id": "sprint-client-ui-refresh",
+      "name": "Client Dashboard UI/UX Refresh",
+      "hours": "8-12",
+      "rationale": "Address information overload in client portal. Progressive disclosure, unified visual hierarchy, and strategic prioritization to reduce cognitive load and improve actionability.",
+      "items": [
+        {
+          "id": 320,
+          "title": "StrategyTab redesign — accordion sections, health score, reduced gradients",
+          "source": "UI_UX_AUDIT Mar 2026",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — Added Strategy Health Score (0-100) at top with 3 sub-scores (Content Gaps 40%, Quick Wins 30%, Coverage 30%). Converted all sections to accordions with only Content Opportunities expanded by default. Removed competing gradient backgrounds — all sections now use consistent bg-zinc-900/border-zinc-800. Truncated lists show top 5 with 'View all' buttons. Moved Page Keyword Map to bottom as reference data.",
+          "status": "done",
+          "shippedAt": "2026-03-19"
+        },
+        {
+          "id": 321,
+          "title": "HealthTab redesign — 'Fix These First' priority view",
+          "source": "UI_UX_AUDIT Mar 2026",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Restructure into 3 max sections: 1) 'Your site's health: X/100' with 1-sentence summary, 2) 'Fix these first' — top 5 actionable issues prioritized (errors > warnings > content), 3) 'Deep dive' (collapsed) — page breakdown, CWV details, category breakdown. Collapse Score history chart, Category breakdown, Site-wide issues, and Page-by-page list by default. Show only top 3 problematic pages initially.",
+          "status": "pending"
+        },
+        {
+          "id": 322,
+          "title": "OverviewTab redesign — digest-first layout",
+          "source": "UI_UX_AUDIT Mar 2026",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Lead with 'What changed this week' digest — metric deltas + 1-sentence narrative. Move score rings to collapsible 'Health Snapshot' section. Sidebar quick actions reduced to 3 primary CTAs. Move trend charts to 'History' sub-tab. Action banners stack vertically not horizontally. Insights digest becomes primary above-fold content.",
+          "status": "pending"
+        },
+        {
+          "id": 323,
+          "title": "SearchTab redesign — insight-first, tables secondary",
+          "source": "UI_UX_AUDIT Mar 2026",
+          "est": "2h",
+          "priority": "P2",
+          "notes": "Lead with 'What's working' insight cards (top movers, quick wins). Data tables move to collapsible 'Detailed Breakdown' section. Annotations become timeline view not separate tab. CTR opportunities prioritized above raw query lists. Default view shows 10 rows with 'Show more' not infinite scroll.",
+          "status": "pending"
         }
       ]
     }

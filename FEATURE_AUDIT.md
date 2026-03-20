@@ -51,7 +51,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 5. PageSpeed / Performance
-**What it does:** Runs Google PageSpeed Insights on key pages. Reports Core Web Vitals (LCP, INP, CLS) with per-page breakdowns and optimization opportunities. Single-page on-demand testing by slug. Homepage CWV wired into the site audit as a **dedicated summary card** — runs both mobile + desktop in parallel, shows CrUX field-data pass/fail (actual Google ranking signal) with per-metric ratings and Lighthouse lab score as secondary diagnostic. CWV data lives in `cwvSummary` on the audit response (not cluttering siteWideIssues). **Auto-restore**: bulk and single-page test results persist to disk and load on mount — expensive 30-60s tests survive navigation and deploys.
+**What it does:** Runs Google PageSpeed Insights on key pages. Reports Core Web Vitals (LCP, INP, CLS) with per-page breakdowns and optimization opportunities. Single-page on-demand testing by slug. Homepage CWV wired into the site audit as a **dedicated summary card** — runs both mobile + desktop in parallel, shows CrUX field-data pass/fail (actual Google ranking signal) with per-metric ratings and Lighthouse lab score as secondary diagnostic. CWV data lives in `cwvSummary` on the audit response (not cluttering siteWideIssues). **Client-facing**: the same CWV summary card renders in the client portal HealthTab — clients see their mobile/desktop pass/fail status, Loading Speed, Responsiveness, and Visual Stability metrics in plain language with color-coded ratings. **Auto-restore**: bulk and single-page test results persist to disk and load on mount — expensive 30-60s tests survive navigation and deploys.
 
 **Agency value:** Performance data directly from Google's own tool. No "but my site feels fast" debates — the numbers are objective.
 
@@ -985,7 +985,7 @@ When the user asks to update this document with recent features, follow this pro
 ---
 
 ### 71. AI Usage Dashboard
-**What it does:** Admin-facing AI usage monitoring panel in the Command Center. `GET /api/ai/usage` returns per-feature token consumption with timestamps, model used, and estimated cost. Dashboard shows: total tokens consumed, estimated cost, per-feature breakdown (briefs, posts, chat, schema, strategy, etc.), and SEMRush credit usage tracking via `server/usage-tracking.ts` (daily limit checks, increment/reset). Filterable by workspace and date range.
+**What it does:** Admin-facing AI usage monitoring panel in the Command Center. `GET /api/ai/usage` returns per-feature token consumption with timestamps, model used, and estimated cost. Dashboard shows: total tokens consumed, estimated cost, per-feature breakdown (briefs, posts, chat, schema, strategy, etc.), and SEMRush credit usage tracking. Filterable by workspace and date range. **Data reads from disk files** (JSON per day in `ai-usage/` and `semrush-usage/` directories) — no in-memory truncation, so all historical data survives restarts and deploys.
 
 **Agency value:** Cost visibility for AI operations. Know exactly which features and which clients consume the most tokens. SEMRush credit tracking prevents unexpected overage charges.
 

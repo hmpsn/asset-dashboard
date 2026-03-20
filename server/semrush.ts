@@ -22,20 +22,6 @@ interface SemrushCreditEntry {
 }
 
 const CREDIT_DIR = getDataDir('semrush-usage');
-const MAX_CREDIT_LOG = 1000;
-let creditLog: SemrushCreditEntry[] = [];
-
-// Load recent credit files on startup
-(function loadRecentCredits() {
-  try {
-    const files = fs.readdirSync(CREDIT_DIR).filter(f => f.endsWith('.json')).sort().slice(-30);
-    for (const f of files) {
-      const data = JSON.parse(fs.readFileSync(path.join(CREDIT_DIR, f), 'utf-8'));
-      if (Array.isArray(data)) creditLog.push(...data);
-    }
-    if (creditLog.length > MAX_CREDIT_LOG) creditLog = creditLog.slice(-MAX_CREDIT_LOG);
-  } catch { /* first run */ }
-})();
 
 let pendingCreditWrites: SemrushCreditEntry[] = [];
 let creditFlushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -53,8 +39,6 @@ export function flushCreditsToDisk(): void {
 
 function logCreditUsage(entry: Omit<SemrushCreditEntry, 'timestamp'>): void {
   const full = { ...entry, timestamp: new Date().toISOString() };
-  creditLog.push(full);
-  if (creditLog.length > MAX_CREDIT_LOG) creditLog.splice(0, creditLog.length - MAX_CREDIT_LOG);
   pendingCreditWrites.push(full);
   if (pendingCreditWrites.length >= 10) { flushCreditsToDisk(); return; }
   if (!creditFlushTimer) creditFlushTimer = setTimeout(() => { creditFlushTimer = null; flushCreditsToDisk(); }, 5000);
@@ -63,6 +47,32 @@ function logCreditUsage(entry: Omit<SemrushCreditEntry, 'timestamp'>): void {
 // Flush on normal process exit (graceful shutdown handles SIGTERM/SIGINT)
 process.on('beforeExit', flushCreditsToDisk);
 
+/**
+ * Load ALL credit entries from disk files for the given time range, plus any pending writes.
+ * Authoritative data source — no truncation.
+ */
+function loadCreditsFromDisk(since?: string, days?: number): SemrushCreditEntry[] {
+  flushCreditsToDisk();
+  const cutoffDate = since
+    ? since.slice(0, 10)
+    : days
+      ? (() => { const d = new Date(); d.setDate(d.getDate() - days); return d.toISOString().slice(0, 10); })()
+      : '0000';
+  try {
+    const files = fs.readdirSync(CREDIT_DIR)
+      .filter(f => f.endsWith('.json') && f.replace('.json', '') >= cutoffDate)
+      .sort();
+    const entries: SemrushCreditEntry[] = [];
+    for (const f of files) {
+      try {
+        const data = JSON.parse(fs.readFileSync(path.join(CREDIT_DIR, f), 'utf-8'));
+        if (Array.isArray(data)) entries.push(...data);
+      } catch { /* skip corrupt file */ }
+    }
+    return entries;
+  } catch { return []; }
+}
+
 /** Get SEMRush credit usage summary */
 export function getSemrushUsage(workspaceId?: string, since?: string): {
   totalCredits: number;
@@ -70,7 +80,7 @@ export function getSemrushUsage(workspaceId?: string, since?: string): {
   cachedCalls: number;
   entries: SemrushCreditEntry[];
 } {
-  let entries = creditLog;
+  let entries = loadCreditsFromDisk(since);
   if (workspaceId) entries = entries.filter(e => e.workspaceId === workspaceId);
   if (since) entries = entries.filter(e => e.timestamp >= since);
   return {
@@ -89,7 +99,7 @@ export function getSemrushByDay(workspaceId?: string, days = 30): Array<{
   cutoff.setDate(cutoff.getDate() - days);
   const since = cutoff.toISOString();
 
-  let entries = creditLog.filter(e => e.timestamp >= since);
+  let entries = loadCreditsFromDisk(since, days);
   if (workspaceId) entries = entries.filter(e => e.workspaceId === workspaceId);
 
   const byDay = new Map<string, { credits: number; calls: number; cachedCalls: number }>();
