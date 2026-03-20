@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Zap, FileText, Sparkles, Target, Search, CheckCircle2,
+  Zap, FileText, Sparkles, Target, CheckCircle2,
   TrendingUp, ChevronDown, Shield, BookOpen, Layers,
 } from 'lucide-react';
 import { TierGate, EmptyState, type Tier } from '../ui';
@@ -40,16 +40,7 @@ interface StrategyTabProps {
 
 export function StrategyTab({ strategyData, requestedTopics, contentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal, contentPlanKeywords, onTabChange, workspaceId, setToast, onContentRequested }: StrategyTabProps) {
   const betaMode = useBetaMode();
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['content-opportunities']));
-  const [expandedCounts, setExpandedCounts] = useState<Record<string, number>>({
-    'growth-opportunities': 5,
-    'quick-wins': 3,
-    'keyword-opportunities': 5,
-    'competitor-gaps': 9,
-    'page-keyword-map': 20,
-  });
-  const [mapSearch, setMapSearch] = useState('');
-  const [mapSort, setMapSort] = useState<'default' | 'position' | 'impressions' | 'clicks'>('default');
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['content-opportunities', 'growth-opportunities']));
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => {
@@ -58,10 +49,6 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       else next.add(section);
       return next;
     });
-  };
-
-  const showAll = (section: string, total: number) => {
-    setExpandedCounts(prev => ({ ...prev, [section]: total }));
   };
 
   if (!strategyData) {
@@ -165,7 +152,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium text-zinc-200">Content Gaps</div>
-            <div className="text-[11px] text-zinc-500">{strategyData.contentGaps.length} topics to create</div>
+            <div className="text-[11px] text-zinc-500">{strategyData.contentGaps?.length || 0} topics to create</div>
           </div>
           <button 
             onClick={() => toggleSection('content-opportunities')}
@@ -196,7 +183,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
 
         {/* Growth Opportunities Summary Card */}
         {(() => {
-          const unranked = strategyData.growthOpportunities?.filter(p => !p.isRanking) || [];
+          const unranked = strategyData.pageMap.filter(p => !p.currentPosition);
           if (unranked.length === 0) return null;
           return (
             <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 flex items-center gap-3">
@@ -326,7 +313,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         </TierGate>
       )}
 
-      {/* ── GROWTH OPPORTUNITIES (collapsed by default) ── */}
+      {/* ── GROWTH OPPORTUNITIES (expanded by default) ── */}
       {(() => {
         const unranked = strategyData.pageMap
           .filter(p => !p.currentPosition)
@@ -462,163 +449,221 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         );
       })()}
 
-      {/* ── REFERENCE DATA (collapsed by default) ── */}
+      {/* ── QUICK WINS (individual section) ── */}
+      {strategyData.quickWins && strategyData.quickWins.length > 0 && (
+        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+          <button 
+            onClick={() => toggleSection('quick-wins')}
+            className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                <Zap className="w-3.5 h-3.5 text-amber-400" />
+              </div>
+              <div className="text-left">
+                <div className="text-sm font-medium text-zinc-200">Quick Wins</div>
+                <div className="text-[11px] text-zinc-500">{strategyData.quickWins.length} low-effort improvements</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">{strategyData.quickWins.length}</span>
+              <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${expandedSections.has('quick-wins') ? '' : '-rotate-90'}`} />
+            </div>
+          </button>
+
+          {expandedSections.has('quick-wins') && (
+            <div className="px-4 pb-4 space-y-2 border-t border-zinc-800/50">
+              {strategyData.quickWins.slice(0, expandedSections.has('quick-wins-all') ? undefined : 3).map((qw, i) => {
+                const impactColor = qw.estimatedImpact === 'high' ? 'text-green-400 bg-green-500/15 border-green-500/30' : qw.estimatedImpact === 'medium' ? 'text-amber-400 bg-amber-500/15 border-amber-500/30' : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
+                return (
+                  <div key={i} className="px-3 py-2.5 rounded-lg bg-zinc-950/50 border border-zinc-800/80">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-mono text-zinc-500">{qw.pagePath}</span>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${impactColor}`}>{qw.estimatedImpact}</span>
+                    </div>
+                    <div className="text-[11px] text-zinc-200 mt-1 font-medium">{qw.action}</div>
+                  </div>
+                );
+              })}
+              {strategyData.quickWins.length > 3 && (
+                <button 
+                  onClick={() => toggleSection('quick-wins-all')}
+                  className="w-full text-center py-2 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
+                >
+                  {expandedSections.has('quick-wins-all') ? 'Show fewer' : `View all ${strategyData.quickWins.length}`}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── KEYWORD OPPORTUNITIES (individual section) ── */}
+      {strategyData.opportunities.length > 0 && (
+        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+          <button 
+            onClick={() => toggleSection('keyword-opportunities')}
+            className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+              </div>
+              <div className="text-left">
+                <div className="text-sm font-medium text-zinc-200">Keyword Opportunities</div>
+                <div className="text-[11px] text-zinc-500">{strategyData.opportunities.length} strategic keyword targets</div>
+              </div>
+            </div>
+            <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${expandedSections.has('keyword-opportunities') ? '' : '-rotate-90'}`} />
+          </button>
+
+          {expandedSections.has('keyword-opportunities') && (
+            <div className="px-4 pb-4">
+              <p className="text-[11px] text-zinc-500 mb-3">Additional keywords your existing pages could target to capture more search traffic.</p>
+              <div className="flex flex-wrap gap-1.5">
+                {strategyData.opportunities.slice(0, 10).map((opp, i) => (
+                  <span key={i} className="text-[11px] text-zinc-400 bg-zinc-950/50 border border-zinc-800/50 px-2 py-1 rounded">{opp}</span>
+                ))}
+                {strategyData.opportunities.length > 10 && (
+                  <span className="text-[11px] text-zinc-500 px-1 py-1">+{strategyData.opportunities.length - 10} more</span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── TARGET KEYWORDS (individual section) ── */}
       <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
         <button 
-          onClick={() => toggleSection('reference-data')}
+          onClick={() => toggleSection('target-keywords')}
           className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors"
         >
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-lg bg-zinc-700/50 flex items-center justify-center">
-              <BookOpen className="w-3.5 h-3.5 text-zinc-400" />
+              <Target className="w-3.5 h-3.5 text-zinc-400" />
             </div>
             <div className="text-left">
-              <div className="text-sm font-medium text-zinc-300">Reference Data</div>
-              <div className="text-[11px] text-zinc-500">Quick wins, keyword lists, and page mappings</div>
+              <div className="text-sm font-medium text-zinc-300">Target Keywords</div>
+              <div className="text-[11px] text-zinc-500">{strategyData.siteKeywords.length} keywords we're tracking</div>
             </div>
           </div>
-          <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${expandedSections.has('reference-data') ? '' : '-rotate-90'}`} />
+          <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${expandedSections.has('target-keywords') ? '' : '-rotate-90'}`} />
         </button>
 
-        {expandedSections.has('reference-data') && (
-          <div className="border-t border-zinc-800 px-4 pb-4 space-y-4">
-            {/* Quick Wins */}
-            {strategyData.quickWins && strategyData.quickWins.length > 0 && (
-              <div className="pt-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Zap className="w-4 h-4 text-amber-400" />
-                  <span className="text-xs font-medium text-zinc-300">Quick Wins ({strategyData.quickWins.length})</span>
-                </div>
-                <div className="space-y-1.5">
-                  {strategyData.quickWins.slice(0, 3).map((qw, i) => {
-                    const impactColor = qw.estimatedImpact === 'high' ? 'text-green-400 bg-green-500/15 border-green-500/30' : qw.estimatedImpact === 'medium' ? 'text-amber-400 bg-amber-500/15 border-amber-500/30' : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
-                    return (
-                      <div key={i} className="px-3 py-2 rounded-lg bg-zinc-950/50 border border-zinc-800/50">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-mono text-zinc-500">{qw.pagePath}</span>
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${impactColor}`}>{qw.estimatedImpact}</span>
-                        </div>
-                        <div className="text-[11px] text-zinc-300">{qw.action}</div>
-                      </div>
-                    );
-                  })}
-                  {strategyData.quickWins.length > 3 && (
-                    <button 
-                      onClick={() => toggleSection('quick-wins-all')}
-                      className="w-full text-center py-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
-                    >
-                      {expandedSections.has('quick-wins-all') ? 'Show fewer' : `View all ${strategyData.quickWins.length}`}
-                    </button>
-                  )}
-                </div>
-                {expandedSections.has('quick-wins-all') && (
-                  <div className="mt-2 space-y-1.5">
-                    {strategyData.quickWins.slice(3).map((qw, i) => {
-                      const impactColor = qw.estimatedImpact === 'high' ? 'text-green-400 bg-green-500/15 border-green-500/30' : qw.estimatedImpact === 'medium' ? 'text-amber-400 bg-amber-500/15 border-amber-500/30' : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
-                      return (
-                        <div key={i} className="px-3 py-2 rounded-lg bg-zinc-950/50 border border-zinc-800/50">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-mono text-zinc-500">{qw.pagePath}</span>
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${impactColor}`}>{qw.estimatedImpact}</span>
-                          </div>
-                          <div className="text-[11px] text-zinc-300">{qw.action}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Keyword Opportunities */}
-            {strategyData.opportunities.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <Sparkles className="w-4 h-4 text-purple-400" />
-                  <span className="text-xs font-medium text-zinc-300">Keyword Opportunities ({strategyData.opportunities.length})</span>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {strategyData.opportunities.slice(0, 10).map((opp, i) => (
-                    <span key={i} className="text-[11px] text-zinc-400 bg-zinc-950/50 border border-zinc-800/50 px-2 py-1 rounded">{opp}</span>
-                  ))}
-                  {strategyData.opportunities.length > 10 && (
-                    <span className="text-[11px] text-zinc-500 px-1 py-1">+{strategyData.opportunities.length - 10} more</span>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Target Keywords */}
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Target className="w-4 h-4 text-zinc-400" />
-                <span className="text-xs font-medium text-zinc-300">Target Keywords ({strategyData.siteKeywords.length})</span>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {strategyData.siteKeywords.slice(0, 10).map(kw => (
-                  <span key={kw} className="text-[11px] text-zinc-400 bg-zinc-950/50 border border-zinc-800/50 px-2 py-1 rounded">{kw}</span>
-                ))}
-                {strategyData.siteKeywords.length > 10 && (
-                  <span className="text-[11px] text-zinc-500 px-1 py-1">+{strategyData.siteKeywords.length - 10} more</span>
-                )}
-              </div>
+        {expandedSections.has('target-keywords') && (
+          <div className="px-4 pb-4">
+            <div className="flex flex-wrap gap-2">
+              {strategyData.siteKeywords.slice(0, 15).map(kw => (
+                <span key={kw} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-zinc-800 border border-zinc-700 text-[11px] text-zinc-400">
+                  {kw}
+                </span>
+              ))}
+              {strategyData.siteKeywords.length > 15 && (
+                <span className="text-[11px] text-zinc-500 px-2 py-1">+{strategyData.siteKeywords.length - 15} more</span>
+              )}
             </div>
+          </div>
+        )}
+      </div>
 
-            {/* Competitor Gaps (Premium) */}
-            {strategyData.keywordGaps && strategyData.keywordGaps.length > 0 && (
-              <TierGate tier={effectiveTier} required="premium" feature="Competitor Keyword Gaps" teaser={`${strategyData.keywordGaps.length} keyword gaps found`}>
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Target className="w-4 h-4 text-orange-400" />
-                    <span className="text-xs font-medium text-zinc-300">Competitor Gaps ({strategyData.keywordGaps.length})</span>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                    {strategyData.keywordGaps.slice(0, 6).map((gap, i) => (
-                      <div key={i} className="flex items-center justify-between px-2 py-1.5 rounded bg-zinc-950/50 border border-zinc-800/50">
-                        <span className="text-[11px] text-zinc-400 truncate">{gap.keyword}</span>
-                        {gap.difficulty != null && (
-                          <span className={`text-[10px] ${gap.difficulty <= 30 ? 'text-green-400' : gap.difficulty <= 60 ? 'text-amber-400' : 'text-red-400'}`}>
+      {/* ── COMPETITOR KEYWORD GAPS (individual section) ── */}
+      {strategyData.keywordGaps && strategyData.keywordGaps.length > 0 && (
+        <TierGate tier={effectiveTier} required="premium" feature="Competitor Keyword Gaps" teaser={`${strategyData.keywordGaps.length} keyword gaps found — upgrade to Premium`}>
+          <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+            <button 
+              onClick={() => toggleSection('competitor-gaps')}
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-orange-500/20 flex items-center justify-center">
+                  <Target className="w-3.5 h-3.5 text-orange-400" />
+                </div>
+                <div className="text-left">
+                  <div className="text-sm font-medium text-zinc-200">Competitor Keyword Gaps</div>
+                  <div className="text-[11px] text-zinc-500">{strategyData.keywordGaps.length} keywords competitors rank for</div>
+                </div>
+              </div>
+              <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${expandedSections.has('competitor-gaps') ? '' : '-rotate-90'}`} />
+            </button>
+
+            {expandedSections.has('competitor-gaps') && (
+              <div className="px-4 pb-4">
+                <p className="text-[11px] text-zinc-500 mb-3">Keywords your competitors rank for that you don't — content gaps vs. your competition.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {strategyData.keywordGaps.slice(0, 6).map((gap, i) => (
+                    <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg bg-zinc-950/50 border border-zinc-800/50">
+                      <span className="text-[11px] text-zinc-300 font-medium truncate mr-2">{gap.keyword}</span>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {gap.volume != null && gap.volume > 0 && <span className="text-[11px] text-zinc-500">{gap.volume.toLocaleString()}</span>}
+                        {gap.difficulty != null && gap.difficulty > 0 && (
+                          <span className={`text-[11px] font-medium ${gap.difficulty <= 30 ? 'text-green-400' : gap.difficulty <= 60 ? 'text-amber-400' : 'text-red-400'}`}>
                             KD {gap.difficulty}
                           </span>
                         )}
                       </div>
-                    ))}
-                    {strategyData.keywordGaps.length > 6 && (
-                      <span className="text-[11px] text-zinc-500 px-2 py-1.5">+{strategyData.keywordGaps.length - 6} more</span>
-                    )}
-                  </div>
-                </div>
-              </TierGate>
-            )}
-
-            {/* Page Keyword Map */}
-            <TierGate tier={effectiveTier} required="growth" feature="Page Keyword Map" teaser={`${strategyData.pageMap.length} pages tracked`}>
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <Layers className="w-4 h-4 text-zinc-400" />
-                  <span className="text-xs font-medium text-zinc-300">Page Keyword Map ({strategyData.pageMap.length})</span>
-                </div>
-                <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                  {strategyData.pageMap.slice(0, 5).map(page => (
-                    <div key={page.pagePath} className="flex items-center justify-between px-2 py-1.5 rounded bg-zinc-950/50 border border-zinc-800/50">
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[11px] text-zinc-400 font-mono truncate">{page.pagePath}</div>
-                        <div className="text-[10px] text-teal-400/70">{page.primaryKeyword}</div>
-                      </div>
-                      {page.currentPosition && (
-                        <span className={`text-[11px] font-mono ${page.currentPosition <= 10 ? 'text-emerald-400' : 'text-amber-400'}`}>#{page.currentPosition.toFixed(0)}</span>
-                      )}
                     </div>
                   ))}
-                  {strategyData.pageMap.length > 5 && (
-                    <span className="text-[11px] text-zinc-500 px-2 py-1">+{strategyData.pageMap.length - 5} more pages</span>
-                  )}
                 </div>
               </div>
-            </TierGate>
+            )}
           </div>
-        )}
-      </div>
+        </TierGate>
+      )}
+
+      {/* ── PAGE KEYWORD MAP (individual section) ── */}
+      <TierGate tier={effectiveTier} required="growth" feature="Page Keyword Map" teaser={`${strategyData.pageMap.length} pages tracked`}>
+        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+          <button 
+            onClick={() => toggleSection('page-keyword-map')}
+            className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-zinc-700/50 flex items-center justify-center">
+                <Layers className="w-3.5 h-3.5 text-zinc-400" />
+              </div>
+              <div className="text-left">
+                <div className="text-sm font-medium text-zinc-300">Page Keyword Map</div>
+                <div className="text-[11px] text-zinc-500">{strategyData.pageMap.length} pages with keyword assignments</div>
+              </div>
+            </div>
+            <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${expandedSections.has('page-keyword-map') ? '' : '-rotate-90'}`} />
+          </button>
+
+          {expandedSections.has('page-keyword-map') && (
+            <div className="border-t border-zinc-800">
+              <div className="divide-y divide-zinc-800/50 max-h-[300px] overflow-y-auto">
+                {strategyData.pageMap.slice(0, 5).map(page => (
+                  <div key={page.pagePath} className="px-4 py-2.5 hover:bg-zinc-800/30 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[11px] text-zinc-400 font-mono truncate">{page.pagePath}</div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                        {page.currentPosition ? (
+                          <span className={`text-[11px] font-mono font-medium px-1.5 py-0.5 rounded bg-zinc-800 ${page.currentPosition <= 10 ? 'text-emerald-400' : 'text-amber-400'}`}>#{page.currentPosition.toFixed(0)}</span>
+                        ) : (
+                          <span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded font-mono">—</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[10px] text-teal-400/80">{page.primaryKeyword}</span>
+                      {page.secondaryKeywords && page.secondaryKeywords.length > 0 && (
+                        <span className="text-[10px] text-zinc-600">+{page.secondaryKeywords.length} more</span>
+                      )}
+                      {page.impressions != null && page.impressions > 0 && <span className="text-[10px] text-zinc-500">{page.impressions.toLocaleString()} imp</span>}
+                    </div>
+                  </div>
+                ))}
+                {strategyData.pageMap.length > 5 && (
+                  <span className="text-[11px] text-zinc-500 px-4 py-2">+{strategyData.pageMap.length - 5} more pages</span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </TierGate>
     </div>
   );
 }

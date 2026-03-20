@@ -44,6 +44,12 @@ export const approvals = {
   create: (wsId: string, body: Record<string, unknown>) =>
     post<unknown>(`/api/approvals/${wsId}`, body),
 
+  list: (wsId: string) =>
+    getSafe<unknown[]>(`/api/approvals/${wsId}`, []),
+
+  remove: (wsId: string, batchId: string) =>
+    del<{ ok: boolean }>(`/api/approvals/${wsId}/${batchId}`),
+
   publicList: (wsId: string) =>
     getSafe<unknown[]>(`/api/public/approvals/${wsId}`, []),
 

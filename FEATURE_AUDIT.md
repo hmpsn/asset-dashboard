@@ -106,7 +106,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 10. Approval Workflow
-**What it does:** Agency proposes SEO changes (titles, descriptions, schemas) as batches. Client reviews, approves/rejects, edits, and the approved changes push directly to Webflow via API. Schema approvals show JSON-LD previews with @graph type badges. Supports both metadata and structured data changes in a single workflow.
+**What it does:** Agency proposes SEO changes (titles, descriptions, schemas) as batches. Client reviews, approves/rejects, edits, and the approved changes push directly to Webflow via API. Schema approvals show JSON-LD previews with @graph type badges. Supports both metadata and structured data changes in a single workflow. **Retract capability**: every tool that sends approval batches (SEO Editor, Schema Generator, CMS Editor) now shows a "Sent to Client" panel listing pending batches with a "Retract" button — removes the batch from the client's view instantly. Inline confirmation prevents accidental deletes. Expandable item details show per-item status. Auto-refreshes after new batches are sent.
 
 **Agency value:** No more email chains asking "is this title OK?" — structured workflow with clear status tracking. Schema changes go through the same flow.
 

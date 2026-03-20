@@ -6,6 +6,7 @@ import {
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { StatusBadge } from './ui/StatusBadge';
 import { get, patch, post, getSafe } from '../api/client';
+import { PendingApprovals } from './PendingApprovals';
 
 interface SeoField {
   id: string;
@@ -77,6 +78,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
   const [approvalSelected, setApprovalSelected] = useState<Set<string>>(new Set());
   const [sendingApproval, setSendingApproval] = useState(false);
   const [approvalSent, setApprovalSent] = useState(false);
+  const [approvalRefreshKey, setApprovalRefreshKey] = useState(0);
   const [variations, setVariations] = useState<Record<string, { fieldSlug: string; options: string[] }>>({});
   const [approvalBatches, setApprovalBatches] = useState<ApprovalBatch[]>([]);
   const [historyExpanded, setHistoryExpanded] = useState<Set<string>>(new Set());
@@ -275,6 +277,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
       setApprovalSent(true);
       refreshStates();
       setApprovalSelected(new Set());
+      setApprovalRefreshKey(k => k + 1);
       setTimeout(() => setApprovalSent(false), 4000);
     } catch (err) {
       console.error('Failed to send for approval:', err);
@@ -356,6 +359,15 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
           )}
         </div>
       </div>
+
+      {/* Pending CMS approval batches sent to client */}
+      {workspaceId && (
+        <PendingApprovals
+          workspaceId={workspaceId}
+          nameFilter="CMS"
+          refreshKey={approvalRefreshKey}
+        />
+      )}
 
       {/* Edit status summary bar */}
       {summary.total > 0 && (

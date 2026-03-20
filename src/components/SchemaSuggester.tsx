@@ -16,6 +16,7 @@ import { SchemaPageCard } from './schema/SchemaPageCard';
 import { BulkPublishPanel } from './schema/BulkPublishPanel';
 import { PagePicker } from './schema/PagePicker';
 import { SchemaPlanPanel } from './schema/SchemaPlanPanel';
+import { PendingApprovals } from './PendingApprovals';
 import { SchemaWorkflowGuide } from './schema/SchemaWorkflowGuide';
 import { SCHEMA_ROLE_INDEX } from '../../shared/types/schema-plan';
 
@@ -78,6 +79,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
   const [confirmPublish, setConfirmPublish] = useState<string | null>(null);
   const [sendingToClient, setSendingToClient] = useState(false);
   const [sentToClient, setSentToClient] = useState(false);
+  const [approvalRefreshKey, setApprovalRefreshKey] = useState(0);
   const [sendingPage, setSendingPage] = useState<Set<string>>(new Set());
   const [sentPages, setSentPages] = useState<Set<string>>(new Set());
   const [progressMsg, setProgressMsg] = useState<string | null>(null);
@@ -211,6 +213,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
       await post(`/api/approvals/${workspaceId}`, { siteId, name: 'Schema Review', items });
       setSentToClient(true);
       refreshStates();
+      setApprovalRefreshKey(k => k + 1);
     } catch { /* skip */ }
     setSendingToClient(false);
   };
@@ -391,6 +394,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
       if (token) headers['x-auth-token'] = token;
       await post(`/api/approvals/${workspaceId}`, { siteId, name: `Schema: ${page.pageTitle}`, items });
       setSentPages(prev => new Set(prev).add(page.pageId));
+      setApprovalRefreshKey(k => k + 1);
     } catch { /* skip */ }
     setSendingPage(prev => {
       const next = new Set(prev);
@@ -805,6 +809,15 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
           <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400" />
           <span className="text-xs text-teal-300">Generating schema for page...</span>
         </div>
+      )}
+
+      {/* Pending schema approval batches sent to client */}
+      {workspaceId && (
+        <PendingApprovals
+          workspaceId={workspaceId}
+          nameFilter="Schema"
+          refreshKey={approvalRefreshKey}
+        />
       )}
 
       {/* Summary cards */}

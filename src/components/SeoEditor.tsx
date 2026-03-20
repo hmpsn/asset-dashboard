@@ -11,6 +11,7 @@ import { StatusBadge } from './ui/StatusBadge';
 import { PageEditRow } from './editor/PageEditRow';
 import { BulkOperations } from './editor/BulkOperations';
 import { ApprovalPanel } from './editor/ApprovalPanel';
+import { PendingApprovals } from './PendingApprovals';
 
 interface PageMeta {
   id: string;
@@ -50,6 +51,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const [approvalSelected, setApprovalSelected] = useState<Set<string>>(new Set());
   const [sendingApproval, setSendingApproval] = useState(false);
   const [approvalSent, setApprovalSent] = useState(false);
+  const [approvalRefreshKey, setApprovalRefreshKey] = useState(0);
   const [sendingPage, setSendingPage] = useState<Set<string>>(new Set());
   const [sentPage, setSentPage] = useState<Set<string>>(new Set());
   const [variations, setVariations] = useState<Record<string, { field: string; options: string[] }>>({});
@@ -382,6 +384,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       // Refresh page edit states to reflect the new 'in-review' status
       refreshStates();
       setApprovalSelected(new Set());
+      setApprovalRefreshKey(k => k + 1);
       setTimeout(() => setApprovalSent(false), 4000);
     } catch (err) {
       console.error('Failed to send for approval:', err);
@@ -478,6 +481,15 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         <div className="flex items-center gap-2 px-4 py-3 bg-green-500/10 border border-green-500/30 rounded-lg text-sm text-green-300">
           <Check className="w-4 h-4" /> {bulkResults}
         </div>
+      )}
+
+      {/* Pending approval batches sent to client */}
+      {workspaceId && (
+        <PendingApprovals
+          workspaceId={workspaceId}
+          nameFilter="SEO"
+          refreshKey={approvalRefreshKey}
+        />
       )}
 
       {/* Edit status summary bar */}

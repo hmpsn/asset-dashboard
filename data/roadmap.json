@@ -313,131 +313,6 @@
       ]
     },
     {
-      "id": "sprint-arch-schema",
-      "name": "Architecture → Schema Integration",
-      "hours": "38h",
-      "rationale": "Bridge site architecture tree with schema generation. Deterministic breadcrumbs, unified schema plan, coverage dashboard, priority queue, competitive intelligence, and full pipeline automation.",
-      "items": [
-        {
-          "id": 500,
-          "title": "[C1] Deterministic BreadcrumbList from architecture tree",
-          "source": "ARCHITECTURE_SCHEMA_PLAN",
-          "est": "2h",
-          "priority": "P1",
-          "notes": "Shipped — getAncestorChain() + flattenTree() + getCachedArchitecture() in site-architecture.ts. SchemaContext._architectureTree extension. Architecture loaded in routes (webflow-schema + jobs). injectCrossReferences() builds full breadcrumb chain from tree with URL-segment fallback. Feature #169.",
-          "status": "done"
-        },
-        {
-          "id": 501,
-          "title": "[C2] Unify schema plan with architecture tree input",
-          "source": "ARCHITECTURE_SCHEMA_PLAN",
-          "est": "3h",
-          "priority": "P1",
-          "notes": "Shipped — PlanContext.architectureResult + flattenTree()-based page list with pageType/depth enrichment. Route loads cached architecture. Falls back to direct API+sitemap when tree unavailable. Feature #170.",
-          "status": "done"
-        },
-        {
-          "id": 502,
-          "title": "[D1] Page type → schema type mapping + prompt injection",
-          "source": "DEVIN_SCHEMA_SPECS",
-          "est": "3h",
-          "priority": "P1",
-          "notes": "Shipped — PAGE_TYPE_SCHEMA_MAP constant mapping all 16 page types to primary/secondary Schema.org types. SCHEMA TYPE GUIDANCE block injected into AI prompt when pageType is set (not 'auto'). Exported for D2/D3 consumption. Feature #143.",
-          "status": "done"
-        },
-        {
-          "id": 503,
-          "title": "[C3] Schema coverage dashboard in SiteArchitecture UI",
-          "source": "ARCHITECTURE_SCHEMA_PLAN",
-          "est": "4h",
-          "priority": "P2",
-          "notes": "Shipped — GET /api/site-architecture/:wsId/schema-coverage endpoint, coverage stat card with %, per-node tree badges (checkmark/X), Missing Schema sidebar panel. Feature #172.",
-          "status": "done"
-        },
-        {
-          "id": 504,
-          "title": "[D2] Template → schema template binding",
-          "source": "DEVIN_SCHEMA_SPECS",
-          "est": "3h",
-          "priority": "P2",
-          "notes": "Shipped — schemaTypes on ContentTemplate auto-populated from PAGE_TYPE_SCHEMA_MAP, expectedSchemaTypes inherited by MatrixCell on generation, purple badges in CellDetailPanel. Feature #144.",
-          "status": "done"
-        },
-        {
-          "id": 505,
-          "title": "[D3] Hub page → CollectionPage/ItemList auto-suggest",
-          "source": "DEVIN_SCHEMA_SPECS",
-          "est": "2h",
-          "priority": "P2",
-          "notes": "Shipped — getChildNodes() helper + CollectionPage injection in injectCrossReferences() for pages with 2+ existing children. Feature #144.",
-          "status": "done"
-        },
-        {
-          "id": 506,
-          "title": "[C4] Internal link health → schema priority queue",
-          "source": "ARCHITECTURE_SCHEMA_PLAN",
-          "est": "2h",
-          "priority": "P2",
-          "notes": "Shipped — schema coverage endpoint enriched with PageLinkHealth data. Priority scoring: critical (orphan+no schema) → high (< 3 inbound) → medium → low (has schema, poor links). Frontend priority queue panel with badges + orphan tags. Feature #173.",
-          "status": "done"
-        },
-        {
-          "id": 507,
-          "title": "[C5] SiteNavigationElement auto-gen for homepage",
-          "source": "ARCHITECTURE_SCHEMA_PLAN",
-          "est": "1h",
-          "priority": "P2",
-          "notes": "Shipped — injectCrossReferences() auto-injects SiteNavigationElement for homepage from depth-1 tree children (existing + hasContent, capped at 10). Feature #171.",
-          "status": "done"
-        },
-        {
-          "id": 508,
-          "title": "[D5] Sibling/parent-child relationship enrichment",
-          "source": "DEVIN_SCHEMA_SPECS",
-          "est": "3h",
-          "priority": "P2",
-          "notes": "Shipped — getParentNode(), getSiblingNodes(), getChildNodes() helpers. isPartOf→parent page, relatedLink→siblings (max 5), hasPart→children injected into WebPage nodes. Feature #144.",
-          "status": "done"
-        },
-        {
-          "id": 509,
-          "title": "[D4] Competitor schema intelligence",
-          "source": "DEVIN_SCHEMA_SPECS",
-          "est": "4h",
-          "priority": "P3",
-          "notes": "Shipped — crawlCompetitorSchemas() + compareSchemas() with 24h file cache, rate-limited fetcher (2 concurrent, 500ms delay, 10s timeout). GET /api/competitor-schema/:workspaceId. Feature #147.",
-          "status": "done"
-        },
-        {
-          "id": 510,
-          "title": "[C6] Schema impact tracking via GSC before/after",
-          "source": "ARCHITECTURE_SCHEMA_PLAN",
-          "est": "4h",
-          "priority": "P3",
-          "notes": "Shipped — sourceFilter on getSeoChangeImpact(), getSchemaImpactSummary() with aggregate deltas, /api/schema-impact endpoint, collapsible impact panel in SchemaSuggester with per-deployment GSC before/after. Feature #174.",
-          "status": "done"
-        },
-        {
-          "id": 511,
-          "title": "[D6] Brief E-E-A-T → author/publisher schema enrichment",
-          "source": "DEVIN_SCHEMA_SPECS",
-          "est": "3h",
-          "priority": "P3",
-          "notes": "Shipped — extractEeatFromBrief() extracts author name, credentials, expertise topics from brief eeatGuidance. Injected into AI prompt + post-processing populates Person author on Article/BlogPosting. Feature #148.",
-          "status": "done"
-        },
-        {
-          "id": 512,
-          "title": "[D7] Planned page schema pre-generation",
-          "source": "DEVIN_SCHEMA_SPECS",
-          "est": "4h",
-          "priority": "P3",
-          "notes": "Shipped — generateSchemaSkeleton() builds deterministic JSON-LD from cell + template. pending_schemas SQLite table with pending/applied/stale lifecycle. Triggered async from updateMatrixCell() on brief_generated/approved. GET /api/pending-schemas/:workspaceId endpoint. Feature #149.",
-          "status": "done"
-        }
-      ]
-    },
-    {
       "id": "sprint-ui-ux-audit",
       "name": "UI/UX Audit Implementation",
       "hours": "45-60",
@@ -614,6 +489,73 @@
           "est": "2-3h",
           "priority": "P2",
           "notes": "Standardize loading patterns: route-level (keep ChunkFallback), data fetching (skeleton screens), actions (button loading + optimistic UI), background jobs (progress panel).",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "sprint-client-ui-refresh",
+      "name": "Client Dashboard UI/UX Refresh",
+      "hours": "8-12",
+      "rationale": "Address information overload in client portal. Progressive disclosure, unified visual hierarchy, and strategic prioritization to reduce cognitive load and improve actionability.",
+      "items": [
+        {
+          "id": 320,
+          "title": "StrategyTab redesign — accordion sections, health score, reduced gradients",
+          "source": "UI_UX_AUDIT Mar 2026",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — Added Strategy Health Score (0-100) at top with 3 sub-scores (Content Gaps 40%, Quick Wins 30%, Coverage 30%). Converted all sections to accordions with only Content Opportunities expanded by default. Removed competing gradient backgrounds — all sections now use consistent bg-zinc-900/border-zinc-800.",
+          "status": "done",
+          "shippedAt": "2026-03-19"
+        },
+        {
+          "id": 320.5,
+          "title": "StrategyTab refinements — View all buttons, keyword visibility, helper text",
+          "source": "UI_UX_AUDIT Mar 2026",
+          "est": "30m",
+          "priority": "P1",
+          "notes": "Shipped — Fixed 'View all' buttons to use expandedCounts state and actually expand lists. Added primary keyword display to Growth Opportunities cards. Added clarifying helper text under Keyword Opportunities ('Additional keywords your existing pages could target') and Competitor Gaps ('Keywords your competitors rank for that you don't'). Page Keyword Map now shows '+X more' indicator for secondary keywords.",
+          "status": "done",
+          "shippedAt": "2026-03-19"
+        },
+        {
+          "id": 320.6,
+          "title": "StrategyTab v2 — Card-based command center",
+          "source": "UI_UX_AUDIT Mar 2026",
+          "est": "2h",
+          "priority": "P1",
+          "notes": "Shipped — Complete redesign from accordion-based to card-based command center. 1) Top Summary Bar: 3 action cards (Content Gaps | Quick Wins | Growth Opportunities) with counts and CTAs that jump to sections. 2) Content Opportunities: Removed rationale truncation (show full text), show first 4 in 2-col grid with 'View all' toggle for even columns. 3) Growth Opportunities: Transformed from list to 3-up card grid with smart CTAs based on difficulty/impressions (Optimize to Rank/Build Authority/Expand Content/Quick Win). 4) Consolidated Reference Data: Quick Wins, Keyword Opportunities, Target Keywords, Competitor Gaps, Page Map now in single collapsed 'Reference Data' section. Reduced click fatigue, clearer actions, better scanability.",
+          "status": "done",
+          "shippedAt": "2026-03-19"
+        },
+        {
+          "id": 321,
+          "title": "HealthTab redesign — Card-based command center",
+          "source": "UI_UX_AUDIT Mar 2026",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped v2 — Complete card-based redesign: 1) Health Score summary at top with 1-sentence status, 2) Page Speed card fully expanded (CWV mobile/desktop side-by-side), 3) Two-column layout: 'Fix These First' list (top 5 prioritized issues) | Page Cards (top 3 worst pages with click-to-expand), 4) Site-Wide Issues as compact conditional banner, 5) History & Details in single collapsed accordion. Removed FixRecommendations and OrderStatus from this tab. Removed all nested accordions. Clients can now scan→decide→act without clicking through sections.",
+          "status": "done",
+          "shippedAt": "2026-03-19"
+        },
+        {
+          "id": 321,
+          "title": "HealthTab redesign — Card-based command center",
+          "source": "UI_UX_AUDIT Mar 2026",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped v2 — Complete card-based redesign: 1) Health Score summary at top with 1-sentence status, 2) Page Speed card fully expanded (CWV mobile/desktop side-by-side), 3) Two-column layout: 'Fix These First' list (top 5 prioritized issues) | Page Cards (top 3 worst pages with click-to-expand), 4) Site-Wide Issues as compact conditional banner, 5) History & Details in single collapsed accordion. Removed FixRecommendations and OrderStatus from this tab. Removed all nested accordions. Clients can now scan→decide→act without clicking through sections.",
+          "status": "done",
+          "shippedAt": "2026-03-19"
+        },
+        {
+          "id": 323,
+          "title": "SearchTab redesign — insight-first, tables secondary",
+          "source": "UI_UX_AUDIT Mar 2026",
+          "est": "2h",
+          "priority": "P2",
+          "notes": "Lead with 'What's working' insight cards (top movers, quick wins). Data tables move to collapsible 'Detailed Breakdown' section. Annotations become timeline view not separate tab. CTR opportunities prioritized above raw query lists. Default view shows 10 rows with 'Show more' not infinite scroll.",
           "status": "pending"
         }
       ]
@@ -969,6 +911,132 @@
           "status": "pending"
         }
       ]
+    },
+    {
+      "id": "sprint-arch-schema",
+      "name": "✅ SHIPPED — Architecture → Schema Integration",
+      "hours": "38h",
+      "rationale": "Bridge site architecture tree with schema generation. Deterministic breadcrumbs, unified schema plan, coverage dashboard, priority queue, competitive intelligence, and full pipeline automation.",
+      "items": [
+        {
+          "id": 500,
+          "title": "[C1] Deterministic BreadcrumbList from architecture tree",
+          "source": "ARCHITECTURE_SCHEMA_PLAN",
+          "est": "2h",
+          "priority": "P1",
+          "notes": "Shipped — getAncestorChain() + flattenTree() + getCachedArchitecture() in site-architecture.ts. SchemaContext._architectureTree extension. Architecture loaded in routes (webflow-schema + jobs). injectCrossReferences() builds full breadcrumb chain from tree with URL-segment fallback. Feature #169.",
+          "status": "done"
+        },
+        {
+          "id": 501,
+          "title": "[C2] Unify schema plan with architecture tree input",
+          "source": "ARCHITECTURE_SCHEMA_PLAN",
+          "est": "3h",
+          "priority": "P1",
+          "notes": "Shipped — PlanContext.architectureResult + flattenTree()-based page list with pageType/depth enrichment. Route loads cached architecture. Falls back to direct API+sitemap when tree unavailable. Feature #170.",
+          "status": "done"
+        },
+        {
+          "id": 502,
+          "title": "[D1] Page type → schema type mapping + prompt injection",
+          "source": "DEVIN_SCHEMA_SPECS",
+          "est": "3h",
+          "priority": "P1",
+          "notes": "Shipped — PAGE_TYPE_SCHEMA_MAP constant mapping all 16 page types to primary/secondary Schema.org types. SCHEMA TYPE GUIDANCE block injected into AI prompt when pageType is set (not 'auto'). Exported for D2/D3 consumption. Feature #143.",
+          "status": "done"
+        },
+        {
+          "id": 503,
+          "title": "[C3] Schema coverage dashboard in SiteArchitecture UI",
+          "source": "ARCHITECTURE_SCHEMA_PLAN",
+          "est": "4h",
+          "priority": "P2",
+          "notes": "Shipped — GET /api/site-architecture/:wsId/schema-coverage endpoint, coverage stat card with %, per-node tree badges (checkmark/X), Missing Schema sidebar panel. Feature #172.",
+          "status": "done"
+        },
+        {
+          "id": 504,
+          "title": "[D2] Template → schema template binding",
+          "source": "DEVIN_SCHEMA_SPECS",
+          "est": "3h",
+          "priority": "P2",
+          "notes": "Shipped — schemaTypes on ContentTemplate auto-populated from PAGE_TYPE_SCHEMA_MAP, expectedSchemaTypes inherited by MatrixCell on generation, purple badges in CellDetailPanel. Feature #144.",
+          "status": "done"
+        },
+        {
+          "id": 505,
+          "title": "[D3] Hub page → CollectionPage/ItemList auto-suggest",
+          "source": "DEVIN_SCHEMA_SPECS",
+          "est": "2h",
+          "priority": "P2",
+          "notes": "Shipped — getChildNodes() helper + CollectionPage injection in injectCrossReferences() for pages with 2+ existing children. Feature #144.",
+          "status": "done"
+        },
+        {
+          "id": 506,
+          "title": "[C4] Internal link health → schema priority queue",
+          "source": "ARCHITECTURE_SCHEMA_PLAN",
+          "est": "2h",
+          "priority": "P2",
+          "notes": "Shipped — schema coverage endpoint enriched with PageLinkHealth data. Priority scoring: critical (orphan+no schema) → high (< 3 inbound) → medium → low (has schema, poor links). Frontend priority queue panel with badges + orphan tags. Feature #173.",
+          "status": "done"
+        },
+        {
+          "id": 507,
+          "title": "[C5] SiteNavigationElement auto-gen for homepage",
+          "source": "ARCHITECTURE_SCHEMA_PLAN",
+          "est": "1h",
+          "priority": "P2",
+          "notes": "Shipped — injectCrossReferences() auto-injects SiteNavigationElement for homepage from depth-1 tree children (existing + hasContent, capped at 10). Feature #171.",
+          "status": "done"
+        },
+        {
+          "id": 508,
+          "title": "[D5] Sibling/parent-child relationship enrichment",
+          "source": "DEVIN_SCHEMA_SPECS",
+          "est": "3h",
+          "priority": "P2",
+          "notes": "Shipped — getParentNode(), getSiblingNodes(), getChildNodes() helpers. isPartOf→parent page, relatedLink→siblings (max 5), hasPart→children injected into WebPage nodes. Feature #144.",
+          "status": "done"
+        },
+        {
+          "id": 509,
+          "title": "[D4] Competitor schema intelligence",
+          "source": "DEVIN_SCHEMA_SPECS",
+          "est": "4h",
+          "priority": "P3",
+          "notes": "Shipped — crawlCompetitorSchemas() + compareSchemas() with 24h file cache, rate-limited fetcher (2 concurrent, 500ms delay, 10s timeout). GET /api/competitor-schema/:workspaceId. Feature #147.",
+          "status": "done"
+        },
+        {
+          "id": 510,
+          "title": "[C6] Schema impact tracking via GSC before/after",
+          "source": "ARCHITECTURE_SCHEMA_PLAN",
+          "est": "4h",
+          "priority": "P3",
+          "notes": "Shipped — sourceFilter on getSeoChangeImpact(), getSchemaImpactSummary() with aggregate deltas, /api/schema-impact endpoint, collapsible impact panel in SchemaSuggester with per-deployment GSC before/after. Feature #174.",
+          "status": "done"
+        },
+        {
+          "id": 511,
+          "title": "[D6] Brief E-E-A-T → author/publisher schema enrichment",
+          "source": "DEVIN_SCHEMA_SPECS",
+          "est": "3h",
+          "priority": "P3",
+          "notes": "Shipped — extractEeatFromBrief() extracts author name, credentials, expertise topics from brief eeatGuidance. Injected into AI prompt + post-processing populates Person author on Article/BlogPosting. Feature #148.",
+          "status": "done"
+        },
+        {
+          "id": 512,
+          "title": "[D7] Planned page schema pre-generation",
+          "source": "DEVIN_SCHEMA_SPECS",
+          "est": "4h",
+          "priority": "P3",
+          "notes": "Shipped — generateSchemaSkeleton() builds deterministic JSON-LD from cell + template. pending_schemas SQLite table with pending/applied/stale lifecycle. Triggered async from updateMatrixCell() on brief_generated/approved. GET /api/pending-schemas/:workspaceId endpoint. Feature #149.",
+          "status": "done"
+        }
+      ],
+      "shippedAt": "2026-03-20"
     },
     {
       "id": "sprint-seo-intel",
@@ -2728,73 +2796,16 @@
           "notes": "Shipped — CWV data now surfaces across 10 platform surfaces: (1) Client HealthTab card with mobile/desktop pass/fail and plain-language metrics, (2) Client AI chatbot context — cwvSummary added to siteHealthDetail so chatbot answers speed questions, server prompt updated with CWV data inventory line, (3) Monthly report emails — new Page Speed section with Mobile/Desktop speed badges and Lighthouse scores between score ring and traffic stats, (4) InsightsDigest — proactive 'Page speed: Passed/Needs Work' insight card on client Overview tab. Also: admin SeoAudit card, admin AI chat, audit report exports (CSV+HTML), AI recommendations engine, applySuppressionsToAudit pass-through fix.",
           "status": "done",
           "shippedAt": "2026-03-19"
-        }
-      ]
-    },
-    {
-      "id": "sprint-client-ui-refresh",
-      "name": "Client Dashboard UI/UX Refresh",
-      "hours": "8-12",
-      "rationale": "Address information overload in client portal. Progressive disclosure, unified visual hierarchy, and strategic prioritization to reduce cognitive load and improve actionability.",
-      "items": [
-        {
-          "id": 320,
-          "title": "StrategyTab redesign — accordion sections, health score, reduced gradients",
-          "source": "UI_UX_AUDIT Mar 2026",
-          "est": "2-3h",
-          "priority": "P1",
-          "notes": "Shipped — Added Strategy Health Score (0-100) at top with 3 sub-scores (Content Gaps 40%, Quick Wins 30%, Coverage 30%). Converted all sections to accordions with only Content Opportunities expanded by default. Removed competing gradient backgrounds — all sections now use consistent bg-zinc-900/border-zinc-800.",
-          "status": "done",
-          "shippedAt": "2026-03-19"
         },
         {
-          "id": 320.5,
-          "title": "StrategyTab refinements — View all buttons, keyword visibility, helper text",
-          "source": "UI_UX_AUDIT Mar 2026",
-          "est": "30m",
+          "id": 313,
+          "title": "Approval batch retract — pull back sent approvals from client view",
+          "source": "USER REQUEST",
+          "est": "45m",
           "priority": "P1",
-          "notes": "Shipped — Fixed 'View all' buttons to use expandedCounts state and actually expand lists. Added primary keyword display to Growth Opportunities cards. Added clarifying helper text under Keyword Opportunities ('Additional keywords your existing pages could target') and Competitor Gaps ('Keywords your competitors rank for that you don't'). Page Keyword Map now shows '+X more' indicator for secondary keywords.",
+          "notes": "Shipped — New PendingApprovals component shows all pending/partial approval batches with Retract button. Inline confirmation dialog prevents accidental deletes. Expandable item details show per-item approval status. Wired into SeoEditor (nameFilter='SEO'), SchemaSuggester (nameFilter='Schema'), CmsEditor (nameFilter='CMS'). Each tool auto-refreshes the panel after sending new batches. API client method approvals.remove() calls existing DELETE /api/approvals/:workspaceId/:batchId endpoint that had no frontend wiring before. Also added approvals.list() admin endpoint wrapper.",
           "status": "done",
-          "shippedAt": "2026-03-19"
-        },
-        {
-          "id": 320.6,
-          "title": "StrategyTab v2 — Card-based command center",
-          "source": "UI_UX_AUDIT Mar 2026",
-          "est": "2h",
-          "priority": "P1",
-          "notes": "Shipped — Complete redesign from accordion-based to card-based command center. 1) Top Summary Bar: 3 action cards (Content Gaps | Quick Wins | Growth Opportunities) with counts and CTAs that jump to sections. 2) Content Opportunities: Removed rationale truncation (show full text), show first 4 in 2-col grid with 'View all' toggle for even columns. 3) Growth Opportunities: Transformed from list to 3-up card grid with smart CTAs based on difficulty/impressions (Optimize to Rank/Build Authority/Expand Content/Quick Win). 4) Consolidated Reference Data: Quick Wins, Keyword Opportunities, Target Keywords, Competitor Gaps, Page Map now in single collapsed 'Reference Data' section. Reduced click fatigue, clearer actions, better scanability.",
-          "status": "done",
-          "shippedAt": "2026-03-19"
-        },
-        {
-          "id": 321,
-          "title": "HealthTab redesign — Card-based command center",
-          "source": "UI_UX_AUDIT Mar 2026",
-          "est": "2-3h",
-          "priority": "P1",
-          "notes": "Shipped v2 — Complete card-based redesign: 1) Health Score summary at top with 1-sentence status, 2) Page Speed card fully expanded (CWV mobile/desktop side-by-side), 3) Two-column layout: 'Fix These First' list (top 5 prioritized issues) | Page Cards (top 3 worst pages with click-to-expand), 4) Site-Wide Issues as compact conditional banner, 5) History & Details in single collapsed accordion. Removed FixRecommendations and OrderStatus from this tab. Removed all nested accordions. Clients can now scan→decide→act without clicking through sections.",
-          "status": "done",
-          "shippedAt": "2026-03-19"
-        },
-        {
-          "id": 321,
-          "title": "HealthTab redesign — Card-based command center",
-          "source": "UI_UX_AUDIT Mar 2026",
-          "est": "2-3h",
-          "priority": "P1",
-          "notes": "Shipped v2 — Complete card-based redesign: 1) Health Score summary at top with 1-sentence status, 2) Page Speed card fully expanded (CWV mobile/desktop side-by-side), 3) Two-column layout: 'Fix These First' list (top 5 prioritized issues) | Page Cards (top 3 worst pages with click-to-expand), 4) Site-Wide Issues as compact conditional banner, 5) History & Details in single collapsed accordion. Removed FixRecommendations and OrderStatus from this tab. Removed all nested accordions. Clients can now scan→decide→act without clicking through sections.",
-          "status": "done",
-          "shippedAt": "2026-03-19"
-        },
-        {
-          "id": 323,
-          "title": "SearchTab redesign — insight-first, tables secondary",
-          "source": "UI_UX_AUDIT Mar 2026",
-          "est": "2h",
-          "priority": "P2",
-          "notes": "Lead with 'What's working' insight cards (top movers, quick wins). Data tables move to collapsible 'Detailed Breakdown' section. Annotations become timeline view not separate tab. CTR opportunities prioritized above raw query lists. Default view shows 10 rows with 'Show more' not infinite scroll.",
-          "status": "pending"
+          "shippedAt": "2026-03-20"
         }
       ]
     }
