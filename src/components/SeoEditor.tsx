@@ -504,22 +504,35 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
           {summary.approved > 0 && <span className="text-green-400">{summary.approved}</span>}
           {summary.rejected > 0 && <StatusBadge status="rejected" />}
           {summary.rejected > 0 && <span className="text-red-400">{summary.rejected}</span>}
-          {summary.rejected > 0 && workspaceId && (
-            <button
-              onClick={async () => {
-                await post(`/api/workspaces/${workspaceId}/page-states/clear`, { status: 'rejected' });
-                refreshStates();
-              }}
-              className="text-[10px] text-red-400/70 hover:text-red-300 underline underline-offset-2 transition-colors"
-            >
-              clear
-            </button>
-          )}
           {summary.issueDetected > 0 && <StatusBadge status="issue-detected" />}
           {summary.issueDetected > 0 && <span className="text-amber-400">{summary.issueDetected}</span>}
           {summary.fixProposed > 0 && <StatusBadge status="fix-proposed" />}
           {summary.fixProposed > 0 && <span className="text-blue-400">{summary.fixProposed}</span>}
+          {workspaceId && (
+            <button
+              onClick={async () => {
+                await post(`/api/workspaces/${workspaceId}/page-states/clear`, { status: 'all' });
+                refreshStates();
+              }}
+              className="ml-auto text-[10px] text-zinc-500 hover:text-red-400 underline underline-offset-2 transition-colors"
+            >
+              reset all
+            </button>
+          )}
         </div>
+      )}
+
+      {/* Always-visible reset — clears all page edit states + stale approval data */}
+      {workspaceId && summary.total === 0 && (
+        <button
+          onClick={async () => {
+            await post(`/api/workspaces/${workspaceId}/page-states/clear`, { status: 'all' });
+            refreshStates();
+          }}
+          className="text-[10px] text-zinc-500 hover:text-red-400 underline underline-offset-2 transition-colors"
+        >
+          Reset page tracking
+        </button>
       )}
 
       {/* Search */}
@@ -569,6 +582,12 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
             onUpdateField={updateField} onSave={savePage} onAiRewrite={aiRewrite}
             onSelectVariation={(pageId, field, value) => updateField(pageId, field, value)}
             onClearVariations={(pageId) => setVariations(prev => { const n = { ...prev }; delete n[pageId]; return n; })}
+            onClearTracking={workspaceId ? async (pageId) => {
+              try {
+                const res = await fetch(`/api/workspaces/${workspaceId}/page-states/${pageId}`, { method: 'DELETE' });
+                if (res.ok) refreshStates();
+              } catch { /* silent */ }
+            } : undefined}
           />
         ))}
       </div>

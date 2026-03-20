@@ -4,7 +4,7 @@
  */
 import {
   Loader2, Save, Sparkles, ChevronDown, ChevronRight,
-  Check, AlertTriangle, CheckSquare, Square, Send,
+  Check, AlertTriangle, CheckSquare, Square, Send, X,
 } from 'lucide-react';
 import { StatusBadge } from '../ui/StatusBadge';
 import { statusBorderClass } from '../ui/statusConfig';
@@ -60,6 +60,7 @@ export interface PageEditRowProps {
   onAiRewrite: (pageId: string, field: 'title' | 'description') => void;
   onSelectVariation: (pageId: string, field: 'seoTitle' | 'seoDescription', value: string) => void;
   onClearVariations: (pageId: string) => void;
+  onClearTracking?: (pageId: string) => void;
 }
 
 export function PageEditRow({
@@ -67,7 +68,7 @@ export function PageEditRow({
   pageRecs, pageState, variations, showApprovalCheckbox,
   isSendingToClient, isSentToClient, hasChanges, onSendToClient,
   onToggleExpand, onToggleApprovalSelect, onUpdateField, onSave,
-  onAiRewrite, onSelectVariation, onClearVariations,
+  onAiRewrite, onSelectVariation, onClearVariations, onClearTracking,
 }: PageEditRowProps) {
   const hasSeoTitle = !!(page.seo?.title);
   const hasSeoDesc = !!(page.seo?.description);
@@ -97,6 +98,15 @@ export function PageEditRow({
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge status={pageState?.status} />
+          {pageState?.status && onClearTracking && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onClearTracking(page.id); }}
+              className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+              title="Clear page tracking status"
+            >
+              <X className="w-3 h-3" /> clear
+            </button>
+          )}
           {hasRecFlag && <span className="flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400"><AlertTriangle className="w-3 h-3" />{metaRecs.length} rec{metaRecs.length > 1 ? 's' : ''}</span>}
           {!hasSeoTitle && <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">No title</span>}
           {!hasSeoDesc && <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400">No desc</span>}

@@ -29,13 +29,13 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
   const load = useCallback(async () => {
     try {
       const all = await approvals.list(workspaceId) as ApprovalBatch[];
-      let pending = all.filter(b => b.status === 'pending' || b.status === 'partial');
+      let filtered = all;
       if (nameFilter) {
         const lower = nameFilter.toLowerCase();
-        pending = pending.filter(b => b.name.toLowerCase().includes(lower));
+        filtered = filtered.filter(b => b.name.toLowerCase().includes(lower));
       }
-      pending.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      setBatches(pending);
+      filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setBatches(filtered);
     } catch (err) { console.error('[PendingApprovals] load error:', err); }
     finally { setLoading(false); }
   }, [workspaceId, nameFilter]);
@@ -62,6 +62,8 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
   };
 
   const statusBadge = (status: string) => {
+    if (status === 'applied') return <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/15 text-green-400 border border-green-500/20 font-medium">Applied</span>;
+    if (status === 'approved') return <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 font-medium">Approved</span>;
     if (status === 'partial') return <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20 font-medium">Partially Reviewed</span>;
     return <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/15 text-teal-400 border border-teal-500/20 font-medium">Awaiting Review</span>;
   };
@@ -83,6 +85,7 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
           const isConfirming = confirmId === batch.id;
           const pendingCount = batch.items.filter(i => i.status === 'pending').length;
           const approvedCount = batch.items.filter(i => i.status === 'approved').length;
+          const rejectedCount = batch.items.filter(i => i.status === 'rejected').length;
           return (
             <div key={batch.id}>
               <div className="flex items-center gap-2 px-3 py-2">
@@ -100,6 +103,7 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
                     {new Date(batch.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     {' · '}{batch.items.length} item{batch.items.length !== 1 ? 's' : ''}
                     {approvedCount > 0 && <span className="text-emerald-400"> · {approvedCount} approved</span>}
+                    {rejectedCount > 0 && <span className="text-red-400"> · {rejectedCount} rejected</span>}
                     {pendingCount > 0 && pendingCount < batch.items.length && <span className="text-zinc-400"> · {pendingCount} pending</span>}
                   </div>
                 </div>

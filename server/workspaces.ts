@@ -310,6 +310,22 @@ function deleteSeoEditTrackingStmt() {
   return _deleteSeoEditTracking;
 }
 
+let _clearAllPageEditStates: ReturnType<typeof db.prepare> | null = null;
+function clearAllPageEditStatesStmt() {
+  if (!_clearAllPageEditStates) {
+    _clearAllPageEditStates = db.prepare(`DELETE FROM page_edit_states WHERE workspace_id = ?`);
+  }
+  return _clearAllPageEditStates;
+}
+
+let _clearAllSeoEditTracking: ReturnType<typeof db.prepare> | null = null;
+function clearAllSeoEditTrackingStmt() {
+  if (!_clearAllSeoEditTracking) {
+    _clearAllSeoEditTracking = db.prepare(`DELETE FROM seo_edit_tracking WHERE workspace_id = ?`);
+  }
+  return _clearAllSeoEditTracking;
+}
+
 // ── Helper: convert Workspace to DB params ──
 
 function workspaceToParams(ws: Workspace) {
@@ -685,6 +701,12 @@ function deleteSeoEditTrackingByPageIdsStmt() {
 export function clearPageStatesByStatus(workspaceId: string, status: string): number {
   const row = getByIdStmt().get(workspaceId) as WorkspaceRow | undefined;
   if (!row) return 0;
+  if (status === 'all') {
+    // Clear ALL page states and tracking for this workspace
+    clearAllSeoEditTrackingStmt().run(workspaceId);
+    const info = clearAllPageEditStatesStmt().run(workspaceId);
+    return info.changes;
+  }
   // Delete matching seo_edit_tracking rows first (before the page states are gone)
   deleteSeoEditTrackingByPageIdsStmt().run(workspaceId, workspaceId, status);
   const info = deletePageEditStatesByStatusStmt().run(workspaceId, status);

@@ -63,11 +63,13 @@ export function usePageEditStates(workspaceId: string | undefined, isPublic = fa
       : `/api/workspaces/${workspaceId}/page-states`;
     getOptional<Record<string, PageEditState>>(url)
       .then(data => {
-        if (id !== fetchRef.current || !data) return;
-        cache.set(workspaceId, { data, fetchedAt: Date.now() });
-        setStates(data);
+        if (id !== fetchRef.current) return;
+        const resolved = data ?? {};
+        if (!data) console.warn('[usePageEditStates] API returned null for', workspaceId);
+        cache.set(workspaceId, { data: resolved, fetchedAt: Date.now() });
+        setStates(resolved);
       })
-      .catch(() => { /* non-critical */ })
+      .catch((err) => { console.warn('[usePageEditStates] fetch error:', err); })
       .finally(() => { if (id === fetchRef.current) setLoading(false); });
   }, [workspaceId, isPublic]);
 
@@ -81,11 +83,12 @@ export function usePageEditStates(workspaceId: string | undefined, isPublic = fa
       : `/api/workspaces/${workspaceId}/page-states`;
     getOptional<Record<string, PageEditState>>(url)
       .then(data => {
-        if (id !== fetchRef.current || !data) return;
-        cache.set(workspaceId, { data, fetchedAt: Date.now() });
-        setStates(data);
+        if (id !== fetchRef.current) return;
+        const resolved = data ?? {};
+        cache.set(workspaceId, { data: resolved, fetchedAt: Date.now() });
+        setStates(resolved);
       })
-      .catch(() => { /* non-critical */ })
+      .catch((err) => { console.warn('[usePageEditStates] refresh error:', err); })
       .finally(() => { if (id === fetchRef.current) setLoading(false); });
   }, [workspaceId, isPublic]);
 

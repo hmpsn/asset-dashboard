@@ -104,11 +104,16 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', (req, res) =
   if (status === 'approved' || status === 'rejected') {
     const item = batch.items.find(i => i.id === req.params.itemId);
     if (item) {
-      updatePageState(req.params.workspaceId, item.pageId, {
+      const pageStateResult = updatePageState(req.params.workspaceId, item.pageId, {
         status: status === 'approved' ? 'approved' : 'rejected',
         updatedBy: 'client',
         ...(status === 'rejected' && clientNote ? { rejectionNote: clientNote } : {}),
       });
+      if (!pageStateResult) {
+        log.warn({ workspaceId: req.params.workspaceId, pageId: item.pageId, status }, 'updatePageState returned null — workspace may not exist in DB');
+      } else {
+        log.info({ workspaceId: req.params.workspaceId, pageId: item.pageId, status: pageStateResult.status }, 'synced page edit state from approval');
+      }
       // Activity feed for client actions
       const actorInfo = getClientActor(req, req.params.workspaceId);
       const actorName = actorInfo?.name || 'Client';
