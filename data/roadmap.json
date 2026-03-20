@@ -2758,6 +2758,16 @@
           "shippedAt": "2026-03-19"
         },
         {
+          "id": 320.6,
+          "title": "StrategyTab v2 — Card-based command center",
+          "source": "UI_UX_AUDIT Mar 2026",
+          "est": "2h",
+          "priority": "P1",
+          "notes": "Shipped — Complete redesign from accordion-based to card-based command center. 1) Top Summary Bar: 3 action cards (Content Gaps | Quick Wins | Growth Opportunities) with counts and CTAs that jump to sections. 2) Content Opportunities: Removed rationale truncation (show full text), show first 4 in 2-col grid with 'View all' toggle for even columns. 3) Growth Opportunities: Transformed from list to 3-up card grid with smart CTAs based on difficulty/impressions (Optimize to Rank/Build Authority/Expand Content/Quick Win). 4) Consolidated Reference Data: Quick Wins, Keyword Opportunities, Target Keywords, Competitor Gaps, Page Map now in single collapsed 'Reference Data' section. Reduced click fatigue, clearer actions, better scanability.",
+          "status": "done",
+          "shippedAt": "2026-03-19"
+        },
+        {
           "id": 321,
           "title": "HealthTab redesign — Card-based command center",
           "source": "UI_UX_AUDIT Mar 2026",
