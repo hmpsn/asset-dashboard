@@ -11,9 +11,10 @@ export interface CoreWebVitals {
   FID: number | null;   // First Input Delay (ms)
   CLS: number | null;   // Cumulative Layout Shift
   FCP: number | null;   // First Contentful Paint (ms)
-  SI: number | null;    // Speed Index (ms)
-  TBT: number | null;   // Total Blocking Time (ms)
-  TTI: number | null;   // Time to Interactive (ms)
+  INP: number | null;   // Interaction to Next Paint (ms) — replaces FID
+  SI: number | null;    // Speed Index (ms) — lab only
+  TBT: number | null;   // Total Blocking Time (ms) — lab only
+  TTI: number | null;   // Time to Interactive (ms) — lab only
 }
 
 export interface PageSpeedResult {
@@ -25,6 +26,7 @@ export interface PageSpeedResult {
   opportunities: Opportunity[];
   diagnostics: Diagnostic[];
   fetchedAt: string;
+  fieldDataAvailable: boolean; // true = CrUX real-user data used for vitals
 }
 
 export interface Opportunity {
@@ -90,7 +92,42 @@ async function runPageSpeed(url: string, strategy: 'mobile' | 'desktop'): Promis
   }
 }
 
-function extractVitals(data: Record<string, unknown>): CoreWebVitals {
+// CrUX field data metric keys in the PSI API response
+interface CrUXMetric { percentile: number; category?: string }
+interface CrUXMetrics {
+  LARGEST_CONTENTFUL_PAINT_MS?: CrUXMetric;
+  CUMULATIVE_LAYOUT_SHIFT_SCORE?: CrUXMetric;
+  FIRST_CONTENTFUL_PAINT_MS?: CrUXMetric;
+  FIRST_INPUT_DELAY_MS?: CrUXMetric;
+  INTERACTION_TO_NEXT_PAINT?: CrUXMetric;
+  EXPERIMENTAL_TIME_TO_FIRST_BYTE?: CrUXMetric;
+}
+interface LoadingExperience {
+  metrics?: CrUXMetrics;
+  overall_category?: string;
+}
+
+function extractFieldVitals(data: Record<string, unknown>): { vitals: Partial<CoreWebVitals>; available: boolean } {
+  const le = (data as { loadingExperience?: LoadingExperience })?.loadingExperience;
+  const m = le?.metrics;
+  if (!m) return { vitals: {}, available: false };
+
+  const hasAny = !!(m.LARGEST_CONTENTFUL_PAINT_MS || m.CUMULATIVE_LAYOUT_SHIFT_SCORE || m.FIRST_CONTENTFUL_PAINT_MS);
+  if (!hasAny) return { vitals: {}, available: false };
+
+  return {
+    vitals: {
+      LCP: m.LARGEST_CONTENTFUL_PAINT_MS?.percentile ?? null,
+      CLS: m.CUMULATIVE_LAYOUT_SHIFT_SCORE ? m.CUMULATIVE_LAYOUT_SHIFT_SCORE.percentile / 100 : null,
+      FCP: m.FIRST_CONTENTFUL_PAINT_MS?.percentile ?? null,
+      FID: m.FIRST_INPUT_DELAY_MS?.percentile ?? null,
+      INP: m.INTERACTION_TO_NEXT_PAINT?.percentile ?? null,
+    },
+    available: true,
+  };
+}
+
+function extractLabVitals(data: Record<string, unknown>): CoreWebVitals {
   const audits = (data as { lighthouseResult?: { audits?: Record<string, { numericValue?: number }> } })
     ?.lighthouseResult?.audits || {};
 
@@ -99,9 +136,34 @@ function extractVitals(data: Record<string, unknown>): CoreWebVitals {
     FID: audits['max-potential-fid']?.numericValue ?? null,
     CLS: audits['cumulative-layout-shift']?.numericValue ?? null,
     FCP: audits['first-contentful-paint']?.numericValue ?? null,
+    INP: null, // lab has no INP equivalent
     SI: audits['speed-index']?.numericValue ?? null,
     TBT: audits['total-blocking-time']?.numericValue ?? null,
     TTI: audits['interactive']?.numericValue ?? null,
+  };
+}
+
+function extractVitals(data: Record<string, unknown>): { vitals: CoreWebVitals; fieldDataAvailable: boolean } {
+  const lab = extractLabVitals(data);
+  const field = extractFieldVitals(data);
+
+  if (!field.available) {
+    return { vitals: lab, fieldDataAvailable: false };
+  }
+
+  // Prefer CrUX field data for ranking-relevant metrics; keep lab-only metrics from Lighthouse
+  return {
+    vitals: {
+      LCP: field.vitals.LCP ?? lab.LCP,
+      FID: field.vitals.FID ?? lab.FID,
+      CLS: field.vitals.CLS ?? lab.CLS,
+      FCP: field.vitals.FCP ?? lab.FCP,
+      INP: field.vitals.INP ?? null,
+      SI: lab.SI,    // lab only
+      TBT: lab.TBT,  // lab only
+      TTI: lab.TTI,  // lab only
+    },
+    fieldDataAvailable: true,
   };
 }
 
@@ -198,15 +260,17 @@ export async function runSinglePageSpeed(
   const data = await runPageSpeed(url, strategy);
   if (!data) return null;
 
+  const { vitals, fieldDataAvailable } = extractVitals(data);
   return {
     url,
     page: pageTitle || url.replace(/https?:\/\/[^/]+\/?/, '/') || '/',
     strategy,
     score: extractScore(data),
-    vitals: extractVitals(data),
+    vitals,
     opportunities: extractOpportunities(data),
     diagnostics: extractDiagnostics(data),
     fetchedAt: new Date().toISOString(),
+    fieldDataAvailable,
   };
 }
 
@@ -221,7 +285,7 @@ export async function runSiteSpeed(
   const baseUrl = subdomain ? `https://${subdomain}.webflow.io` : '';
 
   if (!baseUrl) {
-    return { siteId, strategy, pages: [], averageScore: 0, averageVitals: { LCP: null, FID: null, CLS: null, FCP: null, SI: null, TBT: null, TTI: null }, testedAt: new Date().toISOString() };
+    return { siteId, strategy, pages: [], averageScore: 0, averageVitals: { LCP: null, FID: null, CLS: null, FCP: null, INP: null, SI: null, TBT: null, TTI: null }, testedAt: new Date().toISOString() };
   }
 
   const allPages = await listPages(siteId, tokenOverride);
@@ -256,15 +320,17 @@ export async function runSiteSpeed(
     const data = await runPageSpeed(url, strategy);
     if (!data) continue;
 
+    const { vitals, fieldDataAvailable } = extractVitals(data);
     results.push({
       url,
       page: page.title,
       strategy,
       score: extractScore(data),
-      vitals: extractVitals(data),
+      vitals,
       opportunities: extractOpportunities(data),
       diagnostics: extractDiagnostics(data),
       fetchedAt: new Date().toISOString(),
+      fieldDataAvailable,
     });
   }
 
@@ -273,15 +339,17 @@ export async function runSiteSpeed(
     log.info(`PageSpeed: testing CMS page ${cmsPage.url}...`);
     const data = await runPageSpeed(cmsPage.url, strategy);
     if (!data) continue;
+    const { vitals: cmsVitals, fieldDataAvailable: cmsFieldData } = extractVitals(data);
     results.push({
       url: cmsPage.url,
       page: `${cmsPage.pageName} (CMS)`,
       strategy,
       score: extractScore(data),
-      vitals: extractVitals(data),
+      vitals: cmsVitals,
       opportunities: extractOpportunities(data),
       diagnostics: extractDiagnostics(data),
       fetchedAt: new Date().toISOString(),
+      fieldDataAvailable: cmsFieldData,
     });
   }
 
@@ -290,8 +358,8 @@ export async function runSiteSpeed(
     ? Math.round(results.reduce((s, r) => s + r.score, 0) / results.length)
     : 0;
 
-  const avgVitals: CoreWebVitals = { LCP: null, FID: null, CLS: null, FCP: null, SI: null, TBT: null, TTI: null };
-  const vitalKeys: (keyof CoreWebVitals)[] = ['LCP', 'FID', 'CLS', 'FCP', 'SI', 'TBT', 'TTI'];
+  const avgVitals: CoreWebVitals = { LCP: null, FID: null, CLS: null, FCP: null, INP: null, SI: null, TBT: null, TTI: null };
+  const vitalKeys: (keyof CoreWebVitals)[] = ['LCP', 'FID', 'CLS', 'FCP', 'INP', 'SI', 'TBT', 'TTI'];
   for (const key of vitalKeys) {
     const vals = results.map(r => r.vitals[key]).filter((v): v is number => v !== null);
     if (vals.length > 0) {

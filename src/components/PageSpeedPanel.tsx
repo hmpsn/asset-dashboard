@@ -12,6 +12,7 @@ interface CoreWebVitals {
   FID: number | null;
   CLS: number | null;
   FCP: number | null;
+  INP: number | null;
   SI: number | null;
   TBT: number | null;
   TTI: number | null;
@@ -41,6 +42,7 @@ interface PageSpeedResult {
   opportunities: Opportunity[];
   diagnostics: Diagnostic[];
   fetchedAt: string;
+  fieldDataAvailable?: boolean;
 }
 
 interface SiteSpeedResult {
@@ -80,6 +82,7 @@ function vitalRating(key: string, val: number | null): 'good' | 'needs-improveme
   switch (key) {
     case 'LCP': return val <= 2500 ? 'good' : val <= 4000 ? 'needs-improvement' : 'poor';
     case 'FID': return val <= 100 ? 'good' : val <= 300 ? 'needs-improvement' : 'poor';
+    case 'INP': return val <= 200 ? 'good' : val <= 500 ? 'needs-improvement' : 'poor';
     case 'CLS': return val <= 0.1 ? 'good' : val <= 0.25 ? 'needs-improvement' : 'poor';
     case 'FCP': return val <= 1800 ? 'good' : val <= 3000 ? 'needs-improvement' : 'poor';
     case 'SI': return val <= 3400 ? 'good' : val <= 5800 ? 'needs-improvement' : 'poor';
@@ -226,14 +229,16 @@ export function PageSpeedPanel({ siteId }: Props) {
         <div className="flex flex-col items-center gap-2">
           <MetricRing score={result.score} size={100} />
           <div className="text-xs text-zinc-500">{strategy === 'mobile' ? 'Mobile' : 'Desktop'}</div>
+          {result.fieldDataAvailable && <div className="px-1.5 py-0.5 rounded text-[10px] bg-green-500/10 border border-green-500/20 text-green-400">Real users</div>}
+          {!result.fieldDataAvailable && <div className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 border border-amber-500/20 text-amber-400">Lab test</div>}
         </div>
         <div className="grid grid-cols-3 gap-2">
           <VitalCard label="LCP" value={result.vitals.LCP} formatted={formatMs(result.vitals.LCP)} vitalKey="LCP" />
           <VitalCard label="FCP" value={result.vitals.FCP} formatted={formatMs(result.vitals.FCP)} vitalKey="FCP" />
           <VitalCard label="CLS" value={result.vitals.CLS} formatted={formatCLS(result.vitals.CLS)} vitalKey="CLS" />
+          <VitalCard label="INP" value={result.vitals.INP} formatted={formatMs(result.vitals.INP)} vitalKey="INP" />
           <VitalCard label="TBT" value={result.vitals.TBT} formatted={formatMs(result.vitals.TBT)} vitalKey="TBT" />
           <VitalCard label="Speed Index" value={result.vitals.SI} formatted={formatMs(result.vitals.SI)} vitalKey="SI" />
-          <VitalCard label="TTI" value={result.vitals.TTI} formatted={formatMs(result.vitals.TTI)} vitalKey="TTI" />
         </div>
       </div>
 
@@ -437,9 +442,9 @@ export function PageSpeedPanel({ siteId }: Props) {
           <VitalCard label="LCP" value={v.LCP} formatted={formatMs(v.LCP)} vitalKey="LCP" />
           <VitalCard label="FCP" value={v.FCP} formatted={formatMs(v.FCP)} vitalKey="FCP" />
           <VitalCard label="CLS" value={v.CLS} formatted={formatCLS(v.CLS)} vitalKey="CLS" />
+          <VitalCard label="INP" value={v.INP} formatted={formatMs(v.INP)} vitalKey="INP" />
           <VitalCard label="TBT" value={v.TBT} formatted={formatMs(v.TBT)} vitalKey="TBT" />
           <VitalCard label="Speed Index" value={v.SI} formatted={formatMs(v.SI)} vitalKey="SI" />
-          <VitalCard label="TTI" value={v.TTI} formatted={formatMs(v.TTI)} vitalKey="TTI" />
         </div>
       </div>
 
@@ -462,7 +467,7 @@ export function PageSpeedPanel({ siteId }: Props) {
                 <div className="flex items-center gap-3 text-xs text-zinc-500">
                   <span>LCP {formatMs(page.vitals.LCP)}</span>
                   <span>CLS {formatCLS(page.vitals.CLS)}</span>
-                  <span>TBT {formatMs(page.vitals.TBT)}</span>
+                  <span>INP {formatMs(page.vitals.INP)}</span>
                 </div>
               </button>
 
@@ -473,9 +478,9 @@ export function PageSpeedPanel({ siteId }: Props) {
                     <VitalCard label="LCP" value={page.vitals.LCP} formatted={formatMs(page.vitals.LCP)} vitalKey="LCP" />
                     <VitalCard label="FCP" value={page.vitals.FCP} formatted={formatMs(page.vitals.FCP)} vitalKey="FCP" />
                     <VitalCard label="CLS" value={page.vitals.CLS} formatted={formatCLS(page.vitals.CLS)} vitalKey="CLS" />
+                    <VitalCard label="INP" value={page.vitals.INP} formatted={formatMs(page.vitals.INP)} vitalKey="INP" />
                     <VitalCard label="TBT" value={page.vitals.TBT} formatted={formatMs(page.vitals.TBT)} vitalKey="TBT" />
                     <VitalCard label="SI" value={page.vitals.SI} formatted={formatMs(page.vitals.SI)} vitalKey="SI" />
-                    <VitalCard label="TTI" value={page.vitals.TTI} formatted={formatMs(page.vitals.TTI)} vitalKey="TTI" />
                   </div>
 
                   {/* Opportunities */}
