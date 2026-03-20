@@ -35,21 +35,21 @@ describe('MobileGuard', () => {
       </MobileGuard>
     );
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
-    expect(screen.queryByText('Best on Desktop')).toBeNull();
+    expect(screen.queryByText('Best on desktop.')).toBeNull();
   });
 
-  it('shows interstitial on mobile (< 768px)', () => {
+  it('shows banner on mobile (< 768px)', () => {
     setWindowWidth(375);
     render(
       <MobileGuard>
         <p>Dashboard</p>
       </MobileGuard>
     );
-    expect(screen.getByText('Best on Desktop')).toBeInTheDocument();
-    expect(screen.getByText('Continue anyway')).toBeInTheDocument();
+    expect(screen.getByText('Best on desktop.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Dismiss mobile warning')).toBeInTheDocument();
   });
 
-  it('dismisses interstitial and shows children when "Continue anyway" is clicked', () => {
+  it('dismisses banner and shows children when dismiss button is clicked', () => {
     setWindowWidth(375);
     render(
       <MobileGuard>
@@ -57,8 +57,8 @@ describe('MobileGuard', () => {
       </MobileGuard>
     );
 
-    fireEvent.click(screen.getByText('Continue anyway'));
-    expect(screen.queryByText('Best on Desktop')).toBeNull();
+    fireEvent.click(screen.getByLabelText('Dismiss mobile warning'));
+    expect(screen.queryByText('Best on desktop.')).toBeNull();
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
   });
 
@@ -84,17 +84,17 @@ describe('MobileGuard', () => {
       </MobileGuard>
     );
 
-    expect(screen.queryByText('Best on Desktop')).toBeNull();
+    expect(screen.queryByText('Best on desktop.')).toBeNull();
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
   });
 
-  it('shows explanation text in interstitial', () => {
+  it('shows limited editing tools message in banner', () => {
     setWindowWidth(375);
     render(
       <MobileGuard>
         <p>Content</p>
       </MobileGuard>
     );
-    expect(screen.getByText(/optimized for desktop screens/)).toBeInTheDocument();
+    expect(screen.getByText(/Editing tools are limited on mobile/)).toBeInTheDocument();
   });
 });
