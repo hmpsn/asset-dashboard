@@ -815,7 +815,6 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
       {workspaceId && (
         <PendingApprovals
           workspaceId={workspaceId}
-          nameFilter="Schema"
           refreshKey={approvalRefreshKey}
         />
       )}

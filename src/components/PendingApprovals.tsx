@@ -61,8 +61,6 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
     });
   };
 
-  if (loading || batches.length === 0) return null;
-
   const statusBadge = (status: string) => {
     if (status === 'partial') return <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20 font-medium">Partially Reviewed</span>;
     return <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/15 text-teal-400 border border-teal-500/20 font-medium">Awaiting Review</span>;
@@ -72,8 +70,13 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
     <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
       <div className="px-3 py-2 border-b border-zinc-800 flex items-center gap-2">
         <Send className="w-3.5 h-3.5 text-teal-400" />
-        <span className="text-xs font-medium text-zinc-300">Sent to Client ({batches.length})</span>
+        <span className="text-xs font-medium text-zinc-300">Sent to Client{!loading && ` (${batches.length})`}</span>
       </div>
+      {loading ? (
+        <div className="px-3 py-3 text-[11px] text-zinc-500">Loading...</div>
+      ) : batches.length === 0 ? (
+        <div className="px-3 py-3 text-[11px] text-zinc-500">No pending approval batches</div>
+      ) : (
       <div className="divide-y divide-zinc-800/50">
         {batches.map(batch => {
           const isExpanded = !compact && expanded.has(batch.id);
@@ -144,6 +147,7 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
           );
         })}
       </div>
+      )}
     </div>
   );
 }

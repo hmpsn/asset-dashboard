@@ -364,7 +364,6 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
       {workspaceId && (
         <PendingApprovals
           workspaceId={workspaceId}
-          nameFilter="CMS"
           refreshKey={approvalRefreshKey}
         />
       )}

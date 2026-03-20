@@ -487,7 +487,6 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       {workspaceId && (
         <PendingApprovals
           workspaceId={workspaceId}
-          nameFilter="SEO"
           refreshKey={approvalRefreshKey}
         />
       )}

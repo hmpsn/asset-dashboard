@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   Zap, FileText, Sparkles, Target, CheckCircle2,
   TrendingUp, ChevronDown, Shield, BookOpen, Layers,
+  MessageCircle,
 } from 'lucide-react';
 import { TierGate, EmptyState, type Tier } from '../ui';
 import type { ClientKeywordStrategy, ClientContentRequest } from './types';
 import { useBetaMode } from './BetaContext';
+import { PageKeywordMapContent } from './PageKeywordMapContent';
 import { STUDIO_NAME } from '../../constants';
 import { post } from '../../api';
 
@@ -42,6 +44,11 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const betaMode = useBetaMode();
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['content-opportunities', 'growth-opportunities']));
 
+  // Refs for scroll-to-section
+  const contentOpportunitiesRef = useRef<HTMLDivElement>(null);
+  const quickWinsRef = useRef<HTMLDivElement>(null);
+  const growthOpportunitiesRef = useRef<HTMLDivElement>(null);
+
   const toggleSection = (section: string) => {
     setExpandedSections(prev => {
       const next = new Set(prev);
@@ -49,6 +56,13 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       else next.add(section);
       return next;
     });
+  };
+
+  const scrollToSection = (section: string, ref: React.RefObject<HTMLDivElement | null>) => {
+    toggleSection(section);
+    setTimeout(() => {
+      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
   };
 
   if (!strategyData) {
@@ -155,7 +169,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
             <div className="text-[11px] text-zinc-500">{strategyData.contentGaps?.length || 0} topics to create</div>
           </div>
           <button 
-            onClick={() => toggleSection('content-opportunities')}
+            onClick={() => scrollToSection('content-opportunities', contentOpportunitiesRef)}
             className="px-3 py-1.5 rounded-lg bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 font-medium hover:bg-teal-600/30 transition-colors flex-shrink-0"
           >
             Explore
@@ -173,7 +187,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               <div className="text-[11px] text-zinc-500">{strategyData.quickWins.length} easy improvements</div>
             </div>
             <button 
-              onClick={() => toggleSection('quick-wins')}
+              onClick={() => scrollToSection('quick-wins', quickWinsRef)}
               className="px-3 py-1.5 rounded-lg bg-amber-600/20 border border-amber-500/30 text-[11px] text-amber-300 font-medium hover:bg-amber-600/30 transition-colors flex-shrink-0"
             >
               View
@@ -195,10 +209,10 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 <div className="text-[11px] text-zinc-500">{unranked.length} pages to optimize</div>
               </div>
               <button 
-                onClick={() => toggleSection('growth-opportunities')}
+                onClick={() => scrollToSection('growth-opportunities', growthOpportunitiesRef)}
                 className="px-3 py-1.5 rounded-lg bg-blue-600/20 border border-blue-500/30 text-[11px] text-blue-300 font-medium hover:bg-blue-600/30 transition-colors flex-shrink-0"
               >
-                Optimize
+                Review
               </button>
             </div>
           );
@@ -207,6 +221,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
 
       {/* ── CONTENT OPPORTUNITIES (always expanded - primary action area) ── */}
       {strategyData.contentGaps && strategyData.contentGaps.length > 0 && (
+      <div ref={contentOpportunitiesRef}>
         <TierGate tier={effectiveTier} required="growth" feature="Content Opportunities" teaser={`${strategyData.contentGaps.length} content topics identified — upgrade to unlock recommendations`}>
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
           <button 
@@ -311,9 +326,11 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           )}
         </div>
         </TierGate>
+      </div>
       )}
 
       {/* ── GROWTH OPPORTUNITIES (expanded by default) ── */}
+      <div ref={growthOpportunitiesRef}>
       {(() => {
         const unranked = strategyData.pageMap
           .filter(p => !p.currentPosition)
@@ -374,20 +391,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   Pages that aren't ranking yet but show potential. These opportunities are prioritized by search intent and competition level.
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {unranked.slice(0, expandedSections.has('growth-opportunities-all') ? undefined : 3).map(page => {
-                    const actionLabel = page.hasImpressions 
-                      ? 'Optimize to Rank' 
-                      : (page.difficulty || 50) > 60 
-                        ? 'Build Authority' 
-                        : (page.difficulty || 50) > 30 
-                          ? 'Expand Content' 
-                          : 'Quick Win';
-                    const actionColor = page.hasImpressions 
-                      ? 'bg-blue-600 hover:bg-blue-500' 
-                      : (page.difficulty || 50) > 60 
-                        ? 'bg-amber-600 hover:bg-amber-500' 
-                        : 'bg-teal-600 hover:bg-teal-500';
-                    return (
+                  {unranked.slice(0, expandedSections.has('growth-opportunities-all') ? undefined : 3).map(page => (
                       <div key={page.pagePath} className="rounded-lg bg-zinc-950/50 border border-zinc-800/80 p-3 flex flex-col hover:border-blue-500/30 transition-all">
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex-1 min-w-0">
@@ -412,28 +416,27 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                           {workspaceId && (
                             <button
                               onClick={() => {
-                                // Create content request for this page optimization
-                                const reason = page.reasons[0];
+                                // Flag for discussion in next meeting
                                 post(`/api/public/content-request/${workspaceId}`, {
-                                  type: 'page_optimization',
+                                  type: 'meeting_discussion',
                                   targetPage: page.pagePath,
                                   targetKeyword: page.primaryKeyword,
-                                  notes: reason,
+                                  notes: `Growth opportunity: ${page.reasons[0]}`,
                                   priority: page.hasImpressions ? 'high' : 'medium'
                                 }).then(() => {
-                                  setToast?.('Optimization request created');
+                                  setToast?.('Added to meeting agenda');
                                   onContentRequested?.();
-                                }).catch(() => setToast?.('Failed to create request'));
+                                }).catch(() => setToast?.('Failed to add to agenda'));
                               }}
-                              className={`px-2.5 py-1 rounded text-[10px] font-medium text-white transition-colors ${actionColor}`}
+                              className="px-2.5 py-1 rounded text-[10px] font-medium text-zinc-300 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 transition-colors flex items-center gap-1"
                             >
-                              {actionLabel}
+                              <MessageCircle className="w-3 h-3" />
+                              Discuss
                             </button>
                           )}
                         </div>
                       </div>
-                    );
-                  })}
+                  ))}
                 </div>
                 {unranked.length > 3 && (
                   <button 
@@ -448,9 +451,11 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           </div>
         );
       })()}
+      </div>
 
       {/* ── QUICK WINS (individual section) ── */}
       {strategyData.quickWins && strategyData.quickWins.length > 0 && (
+      <div ref={quickWinsRef}>
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
           <button 
             onClick={() => toggleSection('quick-wins')}
@@ -496,9 +501,9 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
             </div>
           )}
         </div>
+      </div>
       )}
 
-      {/* ── KEYWORD OPPORTUNITIES (individual section) ── */}
       {strategyData.opportunities.length > 0 && (
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
           <button 
@@ -611,8 +616,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         </TierGate>
       )}
 
-      {/* ── PAGE KEYWORD MAP (individual section) ── */}
-      <TierGate tier={effectiveTier} required="growth" feature="Page Keyword Map" teaser={`${strategyData.pageMap.length} pages tracked`}>
+      {/* ── PAGE KEYWORD MAP (redesigned with hierarchy & filters) ── */}
+      <TierGate tier={effectiveTier} required="growth" feature="Page Performance Map" teaser={`${strategyData.pageMap.length} pages tracked`}>
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
           <button 
             onClick={() => toggleSection('page-keyword-map')}
@@ -623,44 +628,20 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 <Layers className="w-3.5 h-3.5 text-zinc-400" />
               </div>
               <div className="text-left">
-                <div className="text-sm font-medium text-zinc-300">Page Keyword Map</div>
-                <div className="text-[11px] text-zinc-500">{strategyData.pageMap.length} pages with keyword assignments</div>
+                <div className="text-sm font-medium text-zinc-300">Page Performance Map</div>
+                <div className="text-[11px] text-zinc-500">{strategyData.pageMap.length} pages with rankings & opportunities</div>
               </div>
             </div>
             <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${expandedSections.has('page-keyword-map') ? '' : '-rotate-90'}`} />
           </button>
 
           {expandedSections.has('page-keyword-map') && (
-            <div className="border-t border-zinc-800">
-              <div className="divide-y divide-zinc-800/50 max-h-[300px] overflow-y-auto">
-                {strategyData.pageMap.slice(0, 5).map(page => (
-                  <div key={page.pagePath} className="px-4 py-2.5 hover:bg-zinc-800/30 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[11px] text-zinc-400 font-mono truncate">{page.pagePath}</div>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-                        {page.currentPosition ? (
-                          <span className={`text-[11px] font-mono font-medium px-1.5 py-0.5 rounded bg-zinc-800 ${page.currentPosition <= 10 ? 'text-emerald-400' : 'text-amber-400'}`}>#{page.currentPosition.toFixed(0)}</span>
-                        ) : (
-                          <span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded font-mono">—</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-[10px] text-teal-400/80">{page.primaryKeyword}</span>
-                      {page.secondaryKeywords && page.secondaryKeywords.length > 0 && (
-                        <span className="text-[10px] text-zinc-600">+{page.secondaryKeywords.length} more</span>
-                      )}
-                      {page.impressions != null && page.impressions > 0 && <span className="text-[10px] text-zinc-500">{page.impressions.toLocaleString()} imp</span>}
-                    </div>
-                  </div>
-                ))}
-                {strategyData.pageMap.length > 5 && (
-                  <span className="text-[11px] text-zinc-500 px-4 py-2">+{strategyData.pageMap.length - 5} more pages</span>
-                )}
-              </div>
-            </div>
+            <PageKeywordMapContent 
+              pageMap={strategyData.pageMap} 
+              workspaceId={workspaceId}
+              setToast={setToast}
+              onContentRequested={onContentRequested}
+            />
           )}
         </div>
       </TierGate>

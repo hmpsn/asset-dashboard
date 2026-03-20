@@ -31,7 +31,10 @@ function hasContentIssues(issues: { check: string; message: string }[]): boolean
 
 export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, workspaceId, onContentRequested }: HealthTabProps) {
   // State for accordion sections (all collapsed by default)
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['all-pages', 'site-wide-all']));
+  
+  // Ref for snap-to-section
+  const allPagesRef = useRef<HTMLDivElement>(null);
   const [severityFilter, setSeverityFilter] = useState<'all' | 'error' | 'warning' | 'info'>(initialSeverity || 'all');
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
   const [auditSearch, setAuditSearch] = useState('');
@@ -366,7 +369,10 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                   })}
                 </div>
                 <button 
-                  onClick={() => toggleSection('all-pages')}
+                  onClick={() => {
+                    toggleSection('all-pages');
+                    setTimeout(() => allPagesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+                  }}
                   className="w-full mt-3 text-center py-2 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors border border-dashed border-zinc-800 rounded-lg hover:border-zinc-700"
                 >
                   View all {auditDetail.audit.totalPages} pages
@@ -426,6 +432,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             })}
 
             {/* All Pages List (when "View all" is clicked) */}
+            <div ref={allPagesRef}>
             {expandedSections.has('all-pages') && (
               <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
                 <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2 flex-wrap bg-zinc-950/30">
@@ -469,48 +476,60 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                 </div>
               </div>
             )}
+            </div>
           </>
         );
       })()}
 
-      {/* ── 4. SITE-WIDE ISSUES (Conditional Banner) ── */}
+      {/* ── 4. SITE-WIDE ISSUES (Expanded by default for visibility) ── */}
       {auditDetail.audit.siteWideIssues.length > 0 && (
-        <div className="bg-zinc-900/50 rounded-xl border border-zinc-800/50 p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <Info className="w-4 h-4 text-amber-400" />
-            <span className="text-xs font-medium text-zinc-300">Site-Wide Issues ({auditDetail.audit.siteWideIssues.length})</span>
+        <div className="bg-amber-900/20 rounded-xl border border-amber-500/30 overflow-hidden">
+          <div className="px-4 py-3 border-b border-amber-500/20 bg-amber-900/30">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                <Info className="w-4 h-4 text-amber-400" />
+              </div>
+              <div>
+                <div className="text-sm font-medium text-amber-200">Site-Wide Issues</div>
+                <div className="text-[11px] text-amber-400/70">{auditDetail.audit.siteWideIssues.length} issues affecting your entire site</div>
+              </div>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {auditDetail.audit.siteWideIssues.slice(0, 3).map((issue, i) => {
-              const sc = SEV[issue.severity];
-              return (
-                <div key={i} className={`px-2.5 py-1.5 rounded-lg ${sc.bg} border ${sc.border} text-[11px]`}>
-                  <span className={sc.text}>{issue.message}</span>
-                </div>
-              );
-            })}
-            {auditDetail.audit.siteWideIssues.length > 3 && (
-              <button 
-                onClick={() => toggleSection('site-wide-all')}
-                className="px-2.5 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-[11px] text-zinc-400 hover:text-zinc-300"
-              >
-                +{auditDetail.audit.siteWideIssues.length - 3} more
-              </button>
-            )}
-          </div>
-          {expandedSections.has('site-wide-all') && (
-            <div className="mt-3 pt-3 border-t border-zinc-800/50 space-y-2">
-              {auditDetail.audit.siteWideIssues.map((issue, i) => {
+          
+          <div className="p-3">
+            <div className="flex flex-wrap gap-2">
+              {auditDetail.audit.siteWideIssues.slice(0, 3).map((issue, i) => {
                 const sc = SEV[issue.severity];
                 return (
-                  <div key={i} className={`px-3 py-2 rounded-lg ${sc.bg} border ${sc.border}`}>
-                    <div className={`text-[11px] font-medium ${sc.text}`}>{issue.message}</div>
-                    {issue.recommendation && <div className="text-[11px] text-zinc-500 mt-0.5">{issue.recommendation}</div>}
+                  <div key={i} className={`px-2.5 py-1.5 rounded-lg ${sc.bg} border ${sc.border} text-[11px]`}>
+                    <span className={sc.text}>{issue.message}</span>
                   </div>
                 );
               })}
+              {auditDetail.audit.siteWideIssues.length > 3 && (
+                <button 
+                  onClick={() => toggleSection('site-wide-all')}
+                  className="px-2.5 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-[11px] text-zinc-400 hover:text-zinc-300"
+                >
+                  +{auditDetail.audit.siteWideIssues.length - 3} more
+                </button>
+              )}
             </div>
-          )}
+            
+            {expandedSections.has('site-wide-all') && (
+              <div className="mt-3 pt-3 border-t border-amber-500/20 space-y-2">
+                {auditDetail.audit.siteWideIssues.map((issue, i) => {
+                  const sc = SEV[issue.severity];
+                  return (
+                    <div key={i} className={`px-3 py-2 rounded-lg ${sc.bg} border ${sc.border}`}>
+                      <div className={`text-[11px] font-medium ${sc.text}`}>{issue.message}</div>
+                      {issue.recommendation && <div className="text-[11px] text-zinc-500 mt-0.5">{issue.recommendation}</div>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
