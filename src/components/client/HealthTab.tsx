@@ -6,8 +6,6 @@ import { ScoreHistoryChart } from './helpers';
 import { toLiveUrl } from './utils';
 import { SEV, CAT_LABELS } from './types';
 import type { AuditSummary, AuditDetail, CwvStrategyResult } from './types';
-import { FixRecommendations } from './FixRecommendations';
-import { OrderStatus } from './OrderStatus';
 import { STUDIO_NAME } from '../../constants';
 import { post, getSafe } from '../../api/client';
 
@@ -18,7 +16,6 @@ export interface HealthTabProps {
   auditDetail: AuditDetail | null;
   liveDomain?: string;
   initialSeverity?: 'all' | 'error' | 'warning' | 'info';
-  tier?: 'free' | 'growth' | 'premium';
   workspaceId?: string;
   onContentRequested?: () => void;
 }
@@ -32,10 +29,9 @@ function hasContentIssues(issues: { check: string; message: string }[]): boolean
   });
 }
 
-export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, tier, workspaceId, onContentRequested }: HealthTabProps) {
+export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, workspaceId, onContentRequested }: HealthTabProps) {
   // State for accordion sections (all collapsed by default)
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
-  const [visiblePages, setVisiblePages] = useState(3);
   const [severityFilter, setSeverityFilter] = useState<'all' | 'error' | 'warning' | 'info'>(initialSeverity || 'all');
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
   const [auditSearch, setAuditSearch] = useState('');
@@ -120,7 +116,6 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, tie
           <h2 className="text-xl font-semibold text-zinc-100">Site Health</h2>
           <p className="text-sm text-zinc-500 mt-1">{auditDetail.audit.totalPages} pages · Last scanned {new Date(auditDetail.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
         </div>
-        {/* Share dropdown preserved */}
         <div className="relative" ref={shareRef}>
           <button onClick={() => setShareOpen(!shareOpen)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 transition-colors">
@@ -198,9 +193,69 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, tie
         );
       })()}
 
-      {/* ── 2. FIX THESE FIRST (Top 5 prioritized) ── */}
+      {/* ── 2. PAGE SPEED (Always Expanded) ── */}
+      {auditDetail.audit.cwvSummary && (auditDetail.audit.cwvSummary.mobile || auditDetail.audit.cwvSummary.desktop) && (() => {
+        const ratingColor = (r: CwvStrategyResult['metrics']['LCP']['rating']) =>
+          r === 'good' ? 'text-emerald-400' : r === 'needs-improvement' ? 'text-amber-400' : r === 'poor' ? 'text-red-400' : 'text-zinc-500';
+        const ratingBg = (r: CwvStrategyResult['metrics']['LCP']['rating']) =>
+          r === 'good' ? 'bg-emerald-500/10 border-emerald-500/20' : r === 'needs-improvement' ? 'bg-amber-500/10 border-amber-500/20' : r === 'poor' ? 'bg-red-500/10 border-red-500/20' : 'bg-zinc-800/50 border-zinc-700/30';
+        const assessBadge = (a: CwvStrategyResult['assessment']) =>
+          a === 'good' ? { text: 'Passed', cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' }
+          : a === 'needs-improvement' ? { text: 'Needs Work', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/30' }
+          : a === 'poor' ? { text: 'Failed', cls: 'bg-red-500/15 text-red-400 border-red-500/30' }
+          : { text: 'No Data', cls: 'bg-zinc-800/50 text-zinc-500 border-zinc-700/30' };
+        const renderStrategy = (label: string, s: CwvStrategyResult) => {
+          const badge = assessBadge(s.assessment);
+          return (
+            <div key={label} className="flex-1 min-w-[200px]">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-zinc-400 uppercase tracking-wider">{label}</span>
+                <span className={`text-[11px] px-2 py-0.5 rounded border font-medium ${badge.cls}`}>{badge.text}</span>
+              </div>
+              <div className="space-y-1.5">
+                {[
+                  { key: 'LCP' as const, label: 'Loading Speed', fmt: (v: number) => `${(v / 1000).toFixed(1)}s`, desc: 'Content appears' },
+                  { key: 'INP' as const, label: 'Responsiveness', fmt: (v: number) => `${Math.round(v)}ms`, desc: 'Page reacts' },
+                  { key: 'CLS' as const, label: 'Visual Stability', fmt: (v: number) => v.toFixed(2), desc: 'Layout shifts' },
+                ].map(m => {
+                  const metric = s.metrics[m.key];
+                  return (
+                    <div key={m.key} className={`flex items-center justify-between px-3 py-2 rounded-lg border ${ratingBg(metric.rating)}`}>
+                      <div>
+                        <span className="text-xs font-medium text-zinc-300">{m.label}</span>
+                        <span className="text-[10px] text-zinc-500 ml-1.5">{m.desc}</span>
+                      </div>
+                      <span className={`text-sm font-mono font-medium ${ratingColor(metric.rating)}`}>
+                        {metric.value !== null ? m.fmt(metric.value) : '—'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              {!s.fieldDataAvailable && (
+                <div className="mt-1.5 text-[10px] text-zinc-500 italic">Lab simulation — real data not yet available</div>
+              )}
+            </div>
+          );
+        };
+        return (
+          <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Globe className="w-4 h-4 text-teal-400" />
+              <span className="text-sm font-medium text-zinc-200">Page Speed &amp; Core Web Vitals</span>
+              <span className="text-[11px] text-zinc-500 ml-2">Google uses these to rank your site</span>
+            </div>
+            <div className="flex gap-4 flex-wrap">
+              {auditDetail.audit.cwvSummary!.mobile && renderStrategy('Mobile', auditDetail.audit.cwvSummary!.mobile)}
+              {auditDetail.audit.cwvSummary!.desktop && renderStrategy('Desktop', auditDetail.audit.cwvSummary!.desktop)}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── 3. FIX THESE FIRST (Top 5) + Pages Grid ── */}
       {(() => {
-        // Collect all issues prioritized: errors > warnings > content issues
+        // Collect and prioritize issues
         const allIssues: Array<{
           pageId: string;
           page: string;
@@ -213,7 +268,6 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, tie
             allIssues.push({ pageId: p.pageId, page: p.page, slug: p.slug, url: p.url, issue: i });
           });
         });
-        // Sort: errors first, then warnings, then by content-related
         const prioritized = allIssues.sort((a, b) => {
           const sevScore = (s: string) => s === 'error' ? 3 : s === 'warning' ? 2 : 1;
           const sevDiff = sevScore(b.issue.severity) - sevScore(a.issue.severity);
@@ -222,74 +276,265 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, tie
           const bContent = hasContentIssues([b.issue]) ? 1 : 0;
           return bContent - aContent;
         }).slice(0, 5);
-        if (prioritized.length === 0) return null;
+
+        // Sort pages by issue count (worst first) for the cards
+        const sortedPages = [...auditDetail.audit.pages].sort((a, b) => {
+          const aErrs = a.issues.filter(i => i.severity === 'error').length;
+          const bErrs = b.issues.filter(i => i.severity === 'error').length;
+          if (aErrs !== bErrs) return bErrs - aErrs;
+          return b.issues.length - a.issues.length;
+        }).slice(0, 3);
+
         return (
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-            <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-red-400" />
-              <span className="text-sm font-medium text-zinc-200">Fix these first</span>
-              <span className="text-[11px] text-zinc-500 ml-auto">Top {prioritized.length} priorities</span>
-            </div>
-            <div className="divide-y divide-zinc-800/50">
-              {prioritized.map((item, i) => {
-                const sc = SEV[item.issue.severity];
-                return (
-                  <div key={`${item.pageId}-${i}`} className="px-4 py-3 hover:bg-zinc-800/30 transition-colors">
-                    <div className="flex items-start gap-3">
-                      <span className="w-5 h-5 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center flex-shrink-0 text-[11px] text-zinc-400 font-medium">{i + 1}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[11px] font-medium uppercase ${sc.text}`}>{item.issue.severity}</span>
-                          <span className="text-[11px] text-zinc-500 truncate">{item.page}</span>
-                        </div>
-                        <div className="text-[11px] text-zinc-300 mt-0.5">{item.issue.message}</div>
-                        {item.issue.recommendation && (
-                          <div className="text-[11px] text-zinc-500 mt-0.5">{item.issue.recommendation}</div>
-                        )}
-                      </div>
-                      {hasContentIssues([item.issue]) && workspaceId && !requestedPages.has(item.pageId) && (
-                        <button
-                          onClick={() => requestContentImprovement({ pageId: item.pageId, page: item.page, slug: item.slug, issues: [item.issue] })}
-                          disabled={requestingPage === item.pageId}
-                          className="flex-shrink-0 px-2 py-1 rounded bg-teal-600 hover:bg-teal-500 text-white text-[10px] font-medium transition-colors"
-                        >
-                          {requestingPage === item.pageId ? '...' : 'Fix'}
-                        </button>
-                      )}
+          <>
+            {/* Two-column layout: Fix List | Page Cards */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Fix These First */}
+              <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+                <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-red-400" />
+                  <span className="text-sm font-medium text-zinc-200">Fix these first</span>
+                </div>
+                <div className="divide-y divide-zinc-800/50">
+                  {prioritized.length === 0 ? (
+                    <div className="px-4 py-6 text-center">
+                      <CheckCircle2 className="w-8 h-8 text-emerald-500/50 mx-auto mb-2" />
+                      <p className="text-xs text-zinc-500">No critical issues found!</p>
                     </div>
+                  ) : (
+                    prioritized.map((item, i) => {
+                      const sc = SEV[item.issue.severity];
+                      return (
+                        <div key={`${item.pageId}-${i}`} className="px-4 py-3 hover:bg-zinc-800/30 transition-colors">
+                          <div className="flex items-start gap-3">
+                            <span className="w-5 h-5 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center flex-shrink-0 text-[11px] text-zinc-400 font-medium">{i + 1}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-[11px] font-medium uppercase ${sc.text}`}>{item.issue.severity}</span>
+                                <span className="text-[11px] text-zinc-500 truncate">{item.page}</span>
+                              </div>
+                              <div className="text-[11px] text-zinc-300 mt-0.5">{item.issue.message}</div>
+                            </div>
+                            {hasContentIssues([item.issue]) && workspaceId && !requestedPages.has(item.pageId) && (
+                              <button
+                                onClick={() => requestContentImprovement({ pageId: item.pageId, page: item.page, slug: item.slug, issues: [item.issue] })}
+                                disabled={requestingPage === item.pageId}
+                                className="flex-shrink-0 px-2 py-1 rounded bg-teal-600 hover:bg-teal-500 text-white text-[10px] font-medium transition-colors"
+                              >
+                                {requestingPage === item.pageId ? '...' : 'Fix'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Page Cards */}
+              <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-zinc-400" />
+                    <span className="text-sm font-medium text-zinc-200">Pages needing attention</span>
+                  </div>
+                  <span className="text-[11px] text-zinc-500">Top {sortedPages.length}</span>
+                </div>
+                <div className="grid grid-cols-1 gap-2">
+                  {sortedPages.map(page => {
+                    const errs = page.issues.filter(i => i.severity === 'error').length;
+                    const warns = page.issues.filter(i => i.severity === 'warning').length;
+                    return (
+                      <button
+                        key={page.pageId}
+                        onClick={() => togglePage(page.pageId)}
+                        className="flex items-center gap-3 p-3 rounded-lg bg-zinc-950/50 border border-zinc-800/50 hover:border-zinc-700 hover:bg-zinc-800/30 transition-all text-left"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-medium text-zinc-300 truncate">{page.page}</div>
+                          <div className="text-[11px] text-zinc-500 truncate">{toLiveUrl(page.url, liveDomain)}</div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {errs > 0 && <span className="text-[11px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">{errs}E</span>}
+                          {warns > 0 && <span className="text-[11px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">{warns}W</span>}
+                          <div className={`text-xs font-bold ${scoreColorClass(page.score)}`}>{page.score}</div>
+                          <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${expandedPages.has(page.pageId) ? '' : '-rotate-90'}`} />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <button 
+                  onClick={() => toggleSection('all-pages')}
+                  className="w-full mt-3 text-center py-2 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors border border-dashed border-zinc-800 rounded-lg hover:border-zinc-700"
+                >
+                  View all {auditDetail.audit.totalPages} pages
+                </button>
+              </div>
+            </div>
+
+            {/* Expanded Page Details (when a page card is clicked) */}
+            {expandedPages.size > 0 && Array.from(expandedPages).map(pageId => {
+              const page = auditDetail.audit.pages.find(p => p.pageId === pageId);
+              if (!page) return null;
+              return (
+                <div key={pageId} className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 animate-in fade-in slide-in-from-top-2">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <div className="text-sm font-medium text-zinc-200">{page.page}</div>
+                      <div className="text-[11px] text-zinc-500">{toLiveUrl(page.url, liveDomain)}</div>
+                    </div>
+                    <button onClick={() => togglePage(pageId)} className="p-1.5 rounded hover:bg-zinc-800 text-zinc-500">
+                      <span className="sr-only">Close</span>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {page.issues.map((issue, i) => {
+                      const sc = SEV[issue.severity];
+                      return (
+                        <div key={i} className={`px-3 py-2.5 rounded-lg ${sc.bg} border ${sc.border}`}>
+                          <div className="flex items-start gap-2">
+                            {issue.severity === 'error' && <AlertTriangle className={`w-3.5 h-3.5 ${sc.text} flex-shrink-0 mt-0.5`} />}
+                            {issue.severity === 'warning' && <Info className={`w-3.5 h-3.5 ${sc.text} flex-shrink-0 mt-0.5`} />}
+                            <div className="flex-1">
+                              <div className="text-[11px] text-zinc-300">{issue.message}</div>
+                              {issue.recommendation && <div className="text-[11px] text-zinc-500 mt-0.5">{issue.recommendation}</div>}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {hasContentIssues(page.issues) && workspaceId && (
+                    <button
+                      onClick={() => requestContentImprovement(page)}
+                      disabled={requestedPages.has(page.pageId) || requestingPage === page.pageId}
+                      className={`mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
+                        requestedPages.has(page.pageId)
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-default'
+                          : 'bg-teal-600 hover:bg-teal-500 text-white'
+                      }`}
+                    >
+                      <FileEdit className="w-3 h-3" />
+                      {requestedPages.has(page.pageId) ? 'Request created' : requestingPage === page.pageId ? 'Creating...' : 'Request Content Fix'}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* All Pages List (when "View all" is clicked) */}
+            {expandedSections.has('all-pages') && (
+              <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+                <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2 flex-wrap bg-zinc-950/30">
+                  <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-0.5">
+                    {(['all', 'error', 'warning', 'info'] as const).map(s => (
+                      <button key={s} onClick={() => setSeverityFilter(s)}
+                        className={`px-3 py-2 min-h-[44px] rounded-md text-[11px] font-medium transition-colors ${
+                          severityFilter === s ? (s === 'all' ? 'bg-zinc-700 text-zinc-200' : `${SEV[s].bg} ${SEV[s].text}`) : 'text-zinc-500 hover:text-zinc-300'
+                        }`}>{s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}</button>
+                    ))}
+                  </div>
+                  <input type="text" value={auditSearch} onChange={e => setAuditSearch(e.target.value)} placeholder="Search pages..."
+                    className="bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-[11px] text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-600 w-40" />
+                  <button onClick={() => toggleSection('all-pages')} className="ml-auto p-1.5 rounded hover:bg-zinc-800 text-zinc-500">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
+                <div className="divide-y divide-zinc-800/50 max-h-[500px] overflow-y-auto">
+                  {filteredPages.map(page => {
+                    const errs = page.issues.filter(i => i.severity === 'error').length;
+                    const warns = page.issues.filter(i => i.severity === 'warning').length;
+                    return (
+                      <button
+                        key={page.pageId}
+                        onClick={() => togglePage(page.pageId)}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/30 transition-colors text-left"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-medium text-zinc-300 truncate">{page.page}</div>
+                          <div className="text-[11px] text-zinc-500 truncate">{toLiveUrl(page.url, liveDomain)}</div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {errs > 0 && <span className="text-[11px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">{errs} err</span>}
+                          {warns > 0 && <span className="text-[11px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">{warns} warn</span>}
+                          <div className={`text-xs font-bold ${scoreColorClass(page.score)}`}>{page.score}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                  {filteredPages.length === 0 && <div className="px-4 py-8 text-center text-xs text-zinc-500">No pages match your filters</div>}
+                </div>
+              </div>
+            )}
+          </>
+        );
+      })()}
+
+      {/* ── 4. SITE-WIDE ISSUES (Conditional Banner) ── */}
+      {auditDetail.audit.siteWideIssues.length > 0 && (
+        <div className="bg-zinc-900/50 rounded-xl border border-zinc-800/50 p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Info className="w-4 h-4 text-amber-400" />
+            <span className="text-xs font-medium text-zinc-300">Site-Wide Issues ({auditDetail.audit.siteWideIssues.length})</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {auditDetail.audit.siteWideIssues.slice(0, 3).map((issue, i) => {
+              const sc = SEV[issue.severity];
+              return (
+                <div key={i} className={`px-2.5 py-1.5 rounded-lg ${sc.bg} border ${sc.border} text-[11px]`}>
+                  <span className={sc.text}>{issue.message}</span>
+                </div>
+              );
+            })}
+            {auditDetail.audit.siteWideIssues.length > 3 && (
+              <button 
+                onClick={() => toggleSection('site-wide-all')}
+                className="px-2.5 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-[11px] text-zinc-400 hover:text-zinc-300"
+              >
+                +{auditDetail.audit.siteWideIssues.length - 3} more
+              </button>
+            )}
+          </div>
+          {expandedSections.has('site-wide-all') && (
+            <div className="mt-3 pt-3 border-t border-zinc-800/50 space-y-2">
+              {auditDetail.audit.siteWideIssues.map((issue, i) => {
+                const sc = SEV[issue.severity];
+                return (
+                  <div key={i} className={`px-3 py-2 rounded-lg ${sc.bg} border ${sc.border}`}>
+                    <div className={`text-[11px] font-medium ${sc.text}`}>{issue.message}</div>
+                    {issue.recommendation && <div className="text-[11px] text-zinc-500 mt-0.5">{issue.recommendation}</div>}
                   </div>
                 );
               })}
             </div>
-          </div>
-        );
-      })()}
+          )}
+        </div>
+      )}
 
-      {/* ── 3. DEEP DIVE (accordion sections, all collapsed by default) ── */}
-      <div className="space-y-3">
-        {/* Score History */}
-        {auditDetail.scoreHistory.length >= 2 && (
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-            <button onClick={() => toggleSection('score-history')} className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors">
-              <span className="text-sm font-medium text-zinc-300">Score History</span>
-              <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${expandedSections.has('score-history') ? '' : '-rotate-90'}`} />
-            </button>
-            {expandedSections.has('score-history') && (
-              <div className="px-4 pb-4">
+      {/* ── 5. HISTORY (Collapsed by default - less important) ── */}
+      <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+        <button onClick={() => toggleSection('history')} className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors">
+          <div className="flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-zinc-400" />
+            <span className="text-sm font-medium text-zinc-300">History &amp; Details</span>
+          </div>
+          <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${expandedSections.has('history') ? '' : '-rotate-90'}`} />
+        </button>
+        {expandedSections.has('history') && (
+          <div className="px-4 pb-4 border-t border-zinc-800 space-y-4">
+            {/* Score History */}
+            {auditDetail.scoreHistory.length >= 2 && (
+              <div className="pt-4">
+                <div className="text-xs font-medium text-zinc-400 mb-2">Score History</div>
                 <ScoreHistoryChart history={auditDetail.scoreHistory} />
               </div>
             )}
-          </div>
-        )}
-
-        {/* Category Breakdown */}
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-          <button onClick={() => toggleSection('categories')} className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors">
-            <span className="text-sm font-medium text-zinc-300">Issues by Category</span>
-            <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${expandedSections.has('categories') ? '' : '-rotate-90'}`} />
-          </button>
-          {expandedSections.has('categories') && (
-            <div className="px-4 pb-4">
+            {/* Category Breakdown */}
+            <div>
+              <div className="text-xs font-medium text-zinc-400 mb-2">Issues by Category</div>
               <div className="space-y-2">
                 {Object.entries(categoryStats).map(([cat, counts]) => {
                   const info = CAT_LABELS[cat] || { label: cat, color: '#71717a' };
@@ -307,203 +552,9 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, tie
                 })}
               </div>
             </div>
-          )}
-        </div>
-
-        {/* Core Web Vitals */}
-        {auditDetail.audit.cwvSummary && (auditDetail.audit.cwvSummary.mobile || auditDetail.audit.cwvSummary.desktop) && (
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-            <button onClick={() => toggleSection('cwv')} className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors">
-              <div className="flex items-center gap-2">
-                <Globe className="w-4 h-4 text-teal-400" />
-                <span className="text-sm font-medium text-zinc-300">Page Speed &amp; Core Web Vitals</span>
-              </div>
-              <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${expandedSections.has('cwv') ? '' : '-rotate-90'}`} />
-            </button>
-            {expandedSections.has('cwv') && (() => {
-              const ratingColor = (r: CwvStrategyResult['metrics']['LCP']['rating']) =>
-                r === 'good' ? 'text-emerald-400' : r === 'needs-improvement' ? 'text-amber-400' : r === 'poor' ? 'text-red-400' : 'text-zinc-500';
-              const ratingBg = (r: CwvStrategyResult['metrics']['LCP']['rating']) =>
-                r === 'good' ? 'bg-emerald-500/10 border-emerald-500/20' : r === 'needs-improvement' ? 'bg-amber-500/10 border-amber-500/20' : r === 'poor' ? 'bg-red-500/10 border-red-500/20' : 'bg-zinc-800/50 border-zinc-700/30';
-              const assessBadge = (a: CwvStrategyResult['assessment']) =>
-                a === 'good' ? { text: 'Passed', cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' }
-                : a === 'needs-improvement' ? { text: 'Needs Work', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/30' }
-                : a === 'poor' ? { text: 'Failed', cls: 'bg-red-500/15 text-red-400 border-red-500/30' }
-                : { text: 'No Data', cls: 'bg-zinc-800/50 text-zinc-500 border-zinc-700/30' };
-              const renderStrategy = (label: string, s: CwvStrategyResult) => {
-                const badge = assessBadge(s.assessment);
-                return (
-                  <div key={label} className="flex-1 min-w-[240px]">
-                    <div className="flex items-center justify-between mb-2.5">
-                      <span className="text-xs font-medium text-zinc-400 uppercase tracking-wider">{label}</span>
-                      <span className={`text-[11px] px-2 py-0.5 rounded border font-medium ${badge.cls}`}>{badge.text}</span>
-                    </div>
-                    <div className="space-y-1.5">
-                      {[
-                        { key: 'LCP' as const, label: 'Loading Speed', fmt: (v: number) => `${(v / 1000).toFixed(1)}s`, desc: 'How fast content appears' },
-                        { key: 'INP' as const, label: 'Responsiveness', fmt: (v: number) => `${Math.round(v)}ms`, desc: 'How fast the page reacts' },
-                        { key: 'CLS' as const, label: 'Visual Stability', fmt: (v: number) => v.toFixed(2), desc: 'How much the layout shifts' },
-                      ].map(m => {
-                        const metric = s.metrics[m.key];
-                        return (
-                          <div key={m.key} className={`flex items-center justify-between px-3 py-2 rounded-lg border ${ratingBg(metric.rating)}`}>
-                            <div>
-                              <span className="text-xs font-medium text-zinc-300">{m.label}</span>
-                              <span className="text-[10px] text-zinc-500 ml-1.5">{m.desc}</span>
-                            </div>
-                            <span className={`text-sm font-mono font-medium ${ratingColor(metric.rating)}`}>
-                              {metric.value !== null ? m.fmt(metric.value) : '—'}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    {!s.fieldDataAvailable && (
-                      <div className="mt-1.5 text-[10px] text-zinc-500 italic px-1">Based on lab simulation — real visitor data not yet available</div>
-                    )}
-                  </div>
-                );
-              };
-              return (
-                <div className="px-4 pb-4 flex gap-4 flex-wrap">
-                  {auditDetail.audit.cwvSummary!.mobile && renderStrategy('Mobile', auditDetail.audit.cwvSummary!.mobile)}
-                  {auditDetail.audit.cwvSummary!.desktop && renderStrategy('Desktop', auditDetail.audit.cwvSummary!.desktop)}
-                </div>
-              );
-            })()}
           </div>
         )}
-
-        {/* Site-Wide Issues */}
-        {auditDetail.audit.siteWideIssues.length > 0 && (
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-            <button onClick={() => toggleSection('site-wide')} className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors">
-              <span className="text-sm font-medium text-zinc-300">Site-Wide Issues</span>
-              <span className="text-[11px] text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded-full">{auditDetail.audit.siteWideIssues.length}</span>
-            </button>
-            {expandedSections.has('site-wide') && (
-              <div className="px-4 pb-4 space-y-2">
-                {auditDetail.audit.siteWideIssues.map((issue, i) => {
-                  const sc = SEV[issue.severity] || SEV.info;
-                  return (
-                    <div key={i} className={`px-3 py-2.5 rounded-lg ${sc.bg} border ${sc.border}`}>
-                      <div className={`flex items-center gap-1.5 text-xs font-medium ${sc.text}`}>
-                        {issue.severity === 'error' && <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />}
-                        {issue.severity === 'warning' && <Info className="w-3.5 h-3.5 flex-shrink-0" />}
-                        {issue.severity === 'info' && <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />}
-                        {issue.message}
-                      </div>
-                      {issue.recommendation && <div className="text-[11px] text-zinc-500 mt-0.5">{issue.recommendation}</div>}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Page Breakdown (top 3 only initially) */}
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-          <button onClick={() => toggleSection('page-breakdown')} className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-zinc-300">Page Breakdown</span>
-              <span className="text-[11px] text-zinc-500">{filteredPages.length} pages</span>
-            </div>
-            <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${expandedSections.has('page-breakdown') ? '' : '-rotate-90'}`} />
-          </button>
-          {expandedSections.has('page-breakdown') && (
-            <div className="border-t border-zinc-800">
-              <div className="px-4 py-2 border-b border-zinc-800 flex items-center gap-2 flex-wrap bg-zinc-950/30">
-                <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-0.5">
-                  {(['all', 'error', 'warning', 'info'] as const).map(s => (
-                    <button key={s} onClick={() => setSeverityFilter(s)}
-                      className={`px-3 py-2 min-h-[44px] rounded-md text-[11px] font-medium transition-colors ${
-                        severityFilter === s ? (s === 'all' ? 'bg-zinc-700 text-zinc-200' : `${SEV[s].bg} ${SEV[s].text}`) : 'text-zinc-500 hover:text-zinc-300'
-                      }`}>{s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}</button>
-                  ))}
-                </div>
-                <input type="text" value={auditSearch} onChange={e => setAuditSearch(e.target.value)} placeholder="Search pages..."
-                  className="bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-[11px] text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-600 w-40" />
-              </div>
-              <div className="divide-y divide-zinc-800/50 max-h-[400px] overflow-y-auto">
-                {filteredPages.slice(0, visiblePages).map(page => {
-                  const isExp = expandedPages.has(page.pageId);
-                  const pageIssues = severityFilter === 'all' ? page.issues : page.issues.filter(i => i.severity === severityFilter);
-                  const errs = page.issues.filter(i => i.severity === 'error').length;
-                  const warns = page.issues.filter(i => i.severity === 'warning').length;
-                  return (
-                    <div key={page.pageId}>
-                      <button onClick={() => togglePage(page.pageId)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/30 transition-colors text-left">
-                        <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${isExp ? '' : '-rotate-90'}`} />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-medium text-zinc-300 truncate">{page.page}</div>
-                          <div className="text-[11px] text-zinc-500 truncate">{toLiveUrl(page.url, liveDomain)}</div>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {errs > 0 && <span className="text-[11px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">{errs} err</span>}
-                          {warns > 0 && <span className="text-[11px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">{warns} warn</span>}
-                          <div className={`text-xs font-bold ${scoreColorClass(page.score)}`}>{page.score}</div>
-                        </div>
-                      </button>
-                      {isExp && pageIssues.length > 0 && (
-                        <div className="px-4 pb-3 pl-11 space-y-1.5">
-                          {pageIssues.map((issue, i) => {
-                            const sc = SEV[issue.severity] || SEV.info;
-                            return (
-                              <div key={i} className={`px-3 py-2 rounded-lg ${sc.bg} border ${sc.border}`}>
-                                <div className="flex items-start gap-2">
-                                  {issue.severity === 'error' && <AlertTriangle className={`w-3.5 h-3.5 ${sc.text} flex-shrink-0 mt-0.5`} />}
-                                  {issue.severity === 'warning' && <Info className={`w-3.5 h-3.5 ${sc.text} flex-shrink-0 mt-0.5`} />}
-                                  {issue.severity === 'info' && <CheckCircle2 className={`w-3.5 h-3.5 ${sc.text} flex-shrink-0 mt-0.5`} />}
-                                  <span className={`text-[11px] font-medium uppercase ${sc.text} flex-shrink-0 mt-0.5`}>{issue.severity}</span>
-                                  <div>
-                                    <div className="text-[11px] text-zinc-300">{issue.message}</div>
-                                    {issue.recommendation && <div className="text-[11px] text-zinc-500 mt-0.5">{issue.recommendation}</div>}
-                                    {issue.value && <div className="text-[11px] text-zinc-500 mt-0.5 font-mono">Current: {issue.value}</div>}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                          {hasContentIssues(page.issues) && workspaceId && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); requestContentImprovement(page); }}
-                              disabled={requestedPages.has(page.pageId) || requestingPage === page.pageId}
-                              className={`mt-1.5 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
-                                requestedPages.has(page.pageId)
-                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-default'
-                                  : 'bg-teal-600 hover:bg-teal-500 text-white'
-                              }`}
-                            >
-                              <FileEdit className="w-3 h-3" />
-                              {requestedPages.has(page.pageId) ? 'Content request created' : requestingPage === page.pageId ? 'Creating request...' : 'Request Content Improvement'}
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-                {filteredPages.length === 0 && <div className="px-4 py-8 text-center text-xs text-zinc-500">No pages match your filters</div>}
-                {filteredPages.length > visiblePages && (
-                  <button 
-                    onClick={() => setVisiblePages(filteredPages.length)}
-                    className="w-full text-center py-3 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors border-t border-zinc-800"
-                  >
-                    View all {filteredPages.length} pages
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
       </div>
-
-      {/* Fix recommendations with cart CTAs */}
-      <FixRecommendations auditDetail={auditDetail} tier={tier} workspaceId={workspaceId} />
-
-      {/* Order status — recent fix purchases */}
-      {workspaceId && <OrderStatus workspaceId={workspaceId} />}
     </div>
   );
 

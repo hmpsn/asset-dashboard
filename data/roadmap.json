@@ -2759,22 +2759,23 @@
         },
         {
           "id": 321,
-          "title": "HealthTab redesign — 'Fix These First' priority view",
+          "title": "HealthTab redesign — Card-based command center",
           "source": "UI_UX_AUDIT Mar 2026",
           "est": "2-3h",
           "priority": "P1",
-          "notes": "Shipped — Restructured into 3 sections: 1) 'Your site's health: X/100' with 1-sentence summary at top, 2) 'Fix these first' — top 5 actionable issues prioritized (errors > warnings > content), 3) 'Deep dive' accordion — Score History, Category Breakdown, Core Web Vitals, Site-Wide Issues, and Page Breakdown all collapsed by default. Page Breakdown shows top 3 problematic pages initially with 'View all' button. Removed severity filter buttons from top, moved them inside Page Breakdown section.",
+          "notes": "Shipped v2 — Complete card-based redesign: 1) Health Score summary at top with 1-sentence status, 2) Page Speed card fully expanded (CWV mobile/desktop side-by-side), 3) Two-column layout: 'Fix These First' list (top 5 prioritized issues) | Page Cards (top 3 worst pages with click-to-expand), 4) Site-Wide Issues as compact conditional banner, 5) History & Details in single collapsed accordion. Removed FixRecommendations and OrderStatus from this tab. Removed all nested accordions. Clients can now scan→decide→act without clicking through sections.",
           "status": "done",
           "shippedAt": "2026-03-19"
         },
         {
-          "id": 322,
-          "title": "OverviewTab redesign — digest-first layout",
+          "id": 321,
+          "title": "HealthTab redesign — Card-based command center",
           "source": "UI_UX_AUDIT Mar 2026",
           "est": "2-3h",
-          "priority": "P2",
-          "notes": "Lead with 'What changed this week' digest — metric deltas + 1-sentence narrative. Move score rings to collapsible 'Health Snapshot' section. Sidebar quick actions reduced to 3 primary CTAs. Move trend charts to 'History' sub-tab. Action banners stack vertically not horizontally. Insights digest becomes primary above-fold content.",
-          "status": "pending"
+          "priority": "P1",
+          "notes": "Shipped v2 — Complete card-based redesign: 1) Health Score summary at top with 1-sentence status, 2) Page Speed card fully expanded (CWV mobile/desktop side-by-side), 3) Two-column layout: 'Fix These First' list (top 5 prioritized issues) | Page Cards (top 3 worst pages with click-to-expand), 4) Site-Wide Issues as compact conditional banner, 5) History & Details in single collapsed accordion. Removed FixRecommendations and OrderStatus from this tab. Removed all nested accordions. Clients can now scan→decide→act without clicking through sections.",
+          "status": "done",
+          "shippedAt": "2026-03-19"
         },
         {
           "id": 323,
