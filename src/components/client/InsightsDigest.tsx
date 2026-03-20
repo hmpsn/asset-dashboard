@@ -182,6 +182,32 @@ function generateInsights(props: InsightsDigestProps): DigestInsight[] {
     });
   }
 
+  // 5b. Core Web Vitals
+  const cwv = auditDetail?.audit.cwvSummary;
+  if (cwv && (cwv.mobile || cwv.desktop)) {
+    const mob = cwv.mobile;
+    const desk = cwv.desktop;
+    const assessLabel = (a: string) => a === 'good' ? 'Passed' : a === 'needs-improvement' ? 'Needs Work' : a === 'poor' ? 'Poor' : 'No Data';
+    const parts: string[] = [];
+    if (mob) parts.push(`Mobile: ${assessLabel(mob.assessment)}`);
+    if (desk) parts.push(`Desktop: ${assessLabel(desk.assessment)}`);
+    const anyBad = (mob?.assessment === 'poor' || mob?.assessment === 'needs-improvement') ||
+                   (desk?.assessment === 'poor' || desk?.assessment === 'needs-improvement');
+    const allGood = (mob?.assessment === 'good' || !mob) && (desk?.assessment === 'good' || !desk);
+    cards.push({
+      id: 'cwv',
+      icon: Globe,
+      color: allGood ? 'green' : anyBad ? 'amber' : 'blue',
+      headline: `Page speed: ${parts.join(' · ')}`,
+      body: allGood
+        ? 'Your Core Web Vitals are passing — page speed is not holding back your rankings.'
+        : 'Some Core Web Vitals metrics need attention. Improving page speed can boost both rankings and user experience.',
+      action: { label: 'View speed details', tab: 'health' },
+      priority: allGood ? 5 : 3,
+      sentiment: allGood ? 'positive' : 'opportunity',
+    });
+  }
+
   // 6. Key conversion events (pinned events only)
   const pinnedConversions = ga4Conversions.filter(c => isEventPinned(c.eventName));
   if (pinnedConversions.length > 0) {

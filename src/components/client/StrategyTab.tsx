@@ -37,6 +37,13 @@ interface StrategyTabProps {
 export function StrategyTab({ strategyData, requestedTopics, contentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal, contentPlanKeywords, onTabChange }: StrategyTabProps) {
   const betaMode = useBetaMode();
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['content-opportunities']));
+  const [expandedCounts, setExpandedCounts] = useState<Record<string, number>>({
+    'growth-opportunities': 5,
+    'quick-wins': 3,
+    'keyword-opportunities': 5,
+    'competitor-gaps': 9,
+    'page-keyword-map': 20,
+  });
   const [mapSearch, setMapSearch] = useState('');
   const [mapSort, setMapSort] = useState<'default' | 'position' | 'impressions' | 'clicks'>('default');
 
@@ -47,6 +54,10 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       else next.add(section);
       return next;
     });
+  };
+
+  const showAll = (section: string, total: number) => {
+    setExpandedCounts(prev => ({ ...prev, [section]: total }));
   };
 
   if (!strategyData) {
@@ -298,12 +309,15 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
 
             {expandedSections.has('growth-opportunities') && (
               <div className="px-4 pb-4 space-y-2">
-                {unranked.slice(0, 5).map(page => (
+                {unranked.slice(0, expandedCounts['growth-opportunities']).map(page => (
                   <div key={page.pagePath} className="rounded-lg bg-zinc-950/50 border border-zinc-800/80 p-3">
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
                         <div className="text-[11px] font-medium text-zinc-200 truncate">{page.pageTitle || page.pagePath}</div>
                         <div className="text-[10px] text-zinc-500 font-mono truncate">{page.pagePath}</div>
+                        {page.primaryKeyword && (
+                          <div className="text-[10px] text-teal-400/80 mt-0.5">Target: &ldquo;{page.primaryKeyword}&rdquo;</div>
+                        )}
                       </div>
                       <div className="flex items-center gap-1.5 flex-shrink-0">
                         {page.hasImpressions && <span className="text-[10px] text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">Almost there</span>}
@@ -320,9 +334,9 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                     </div>
                   </div>
                 ))}
-                {unranked.length > 5 && (
+                {unranked.length > expandedCounts['growth-opportunities'] && (
                   <button 
-                    onClick={() => toggleSection('growth-opportunities-all')}
+                    onClick={() => showAll('growth-opportunities', unranked.length)}
                     className="w-full text-center py-2 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
                   >
                     View all {unranked.length} opportunities
@@ -358,7 +372,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
 
           {expandedSections.has('quick-wins') && (
             <div className="px-4 pb-4 space-y-2">
-              {strategyData.quickWins.slice(0, 3).map((qw, i) => {
+              {strategyData.quickWins.slice(0, expandedCounts['quick-wins']).map((qw, i) => {
                 const impactColor = qw.estimatedImpact === 'high' ? 'text-green-400 bg-green-500/15 border-green-500/30' : qw.estimatedImpact === 'medium' ? 'text-amber-400 bg-amber-500/15 border-amber-500/30' : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
                 return (
                   <div key={i} className="px-3 py-2.5 rounded-lg bg-zinc-950/50 border border-zinc-800/80">
@@ -370,12 +384,12 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   </div>
                 );
               })}
-              {strategyData.quickWins.length > 3 && (
+              {strategyData.quickWins && strategyData.quickWins.length > expandedCounts['quick-wins'] && (
                 <button 
-                  onClick={() => toggleSection('quick-wins-all')}
+                  onClick={() => showAll('quick-wins', strategyData.quickWins!.length)}
                   className="w-full text-center py-2 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
                 >
-                  View all {strategyData.quickWins.length} quick wins
+                  View all {strategyData.quickWins!.length} quick wins
                 </button>
               )}
             </div>
@@ -404,17 +418,18 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
 
           {expandedSections.has('keyword-opportunities') && (
             <div className="px-4 pb-4">
+              <p className="text-[11px] text-zinc-500 mb-3">Additional keywords your existing pages could target to capture more search traffic.</p>
               <div className="space-y-1.5">
-                {strategyData.opportunities.slice(0, 5).map((opp, i) => (
+                {strategyData.opportunities.slice(0, expandedCounts['keyword-opportunities']).map((opp, i) => (
                   <div key={i} className="flex items-start gap-2 text-[11px] text-zinc-300 px-3 py-2 rounded-lg bg-zinc-950/50 border border-zinc-800/50">
                     <span className="w-5 h-5 rounded-full bg-purple-500/15 border border-purple-500/25 flex items-center justify-center flex-shrink-0 mt-0.5 text-[11px] text-purple-400 font-bold">{i + 1}</span>
                     {opp}
                   </div>
                 ))}
               </div>
-              {strategyData.opportunities.length > 5 && (
+              {strategyData.opportunities.length > expandedCounts['keyword-opportunities'] && (
                 <button 
-                  onClick={() => toggleSection('keyword-opportunities-all')}
+                  onClick={() => showAll('keyword-opportunities', strategyData.opportunities.length)}
                   className="w-full text-center py-2 mt-2 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
                 >
                   View all {strategyData.opportunities.length} opportunities
@@ -487,8 +502,9 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
 
           {expandedSections.has('competitor-gaps') && (
             <div className="px-4 pb-4">
+              <p className="text-[11px] text-zinc-500 mb-3">Keywords your competitors rank for that you don&apos;t — content gaps vs. your competition.</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                {strategyData.keywordGaps.slice(0, 9).map((gap, i) => (
+                {strategyData.keywordGaps.slice(0, expandedCounts['competitor-gaps']).map((gap, i) => (
                   <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg bg-zinc-950/50 border border-zinc-800/50">
                     <span className="text-[11px] text-zinc-300 font-medium truncate mr-2">{gap.keyword}</span>
                     <div className="flex items-center gap-2 flex-shrink-0">
@@ -502,12 +518,12 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   </div>
                 ))}
               </div>
-              {strategyData.keywordGaps.length > 9 && (
+              {strategyData.keywordGaps && strategyData.keywordGaps.length > expandedCounts['competitor-gaps'] && (
                 <button 
-                  onClick={() => toggleSection('competitor-gaps-all')}
+                  onClick={() => showAll('competitor-gaps', strategyData.keywordGaps!.length)}
                   className="w-full text-center py-2 mt-2 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
                 >
-                  View all {strategyData.keywordGaps.length} gaps
+                  View all {strategyData.keywordGaps!.length} gaps
                 </button>
               )}
             </div>
@@ -567,7 +583,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   </select>
                 </div>
                 <div className="divide-y divide-zinc-800/50 max-h-[400px] overflow-y-auto">
-                  {filtered.slice(0, 20).map(page => (
+                  {filtered.slice(0, expandedCounts['page-keyword-map']).map(page => (
                     <div key={page.pagePath} className="px-4 py-2.5 hover:bg-zinc-800/30 transition-colors">
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0">
@@ -583,14 +599,20 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                       </div>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-[10px] text-teal-400/80">{page.primaryKeyword}</span>
+                        {page.secondaryKeywords && page.secondaryKeywords.length > 0 && (
+                          <span className="text-[10px] text-zinc-600">+{page.secondaryKeywords.length} more</span>
+                        )}
                         {page.impressions != null && page.impressions > 0 && <span className="text-[10px] text-zinc-500">{page.impressions.toLocaleString()} imp</span>}
                       </div>
                     </div>
                   ))}
-                  {filtered.length > 20 && (
-                    <div className="px-4 py-3 text-center text-[11px] text-zinc-500">
-                      {filtered.length - 20} more pages — refine search to narrow results
-                    </div>
+                  {filtered.length > expandedCounts['page-keyword-map'] && (
+                    <button 
+                      onClick={() => showAll('page-keyword-map', filtered.length)}
+                      className="w-full text-center py-3 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
+                    >
+                      Show all {filtered.length} pages
+                    </button>
                   )}
                   {filtered.length === 0 && (
                     <div className="px-4 py-8 text-center text-xs text-zinc-500">No pages match your filters</div>

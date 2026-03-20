@@ -136,6 +136,7 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
           .sort((a, b) => b.issues.length - a.issues.length)
           .slice(0, 5)
           .map(p => ({ page: p.page, score: p.score, issueCount: p.issues.length, topIssues: p.issues.slice(0, 3).map(i => ({ check: i.check, severity: i.severity, message: i.message })) })),
+        cwvSummary: auditDetail.audit.cwvSummary,
       };
     }
     if (strategyData) {

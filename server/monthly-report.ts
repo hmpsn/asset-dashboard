@@ -60,6 +60,14 @@ interface TrafficComparison {
   pageviews?: { current: number; previous: number; changePct: number };
 }
 
+interface CwvStrategyResult {
+  assessment: 'good' | 'needs-improvement' | 'poor' | 'no-data';
+  fieldDataAvailable: boolean;
+  lighthouseScore: number;
+  metrics: { LCP: { value: number | null; rating: 'good' | 'needs-improvement' | 'poor' | null }; INP: { value: number | null; rating: 'good' | 'needs-improvement' | 'poor' | null }; CLS: { value: number | null; rating: 'good' | 'needs-improvement' | 'poor' | null } };
+}
+interface CwvSummary { mobile?: CwvStrategyResult; desktop?: CwvStrategyResult; }
+
 interface MonthlyData {
   workspace: Workspace;
   siteScore?: number;
@@ -67,6 +75,7 @@ interface MonthlyData {
   totalPages?: number;
   errors?: number;
   warnings?: number;
+  cwvSummary?: CwvSummary;
   requestsCompleted: number;
   requestsOpen: number;
   approvalsApplied: number;
@@ -124,6 +133,7 @@ async function gatherMonthlyData(ws: Workspace): Promise<MonthlyData> {
     totalPages: snapshot?.audit.totalPages,
     errors: snapshot?.audit.errors,
     warnings: snapshot?.audit.warnings,
+    cwvSummary: snapshot?.audit.cwvSummary as CwvSummary | undefined,
     requestsCompleted: completedThisMonth,
     requestsOpen: openRequests,
     approvalsApplied: appliedBatches,
@@ -158,6 +168,7 @@ export function generateReportHTML(data: MonthlyData): string {
     totalPages: data.totalPages,
     errors: data.errors,
     warnings: data.warnings,
+    cwvSummary: data.cwvSummary,
     requestsCompleted: data.requestsCompleted,
     requestsOpen: data.requestsOpen,
     approvalsApplied: data.approvalsApplied,
@@ -187,6 +198,7 @@ async function sendMonthlyReportEmail(ws: Workspace, data: MonthlyData) {
     totalPages: data.totalPages,
     errors: data.errors,
     warnings: data.warnings,
+    cwvSummary: data.cwvSummary,
     requestsCompleted: data.requestsCompleted,
     requestsOpen: data.requestsOpen,
     approvalsApplied: data.approvalsApplied,

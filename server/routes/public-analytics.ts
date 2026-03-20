@@ -202,6 +202,7 @@ ${context?.ga4Organic ? '✅ **Organic Overview** — organic users, sessions, e
 ${context?.ga4NewVsReturning ? '✅ **New vs Returning Users** — segment breakdown with engagement rates' : ''}
 ${hasHealth ? '✅ **Site Health Audit** — site score, errors, warnings, page-level issues, score history' : ''}
 ${context?.siteHealthDetail ? '✅ **Audit Detail** — site-wide issues, top problem pages with specific issue descriptions' : ''}
+${context?.siteHealthDetail?.cwvSummary ? '✅ **Core Web Vitals** — mobile and desktop page speed assessment (LCP, INP, CLS) with pass/fail ratings from Google' : ''}
 ${clientAuditTrafficSection ? '✅ **Audit Traffic Intelligence** — high-traffic pages that have SEO issues' : ''}
 ${hasStrategy ? '✅ **SEO Strategy** — keyword-to-page mapping, content gaps, quick wins, opportunities' : ''}
 ${hasRankings ? '✅ **Rank Tracking** — tracked keyword positions, clicks, impressions, position changes' : ''}

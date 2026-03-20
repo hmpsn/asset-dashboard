@@ -2721,11 +2721,11 @@
         },
         {
           "id": 312,
-          "title": "Surface CWV summary card in client portal HealthTab",
+          "title": "Platform-wide CWV integration — chatbot, monthly reports, InsightsDigest, HealthTab",
           "source": "FEATURE",
-          "est": "30m",
+          "est": "1.5h",
           "priority": "P1",
-          "notes": "Shipped — CWV summary card (mobile + desktop pass/fail, LCP/INP/CLS with plain-language labels and color-coded ratings) now renders in the client HealthTab between the score grid and fix recommendations. Also fixed applySuppressionsToAudit() in server/helpers.ts which was dropping cwvSummary from the filtered audit result — the return object explicitly listed fields but omitted cwvSummary.",
+          "notes": "Shipped — CWV data now surfaces across 10 platform surfaces: (1) Client HealthTab card with mobile/desktop pass/fail and plain-language metrics, (2) Client AI chatbot context — cwvSummary added to siteHealthDetail so chatbot answers speed questions, server prompt updated with CWV data inventory line, (3) Monthly report emails — new Page Speed section with Mobile/Desktop speed badges and Lighthouse scores between score ring and traffic stats, (4) InsightsDigest — proactive 'Page speed: Passed/Needs Work' insight card on client Overview tab. Also: admin SeoAudit card, admin AI chat, audit report exports (CSV+HTML), AI recommendations engine, applySuppressionsToAudit pass-through fix.",
           "status": "done",
           "shippedAt": "2026-03-19"
         }
@@ -2743,7 +2743,17 @@
           "source": "UI_UX_AUDIT Mar 2026",
           "est": "2-3h",
           "priority": "P1",
-          "notes": "Shipped — Added Strategy Health Score (0-100) at top with 3 sub-scores (Content Gaps 40%, Quick Wins 30%, Coverage 30%). Converted all sections to accordions with only Content Opportunities expanded by default. Removed competing gradient backgrounds — all sections now use consistent bg-zinc-900/border-zinc-800. Truncated lists show top 5 with 'View all' buttons. Moved Page Keyword Map to bottom as reference data.",
+          "notes": "Shipped — Added Strategy Health Score (0-100) at top with 3 sub-scores (Content Gaps 40%, Quick Wins 30%, Coverage 30%). Converted all sections to accordions with only Content Opportunities expanded by default. Removed competing gradient backgrounds — all sections now use consistent bg-zinc-900/border-zinc-800.",
+          "status": "done",
+          "shippedAt": "2026-03-19"
+        },
+        {
+          "id": 320.5,
+          "title": "StrategyTab refinements — View all buttons, keyword visibility, helper text",
+          "source": "UI_UX_AUDIT Mar 2026",
+          "est": "30m",
+          "priority": "P1",
+          "notes": "Shipped — Fixed 'View all' buttons to use expandedCounts state and actually expand lists. Added primary keyword display to Growth Opportunities cards. Added clarifying helper text under Keyword Opportunities ('Additional keywords your existing pages could target') and Competitor Gaps ('Keywords your competitors rank for that you don't'). Page Keyword Map now shows '+X more' indicator for secondary keywords.",
           "status": "done",
           "shippedAt": "2026-03-19"
         },
@@ -2753,8 +2763,9 @@
           "source": "UI_UX_AUDIT Mar 2026",
           "est": "2-3h",
           "priority": "P1",
-          "notes": "Restructure into 3 max sections: 1) 'Your site's health: X/100' with 1-sentence summary, 2) 'Fix these first' — top 5 actionable issues prioritized (errors > warnings > content), 3) 'Deep dive' (collapsed) — page breakdown, CWV details, category breakdown. Collapse Score history chart, Category breakdown, Site-wide issues, and Page-by-page list by default. Show only top 3 problematic pages initially.",
-          "status": "pending"
+          "notes": "Shipped — Restructured into 3 sections: 1) 'Your site's health: X/100' with 1-sentence summary at top, 2) 'Fix these first' — top 5 actionable issues prioritized (errors > warnings > content), 3) 'Deep dive' accordion — Score History, Category Breakdown, Core Web Vitals, Site-Wide Issues, and Page Breakdown all collapsed by default. Page Breakdown shows top 3 problematic pages initially with 'View all' button. Removed severity filter buttons from top, moved them inside Page Breakdown section.",
+          "status": "done",
+          "shippedAt": "2026-03-19"
         },
         {
           "id": 322,

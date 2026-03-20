@@ -546,6 +546,10 @@ export function renderMonthlyReport(data: {
   totalPages?: number;
   errors?: number;
   warnings?: number;
+  cwvSummary?: {
+    mobile?: { assessment: string; lighthouseScore: number; metrics: { LCP: { value: number | null; rating: string | null }; INP: { value: number | null; rating: string | null }; CLS: { value: number | null; rating: string | null } } };
+    desktop?: { assessment: string; lighthouseScore: number; metrics: { LCP: { value: number | null; rating: string | null }; INP: { value: number | null; rating: string | null }; CLS: { value: number | null; rating: string | null } } };
+  };
   requestsCompleted: number;
   requestsOpen: number;
   approvalsApplied: number;
@@ -577,6 +581,37 @@ export function renderMonthlyReport(data: {
       ${scoreDelta != null ? `<div style="font-size:12px;color:${scoreDelta >= 0 ? '#059669' : '#dc2626'};margin-top:2px;">${scoreDelta >= 0 ? '↑' : '↓'} ${Math.abs(scoreDelta)} from last audit</div>` : ''}
       ${d.totalPages ? `<div style="font-size:11px;color:#9ca3af;margin-top:2px;">${d.totalPages} pages · ${d.errors ?? 0} errors · ${d.warnings ?? 0} warnings</div>` : ''}
     </div>` : '';
+
+  // CWV / Page Speed section
+  const cwvBadge = (assessment: string) => {
+    const config: Record<string, { label: string; color: string; bg: string }> = {
+      good: { label: 'Passed', color: '#059669', bg: '#ecfdf5' },
+      'needs-improvement': { label: 'Needs Work', color: '#d97706', bg: '#fffbeb' },
+      poor: { label: 'Poor', color: '#dc2626', bg: '#fef2f2' },
+    };
+    const c = config[assessment] || { label: 'No Data', color: '#9ca3af', bg: '#f3f4f6' };
+    return `<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;color:${c.color};background:${c.bg};">${c.label}</span>`;
+  };
+
+  const cwvStrategyCell = (label: string, strategy: { assessment: string; lighthouseScore: number }) => {
+    return `<td style="padding:10px;background:#f8f9fa;border-radius:8px;text-align:center;width:50%;">
+      <div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:4px;">${label}</div>
+      ${cwvBadge(strategy.assessment)}
+      <div style="font-size:11px;color:#9ca3af;margin-top:4px;">Lighthouse: ${strategy.lighthouseScore}/100</div>
+    </td>`;
+  };
+
+  let cwvSection = '';
+  if (d.cwvSummary && (d.cwvSummary.mobile || d.cwvSummary.desktop)) {
+    const cells: string[] = [];
+    if (d.cwvSummary.mobile) cells.push(cwvStrategyCell('Mobile Speed', d.cwvSummary.mobile));
+    if (d.cwvSummary.desktop) cells.push(cwvStrategyCell('Desktop Speed', d.cwvSummary.desktop));
+    cwvSection = `
+      <div style="margin-top:16px;">
+        <div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Page Speed (Core Web Vitals)</div>
+        <table style="width:100%;border-collapse:separate;border-spacing:6px;"><tr>${cells.join('')}</tr></table>
+      </div>`;
+  }
 
   // Traffic comparison section
   const trafficCell = (label: string, m: { current: number; previous: number; changePct: number }) => {
@@ -659,7 +694,7 @@ export function renderMonthlyReport(data: {
       preheader: `Your ${d.monthName} summary for ${d.workspaceName}`,
       headline: 'Monthly Report',
       subtitle: `${d.workspaceName} · ${d.monthName}`,
-      body: trialBanner + scoreSection + trafficSection + metricsGrid + activitySection + chatSection + pendingAlert,
+      body: trialBanner + scoreSection + cwvSection + trafficSection + metricsGrid + activitySection + chatSection + pendingAlert,
       cta: d.dashboardUrl ? { label: 'Open Dashboard', url: d.dashboardUrl } : undefined,
       footer: `Automated monthly summary from ${STUDIO_NAME}`,
       logoUrl: deriveLogoUrl(d.dashboardUrl),
