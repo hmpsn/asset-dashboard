@@ -20,6 +20,7 @@ import {
   getJob,
   listJobs,
   cancelJob,
+  clearCompletedJobs,
   registerAbort,
   isJobCancelled,
   hasActiveJob,
@@ -64,6 +65,11 @@ router.get('/api/jobs/:id', (req, res) => {
   const job = getJob(req.params.id);
   if (!job) return res.status(404).json({ error: 'Job not found' });
   res.json(job);
+});
+
+router.delete('/api/jobs/completed', (_req, res) => {
+  const count = clearCompletedJobs();
+  res.json({ cleared: count });
 });
 
 router.delete('/api/jobs/:id', (req, res) => {

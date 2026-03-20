@@ -126,6 +126,7 @@ export function BackgroundTaskProvider({ children }: { children: ReactNode }) {
 
   const clearDone = useCallback(() => {
     setJobs(prev => prev.filter(j => j.status === 'pending' || j.status === 'running'));
+    del('/api/jobs/completed').catch(() => {});
   }, []);
 
   const activeJobs = jobs.filter(j => j.status === 'pending' || j.status === 'running');

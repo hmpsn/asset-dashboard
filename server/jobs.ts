@@ -259,6 +259,19 @@ export function hasActiveJob(type: string, workspaceId?: string): Job | undefine
   return undefined;
 }
 
+/** Delete all completed (done/error/cancelled) jobs from memory and SQLite. */
+export function clearCompletedJobs(): number {
+  let count = 0;
+  for (const [id, job] of jobs) {
+    if (job.status === 'done' || job.status === 'error' || job.status === 'cancelled') {
+      jobs.delete(id);
+      try { deleteStmt().run(id); } catch { /* best effort */ }
+      count++;
+    }
+  }
+  return count;
+}
+
 /** Mark all active (running/pending) jobs as interrupted (called during graceful shutdown). */
 export function markRunningJobsInterrupted(): void {
   for (const job of jobs.values()) {

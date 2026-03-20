@@ -334,19 +334,20 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
           value: `${psi.score}/100`,
         });
         // Individual CWV metrics
+        const testedPage = homepageUrl;
         if (psi.vitals.LCP !== null) {
           const lcpSec = (psi.vitals.LCP / 1000).toFixed(1);
           if (psi.vitals.LCP > 4000) {
-            siteWideIssues.push({ check: 'cwv-lcp', severity: 'error', message: `LCP is ${lcpSec}s (poor — should be under 2.5s)`, recommendation: 'Largest Contentful Paint over 4s severely impacts user experience. Optimize images, reduce server response time, and minimize render-blocking resources.', value: `${lcpSec}s` });
+            siteWideIssues.push({ check: 'cwv-lcp', severity: 'error', message: `LCP is ${lcpSec}s (poor — should be under 2.5s)`, recommendation: `Largest Contentful Paint over 4s severely impacts user experience. Measured on mobile for: ${testedPage}. Optimize images, reduce server response time, and minimize render-blocking resources.`, value: `${lcpSec}s` });
           } else if (psi.vitals.LCP > 2500) {
-            siteWideIssues.push({ check: 'cwv-lcp', severity: 'warning', message: `LCP is ${lcpSec}s (needs improvement — target under 2.5s)`, recommendation: 'Optimize Largest Contentful Paint by compressing images, using next-gen formats, and preloading key resources.', value: `${lcpSec}s` });
+            siteWideIssues.push({ check: 'cwv-lcp', severity: 'warning', message: `LCP is ${lcpSec}s (needs improvement — target under 2.5s)`, recommendation: `Measured on mobile for: ${testedPage}. Optimize Largest Contentful Paint by compressing images, using next-gen formats, and preloading key resources.`, value: `${lcpSec}s` });
           }
         }
         if (psi.vitals.CLS !== null && psi.vitals.CLS > 0.25) {
-          siteWideIssues.push({ check: 'cwv-cls', severity: psi.vitals.CLS > 0.5 ? 'error' : 'warning', message: `CLS is ${psi.vitals.CLS.toFixed(3)} (should be under 0.1)`, recommendation: 'Cumulative Layout Shift is too high. Set explicit dimensions on images/videos, avoid inserting content above existing content, and use CSS containment.', value: `${psi.vitals.CLS.toFixed(3)}` });
+          siteWideIssues.push({ check: 'cwv-cls', severity: psi.vitals.CLS > 0.5 ? 'error' : 'warning', message: `CLS is ${psi.vitals.CLS.toFixed(3)} (should be under 0.1)`, recommendation: `Cumulative Layout Shift is too high. Measured on mobile for: ${testedPage}. Set explicit dimensions on images/videos, avoid inserting content above existing content, and use CSS containment.`, value: `${psi.vitals.CLS.toFixed(3)}` });
         }
         if (psi.vitals.TBT !== null && psi.vitals.TBT > 600) {
-          siteWideIssues.push({ check: 'cwv-tbt', severity: psi.vitals.TBT > 1500 ? 'error' : 'warning', message: `Total Blocking Time is ${Math.round(psi.vitals.TBT)}ms (should be under 200ms)`, recommendation: 'Reduce JavaScript execution time, break up long tasks, and defer non-critical scripts.', value: `${Math.round(psi.vitals.TBT)}ms` });
+          siteWideIssues.push({ check: 'cwv-tbt', severity: psi.vitals.TBT > 1500 ? 'error' : 'warning', message: `Total Blocking Time is ${Math.round(psi.vitals.TBT)}ms (should be under 200ms)`, recommendation: `Measured on mobile for: ${testedPage}. Reduce JavaScript execution time, break up long tasks, and defer non-critical scripts.`, value: `${Math.round(psi.vitals.TBT)}ms` });
         }
       }
     } catch (err) {
