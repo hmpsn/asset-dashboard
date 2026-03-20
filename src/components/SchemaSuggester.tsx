@@ -5,7 +5,7 @@ import type { FixContext } from '../App';
 import {
   Loader2, CheckCircle,
   AlertCircle, Info, Sparkles, RefreshCw, Plus, Database, HelpCircle,
-  TrendingUp, TrendingDown, Clock, BarChart3,
+  TrendingUp, TrendingDown, Clock, BarChart3, BookOpen,
 } from 'lucide-react';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { useRecommendations } from '../hooks/useRecommendations';
@@ -16,7 +16,10 @@ import { SchemaPageCard } from './schema/SchemaPageCard';
 import { BulkPublishPanel } from './schema/BulkPublishPanel';
 import { PagePicker } from './schema/PagePicker';
 import { SchemaPlanPanel } from './schema/SchemaPlanPanel';
+import { SchemaWorkflowGuide } from './schema/SchemaWorkflowGuide';
 import { SCHEMA_ROLE_INDEX } from '../../shared/types/schema-plan';
+
+type SchemaSubTab = 'generator' | 'guide';
 
 interface SchemaSuggestion {
   type: string;
@@ -60,6 +63,7 @@ interface Props {
 }
 
 export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
+  const [schemaSubTab, setSchemaSubTab] = useState<SchemaSubTab>('generator');
   const { forPage: recsForPage, loaded: recsLoaded } = useRecommendations(workspaceId);
   const [data, setData] = useState<SchemaPageSuggestion[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -529,9 +533,36 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
     p => !pageSearch || p.title.toLowerCase().includes(pageSearch.toLowerCase()) || p.slug.toLowerCase().includes(pageSearch.toLowerCase())
   );
 
+  const schemaTabBar = (
+    <div className="flex items-center gap-1 border-b border-zinc-800 pb-0 mb-4">
+      {([
+        { id: 'generator' as SchemaSubTab, label: 'Generator', icon: Sparkles },
+        { id: 'guide' as SchemaSubTab, label: 'Workflow Guide', icon: BookOpen },
+      ]).map(t => (
+        <button
+          key={t.id}
+          onClick={() => setSchemaSubTab(t.id)}
+          className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px ${
+            schemaSubTab === t.id
+              ? 'border-teal-500 text-teal-300'
+              : 'border-transparent text-zinc-500 hover:text-zinc-300'
+          }`}
+        >
+          <t.icon className="w-3.5 h-3.5" />
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (schemaSubTab === 'guide') {
+    return <div>{schemaTabBar}<SchemaWorkflowGuide /></div>;
+  }
+
   if (!started) {
     return (
       <div className="space-y-4">
+        {schemaTabBar}
         <div className="flex flex-col items-center justify-center py-8 gap-4">
           <div className="w-14 h-14 rounded-2xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center">
             <Sparkles className="w-7 h-7 text-teal-400" />
@@ -659,6 +690,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
   if (loading && (!data || data.length === 0)) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3 text-zinc-500">
+        {schemaTabBar}
         <Loader2 className="w-6 h-6 animate-spin" />
         <p className="text-sm">{progressMsg || 'Scanning pages for schema opportunities...'}</p>
         <p className="text-xs text-zinc-500">Results will appear as each batch completes</p>
@@ -672,6 +704,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
   if (scanError) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3">
+        {schemaTabBar}
         <AlertCircle className="w-8 h-8 text-red-400" />
         <p className="text-red-400 text-sm font-medium">Schema generation failed</p>
         <p className="text-zinc-500 text-xs max-w-md text-center">{scanError}</p>
@@ -685,6 +718,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
   if (!data || data.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3">
+        {schemaTabBar}
         <CheckCircle className="w-8 h-8 text-green-400" />
         <p className="text-zinc-400 text-sm">No schema suggestions needed</p>
         <button onClick={runScan} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors mt-2">
@@ -704,6 +738,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
 
   return (
     <div className="space-y-4">
+      {schemaTabBar}
       {/* Schema site plan */}
       <SchemaPlanPanel siteId={siteId} />
 
