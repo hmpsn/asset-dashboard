@@ -459,7 +459,8 @@
           "est": "30m",
           "priority": "P0",
           "notes": "Command Palette exists but only accessible via ⌘K keyboard shortcut. Add magnifying glass icon button to header bar (next to notification bell) that opens Command Palette. Show ⌘K hint in tooltip.",
-          "status": "pending"
+          "status": "done",
+          "shippedAt": "2026-03-19"
         },
         {
           "id": 502,
@@ -468,7 +469,8 @@
           "est": "2-3h",
           "priority": "P0",
           "notes": "Currently blocks all mobile with 'Desktop only' message. Change to: allow read-only views (analytics, search, audit results) on mobile. Block only complex editing tools. Show 'Best on desktop' notice instead of hard block.",
-          "status": "pending"
+          "status": "done",
+          "shippedAt": "2026-03-19"
         },
         {
           "id": 503,
@@ -2579,6 +2581,16 @@
           "notes": "Shipped — AI Pre-Check button in review checklist runs GPT-4.1-mini against post content to evaluate all 6 checklist items. Auto-checks passing items, shows pass/fail badges with AI reasoning.",
           "status": "done",
           "shippedAt": "2026-03-17"
+        },
+        {
+          "id": 310,
+          "title": "CWV field-data vs Lighthouse lab score fix",
+          "source": "BUG",
+          "est": "1h",
+          "priority": "P1",
+          "notes": "Shipped — Audit now runs mobile + desktop in parallel, leads with CrUX field-data pass/fail (actual ranking signal), shows Lighthouse lab score as secondary diagnostic. Fixes misleading 49/100 mobile-only lab score being shown as the headline.",
+          "status": "done",
+          "shippedAt": "2026-03-19"
         }
       ]
     }
