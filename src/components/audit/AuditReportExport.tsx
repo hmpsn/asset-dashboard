@@ -9,6 +9,17 @@ import type { SeoAuditResult } from './types';
 
 export function getCSV(data: SeoAuditResult): string {
   const rows = [['Page', 'Slug', 'Score', 'Severity', 'Check', 'Message', 'Recommendation', 'Value', 'AI Suggestion']];
+  // CWV summary rows
+  if (data.cwvSummary) {
+    for (const [label, s] of [['Mobile', data.cwvSummary.mobile], ['Desktop', data.cwvSummary.desktop]] as const) {
+      if (!s) continue;
+      const assessText = s.assessment === 'good' ? 'Passed' : s.assessment === 'needs-improvement' ? 'Needs Work' : s.assessment === 'poor' ? 'Failed' : 'No Data';
+      const lcpVal = s.metrics.LCP.value !== null ? `${(s.metrics.LCP.value / 1000).toFixed(1)}s` : '—';
+      const inpVal = s.metrics.INP.value !== null ? `${Math.round(s.metrics.INP.value)}ms` : '—';
+      const clsVal = s.metrics.CLS.value !== null ? s.metrics.CLS.value.toFixed(2) : '—';
+      rows.push([`[CWV ${label}]`, '', '', s.assessment === 'good' ? 'info' : s.assessment === 'poor' ? 'error' : 'warning', 'cwv', `${label} CWV: ${assessText} (LCP ${lcpVal}, INP ${inpVal}, CLS ${clsVal})`, `Lighthouse lab score: ${s.lighthouseScore}/100. ${s.fieldDataAvailable ? 'Real-user data (CrUX).' : 'Lab simulation only.'}`, assessText, '']);
+    }
+  }
   for (const issue of data.siteWideIssues) {
     rows.push(['[Site-Wide]', '', '', issue.severity, issue.check, issue.message, issue.recommendation, issue.value || '', issue.suggestedFix || '']);
   }
@@ -87,6 +98,19 @@ export function generateHtmlReport(data: SeoAuditResult): string {
       Average page score: <strong>${data.siteScore}</strong>/100</p>
     </div>
   </div>
+
+  ${data.cwvSummary ? (() => {
+    const renderStrat = (label: string, s: NonNullable<typeof data.cwvSummary>['mobile']) => {
+      if (!s) return '';
+      const assess = s.assessment === 'good' ? 'Passed' : s.assessment === 'needs-improvement' ? 'Needs Work' : s.assessment === 'poor' ? 'Failed' : 'No Data';
+      const color = s.assessment === 'good' ? '#22c55e' : s.assessment === 'needs-improvement' ? '#f59e0b' : s.assessment === 'poor' ? '#ef4444' : '#999';
+      const lcpVal = s.metrics.LCP.value !== null ? (s.metrics.LCP.value / 1000).toFixed(1) + 's' : '—';
+      const inpVal = s.metrics.INP.value !== null ? Math.round(s.metrics.INP.value) + 'ms' : '—';
+      const clsVal = s.metrics.CLS.value !== null ? s.metrics.CLS.value.toFixed(2) : '—';
+      return '<div class="summary-item"><h3>' + label + ' <span style="color:' + color + ';font-weight:700">' + assess + '</span></h3><p>LCP: <strong>' + lcpVal + '</strong> · INP: <strong>' + inpVal + '</strong> · CLS: <strong>' + clsVal + '</strong><br>Lighthouse: ' + s.lighthouseScore + '/100' + (s.fieldDataAvailable ? ' · <em>Real-user data (CrUX)</em>' : ' · <em>Lab simulation only</em>') + '</p></div>';
+    };
+    return '<h2>Core Web Vitals <span style="font-size:13px;color:#666;font-weight:400">— Google ranking signal</span></h2><div class="summary-box">' + renderStrat('Mobile', data.cwvSummary.mobile) + renderStrat('Desktop', data.cwvSummary.desktop) + '</div>';
+  })() : ''}
 
   ${data.siteWideIssues.length > 0 ? `<h2>Site-Wide Issues</h2>${data.siteWideIssues.map(i => `
   <div class="issue-row">

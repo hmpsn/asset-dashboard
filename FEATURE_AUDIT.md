@@ -51,7 +51,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 5. PageSpeed / Performance
-**What it does:** Runs Google PageSpeed Insights on key pages. Reports Core Web Vitals (LCP, INP, CLS) with per-page breakdowns and optimization opportunities. Single-page on-demand testing by slug. Homepage CWV wired into the site audit for a unified health picture — **now runs both mobile + desktop in parallel**, leads with **CrUX field-data pass/fail** (the actual Google ranking signal) and shows Lighthouse lab score as secondary diagnostic with clear source labeling. **Auto-restore**: bulk and single-page test results persist to disk and load on mount — expensive 30-60s tests survive navigation and deploys.
+**What it does:** Runs Google PageSpeed Insights on key pages. Reports Core Web Vitals (LCP, INP, CLS) with per-page breakdowns and optimization opportunities. Single-page on-demand testing by slug. Homepage CWV wired into the site audit as a **dedicated summary card** — runs both mobile + desktop in parallel, shows CrUX field-data pass/fail (actual Google ranking signal) with per-metric ratings and Lighthouse lab score as secondary diagnostic. CWV data lives in `cwvSummary` on the audit response (not cluttering siteWideIssues). **Auto-restore**: bulk and single-page test results persist to disk and load on mount — expensive 30-60s tests survive navigation and deploys.
 
 **Agency value:** Performance data directly from Google's own tool. No "but my site feels fast" debates — the numbers are objective.
 

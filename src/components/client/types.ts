@@ -29,9 +29,12 @@ export interface WorkspaceInfo { id: string; name: string; webflowSiteId?: strin
 export interface AuditSummary { id: string; createdAt: string; siteScore: number; totalPages: number; errors: number; warnings: number; previousScore?: number; }
 export interface SeoIssue { check: string; severity: 'error' | 'warning' | 'info'; category?: string; message: string; recommendation: string; value?: string; }
 export interface PageAuditResult { pageId: string; page: string; slug: string; url: string; score: number; issues: SeoIssue[]; }
+export interface CwvMetricSummary { value: number | null; rating: 'good' | 'needs-improvement' | 'poor' | null; }
+export interface CwvStrategyResult { assessment: 'good' | 'needs-improvement' | 'poor' | 'no-data'; fieldDataAvailable: boolean; lighthouseScore: number; metrics: { LCP: CwvMetricSummary; INP: CwvMetricSummary; CLS: CwvMetricSummary; }; }
+export interface CwvSummary { mobile?: CwvStrategyResult; desktop?: CwvStrategyResult; }
 export interface AuditDetail {
   id: string; createdAt: string; siteName: string; logoUrl?: string; previousScore?: number;
-  audit: { siteScore: number; totalPages: number; errors: number; warnings: number; infos: number; pages: PageAuditResult[]; siteWideIssues: SeoIssue[]; };
+  audit: { siteScore: number; totalPages: number; errors: number; warnings: number; infos: number; pages: PageAuditResult[]; siteWideIssues: SeoIssue[]; cwvSummary?: CwvSummary; };
   scoreHistory: Array<{ id: string; createdAt: string; siteScore: number }>;
 }
 export interface ChatMessage { role: 'user' | 'assistant'; content: string; }

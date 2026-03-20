@@ -2701,11 +2701,11 @@
         },
         {
           "id": 310,
-          "title": "CWV field-data vs Lighthouse lab score fix",
+          "title": "CWV field-data vs Lighthouse lab score — dedicated summary card",
           "source": "BUG",
-          "est": "1h",
+          "est": "2h",
           "priority": "P1",
-          "notes": "Shipped — Audit now runs mobile + desktop in parallel, leads with CrUX field-data pass/fail (actual ranking signal), shows Lighthouse lab score as secondary diagnostic. Fixes misleading 49/100 mobile-only lab score being shown as the headline.",
+          "notes": "Shipped — CWV data moved out of siteWideIssues into dedicated cwvSummary on audit response. Frontend renders as a prominent card with mobile + desktop columns, per-metric ratings (LCP/INP/CLS), pass/fail badges, and Lighthouse lab score as secondary. Only Lighthouse lab score remains in siteWideIssues as info. Updated CSV/HTML report exports and client portal types.",
           "status": "done",
           "shippedAt": "2026-03-19"
         }
