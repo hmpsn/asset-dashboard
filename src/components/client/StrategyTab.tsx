@@ -59,7 +59,13 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   };
 
   const scrollToSection = (section: string, ref: React.RefObject<HTMLDivElement | null>) => {
-    toggleSection(section);
+    // Ensure section is expanded before scrolling
+    setExpandedSections(prev => {
+      if (prev.has(section)) return prev;
+      const next = new Set(prev);
+      next.add(section);
+      return next;
+    });
     setTimeout(() => {
       ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 50);
