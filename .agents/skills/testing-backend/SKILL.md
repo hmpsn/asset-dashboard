@@ -19,8 +19,8 @@ npm run dev:server
 ```bash
 cd ~/repos/asset-dashboard && npx vitest run
 ```
-- Pre-existing failure: `TabBar.test.tsx` or `users-api.test.ts` may fail — unrelated to backend changes
-- Expected: ~37-38/38 test files pass, ~464-596 tests pass (count grows over time)
+- Expected: ~58 test files pass, ~645+ tests pass (count grows over time)
+- Run specific test file: `npx vitest run tests/unit/your-test.test.ts`
 
 ## Testing Schema Module (D1-D5)
 
@@ -48,6 +48,49 @@ npx vitest run tests/unit/your-test.test.ts
 - Schema generation (`generateSchemaForPage`, `generateSchemaSuggestions`) requires `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`
 - Site architecture fetching requires `WEBFLOW_API_TOKEN`
 - Without these, test pure functions and verify builds only
+
+## Testing Schema Module (D4, D6, D7)
+
+### D4 — Competitor Schema Intelligence
+- **Exported:** `compareSchemas(ourTypes, competitorResult)` from `server/competitor-schema.ts` — pure function, no network needed
+- **Exported:** `crawlCompetitorSchemas(domain, maxPages?)` — requires live network access to competitor domains
+- **API endpoint:** `GET /api/competitor-schema/:workspaceId` — requires workspace with `competitorDomains` configured
+- Rate limiting: max 2 concurrent fetches, 500ms between batches, 10s timeout
+- Caching: 24h TTL, file-based in `competitor-schemas/` data dir
+
+### D6 — E-E-A-T Enrichment
+- **Exported:** `extractEeatFromBrief(brief)` from `server/schema-suggester.ts` — pure function
+- Extracts: `authorName`, `authorTitle`, `expertiseTopics` from brief's `eeatGuidance` field
+- **Known regex edge case:** Names with "Dr." prefix or period-delimited (e.g., "Author: John Doe. Covers...") may over-capture. Comma-delimited input works correctly (e.g., "Author: John Doe, covers...").
+- Full E-E-A-T injection into AI prompt requires OpenAI/Anthropic API key
+
+### D7 — Schema Pre-Generation
+- **Exported:** `generateSchemaSkeleton(cell, template, siteUrl)` from `server/schema-queue.ts` — pure function, deterministic
+- **Exported:** `queueSchemaPreGeneration(workspaceId, matrixId, cellId)` — async, triggers on cell status transition
+- **Exported:** `listPendingSchemas(workspaceId)`, `markSchemaApplied(cellId)`, `markSchemaStale(cellId)`
+- **API endpoint:** `GET /api/pending-schemas/:workspaceId`
+- **Trigger:** PATCH cell status to `brief_generated` or `approved` via `PATCH /api/content-matrices/:wsId/:matrixId/cells/:cellId`
+- **Stale marking:** PATCH cell with changed `targetKeyword` or `customKeyword`
+
+### D7 Integration Test Pattern
+The full D7 lifecycle can be tested end-to-end via API without any external keys:
+```typescript
+import { createTestContext } from './helpers.js';
+import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { createTemplate } from '../../server/content-templates.js';
+
+const ctx = createTestContext(13251);
+await ctx.startServer();
+const ws = createWorkspace('Test');
+const tpl = createTemplate(ws.id, { name: 'Blog', pageType: 'blog' });
+
+// Create matrix → PATCH cell to brief_generated → wait 500ms → GET /api/pending-schemas/:wsId
+// Verify: pending schema with status 'pending', schemaTypes contains 'BlogPosting'
+// PATCH cell with new keyword → verify schema marked 'stale'
+// PATCH cell to 'approved' → verify new pending schema created
+```
+- `listPendingSchemas` returns transformed objects: `{ cellId, plannedUrl, schemaTypes, status, createdAt }` — NOT raw JSON
+- Allow 500ms after PATCH for async pre-generation to complete
 
 ## Testing Backup Verification
 
@@ -164,6 +207,12 @@ db.close();
 - `runMigrations()` is called on server startup in `server/index.ts` before route mounting
 - WAL mode enabled for concurrent read performance
 - Graceful shutdown sequence: mark health 503 → mark jobs interrupted → close WebSocket → drain HTTP → flush data → close SQLite
+
+## Build Verification
+```bash
+npx tsc --noEmit --skipLibCheck && npx vite build
+```
+Both must exit 0 before creating PRs.
 
 ## Devin Secrets Needed
 None required for basic backend testing. The server runs without any API keys in development mode.
