@@ -439,9 +439,9 @@
     },
     {
       "id": "sprint-ui-ux-audit",
-      "name": "UI/UX Audit Quick Wins",
-      "hours": "12-18",
-      "rationale": "Address critical UX issues identified in comprehensive UI/UX audit: empty state standardization, notification unification, mobile experience, and command palette visibility.",
+      "name": "UI/UX Audit Implementation",
+      "hours": "45-60",
+      "rationale": "Complete implementation of all findings from comprehensive UI/UX audit: quick wins (empty states, command palette, mobile), backend capability exposure (churn, anomalies, ROI, cannibalization), and strategic improvements (widget system, AI insights, accessibility).",
       "items": [
         {
           "id": 500,
@@ -497,6 +497,123 @@
           "est": "2-3h",
           "priority": "P2",
           "notes": "Backend has anomaly-detection.ts with ML-based anomaly detection. Currently barely visible. Create 'Insights' tab or section showing detected anomalies with explanations: 'Your LCP improved 23% this week', 'Traffic drop detected on [page]', 'Ranking anomaly for [keyword]'.",
+          "status": "pending"
+        },
+        {
+          "id": 506,
+          "title": "ROI Dashboard in Admin — Show organic traffic value per workspace",
+          "source": "UI_UX_AUDIT §Backend Capabilities",
+          "est": "2h",
+          "priority": "P1",
+          "notes": "ROI calculation exists in client portal only. Add ROI metric cards to admin Workspace Home and Command Center workspace cards. Shows organic traffic value delivered to justify agency fees.",
+          "status": "pending"
+        },
+        {
+          "id": 507,
+          "title": "Cannibalization Detection UI — Surface keyword conflicts in Strategy tab",
+          "source": "UI_UX_AUDIT §Backend Capabilities",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Backend has cannibalization-detection.ts. Add report to Strategy tab showing pages competing for same keywords. Severity badges: critical (same keyword, both ranking), warning (overlap detected).",
+          "status": "pending"
+        },
+        {
+          "id": 508,
+          "title": "Content Decay Prominence — Promote decaying content alert to main view",
+          "source": "UI_UX_AUDIT §Backend Capabilities",
+          "est": "1-2h",
+          "priority": "P2",
+          "notes": "ContentDecay exists as buried sub-tab. Add decay alert card to Content Pipeline main view. Show pages with declining traffic and 'Refresh' action button.",
+          "status": "pending"
+        },
+        {
+          "id": 509,
+          "title": "Approval Reminders UI — Add 'Send reminder' to approval batches",
+          "source": "UI_UX_AUDIT §Backend Capabilities",
+          "est": "1-2h",
+          "priority": "P2",
+          "notes": "Backend has approval-reminders.ts. Add 'Send reminder' button to pending approval batches. Show reminder history (last sent, count).",
+          "status": "pending"
+        },
+        {
+          "id": 510,
+          "title": "Scheduled Audits Config — UI for recurring audit settings",
+          "source": "UI_UX_AUDIT §Backend Capabilities",
+          "est": "2h",
+          "priority": "P2",
+          "notes": "Backend has scheduled-audits.ts. Add configuration UI to Site Audit tab: enable/disable, frequency (weekly/monthly), email alerts on score drops.",
+          "status": "pending"
+        },
+        {
+          "id": 511,
+          "title": "Widget System — Customizable Workspace Home dashboard",
+          "source": "UI_UX_AUDIT §Long-Term",
+          "est": "6-8h",
+          "priority": "P2",
+          "notes": "Let users pin/unpin modules on Workspace Home, rearrange widget order, choose sizes (compact/full/wide). Save per-workspace layouts to localStorage or workspace config.",
+          "status": "pending"
+        },
+        {
+          "id": 512,
+          "title": "AI Insights Feed — TikTok-style vertical feed of actionable insights",
+          "source": "UI_UX_AUDIT §Long-Term",
+          "est": "4-6h",
+          "priority": "P3",
+          "notes": "Swipeable insight cards: 'LCP improved 23%', '3 pages need schema', 'Competitor published 5 articles'. Auto-generated from anomaly detection + audit + strategy data.",
+          "status": "pending"
+        },
+        {
+          "id": 513,
+          "title": "Command Palette 2.0 — Action palette with natural language",
+          "source": "UI_UX_AUDIT §Long-Term",
+          "est": "4-6h",
+          "priority": "P3",
+          "notes": "Expand from navigation to actions: 'Generate schema for [page]', 'Create brief for [keyword]', 'Run audit'. Natural language: 'Show thin content pages'.",
+          "status": "pending"
+        },
+        {
+          "id": 514,
+          "title": "Client Education Hub — Embedded SEO education throughout",
+          "source": "UI_UX_AUDIT §Long-Term",
+          "est": "3-4h",
+          "priority": "P3",
+          "notes": "Contextual tooltips with 'Why this matters'. 'Learn more' links to SeoGlossary. Video explanations for complex features. Education tip cards in empty states.",
+          "status": "pending"
+        },
+        {
+          "id": 515,
+          "title": "Performance Budget Dashboard — Visual page weight tracker",
+          "source": "UI_UX_AUDIT §Long-Term",
+          "est": "3-4h",
+          "priority": "P3",
+          "notes": "Show page weight over time per workspace. Alert on regressions. Recommendations: 'Homepage grew 400KB, consider image optimization'.",
+          "status": "pending"
+        },
+        {
+          "id": 516,
+          "title": "Accessibility Improvements — WCAG AA compliance pass",
+          "source": "UI_UX_AUDIT §10",
+          "est": "4-6h",
+          "priority": "P2",
+          "notes": "Add ARIA landmarks, focus management for modals, keyboard navigation for complex widgets. Skip links. Test with screen reader (NVDA/VoiceOver).",
+          "status": "pending"
+        },
+        {
+          "id": 517,
+          "title": "Form Validation Standardization — React Hook Form + Zod",
+          "source": "UI_UX_AUDIT §9",
+          "est": "3-4h",
+          "priority": "P2",
+          "notes": "Replace basic HTML validation with consistent form library. Inline field-level validation with clear errors. aria-invalid + aria-describedby support. Success states for valid fields.",
+          "status": "pending"
+        },
+        {
+          "id": 518,
+          "title": "Loading State Consistency — Unified skeleton system",
+          "source": "UI_UX_AUDIT §3",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Standardize loading patterns: route-level (keep ChunkFallback), data fetching (skeleton screens), actions (button loading + optimistic UI), background jobs (progress panel).",
           "status": "pending"
         }
       ]
