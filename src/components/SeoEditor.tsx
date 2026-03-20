@@ -504,6 +504,17 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
           {summary.approved > 0 && <span className="text-green-400">{summary.approved}</span>}
           {summary.rejected > 0 && <StatusBadge status="rejected" />}
           {summary.rejected > 0 && <span className="text-red-400">{summary.rejected}</span>}
+          {summary.rejected > 0 && workspaceId && (
+            <button
+              onClick={async () => {
+                await post(`/api/workspaces/${workspaceId}/page-states/clear`, { status: 'rejected' });
+                refreshStates();
+              }}
+              className="text-[10px] text-red-400/70 hover:text-red-300 underline underline-offset-2 transition-colors"
+            >
+              clear
+            </button>
+          )}
           {summary.issueDetected > 0 && <StatusBadge status="issue-detected" />}
           {summary.issueDetected > 0 && <span className="text-amber-400">{summary.issueDetected}</span>}
           {summary.fixProposed > 0 && <StatusBadge status="fix-proposed" />}

@@ -666,6 +666,31 @@ export function getAllPageStates(workspaceId: string): Record<string, PageEditSt
   return states;
 }
 
+let _deletePageEditStatesByStatus: ReturnType<typeof db.prepare> | null = null;
+function deletePageEditStatesByStatusStmt() {
+  if (!_deletePageEditStatesByStatus) {
+    _deletePageEditStatesByStatus = db.prepare(`DELETE FROM page_edit_states WHERE workspace_id = ? AND status = ?`);
+  }
+  return _deletePageEditStatesByStatus;
+}
+
+let _deleteSeoEditTrackingByPageIds: ReturnType<typeof db.prepare> | null = null;
+function deleteSeoEditTrackingByPageIdsStmt() {
+  if (!_deleteSeoEditTrackingByPageIds) {
+    _deleteSeoEditTrackingByPageIds = db.prepare(`DELETE FROM seo_edit_tracking WHERE workspace_id = ? AND page_id IN (SELECT page_id FROM page_edit_states WHERE workspace_id = ? AND status = ?)`);
+  }
+  return _deleteSeoEditTrackingByPageIds;
+}
+
+export function clearPageStatesByStatus(workspaceId: string, status: string): number {
+  const row = getByIdStmt().get(workspaceId) as WorkspaceRow | undefined;
+  if (!row) return 0;
+  // Delete matching seo_edit_tracking rows first (before the page states are gone)
+  deleteSeoEditTrackingByPageIdsStmt().run(workspaceId, workspaceId, status);
+  const info = deletePageEditStatesByStatusStmt().run(workspaceId, status);
+  return info.changes;
+}
+
 export function clearPageState(workspaceId: string, pageId: string): boolean {
   const row = getByIdStmt().get(workspaceId) as WorkspaceRow | undefined;
   if (!row) return false;

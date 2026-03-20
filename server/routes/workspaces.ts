@@ -42,6 +42,7 @@ import {
   getPageState,
   getAllPageStates,
   clearPageState,
+  clearPageStatesByStatus,
 } from '../workspaces.js';
 
 // Workspaces
@@ -584,6 +585,14 @@ router.delete('/api/workspaces/:id/page-states/:pageId', requireWorkspaceAccess(
   const ok = clearPageState(req.params.id, req.params.pageId);
   if (!ok) return res.status(404).json({ error: 'Not found' });
   res.json({ ok: true });
+});
+
+// POST: bulk clear page states by status (admin)
+router.post('/api/workspaces/:id/page-states/clear', requireWorkspaceAccess(), (req, res) => {
+  const { status } = req.body;
+  if (!status) return res.status(400).json({ error: 'status required' });
+  const cleared = clearPageStatesByStatus(req.params.id, status);
+  res.json({ ok: true, cleared });
 });
 
 // --- Admin: Client User Management (requires internal auth) ---
