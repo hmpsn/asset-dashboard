@@ -51,7 +51,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 5. PageSpeed / Performance
-**What it does:** Runs Google PageSpeed Insights on key pages. Reports Core Web Vitals (LCP, FID, CLS) with per-page breakdowns and optimization opportunities. Single-page on-demand testing by slug. Homepage CWV wired into the site audit for a unified health picture. **Auto-restore**: bulk and single-page test results persist to disk and load on mount — expensive 30-60s tests survive navigation and deploys.
+**What it does:** Runs Google PageSpeed Insights on key pages. Reports Core Web Vitals (LCP, INP, CLS) with per-page breakdowns and optimization opportunities. Single-page on-demand testing by slug. Homepage CWV wired into the site audit for a unified health picture — **now runs both mobile + desktop in parallel**, leads with **CrUX field-data pass/fail** (the actual Google ranking signal) and shows Lighthouse lab score as secondary diagnostic with clear source labeling. **Auto-restore**: bulk and single-page test results persist to disk and load on mount — expensive 30-60s tests survive navigation and deploys.
 
 **Agency value:** Performance data directly from Google's own tool. No "but my site feels fast" debates — the numbers are objective.
 
@@ -818,7 +818,7 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - **Google Search Console 404 import**: Pull crawl errors from GSC to seed the redirect scanner with known broken URLs.
 
 ### Site Audit Enhancements
-- ~~Redirect + CWV integration~~: ✅ Shipped — Redirect chains and homepage Core Web Vitals wired into audit.
+- ~~Redirect + CWV integration~~: ✅ Shipped — Redirect chains and homepage Core Web Vitals wired into audit. Now runs mobile + desktop in parallel, leads with CrUX field-data pass/fail (actual ranking signal), Lighthouse lab score shown as secondary diagnostic.
 - ~~Contextual cross-link tips~~: ✅ Shipped — Audit results suggest SEO Editor, Redirects, Schema, Performance based on findings.
 - ~~Auto-restore after deploys~~: ✅ Shipped — Admin SeoAudit loads latest persisted snapshot from disk on mount when no in-memory job exists. No data loss between deploys.
 - ~~Error-sorted page list~~: ✅ Shipped — Pages sorted by error count descending so critical pages surface first.

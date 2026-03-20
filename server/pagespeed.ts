@@ -21,8 +21,9 @@ export interface PageSpeedResult {
   url: string;
   page: string;
   strategy: 'mobile' | 'desktop';
-  score: number;
+  score: number;          // Lighthouse lab score (diagnostic, NOT a ranking signal)
   vitals: CoreWebVitals;
+  cwvAssessment?: CwvAssessmentResult; // CrUX field-data pass/fail — the actual ranking signal
   opportunities: Opportunity[];
   diagnostics: Diagnostic[];
   fetchedAt: string;
@@ -124,6 +125,69 @@ function extractFieldVitals(data: Record<string, unknown>): { vitals: Partial<Co
       INP: m.INTERACTION_TO_NEXT_PAINT?.percentile ?? null,
     },
     available: true,
+  };
+}
+
+// CWV pass/fail assessment — the ACTUAL Google ranking signal (not the Lighthouse score)
+export type CwvAssessment = 'good' | 'needs-improvement' | 'poor' | 'no-data';
+
+export interface CwvAssessmentResult {
+  assessment: CwvAssessment;
+  fieldDataAvailable: boolean;
+  metrics: {
+    LCP: { value: number | null; rating: 'good' | 'needs-improvement' | 'poor' | null };
+    INP: { value: number | null; rating: 'good' | 'needs-improvement' | 'poor' | null };
+    CLS: { value: number | null; rating: 'good' | 'needs-improvement' | 'poor' | null };
+  };
+}
+
+function rateCwvMetric(
+  metric: CrUXMetric | undefined,
+  thresholds: [number, number],
+): 'good' | 'needs-improvement' | 'poor' | null {
+  if (!metric) return null;
+  const v = metric.percentile;
+  if (v <= thresholds[0]) return 'good';
+  if (v <= thresholds[1]) return 'needs-improvement';
+  return 'poor';
+}
+
+export function extractCwvAssessment(data: Record<string, unknown>): CwvAssessmentResult {
+  const le = (data as { loadingExperience?: LoadingExperience })?.loadingExperience;
+  const m = le?.metrics;
+
+  if (!m || !m.LARGEST_CONTENTFUL_PAINT_MS) {
+    return {
+      assessment: 'no-data',
+      fieldDataAvailable: false,
+      metrics: {
+        LCP: { value: null, rating: null },
+        INP: { value: null, rating: null },
+        CLS: { value: null, rating: null },
+      },
+    };
+  }
+
+  const lcpRating = rateCwvMetric(m.LARGEST_CONTENTFUL_PAINT_MS, [2500, 4000]);
+  const inpRating = rateCwvMetric(m.INTERACTION_TO_NEXT_PAINT, [200, 500]);
+  const clsVal = m.CUMULATIVE_LAYOUT_SHIFT_SCORE;
+  const clsRating = clsVal
+    ? (clsVal.percentile / 100 <= 0.1 ? 'good' : clsVal.percentile / 100 <= 0.25 ? 'needs-improvement' : 'poor') as 'good' | 'needs-improvement' | 'poor'
+    : null;
+
+  const ratings = [lcpRating, inpRating, clsRating].filter(Boolean) as string[];
+  let assessment: CwvAssessment = 'good';
+  if (ratings.includes('poor')) assessment = 'poor';
+  else if (ratings.includes('needs-improvement')) assessment = 'needs-improvement';
+
+  return {
+    assessment,
+    fieldDataAvailable: true,
+    metrics: {
+      LCP: { value: m.LARGEST_CONTENTFUL_PAINT_MS?.percentile ?? null, rating: lcpRating },
+      INP: { value: m.INTERACTION_TO_NEXT_PAINT?.percentile ?? null, rating: inpRating },
+      CLS: { value: clsVal ? clsVal.percentile / 100 : null, rating: clsRating },
+    },
   };
 }
 
@@ -261,12 +325,14 @@ export async function runSinglePageSpeed(
   if (!data) return null;
 
   const { vitals, fieldDataAvailable } = extractVitals(data);
+  const cwv = extractCwvAssessment(data);
   return {
     url,
     page: pageTitle || url.replace(/https?:\/\/[^/]+\/?/, '/') || '/',
     strategy,
     score: extractScore(data),
     vitals,
+    cwvAssessment: cwv.fieldDataAvailable ? cwv : undefined,
     opportunities: extractOpportunities(data),
     diagnostics: extractDiagnostics(data),
     fetchedAt: new Date().toISOString(),

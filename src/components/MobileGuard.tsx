@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { Monitor, X } from 'lucide-react';
 
 /**
- * Shows a dismissible interstitial on small screens (<768px)
- * recommending the desktop experience. Stores dismissal in sessionStorage.
+ * Shows a dismissible banner on small screens (<768px) recommending desktop.
+ * Allows read-only mobile access instead of blocking entirely.
+ * Stores dismissal in sessionStorage.
  */
 export function MobileGuard({ children }: { children: React.ReactNode }) {
   const [dismissed, setDismissed] = useState(() => {
@@ -22,28 +23,31 @@ export function MobileGuard({ children }: { children: React.ReactNode }) {
     try { sessionStorage.setItem('mobile_guard_dismissed', '1'); } catch { /* skip */ }
   };
 
-  if (!isMobile || dismissed) return <>{children}</>;
-
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#0f1219] p-6">
-      <div className="max-w-sm w-full text-center space-y-5">
-        <div className="mx-auto w-14 h-14 rounded-2xl bg-teal-500/10 flex items-center justify-center">
-          <Monitor className="w-7 h-7 text-teal-400" />
+    <>
+      {isMobile && !dismissed && (
+        <div className="fixed top-0 left-0 right-0 z-[9999] bg-amber-500/10 border-b border-amber-500/20 px-4 py-3">
+          <div className="flex items-center justify-between max-w-screen-xl mx-auto">
+            <div className="flex items-center gap-2">
+              <Monitor className="w-4 h-4 text-amber-400 flex-shrink-0" />
+              <p className="text-xs text-amber-300">
+                <span className="font-medium">Best on desktop.</span>{' '}
+                <span className="text-amber-400/80">Editing tools are limited on mobile.</span>
+              </p>
+            </div>
+            <button
+              onClick={dismiss}
+              className="p-1 rounded text-amber-400/60 hover:text-amber-300 hover:bg-amber-500/10 transition-colors flex-shrink-0"
+              aria-label="Dismiss mobile warning"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
-        <div>
-          <h2 className="text-lg font-semibold text-zinc-100">Best on Desktop</h2>
-          <p className="text-sm text-zinc-400 mt-2 leading-relaxed">
-            This dashboard is optimized for desktop screens. For the best experience, please visit on a laptop or desktop computer.
-          </p>
-        </div>
-        <button
-          onClick={dismiss}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors"
-        >
-          <X className="w-3.5 h-3.5" />
-          Continue anyway
-        </button>
+      )}
+      <div className={isMobile && !dismissed ? 'pt-12' : ''}>
+        {children}
       </div>
-    </div>
+    </>
   );
 }

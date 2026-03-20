@@ -316,46 +316,97 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
     log.error({ err: err }, 'Redirect scan failed (non-fatal)');
   }
 
-  // --- Homepage Core Web Vitals (quick single-page PSI check) ---
+  // --- Homepage Core Web Vitals (mobile + desktop) ---
+  // Google ranks based on CrUX field data (real Chrome users, 28-day window), NOT Lighthouse lab scores.
+  // We run both strategies and lead with the CWV pass/fail assessment.
   const homepageUrl = siteWideUrl || baseUrl;
   if (homepageUrl && process.env.GOOGLE_PSI_KEY) {
     try {
-      log.info('Running homepage PageSpeed check...');
-      const psi = await runSinglePageSpeed(homepageUrl, 'mobile', 'Homepage');
-      if (psi) {
-        const scoreLabel = psi.score >= 90 ? 'good' : psi.score >= 50 ? 'needs improvement' : 'poor';
-        const severity: Severity = psi.score >= 90 ? 'info' : psi.score >= 50 ? 'warning' : 'error';
-        siteWideIssues.push({
-          check: 'cwv', severity,
-          message: `Homepage performance score: ${psi.score}/100 (${scoreLabel})`,
-          recommendation: psi.score >= 90
-            ? 'Great performance! Core Web Vitals are a Google ranking signal.'
-            : `Performance score of ${psi.score} may hurt rankings. Core Web Vitals are a Google ranking signal. Run the full PageSpeed tool for detailed recommendations.`,
-          value: `${psi.score}/100`,
-        });
-        // Individual CWV metrics
-        const testedPage = homepageUrl;
-        const src = psi.fieldDataAvailable ? 'Real-user data (CrUX, 28-day p75)' : 'Lab simulation (Lighthouse)';
-        const srcShort = psi.fieldDataAvailable ? 'real users' : 'lab test';
-        if (psi.vitals.LCP !== null) {
-          const lcpSec = (psi.vitals.LCP / 1000).toFixed(1);
-          if (psi.vitals.LCP > 4000) {
-            siteWideIssues.push({ check: 'cwv-lcp', severity: 'error', message: `LCP is ${lcpSec}s (poor — should be under 2.5s) [${srcShort}]`, recommendation: `${src} for ${testedPage}. Largest Contentful Paint over 4s severely impacts user experience and rankings. Optimize images, reduce server response time, and minimize render-blocking resources.`, value: `${lcpSec}s` });
-          } else if (psi.vitals.LCP > 2500) {
-            siteWideIssues.push({ check: 'cwv-lcp', severity: 'warning', message: `LCP is ${lcpSec}s (needs improvement — target under 2.5s) [${srcShort}]`, recommendation: `${src} for ${testedPage}. Optimize Largest Contentful Paint by compressing images, using next-gen formats, and preloading key resources.`, value: `${lcpSec}s` });
+      log.info('Running homepage PageSpeed check (mobile + desktop)...');
+      const [psiMobile, psiDesktop] = await Promise.all([
+        runSinglePageSpeed(homepageUrl, 'mobile', 'Homepage').catch(() => null),
+        runSinglePageSpeed(homepageUrl, 'desktop', 'Homepage').catch(() => null),
+      ]);
+
+      // Helper: emit CWV issues for a single strategy result
+      const emitCwvIssues = (psi: NonNullable<typeof psiMobile>, label: string) => {
+        const cwv = psi.cwvAssessment;
+
+        // --- Primary: CWV field-data assessment (the actual Google ranking signal) ---
+        if (cwv) {
+          const assessLabel = cwv.assessment === 'good' ? 'Passed' : cwv.assessment === 'needs-improvement' ? 'Needs Improvement' : 'Failed';
+          const assessSeverity = cwv.assessment === 'good' ? 'info' : cwv.assessment === 'needs-improvement' ? 'warning' : 'error';
+
+          const parts: string[] = [];
+          if (cwv.metrics.LCP.value !== null) parts.push(`LCP ${(cwv.metrics.LCP.value / 1000).toFixed(1)}s`);
+          if (cwv.metrics.INP.value !== null) parts.push(`INP ${Math.round(cwv.metrics.INP.value)}ms`);
+          if (cwv.metrics.CLS.value !== null) parts.push(`CLS ${cwv.metrics.CLS.value.toFixed(2)}`);
+          const metricsStr = parts.length ? ` (${parts.join(', ')})` : '';
+
+          siteWideIssues.push({
+            check: 'cwv', severity: assessSeverity as 'info' | 'warning' | 'error',
+            message: `${label} Core Web Vitals: ${assessLabel}${metricsStr} [real users]`,
+            recommendation: cwv.assessment === 'good'
+              ? `Core Web Vitals passed for ${homepageUrl} (${label.toLowerCase()}). This is the actual Google ranking signal — based on real Chrome user data over 28 days.`
+              : `Core Web Vitals ${assessLabel.toLowerCase()} for ${homepageUrl} (${label.toLowerCase()}). This is the actual Google ranking signal — based on real Chrome user data over 28 days. Run the full PageSpeed tool for detailed recommendations.`,
+            value: assessLabel,
+          });
+
+          // Individual field-data CWV metric warnings
+          if (cwv.metrics.LCP.rating === 'poor' || cwv.metrics.LCP.rating === 'needs-improvement') {
+            const lcpSec = cwv.metrics.LCP.value !== null ? (cwv.metrics.LCP.value / 1000).toFixed(1) : '?';
+            const sev = cwv.metrics.LCP.rating === 'poor' ? 'error' : 'warning';
+            siteWideIssues.push({ check: 'cwv-lcp', severity: sev, message: `${label} LCP is ${lcpSec}s (${cwv.metrics.LCP.rating === 'poor' ? 'poor — should be under 2.5s' : 'needs improvement — target under 2.5s'}) [real users]`, recommendation: `Real-user data (CrUX, 28-day p75) for ${homepageUrl}. Optimize Largest Contentful Paint by compressing images, using next-gen formats, and preloading key resources.`, value: `${lcpSec}s` });
+          }
+          if (cwv.metrics.INP.rating === 'poor' || cwv.metrics.INP.rating === 'needs-improvement') {
+            const inpMs = cwv.metrics.INP.value !== null ? Math.round(cwv.metrics.INP.value) : '?';
+            const sev = cwv.metrics.INP.rating === 'poor' ? 'error' : 'warning';
+            siteWideIssues.push({ check: 'cwv-inp', severity: sev, message: `${label} INP is ${inpMs}ms (${cwv.metrics.INP.rating === 'poor' ? 'poor — should be under 200ms' : 'needs improvement — target under 200ms'}) [real users]`, recommendation: `Real-user data (CrUX) for ${homepageUrl}. Interaction to Next Paint measures responsiveness — a Core Web Vital that directly affects rankings.`, value: `${inpMs}ms` });
+          }
+          if (cwv.metrics.CLS.rating === 'poor' || cwv.metrics.CLS.rating === 'needs-improvement') {
+            const clsVal = cwv.metrics.CLS.value !== null ? cwv.metrics.CLS.value.toFixed(3) : '?';
+            const sev = cwv.metrics.CLS.rating === 'poor' ? 'error' : 'warning';
+            siteWideIssues.push({ check: 'cwv-cls', severity: sev, message: `${label} CLS is ${clsVal} (${cwv.metrics.CLS.rating === 'poor' ? 'poor — should be under 0.1' : 'needs improvement — target under 0.1'}) [real users]`, recommendation: `Real-user data (CrUX) for ${homepageUrl}. Set explicit dimensions on images/videos, avoid inserting content above existing content, and use CSS containment.`, value: `${clsVal}` });
           }
         }
-        if (psi.vitals.CLS !== null && psi.vitals.CLS > 0.25) {
-          siteWideIssues.push({ check: 'cwv-cls', severity: psi.vitals.CLS > 0.5 ? 'error' : 'warning', message: `CLS is ${psi.vitals.CLS.toFixed(3)} (should be under 0.1) [${srcShort}]`, recommendation: `${src} for ${testedPage}. Cumulative Layout Shift is too high. Set explicit dimensions on images/videos, avoid inserting content above existing content, and use CSS containment.`, value: `${psi.vitals.CLS.toFixed(3)}` });
-        }
+
+        // --- Secondary: Lighthouse lab score (diagnostic only, NOT a ranking signal) ---
+        const scoreLabel = psi.score >= 90 ? 'good' : psi.score >= 50 ? 'needs improvement' : 'poor';
+        siteWideIssues.push({
+          check: 'cwv-lab', severity: 'info',
+          message: `${label} Lighthouse lab score: ${psi.score}/100 (${scoreLabel}) [lab simulation]`,
+          recommendation: `Lighthouse simulates page load on a mid-tier device. This score is NOT used by Google for rankings — it's a diagnostic tool. Use it to identify optimization opportunities, but the CWV field-data assessment above is what affects search rankings.`,
+          value: `${psi.score}/100`,
+        });
+
+        // TBT — lab-only metric, useful diagnostic
         if (psi.vitals.TBT !== null && psi.vitals.TBT > 600) {
-          siteWideIssues.push({ check: 'cwv-tbt', severity: psi.vitals.TBT > 1500 ? 'error' : 'warning', message: `Total Blocking Time is ${Math.round(psi.vitals.TBT)}ms (should be under 200ms) [lab test]`, recommendation: `Lab simulation for ${testedPage}. TBT is a lab-only metric (not used directly for rankings). Reduce JavaScript execution time, break up long tasks, and defer non-critical scripts.`, value: `${Math.round(psi.vitals.TBT)}ms` });
+          siteWideIssues.push({ check: 'cwv-tbt', severity: psi.vitals.TBT > 1500 ? 'error' : 'warning', message: `${label} Total Blocking Time is ${Math.round(psi.vitals.TBT)}ms (should be under 200ms) [lab]`, recommendation: `Lab simulation for ${homepageUrl}. TBT is a lab-only proxy for responsiveness. Reduce JavaScript execution time, break up long tasks, and defer non-critical scripts.`, value: `${Math.round(psi.vitals.TBT)}ms` });
         }
-        // INP — field-only metric, replaces FID for ranking signal
-        if (psi.vitals.INP !== null && psi.vitals.INP > 500) {
-          siteWideIssues.push({ check: 'cwv-inp', severity: psi.vitals.INP > 800 ? 'error' : 'warning', message: `INP is ${Math.round(psi.vitals.INP)}ms (should be under 200ms) [real users]`, recommendation: `Real-user data (CrUX) for ${testedPage}. Interaction to Next Paint measures responsiveness — a Core Web Vital that directly affects rankings. Reduce event handler complexity and minimize main-thread work.`, value: `${Math.round(psi.vitals.INP)}ms` });
+
+        // If no field data, warn that we're relying on lab only
+        if (!cwv) {
+          const labScoreSev = psi.score >= 90 ? 'info' : psi.score >= 50 ? 'warning' : 'error';
+          siteWideIssues.push({
+            check: 'cwv', severity: labScoreSev as 'info' | 'warning' | 'error',
+            message: `${label} performance: ${psi.score}/100 (lab only — no real-user data available)`,
+            recommendation: `No Chrome UX Report (CrUX) data available for this site (${label.toLowerCase()}). This usually means the site has too few visitors for Google to collect field data. The Lighthouse lab score of ${psi.score}/100 is shown for diagnostics but is NOT a direct ranking signal. Focus on ensuring good Core Web Vitals when real-user data becomes available.`,
+            value: `${psi.score}/100`,
+          });
+          // Still report lab LCP/CLS if problematic
+          if (psi.vitals.LCP !== null && psi.vitals.LCP > 2500) {
+            const lcpSec = (psi.vitals.LCP / 1000).toFixed(1);
+            siteWideIssues.push({ check: 'cwv-lcp', severity: psi.vitals.LCP > 4000 ? 'error' : 'warning', message: `${label} LCP is ${lcpSec}s (${psi.vitals.LCP > 4000 ? 'poor' : 'needs improvement'} — target under 2.5s) [lab]`, recommendation: `Lab simulation for ${homepageUrl}. Optimize Largest Contentful Paint by compressing images, using next-gen formats, and preloading key resources.`, value: `${lcpSec}s` });
+          }
+          if (psi.vitals.CLS !== null && psi.vitals.CLS > 0.1) {
+            siteWideIssues.push({ check: 'cwv-cls', severity: psi.vitals.CLS > 0.25 ? 'error' : 'warning', message: `${label} CLS is ${psi.vitals.CLS.toFixed(3)} (${psi.vitals.CLS > 0.25 ? 'poor' : 'needs improvement'} — target under 0.1) [lab]`, recommendation: `Lab simulation for ${homepageUrl}. Set explicit dimensions on images/videos, avoid inserting content above existing content.`, value: `${psi.vitals.CLS.toFixed(3)}` });
+          }
         }
-      }
+      };
+
+      // Emit mobile first (Google uses mobile-first indexing)
+      if (psiMobile) emitCwvIssues(psiMobile, 'Mobile');
+      if (psiDesktop) emitCwvIssues(psiDesktop, 'Desktop');
     } catch (err) {
       log.error({ err: err }, 'PageSpeed check failed (non-fatal)');
     }

@@ -638,6 +638,22 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
 
           {/* ── Header widgets (right side) ── */}
           <div className="ml-auto flex items-center gap-1">
+            {/* Command Palette trigger */}
+            <button
+              onClick={() => {
+                // Programmatically trigger the ⌘K keyboard shortcut
+                const event = new KeyboardEvent('keydown', {
+                  key: 'k',
+                  metaKey: true,
+                  bubbles: true,
+                });
+                window.dispatchEvent(event);
+              }}
+              title="Command Palette (⌘K)"
+              className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-all"
+            >
+              <Search className="w-3.5 h-3.5" />
+            </button>
             {/* Requests widget */}
             {selected && (
               <button

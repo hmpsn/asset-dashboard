@@ -438,6 +438,68 @@
       ]
     },
     {
+      "id": "sprint-ui-ux-audit",
+      "name": "UI/UX Audit Quick Wins",
+      "hours": "12-18",
+      "rationale": "Address critical UX issues identified in comprehensive UI/UX audit: empty state standardization, notification unification, mobile experience, and command palette visibility.",
+      "items": [
+        {
+          "id": 500,
+          "title": "Empty State Standardization — Migrate 114 ad-hoc empty states to EmptyState primitive",
+          "source": "UI_UX_AUDIT §4",
+          "est": "4-6h",
+          "priority": "P0",
+          "notes": "114 ad-hoc empty state implementations across 50 files. Audit each, migrate to EmptyState component with context-appropriate icon/title/description/action. Create variants: NoData, NoSearchResults, NeedsConnection.",
+          "status": "pending"
+        },
+        {
+          "id": 501,
+          "title": "Command Palette Visibility — Add search trigger to header bar",
+          "source": "UI_UX_AUDIT §3",
+          "est": "30m",
+          "priority": "P0",
+          "notes": "Command Palette exists but only accessible via ⌘K keyboard shortcut. Add magnifying glass icon button to header bar (next to notification bell) that opens Command Palette. Show ⌘K hint in tooltip.",
+          "status": "pending"
+        },
+        {
+          "id": 502,
+          "title": "MobileGuard Improvement — Allow read-only mobile access",
+          "source": "UI_UX_AUDIT §6",
+          "est": "2-3h",
+          "priority": "P0",
+          "notes": "Currently blocks all mobile with 'Desktop only' message. Change to: allow read-only views (analytics, search, audit results) on mobile. Block only complex editing tools. Show 'Best on desktop' notice instead of hard block.",
+          "status": "pending"
+        },
+        {
+          "id": 503,
+          "title": "Unified Notification Hub — Merge NotificationBell + TaskPanel",
+          "source": "UI_UX_AUDIT §7",
+          "est": "3-4h",
+          "priority": "P1",
+          "notes": "Current fragmentation: NotificationBell (top right), TaskPanel (processing queue), inline toasts, email queue. Create unified notification center with categories: Actions Needed (approvals, requests), System Events (audits complete), Alerts (score drops). Add notification preferences per workspace.",
+          "status": "pending"
+        },
+        {
+          "id": 504,
+          "title": "Churn Signals Exposure — Add 'At Risk' filter to workspace overview",
+          "source": "UI_UX_AUDIT §Backend Capabilities",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Backend has churn-signals.ts that detects client risk based on activity patterns. Not exposed in UI. Add 'At Risk' badge/filter to workspace cards in Command Center. Show churn risk factors (low activity, pending approvals aging, etc.).",
+          "status": "pending"
+        },
+        {
+          "id": 505,
+          "title": "Anomaly Detection Dashboard — Expose ML-based traffic/ranking anomalies",
+          "source": "UI_UX_AUDIT §Backend Capabilities",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Backend has anomaly-detection.ts with ML-based anomaly detection. Currently barely visible. Create 'Insights' tab or section showing detected anomalies with explanations: 'Your LCP improved 23% this week', 'Traffic drop detected on [page]', 'Ranking anomaly for [keyword]'.",
+          "status": "pending"
+        }
+      ]
+    },
+    {
       "id": "backlog",
       "name": "Backlog",
       "hours": "80+",
