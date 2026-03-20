@@ -816,6 +816,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
         <PendingApprovals
           workspaceId={workspaceId}
           refreshKey={approvalRefreshKey}
+          onRetracted={() => setApprovalRefreshKey(k => k + 1)}
         />
       )}
 

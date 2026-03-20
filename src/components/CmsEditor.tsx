@@ -365,6 +365,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
         <PendingApprovals
           workspaceId={workspaceId}
           refreshKey={approvalRefreshKey}
+          onRetracted={() => refreshStates()}
         />
       )}
 

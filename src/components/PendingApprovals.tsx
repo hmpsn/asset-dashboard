@@ -36,7 +36,7 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
       }
       pending.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setBatches(pending);
-    } catch { /* silent */ }
+    } catch (err) { console.error('[PendingApprovals] load error:', err); }
     finally { setLoading(false); }
   }, [workspaceId, nameFilter]);
 

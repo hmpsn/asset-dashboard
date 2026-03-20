@@ -22,6 +22,8 @@ async function getSentryPlugin(): Promise<Plugin[]> {
   }
 }
 
+const API_PORT = process.env.PORT || '3001';
+
 export default defineConfig(async () => ({
   build: {
     sourcemap: !!process.env.SENTRY_AUTH_TOKEN, // Only generate source maps when Sentry is configured
@@ -41,10 +43,10 @@ export default defineConfig(async () => ({
   ],
   server: {
     proxy: {
-      '/api': 'http://localhost:3001',
+      '/api': `http://localhost:${API_PORT}`,
       // Only proxy the exact /ws path (WebSocket endpoint), not /ws/:id/:tab admin routes
       '^/ws$': {
-        target: 'ws://localhost:3001',
+        target: `ws://localhost:${API_PORT}`,
         ws: true,
         rewrite: () => '/ws',
       },

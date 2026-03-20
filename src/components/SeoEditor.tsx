@@ -488,6 +488,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         <PendingApprovals
           workspaceId={workspaceId}
           refreshKey={approvalRefreshKey}
+          onRetracted={() => refreshStates()}
         />
       )}
 

@@ -348,23 +348,62 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                   {sortedPages.map(page => {
                     const errs = page.issues.filter(i => i.severity === 'error').length;
                     const warns = page.issues.filter(i => i.severity === 'warning').length;
+                    const isExpanded = expandedPages.has(page.pageId);
                     return (
-                      <button
-                        key={page.pageId}
-                        onClick={() => togglePage(page.pageId)}
-                        className="flex items-center gap-3 p-3 rounded-lg bg-zinc-950/50 border border-zinc-800/50 hover:border-zinc-700 hover:bg-zinc-800/30 transition-all text-left"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-medium text-zinc-300 truncate">{page.page}</div>
-                          <div className="text-[11px] text-zinc-500 truncate">{toLiveUrl(page.url, liveDomain)}</div>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {errs > 0 && <span className="text-[11px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">{errs}E</span>}
-                          {warns > 0 && <span className="text-[11px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">{warns}W</span>}
-                          <div className={`text-xs font-bold ${scoreColorClass(page.score)}`}>{page.score}</div>
-                          <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${expandedPages.has(page.pageId) ? '' : '-rotate-90'}`} />
-                        </div>
-                      </button>
+                      <div key={page.pageId} className={`rounded-lg border transition-all ${isExpanded ? 'bg-zinc-950/80 border-zinc-700' : 'bg-zinc-950/50 border-zinc-800/50 hover:border-zinc-700'}`}>
+                        <button
+                          onClick={() => togglePage(page.pageId)}
+                          className="w-full flex items-center gap-3 p-3 text-left"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-medium text-zinc-300 truncate">{page.page}</div>
+                            <div className="text-[11px] text-zinc-500 truncate">{toLiveUrl(page.url, liveDomain)}</div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {errs > 0 && <span className="text-[11px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">{errs}E</span>}
+                            {warns > 0 && <span className="text-[11px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">{warns}W</span>}
+                            <div className={`text-xs font-bold ${scoreColorClass(page.score)}`}>{page.score}</div>
+                            <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
+                          </div>
+                        </button>
+                        
+                        {/* Expanded issues accordion inside the card */}
+                        {isExpanded && (
+                          <div className="px-3 pb-3 border-t border-zinc-800/50">
+                            <div className="pt-3 space-y-2">
+                              {page.issues.map((issue, i) => {
+                                const sc = SEV[issue.severity];
+                                return (
+                                  <div key={i} className={`px-3 py-2 rounded-lg ${sc.bg} border ${sc.border}`}>
+                                    <div className="flex items-start gap-2">
+                                      {issue.severity === 'error' && <AlertTriangle className={`w-3.5 h-3.5 ${sc.text} flex-shrink-0 mt-0.5`} />}
+                                      {issue.severity === 'warning' && <Info className={`w-3.5 h-3.5 ${sc.text} flex-shrink-0 mt-0.5`} />}
+                                      <div className="flex-1">
+                                        <div className="text-[11px] text-zinc-300">{issue.message}</div>
+                                        {issue.recommendation && <div className="text-[11px] text-zinc-500 mt-0.5">{issue.recommendation}</div>}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            {hasContentIssues(page.issues) && workspaceId && (
+                              <button
+                                onClick={() => requestContentImprovement(page)}
+                                disabled={requestedPages.has(page.pageId) || requestingPage === page.pageId}
+                                className={`mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
+                                  requestedPages.has(page.pageId)
+                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-default'
+                                    : 'bg-teal-600 hover:bg-teal-500 text-white'
+                                }`}
+                              >
+                                <FileEdit className="w-3 h-3" />
+                                {requestedPages.has(page.pageId) ? 'Request created' : requestingPage === page.pageId ? 'Creating...' : 'Request Content Fix'}
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
@@ -378,57 +417,6 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                 </button>
               </div>
             </div>
-
-            {/* Expanded Page Details (when a page card is clicked) */}
-            {expandedPages.size > 0 && Array.from(expandedPages).map(pageId => {
-              const page = auditDetail.audit.pages.find(p => p.pageId === pageId);
-              if (!page) return null;
-              return (
-                <div key={pageId} className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 animate-in fade-in slide-in-from-top-2">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <div className="text-sm font-medium text-zinc-200">{page.page}</div>
-                      <div className="text-[11px] text-zinc-500">{toLiveUrl(page.url, liveDomain)}</div>
-                    </div>
-                    <button onClick={() => togglePage(pageId)} className="p-1.5 rounded hover:bg-zinc-800 text-zinc-500">
-                      <span className="sr-only">Close</span>
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                  </div>
-                  <div className="space-y-2">
-                    {page.issues.map((issue, i) => {
-                      const sc = SEV[issue.severity];
-                      return (
-                        <div key={i} className={`px-3 py-2.5 rounded-lg ${sc.bg} border ${sc.border}`}>
-                          <div className="flex items-start gap-2">
-                            {issue.severity === 'error' && <AlertTriangle className={`w-3.5 h-3.5 ${sc.text} flex-shrink-0 mt-0.5`} />}
-                            {issue.severity === 'warning' && <Info className={`w-3.5 h-3.5 ${sc.text} flex-shrink-0 mt-0.5`} />}
-                            <div className="flex-1">
-                              <div className="text-[11px] text-zinc-300">{issue.message}</div>
-                              {issue.recommendation && <div className="text-[11px] text-zinc-500 mt-0.5">{issue.recommendation}</div>}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {hasContentIssues(page.issues) && workspaceId && (
-                    <button
-                      onClick={() => requestContentImprovement(page)}
-                      disabled={requestedPages.has(page.pageId) || requestingPage === page.pageId}
-                      className={`mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
-                        requestedPages.has(page.pageId)
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-default'
-                          : 'bg-teal-600 hover:bg-teal-500 text-white'
-                      }`}
-                    >
-                      <FileEdit className="w-3 h-3" />
-                      {requestedPages.has(page.pageId) ? 'Request created' : requestingPage === page.pageId ? 'Creating...' : 'Request Content Fix'}
-                    </button>
-                  )}
-                </div>
-              );
-            })}
 
             {/* All Pages List (always visible) */}
             <div ref={allPagesRef}>
@@ -478,7 +466,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
         );
       })()}
 
-      {/* ── 4. SITE-WIDE ISSUES (Expanded by default for visibility) ── */}
+      {/* ── 5. SITE-WIDE ISSUES (Expanded by default for visibility) ── */}
       {auditDetail.audit.siteWideIssues.length > 0 && (
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
           <div className="px-4 py-3 border-b border-zinc-800 bg-zinc-900">
@@ -530,7 +518,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
         </div>
       )}
 
-      {/* ── 5. HISTORY (Collapsed by default - less important) ── */}
+      {/* ── 6. HISTORY (Collapsed by default - at the bottom) ── */}
       <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
         <button onClick={() => toggleSection('history')} className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors">
           <div className="flex items-center gap-2">

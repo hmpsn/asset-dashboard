@@ -28,6 +28,8 @@ import {
   getTokenForSite,
   getClientPortalUrl,
   updatePageState,
+  getPageState,
+  clearPageState,
 } from '../workspaces.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { createLogger } from '../logger.js';
@@ -64,8 +66,22 @@ router.get('/api/approvals/:workspaceId/:batchId', (req, res) => {
 });
 
 router.delete('/api/approvals/:workspaceId/:batchId', (req, res) => {
-  deleteBatch(req.params.workspaceId, req.params.batchId);
-  broadcastToWorkspace(req.params.workspaceId, 'approval:update', { batchId: req.params.batchId, action: 'deleted' });
+  const { workspaceId, batchId } = req.params;
+  // Fetch batch before deleting so we can reset page edit states
+  const batch = getBatch(workspaceId, batchId);
+  if (batch) {
+    for (const item of batch.items) {
+      if (item.pageId) {
+        // Reset pages that are still "in-review" for this batch back to clean
+        const state = getPageState(workspaceId, item.pageId);
+        if (state?.status === 'in-review' && state.approvalBatchId === batchId) {
+          clearPageState(workspaceId, item.pageId);
+        }
+      }
+    }
+  }
+  deleteBatch(workspaceId, batchId);
+  broadcastToWorkspace(workspaceId, 'approval:update', { batchId, action: 'deleted' });
   res.json({ ok: true });
 });
 
