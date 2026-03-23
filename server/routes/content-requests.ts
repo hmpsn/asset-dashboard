@@ -62,6 +62,14 @@ router.patch('/api/content-requests/:workspaceId/:id', validate(updateContentReq
       notifyClientBriefReady({ clientEmail: wsInfo.clientEmail, workspaceName: wsInfo.name, workspaceId: req.params.workspaceId, topic: updated.topic, targetKeyword: updated.targetKeyword, dashboardUrl: dashUrl });
     }
   }
+  // When content is delivered and has a target page, update page state to live
+  if (status === 'delivered' && updated.targetPageId) {
+    updatePageState(req.params.workspaceId, updated.targetPageId, {
+      status: 'live',
+      source: 'content-delivery',
+      contentRequestId: updated.id,
+    });
+  }
   // When content is marked as published and has a target page, update page state to live
   if (status === 'published' && updated.targetPageId) {
     updatePageState(req.params.workspaceId, updated.targetPageId, {

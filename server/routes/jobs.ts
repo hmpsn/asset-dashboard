@@ -248,6 +248,14 @@ router.post('/api/jobs', async (req, res) => {
               result: { success: true, newAssetId: uploadResult.assetId, originalSize, newSize, savings, savingsPercent, newFileName },
               message: `Saved ${Math.round(savings / 1024)}KB (${savingsPercent}%)`,
             });
+            const singleCompressWsId = params.workspaceId as string;
+            if (singleCompressWsId) {
+              addActivity(singleCompressWsId, 'images_optimized',
+                `Image compressed: ${fileName || 'image'} — saved ${Math.round(savings / 1024)}KB (${savingsPercent}%)`,
+                undefined,
+                { originalSize, newSize, savings, savingsPercent }
+              );
+            }
           } catch (err) {
             updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Compression failed' });
           }
@@ -284,6 +292,14 @@ router.post('/api/jobs', async (req, res) => {
               updateJob(job.id, { progress: i + 1, message: `Compressed ${i + 1}/${assets.length} (${Math.round(totalSaved / 1024)}KB saved)` });
             }
             updateJob(job.id, { status: 'done', result: { results, totalSaved }, progress: assets.length, message: `Done — saved ${Math.round(totalSaved / 1024)}KB total` });
+            const compressWsId = params.workspaceId as string;
+            if (compressWsId) {
+              addActivity(compressWsId, 'images_optimized',
+                `Bulk compression: ${assets.length} images processed, ${Math.round(totalSaved / 1024)}KB saved`,
+                undefined,
+                { processed: assets.length, totalSavedBytes: totalSaved }
+              );
+            }
           } catch (err) {
             updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Bulk compress failed' });
           }
@@ -336,6 +352,14 @@ router.post('/api/jobs', async (req, res) => {
               updateJob(job.id, { progress: i + 1, message: `Generated ${i + 1}/${altAssets.length} alt texts` });
             }
             updateJob(job.id, { status: 'done', result: results, progress: altAssets.length, message: `Done — ${results.filter(r => r.updated).length}/${altAssets.length} updated` });
+            const jobWsId = params.workspaceId as string;
+            if (jobWsId) {
+              addActivity(jobWsId, 'images_optimized',
+                `Bulk alt text: ${results.filter(r => r.updated).length} images updated`,
+                undefined,
+                { updated: results.filter(r => r.updated).length, total: altAssets.length }
+              );
+            }
           } catch (err) {
             updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Bulk alt text failed' });
           }
@@ -432,6 +456,13 @@ router.post('/api/jobs', async (req, res) => {
               updateJob(job.id, { progress: i + 1, message: `Fixed ${i + 1}/${pages.length} ${field}s` });
             }
             updateJob(job.id, { status: 'done', result: { results, field }, progress: pages.length, message: `Done — ${results.filter(r => r.applied).length}/${pages.length} ${field}s updated` });
+            if (bwsId) {
+              addActivity(bwsId, 'seo_updated',
+                `Bulk ${field} optimization: ${results.filter(r => r.applied).length} pages updated`,
+                `AI-generated ${field}s applied to ${results.filter(r => r.applied).length}/${pages.length} pages`,
+                { field, pagesUpdated: results.filter(r => r.applied).length, totalPages: pages.length }
+              );
+            }
           } catch (err) {
             updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Bulk SEO fix failed' });
           }

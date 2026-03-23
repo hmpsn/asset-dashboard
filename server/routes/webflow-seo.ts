@@ -18,6 +18,7 @@ import {
   getBrandName,
 } from '../workspaces.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
+import { addActivity } from '../activity-log.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('webflow-seo');
@@ -309,6 +310,16 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', async (req, res) => {
     } catch (err) {
       results.push({ pageId: page.pageId, text: '', applied: false, error: String(err) });
     }
+  }
+
+  // Log activity for bulk SEO fix
+  const bulkWsId = workspaceId || ws?.id;
+  if (bulkWsId) {
+    addActivity(bulkWsId, 'seo_updated',
+      `Bulk ${field} optimization: ${results.filter(r => r.applied).length} pages updated`,
+      `AI-generated ${field}s applied to ${results.filter(r => r.applied).length}/${pages.length} pages`,
+      { field, pagesUpdated: results.filter(r => r.applied).length, totalPages: pages.length }
+    );
   }
 
   res.json({ results, field });

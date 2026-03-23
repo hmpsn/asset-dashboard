@@ -88,14 +88,6 @@ interface PageEditRow {
   updated_by: string | null;
 }
 
-interface SeoEditRow {
-  workspace_id: string;
-  page_id: string;
-  status: string;
-  updated_at: string;
-  fields: string | null;
-}
-
 function rowToWorkspace(row: WorkspaceRow): Workspace {
   const ws: Workspace = {
     id: row.id,
@@ -139,7 +131,7 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   return ws;
 }
 
-/** Attach pageEditStates and seoEditTracking from their respective tables. */
+/** Attach pageEditStates from the page_edit_states table. */
 function attachPageStates(ws: Workspace): Workspace {
   const pageRows = listPageEditStatesStmt().all(ws.id) as PageEditRow[];
   if (pageRows.length > 0) {
@@ -162,18 +154,6 @@ function attachPageStates(ws: Workspace): Workspace {
       };
     }
     ws.pageEditStates = states;
-  }
-  const seoRows = listSeoEditTrackingStmt().all(ws.id) as SeoEditRow[];
-  if (seoRows.length > 0) {
-    const tracking: Record<string, { status: 'flagged' | 'in-review' | 'live'; updatedAt: string; fields?: string[] }> = {};
-    for (const r of seoRows) {
-      tracking[r.page_id] = {
-        status: r.status as 'flagged' | 'in-review' | 'live',
-        updatedAt: r.updated_at,
-        fields: r.fields ? JSON.parse(r.fields) : undefined,
-      };
-    }
-    ws.seoEditTracking = tracking;
   }
   return ws;
 }
@@ -282,33 +262,6 @@ function deletePageEditStateStmt() {
   return _deletePageEditState;
 }
 
-let _listSeoEditTracking: ReturnType<typeof db.prepare> | null = null;
-function listSeoEditTrackingStmt() {
-  if (!_listSeoEditTracking) {
-    _listSeoEditTracking = db.prepare(`SELECT * FROM seo_edit_tracking WHERE workspace_id = ?`);
-  }
-  return _listSeoEditTracking;
-}
-
-let _upsertSeoEditTracking: ReturnType<typeof db.prepare> | null = null;
-function upsertSeoEditTrackingStmt() {
-  if (!_upsertSeoEditTracking) {
-    _upsertSeoEditTracking = db.prepare(`
-      INSERT OR REPLACE INTO seo_edit_tracking
-        (workspace_id, page_id, status, updated_at, fields)
-      VALUES (@workspace_id, @page_id, @status, @updated_at, @fields)
-    `);
-  }
-  return _upsertSeoEditTracking;
-}
-
-let _deleteSeoEditTracking: ReturnType<typeof db.prepare> | null = null;
-function deleteSeoEditTrackingStmt() {
-  if (!_deleteSeoEditTracking) {
-    _deleteSeoEditTracking = db.prepare(`DELETE FROM seo_edit_tracking WHERE workspace_id = ? AND page_id = ?`);
-  }
-  return _deleteSeoEditTracking;
-}
 
 let _clearAllPageEditStates: ReturnType<typeof db.prepare> | null = null;
 function clearAllPageEditStatesStmt() {
@@ -318,13 +271,6 @@ function clearAllPageEditStatesStmt() {
   return _clearAllPageEditStates;
 }
 
-let _clearAllSeoEditTracking: ReturnType<typeof db.prepare> | null = null;
-function clearAllSeoEditTrackingStmt() {
-  if (!_clearAllSeoEditTracking) {
-    _clearAllSeoEditTracking = db.prepare(`DELETE FROM seo_edit_tracking WHERE workspace_id = ?`);
-  }
-  return _clearAllSeoEditTracking;
-}
 
 let _getPageIdBySlug: ReturnType<typeof db.prepare> | null = null;
 function getPageIdBySlugStmt() {
@@ -437,7 +383,7 @@ export function createWorkspace(name: string, webflowSiteId?: string, webflowSit
   return workspace;
 }
 
-export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'seoEditTracking' | 'pageEditStates' | 'publishTarget'>>): Workspace | null {
+export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget'>>): Workspace | null {
   const row = getByIdStmt().get(id) as WorkspaceRow | undefined;
   if (!row) return null;
 
@@ -475,7 +421,7 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
     }
   }
 
-  // Handle pageEditStates and seoEditTracking — these go to separate tables
+  // Handle pageEditStates — these go to a separate table
   if (updates.pageEditStates !== undefined) {
     const states = updates.pageEditStates || {};
     // Get existing page IDs so we can detect removals
@@ -505,27 +451,6 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
         rejection_note: state.rejectionNote ?? null,
         updated_at: state.updatedAt,
         updated_by: state.updatedBy ?? null,
-      });
-    }
-  }
-
-  if (updates.seoEditTracking !== undefined) {
-    const tracking = updates.seoEditTracking || {};
-    const existingRows = listSeoEditTrackingStmt().all(id) as SeoEditRow[];
-    const existingIds = new Set(existingRows.map(r => r.page_id));
-    const newIds = new Set(Object.keys(tracking));
-    for (const pid of existingIds) {
-      if (!newIds.has(pid)) {
-        deleteSeoEditTrackingStmt().run(id, pid);
-      }
-    }
-    for (const [pid, t] of Object.entries(tracking)) {
-      upsertSeoEditTrackingStmt().run({
-        workspace_id: id,
-        page_id: pid,
-        status: t.status,
-        updated_at: t.updatedAt,
-        fields: t.fields ? JSON.stringify(t.fields) : null,
       });
     }
   }
@@ -576,17 +501,6 @@ export function getPageIdBySlug(workspaceId: string, slug: string): string | und
 const STATUS_PRIORITY: Record<PageEditStatus, number> = {
   clean: 0, 'issue-detected': 1, 'fix-proposed': 2, 'in-review': 3, approved: 4, rejected: 4, live: 5,
 };
-
-// Map new statuses down to legacy seoEditTracking format
-function toLegacyStatus(status: PageEditStatus): 'flagged' | 'in-review' | 'live' | null {
-  switch (status) {
-    case 'issue-detected': case 'fix-proposed': return 'flagged';
-    case 'in-review': return 'in-review';
-    case 'approved': case 'live': return 'live';
-    case 'rejected': return 'flagged';
-    default: return null;
-  }
-}
 
 export function updatePageState(
   workspaceId: string,
@@ -649,20 +563,6 @@ export function updatePageState(
     updated_by: merged.updatedBy ?? null,
   });
 
-  // Sync legacy seoEditTracking
-  const legacy = toLegacyStatus(merged.status);
-  if (legacy) {
-    upsertSeoEditTrackingStmt().run({
-      workspace_id: workspaceId,
-      page_id: pageId,
-      status: legacy,
-      updated_at: now,
-      fields: merged.fields ? JSON.stringify(merged.fields) : null,
-    });
-  } else if (merged.status === 'clean') {
-    deleteSeoEditTrackingStmt().run(workspaceId, pageId);
-  }
-
   return merged;
 }
 
@@ -717,25 +617,15 @@ function deletePageEditStatesByStatusStmt() {
   return _deletePageEditStatesByStatus;
 }
 
-let _deleteSeoEditTrackingByPageIds: ReturnType<typeof db.prepare> | null = null;
-function deleteSeoEditTrackingByPageIdsStmt() {
-  if (!_deleteSeoEditTrackingByPageIds) {
-    _deleteSeoEditTrackingByPageIds = db.prepare(`DELETE FROM seo_edit_tracking WHERE workspace_id = ? AND page_id IN (SELECT page_id FROM page_edit_states WHERE workspace_id = ? AND status = ?)`);
-  }
-  return _deleteSeoEditTrackingByPageIds;
-}
 
 export function clearPageStatesByStatus(workspaceId: string, status: string): number {
   const row = getByIdStmt().get(workspaceId) as WorkspaceRow | undefined;
   if (!row) return 0;
   if (status === 'all') {
-    // Clear ALL page states and tracking for this workspace
-    clearAllSeoEditTrackingStmt().run(workspaceId);
+    // Clear ALL page states for this workspace
     const info = clearAllPageEditStatesStmt().run(workspaceId);
     return info.changes;
   }
-  // Delete matching seo_edit_tracking rows first (before the page states are gone)
-  deleteSeoEditTrackingByPageIdsStmt().run(workspaceId, workspaceId, status);
   const info = deletePageEditStatesByStatusStmt().run(workspaceId, status);
   return info.changes;
 }
@@ -744,6 +634,5 @@ export function clearPageState(workspaceId: string, pageId: string): boolean {
   const row = getByIdStmt().get(workspaceId) as WorkspaceRow | undefined;
   if (!row) return false;
   deletePageEditStateStmt().run(workspaceId, pageId);
-  deleteSeoEditTrackingStmt().run(workspaceId, pageId);
   return true;
 }

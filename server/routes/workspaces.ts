@@ -538,20 +538,6 @@ router.delete('/api/workspaces/:id/audit-suppressions', requireWorkspaceAccess()
   res.json({ ok: true, suppressions });
 });
 
-// --- SEO Edit Tracking ---
-// GET edit tracking for a workspace
-router.get('/api/workspaces/:id/seo-edit-tracking', requireWorkspaceAccess(), (req, res) => {
-  const ws = getWorkspace(req.params.id);
-  if (!ws) return res.status(404).json({ error: 'Not found' });
-  res.json(ws.seoEditTracking || {});
-});
-
-const seoEditTrackingSchema = z.object({
-  pageId: z.string().min(1, 'pageId is required'),
-  status: z.enum(['flagged', 'in-review', 'live']),
-  fields: z.array(z.string()).optional(),
-});
-
 const pageStateUpdateSchema = z.object({
   status: z.enum(['clean', 'issue-detected', 'fix-proposed', 'in-review', 'approved', 'rejected', 'live']).optional(),
   fields: z.array(z.string()).optional(),
@@ -576,41 +562,6 @@ const updateClientUserSchema = z.object({
   email: z.string().email().optional(),
   role: z.enum(['client_owner', 'client_member']).optional(),
   avatarUrl: z.string().url().optional().or(z.literal('')),
-});
-
-// PATCH: manually set status for a page (legacy endpoint — delegates to updatePageState)
-router.patch('/api/workspaces/:id/seo-edit-tracking', requireWorkspaceAccess(), validate(seoEditTrackingSchema), (req, res) => {
-  const ws = getWorkspace(req.params.id);
-  if (!ws) return res.status(404).json({ error: 'Not found' });
-  const { pageId, status, fields } = req.body;
-  // Map legacy statuses to unified PageEditState statuses
-  const statusMap: Record<string, 'issue-detected' | 'in-review' | 'live'> = {
-    'flagged': 'issue-detected',
-    'in-review': 'in-review',
-    'live': 'live',
-  };
-  const mappedStatus = statusMap[status] || 'issue-detected';
-  updatePageState(req.params.id, pageId, {
-    status: mappedStatus,
-    source: 'manual',
-    fields,
-  });
-  // Return same format for backward compatibility
-  const tracking = ws.seoEditTracking || {};
-  tracking[pageId] = { status, updatedAt: new Date().toISOString(), fields };
-  res.json({ ok: true, tracking });
-});
-
-// DELETE: clear tracking for a page
-router.delete('/api/workspaces/:id/seo-edit-tracking', requireWorkspaceAccess(), (req, res) => {
-  const ws = getWorkspace(req.params.id);
-  if (!ws) return res.status(404).json({ error: 'Not found' });
-  const { pageId } = req.body;
-  if (!pageId) return res.status(400).json({ error: 'pageId required' });
-  const tracking = ws.seoEditTracking || {};
-  delete tracking[pageId];
-  updateWorkspace(req.params.id, { seoEditTracking: tracking });
-  res.json({ ok: true, tracking });
 });
 
 // --- Unified Page Edit States ---

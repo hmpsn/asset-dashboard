@@ -24,13 +24,6 @@ import { createLogger } from '../logger.js';
 
 const log = createLogger('misc');
 
-// Public GET for client portal
-router.get('/api/public/seo-edit-tracking/:workspaceId', (req, res) => {
-  const ws = getWorkspace(req.params.workspaceId);
-  if (!ws) return res.status(404).json({ error: 'Not found' });
-  res.json(ws.seoEditTracking || {});
-});
-
 // GET all page states for a workspace (client/public)
 router.get('/api/public/page-states/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
