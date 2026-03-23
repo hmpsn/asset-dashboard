@@ -32,6 +32,8 @@ export interface PageKeywordMap {
   difficulty?: number;
   cpc?: number;
   secondaryMetrics?: { keyword: string; volume: number; difficulty: number }[];
+  metricsSource?: 'exact' | 'partial_match' | 'bulk_lookup';
+  validated?: boolean;
 }
 
 export interface KeywordGapItem {
