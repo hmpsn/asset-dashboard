@@ -229,29 +229,11 @@ describe('updatePageState', () => {
     expect(updated!.fields).toEqual(['title', 'meta-description']);
   });
 
-  it('syncs legacy seoEditTracking for flagged statuses', () => {
+  it('does not include legacy seoEditTracking on workspace', () => {
     updatePageState(wsId, 'page_7', { status: 'issue-detected' });
     const ws = getWorkspace(wsId);
-    expect(ws!.seoEditTracking?.['page_7']?.status).toBe('flagged');
-  });
-
-  it('syncs legacy seoEditTracking for in-review status', () => {
-    updatePageState(wsId, 'page_8', { status: 'in-review' });
-    const ws = getWorkspace(wsId);
-    expect(ws!.seoEditTracking?.['page_8']?.status).toBe('in-review');
-  });
-
-  it('syncs legacy seoEditTracking for live status', () => {
-    updatePageState(wsId, 'page_9', { status: 'approved' });
-    const ws = getWorkspace(wsId);
-    expect(ws!.seoEditTracking?.['page_9']?.status).toBe('live');
-  });
-
-  it('removes from legacy tracking when set to clean', () => {
-    updatePageState(wsId, 'page_10', { status: 'in-review' });
-    updatePageState(wsId, 'page_10', { status: 'clean' });
-    const ws = getWorkspace(wsId);
-    expect(ws!.seoEditTracking?.['page_10']).toBeUndefined();
+    expect(ws!.pageEditStates?.['page_7']?.status).toBe('issue-detected');
+    expect((ws as Record<string, unknown>).seoEditTracking).toBeUndefined();
   });
 });
 
@@ -281,14 +263,12 @@ describe('getPageState / getAllPageStates', () => {
 });
 
 describe('clearPageState', () => {
-  it('removes page state and legacy tracking', () => {
+  it('removes page state', () => {
     const ws = createWorkspace('Clear State ' + Date.now());
     updatePageState(ws.id, 'p_clear', { status: 'in-review' });
 
     expect(clearPageState(ws.id, 'p_clear')).toBe(true);
     expect(getPageState(ws.id, 'p_clear')).toBeUndefined();
-    const wsData = getWorkspace(ws.id);
-    expect(wsData!.seoEditTracking?.['p_clear']).toBeUndefined();
 
     deleteWorkspace(ws.id);
   });
