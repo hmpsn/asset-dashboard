@@ -22,7 +22,7 @@ export function Annotations({ workspaceId }: { workspaceId: string }) {
   useEffect(() => {
     annotationsApi.list(workspaceId)
       .then(d => { if (Array.isArray(d)) setAnnotations(d); })
-      .catch(() => {})
+      .catch((err) => { console.error('Annotations operation failed:', err); })
       .finally(() => setLoading(false));
   }, [workspaceId]);
 
@@ -32,13 +32,13 @@ export function Annotations({ workspaceId }: { workspaceId: string }) {
       const entry = await annotationsApi.create(workspaceId, newAnn);
       setAnnotations(prev => [entry as Annotation, ...prev]);
       setNewAnn({ date: '', label: '', description: '', color: '#2dd4bf' });
-    } catch { /* skip */ }
+    } catch (err) { console.error('Annotations operation failed:', err); }
   };
 
   const deleteAnnotation = async (id: string) => {
     try {
       await annotationsApi.remove(workspaceId, id);
-    } catch { /* skip */ }
+    } catch (err) { console.error('Annotations operation failed:', err); }
     setAnnotations(prev => prev.filter(a => a.id !== id));
   };
 

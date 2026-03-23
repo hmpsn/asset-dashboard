@@ -51,7 +51,7 @@ export function RevenueDashboard() {
   const refresh = useCallback(() => {
     get<RevenueSummary>('/api/revenue/summary')
       .then(setData)
-      .catch(() => {})
+      .catch((err) => { console.error('RevenueDashboard operation failed:', err); })
       .finally(() => setLoading(false));
   }, []);
 
@@ -62,7 +62,7 @@ export function RevenueDashboard() {
     try {
       await del(`/api/revenue/payments/${id}`);
       refresh();
-    } catch { /* ignore */ }
+    } catch (err) { console.error('RevenueDashboard operation failed:', err); }
     setDeleting(null);
   };
 
@@ -71,7 +71,7 @@ export function RevenueDashboard() {
       await del('/api/revenue/payments');
       setConfirmPurge(false);
       refresh();
-    } catch { /* ignore */ }
+    } catch (err) { console.error('RevenueDashboard operation failed:', err); }
   };
 
   if (loading) {

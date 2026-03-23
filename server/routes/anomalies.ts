@@ -3,6 +3,7 @@
  */
 import { Router } from 'express';
 
+import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 import {
@@ -17,7 +18,7 @@ router.get('/api/anomalies', (_req, res) => {
   res.json(listAnomalies());
 });
 
-router.get('/api/anomalies/:workspaceId', (req, res) => {
+router.get('/api/anomalies/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const includeDismissed = req.query.includeDismissed === 'true';
   res.json(listAnomalies(req.params.workspaceId, includeDismissed));
 });

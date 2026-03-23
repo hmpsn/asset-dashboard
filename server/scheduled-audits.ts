@@ -208,6 +208,8 @@ async function runScheduledAudit(schedule: AuditSchedule) {
   }
 }
 
+const runningAudits = new Set<string>();
+
 let checkInterval: ReturnType<typeof setInterval> | null = null;
 
 export function startScheduler() {
@@ -228,7 +230,13 @@ export function startScheduler() {
       const intervalMs = schedule.intervalDays * 24 * 60 * 60 * 1000;
 
       if (now - lastRun >= intervalMs) {
-        await runScheduledAudit(schedule);
+        if (runningAudits.has(schedule.workspaceId)) continue;
+        runningAudits.add(schedule.workspaceId);
+        try {
+          await runScheduledAudit(schedule);
+        } finally {
+          runningAudits.delete(schedule.workspaceId);
+        }
       }
     }
   };

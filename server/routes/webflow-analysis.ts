@@ -3,6 +3,7 @@
  */
 import { Router } from 'express';
 
+import { requireWorkspaceAccessFromQuery } from '../auth.js';
 const router = Router();
 
 import { addActivity } from '../activity-log.js';
@@ -154,7 +155,7 @@ router.get('/api/competitor-compare-latest', (req, res) => {
 // --- Dead Link Checker ---
 
 // Get available domains for a site (staging + custom)
-router.get('/api/webflow/link-check-domains/:siteId', async (req, res) => {
+router.get('/api/webflow/link-check-domains/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
     const domains = await getSiteDomains(req.params.siteId, token || '');
@@ -166,7 +167,7 @@ router.get('/api/webflow/link-check-domains/:siteId', async (req, res) => {
   }
 });
 
-router.get('/api/webflow/link-check/:siteId', async (req, res) => {
+router.get('/api/webflow/link-check/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
     const domain = typeof req.query.domain === 'string' ? req.query.domain : undefined;
@@ -180,13 +181,13 @@ router.get('/api/webflow/link-check/:siteId', async (req, res) => {
 });
 
 // Load last saved link check snapshot
-router.get('/api/webflow/link-check-snapshot/:siteId', (req, res) => {
+router.get('/api/webflow/link-check-snapshot/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
   const snapshot = getLinkCheck(req.params.siteId);
   res.json(snapshot);
 });
 
 // --- Redirect Scanner ---
-router.get('/api/webflow/redirect-scan/:siteId', async (req, res) => {
+router.get('/api/webflow/redirect-scan/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
     // Resolve live domain + GSC property from workspace
@@ -229,14 +230,14 @@ router.get('/api/webflow/redirect-scan/:siteId', async (req, res) => {
 });
 
 // Load previously saved redirect scan results from disk
-router.get('/api/webflow/redirect-snapshot/:siteId', (req, res) => {
+router.get('/api/webflow/redirect-snapshot/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
   const snapshot = getRedirectSnapshot(req.params.siteId);
   if (!snapshot) return res.json(null);
   res.json(snapshot);
 });
 
 // --- Internal Linking Suggestions ---
-router.get('/api/webflow/internal-links/:siteId', async (req, res) => {
+router.get('/api/webflow/internal-links/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
     const workspaceId = req.query.workspaceId as string | undefined;
@@ -250,7 +251,7 @@ router.get('/api/webflow/internal-links/:siteId', async (req, res) => {
 });
 
 // Load last saved internal links snapshot
-router.get('/api/webflow/internal-links-snapshot/:siteId', (req, res) => {
+router.get('/api/webflow/internal-links-snapshot/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
   const snapshot = getInternalLinks(req.params.siteId);
   res.json(snapshot);
 });

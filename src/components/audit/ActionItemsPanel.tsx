@@ -41,7 +41,7 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
   const load = useCallback(() => {
     get<ActionItem[]>(`/api/reports/snapshot/${snapshotId}/actions`)
       .then(d => { if (Array.isArray(d)) setItems(d); })
-      .catch(() => {});
+      .catch((err) => { console.error('ActionItemsPanel operation failed:', err); });
   }, [snapshotId]);
 
   useEffect(() => { load(); }, [load]);

@@ -10,10 +10,11 @@ import { createLogger } from '../logger.js';
 
 const log = createLogger('seo-change-tracker');
 
+import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 // List recent SEO changes for a workspace
-router.get('/api/seo-changes/:workspaceId', (req, res) => {
+router.get('/api/seo-changes/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
@@ -22,7 +23,7 @@ router.get('/api/seo-changes/:workspaceId', (req, res) => {
 });
 
 // Get SEO change impact with GSC before/after comparison
-router.get('/api/seo-change-impact/:workspaceId', async (req, res) => {
+router.get('/api/seo-change-impact/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (!ws.gscPropertyUrl) return res.status(400).json({ error: 'No GSC property configured' });
@@ -46,7 +47,7 @@ router.get('/api/seo-change-impact/:workspaceId', async (req, res) => {
 });
 
 // Schema-specific impact summary with aggregate stats
-router.get('/api/schema-impact/:workspaceId', async (req, res) => {
+router.get('/api/schema-impact/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (!ws.gscPropertyUrl) return res.status(400).json({ error: 'No GSC property configured' });

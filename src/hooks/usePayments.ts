@@ -113,7 +113,7 @@ export function usePayments(
         setRequestedTopics(prev => new Set(prev).add(pricingModal.targetKeyword));
         getSafe<ClientContentRequest[]>(`/api/public/content-requests/${workspaceId}`, []).then((reqs) => {
           if (Array.isArray(reqs) && reqs.length > 0) setContentRequests(reqs);
-        }).catch(() => {});
+        }).catch((err) => { console.error('usePayments operation failed:', err); });
         const label = pricingModal.serviceType === 'full_post' ? 'Full blog post' : 'Brief';
         setToast({ message: `${label} requested for "${pricingModal.topic}"! Check the Content tab.`, type: 'success' });
         setRequestingTopic(null);

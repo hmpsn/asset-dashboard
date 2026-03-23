@@ -142,7 +142,7 @@ export function Roadmap() {
           setRoadmap(d.sprints);
         }
       })
-      .catch(() => {})
+      .catch((err) => { console.error('Roadmap operation failed:', err); })
       .finally(() => setLoading(false));
   }, []);
 
@@ -161,7 +161,7 @@ export function Roadmap() {
       }));
     });
     // Persist single item via PATCH
-    roadmapApi.updateItem(itemId, { status: newStatus }).catch(() => {});
+    roadmapApi.updateItem(itemId, { status: newStatus }).catch((err) => { console.error('Roadmap operation failed:', err); });
   };
 
   if (loading) {

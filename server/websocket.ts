@@ -6,10 +6,13 @@ import { initActivityBroadcast } from './activity-log.js';
 import { initAnomalyBroadcast } from './anomaly-detection.js';
 import { initStripeBroadcast } from './stripe.js';
 import { startWatcher } from './processor.js';
+import { verifyToken, type JwtPayload } from './auth.js';
+import { getUserById } from './users.js';
 
 // --- WebSocket state ---
 const clients = new Set<WebSocket>();
 const clientWorkspaces = new Map<WebSocket, Set<string>>();
+const authenticatedClients = new Map<WebSocket, JwtPayload & { workspaceIds?: string[] }>();
 
 // --- User Presence Tracking ---
 interface PresenceInfo {
@@ -84,7 +87,24 @@ export function initWebSocket(server: Server): WebSocketServer {
     ws.on('message', (raw) => {
       try {
         const msg = JSON.parse(String(raw));
-        if (msg.action === 'subscribe' && typeof msg.workspaceId === 'string') {
+        if (msg.action === 'authenticate' && typeof msg.token === 'string') {
+          const payload = verifyToken(msg.token);
+          if (payload) {
+            const user = getUserById(payload.userId);
+            const wsIds = user?.workspaceIds;
+            authenticatedClients.set(ws, { ...payload, workspaceIds: wsIds });
+            ws.send(JSON.stringify({ action: 'authenticated', ok: true }));
+          } else {
+            ws.send(JSON.stringify({ action: 'authenticated', ok: false }));
+          }
+        } else if (msg.action === 'subscribe' && typeof msg.workspaceId === 'string') {
+          // If the client authenticated, enforce workspace access
+          const auth = authenticatedClients.get(ws);
+          if (auth && auth.role !== 'owner' && auth.workspaceIds && !auth.workspaceIds.includes(msg.workspaceId)) {
+            ws.send(JSON.stringify({ error: 'Access denied' }));
+            return;
+          }
+          // Allow unauthenticated clients (e.g. client portal users who auth via httpOnly cookies)
           clientWorkspaces.get(ws)?.add(msg.workspaceId);
         } else if (msg.action === 'unsubscribe' && typeof msg.workspaceId === 'string') {
           clientWorkspaces.get(ws)?.delete(msg.workspaceId);
@@ -112,6 +132,7 @@ export function initWebSocket(server: Server): WebSocketServer {
       clients.delete(ws);
       clientWorkspaces.delete(ws);
       clientPresence.delete(ws);
+      authenticatedClients.delete(ws);
       if (hadPresence) broadcastPresenceUpdate();
     });
   });

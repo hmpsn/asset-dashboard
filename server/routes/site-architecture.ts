@@ -13,9 +13,10 @@ import type { PageLinkHealth, InternalLinkResult } from '../internal-links.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('routes:site-architecture');
+import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
-router.get('/api/site-architecture/:workspaceId', async (req, res) => {
+router.get('/api/site-architecture/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   try {
     const result = await buildSiteArchitecture(req.params.workspaceId);
     res.json(result);
@@ -27,7 +28,7 @@ router.get('/api/site-architecture/:workspaceId', async (req, res) => {
 });
 
 // Schema coverage: cross-reference architecture tree with schema snapshot
-router.get('/api/site-architecture/:workspaceId/schema-coverage', async (req, res) => {
+router.get('/api/site-architecture/:workspaceId/schema-coverage', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   try {
     const ws = getWorkspace(req.params.workspaceId);
     if (!ws?.webflowSiteId) return res.status(404).json({ error: 'Workspace or site not found' });

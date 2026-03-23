@@ -159,19 +159,19 @@ export function useClientData(_workspaceId: string) {
   const loadDashboardData = useCallback((data: WorkspaceInfo, setPricingData?: (p: unknown) => void) => {
     if (data.gscPropertyUrl) loadSearchData(data.id, 28);
     getOptional<AuditSummary>(`/api/public/audit-summary/${data.id}`).then(a => { if (a?.id) { setAudit(a); clearSectionError('audit'); } }).catch(() => setSectionError('audit', 'Unable to load site health data'));
-    getOptional<AuditDetail>(`/api/public/audit-detail/${data.id}`).then(d => { if (d?.id) setAuditDetail(d); }).catch(() => {});
+    getOptional<AuditDetail>(`/api/public/audit-detail/${data.id}`).then(d => { if (d?.id) setAuditDetail(d); }).catch((err) => { console.error('useClientData operation failed:', err); });
     if (data.ga4PropertyId) loadGA4Data(data.id, 28);
     loadApprovals(data.id);
     loadRequests(data.id);
     getSafe<unknown[]>(`/api/public/activity/${data.id}?limit=20`, []).then(a => { if (Array.isArray(a)) setActivityLog(a as typeof activityLog); }).catch(() => setSectionError('activity', 'Unable to load activity'));
-    getSafe<unknown[]>(`/api/public/rank-tracking/${data.id}/history`, []).then(h => { if (Array.isArray(h)) setRankHistory(h as typeof rankHistory); }).catch(() => {});
+    getSafe<unknown[]>(`/api/public/rank-tracking/${data.id}/history`, []).then(h => { if (Array.isArray(h)) setRankHistory(h as typeof rankHistory); }).catch((err) => { console.error('useClientData operation failed:', err); });
     getSafe<unknown[]>(`/api/public/rank-tracking/${data.id}/latest`, []).then(l => { if (Array.isArray(l)) setLatestRanks(l as typeof latestRanks); }).catch(() => setSectionError('ranks', 'Unable to load ranking data'));
-    getSafe<unknown[]>(`/api/public/annotations/${data.id}`, []).then(a => { if (Array.isArray(a)) setAnnotations(a as typeof annotations); }).catch(() => {});
+    getSafe<unknown[]>(`/api/public/annotations/${data.id}`, []).then(a => { if (Array.isArray(a)) setAnnotations(a as typeof annotations); }).catch((err) => { console.error('useClientData operation failed:', err); });
     if (data.seoClientView) {
       getOptional<ClientKeywordStrategy>(`/api/public/seo-strategy/${data.id}`).then(s => { if (s) setStrategyData(s); }).catch(() => setSectionError('strategy', 'Unable to load SEO strategy'));
     }
-    getOptional<unknown>(`/api/public/pricing/${data.id}`).then(p => { if (p && setPricingData) setPricingData(p); }).catch(() => {});
-    getSafe<unknown[]>(`/api/public/anomalies/${data.id}`, []).then(a => { if (Array.isArray(a)) setAnomalies(a as typeof anomalies); }).catch(() => {});
+    getOptional<unknown>(`/api/public/pricing/${data.id}`).then(p => { if (p && setPricingData) setPricingData(p); }).catch((err) => { console.error('useClientData operation failed:', err); });
+    getSafe<unknown[]>(`/api/public/anomalies/${data.id}`, []).then(a => { if (Array.isArray(a)) setAnomalies(a as typeof anomalies); }).catch((err) => { console.error('useClientData operation failed:', err); });
     getSafe<ClientContentRequest[]>(`/api/public/content-requests/${data.id}`, []).then((reqs) => {
       if (Array.isArray(reqs) && reqs.length > 0) {
         setContentRequests(reqs);
@@ -213,7 +213,7 @@ export function useClientData(_workspaceId: string) {
         }
         setContentPlanReviewCells(reviewCells);
       }
-    }).catch(() => {});
+    }).catch((err) => { console.error('useClientData operation failed:', err); });
   }, [loadSearchData, loadGA4Data, loadApprovals, loadRequests, clearSectionError, setSectionError]);
 
   const changeDays = useCallback((d: number, currentWs: WorkspaceInfo | null) => {
@@ -246,7 +246,7 @@ export function useClientData(_workspaceId: string) {
       if (key === 'approvals' && Array.isArray(d)) setApprovalBatches(d as ApprovalBatch[]);
       if (key === 'requests' && Array.isArray(d)) setRequests(d as ClientRequest[]);
       if (key === 'content' && Array.isArray(d)) { setContentRequests(d as ClientContentRequest[]); setRequestedTopics(new Set((d as ClientContentRequest[]).map(r => r.targetKeyword))); }
-    } catch { /* ignore */ }
+    } catch (err) { console.error('useClientData operation failed:', err); }
   }, []);
 
   return {

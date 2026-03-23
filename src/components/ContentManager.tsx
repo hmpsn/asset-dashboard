@@ -50,7 +50,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
     try {
       const data = await contentPosts.list(workspaceId);
       setPosts(Array.isArray(data) ? data as PostSummary[] : []);
-    } catch { /* ignore */ }
+    } catch (err) { console.error('ContentManager operation failed:', err); }
     setLoading(false);
   }, [workspaceId]);
 
@@ -60,7 +60,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
   useEffect(() => {
     workspacesApi.getById(workspaceId)
       .then((ws: Record<string, unknown>) => { if (ws && 'publishTarget' in ws && ws.publishTarget) setHasPublishTarget(true); })
-      .catch(() => {});
+      .catch((err) => { console.error('ContentManager operation failed:', err); });
   }, [workspaceId]);
 
   const publishPost = async (postId: string) => {
@@ -68,7 +68,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
     try {
       const result = await contentPosts.publishToWebflow(workspaceId, postId, {});
       if (result.success) fetchPosts();
-    } catch { /* ignore */ }
+    } catch (err) { console.error('ContentManager operation failed:', err); }
     setPublishingPost(null);
   };
 
@@ -85,7 +85,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
     try {
       const updated = await contentPosts.update(workspaceId, postId, { status }) as PostSummary;
       setPosts(prev => prev.map(p => p.id === postId ? { ...p, ...updated } : p));
-    } catch { /* ignore */ }
+    } catch (err) { console.error('ContentManager operation failed:', err); }
     setUpdatingStatus(null);
   };
 
@@ -94,7 +94,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
       await contentPosts.remove(workspaceId, postId);
       setPosts(prev => prev.filter(p => p.id !== postId));
       setDeleteConfirm(null);
-    } catch { /* ignore */ }
+    } catch (err) { console.error('ContentManager operation failed:', err); }
   };
 
   // Filter & sort

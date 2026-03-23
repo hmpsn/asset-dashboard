@@ -8,7 +8,8 @@ export function toLiveUrl(url: string, liveDomain?: string): string {
   try {
     const path = new URL(url).pathname;
     return path || '/';
-  } catch {
+  } catch (err) {
+      console.error('utils operation failed:', err);
     return url.replace(/https?:\/\/[^/]+/, '') || '/';
   }
 }

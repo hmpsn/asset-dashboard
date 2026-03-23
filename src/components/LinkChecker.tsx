@@ -51,7 +51,7 @@ export function LinkChecker({ siteId }: Props) {
         setDomains(d);
         setSelectedDomain(d.defaultDomain || d.staging);
       })
-      .catch(() => {});
+      .catch((err) => { console.error('LinkChecker operation failed:', err); });
   }, [siteId]);
 
   const runCheck = () => {
@@ -60,7 +60,7 @@ export function LinkChecker({ siteId }: Props) {
     const domainParam = selectedDomain ? `?domain=${encodeURIComponent(selectedDomain)}` : '';
     get<LinkCheckResult>(`/api/webflow/link-check/${siteId}${domainParam}`)
       .then(d => setData(d))
-      .catch(() => {})
+      .catch((err) => { console.error('LinkChecker operation failed:', err); })
       .finally(() => setLoading(false));
   };
 
@@ -70,7 +70,7 @@ export function LinkChecker({ siteId }: Props) {
     setData(null); setHasRun(false);
     getOptional<{ result?: LinkCheckResult }>(`/api/webflow/link-check-snapshot/${siteId}`)
       .then(snap => { if (!cancelled && snap?.result) { setData(snap.result); setHasRun(true); } })
-      .catch(() => {});
+      .catch((err) => { console.error('LinkChecker operation failed:', err); });
     return () => { cancelled = true; };
   }, [siteId]);
 

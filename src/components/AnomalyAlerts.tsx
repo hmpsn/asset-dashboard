@@ -85,7 +85,7 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
         : `/api/public/anomalies/${workspaceId}`;
       const data = await get<Anomaly[]>(endpoint);
       setAnomalies(Array.isArray(data) ? data : []);
-    } catch { /* silent */ }
+    } catch (err) { console.error('AnomalyAlerts operation failed:', err); }
     finally { setLoading(false); }
   }, [workspaceId, isAdmin]);
 
@@ -99,14 +99,14 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
     try {
       await post(`/api/anomalies/${id}/dismiss`);
       setAnomalies(prev => prev.filter(a => a.id !== id));
-    } catch { /* silent */ }
+    } catch (err) { console.error('AnomalyAlerts operation failed:', err); }
   };
 
   const handleAcknowledge = async (id: string) => {
     try {
       await post(`/api/anomalies/${id}/acknowledge`);
       setAnomalies(prev => prev.map(a => a.id === id ? { ...a, acknowledgedAt: new Date().toISOString() } : a));
-    } catch { /* silent */ }
+    } catch (err) { console.error('AnomalyAlerts operation failed:', err); }
   };
 
   const handleScan = async () => {
@@ -114,7 +114,7 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
     try {
       await post('/api/anomalies/scan');
       await fetchAnomalies();
-    } catch { /* silent */ }
+    } catch (err) { console.error('AnomalyAlerts operation failed:', err); }
     finally { setLoading(false); }
   };
 

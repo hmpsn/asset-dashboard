@@ -94,7 +94,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     try {
       const { suppressions: updated } = await post<{ suppressions: { check: string; pageSlug: string; pagePattern?: string }[] }>(`/api/workspaces/${workspaceId}/audit-suppressions`, { check, pageSlug });
       setSuppressions(updated);
-    } catch {}
+    } catch (err) { console.error('Failed to suppress issue:', err); }
     setActionMenuKey(null);
   };
 
@@ -103,7 +103,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     try {
       const { suppressions: updated } = await del<{ suppressions: { check: string; pageSlug: string; pagePattern?: string }[] }>(`/api/workspaces/${workspaceId}/audit-suppressions`, { check, pageSlug });
       setSuppressions(updated);
-    } catch {}
+    } catch (err) { console.error('Failed to unsuppress issue:', err); }
   };
 
   const suppressPattern = async (check: string, pageSlug: string) => {
@@ -113,7 +113,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     try {
       const { suppressions: updated } = await post<{ suppressions: { check: string; pageSlug: string; pagePattern?: string }[] }>(`/api/workspaces/${workspaceId}/audit-suppressions`, { check, pagePattern: pattern, reason: `Pattern: ${pattern}` });
       setSuppressions(updated);
-    } catch {}
+    } catch (err) { console.error('Failed to suppress pattern:', err); }
     setActionMenuKey(null);
   };
 
@@ -169,7 +169,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         }],
       });
       setSentForReview(prev => new Set(prev).add(fixKey));
-    } catch { /* skip */ }
+    } catch (err) { console.error('Failed to send for review:', err); }
     finally { setSendingReview(null); }
   };
 
@@ -209,7 +209,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
       setFlaggedIssues(prev => new Set(prev).add(key));
       setFlaggingKey(null);
       setFlagNote('');
-    } catch { /* skip */ }
+    } catch (err) { console.error('Failed to flag for client:', err); }
     finally { setFlagSending(false); }
   };
 
@@ -237,7 +237,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
       const item = issueToTaskItem(page, issue);
       await post('/api/requests', { workspaceId, ...item });
       setCreatedTasks(prev => new Set(prev).add(taskKey));
-    } catch { /* skip */ }
+    } catch (err) { console.error('Failed to create task:', err); }
     finally { setCreatingTask(null); }
   };
 
@@ -272,7 +272,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         return next;
       });
       setBatchResult({ count: result.created, timestamp: Date.now() });
-    } catch { /* skip */ }
+    } catch (err) { console.error('Failed to batch create tasks:', err); }
     finally { setBatchCreating(false); }
   };
 
@@ -297,15 +297,23 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     try {
       const updated = await put<{ enabled: boolean; intervalDays: number; scoreDropThreshold: number; lastRunAt?: string; lastScore?: number }>(`/api/audit-schedules/${workspaceId}`, { enabled, intervalDays: scheduleInterval, scoreDropThreshold: scheduleThreshold });
       setSchedule(updated);
-    } catch { /* skip */ }
+    } catch (err) { console.error('Failed to save schedule:', err); }
     finally { setScheduleSaving(false); }
   };
 
   const [bulkApplying, setBulkApplying] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
+  const bulkAbortRef = useRef<AbortController | null>(null);
+
+  // Cleanup: abort any in-progress bulk operation on unmount
+  useEffect(() => () => { bulkAbortRef.current?.abort(); }, []);
 
   const acceptAllSuggestions = async () => {
     if (!data) return;
+    // Abort any previous bulk operation
+    bulkAbortRef.current?.abort();
+    bulkAbortRef.current = new AbortController();
+    const signal = bulkAbortRef.current.signal;
     // Collect all fixable issues across all pages
     const fixes: { pageId: string; issue: SeoIssue }[] = [];
     for (const page of data.pages) {
@@ -320,9 +328,16 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     setBulkApplying(true);
     setBulkProgress({ done: 0, total: fixes.length });
     for (let i = 0; i < fixes.length; i++) {
+      if (signal.aborted) break;
       await acceptSuggestion(fixes[i].pageId, fixes[i].issue);
       setBulkProgress({ done: i + 1, total: fixes.length });
     }
+    setBulkApplying(false);
+    setBulkProgress(null);
+  };
+
+  const cancelBulkApply = () => {
+    bulkAbortRef.current?.abort();
     setBulkApplying(false);
     setBulkProgress(null);
   };
@@ -398,7 +413,8 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     }
     setAuditError(null);
     loadHistory();
-  }, [siteId, loadHistory]); // eslint-disable-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [siteId, loadHistory]);
 
   const handleSaveAndShare = async () => {
     if (!data) return;
@@ -848,6 +864,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         bulkApplying={bulkApplying}
         bulkProgress={bulkProgress}
         onAcceptAllSuggestions={acceptAllSuggestions}
+        onCancelBulkApply={cancelBulkApply}
         onRunAudit={runAudit}
       />
 
@@ -891,7 +908,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
               try {
                 const { suppressions: updated } = await del<{ suppressions: typeof suppressions }>(`/api/workspaces/${workspaceId}/audit-suppressions`, { check: s.check, pagePattern: s.pagePattern });
                 setSuppressions(updated);
-              } catch {}
+              } catch (err) { console.error('Failed to unsuppress:', err); }
             } else {
               await unsuppressIssue(s.check, s.pageSlug);
             }

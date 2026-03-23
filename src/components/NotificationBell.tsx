@@ -195,7 +195,7 @@ export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
       } catch { /* churn fetch failed, skip */ }
 
       setItems(notifications);
-    } catch { /* silent */ }
+    } catch (err) { console.error('NotificationBell operation failed:', err); }
   }, []);
 
   // Fetch on mount + poll every 5 min

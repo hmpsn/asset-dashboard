@@ -100,7 +100,7 @@ export function KeywordAnalysis({ siteId }: Props) {
           const result = await get<{ text?: string }>(`/api/webflow/page-html/${siteId}?path=${encodeURIComponent(pagePath)}`);
           pageContent = result.text || '';
         }
-      } catch { /* fall back to empty content */ }
+      } catch (err) { console.error('KeywordAnalysis operation failed:', err); }
 
       // Run keyword analysis and content score in parallel
       const [kwData, csData] = await Promise.all([

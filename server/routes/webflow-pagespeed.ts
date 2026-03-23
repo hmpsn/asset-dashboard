@@ -3,6 +3,7 @@
  */
 import { Router } from 'express';
 
+import { requireWorkspaceAccessFromQuery } from '../auth.js';
 const router = Router();
 
 import { runSiteSpeed, runSinglePageSpeed } from '../pagespeed.js';
@@ -13,7 +14,7 @@ import { createLogger } from '../logger.js';
 const log = createLogger('webflow-pagespeed');
 
 // --- PageSpeed / Core Web Vitals ---
-router.get('/api/webflow/pagespeed/:siteId', async (req, res) => {
+router.get('/api/webflow/pagespeed/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
     const strategy = (req.query.strategy as 'mobile' | 'desktop') || 'mobile';
@@ -28,13 +29,13 @@ router.get('/api/webflow/pagespeed/:siteId', async (req, res) => {
 });
 
 // Load last saved PageSpeed snapshot
-router.get('/api/webflow/pagespeed-snapshot/:siteId', (req, res) => {
+router.get('/api/webflow/pagespeed-snapshot/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
   const snapshot = getPageSpeed(req.params.siteId);
   res.json(snapshot);
 });
 
 // Single-page PageSpeed test (resolves URL from siteId + slug)
-router.post('/api/webflow/pagespeed-single/:siteId', async (req, res) => {
+router.post('/api/webflow/pagespeed-single/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   try {
     const { siteId } = req.params;
     const { pageSlug, strategy, pageTitle } = req.body;

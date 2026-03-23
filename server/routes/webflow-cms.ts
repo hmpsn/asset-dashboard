@@ -19,10 +19,11 @@ import { createLogger } from '../logger.js';
 
 const log = createLogger('webflow-cms');
 
+import { requireWorkspaceAccessFromQuery } from '../auth.js';
 const router = Router();
 
 // --- CMS Collections ---
-router.get('/api/webflow/collections/:siteId', async (req, res) => {
+router.get('/api/webflow/collections/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   try {
     const collections = await listCollections(req.params.siteId);
     res.json(collections);
@@ -60,7 +61,7 @@ router.patch('/api/webflow/collections/:collectionId/items/:itemId', async (req,
 });
 
 // --- CMS SEO Editor: list all collections with SEO-relevant fields and items ---
-router.get('/api/webflow/cms-seo/:siteId', async (req, res) => {
+router.get('/api/webflow/cms-seo/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
     const collections = await listCollections(req.params.siteId, token);

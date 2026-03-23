@@ -62,7 +62,7 @@ export function ContentTab({
           setContentPerf(map);
         }
       })
-      .catch(() => {});
+      .catch((err) => { console.error('ContentTab operation failed:', err); });
   }, [workspaceId, contentRequests]);
 
   // ── Content-specific API functions + interaction state (extracted hook) ──

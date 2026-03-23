@@ -75,7 +75,7 @@ export function ReviewChecklist({
           }
         }
       }
-    } catch { /* skip */ }
+    } catch (err) { console.error('ReviewChecklist operation failed:', err); }
     setAiRunning(false);
   };
 

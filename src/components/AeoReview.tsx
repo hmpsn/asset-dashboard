@@ -102,7 +102,7 @@ export function AeoReview({ workspaceId }: Props) {
   useEffect(() => {
     aeoReviewApi.get(workspaceId)
       .then(d => { const r = d as AeoSiteReview | null; if (r && r.pages) setReview(r); })
-      .catch(() => {});
+      .catch((err) => { console.error('AeoReview operation failed:', err); });
   }, [workspaceId]);
 
   const runSiteReview = useCallback(async () => {
@@ -139,7 +139,8 @@ export function AeoReview({ workspaceId }: Props) {
         const quickWins = pages.reduce((s, p) => s + p.quickWinCount, 0);
         return { ...prev, pages, totalChanges, quickWins, generatedAt: new Date().toISOString() };
       });
-    } catch {
+    } catch (err) {
+      console.error('AeoReview operation failed:', err);
       setError(`Failed to review ${pageUrl}`);
     } finally {
       setLoadingPage(null);

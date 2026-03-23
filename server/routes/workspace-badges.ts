@@ -7,6 +7,7 @@ import { listContentRequests } from '../content-requests.js';
 import { listBriefs } from '../content-brief.js';
 import { listPosts } from '../content-posts.js';
 
+import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 /**
@@ -15,7 +16,7 @@ const router = Router();
  * Returns badge-count data so App.tsx doesn't need to fetch full content-requests,
  * content-briefs, and content-posts lists just to derive two numbers.
  */
-router.get('/api/workspace-badges/:id', (req, res) => {
+router.get('/api/workspace-badges/:id', requireWorkspaceAccess(), (req, res) => {
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 

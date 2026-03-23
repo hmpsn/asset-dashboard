@@ -370,7 +370,7 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
           setServerRecs(data.recommendations);
         }
       })
-      .catch(() => {});
+      .catch((err) => { console.error('FixRecommendations operation failed:', err); });
     return () => { cancelled = true; };
   }, [workspaceId]);
 

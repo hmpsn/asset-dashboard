@@ -16,6 +16,7 @@ import { getWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('routes:content-plan-review');
+import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 // ── Public endpoints (client portal) ──
@@ -122,7 +123,7 @@ router.post('/api/public/content-plan/:workspaceId/:matrixId/cells/:cellId/flag'
  * Sends the template for client review by creating an approval batch
  * with the template structure as the approval item.
  */
-router.post('/api/content-plan/:workspaceId/:matrixId/send-template-review', (req, res) => {
+router.post('/api/content-plan/:workspaceId/:matrixId/send-template-review', requireWorkspaceAccess('workspaceId'), (req, res) => {
   try {
     const matrix = getMatrix(req.params.workspaceId, req.params.matrixId);
     if (!matrix) return res.status(404).json({ error: 'Matrix not found' });
@@ -174,7 +175,7 @@ router.post('/api/content-plan/:workspaceId/:matrixId/send-template-review', (re
  * Admin selects specific cell IDs to send as sample briefs for client review.
  * Creates an approval batch with the selected cells' keyword + URL info.
  */
-router.post('/api/content-plan/:workspaceId/:matrixId/send-samples', (req, res) => {
+router.post('/api/content-plan/:workspaceId/:matrixId/send-samples', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const { cellIds } = req.body as { cellIds?: string[] };
   if (!cellIds?.length) return res.status(400).json({ error: 'cellIds array is required' });
 
@@ -227,7 +228,7 @@ router.post('/api/content-plan/:workspaceId/:matrixId/send-samples', (req, res) 
  * After samples are approved, batch-approve all remaining planned/keyword_validated cells.
  * Moves them to 'approved' status so brief generation can proceed.
  */
-router.post('/api/content-plan/:workspaceId/:matrixId/batch-approve', (req, res) => {
+router.post('/api/content-plan/:workspaceId/:matrixId/batch-approve', requireWorkspaceAccess('workspaceId'), (req, res) => {
   try {
     const matrix = getMatrix(req.params.workspaceId, req.params.matrixId);
     if (!matrix) return res.status(404).json({ error: 'Matrix not found' });

@@ -79,7 +79,7 @@ export function SeoChangeImpact({ workspaceId, hasGsc }: SeoChangeImpactProps) {
   useEffect(() => {
     getOptional<{ changes?: SeoChangeEvent[] }>(`/api/seo-changes/${workspaceId}?limit=20`)
       .then(d => { if (d?.changes) setChanges(d.changes); })
-      .catch(() => {});
+      .catch((err) => { console.error('SeoChangeImpact operation failed:', err); });
   }, [workspaceId]);
 
   const loadImpact = () => {
@@ -88,7 +88,7 @@ export function SeoChangeImpact({ workspaceId, hasGsc }: SeoChangeImpactProps) {
     setShowImpact(true);
     getOptional<{ impact?: PageImpact[] }>(`/api/seo-change-impact/${workspaceId}?limit=10`)
       .then(d => { if (d?.impact) setImpact(d.impact); })
-      .catch(() => {})
+      .catch((err) => { console.error('SeoChangeImpact operation failed:', err); })
       .finally(() => setLoading(false));
   };
 

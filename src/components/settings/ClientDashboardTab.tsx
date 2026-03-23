@@ -101,7 +101,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
     try {
       const data = await get<ClientUserSafe[]>(`/api/workspaces/${workspaceId}/client-users`);
       setClientUsers(data);
-    } catch { /* ignore */ }
+    } catch (err) { console.error('ClientDashboardTab operation failed:', err); }
     finally { setClientUsersLoading(false); }
   };
 

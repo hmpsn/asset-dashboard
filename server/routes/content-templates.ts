@@ -12,24 +12,25 @@ import {
 } from '../content-templates.js';
 import { createLogger } from '../logger.js';
 
+import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 const log = createLogger('content-templates-routes');
 
 // List all templates for a workspace
-router.get('/api/content-templates/:workspaceId', (req, res) => {
+router.get('/api/content-templates/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const templates = listTemplates(req.params.workspaceId);
   res.json(templates);
 });
 
 // Get a specific template
-router.get('/api/content-templates/:workspaceId/:templateId', (req, res) => {
+router.get('/api/content-templates/:workspaceId/:templateId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const template = getTemplate(req.params.workspaceId, req.params.templateId);
   if (!template) return res.status(404).json({ error: 'Template not found' });
   res.json(template);
 });
 
 // Create a new template
-router.post('/api/content-templates/:workspaceId', (req, res) => {
+router.post('/api/content-templates/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   try {
     const { name, description, pageType, variables, sections, urlPattern, keywordPattern, titlePattern, metaDescPattern, cmsFieldMap, toneAndStyle } = req.body;
     if (!name) return res.status(400).json({ error: 'name is required' });
@@ -56,7 +57,7 @@ router.post('/api/content-templates/:workspaceId', (req, res) => {
 });
 
 // Update an existing template
-router.put('/api/content-templates/:workspaceId/:templateId', (req, res) => {
+router.put('/api/content-templates/:workspaceId/:templateId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   try {
     const updated = updateTemplate(req.params.workspaceId, req.params.templateId, req.body);
     if (!updated) return res.status(404).json({ error: 'Template not found' });
@@ -68,14 +69,14 @@ router.put('/api/content-templates/:workspaceId/:templateId', (req, res) => {
 });
 
 // Delete a template
-router.delete('/api/content-templates/:workspaceId/:templateId', (req, res) => {
+router.delete('/api/content-templates/:workspaceId/:templateId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const deleted = deleteTemplate(req.params.workspaceId, req.params.templateId);
   if (!deleted) return res.status(404).json({ error: 'Template not found' });
   res.json({ ok: true });
 });
 
 // Duplicate a template
-router.post('/api/content-templates/:workspaceId/:templateId/duplicate', (req, res) => {
+router.post('/api/content-templates/:workspaceId/:templateId/duplicate', requireWorkspaceAccess('workspaceId'), (req, res) => {
   try {
     const { name } = req.body;
     const copy = duplicateTemplate(req.params.workspaceId, req.params.templateId, name);

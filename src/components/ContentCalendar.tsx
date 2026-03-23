@@ -184,7 +184,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
       }
 
       setItems(allItems);
-    } catch { /* ignore */ }
+    } catch (err) { console.error('ContentCalendar operation failed:', err); }
     setLoading(false);
   }, [workspaceId]);
 

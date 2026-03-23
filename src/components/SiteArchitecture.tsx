@@ -218,7 +218,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
     try {
       const result = await siteArchitecture.schemaCoverage(workspaceId);
       setCoverage(result);
-    } catch { /* silently skip — coverage is supplementary */ }
+    } catch (err) { console.error('SiteArchitecture operation failed:', err); }
   }, [workspaceId]);
 
   const coverageMap = useMemo((): Record<string, SchemaCoveragePage> | undefined => {
@@ -240,8 +240,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
     setLoading(false);
   }, [workspaceId]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); loadCoverage(); }, [workspaceId]);
+  useEffect(() => { load(); loadCoverage(); }, [workspaceId, load, loadCoverage]);
 
   // Filter tree nodes recursively
   const filteredTree = useMemo(() => {

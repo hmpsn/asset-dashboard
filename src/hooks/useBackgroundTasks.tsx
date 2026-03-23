@@ -66,7 +66,7 @@ export function BackgroundTaskProvider({ children }: { children: ReactNode }) {
               return [job, ...prev];
             });
           }
-        } catch { /* ignore parse errors */ }
+        } catch (err) { console.error('useBackgroundTasks operation failed:', err); }
       };
 
       ws.onclose = () => {
@@ -93,7 +93,7 @@ export function BackgroundTaskProvider({ children }: { children: ReactNode }) {
       .then((data) => {
         if (Array.isArray(data)) setJobs(data);
       })
-      .catch(() => {});
+      .catch((err) => { console.error('useBackgroundTasks operation failed:', err); });
   }, []);
 
   const startJob = useCallback(async (type: string, params: Record<string, unknown>): Promise<string | null> => {
@@ -126,7 +126,7 @@ export function BackgroundTaskProvider({ children }: { children: ReactNode }) {
 
   const clearDone = useCallback(() => {
     setJobs(prev => prev.filter(j => j.status === 'pending' || j.status === 'running'));
-    del('/api/jobs/completed').catch(() => {});
+    del('/api/jobs/completed').catch((err) => { console.error('useBackgroundTasks operation failed:', err); });
   }, []);
 
   const activeJobs = jobs.filter(j => j.status === 'pending' || j.status === 'running');

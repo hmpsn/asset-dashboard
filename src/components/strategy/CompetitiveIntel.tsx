@@ -114,8 +114,7 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable }:
     if (competitors.length > 0 && semrushAvailable) {
       fetchIntel();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspaceId, competitorKey, semrushAvailable]);
+  }, [workspaceId, competitorKey, semrushAvailable]); // fetchIntel is stable — reads from closure
 
   if (!semrushAvailable) {
     return (

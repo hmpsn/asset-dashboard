@@ -96,24 +96,23 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
   const [bulkUpdating, setBulkUpdating] = useState(false);
 
   useEffect(() => {
-    getSafe<Workspace[]>('/api/workspaces', []).then(setWorkspaces).catch(() => {});
+    getSafe<Workspace[]>('/api/workspaces', []).then(setWorkspaces).catch((err) => { console.error('RequestManager operation failed:', err); });
   }, []);
 
   const refreshRequests = (filter?: string) => {
     const f = filter ?? wsFilter;
     const url = f && f !== 'all' ? `/api/requests?workspaceId=${f}` : '/api/requests';
     setLoading(true);
-    getSafe<ClientRequest[]>(url, []).then(data => { if (Array.isArray(data)) setRequests(data); }).catch(() => {}).finally(() => setLoading(false));
+    getSafe<ClientRequest[]>(url, []).then(data => { if (Array.isArray(data)) setRequests(data); }).catch((err) => { console.error('RequestManager operation failed:', err); }).finally(() => setLoading(false));
   };
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { refreshRequests(wsFilter); }, [wsFilter]);
+  useEffect(() => { refreshRequests(wsFilter); }, [wsFilter]); // refreshRequests is stable — reads wsFilter from closure
 
   const updateRequest = async (id: string, updates: Record<string, string>) => {
     try {
       const updated = await patch<ClientRequest>(`/api/requests/${id}`, updates);
       setRequests(prev => prev.map(r => r.id === id ? updated : r));
-    } catch { /* skip */ }
+    } catch (err) { console.error('RequestManager operation failed:', err); }
   };
 
   const sendNote = async (requestId: string) => {
@@ -132,7 +131,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
       }
       setRequests(prev => prev.map(r => r.id === requestId ? updated : r));
       setNoteInput(''); setNoteFiles([]);
-    } catch { /* skip */ }
+    } catch (err) { console.error('RequestManager operation failed:', err); }
     setSendingNote(false);
   };
 
@@ -143,7 +142,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
       setRequests(prev => prev.filter(r => r.id !== id));
       setSelected(prev => { const n = new Set(prev); n.delete(id); return n; });
       if (expandedId === id) setExpandedId(null);
-    } catch { /* skip */ }
+    } catch (err) { console.error('RequestManager operation failed:', err); }
   };
 
   // Bulk operations
@@ -154,7 +153,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
       await patch('/api/requests/bulk', { ids: Array.from(selected), status });
       setRequests(prev => prev.map(r => selected.has(r.id) ? { ...r, status, updatedAt: new Date().toISOString() } : r));
       setSelected(new Set());
-    } catch { /* skip */ }
+    } catch (err) { console.error('RequestManager operation failed:', err); }
     setBulkUpdating(false);
   };
 
@@ -166,7 +165,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
       await Promise.all(Array.from(selected).map(id => del(`/api/requests/${id}`)));
       setRequests(prev => prev.filter(r => !selected.has(r.id)));
       setSelected(new Set());
-    } catch { /* skip */ }
+    } catch (err) { console.error('RequestManager operation failed:', err); }
     setBulkUpdating(false);
   };
 

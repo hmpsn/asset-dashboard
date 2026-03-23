@@ -18,6 +18,7 @@ import { addActivity } from '../activity-log.js';
 import { createLogger } from '../logger.js';
 import type { SeoIssue } from '../seo-audit.js';
 
+import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 const log = createLogger('rewrite-chat');
 
@@ -62,7 +63,7 @@ function extractPageSections(html: string): { title: string; headings: string[];
 }
 
 // ── Load page for content pane ──
-router.post('/api/rewrite-chat/:workspaceId/load-page', async (req, res) => {
+router.post('/api/rewrite-chat/:workspaceId/load-page', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { workspaceId } = req.params;
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: 'url required' });
@@ -97,7 +98,7 @@ router.post('/api/rewrite-chat/:workspaceId/load-page', async (req, res) => {
 });
 
 // ── Chat endpoint ──
-router.post('/api/rewrite-chat/:workspaceId', async (req, res) => {
+router.post('/api/rewrite-chat/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { workspaceId } = req.params;
   const { question, sessionId, pageUrl, pageContent, pageTitle, pageIssues } = req.body;
 

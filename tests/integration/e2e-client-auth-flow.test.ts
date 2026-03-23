@@ -113,7 +113,8 @@ describe('E2E: Client auth flow', () => {
     expect(body.user).toBeDefined();
     expect(body.user.email).toBe(CLIENT_EMAIL);
     expect(body.user.role).toBe('client_owner');
-    expect(body.token).toBeDefined();
+    // Token is no longer in response body (httpOnly cookie only)
+    expect(body.token).toBeUndefined();
     // Should NOT include passwordHash
     expect(body.user.passwordHash).toBeUndefined();
   });

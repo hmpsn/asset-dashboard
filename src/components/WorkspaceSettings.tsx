@@ -57,17 +57,17 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
   const [savingName, setSavingName] = useState(false);
 
   useEffect(() => {
-    get<WorkspaceData>(`/api/workspaces/${workspaceId}`).then(d => { setWs(d); }).catch(() => {});
+    get<WorkspaceData>(`/api/workspaces/${workspaceId}`).then(d => { setWs(d); }).catch((err) => { console.error('WorkspaceSettings operation failed:', err); });
     get<{ connected: boolean; configured: boolean }>('/api/google/status').then(s => {
       setGoogleStatus(s);
       if (s.connected) {
         setLoadingGoogle(true);
         Promise.all([
-          get<GscSite[]>('/api/google/gsc-sites').then(d => { if (Array.isArray(d)) setGscSites(d); }).catch(() => {}),
-          get<GA4Property[]>('/api/google/ga4-properties').then(d => { if (Array.isArray(d)) setGa4Properties(d); }).catch(() => {}),
+          get<GscSite[]>('/api/google/gsc-sites').then(d => { if (Array.isArray(d)) setGscSites(d); }).catch((err) => { console.error('WorkspaceSettings operation failed:', err); }),
+          get<GA4Property[]>('/api/google/ga4-properties').then(d => { if (Array.isArray(d)) setGa4Properties(d); }).catch((err) => { console.error('WorkspaceSettings operation failed:', err); }),
         ]).finally(() => setLoadingGoogle(false));
       }
-    }).catch(() => {});
+    }).catch((err) => { console.error('WorkspaceSettings operation failed:', err); });
   }, [workspaceId]);
 
   const patchWorkspace = async (fields: Record<string, unknown>) => {

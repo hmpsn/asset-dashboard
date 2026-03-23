@@ -3,6 +3,7 @@
  */
 import { Router } from 'express';
 
+import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 import fs from 'fs';
@@ -235,7 +236,7 @@ router.get('/report/audit/:siteId', (req, res) => {
 
 // --- Monthly Reports ---
 // Manual trigger: generate + optionally email a monthly report
-router.post('/api/monthly-report/:workspaceId', async (req, res) => {
+router.post('/api/monthly-report/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   try {
     const result = await triggerMonthlyReport(req.params.workspaceId);
     res.json({ sent: result.sent, html: result.html, reportId: result.reportId });

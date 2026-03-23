@@ -111,7 +111,7 @@ function AdminApp() {
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark';
     setTheme(next);
-    try { localStorage.setItem('admin-theme', next); } catch { /* skip */ }
+    try { localStorage.setItem('admin-theme', next); } catch (err) { console.error('App operation failed:', err); }
   };
 
   if (auth.checking) {
@@ -173,8 +173,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     } else if (!urlWorkspaceId && !GLOBAL_TABS.has(tab)) {
       if (selected) setSelected(null);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlWorkspaceId, workspaces, GLOBAL_TABS]);
+  }, [urlWorkspaceId, workspaces, GLOBAL_TABS, selected, tab]);
 
   // ── Collapsible sidebar groups (#160) ──
   const ALL_GROUP_LABELS = ['ANALYTICS', 'SITE HEALTH', 'SEO', 'CONTENT'];
@@ -188,7 +187,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     setCollapsedGroups(prev => {
       const next = new Set(prev);
       if (next.has(label)) next.delete(label); else next.add(label);
-      try { localStorage.setItem('admin-sidebar-collapsed', JSON.stringify([...next])); } catch { /* skip */ }
+      try { localStorage.setItem('admin-sidebar-collapsed', JSON.stringify([...next])); } catch (err) { console.error('App operation failed:', err); }
       return next;
     });
   }, []);
@@ -202,8 +201,8 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
 
   // Fetch initial data
   useEffect(() => {
-    get<Workspace[]>('/api/workspaces').then(setWorkspaces).catch(() => {});
-    get<QueueItem[]>('/api/queue').then(setQueue).catch(() => {});
+    get<Workspace[]>('/api/workspaces').then(setWorkspaces).catch((err) => { console.error('App operation failed:', err); });
+    get<QueueItem[]>('/api/queue').then(setQueue).catch((err) => { console.error('App operation failed:', err); });
     refreshHealth();
   }, [refreshHealth]);
 
@@ -217,7 +216,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
         setPendingContentRequests(badges.pendingRequests);
         setHasContentItems(badges.hasContent);
       })
-      .catch(() => {});
+      .catch((err) => { console.error('App operation failed:', err); });
     return () => { cancelled = true; };
   }, [selected]);
 
@@ -260,7 +259,8 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
             const data = await postForm<{ fileName: string }>(`/api/upload/${selected.folder}/clipboard`, formData);
             setClipboardStatus(`Pasted: ${data.fileName} (resized 2x for HDPI)`);
             setTimeout(() => setClipboardStatus(null), 3000);
-          } catch {
+          } catch (err) {
+      console.error('App operation failed:', err);
             setClipboardStatus('Paste failed');
             setTimeout(() => setClipboardStatus(null), 3000);
           }
@@ -339,7 +339,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
       setCollapsedGroups(prev => {
         const next = new Set(prev);
         next.delete(activeGroup.label);
-        try { localStorage.setItem('admin-sidebar-collapsed', JSON.stringify([...next])); } catch { /* skip */ }
+        try { localStorage.setItem('admin-sidebar-collapsed', JSON.stringify([...next])); } catch (err) { console.error('App operation failed:', err); }
         return next;
       });
     }

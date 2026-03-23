@@ -23,6 +23,7 @@ import { createLogger } from '../logger.js';
 
 const log = createLogger('webflow-alt-text');
 
+import { requireWorkspaceAccessFromQuery } from '../auth.js';
 const router = Router();
 
 // --- AI Alt Text Generation for existing assets ---

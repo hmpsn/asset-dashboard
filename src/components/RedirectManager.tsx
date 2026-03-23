@@ -97,7 +97,7 @@ export function RedirectManager({ siteId }: Props) {
           }
           setRules(newRules);
         }
-      } catch { /* no saved data */ }
+      } catch (err) { console.error('RedirectManager operation failed:', err); }
     })();
   }, [siteId]);
 
@@ -125,7 +125,8 @@ export function RedirectManager({ siteId }: Props) {
         }
         setRules(newRules);
       }
-    } catch {
+    } catch (err) {
+      console.error('RedirectManager operation failed:', err);
       setError('Failed to scan redirects');
     } finally {
       setLoading(false);

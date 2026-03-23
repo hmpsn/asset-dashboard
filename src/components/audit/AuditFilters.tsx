@@ -3,7 +3,7 @@
  * Extracted from SeoAudit.tsx.
  */
 import {
-  Search as SearchIcon, Share2, FileText, RefreshCw, CheckCircle, Loader2,
+  Search as SearchIcon, Share2, FileText, RefreshCw, CheckCircle, Loader2, XCircle,
 } from 'lucide-react';
 import type { SeoAuditResult, CheckCategory } from './types';
 import { CATEGORY_CONFIG } from './types';
@@ -21,6 +21,7 @@ interface ToolbarProps {
   bulkApplying: boolean;
   bulkProgress: { done: number; total: number } | null;
   onAcceptAllSuggestions: () => void;
+  onCancelBulkApply?: () => void;
   onRunAudit: () => void;
 }
 
@@ -29,7 +30,7 @@ export function AuditToolbar({
   saving, onSaveAndShare, onOpenExportModal,
   effectiveData, appliedFixes,
   bulkApplying, bulkProgress,
-  onAcceptAllSuggestions, onRunAudit,
+  onAcceptAllSuggestions, onCancelBulkApply, onRunAudit,
 }: ToolbarProps) {
   const pendingFixes = effectiveData.pages.reduce((count, page) =>
     count + page.issues.filter(i => i.suggestedFix && !appliedFixes.has(`${page.pageId}-${i.check}`)).length, 0);
@@ -61,17 +62,27 @@ export function AuditToolbar({
           <FileText className="w-3.5 h-3.5" /> Export
         </button>
         {pendingFixes > 0 && (
-          <button
-            onClick={onAcceptAllSuggestions}
-            disabled={bulkApplying}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
-            style={{ backgroundColor: 'rgba(16,185,129,0.15)', color: '#6ee7b7', border: '1px solid rgba(16,185,129,0.3)' }}
-          >
-            <CheckCircle className="w-3.5 h-3.5" />
-            {bulkApplying && bulkProgress
-              ? `Applying ${bulkProgress.done}/${bulkProgress.total}...`
-              : `Accept All (${pendingFixes})`}
-          </button>
+          <>
+            <button
+              onClick={onAcceptAllSuggestions}
+              disabled={bulkApplying}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+              style={{ backgroundColor: 'rgba(16,185,129,0.15)', color: '#6ee7b7', border: '1px solid rgba(16,185,129,0.3)' }}
+            >
+              <CheckCircle className="w-3.5 h-3.5" />
+              {bulkApplying && bulkProgress
+                ? `Applying ${bulkProgress.done}/${bulkProgress.total}...`
+                : `Accept All (${pendingFixes})`}
+            </button>
+            {bulkApplying && onCancelBulkApply && (
+              <button
+                onClick={onCancelBulkApply}
+                className="flex items-center gap-1.5 px-2 py-2 rounded-lg text-xs font-medium transition-colors bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20"
+              >
+                <XCircle className="w-3.5 h-3.5" /> Cancel
+              </button>
+            )}
+          </>
         )}
         <button
           onClick={onRunAudit}

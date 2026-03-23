@@ -70,7 +70,7 @@ function AssetAudit({ siteId }: Props) {
     setHasRun(true);
     get<AuditResult>(`/api/webflow/audit/${siteId}`)
       .then(data => setAudit(data))
-      .catch(() => {})
+      .catch((err) => { console.error('AssetAudit operation failed:', err); })
       .finally(() => setLoading(false));
   };
 
@@ -95,7 +95,7 @@ function AssetAudit({ siteId }: Props) {
           ),
         });
       }
-    } catch { /* ignore */ }
+    } catch (err) { console.error('AssetAudit operation failed:', err); }
     setGeneratingAlt(prev => { const n = new Set(prev); n.delete(issue.assetId); return n; });
   };
 
@@ -120,7 +120,7 @@ function AssetAudit({ siteId }: Props) {
       try {
         const data = await post<{ success?: boolean; savings?: number }>(`/api/webflow/compress/${issue.assetId}`, { imageUrl: issue.url, siteId, fileName: issue.fileName });
         if (data.success) totalSaved += (data.savings || 0);
-      } catch { /* ignore */ }
+      } catch (err) { console.error('AssetAudit operation failed:', err); }
       setBulkCompressProgress({ done: idx + 1, total: compressible.length, saved: totalSaved });
     }
     setBulkCompressProgress(null);
@@ -166,7 +166,7 @@ function AssetAudit({ siteId }: Props) {
           ),
         });
       }
-    } catch { /* ignore */ }
+    } catch (err) { console.error('AssetAudit operation failed:', err); }
     setCompressing(prev => { const n = new Set(prev); n.delete(issue.assetId); return n; });
   };
 
@@ -184,7 +184,7 @@ function AssetAudit({ siteId }: Props) {
           issues: audit.issues.filter(i => i.assetId !== issue.assetId),
         });
       }
-    } catch { /* ignore */ }
+    } catch (err) { console.error('AssetAudit operation failed:', err); }
     setDeletingIds(prev => { const n = new Set(prev); n.delete(issue.assetId); return n; });
   };
 
@@ -196,7 +196,7 @@ function AssetAudit({ siteId }: Props) {
     for (const issue of unused) {
       try {
         await del(`/api/webflow/assets/${issue.assetId}?siteId=${siteId}`);
-      } catch { /* ignore */ }
+      } catch (err) { console.error('AssetAudit operation failed:', err); }
     }
     setAudit({
       ...audit,

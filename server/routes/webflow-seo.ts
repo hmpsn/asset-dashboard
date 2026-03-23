@@ -3,6 +3,7 @@
  */
 import { Router } from 'express';
 
+import { requireWorkspaceAccessFromQuery } from '../auth.js';
 const router = Router();
 
 import { callOpenAI } from '../openai-helpers.js';
@@ -24,7 +25,7 @@ import { createLogger } from '../logger.js';
 const log = createLogger('webflow-seo');
 
 // --- SEO Audit ---
-router.get('/api/webflow/seo-audit/:siteId', async (req, res) => {
+router.get('/api/webflow/seo-audit/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
     if (!token) {
@@ -219,7 +220,7 @@ Return ONLY a JSON array of 3 strings, e.g. ["title1","title2","title3"]. No exp
 });
 
 // --- Bulk AI SEO Fix ---
-router.post('/api/webflow/seo-bulk-fix/:siteId', async (req, res) => {
+router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   const { pages, field, workspaceId } = req.body as { pages: Array<{ pageId: string; title: string; slug?: string; currentSeoTitle?: string; currentDescription?: string; pageContent?: string }>; field: 'title' | 'description'; workspaceId?: string };
   if (!pages?.length) return res.status(400).json({ error: 'pages required' });
 
@@ -326,7 +327,7 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', async (req, res) => {
 });
 
 // --- Bulk Pattern Apply (instant text transforms, no AI) ---
-router.post('/api/webflow/seo-pattern-apply/:siteId', async (req, res) => {
+router.post('/api/webflow/seo-pattern-apply/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   const { pages, field, action, text: patternText } = req.body as {
     pages: Array<{ pageId: string; title: string; slug?: string; currentValue: string }>;
     field: 'title' | 'description';
@@ -381,7 +382,7 @@ router.post('/api/webflow/seo-pattern-apply/:siteId', async (req, res) => {
 });
 
 // --- Bulk AI Rewrite (selected pages, concurrency-limited) ---
-router.post('/api/webflow/seo-bulk-rewrite/:siteId', async (req, res) => {
+router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   const { pages, field, workspaceId, dryRun } = req.body as {
     pages: Array<{ pageId: string; title: string; slug?: string; currentSeoTitle?: string; currentDescription?: string }>;
     field: 'title' | 'description';
@@ -495,7 +496,7 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', async (req, res) => {
 });
 
 // --- Fetch page HTML body text (for keyword analysis) ---
-router.get('/api/webflow/page-html/:siteId', async (req, res) => {
+router.get('/api/webflow/page-html/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   const { siteId } = req.params;
   const pagePath = req.query.path as string;
   if (!pagePath) return res.status(400).json({ error: 'path query param required' });

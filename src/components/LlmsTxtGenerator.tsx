@@ -38,7 +38,8 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
       await navigator.clipboard.writeText(data.content);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
+    } catch (err) {
+      console.error('LlmsTxtGenerator operation failed:', err);
       // Fallback for older browsers
       const textarea = document.createElement('textarea');
       textarea.value = data.content;

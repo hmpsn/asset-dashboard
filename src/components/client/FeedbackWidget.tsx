@@ -66,13 +66,12 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
     try {
       const data = await get<FeedbackItem[]>(`/api/public/feedback/${workspaceId}`);
       setItems(data);
-    } catch { /* silent */ }
+    } catch (err) { console.error('FeedbackWidget operation failed:', err); }
   };
 
   useEffect(() => {
     if (open && view === 'list') loadFeedback();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, view]);
+  }, [open, view]); // loadFeedback reads workspaceId from closure — stable across renders
 
   const handleSubmit = async () => {
     if (!title.trim() || !description.trim()) return;

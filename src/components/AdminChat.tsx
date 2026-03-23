@@ -88,7 +88,8 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
       const data = await chat.adminAsk({ workspaceId, question: question.trim(), sessionId });
       if (data.mode) setChatMode(data.mode);
       setMessages(prev => [...prev, { role: 'assistant', content: data.error ? `Error: ${data.error}` : (data.answer ?? '') }]);
-    } catch {
+    } catch (err) {
+      console.error('AdminChat operation failed:', err);
       setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong.' }]);
     } finally {
       setLoading(false);
@@ -104,7 +105,7 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
 
   const toggleHistory = () => {
     setShowHistory(v => {
-      if (!v) chat.sessions(workspaceId, 'admin').then(d => { if (Array.isArray(d)) setSessions(d as typeof sessions); }).catch(() => {});
+      if (!v) chat.sessions(workspaceId, 'admin').then(d => { if (Array.isArray(d)) setSessions(d as typeof sessions); }).catch((err) => { console.error('AdminChat operation failed:', err); });
       return !v;
     });
   };
@@ -114,7 +115,7 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
     setShowHistory(false);
     chat.session(workspaceId, id).then(d => {
       if (d?.messages) setMessages(d.messages.map((m: { role: string; content: string }) => ({ role: m.role as 'user' | 'assistant', content: m.content })));
-    }).catch(() => {});
+    }).catch((err) => { console.error('AdminChat operation failed:', err); });
   };
 
   const placeholder = chatMode === 'content_reviewer'

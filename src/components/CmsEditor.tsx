@@ -167,7 +167,8 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
         setSaved(prev => new Set(prev).add(itemId));
         refreshStates();
       }
-    } catch {
+    } catch (err) {
+      console.error('CmsEditor operation failed:', err);
       setErrors(prev => ({ ...prev, [itemId]: 'Network error' }));
     } finally {
       setSaving(prev => { const n = new Set(prev); n.delete(itemId); return n; });
@@ -185,7 +186,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
         setPublished(prev => new Set(prev).add(collectionId));
         setTimeout(() => setPublished(prev => { const n = new Set(prev); n.delete(collectionId); return n; }), 3000);
       }
-    } catch { /* ignore */ } finally {
+    } catch (err) { console.error('CmsEditor operation failed:', err); } finally {
       setPublishing(prev => { const n = new Set(prev); n.delete(collectionId); return n; });
     }
   };
@@ -224,7 +225,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
       } else if (data.text) {
         updateField(itemId, fieldSlug, data.text);
       }
-    } catch { /* ignore */ } finally {
+    } catch (err) { console.error('CmsEditor operation failed:', err); } finally {
       setAiLoading(prev => { const n = { ...prev }; delete n[key]; return n; });
     }
   };

@@ -142,7 +142,7 @@ export function ContentPerformance({ workspaceId }: Props) {
       try {
         const data = await contentPerformance.trend(workspaceId, requestId);
         setTrendData(prev => ({ ...prev, [requestId]: (data as { trend?: TrendPoint[] }).trend || [] }));
-      } catch { /* ignore */ }
+      } catch (err) { console.error('ContentPerformance operation failed:', err); }
       setTrendLoading(null);
     }
   };

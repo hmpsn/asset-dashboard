@@ -44,7 +44,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
       ]);
       if (Array.isArray(kw)) setKeywords(kw);
       if (Array.isArray(ranks)) setLatestRanks(ranks);
-    } catch { /* skip */ }
+    } catch (err) { console.error('RankTracker operation failed:', err); }
     setLoading(false);
   };
 

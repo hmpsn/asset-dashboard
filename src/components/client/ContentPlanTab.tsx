@@ -32,8 +32,7 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
     setLoading(false);
   }, [workspaceId]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { loadPlans(); }, [workspaceId]);
+  useEffect(() => { loadPlans(); }, [workspaceId, loadPlans]);
 
   const handleCellPreview = useCallback((_cell: MatrixCell) => {
     void _cell; // Preview is handled internally by MatrixProgressView's modal

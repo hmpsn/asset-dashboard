@@ -60,7 +60,7 @@ describe('getClientPortalUrl', () => {
 describe('workspace CRUD', () => {
   it('createWorkspace returns a workspace with expected fields', () => {
     const ws = createWorkspace('Test Workspace', 'site_abc', 'Test Site');
-    expect(ws.id).toMatch(/^ws_\d+(_\d+)?$/);
+    expect(ws.id).toMatch(/^ws_[0-9a-f-]+$/);
     expect(ws.name).toBe('Test Workspace');
     expect(ws.webflowSiteId).toBe('site_abc');
     expect(ws.webflowSiteName).toBe('Test Site');

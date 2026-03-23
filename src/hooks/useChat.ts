@@ -189,8 +189,9 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
         throw err;
       }
       setChatMessages(prev => [...prev, { role: 'assistant', content: data.error ? `Error: ${data.error}` : (data.answer ?? '') }]);
-      if (ws) getOptional<{ allowed: boolean; used: number; limit: number; remaining: number; tier: string }>(`/api/public/chat-usage/${ws.id}`).then(d => { if (d) setChatUsage(d); }).catch(() => {});
-    } catch {
+      if (ws) getOptional<{ allowed: boolean; used: number; limit: number; remaining: number; tier: string }>(`/api/public/chat-usage/${ws.id}`).then(d => { if (d) setChatUsage(d); }).catch((err) => { console.error('useChat operation failed:', err); });
+    } catch (err) {
+      console.error('useChat operation failed:', err);
       setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong.' }]);
     } finally { setChatLoading(false); }
   }, [deps, buildChatContext, chatSessionId, roiValue]);
@@ -341,22 +342,20 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
       const insight = buildInlineInsight();
       if (insight) setProactiveInsight(insight);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deps.overview, deps.ga4Overview, deps.ws]);
+  }, [deps.overview, deps.ga4Overview, deps.ws, buildInlineInsight]);
 
   // Fetch chat usage and ROI data when chat opens
   useEffect(() => {
     if (chatOpen && deps.ws) {
-      getOptional<{ allowed: boolean; used: number; limit: number; remaining: number; tier: string }>(`/api/public/chat-usage/${deps.ws.id}`).then(d => { if (d) setChatUsage(d); }).catch(() => {});
+      getOptional<{ allowed: boolean; used: number; limit: number; remaining: number; tier: string }>(`/api/public/chat-usage/${deps.ws.id}`).then(d => { if (d) setChatUsage(d); }).catch((err) => { console.error('useChat operation failed:', err); });
       // Fetch ROI for upgrade prompts (best-effort, silent fail)
       if (roiValue === null) {
         getOptional<{ organicTrafficValue?: number }>(`/api/public/roi/${deps.ws.id}`).then(d => {
           if (d?.organicTrafficValue) setRoiValue(d.organicTrafficValue);
-        }).catch(() => {});
+        }).catch((err) => { console.error('useChat operation failed:', err); });
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatOpen]);
+  }, [chatOpen, deps.ws, roiValue]);
 
   // Show proactive greeting when chat opens for first time (zero AI cost)
   useEffect(() => {
@@ -366,8 +365,7 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
       const greeting = buildProactiveGreeting();
       setChatMessages([{ role: 'assistant', content: greeting }]);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatOpen]);
+  }, [chatOpen, deps.overview, deps.ga4Overview, deps.ws, deps.effectiveTier, chatMessages.length, buildProactiveGreeting]);
 
   return {
     chatOpen, setChatOpen,

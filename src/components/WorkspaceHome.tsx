@@ -74,7 +74,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       if (key === 'requests') { const d = await requestsApi.list({ workspaceId }); if (Array.isArray(d)) setRequests(d as typeof requests); }
       if (key === 'content') { const d = await contentRequestsApi.list(workspaceId); if (Array.isArray(d)) setContentRequests(d as typeof contentRequests); }
       if (key === 'workOrders') { const d = await workOrdersApi.list(workspaceId); if (Array.isArray(d)) setWorkOrders(d as typeof workOrders); }
-    } catch { /* ignore */ }
+    } catch (err) { console.error('WorkspaceHome operation failed:', err); }
   }, [workspaceId]);
 
   // Real-time workspace events
@@ -168,7 +168,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       if (d.comparison) setComparison(d.comparison);
       if (d.contentPipeline) setContentPipeline(d.contentPipeline);
       setLastFetched(new Date());
-    } catch { /* ignore */ }
+    } catch (err) { console.error('WorkspaceHome operation failed:', err); }
     setRefreshing(false);
   };
 

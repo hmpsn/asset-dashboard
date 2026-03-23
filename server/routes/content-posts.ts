@@ -3,6 +3,7 @@
  */
 import { Router } from 'express';
 
+import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 import { addActivity } from '../activity-log.js';
@@ -39,19 +40,19 @@ const log = createLogger('content-posts');
 // --- Content Post Generator (#194) ---
 
 // List all generated posts for a workspace
-router.get('/api/content-posts/:workspaceId', (req, res) => {
+router.get('/api/content-posts/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   res.json(listPosts(req.params.workspaceId));
 });
 
 // Get a single post
-router.get('/api/content-posts/:workspaceId/:postId', (req, res) => {
+router.get('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const post = getPost(req.params.workspaceId, req.params.postId);
   if (!post) return res.status(404).json({ error: 'Post not found' });
   res.json(post);
 });
 
 // Generate a full post from a brief (async — returns immediately with skeleton, generates in background)
-router.post('/api/content-posts/:workspaceId/generate', async (req, res) => {
+router.post('/api/content-posts/:workspaceId/generate', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { briefId } = req.body;
   if (!briefId) return res.status(400).json({ error: 'briefId required' });
 
@@ -104,7 +105,7 @@ router.post('/api/content-posts/:workspaceId/generate', async (req, res) => {
 });
 
 // Regenerate a single section
-router.post('/api/content-posts/:workspaceId/:postId/regenerate-section', async (req, res) => {
+router.post('/api/content-posts/:workspaceId/:postId/regenerate-section', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { sectionIndex } = req.body;
   if (sectionIndex === undefined) return res.status(400).json({ error: 'sectionIndex required' });
 
@@ -126,7 +127,7 @@ router.post('/api/content-posts/:workspaceId/:postId/regenerate-section', async 
 // Update post fields (inline editing of title, sections, status, etc.)
 // If status is changed to 'approved' and workspace has auto-publish configured,
 // triggers publish-to-webflow in the background.
-router.patch('/api/content-posts/:workspaceId/:postId', (req, res) => {
+router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const previous = getPost(req.params.workspaceId, req.params.postId);
 
   // Snapshot before content-changing edits (not status-only changes)
@@ -189,7 +190,7 @@ router.patch('/api/content-posts/:workspaceId/:postId', (req, res) => {
 });
 
 // Export post as markdown
-router.get('/api/content-posts/:workspaceId/:postId/export/markdown', (req, res) => {
+router.get('/api/content-posts/:workspaceId/:postId/export/markdown', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const post = getPost(req.params.workspaceId, req.params.postId);
   if (!post) return res.status(404).json({ error: 'Post not found' });
   const md = exportPostMarkdown(post);
@@ -199,7 +200,7 @@ router.get('/api/content-posts/:workspaceId/:postId/export/markdown', (req, res)
 });
 
 // Export post as HTML
-router.get('/api/content-posts/:workspaceId/:postId/export/html', (req, res) => {
+router.get('/api/content-posts/:workspaceId/:postId/export/html', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const post = getPost(req.params.workspaceId, req.params.postId);
   if (!post) return res.status(404).json({ error: 'Post not found' });
   const html = exportPostHTML(post);
@@ -208,7 +209,7 @@ router.get('/api/content-posts/:workspaceId/:postId/export/html', (req, res) => 
 });
 
 // Export post as branded PDF-ready HTML (matching content brief export style)
-router.get('/api/content-posts/:workspaceId/:postId/export/pdf', (req, res) => {
+router.get('/api/content-posts/:workspaceId/:postId/export/pdf', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const post = getPost(req.params.workspaceId, req.params.postId);
   if (!post) return res.status(404).json({ error: 'Post not found' });
   const html = renderPostHTML(post);
@@ -217,7 +218,7 @@ router.get('/api/content-posts/:workspaceId/:postId/export/pdf', (req, res) => {
 });
 
 // AI auto-review checklist — runs AI against post content to pre-check each item
-router.post('/api/content-posts/:workspaceId/:postId/ai-review', async (req, res) => {
+router.post('/api/content-posts/:workspaceId/:postId/ai-review', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const post = getPost(req.params.workspaceId, req.params.postId);
   if (!post) return res.status(404).json({ error: 'Post not found' });
 
@@ -283,7 +284,7 @@ Return ONLY valid JSON like:
 // --- Version History ---
 
 // List versions for a post
-router.get('/api/content-posts/:workspaceId/:postId/versions', (req, res) => {
+router.get('/api/content-posts/:workspaceId/:postId/versions', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const versions = listPostVersions(req.params.workspaceId, req.params.postId);
   // Return lightweight list (omit full content to keep response small)
   res.json(versions.map(v => ({
@@ -297,14 +298,14 @@ router.get('/api/content-posts/:workspaceId/:postId/versions', (req, res) => {
 });
 
 // Get a specific version (full content)
-router.get('/api/content-posts/:workspaceId/:postId/versions/:versionId', (req, res) => {
+router.get('/api/content-posts/:workspaceId/:postId/versions/:versionId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const version = getPostVersion(req.params.workspaceId, req.params.versionId);
   if (!version || version.postId !== req.params.postId) return res.status(404).json({ error: 'Version not found' });
   res.json(version);
 });
 
 // Revert to a specific version
-router.post('/api/content-posts/:workspaceId/:postId/versions/:versionId/revert', (req, res) => {
+router.post('/api/content-posts/:workspaceId/:postId/versions/:versionId/revert', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const reverted = revertToVersion(req.params.workspaceId, req.params.postId, req.params.versionId);
   if (!reverted) return res.status(404).json({ error: 'Post or version not found' });
   addActivity(req.params.workspaceId, 'post_reverted', `Reverted "${reverted.title}" to a previous version`);
@@ -312,7 +313,7 @@ router.post('/api/content-posts/:workspaceId/:postId/versions/:versionId/revert'
 });
 
 // Delete a post
-router.delete('/api/content-posts/:workspaceId/:postId', (req, res) => {
+router.delete('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   deletePost(req.params.workspaceId, req.params.postId);
   res.json({ ok: true });
 });

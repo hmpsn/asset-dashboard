@@ -107,7 +107,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   useEffect(() => {
     workspacesApi.getById(workspaceId)
       .then((ws: Record<string, unknown>) => { if (ws && 'publishTarget' in ws && ws.publishTarget) setHasPublishTarget(true); })
-      .catch(() => {});
+      .catch((err) => { console.error('PostEditor operation failed:', err); });
   }, [workspaceId]);
 
   const handlePublish = async (generateImage = false) => {
@@ -161,7 +161,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     try {
       const updated = await contentPosts.update(workspaceId, postId, updates) as GeneratedPost;
       setPost(updated);
-    } catch { /* skip */ }
+    } catch (err) { console.error('PostEditor operation failed:', err); }
   };
 
   const handleRegenerate = async (sectionIndex: number) => {
@@ -169,7 +169,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     try {
       const updated = await contentPosts.regenerateSection(workspaceId, postId, { sectionIndex }) as GeneratedPost;
       setPost(updated);
-    } catch { /* skip */ }
+    } catch (err) { console.error('PostEditor operation failed:', err); }
     setRegenerating(null);
   };
 
@@ -240,7 +240,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     try {
       const data = await contentPosts.versions(workspaceId, postId);
       setVersions(data as Array<{ id: string; versionNumber: number; trigger: string; triggerDetail?: string; totalWordCount: number; createdAt: string }>);
-    } catch { /* skip */ }
+    } catch (err) { console.error('PostEditor operation failed:', err); }
     setVersionsLoading(false);
   }, [workspaceId, postId]);
 
@@ -250,7 +250,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
       const reverted = await contentPosts.revertVersion(workspaceId, postId, versionId) as GeneratedPost;
       setPost(reverted);
       fetchVersions();
-    } catch { /* skip */ }
+    } catch (err) { console.error('PostEditor operation failed:', err); }
     setReverting(null);
   };
 

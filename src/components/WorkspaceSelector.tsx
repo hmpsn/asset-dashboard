@@ -63,7 +63,8 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
       } else {
         setTokenError('No sites found. Check token permissions.');
       }
-    } catch {
+    } catch (err) {
+      console.error('WorkspaceSelector operation failed:', err);
       setTokenError('Failed to fetch sites.');
     } finally {
       setLoadingSites(false);

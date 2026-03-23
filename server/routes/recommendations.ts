@@ -3,6 +3,7 @@
  */
 import { Router } from 'express';
 
+import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 import {

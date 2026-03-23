@@ -3,6 +3,7 @@
  */
 import { Router } from 'express';
 
+import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 import { addActivity } from '../activity-log.js';
@@ -59,7 +60,7 @@ const updateItemSchema = z.object({
 });
 
 // --- Approvals (admin, authenticated) ---
-router.post('/api/approvals/:workspaceId', validate(createBatchSchema), (req, res) => {
+router.post('/api/approvals/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(createBatchSchema), (req, res) => {
   const { siteId, name, items } = req.body;
   const batch = createBatch(req.params.workspaceId, siteId, name || 'SEO Changes', items);
   // Track all pages in this batch as in-review
@@ -76,17 +77,17 @@ router.post('/api/approvals/:workspaceId', validate(createBatchSchema), (req, re
   res.json(batch);
 });
 
-router.get('/api/approvals/:workspaceId', (req, res) => {
+router.get('/api/approvals/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   res.json(listBatches(req.params.workspaceId));
 });
 
-router.get('/api/approvals/:workspaceId/:batchId', (req, res) => {
+router.get('/api/approvals/:workspaceId/:batchId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const batch = getBatch(req.params.workspaceId, req.params.batchId);
   if (!batch) return res.status(404).json({ error: 'Batch not found' });
   res.json(batch);
 });
 
-router.delete('/api/approvals/:workspaceId/:batchId', (req, res) => {
+router.delete('/api/approvals/:workspaceId/:batchId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const { workspaceId, batchId } = req.params;
   // Fetch batch before deleting so we can reset page edit states
   const batch = getBatch(workspaceId, batchId);

@@ -95,7 +95,8 @@ export function AnalyticsTab({
           })).sort((a, b) => b.conversions - a.conversions),
         }));
       }
-    } catch {
+    } catch (err) {
+      console.error('AnalyticsTab operation failed:', err);
       setModulePageData(prev => { const n = { ...prev }; delete n[moduleId]; return n; });
     } finally {
       setModulePageLoading(prev => ({ ...prev, [moduleId]: false }));

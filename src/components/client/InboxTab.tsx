@@ -94,7 +94,8 @@ export function InboxTab({
       setToast({ message: 'Feedback submitted — your team will review it.', type: 'success' });
       setFlaggingCell(null);
       setFlagComment('');
-    } catch {
+    } catch (err) {
+      console.error('InboxTab operation failed:', err);
       setToast({ message: 'Failed to submit feedback. Please try again.', type: 'error' });
     }
     setFlagSubmitting(false);

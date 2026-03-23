@@ -5,10 +5,11 @@ import { Router } from 'express';
 import { analyzeContentDecay, loadDecayAnalysis, generateBatchRecommendations } from '../content-decay.js';
 import { getWorkspace } from '../workspaces.js';
 
+import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 // Run decay analysis for a workspace
-router.post('/api/content-decay/:workspaceId/analyze', async (req, res) => {
+router.post('/api/content-decay/:workspaceId/analyze', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   try {
     const ws = getWorkspace(req.params.workspaceId);
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -21,14 +22,14 @@ router.post('/api/content-decay/:workspaceId/analyze', async (req, res) => {
 });
 
 // Get cached decay analysis
-router.get('/api/content-decay/:workspaceId', (req, res) => {
+router.get('/api/content-decay/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const analysis = loadDecayAnalysis(req.params.workspaceId);
   if (!analysis) return res.json(null);
   res.json(analysis);
 });
 
 // Generate AI refresh recommendations for top decaying pages
-router.post('/api/content-decay/:workspaceId/recommendations', async (req, res) => {
+router.post('/api/content-decay/:workspaceId/recommendations', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   try {
     const ws = getWorkspace(req.params.workspaceId);
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });

@@ -139,7 +139,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
           ),
         };
       });
-    } catch { /* ignore */ }
+    } catch (err) { console.error('InsightsEngine operation failed:', err); }
   };
 
   // Dismiss
@@ -155,7 +155,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
           ),
         };
       });
-    } catch { /* ignore */ }
+    } catch (err) { console.error('InsightsEngine operation failed:', err); }
   };
 
   const togglePriority = (p: RecPriority) =>
