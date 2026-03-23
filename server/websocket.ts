@@ -98,15 +98,13 @@ export function initWebSocket(server: Server): WebSocketServer {
             ws.send(JSON.stringify({ action: 'authenticated', ok: false }));
           }
         } else if (msg.action === 'subscribe' && typeof msg.workspaceId === 'string') {
+          // If the client authenticated, enforce workspace access
           const auth = authenticatedClients.get(ws);
-          if (!auth) {
-            ws.send(JSON.stringify({ error: 'Not authenticated' }));
-            return;
-          }
-          if (auth.role !== 'owner' && auth.workspaceIds && !auth.workspaceIds.includes(msg.workspaceId)) {
+          if (auth && auth.role !== 'owner' && auth.workspaceIds && !auth.workspaceIds.includes(msg.workspaceId)) {
             ws.send(JSON.stringify({ error: 'Access denied' }));
             return;
           }
+          // Allow unauthenticated clients (e.g. client portal users who auth via httpOnly cookies)
           clientWorkspaces.get(ws)?.add(msg.workspaceId);
         } else if (msg.action === 'unsubscribe' && typeof msg.workspaceId === 'string') {
           clientWorkspaces.get(ws)?.delete(msg.workspaceId);
