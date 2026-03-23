@@ -1039,7 +1039,7 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
       const prioWeight = (p: string) => p === 'high' ? 3 : p === 'medium' ? 2 : 1;
       const withVolume = strategy.contentGaps
         .filter((cg: { volume?: number; impressions?: number }) =>
-          cg.volume === undefined || cg.impressions === undefined ||
+          cg.volume === undefined && cg.impressions === undefined ||
           (cg.volume && cg.volume > 0) || (cg.impressions && cg.impressions > 0)
         );
       if (withVolume.length > 0) {
