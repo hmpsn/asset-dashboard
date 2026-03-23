@@ -24,15 +24,20 @@ import { createTestContext } from './helpers.js';
 const ctx = createTestContext(13203);
 const { api, postJson, patchJson, del } = ctx;
 
+const testWsId = 'ws_integ_content_' + Date.now();
+
 beforeAll(async () => {
+  // Seed workspace so FK constraints on content tables are satisfied
+  db.prepare(
+    `INSERT OR IGNORE INTO workspaces (id, name, folder, created_at)
+     VALUES (?, ?, ?, ?)`,
+  ).run(testWsId, 'Test Content WS', testWsId, new Date().toISOString());
   await ctx.startServer();
 }, 25_000);
 
 afterAll(() => {
   ctx.stopServer();
 });
-
-const testWsId = 'ws_integ_content_' + Date.now();
 
 // Seed a brief directly via SQLite (since generateBrief requires OpenAI)
 function seedBrief(id: string): void {

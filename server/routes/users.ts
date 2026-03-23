@@ -54,7 +54,14 @@ router.patch('/api/users/:id', requireAuth, requireRole('owner', 'admin'), expre
     if ((role === 'owner' || role === 'admin') && req.user!.role !== 'owner') {
       return res.status(403).json({ error: 'Only owners can assign admin roles' });
     }
-    const user = await updateUser(req.params.id, { name, email, role, workspaceIds, avatarUrl });
+    // Only pass defined fields so undefined doesn't overwrite existing values
+    const updates: Record<string, unknown> = {};
+    if (name !== undefined) updates.name = name;
+    if (email !== undefined) updates.email = email;
+    if (role !== undefined) updates.role = role;
+    if (workspaceIds !== undefined) updates.workspaceIds = workspaceIds;
+    if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl;
+    const user = await updateUser(req.params.id, updates);
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json(user);
   } catch (err) {
