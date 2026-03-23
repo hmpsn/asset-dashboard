@@ -144,7 +144,11 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
   useEffect(() => {
     keywords.semrushStatus().then(d => {
       const status = d as { configured?: boolean } | null;
-      if (status?.configured) setSemrushAvailable(true);
+      if (status?.configured) {
+        setSemrushAvailable(true);
+        // Default to quick mode when SEMRush is available
+        setSemrushMode(prev => prev === 'none' ? 'quick' : prev);
+      }
     }).catch(() => {});
   }, []);
 
@@ -539,7 +543,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
             )}
 
             {/* Competitor Domains */}
-            {semrushAvailable && semrushMode === 'full' && (
+            {semrushAvailable && (
               <div>
                 <div className="flex items-center gap-1.5 mb-1">
                   <Users className="w-3.5 h-3.5 text-orange-400" />
@@ -777,7 +781,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
           <CompetitiveIntel
             workspaceId={workspaceId}
             competitors={competitors.split(/[,\n]+/).map(c => c.trim()).filter(Boolean)}
-            semrushAvailable={semrushAvailable && semrushMode === 'full'}
+            semrushAvailable={semrushAvailable}
           />
 
           {/* How it works */}
