@@ -11,7 +11,7 @@ import {
   updateRecommendationStatus,
   dismissRecommendation,
 } from '../recommendations.js';
-import { updatePageState } from '../workspaces.js';
+import { updatePageState, getPageIdBySlug } from '../workspaces.js';
 
 // ─── Recommendation Engine ─────────────────────────────────────────
 // Generate (or re-generate) prioritized recommendations for a workspace
@@ -54,8 +54,10 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', (req, res) => {
   if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
   // When recommendation is completed, mark affected pages as live
   if (status === 'completed' && rec.affectedPages && rec.affectedPages.length > 0) {
+    const workspaceId = req.params.workspaceId;
     for (const pageSlug of rec.affectedPages) {
-      updatePageState(req.params.workspaceId, pageSlug, {
+      const resolvedPageId = getPageIdBySlug(workspaceId, pageSlug) ?? pageSlug;
+      updatePageState(workspaceId, resolvedPageId, {
         status: 'live',
         source: 'recommendation',
         recommendationId: rec.id,

@@ -15,7 +15,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import db from './db/index.js';
-import { getWorkspace } from './workspaces.js';
+import { getWorkspace, updatePageState, getPageIdBySlug } from './workspaces.js';
 import type { Workspace, QuickWin, ContentGap } from './workspaces.js';
 import { getLatestSnapshot } from './reports.js';
 import type { AuditSnapshot } from './reports.js';
@@ -641,6 +641,17 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           insight: `✓ Auto-resolved — this issue is no longer detected in the latest audit. ${oldRec.insight}`,
         });
         autoResolved++;
+        // Mark affected pages as live
+        if (oldRec.affectedPages && oldRec.affectedPages.length > 0) {
+          for (const pageSlug of oldRec.affectedPages) {
+            const resolvedPageId = getPageIdBySlug(workspaceId, pageSlug) ?? pageSlug;
+            updatePageState(workspaceId, resolvedPageId, {
+              status: 'live',
+              source: 'recommendation',
+              recommendationId: oldRec.id,
+            });
+          }
+        }
       }
     }
   }
