@@ -36,6 +36,7 @@ import {
 } from '../webflow.js';
 import { buildKnowledgeBase } from '../seo-context.js';
 import { updateWorkspace, getWorkspace, getTokenForSite } from '../workspaces.js';
+import { validate, z } from '../middleware/validate.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('keyword-strategy');
@@ -563,9 +564,10 @@ Rules:
         return batch.map(p => ({
           pagePath: p.path,
           pageTitle: p.title,
-          primaryKeyword: p.title.toLowerCase(),
+          primaryKeyword: '',
           secondaryKeywords: [],
           searchIntent: 'informational',
+          _parseError: true,
         }));
       }
     };
@@ -578,7 +580,41 @@ Rules:
       const results = await Promise.all(chunk.map((batch, ci) => runBatch(batch, i + ci)));
       allPageMappings.push(...results.flat());
     }
+    // Filter out pages with parse errors and log warning
+    const parseErrors = allPageMappings.filter((pm: { _parseError?: boolean }) => pm._parseError);
+    if (parseErrors.length > 0) {
+      log.warn(`${parseErrors.length} pages had JSON parse errors and were assigned empty keywords`);
+      // Remove parse-error pages from the mappings
+      const validMappings = allPageMappings.filter((pm: { _parseError?: boolean }) => !pm._parseError);
+      allPageMappings.length = 0;
+      allPageMappings.push(...validMappings);
+    }
     log.info(`All batches complete: ${allPageMappings.length} total page mappings`);
+
+    // --- Post-AI keyword validation via SEMRush bulk lookup ---
+    if (isSemrushConfigured() && semrushMode !== 'none') {
+      const allPrimaryKws = allPageMappings.map(pm => pm.primaryKeyword).filter(Boolean);
+      try {
+        const metrics = await getKeywordOverview(allPrimaryKws.slice(0, 100), ws.id);
+        const metricMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m]));
+
+        let unvalidated = 0;
+        for (const pm of allPageMappings) {
+          const m = metricMap.get(pm.primaryKeyword.toLowerCase());
+          if (m && m.volume > 0) {
+            (pm as Record<string, unknown>).validated = true;
+            pm.volume = m.volume;
+            pm.difficulty = m.difficulty;
+          } else {
+            (pm as Record<string, unknown>).validated = false;
+            unvalidated++;
+          }
+        }
+        log.info(`Keyword validation: ${allPageMappings.length - unvalidated} validated, ${unvalidated} unvalidated`);
+      } catch (err) {
+        log.error({ err }, 'Post-AI keyword validation error');
+      }
+    }
 
     // --- STEP 2: Master synthesis — site-level strategy only ---
     // The batch results ARE the pageMap. Master only generates siteKeywords, contentGaps, quickWins, opportunities.
@@ -823,11 +859,14 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
         });
         if (matchingRows.length > 0) {
           const kwMatch = matchingRows.find(r => r.query.toLowerCase().includes(pm.primaryKeyword.toLowerCase()));
-          const best = kwMatch || matchingRows.sort((a, b) => b.impressions - a.impressions)[0];
-          pm.currentPosition = best.position;
+          if (kwMatch) {
+            pm.currentPosition = kwMatch.position;
+          }
+          // Don't set currentPosition from a non-matching query — it's misleading
+
+          // Page-level aggregates are still correct:
           pm.impressions = matchingRows.reduce((s, r) => s + r.impressions, 0);
           pm.clicks = matchingRows.reduce((s, r) => s + r.clicks, 0);
-          // Store per-keyword GSC data (top 20 by impressions)
           pm.gscKeywords = matchingRows
             .sort((a, b) => b.impressions - a.impressions)
             .slice(0, 20)
@@ -846,16 +885,20 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
           pm.volume = match.volume;
           pm.difficulty = match.difficulty;
           pm.cpc = match.cpc;
+          (pm as Record<string, unknown>).metricsSource = 'exact';
         } else {
-          // Try partial match
-          const partial = semrushDomainData.find(k =>
-            k.keyword.toLowerCase().includes(pm.primaryKeyword.toLowerCase()) ||
-            pm.primaryKeyword.toLowerCase().includes(k.keyword.toLowerCase())
-          );
+          // Try word-overlap match (requires >=80% word overlap and at least 2 words)
+          const partial = semrushDomainData.find(k => {
+            const kwWords = new Set(k.keyword.toLowerCase().split(/\s+/));
+            const pmWords = pm.primaryKeyword.toLowerCase().split(/\s+/);
+            const overlap = pmWords.filter(w => kwWords.has(w)).length;
+            return overlap / pmWords.length >= 0.8 && pmWords.length >= 2;
+          });
           if (partial) {
             pm.volume = partial.volume;
             pm.difficulty = partial.difficulty;
             pm.cpc = partial.cpc;
+            (pm as Record<string, unknown>).metricsSource = 'partial_match';
           }
         }
         // Enrich secondary keywords
@@ -891,6 +934,7 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
                 pm.volume = m.volume;
                 pm.difficulty = m.difficulty;
                 pm.cpc = m.cpc;
+                (pm as Record<string, unknown>).metricsSource = 'bulk_lookup';
               }
             }
           }
@@ -948,14 +992,17 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
           if (exact) {
             cg.impressions = exact.impressions;
           } else {
-            // Partial match: sum impressions from queries containing the target keyword
-            let totalImpr = 0;
-            for (const [q, data] of gscByQuery) {
-              if (q.includes(cg.targetKeyword.toLowerCase()) || cg.targetKeyword.toLowerCase().includes(q)) {
-                totalImpr += data.impressions;
+            // Word-level match: sum impressions from queries where all target words appear
+            const targetWords = cg.targetKeyword.toLowerCase().split(/\s+/);
+            if (targetWords.length >= 2) {
+              let totalImpr = 0;
+              for (const [q, data] of gscByQuery) {
+                const qWords = q.split(/\s+/);
+                const allMatch = targetWords.every(tw => qWords.includes(tw));
+                if (allMatch) totalImpr += data.impressions;
               }
+              if (totalImpr > 0) cg.impressions = totalImpr;
             }
-            if (totalImpr > 0) cg.impressions = totalImpr;
           }
         }
       }
@@ -992,6 +1039,7 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
       const prioWeight = (p: string) => p === 'high' ? 3 : p === 'medium' ? 2 : 1;
       const withVolume = strategy.contentGaps
         .filter((cg: { volume?: number; impressions?: number }) =>
+          cg.volume === undefined || cg.impressions === undefined ||
           (cg.volume && cg.volume > 0) || (cg.impressions && cg.impressions > 0)
         );
       if (withVolume.length > 0) {
@@ -1071,7 +1119,21 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', (req, res) => {
 });
 
 // Update keyword strategy (manual edits)
-router.patch('/api/webflow/keyword-strategy/:workspaceId', (req, res) => {
+const patchStrategySchema = z.object({
+  pageMap: z.array(z.object({
+    pagePath: z.string(),
+    pageTitle: z.string(),
+    primaryKeyword: z.string(),
+    secondaryKeywords: z.array(z.string()),
+    searchIntent: z.string(),
+  }).passthrough()).optional(),
+  siteKeywords: z.array(z.string()).optional(),
+  contentGaps: z.array(z.any()).optional(),
+  quickWins: z.array(z.any()).optional(),
+  opportunities: z.array(z.string()).optional(),
+}).strict();
+
+router.patch('/api/webflow/keyword-strategy/:workspaceId', validate(patchStrategySchema), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const updated = { ...(ws.keywordStrategy || {}), ...req.body, generatedAt: new Date().toISOString() };
