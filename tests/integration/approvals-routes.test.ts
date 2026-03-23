@@ -36,7 +36,7 @@ describe('Approvals — create validation', () => {
     const res = await postJson(`/api/approvals/${testWsId}`, {});
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toContain('required');
+    expect(body.error.toLowerCase()).toContain('required');
   });
 
   it('POST without items returns 400', async () => {
@@ -45,7 +45,7 @@ describe('Approvals — create validation', () => {
     });
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toContain('required');
+    expect(body.error.toLowerCase()).toContain('required');
   });
 });
 

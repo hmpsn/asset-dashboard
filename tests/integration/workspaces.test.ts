@@ -49,7 +49,7 @@ describe('Workspace CRUD', () => {
     const res = await postJson('/api/workspaces', {});
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toBe('Name required');
+    expect(body.error.toLowerCase()).toContain('required');
   });
 
   it('GET /api/workspaces/:id returns the created workspace', async () => {

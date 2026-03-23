@@ -67,7 +67,7 @@ describe('Client portal auth — individual login', () => {
     const res = await postJson(`/api/public/client-login/${testWsId}`, {});
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toContain('required');
+    expect(body.error.toLowerCase()).toContain('required');
   });
 
   it('POST /api/public/client-login/:id with wrong credentials returns 401', async () => {

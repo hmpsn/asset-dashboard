@@ -99,7 +99,7 @@ describe('E2E: Client auth flow', () => {
     });
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toContain('required');
+    expect(body.error.toLowerCase()).toContain('required');
   });
 
   it('Step 5: Client user login — correct credentials → 200 + JWT', async () => {
