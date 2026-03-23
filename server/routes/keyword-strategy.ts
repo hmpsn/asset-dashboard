@@ -1125,7 +1125,7 @@ const patchStrategySchema = z.object({
     pageTitle: z.string(),
     primaryKeyword: z.string(),
     secondaryKeywords: z.array(z.string()),
-    searchIntent: z.string(),
+    searchIntent: z.string().optional(),
   }).passthrough()).optional(),
   siteKeywords: z.array(z.string()).optional(),
   contentGaps: z.array(z.any()).optional(),
