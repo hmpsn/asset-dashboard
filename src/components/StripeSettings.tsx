@@ -115,7 +115,8 @@ export function StripeSettings() {
       setWebhookSecret('');
       setPublishableKey('');
       showToast('Stripe keys saved successfully', 'success');
-    } catch {
+    } catch (err) {
+      console.error('StripeSettings operation failed:', err);
       showToast('Failed to save Stripe keys', 'error');
     }
     setSaving(false);
@@ -131,7 +132,8 @@ export function StripeSettings() {
       });
       if (!res.ok) throw new Error('Failed to save');
       showToast('Product configuration saved', 'success');
-    } catch {
+    } catch (err) {
+      console.error('StripeSettings operation failed:', err);
       showToast('Failed to save product configuration', 'error');
     }
     setSavingProducts(false);
@@ -144,7 +146,8 @@ export function StripeSettings() {
       setConfig({ configured: false, hasSecretKey: false, hasWebhookSecret: false, hasPublishableKey: false, publishableKey: '', products: [], updatedAt: null });
       setProducts(DEFAULT_PRODUCTS);
       showToast('Stripe configuration cleared', 'success');
-    } catch {
+    } catch (err) {
+      console.error('StripeSettings operation failed:', err);
       showToast('Failed to clear configuration', 'error');
     }
   };

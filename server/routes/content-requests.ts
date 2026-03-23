@@ -3,6 +3,7 @@
  */
 import { Router } from 'express';
 
+import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 import { addActivity } from '../activity-log.js';
@@ -39,17 +40,17 @@ const updateContentRequestSchema = z.object({
 });
 
 // --- Internal Content Request Management ---
-router.get('/api/content-requests/:workspaceId', (req, res) => {
+router.get('/api/content-requests/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   res.json(listContentRequests(req.params.workspaceId));
 });
 
-router.get('/api/content-requests/:workspaceId/:id', (req, res) => {
+router.get('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const request = getContentRequest(req.params.workspaceId, req.params.id);
   if (!request) return res.status(404).json({ error: 'Request not found' });
   res.json(request);
 });
 
-router.patch('/api/content-requests/:workspaceId/:id', validate(updateContentRequestSchema), (req, res) => {
+router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('workspaceId'), validate(updateContentRequestSchema), (req, res) => {
   const { status, internalNote, deliveryUrl, deliveryNotes } = req.body;
   const updated = updateContentRequest(req.params.workspaceId, req.params.id, { status, internalNote, deliveryUrl, deliveryNotes });
   if (!updated) return res.status(404).json({ error: 'Request not found' });
@@ -92,7 +93,7 @@ router.patch('/api/content-requests/:workspaceId/:id', validate(updateContentReq
 });
 
 // Delete a content request
-router.delete('/api/content-requests/:workspaceId/:id', (req, res) => {
+router.delete('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const deleted = deleteContentRequest(req.params.workspaceId, req.params.id);
   if (!deleted) return res.status(404).json({ error: 'Request not found' });
   broadcastToWorkspace(req.params.workspaceId, 'content-request:update', { id: req.params.id, deleted: true });
@@ -160,7 +161,7 @@ export async function getAllSitePages(ws: { webflowSiteId?: string; liveDomain?:
 }
 
 // Generate a brief for a content request
-router.post('/api/content-requests/:workspaceId/:id/generate-brief', async (req, res) => {
+router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const request = getContentRequest(req.params.workspaceId, req.params.id);
@@ -353,7 +354,7 @@ export async function handleContentPerformance(workspaceId: string): Promise<{
   return { items };
 }
 
-router.get('/api/content-performance/:workspaceId', async (req, res) => {
+router.get('/api/content-performance/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   try {
     const data = await handleContentPerformance(req.params.workspaceId);
     res.json(data);
@@ -364,7 +365,7 @@ router.get('/api/content-performance/:workspaceId', async (req, res) => {
 });
 
 // Per-post GSC trend (daily clicks/impressions since publish)
-router.get('/api/content-performance/:workspaceId/:requestId/trend', async (req, res) => {
+router.get('/api/content-performance/:workspaceId/:requestId/trend', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   try {
     const ws = getWorkspace(req.params.workspaceId);
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });

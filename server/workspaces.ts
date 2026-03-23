@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { getUploadRoot as _getUploadRoot, getOptRoot as _getOptRoot } from './data-dir.js';
@@ -348,11 +349,9 @@ export function listWorkspaces(): Workspace[] {
   return rows.map(r => attachPageStates(rowToWorkspace(r)));
 }
 
-let _wsCounter = 0;
-
 export function createWorkspace(name: string, webflowSiteId?: string, webflowSiteName?: string): Workspace {
   const folder = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  const id = `ws_${Date.now()}_${++_wsCounter}`;
+  const id = `ws_${randomUUID()}`;
 
   // New workspaces start with a 14-day Growth trial
   const trialEnd = new Date();
@@ -414,10 +413,18 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
     publishTarget: 'publish_target',
   };
 
+  const ALLOWED_COLUMNS = new Set(Object.values(columnMap));
   for (const [key, col] of Object.entries(columnMap)) {
     if (key in updates) {
       setClauses.push(`${col} = @${col}`);
       params[col] = (p as Record<string, unknown>)[col];
+    }
+  }
+  // Safety net: verify all generated column names are in the allowlist
+  for (const clause of setClauses) {
+    const colName = clause.split(' = ')[0];
+    if (!ALLOWED_COLUMNS.has(colName)) {
+      throw new Error(`Invalid column name: ${colName}`);
     }
   }
 

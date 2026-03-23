@@ -5,9 +5,10 @@ import { Router } from 'express';
 
 const router = Router();
 
-import { hasClientUsers } from '../client-users.js';
+import { hasClientUsers, verifyClientToken } from '../client-users.js';
 import { getGA4TopPages } from '../google-analytics.js';
 import { applySuppressionsToAudit } from '../helpers.js';
+import { verifyClientSession } from '../middleware.js';
 import { listSnapshots, getLatestSnapshot } from '../reports.js';
 import { getAllGscPages } from '../search-console.js';
 import { isStripeConfigured, listProducts } from '../stripe.js';
@@ -69,6 +70,16 @@ router.post('/api/public/onboarding/:id', async (req, res) => {
   try {
     const ws = getWorkspace(req.params.id);
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+    // Require a valid client session or client user JWT
+    const wsId = req.params.id;
+    const sessionToken = req.cookies?.[`client_session_${wsId}`];
+    const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
+    const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
+    const hasClientUserAuth = clientUserToken && verifyClientToken(clientUserToken)?.workspaceId === wsId;
+    if (!hasSession && !hasClientUserAuth) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
 
     const { business, audience, brand, competitors } = req.body;
 

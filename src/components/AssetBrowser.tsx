@@ -74,7 +74,7 @@ function AssetBrowser({ siteId }: Props) {
   const loadAssets = useCallback(() => {
     getSafe<Asset[]>(`/api/webflow/assets/${siteId}`, [])
       .then(data => setAssets(Array.isArray(data) ? data : []))
-      .catch(() => {})
+      .catch((err) => { console.error('AssetBrowser operation failed:', err); })
       .finally(() => setLoading(false));
   }, [siteId]);
 
@@ -93,7 +93,7 @@ function AssetBrowser({ siteId }: Props) {
         );
         setUnusedIds(ids);
       })
-      .catch(() => {})
+      .catch((err) => { console.error('AssetBrowser operation failed:', err); })
       .finally(() => { unusedLoadingRef.current = false; });
   }, [assets.length, unusedIds, siteId]);
 
@@ -143,7 +143,8 @@ function AssetBrowser({ siteId }: Props) {
       }
       setAssets(prev => prev.map(a => a.id === assetId ? { ...a, altText: altDraft } : a));
       setEditingAlt(null);
-    } catch {
+    } catch (err) {
+      console.error('AssetBrowser operation failed:', err);
       setAltError('Network error saving alt text');
     }
   };
@@ -167,7 +168,8 @@ function AssetBrowser({ siteId }: Props) {
           setTimeout(() => setLastGenerated(null), 3000);
         }
       }
-    } catch {
+    } catch (err) {
+      console.error('AssetBrowser operation failed:', err);
       setAltError('Network error generating alt text');
     }
     setGeneratingAlt(prev => { const n = new Set(prev); n.delete(asset.id); return n; });
@@ -237,14 +239,15 @@ function AssetBrowser({ siteId }: Props) {
             } else if (event.type === 'status') {
               setBulkProgress({ done: event.done, total: event.total });
             }
-          } catch { /* skip malformed line */ }
+          } catch (err) { console.error('AssetBrowser operation failed:', err); }
         }
       }
 
       if (failCount > 0) {
         setAltError(`${successCount} saved to Webflow, ${failCount} failed`);
       }
-    } catch {
+    } catch (err) {
+      console.error('AssetBrowser operation failed:', err);
       setAltError('Network error during bulk alt text generation');
     }
     setBulkProgress(null);
@@ -276,7 +279,7 @@ function AssetBrowser({ siteId }: Props) {
         setCompressResult(data.reason || 'Already optimized');
         setTimeout(() => setCompressResult(null), 3000);
       }
-    } catch { /* ignore */ }
+    } catch (err) { console.error('AssetBrowser operation failed:', err); }
     setCompressing(prev => { const n = new Set(prev); n.delete(asset.id); return n; });
   };
 
@@ -295,7 +298,7 @@ function AssetBrowser({ siteId }: Props) {
         setRenamingId(asset.id);
         setRenameDraft(data.fullName);
       }
-    } catch { /* ignore */ }
+    } catch (err) { console.error('AssetBrowser operation failed:', err); }
     setRenameLoading(prev => { const n = new Set(prev); n.delete(asset.id); return n; });
   };
 
@@ -309,7 +312,8 @@ function AssetBrowser({ siteId }: Props) {
         return;
       }
       setAssets(prev => prev.map(a => a.id === assetId ? { ...a, displayName: renameDraft.trim() } : a));
-    } catch {
+    } catch (err) {
+      console.error('AssetBrowser operation failed:', err);
       setAltError('Network error renaming asset');
     }
     setRenamingId(null);
@@ -335,7 +339,7 @@ function AssetBrowser({ siteId }: Props) {
           await patch(`/api/webflow/rename/${asset.id}`, { displayName: data.fullName, siteId });
           setAssets(prev => prev.map(a => a.id === asset.id ? { ...a, displayName: data.fullName } : a));
         }
-      } catch { /* ignore */ }
+      } catch (err) { console.error('AssetBrowser operation failed:', err); }
       setRenameLoading(prev => { const n = new Set(prev); n.delete(asset.id); return n; });
       setBulkRenameProgress({ done: i + 1, total: toRename.length });
     }
@@ -400,7 +404,8 @@ function AssetBrowser({ siteId }: Props) {
       } else {
         setOrganizePreview(data);
       }
-    } catch {
+    } catch (err) {
+      console.error('AssetBrowser operation failed:', err);
       setAltError('Failed to load organization preview');
     }
     setOrganizeLoading(false);
@@ -419,7 +424,8 @@ function AssetBrowser({ siteId }: Props) {
       } else {
         setOrganizeResult(data.summary);
       }
-    } catch {
+    } catch (err) {
+      console.error('AssetBrowser operation failed:', err);
       setAltError('Failed to execute organization');
     }
     setOrganizeExecuting(false);

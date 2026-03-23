@@ -140,7 +140,7 @@ export function PageSpeedPanel({ siteId }: Props) {
         setPages(list);
         if (list.length > 0) setSelectedPage(list[0].id);
       })
-      .catch(() => {});
+      .catch((err) => { console.error('PageSpeedPanel operation failed:', err); });
     // Load last saved bulk PageSpeed snapshot
     pageWeight.pagespeedSnapshot(siteId)
       .then(snap => {
@@ -148,7 +148,7 @@ export function PageSpeedPanel({ siteId }: Props) {
         const s = snap as { result?: SiteSpeedResult } | null;
         if (s?.result) { setData(s.result); setHasRun(true); }
       })
-      .catch(() => {});
+      .catch((err) => { console.error('PageSpeedPanel operation failed:', err); });
     return () => { cancelled = true; };
   }, [siteId]);
 

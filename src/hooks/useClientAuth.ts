@@ -84,7 +84,8 @@ export function useClientAuth(
       setAuthenticated(true);
       sessionStorage.setItem(`dash_auth_${workspaceId}`, 'true');
       if (ws) loadDashboardData(ws);
-    } catch {
+    } catch (err) {
+      console.error('useClientAuth operation failed:', err);
       setAuthError('Incorrect password');
     } finally { setAuthLoading(false); }
   }, [workspaceId, ws, passwordInput, loadDashboardData]);
@@ -111,7 +112,7 @@ export function useClientAuth(
   const handleClientLogout = useCallback(async () => {
     try {
       await post(`/api/public/client-logout/${workspaceId}`);
-    } catch { /* ignore */ }
+    } catch (err) { console.error('useClientAuth operation failed:', err); }
     setClientUser(null);
     setAuthenticated(false);
     sessionStorage.removeItem(`dash_auth_${workspaceId}`);

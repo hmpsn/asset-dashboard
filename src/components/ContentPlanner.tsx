@@ -38,8 +38,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
     setLoading(false);
   }, [workspaceId]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { loadData(); }, [workspaceId]);
+  useEffect(() => { loadData(); }, [workspaceId, loadData]);
 
   // ── Template callbacks ──
 

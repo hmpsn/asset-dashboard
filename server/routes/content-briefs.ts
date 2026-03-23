@@ -3,6 +3,7 @@
  */
 import { Router } from 'express';
 
+import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 import { renderBriefHTML } from '../brief-export-html.js';
@@ -26,14 +27,14 @@ const log = createLogger('content-briefs');
 
 // --- Content Briefs ---
 // List all briefs for a workspace
-router.get('/api/content-briefs/:workspaceId', (req, res) => {
+router.get('/api/content-briefs/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const briefs = listBriefs(req.params.workspaceId);
   log.info(`LIST ${req.params.workspaceId}: ${briefs.length} briefs found`);
   res.json(briefs);
 });
 
 // Get a specific brief
-router.get('/api/content-briefs/:workspaceId/:briefId', (req, res) => {
+router.get('/api/content-briefs/:workspaceId/:briefId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   log.info(`GET ${req.params.workspaceId}/${req.params.briefId}`);
   const brief = getBrief(req.params.workspaceId, req.params.briefId);
   if (!brief) {
@@ -45,14 +46,14 @@ router.get('/api/content-briefs/:workspaceId/:briefId', (req, res) => {
 });
 
 // Update a content brief (inline editing)
-router.patch('/api/content-briefs/:workspaceId/:briefId', (req, res) => {
+router.patch('/api/content-briefs/:workspaceId/:briefId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const updated = updateBrief(req.params.workspaceId, req.params.briefId, req.body);
   if (!updated) return res.status(404).json({ error: 'Brief not found' });
   res.json(updated);
 });
 
 // Generate a new content brief
-router.post('/api/content-briefs/:workspaceId/generate', async (req, res) => {
+router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   try {
     const { targetKeyword, businessContext, pageType, referenceUrls } = req.body;
     if (!targetKeyword) return res.status(400).json({ error: 'targetKeyword required' });
@@ -149,7 +150,7 @@ router.post('/api/content-briefs/:workspaceId/generate', async (req, res) => {
 });
 
 // Regenerate a brief with user feedback
-router.post('/api/content-briefs/:workspaceId/:briefId/regenerate', async (req, res) => {
+router.post('/api/content-briefs/:workspaceId/:briefId/regenerate', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   try {
     const { feedback } = req.body;
     if (!feedback) return res.status(400).json({ error: 'feedback required' });
@@ -164,7 +165,7 @@ router.post('/api/content-briefs/:workspaceId/:briefId/regenerate', async (req, 
 });
 
 // Export a brief as branded HTML
-router.get('/api/content-briefs/:workspaceId/:briefId/export', (req, res) => {
+router.get('/api/content-briefs/:workspaceId/:briefId/export', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const brief = getBrief(req.params.workspaceId, req.params.briefId);
   if (!brief) return res.status(404).json({ error: 'Brief not found' });
   const html = renderBriefHTML(brief);
@@ -174,7 +175,7 @@ router.get('/api/content-briefs/:workspaceId/:briefId/export', (req, res) => {
 
 // Send a standalone brief to client for review
 // Creates a content request linked to this brief and sets status to client_review
-router.post('/api/content-briefs/:workspaceId/:briefId/send-to-client', (req, res) => {
+router.post('/api/content-briefs/:workspaceId/:briefId/send-to-client', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const brief = getBrief(req.params.workspaceId, req.params.briefId);
   if (!brief) return res.status(404).json({ error: 'Brief not found' });
 
@@ -218,13 +219,13 @@ router.post('/api/content-briefs/:workspaceId/:briefId/send-to-client', (req, re
 });
 
 // Delete a brief
-router.delete('/api/content-briefs/:workspaceId/:briefId', (req, res) => {
+router.delete('/api/content-briefs/:workspaceId/:briefId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   deleteBrief(req.params.workspaceId, req.params.briefId);
   res.json({ ok: true });
 });
 
 // Validate a keyword via SEMRush before locking it for brief generation
-router.post('/api/content-briefs/:workspaceId/validate-keyword', async (req, res) => {
+router.post('/api/content-briefs/:workspaceId/validate-keyword', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { keyword } = req.body;
   if (!keyword) return res.status(400).json({ error: 'keyword is required' });
 
@@ -284,7 +285,7 @@ router.post('/api/content-briefs/:workspaceId/validate-keyword', async (req, res
 });
 
 // Bulk validate keywords (for matrix pre-assignment)
-router.post('/api/content-briefs/:workspaceId/validate-keywords', async (req, res) => {
+router.post('/api/content-briefs/:workspaceId/validate-keywords', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { keywords } = req.body;
   if (!Array.isArray(keywords) || !keywords.length) {
     return res.status(400).json({ error: 'keywords array is required' });

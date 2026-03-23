@@ -80,14 +80,15 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         };
       }
       setEdits(editMap);
-    } catch {
+    } catch (err) {
+      console.error('SeoEditor operation failed:', err);
       setPages([]);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchPages(); }, [siteId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchPages(); }, [siteId]); // fetchPages is stable — only reads siteId from closure
 
   // Auto-expand target page from audit Fix→
   const fixConsumed = useRef(false);
@@ -216,7 +217,8 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       setBulkResults(`AI generated ${field === 'title' ? 'titles' : 'descriptions'} for ${applied} of ${pagesNeedingFix.length} pages and pushed to Webflow.`);
       fetchPages();
       setTimeout(() => setBulkResults(null), 5000);
-    } catch {
+    } catch (err) {
+      console.error('SeoEditor operation failed:', err);
       setBulkResults('Bulk fix failed.');
     } finally {
       setBulkFixing(false);
@@ -346,7 +348,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       setSentPage(prev => new Set(prev).add(pageId));
       refreshStates();
       setTimeout(() => setSentPage(prev => { const n = new Set(prev); n.delete(pageId); return n; }), 4000);
-    } catch { /* skip */ }
+    } catch (err) { console.error('SeoEditor operation failed:', err); }
     setSendingPage(prev => { const n = new Set(prev); n.delete(pageId); return n; });
   };
 
@@ -586,7 +588,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
               try {
                 const res = await fetch(`/api/workspaces/${workspaceId}/page-states/${pageId}`, { method: 'DELETE' });
                 if (res.ok) refreshStates();
-              } catch { /* silent */ }
+              } catch (err) { console.error('SeoEditor operation failed:', err); }
             } : undefined}
           />
         ))}

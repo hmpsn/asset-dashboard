@@ -5,8 +5,7 @@
 import jwt from 'jsonwebtoken';
 import type { Request, Response, NextFunction } from 'express';
 import { getUserById, type SafeUser } from './users.js';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'hmpsn-studio-dev-secret-change-in-prod';
+import { JWT_SECRET } from './jwt-config.js';
 const JWT_EXPIRES_IN = '7d';
 
 export interface JwtPayload {
@@ -110,6 +109,36 @@ export function requireWorkspaceAccess(paramName: string = 'id') {
       return;
     }
     const wsId = req.params[paramName];
+    if (!wsId) {
+      next();
+      return;
+    }
+    if (!req.user.workspaceIds || !req.user.workspaceIds.includes(wsId)) {
+      res.status(403).json({ error: 'You do not have access to this workspace' });
+      return;
+    }
+    next();
+  };
+}
+
+/**
+ * Requires the authenticated user to have access to the workspace
+ * identified by a query parameter (e.g. ?workspaceId=...).
+ * Used for routes keyed by siteId where workspaceId is passed as a query param.
+ * Owners always have access to all workspaces.
+ * Must be used AFTER requireAuth.
+ */
+export function requireWorkspaceAccessFromQuery(queryParam: string = 'workspaceId') {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      next();
+      return;
+    }
+    if (req.user.role === 'owner') {
+      next();
+      return;
+    }
+    const wsId = req.query[queryParam] as string | undefined;
     if (!wsId) {
       next();
       return;

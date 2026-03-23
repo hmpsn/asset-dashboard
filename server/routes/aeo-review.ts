@@ -16,6 +16,7 @@ import { createLogger } from '../logger.js';
 
 const log = createLogger('aeo-review');
 
+import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 const REVIEW_DIR = getDataDir('aeo-reviews');
 
@@ -37,7 +38,7 @@ function loadReview(workspaceId: string): unknown | null {
 
 // ─── Single page review ──────────────────────────────────────────
 
-router.post('/api/aeo-review/:workspaceId/page', async (req, res) => {
+router.post('/api/aeo-review/:workspaceId/page', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { workspaceId } = req.params;
   const { pageUrl, pageSlug } = req.body;
 
@@ -85,7 +86,7 @@ router.post('/api/aeo-review/:workspaceId/page', async (req, res) => {
 
 // ─── Load saved review ───────────────────────────────────────────
 
-router.get('/api/aeo-review/:workspaceId', (_req, res) => {
+router.get('/api/aeo-review/:workspaceId', requireWorkspaceAccess('workspaceId'), (_req, res) => {
   const data = loadReview(_req.params.workspaceId);
   if (!data) return res.json(null);
   res.json(data);
@@ -93,7 +94,7 @@ router.get('/api/aeo-review/:workspaceId', (_req, res) => {
 
 // ─── Batch site review (runs inline — for job-based, use /api/jobs) ─
 
-router.post('/api/aeo-review/:workspaceId/site', async (req, res) => {
+router.post('/api/aeo-review/:workspaceId/site', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { workspaceId } = req.params;
   const ws = getWorkspace(workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });

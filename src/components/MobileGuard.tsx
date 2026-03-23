@@ -20,7 +20,7 @@ export function MobileGuard({ children }: { children: React.ReactNode }) {
 
   const dismiss = () => {
     setDismissed(true);
-    try { sessionStorage.setItem('mobile_guard_dismissed', '1'); } catch { /* skip */ }
+    try { sessionStorage.setItem('mobile_guard_dismissed', '1'); } catch (err) { console.error('MobileGuard operation failed:', err); }
   };
 
   return (

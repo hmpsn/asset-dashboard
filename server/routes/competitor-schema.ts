@@ -8,13 +8,14 @@ import { getSchemaSnapshot } from '../schema-store.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('routes/competitor-schema');
+import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 /**
  * GET /api/competitor-schema/:workspaceId
  * Crawl competitor domains (from workspace config), extract JSON-LD, compare coverage.
  */
-router.get('/api/competitor-schema/:workspaceId', async (req, res) => {
+router.get('/api/competitor-schema/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   try {
     const ws = getWorkspace(req.params.workspaceId);
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });

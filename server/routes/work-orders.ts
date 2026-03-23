@@ -3,6 +3,7 @@
  */
 import { Router } from 'express';
 
+import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 import { addActivity } from '../activity-log.js';
@@ -31,11 +32,11 @@ router.get('/api/public/fix-orders/:workspaceId', (req, res) => {
 });
 
 // --- Work Orders (admin + public) ---
-router.get('/api/work-orders/:workspaceId', (req, res) => {
+router.get('/api/work-orders/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   res.json(listWorkOrders(req.params.workspaceId));
 });
 
-router.patch('/api/work-orders/:workspaceId/:orderId', (req, res) => {
+router.patch('/api/work-orders/:workspaceId/:orderId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const { status, assignedTo, notes } = req.body;
   const wsId = req.params.workspaceId;
   const updates: Record<string, unknown> = {};

@@ -104,7 +104,7 @@ router.post('/api/public/client-login/:id', clientLoginLimiter, verifyTurnstile,
     res.cookie(`client_user_token_${ws.id}`, token, {
       httpOnly: true, sameSite: 'lax', maxAge: 24 * 60 * 60 * 1000, secure: IS_PROD,
     });
-    res.json({ ok: true, user: safe, token });
+    res.json({ ok: true, user: safe });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }

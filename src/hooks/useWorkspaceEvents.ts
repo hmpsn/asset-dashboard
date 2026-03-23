@@ -51,6 +51,11 @@ export function useWorkspaceEvents(
       const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
 
       ws.onopen = () => {
+        // Authenticate with JWT token before subscribing
+        const authToken = localStorage.getItem('auth_token');
+        if (authToken) {
+          ws.send(JSON.stringify({ action: 'authenticate', token: authToken }));
+        }
         // Subscribe to the workspace
         ws.send(JSON.stringify({ action: 'subscribe', workspaceId }));
         currentSubRef.current = workspaceId;
@@ -75,7 +80,7 @@ export function useWorkspaceEvents(
           if (msg.workspaceId && msg.workspaceId !== workspaceId) return;
           const handler = handlersRef.current[msg.event];
           if (handler) handler(msg.data);
-        } catch { /* ignore parse errors */ }
+        } catch (err) { console.error('useWorkspaceEvents operation failed:', err); }
       };
 
       ws.onclose = () => {

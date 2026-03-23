@@ -120,7 +120,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
       if (pres && typeof pres === 'object') setPresence(pres as PresenceMap);
       if (Array.isArray(fb)) setFeedback(fb);
       if (ts && typeof ts === 'object') setTimeSaved(ts as { totalHoursSaved: number; operationCount: number });
-    }).catch(() => {}).finally(() => setLoading(false));
+    }).catch((err) => { console.error('WorkspaceOverview operation failed:', err); }).finally(() => setLoading(false));
   }, []);
 
   if (loading) {
@@ -643,7 +643,7 @@ export function AIUsageSection() {
   useEffect(() => {
     getOptional<AIUsageData>(`/api/ai/usage?days=${days}`)
       .then(d => { if (d) setData(d); })
-      .catch(() => {});
+      .catch((err) => { console.error('WorkspaceOverview operation failed:', err); });
   }, [days]);
 
   const hasSemrush = data?.semrush && data.semrush.totalCredits > 0;

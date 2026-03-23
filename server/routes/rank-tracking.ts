@@ -3,6 +3,7 @@
  */
 import { Router } from 'express';
 
+import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 import { addActivity } from '../activity-log.js';
@@ -20,29 +21,29 @@ import { getWorkspace } from '../workspaces.js';
 
 // --- Rank Tracking ---
 // Get tracked keywords for a workspace
-router.get('/api/rank-tracking/:workspaceId/keywords', (req, res) => {
+router.get('/api/rank-tracking/:workspaceId/keywords', requireWorkspaceAccess('workspaceId'), (req, res) => {
   res.json(getTrackedKeywords(req.params.workspaceId));
 });
 
 // Add a tracked keyword
-router.post('/api/rank-tracking/:workspaceId/keywords', (req, res) => {
+router.post('/api/rank-tracking/:workspaceId/keywords', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const { query, pinned } = req.body;
   if (!query) return res.status(400).json({ error: 'query required' });
   res.json(addTrackedKeyword(req.params.workspaceId, query, pinned));
 });
 
 // Remove a tracked keyword
-router.delete('/api/rank-tracking/:workspaceId/keywords/:query', (req, res) => {
+router.delete('/api/rank-tracking/:workspaceId/keywords/:query', requireWorkspaceAccess('workspaceId'), (req, res) => {
   res.json(removeTrackedKeyword(req.params.workspaceId, decodeURIComponent(req.params.query)));
 });
 
 // Toggle pin on a tracked keyword
-router.patch('/api/rank-tracking/:workspaceId/keywords/:query/pin', (req, res) => {
+router.patch('/api/rank-tracking/:workspaceId/keywords/:query/pin', requireWorkspaceAccess('workspaceId'), (req, res) => {
   res.json(togglePinKeyword(req.params.workspaceId, decodeURIComponent(req.params.query)));
 });
 
 // Capture a rank snapshot from current GSC data
-router.post('/api/rank-tracking/:workspaceId/snapshot', async (req, res) => {
+router.post('/api/rank-tracking/:workspaceId/snapshot', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   try {
     const ws = getWorkspace(req.params.workspaceId);
     if (!ws?.gscPropertyUrl) return res.status(400).json({ error: 'No GSC property linked' });
@@ -60,14 +61,14 @@ router.post('/api/rank-tracking/:workspaceId/snapshot', async (req, res) => {
 });
 
 // Get rank history (for charting)
-router.get('/api/rank-tracking/:workspaceId/history', (req, res) => {
+router.get('/api/rank-tracking/:workspaceId/history', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const limit = parseInt(req.query.limit as string) || 90;
   const queries = req.query.queries ? (req.query.queries as string).split(',') : undefined;
   res.json(getRankHistory(req.params.workspaceId, queries, limit));
 });
 
 // Get latest ranks with change indicators
-router.get('/api/rank-tracking/:workspaceId/latest', (req, res) => {
+router.get('/api/rank-tracking/:workspaceId/latest', requireWorkspaceAccess('workspaceId'), (req, res) => {
   res.json(getLatestRanks(req.params.workspaceId));
 });
 

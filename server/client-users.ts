@@ -7,12 +7,12 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import db from './db/index.js';
+import { JWT_SECRET } from './jwt-config.js';
 
 export type { ClientRole, ClientUser, SafeClientUser } from '../shared/types/users.ts';
 import type { ClientRole, ClientUser, SafeClientUser } from '../shared/types/users.ts';
 
 const SALT_ROUNDS = 12;
-const JWT_SECRET = process.env.JWT_SECRET || 'hmpsn-studio-dev-secret-change-in-prod';
 const CLIENT_JWT_EXPIRES = '24h';
 
 // --- SQLite row shapes ---

@@ -9,9 +9,10 @@ import { generateLlmsTxt } from '../llms-txt-generator.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('routes:llms-txt');
+import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
-router.get('/api/llms-txt/:workspaceId', async (req, res) => {
+router.get('/api/llms-txt/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   try {
     const result = await generateLlmsTxt(req.params.workspaceId);
     res.json(result);
@@ -22,7 +23,7 @@ router.get('/api/llms-txt/:workspaceId', async (req, res) => {
   }
 });
 
-router.get('/api/llms-txt/:workspaceId/download', async (req, res) => {
+router.get('/api/llms-txt/:workspaceId/download', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   try {
     const result = await generateLlmsTxt(req.params.workspaceId);
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');

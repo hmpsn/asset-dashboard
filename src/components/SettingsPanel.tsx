@@ -67,7 +67,7 @@ export function SettingsPanel() {
     try {
       const data = await getOptional<StorageReport>('/api/admin/storage-stats');
       if (data) setStorage(data);
-    } catch { /* ignore */ }
+    } catch (err) { console.error('SettingsPanel operation failed:', err); }
     finally { setStorageLoading(false); }
   };
 
@@ -88,12 +88,12 @@ export function SettingsPanel() {
   };
 
   useEffect(() => {
-    getSafe<Workspace[]>('/api/workspaces', []).then(setWorkspaces).catch(() => {});
+    getSafe<Workspace[]>('/api/workspaces', []).then(setWorkspaces).catch((err) => { console.error('SettingsPanel operation failed:', err); });
     get<{ connected: boolean; configured: boolean }>('/api/google/status').then(s => {
       setGoogleStatus(s);
       if (s.connected) loadGscSites();
-    }).catch(() => {});
-    get<HealthStatus>('/api/health').then(h => setHealth(h)).catch(() => {});
+    }).catch((err) => { console.error('SettingsPanel operation failed:', err); });
+    get<HealthStatus>('/api/health').then(h => setHealth(h)).catch((err) => { console.error('SettingsPanel operation failed:', err); });
     loadStorage();
   }, []);
 
@@ -102,7 +102,7 @@ export function SettingsPanel() {
     try {
       const sites = await get<GscSite[]>('/api/google/gsc-sites');
       if (Array.isArray(sites)) setGscSites(sites);
-    } catch { /* ignore */ }
+    } catch (err) { console.error('SettingsPanel operation failed:', err); }
     finally { setLoadingGsc(false); }
   };
 

@@ -52,7 +52,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark';
     setTheme(next);
-    try { localStorage.setItem('dashboard-theme', next); } catch { /* skip */ }
+    try { localStorage.setItem('dashboard-theme', next); } catch (err) { console.error('ClientDashboard operation failed:', err); }
   };
   // ── Date picker refs (replaces document.getElementById) ──
   const customStartRef = useRef<HTMLInputElement>(null);
@@ -167,7 +167,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       try {
         const stored = localStorage.getItem(`portal_email_${workspaceId}`);
         if (!stored) setEmailGateOpen(true);
-      } catch { /* skip */ }
+      } catch (err) { console.error('ClientDashboard operation failed:', err); }
     }
   }, [authenticated, clientUser, ws, workspaceId]);
 
@@ -178,7 +178,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     try {
       await post(`/api/public/capture-email/${workspaceId}`, { email: captureEmail.trim(), name: captureName.trim() || undefined });
       localStorage.setItem(`portal_email_${workspaceId}`, captureEmail.trim());
-    } catch { /* best-effort */ }
+    } catch (err) { console.error('ClientDashboard operation failed:', err); }
     setCaptureSubmitting(false);
     setEmailGateOpen(false);
   }, [captureEmail, captureName, captureSubmitting, workspaceId]);
@@ -200,11 +200,11 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     'content-request:created': () => refetchClient('content', `/api/public/content-requests/${workspaceId}`),
     'content-request:update': () => refetchClient('content', `/api/public/content-requests/${workspaceId}`),
     'audit:complete': () => {
-      getOptional<{ id?: string }>(`/api/public/audit-summary/${workspaceId}`).then(a => { if (a?.id) setAudit(a); }).catch(() => {});
+      getOptional<{ id?: string }>(`/api/public/audit-summary/${workspaceId}`).then(a => { if (a?.id) setAudit(a); }).catch((err) => { console.error('ClientDashboard operation failed:', err); });
       refetchClient('activity', `/api/public/activity/${workspaceId}?limit=20`);
     },
     'workspace:updated': () => {
-      getOptional<WorkspaceInfo>(`/api/public/workspace/${workspaceId}`).then(data => { if (data?.id) setWs(data); }).catch(() => {});
+      getOptional<WorkspaceInfo>(`/api/public/workspace/${workspaceId}`).then(data => { if (data?.id) setWs(data); }).catch((err) => { console.error('ClientDashboard operation failed:', err); });
     },
   }, wsIdentity);
 
@@ -251,7 +251,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
             setAuthMode(am);
             setLoginTab(am.hasClientUsers ? 'user' : 'password');
           }
-        } catch { /* ignore */ }
+        } catch (err) { console.error('ClientDashboard operation failed:', err); }
 
         // Check if already authenticated via client user JWT cookie
         let autoAuthed = false;
@@ -265,7 +265,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
             autoAuthed = true;
             loadDashboardData(data, setPricingData);
           }
-        } catch { /* ignore */ }
+        } catch (err) { console.error('ClientDashboard operation failed:', err); }
 
         // Fall back to legacy session check
         if (!autoAuthed) {
@@ -321,8 +321,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         }
       })
       .catch((err) => { setError(err instanceof ApiError && err.status === 403 ? 'This dashboard is currently unavailable. Please contact hmpsn studio for access.' : 'Failed to load dashboard'); setLoading(false); });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspaceId]);
+  }, [workspaceId]); // large init effect — only re-runs on workspace change
 
 
   const eventDisplayName = (eventName: string): string => {
@@ -596,7 +595,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
             </button>
             <button
               type="button"
-              onClick={() => { setEmailGateOpen(false); try { localStorage.setItem(`portal_email_${workspaceId}`, '__skipped__'); } catch {/* skip */} }}
+              onClick={() => { setEmailGateOpen(false); try { localStorage.setItem(`portal_email_${workspaceId}`, '__skipped__'); } catch (err) { console.error('ClientDashboard operation failed:', err); } }}
               className="w-full text-center text-[11px] text-zinc-600 hover:text-zinc-400 transition-colors"
             >
               Skip for now
@@ -873,7 +872,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                   <button onClick={() => { setChatSessionId(`cs-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`); setChatMessages([]); setShowChatHistory(false); }}
                     title="New conversation" className="text-zinc-500 hover:text-zinc-300 p-1"><Plus className="w-3.5 h-3.5" /></button>
                 )}
-                <button onClick={() => { setShowChatHistory(!showChatHistory); if (!showChatHistory && ws) { getSafe<Array<{ id: string; title: string; messageCount: number; updatedAt: string }>>(`/api/public/chat-sessions/${ws.id}?channel=client`, []).then(d => { if (Array.isArray(d)) setChatSessions(d); }).catch(() => {}); } }}
+                <button onClick={() => { setShowChatHistory(!showChatHistory); if (!showChatHistory && ws) { getSafe<Array<{ id: string; title: string; messageCount: number; updatedAt: string }>>(`/api/public/chat-sessions/${ws.id}?channel=client`, []).then(d => { if (Array.isArray(d)) setChatSessions(d); }).catch((err) => { console.error('ClientDashboard operation failed:', err); }); } }}
                   title="Chat history" className={`p-1 ${showChatHistory ? 'text-teal-400' : 'text-zinc-500 hover:text-zinc-300'}`}><MessageSquare className="w-3.5 h-3.5" /></button>
                 <button onClick={() => setChatExpanded(!chatExpanded)} title={chatExpanded ? 'Minimize' : 'Maximize'} className="text-zinc-500 hover:text-zinc-300 p-1">
                   {chatExpanded ? <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg> : <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>}
@@ -891,7 +890,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                       setChatSessionId(s.id); setShowChatHistory(false);
                       if (ws) getOptional<{ messages?: Array<{ role: string; content: string }> }>(`/api/public/chat-sessions/${ws.id}/${s.id}`).then(d => {
                         if (d?.messages) setChatMessages(d.messages.map((m: { role: string; content: string }) => ({ role: m.role as 'user' | 'assistant', content: m.content })));
-                      }).catch(() => {});
+                      }).catch((err) => { console.error('ClientDashboard operation failed:', err); });
                     }} className={`w-full text-left px-3 py-2 rounded-lg border transition-colors ${s.id === chatSessionId ? 'bg-teal-500/10 border-teal-500/30 text-teal-300' : 'bg-zinc-800/50 border-zinc-800 text-zinc-300 hover:bg-zinc-800'}`}>
                       <div className="text-[11px] font-medium truncate">{s.title}</div>
                       <div className="text-[10px] text-zinc-500 mt-0.5">{s.messageCount} messages · {new Date(s.updatedAt).toLocaleDateString()}</div>
@@ -1173,7 +1172,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
               setStripePayment(null);
               setToast({ message: `Payment successful! Your ${stripePayment.productName.toLowerCase()} is being prepared.`, type: 'success' });
               // Refresh content requests
-              getSafe<unknown[]>(`/api/public/content-requests/${workspaceId}`, []).then(setContentRequests).catch(() => {});
+              getSafe<unknown[]>(`/api/public/content-requests/${workspaceId}`, []).then(setContentRequests).catch((err) => { console.error('ClientDashboard operation failed:', err); });
             }}
             onClose={() => setStripePayment(null)}
           />
@@ -1195,7 +1194,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
               // Show welcome wizard after onboarding
               const welcomeKey = clientUser ? `welcome_seen_${workspaceId}_${clientUser.id}` : `welcome_seen_${workspaceId}`;
               if (!localStorage.getItem(welcomeKey)) setShowWelcome(true);
-            } catch {
+            } catch (err) {
+      console.error('ClientDashboard operation failed:', err);
               setToast({ message: 'Failed to save responses. Please try again.', type: 'error' });
             }
             setOnboardingSaving(false);

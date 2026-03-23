@@ -44,7 +44,8 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
       } else {
         setError(data.error || 'Failed to create checkout session');
       }
-    } catch {
+    } catch (err) {
+      console.error('SeoCart operation failed:', err);
       setError('Network error. Please try again.');
     }
     setCheckingOut(false);

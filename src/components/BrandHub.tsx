@@ -75,7 +75,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
     try {
       const data = await get<{ files: BrandDocFile[] }>(`/api/brand-docs/${workspaceId}`);
       setBrandDocs(data.files);
-    } catch { /* ignore */ }
+    } catch (err) { console.error('BrandHub operation failed:', err); }
   }, [workspaceId]);
 
   const handleUploadFiles = async (files: FileList | File[]) => {
@@ -107,7 +107,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
     get<WorkspaceData>(`/api/workspaces/${workspaceId}`).then(d => {
       setWs(d);
       if (d.brandVoice) setBrandVoice(d.brandVoice);
-    }).catch(() => {});
+    }).catch((err) => { console.error('BrandHub operation failed:', err); });
     loadBrandDocs();
   }, [workspaceId, loadBrandDocs]);
 

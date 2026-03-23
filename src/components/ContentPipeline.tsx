@@ -69,7 +69,7 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext 
         cells: allCells.length,
         published: allCells.filter(c => c.status === 'published').length,
       });
-    } catch { /* silent */ }
+    } catch (err) { console.error('ContentPipeline operation failed:', err); }
   }, [workspaceId]);
 
   useEffect(() => { void fetchSummary(); }, [fetchSummary]);

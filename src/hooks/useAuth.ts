@@ -28,7 +28,8 @@ export function useAuth() {
         localStorage.removeItem('auth_token');
         setState({ checking: false, required: true, authenticated: false, token: null });
       }
-    } catch {
+    } catch (err) {
+      console.error('useAuth operation failed:', err);
       setState(prev => ({ ...prev, checking: false }));
     }
   }, []);
@@ -47,7 +48,8 @@ export function useAuth() {
         return true;
       }
       return false;
-    } catch {
+    } catch (err) {
+      console.error('useAuth operation failed:', err);
       return false;
     }
   }, []);

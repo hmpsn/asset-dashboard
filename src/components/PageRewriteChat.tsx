@@ -72,8 +72,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, onBack }: Props) 
   // Auto-load page if initial URL provided
   useEffect(() => {
     if (initialPageUrl) loadPage(initialPageUrl);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [initialPageUrl, loadPage]);
 
   const loadPage = useCallback(async (url: string) => {
     if (!url.trim()) return;

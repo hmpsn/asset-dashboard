@@ -17,12 +17,13 @@ import { createLogger } from '../logger.js';
 
 const log = createLogger('webflow-organize');
 
+import { requireWorkspaceAccessFromQuery } from '../auth.js';
 const router = Router();
 
 // --- Organize Assets into Folders ---
 
 // Preview: builds a plan of which assets go into which folders
-router.get('/api/webflow/organize-preview/:siteId', async (req, res) => {
+router.get('/api/webflow/organize-preview/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   const { siteId } = req.params;
   const token = getTokenForSite(siteId) || undefined;
   if (!token) return res.status(400).json({ error: 'No token for site' });
@@ -137,7 +138,7 @@ router.get('/api/webflow/organize-preview/:siteId', async (req, res) => {
 });
 
 // Execute: creates folders and moves assets according to a plan
-router.post('/api/webflow/organize-execute/:siteId', async (req, res) => {
+router.post('/api/webflow/organize-execute/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   const { siteId } = req.params;
   const { moves, foldersToCreate } = req.body as {
     moves: Array<{ assetId: string; assetName: string; targetFolder: string }>;

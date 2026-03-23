@@ -81,7 +81,7 @@ function PageWeight({ siteId }: Props) {
         const s = snap as { result?: PageWeightResult } | null;
         if (!cancelled && s?.result) { setData(s.result); setHasRun(true); }
       })
-      .catch(() => {});
+      .catch((err) => { console.error('PageWeight operation failed:', err); });
     return () => { cancelled = true; };
   }, [siteId]);
 

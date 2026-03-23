@@ -45,7 +45,8 @@ function loadCart(): CartItem[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
-  } catch {
+  } catch (err) {
+      console.error('useCart operation failed:', err);
     return [];
   }
 }
@@ -53,7 +54,7 @@ function loadCart(): CartItem[] {
 function saveCart(items: CartItem[]) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-  } catch { /* quota exceeded, ignore */ }
+  } catch (err) { console.error('useCart operation failed:', err); }
 }
 
 // --- Provider ---

@@ -53,7 +53,7 @@ export default function ContentDecay({ workspaceId }: Props) {
     setLoading(true);
     contentDecay.get(workspaceId)
       .then(d => setAnalysis(d as DecayAnalysis | null))
-      .catch(() => {})
+      .catch((err) => { console.error('ContentDecay operation failed:', err); })
       .finally(() => setLoading(false));
   }, [workspaceId]);
 
@@ -62,7 +62,7 @@ export default function ContentDecay({ workspaceId }: Props) {
     try {
       const result = await contentDecay.analyze(workspaceId);
       setAnalysis(result as DecayAnalysis);
-    } catch { /* silent */ }
+    } catch (err) { console.error('ContentDecay operation failed:', err); }
     finally { setAnalyzing(false); }
   };
 
@@ -71,7 +71,7 @@ export default function ContentDecay({ workspaceId }: Props) {
     try {
       const result = await contentDecay.recommendations(workspaceId, { maxPages: 5 });
       setAnalysis(result as DecayAnalysis);
-    } catch { /* silent */ }
+    } catch (err) { console.error('ContentDecay operation failed:', err); }
     finally { setGeneratingRecs(false); }
   };
 

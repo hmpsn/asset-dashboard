@@ -133,7 +133,8 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
       if (data && data.siteKeywords) {
         setStrategy(data);
       }
-    } catch {
+    } catch (err) {
+      console.error('KeywordStrategy operation failed:', err);
       // No strategy yet
     } finally {
       setLoading(false);
@@ -151,7 +152,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
         // Default to quick mode when SEMRush is available
         setSemrushMode(prev => prev === 'none' ? 'quick' : prev);
       }
-    }).catch(() => {});
+    }).catch((err) => { console.error('KeywordStrategy operation failed:', err); });
   }, []);
 
   // Sync business context + competitors from loaded strategy
@@ -209,10 +210,11 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
             if (evt.error) { setError(evt.error); break; }
             if (evt.done && evt.strategy) { setStrategy(evt.strategy); break; }
             if (evt.step) { setProgressStep(evt.step); setProgressDetail(evt.detail || ''); setProgressPct(evt.progress || 0); }
-          } catch { /* skip malformed SSE */ }
+          } catch (err) { console.error('KeywordStrategy operation failed:', err); }
         }
       }
-    } catch {
+    } catch (err) {
+      console.error('KeywordStrategy operation failed:', err);
       setError('Failed to generate strategy');
     } finally {
       setGenerating(false);
@@ -252,7 +254,8 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
       const data = await keywords.patchStrategy(workspaceId, { pageMap: updated.pageMap }) as KeywordStrategy;
       if (data.pageMap) setStrategy(data);
       setEditingPage(null);
-    } catch {
+    } catch (err) {
+      console.error('KeywordStrategy operation failed:', err);
       // ignore
     } finally {
       setSaving(false);

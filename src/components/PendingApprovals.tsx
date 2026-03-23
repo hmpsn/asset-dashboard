@@ -49,7 +49,7 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
       setBatches(prev => prev.filter(b => b.id !== batchId));
       setConfirmId(null);
       onRetracted?.(batchId);
-    } catch { /* silent */ }
+    } catch (err) { console.error('PendingApprovals operation failed:', err); }
     finally { setRetracting(null); }
   };
 

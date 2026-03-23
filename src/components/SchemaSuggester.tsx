@@ -103,7 +103,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
       }, 600);
       return () => clearTimeout(timer);
     }
-  }, [fixContext]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fixContext]); // generateSinglePage intentionally excluded — ref guard prevents re-fire
 
   // CMS template schema state
   const [showCmsPanel, setShowCmsPanel] = useState(false);
@@ -140,7 +140,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
           setSnapshotDate(snapshot.createdAt ?? null);
           setStarted(true);
         }
-      } catch { /* no saved data */ }
+      } catch (err) { console.error('SchemaSuggester operation failed:', err); }
     })();
   }, [siteId]);
 
@@ -158,10 +158,10 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
             slug: p.slug || '',
           })));
         }
-      } catch { /* skip */ }
+      } catch (err) { console.error('SchemaSuggester operation failed:', err); }
       setLoadingPages(false);
     })();
-  }, [siteId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [siteId, availablePages.length]);
 
   // Stream partial results from background job via WebSocket
   useEffect(() => {
@@ -214,7 +214,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
       setSentToClient(true);
       refreshStates();
       setApprovalRefreshKey(k => k + 1);
-    } catch { /* skip */ }
+    } catch (err) { console.error('SchemaSuggester operation failed:', err); }
     setSendingToClient(false);
   };
 
@@ -246,7 +246,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
         })));
       }
       setShowPagePicker(true);
-    } catch { /* skip */ }
+    } catch (err) { console.error('SchemaSuggester operation failed:', err); }
     setLoadingPages(false);
   };
 
@@ -264,7 +264,8 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
         return [...prev, result];
       });
       setExpanded(prev => new Set(prev).add(pageId));
-    } catch {
+    } catch (err) {
+      console.error('SchemaSuggester operation failed:', err);
       setScanError('Single page generation failed');
     } finally {
       setGeneratingSingle(null);
@@ -285,7 +286,8 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
         } : p);
       });
       setExpanded(prev => new Set(prev).add(pageId));
-    } catch {
+    } catch (err) {
+      console.error('SchemaSuggester operation failed:', err);
       // keep existing data
     } finally {
       setRegenerating(prev => {
@@ -395,7 +397,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
       await post(`/api/approvals/${workspaceId}`, { siteId, name: `Schema: ${page.pageTitle}`, items });
       setSentPages(prev => new Set(prev).add(page.pageId));
       setApprovalRefreshKey(k => k + 1);
-    } catch { /* skip */ }
+    } catch (err) { console.error('SchemaSuggester operation failed:', err); }
     setSendingPage(prev => {
       const next = new Set(prev);
       next.delete(page.pageId);
@@ -421,7 +423,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
       await put(`/api/webflow/schema-template/${siteId}`, { organizationNode: orgNode, websiteNode });
       setTemplateSaved(true);
       setTimeout(() => setTemplateSaved(false), 3000);
-    } catch { /* skip */ }
+    } catch (err) { console.error('SchemaSuggester operation failed:', err); }
     setSavingTemplate(false);
   };
 

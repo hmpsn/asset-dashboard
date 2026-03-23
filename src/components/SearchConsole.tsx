@@ -178,7 +178,7 @@ export function SearchConsole({ siteId, workspaceId, gscPropertyUrl }: Props) {
     try {
       const hostname = new URL(gscPropertyUrl || '').hostname.replace('www.', '').split('.')[0];
       brandTerms = [hostname.toLowerCase()];
-    } catch { /* ignore */ }
+    } catch (err) { console.error('SearchConsole operation failed:', err); }
     const branded = overview.topQueries.filter(q => brandTerms.some(b => q.query.toLowerCase().includes(b)));
     const nonBranded = overview.topQueries.filter(q => !brandTerms.some(b => q.query.toLowerCase().includes(b)));
 

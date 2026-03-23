@@ -15,12 +15,13 @@ import { CONTENT_SUB_PLANS, type ContentSubPlan } from '../../shared/types/conte
 import { createLogger } from '../logger.js';
 
 const log = createLogger('routes:content-subscriptions');
+import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 // ── Admin endpoints ──
 
 // List all subscriptions for a workspace
-router.get('/api/content-subscriptions/:workspaceId', (req, res) => {
+router.get('/api/content-subscriptions/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   try {
     const subs = listContentSubscriptions(req.params.workspaceId);
     res.json(subs);
@@ -43,7 +44,7 @@ router.get('/api/content-subscription/:id', (req, res) => {
 });
 
 // Create a subscription manually (admin-initiated, no Stripe)
-router.post('/api/content-subscriptions/:workspaceId', (req, res) => {
+router.post('/api/content-subscriptions/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   try {
     const { plan, topicSource, preferredPageTypes, notes } = req.body;
     const planConfig = CONTENT_SUB_PLANS.find(p => p.plan === plan);

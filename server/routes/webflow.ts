@@ -25,6 +25,7 @@ import { createLogger } from '../logger.js';
 
 const log = createLogger('webflow');
 
+import { requireWorkspaceAccessFromQuery } from '../auth.js';
 const router = Router();
 
 // Processing queue
@@ -44,7 +45,7 @@ router.get('/api/webflow/sites', async (req, res) => {
 });
 
 // --- Asset Browser ---
-router.get('/api/webflow/assets/:siteId', async (req, res) => {
+router.get('/api/webflow/assets/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId);
     const assets = await listAssets(req.params.siteId, token || undefined);
@@ -93,7 +94,7 @@ router.post('/api/webflow/assets/bulk-delete', async (req, res) => {
 });
 
 // --- Page SEO Editing ---
-router.get('/api/webflow/pages/:siteId', async (req, res) => {
+router.get('/api/webflow/pages/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
     const allPages = await listPages(req.params.siteId, token);
@@ -127,7 +128,7 @@ router.put('/api/webflow/pages/:pageId/seo', async (req, res) => {
   }
 });
 
-router.post('/api/webflow/publish/:siteId', async (req, res) => {
+router.post('/api/webflow/publish/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
     const result = await publishSite(req.params.siteId, token);

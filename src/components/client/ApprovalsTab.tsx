@@ -199,7 +199,7 @@ export function ApprovalsTab({
                                 const parsed = JSON.parse(displayValue);
                                 const graph = parsed?.['@graph'] as Array<{ '@type'?: string }> | undefined;
                                 schemaTypes = graph?.map(n => String(n['@type'])).filter(Boolean) || [];
-                              } catch { /* ignore */ }
+                              } catch (err) { console.error('ApprovalsTab operation failed:', err); }
                             }
 
                             return (

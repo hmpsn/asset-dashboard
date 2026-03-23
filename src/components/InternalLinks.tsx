@@ -70,7 +70,8 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
       } else {
         setData(result);
       }
-    } catch {
+    } catch (err) {
+      console.error('InternalLinks operation failed:', err);
       setError('Failed to analyze internal links');
     } finally {
       setLoading(false);
@@ -85,7 +86,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
         const s = snap as { result?: InternalLinkResult } | null;
         if (!cancelled && s?.result) setData(s.result);
       })
-      .catch(() => {});
+      .catch((err) => { console.error('InternalLinks operation failed:', err); });
     return () => { cancelled = true; };
   }, [siteId]);
 

@@ -17,6 +17,7 @@ import { listTemplates } from '../content-templates.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('workspace-home');
+import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 /**
@@ -25,7 +26,7 @@ const router = Router();
  * Returns all data the WorkspaceHome dashboard needs in a single response,
  * eliminating 10+ parallel client-side fetches.
  */
-router.get('/api/workspace-home/:id', async (req, res) => {
+router.get('/api/workspace-home/:id', requireWorkspaceAccess(), async (req, res) => {
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 

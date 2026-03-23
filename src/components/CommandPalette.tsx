@@ -62,7 +62,7 @@ function addRecent(id: string) {
     const recent = getRecent().filter(r => r !== id);
     recent.unshift(id);
     localStorage.setItem(RECENT_KEY, JSON.stringify(recent.slice(0, MAX_RECENT)));
-  } catch { /* skip */ }
+  } catch (err) { console.error('CommandPalette operation failed:', err); }
 }
 
 function fuzzyMatch(text: string, query: string): boolean {

@@ -12,6 +12,7 @@ import { listTemplates } from '../content-templates.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('data-export');
+import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 // --- Helpers ---
@@ -42,7 +43,7 @@ function sendExport(res: import('express').Response, data: unknown[], headers: s
 }
 
 // --- Content Briefs Export ---
-router.get('/api/export/:workspaceId/briefs', (req, res) => {
+router.get('/api/export/:workspaceId/briefs', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const { format = 'json' } = req.query as { format?: string };
   const briefs = listBriefs(req.params.workspaceId);
   log.info(`EXPORT briefs ${req.params.workspaceId}: ${briefs.length} items as ${format}`);
@@ -51,7 +52,7 @@ router.get('/api/export/:workspaceId/briefs', (req, res) => {
 });
 
 // --- Content Requests Export ---
-router.get('/api/export/:workspaceId/requests', (req, res) => {
+router.get('/api/export/:workspaceId/requests', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const { format = 'json' } = req.query as { format?: string };
   const requests = listContentRequests(req.params.workspaceId);
   log.info(`EXPORT requests ${req.params.workspaceId}: ${requests.length} items as ${format}`);
@@ -60,7 +61,7 @@ router.get('/api/export/:workspaceId/requests', (req, res) => {
 });
 
 // --- Activity Log Export ---
-router.get('/api/export/:workspaceId/activity', (req, res) => {
+router.get('/api/export/:workspaceId/activity', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const { format = 'json' } = req.query as { format?: string };
   const activity = listActivity(req.params.workspaceId, 500);
   log.info(`EXPORT activity ${req.params.workspaceId}: ${activity.length} items as ${format}`);
@@ -69,7 +70,7 @@ router.get('/api/export/:workspaceId/activity', (req, res) => {
 });
 
 // --- Keyword Strategy Export ---
-router.get('/api/export/:workspaceId/strategy', (req, res) => {
+router.get('/api/export/:workspaceId/strategy', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const { format = 'json' } = req.query as { format?: string };
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -87,7 +88,7 @@ router.get('/api/export/:workspaceId/strategy', (req, res) => {
 });
 
 // --- Payments Export ---
-router.get('/api/export/:workspaceId/payments', (req, res) => {
+router.get('/api/export/:workspaceId/payments', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const { format = 'json' } = req.query as { format?: string };
   const payments = listPayments(req.params.workspaceId);
   log.info(`EXPORT payments ${req.params.workspaceId}: ${payments.length} items as ${format}`);
@@ -96,7 +97,7 @@ router.get('/api/export/:workspaceId/payments', (req, res) => {
 });
 
 // --- Content Matrices Export (flattened cells) ---
-router.get('/api/export/:workspaceId/matrices', (req, res) => {
+router.get('/api/export/:workspaceId/matrices', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const { format = 'json' } = req.query as { format?: string };
   const matrices = listMatrices(req.params.workspaceId);
   // Flatten: one row per cell across all matrices
@@ -123,7 +124,7 @@ router.get('/api/export/:workspaceId/matrices', (req, res) => {
 });
 
 // --- Content Templates Export ---
-router.get('/api/export/:workspaceId/templates', (req, res) => {
+router.get('/api/export/:workspaceId/templates', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const { format = 'json' } = req.query as { format?: string };
   const templates = listTemplates(req.params.workspaceId);
   log.info(`EXPORT templates ${req.params.workspaceId}: ${templates.length} items as ${format}`);

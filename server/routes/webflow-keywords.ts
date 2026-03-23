@@ -9,6 +9,7 @@ import { createLogger } from '../logger.js';
 
 const log = createLogger('webflow-keywords');
 
+import { requireWorkspaceAccessFromQuery } from '../auth.js';
 const router = Router();
 
 // --- AI Keyword Analysis ---

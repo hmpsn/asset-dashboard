@@ -119,7 +119,8 @@ export function PublishSettings({ workspaceId, webflowSiteId, publishTarget, onS
         toast('AI suggested field mappings');
       }
       if (result.fields) setFields(result.fields);
-    } catch {
+    } catch (err) {
+      console.error('PublishSettings operation failed:', err);
       toast('AI suggestion failed', 'error');
     }
     setSuggesting(false);
@@ -139,7 +140,8 @@ export function PublishSettings({ workspaceId, webflowSiteId, publishTarget, onS
         fieldMap,
       });
       toast('Publish settings saved');
-    } catch {
+    } catch (err) {
+      console.error('PublishSettings operation failed:', err);
       toast('Failed to save settings', 'error');
     }
     setSaving(false);

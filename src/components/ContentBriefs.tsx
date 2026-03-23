@@ -113,7 +113,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
       const newBrief = await post<ContentBrief>(`/api/content-briefs/${workspaceId}/${briefId}/regenerate`, { feedback });
       setBriefs(prev => [newBrief, ...prev]);
       setExpanded(newBrief.id);
-    } catch { /* skip */ }
+    } catch (err) { console.error('ContentBriefs operation failed:', err); }
     setRegeneratingBrief(null);
   };
 
@@ -121,7 +121,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
     try {
       const updated = await patch<ContentBrief>(`/api/content-briefs/${workspaceId}/${briefId}`, updates);
       setBriefs(prev => prev.map(b => b.id === briefId ? updated : b));
-    } catch { /* skip */ }
+    } catch (err) { console.error('ContentBriefs operation failed:', err); }
   };
 
   const getBriefById = (briefId: string) => briefs.find(b => b.id === briefId);
@@ -141,7 +141,8 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
         setLoadingBrief(null);
         setExpandedRequest(reqId);
         return;
-      } catch {
+      } catch (err) {
+      console.error('ContentBriefs operation failed:', err);
         // Individual fetch failed — try refetching the full list as fallback
         try {
           const allBriefs = await getSafe<ContentBrief[]>(`/api/content-briefs/${workspaceId}`, []);
@@ -154,7 +155,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
               return;
             }
           }
-        } catch { /* list fetch failed */ }
+        } catch (err) { console.error('ContentBriefs operation failed:', err); }
       }
       setBriefError(`Brief "${briefId}" not found. The brief may have been lost after a server restart. Try regenerating.`);
       setExpandedRequest(reqId);
@@ -175,7 +176,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
         return next;
       });
       if (expandedRequest === reqId) setExpandedRequest(null);
-    } catch { /* skip */ }
+    } catch (err) { console.error('ContentBriefs operation failed:', err); }
   };
 
   const copyAsMarkdown = (b: ContentBrief) => {
@@ -237,14 +238,14 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
           onRequestCountChange?.(reqs.filter(r => r.status === 'requested').length);
         }
       }
-    } catch { /* skip */ }
+    } catch (err) { console.error('ContentBriefs operation failed:', err); }
     setSendingToClient(null);
   };
 
   const fetchPosts = () => {
     getSafe<PostSummary[]>(`/api/content-posts/${workspaceId}`, [])
       .then(r => { if (Array.isArray(r)) setPosts(r); })
-      .catch(() => {});
+      .catch((err) => { console.error('ContentBriefs operation failed:', err); });
   };
 
   useEffect(() => {
@@ -253,7 +254,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
 
     getSafe<ContentBrief[]>(`/api/content-briefs/${workspaceId}`, [])
       .then(parsed => { if (Array.isArray(parsed)) setBriefs(parsed); })
-      .catch(() => {})
+      .catch((err) => { console.error('ContentBriefs operation failed:', err); })
       .finally(checkDone);
 
     getSafe<ContentTopicRequest[]>(`/api/content-requests/${workspaceId}`, [])
@@ -263,7 +264,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
           onRequestCountChange?.(r.filter((req: ContentTopicRequest) => req.status === 'requested').length);
         }
       })
-      .catch(() => {})
+      .catch((err) => { console.error('ContentBriefs operation failed:', err); })
       .finally(checkDone);
 
     fetchPosts();
@@ -280,7 +281,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
         return next;
       });
       setExpandedRequest(req.id);
-    } catch { /* skip */ }
+    } catch (err) { console.error('ContentBriefs operation failed:', err); }
     setGeneratingBriefFor(null);
   };
 
@@ -290,7 +291,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
       const skeleton = await post<PostSummary>(`/api/content-posts/${workspaceId}/generate`, { briefId });
       setPosts(prev => [skeleton, ...prev]);
       setActivePostId(skeleton.id);
-    } catch { /* skip */ }
+    } catch (err) { console.error('ContentBriefs operation failed:', err); }
     setGeneratingPostFor(null);
   };
 
@@ -302,7 +303,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
         onRequestCountChange?.(next.filter(r => r.status === 'requested').length);
         return next;
       });
-    } catch { /* skip */ }
+    } catch (err) { console.error('ContentBriefs operation failed:', err); }
   };
 
   const handleGenerate = async () => {

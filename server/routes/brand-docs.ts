@@ -9,6 +9,7 @@ import { getUploadRoot } from '../data-dir.js';
 import { getWorkspace } from '../workspaces.js';
 import { upload } from '../middleware.js';
 
+import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 function getBrandDocsDir(workspaceId: string): string | null {
@@ -18,7 +19,7 @@ function getBrandDocsDir(workspaceId: string): string | null {
 }
 
 // List brand docs
-router.get('/api/brand-docs/:workspaceId', (req, res) => {
+router.get('/api/brand-docs/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const dir = getBrandDocsDir(req.params.workspaceId);
   if (!dir) return res.status(404).json({ error: 'Workspace not found' });
 
@@ -45,7 +46,7 @@ router.get('/api/brand-docs/:workspaceId', (req, res) => {
 });
 
 // Upload brand docs (multiple .txt/.md files)
-router.post('/api/brand-docs/:workspaceId', upload.array('files', 10), (req, res) => {
+router.post('/api/brand-docs/:workspaceId', requireWorkspaceAccess('workspaceId'), upload.array('files', 10), (req, res) => {
   const dir = getBrandDocsDir(req.params.workspaceId);
   if (!dir) return res.status(404).json({ error: 'Workspace not found' });
 
@@ -83,7 +84,7 @@ router.post('/api/brand-docs/:workspaceId', upload.array('files', 10), (req, res
 });
 
 // Delete a brand doc
-router.delete('/api/brand-docs/:workspaceId/:fileName', (req, res) => {
+router.delete('/api/brand-docs/:workspaceId/:fileName', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const dir = getBrandDocsDir(req.params.workspaceId);
   if (!dir) return res.status(404).json({ error: 'Workspace not found' });
 

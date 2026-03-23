@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { listFeedback, listAllFeedback, updateFeedbackStatus, addFeedbackReply, deleteFeedback } from '../feedback.js';
 import type { FeedbackStatus } from '../feedback.js';
 
+import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 /** List all feedback across all workspaces (admin command center) */
@@ -15,7 +16,7 @@ router.get('/api/feedback', (_req, res) => {
 });
 
 /** List feedback for a specific workspace */
-router.get('/api/feedback/:workspaceId', (req, res) => {
+router.get('/api/feedback/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   try {
     const items = listFeedback(req.params.workspaceId);
     res.json(items);
@@ -25,7 +26,7 @@ router.get('/api/feedback/:workspaceId', (req, res) => {
 });
 
 /** Update feedback status (admin) */
-router.patch('/api/feedback/:workspaceId/:id', (req, res) => {
+router.patch('/api/feedback/:workspaceId/:id', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const { status } = req.body as { status?: FeedbackStatus };
   if (!status || !['new', 'acknowledged', 'fixed', 'wontfix'].includes(status)) {
     return res.status(400).json({ error: 'Invalid status' });
@@ -36,7 +37,7 @@ router.patch('/api/feedback/:workspaceId/:id', (req, res) => {
 });
 
 /** Add admin reply to feedback */
-router.post('/api/feedback/:workspaceId/:id/reply', (req, res) => {
+router.post('/api/feedback/:workspaceId/:id/reply', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const { content } = req.body as { content?: string };
   if (!content?.trim()) return res.status(400).json({ error: 'Content required' });
   const item = addFeedbackReply(req.params.workspaceId, req.params.id, 'team', content.trim());
@@ -45,7 +46,7 @@ router.post('/api/feedback/:workspaceId/:id/reply', (req, res) => {
 });
 
 /** Delete feedback item */
-router.delete('/api/feedback/:workspaceId/:id', (req, res) => {
+router.delete('/api/feedback/:workspaceId/:id', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const ok = deleteFeedback(req.params.workspaceId, req.params.id);
   if (!ok) return res.status(404).json({ error: 'Not found' });
   res.json({ ok: true });

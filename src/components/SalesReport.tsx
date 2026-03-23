@@ -84,7 +84,7 @@ export function SalesReport() {
     try {
       const data = await salesReportApi.list();
       setHistory(data as ReportSummary[]);
-    } catch { /* skip */ }
+    } catch (err) { console.error('SalesReport operation failed:', err); }
   };
 
   useEffect(() => {
@@ -140,7 +140,7 @@ export function SalesReport() {
         setReport(data as SalesAuditResult);
         setView('report');
       }
-    } catch { /* skip */ }
+    } catch (err) { console.error('SalesReport operation failed:', err); }
   };
 
   const openHtmlReport = (id: string) => {

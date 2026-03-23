@@ -3,6 +3,7 @@
  */
 import { Router } from 'express';
 
+import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 import { listChurnSignals, dismissSignal } from '../churn-signals.js';
@@ -12,7 +13,7 @@ router.get('/api/churn-signals', (_req, res) => {
   res.json(listChurnSignals());
 });
 
-router.get('/api/churn-signals/:workspaceId', (req, res) => {
+router.get('/api/churn-signals/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   res.json(listChurnSignals(req.params.workspaceId));
 });
 

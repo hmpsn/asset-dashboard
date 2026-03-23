@@ -19,13 +19,21 @@ export function useWebSocket(handlers: Record<string, EventHandler>) {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
 
+      ws.onopen = () => {
+        // Authenticate with JWT token
+        const authToken = localStorage.getItem('auth_token');
+        if (authToken) {
+          ws.send(JSON.stringify({ action: 'authenticate', token: authToken }));
+        }
+      };
+
       ws.onmessage = (event) => {
         try {
           const { event: eventName, data } = JSON.parse(event.data);
           if (handlersRef.current[eventName]) {
             handlersRef.current[eventName](data);
           }
-        } catch { /* ignore parse errors */ }
+        } catch (err) { console.error('useWebSocket operation failed:', err); }
       };
 
       ws.onclose = () => {
