@@ -578,14 +578,26 @@ const updateClientUserSchema = z.object({
   avatarUrl: z.string().url().optional().or(z.literal('')),
 });
 
-// PATCH: manually set status for a page
+// PATCH: manually set status for a page (legacy endpoint — delegates to updatePageState)
 router.patch('/api/workspaces/:id/seo-edit-tracking', requireWorkspaceAccess(), validate(seoEditTrackingSchema), (req, res) => {
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Not found' });
   const { pageId, status, fields } = req.body;
+  // Map legacy statuses to unified PageEditState statuses
+  const statusMap: Record<string, 'issue-detected' | 'in-review' | 'live'> = {
+    'flagged': 'issue-detected',
+    'in-review': 'in-review',
+    'live': 'live',
+  };
+  const mappedStatus = statusMap[status] || 'issue-detected';
+  updatePageState(req.params.id, pageId, {
+    status: mappedStatus,
+    source: 'manual',
+    fields,
+  });
+  // Return same format for backward compatibility
   const tracking = ws.seoEditTracking || {};
   tracking[pageId] = { status, updatedAt: new Date().toISOString(), fields };
-  updateWorkspace(req.params.id, { seoEditTracking: tracking });
   res.json({ ok: true, tracking });
 });
 
