@@ -88,6 +88,10 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     }
   };
 
+  // Keepalive pings to prevent Render proxy from killing idle SSE connection
+  // Declared before outer try so it can be cleared in both success and error paths
+  let keepalive: ReturnType<typeof setInterval> | null = null;
+
   try {
     // 1. Resolve site base URL — auto-resolve liveDomain if missing
     sendProgress('discovery', 'Resolving site URL...', 0.02);
@@ -436,9 +440,8 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
       return result.text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
     };
 
-    // Keepalive pings to prevent Render proxy from killing idle SSE connection
-    // Declared at outer scope so it can be cleared in both success and error paths
-    let keepalive: ReturnType<typeof setInterval> | null = wantsStream ? setInterval(() => {
+    // Start keepalive now that we're entering the long-running AI phase
+    keepalive = wantsStream ? setInterval(() => {
       try { res.write(`: keepalive\n\n`); } catch { /* connection closed */ }
     }, 10_000) : null;
 
@@ -550,6 +553,10 @@ Rules:
         const parsed = JSON.parse(raw);
         log.info(`Batch ${batchIdx + 1} returned ${Array.isArray(parsed) ? parsed.length : 0} page mappings`);
         sendProgress('ai', `Batch ${batchIdx + 1}/${batches.length} complete (${Array.isArray(parsed) ? parsed.length : 0} pages)`, 0.55 + ((batchIdx + 1) / batches.length) * 0.20);
+        // Strip AI-hallucinated volume/difficulty — those must come from SEMRush enrichment only
+        if (Array.isArray(parsed)) {
+          for (const pm of parsed) { delete pm.volume; delete pm.difficulty; delete pm.cpc; }
+        }
         return Array.isArray(parsed) ? parsed : [];
       } catch {
         log.error({ detail: raw.slice(0, 200) }, `Batch ${batchIdx + 1} returned invalid JSON:`);

@@ -148,12 +148,12 @@ export function PageKeywordMapPanel({
                 <span className="text-[11px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded max-w-[180px] truncate">
                   {page.primaryKeyword}
                 </span>
-                {page.volume !== undefined && (
+                {page.volume !== undefined && page.volume > 0 && (
                   <span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded font-mono">
                     {page.volume.toLocaleString()}/mo
                   </span>
                 )}
-                {page.difficulty !== undefined && (
+                {page.difficulty !== undefined && page.difficulty > 0 && (
                   <span className={`text-[11px] ${difficultyColor(page.difficulty)} bg-zinc-800 px-1.5 py-0.5 rounded font-mono`}>
                     KD {page.difficulty}%
                   </span>

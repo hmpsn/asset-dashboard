@@ -276,10 +276,10 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                           <span className="text-[10px] text-zinc-600 uppercase tracking-wider">{gap.intent}</span>
                         </div>
                       </div>
-                      {(gap.volume != null || gap.difficulty != null || (gap.impressions != null && gap.impressions > 0)) && (
+                      {((gap.volume != null && gap.volume > 0) || (gap.difficulty != null && gap.difficulty > 0) || (gap.impressions != null && gap.impressions > 0)) && (
                         <div className="flex items-center gap-3 mb-1.5">
-                          {gap.volume != null && <span className="text-[10px] text-zinc-400 flex items-center gap-0.5"><BarChart3 className="w-3 h-3" />{fmtNum(gap.volume)}/mo</span>}
-                          {gap.difficulty != null && <span className={`text-[10px] font-medium ${kdColor(gap.difficulty)}`}>KD {gap.difficulty}</span>}
+                          {gap.volume != null && gap.volume > 0 && <span className="text-[10px] text-zinc-400 flex items-center gap-0.5"><BarChart3 className="w-3 h-3" />{fmtNum(gap.volume)}/mo</span>}
+                          {gap.difficulty != null && gap.difficulty > 0 && <span className={`text-[10px] font-medium ${kdColor(gap.difficulty)}`}>KD {gap.difficulty}</span>}
                           {gap.impressions != null && gap.impressions > 0 && <span className="text-[10px] text-blue-400 flex items-center gap-0.5"><Eye className="w-3 h-3" />{fmtNum(gap.impressions)} existing impr</span>}
                         </div>
                       )}
@@ -474,7 +474,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                         <div className="flex items-center justify-between mt-3 pt-3 border-t border-zinc-800/50">
                           <div className="flex items-center gap-1.5">
                             {page.searchIntent && <span className="text-[10px] text-zinc-500 uppercase">{page.searchIntent}</span>}
-                            {page.difficulty != null && (
+                            {page.difficulty != null && page.difficulty > 0 && (
                               <span className={`text-[10px] ${page.difficulty <= 30 ? 'text-green-400' : page.difficulty <= 60 ? 'text-amber-400' : 'text-red-400'}`}>
                                 KD {page.difficulty}
                               </span>

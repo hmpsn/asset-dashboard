@@ -61,7 +61,7 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[11px] text-teal-400">Target keyword: &ldquo;{gap.targetKeyword}&rdquo;</span>
                   {gap.volume != null && <span className="text-[10px] text-zinc-400 flex items-center gap-0.5"><BarChart3 className="w-3 h-3" />{fmtNum(gap.volume)}/mo</span>}
-                  {gap.difficulty != null && <span className={`text-[10px] font-medium ${kdColor(gap.difficulty)}`}>KD {gap.difficulty}</span>}
+                  {gap.difficulty != null && gap.difficulty > 0 && <span className={`text-[10px] font-medium ${kdColor(gap.difficulty)}`}>KD {gap.difficulty}</span>}
                   {gap.impressions != null && gap.impressions > 0 && <span className="text-[10px] text-blue-400 flex items-center gap-0.5"><Eye className="w-3 h-3" />{fmtNum(gap.impressions)} impr</span>}
                 </div>
                 {workspaceId && (
