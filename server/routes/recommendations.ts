@@ -11,7 +11,8 @@ import {
   updateRecommendationStatus,
   dismissRecommendation,
 } from '../recommendations.js';
-import { updatePageState, getPageIdBySlug } from '../workspaces.js';
+import { getLatestSnapshot } from '../reports.js';
+import { updatePageState, getPageIdBySlug, getWorkspace } from '../workspaces.js';
 
 // ─── Recommendation Engine ─────────────────────────────────────────
 // Generate (or re-generate) prioritized recommendations for a workspace
@@ -55,8 +56,23 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', (req, res) => {
   // When recommendation is completed, mark affected pages as live
   if (status === 'completed' && rec.affectedPages && rec.affectedPages.length > 0) {
     const workspaceId = req.params.workspaceId;
+    // Build slug→pageId map from audit snapshot
+    const slugToPageId = new Map<string, string>();
+    const ws = getWorkspace(workspaceId);
+    if (ws?.webflowSiteId) {
+      const snapshot = getLatestSnapshot(ws.webflowSiteId);
+      if (snapshot) {
+        for (const page of snapshot.audit.pages) {
+          const slug = page.slug.replace(/^\//, '');
+          slugToPageId.set(slug, page.pageId);
+          slugToPageId.set(`/${slug}`, page.pageId);
+        }
+      }
+    }
     for (const pageSlug of rec.affectedPages) {
-      const resolvedPageId = getPageIdBySlug(workspaceId, pageSlug) ?? pageSlug;
+      const resolvedPageId = slugToPageId.get(pageSlug)
+        ?? getPageIdBySlug(workspaceId, pageSlug)
+        ?? pageSlug;
       updatePageState(workspaceId, resolvedPageId, {
         status: 'live',
         source: 'recommendation',

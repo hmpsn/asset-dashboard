@@ -588,6 +588,17 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     }
   }
 
+  // ── Build slug→pageId map from audit for resolving affectedPages ──
+  const slugToPageId = new Map<string, string>();
+  if (audit) {
+    for (const page of audit.audit.pages) {
+      const slug = page.slug.replace(/^\//, '');
+      slugToPageId.set(slug, page.pageId);
+      // Also store with leading slash for lookups
+      slugToPageId.set(`/${slug}`, page.pageId);
+    }
+  }
+
   // ── Merge with existing recommendations ──
   // Preserve statuses from previous run and auto-resolve issues no longer detected
   const existing = loadRecommendations(workspaceId);
@@ -644,7 +655,9 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         // Mark affected pages as live
         if (oldRec.affectedPages && oldRec.affectedPages.length > 0) {
           for (const pageSlug of oldRec.affectedPages) {
-            const resolvedPageId = getPageIdBySlug(workspaceId, pageSlug) ?? pageSlug;
+            const resolvedPageId = slugToPageId.get(pageSlug)
+              ?? getPageIdBySlug(workspaceId, pageSlug)
+              ?? pageSlug;
             updatePageState(workspaceId, resolvedPageId, {
               status: 'live',
               source: 'recommendation',

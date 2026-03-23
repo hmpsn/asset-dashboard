@@ -562,6 +562,12 @@ export function getPageIdBySlug(workspaceId: string, slug: string): string | und
     const row2 = getPageIdBySlugStmt().get(workspaceId, stripped) as { page_id: string } | undefined;
     if (row2) return row2.page_id;
   }
+  // Try with leading slash added
+  if (!slug.startsWith('/')) {
+    const withSlash = `/${slug}`;
+    const row3 = getPageIdBySlugStmt().get(workspaceId, withSlash) as { page_id: string } | undefined;
+    if (row3) return row3.page_id;
+  }
   return undefined;
 }
 
