@@ -73,7 +73,7 @@ export type ClientTab = 'overview' | 'performance' | 'search' | 'health' | 'stra
 export interface ClientKeywordStrategy {
   siteKeywords: string[];
   siteKeywordMetrics?: { keyword: string; volume: number; difficulty: number }[];
-  pageMap: { pagePath: string; pageTitle?: string; primaryKeyword: string; secondaryKeywords?: string[]; searchIntent?: string; currentPosition?: number; impressions?: number; clicks?: number; volume?: number; difficulty?: number; gscKeywords?: { query: string; clicks: number; impressions: number; position: number }[] }[];
+  pageMap: { pagePath: string; pageTitle?: string; primaryKeyword: string; secondaryKeywords?: string[]; searchIntent?: string; currentPosition?: number; impressions?: number; clicks?: number; volume?: number; difficulty?: number; metricsSource?: 'exact' | 'partial_match' | 'ai_estimate'; validated?: boolean; gscKeywords?: { query: string; clicks: number; impressions: number; position: number }[] }[];
   opportunities: string[];
   contentGaps?: { topic: string; targetKeyword: string; intent: string; priority: string; rationale: string; suggestedPageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource'; volume?: number; difficulty?: number; impressions?: number }[];
   quickWins?: { pagePath: string; action: string; estimatedImpact: string; rationale: string }[];

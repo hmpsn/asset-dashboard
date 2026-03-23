@@ -45,6 +45,8 @@ router.get('/api/public/seo-strategy/:workspaceId', (req, res) => {
       clicks: p.clicks,
       volume: p.volume,
       difficulty: p.difficulty,
+      metricsSource: p.metricsSource,
+      validated: p.validated,
     })),
     opportunities: strategy.opportunities || [],
     contentGaps: (strategy.contentGaps || []).map(g => ({

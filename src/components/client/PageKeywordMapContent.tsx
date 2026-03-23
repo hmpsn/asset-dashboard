@@ -18,7 +18,10 @@ interface PageMapItem {
   previousPosition?: number;
   impressions?: number;
   clicks?: number;
+  volume?: number;
   difficulty?: number;
+  metricsSource?: 'exact' | 'partial_match' | 'ai_estimate';
+  validated?: boolean;
   searchIntent?: string;
   gscKeywords?: GscKeyword[];
 }
@@ -227,7 +230,14 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                           {/* Summary row: primary keyword + keyword count */}
                           <div className="flex items-center gap-2 mt-1">
                             {page.primaryKeyword && (
-                              <span className="text-[10px] text-teal-400/80 truncate">{page.primaryKeyword}</span>
+                              <span className="text-[10px] text-teal-400/80 truncate inline-flex items-center gap-1">
+                                {page.primaryKeyword}
+                                {page.validated === false && (
+                                  <span className="text-amber-400 bg-amber-500/10 px-1 py-px rounded border border-amber-500/20 text-[9px]" title="This keyword has no confirmed search volume in SEMRush">
+                                    Unvalidated
+                                  </span>
+                                )}
+                              </span>
                             )}
                             {kwCount > 0 && (
                               <span className="text-[10px] text-zinc-600 flex items-center gap-0.5">
@@ -235,9 +245,20 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                                 {kwCount} keywords
                               </span>
                             )}
+                            {page.volume != null && page.volume > 0 && (
+                              <span className="text-[10px] text-zinc-500 inline-flex items-center gap-0.5">
+                                {page.volume.toLocaleString()}/mo
+                                {page.metricsSource === 'partial_match' && (
+                                  <span className="text-amber-400" title="Metrics from a similar keyword — may not be exact">~</span>
+                                )}
+                              </span>
+                            )}
                             {page.difficulty != null && page.difficulty > 0 && (
-                              <span className={`text-[10px] ${page.difficulty <= 30 ? 'text-green-400' : page.difficulty <= 60 ? 'text-amber-400' : 'text-red-400'}`}>
+                              <span className={`text-[10px] inline-flex items-center gap-0.5 ${page.difficulty <= 30 ? 'text-green-400' : page.difficulty <= 60 ? 'text-amber-400' : 'text-red-400'}`}>
                                 KD {page.difficulty}
+                                {page.metricsSource === 'partial_match' && (
+                                  <span className="text-amber-400" title="Metrics from a similar keyword — may not be exact">~</span>
+                                )}
                               </span>
                             )}
                           </div>

@@ -16,6 +16,8 @@ interface PageKeywordMap {
   volume?: number;
   difficulty?: number;
   cpc?: number;
+  metricsSource?: 'exact' | 'partial_match' | 'ai_estimate';
+  validated?: boolean;
   secondaryMetrics?: { keyword: string; volume: number; difficulty: number }[];
 }
 
@@ -148,14 +150,25 @@ export function PageKeywordMapPanel({
                 <span className="text-[11px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded max-w-[180px] truncate">
                   {page.primaryKeyword}
                 </span>
+                {page.validated === false && (
+                  <span className="text-[10px] text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20" title="This keyword has no confirmed search volume in SEMRush">
+                    Unvalidated
+                  </span>
+                )}
                 {page.volume !== undefined && page.volume > 0 && (
-                  <span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded font-mono">
+                  <span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded font-mono inline-flex items-center gap-1">
                     {page.volume.toLocaleString()}/mo
+                    {page.metricsSource === 'partial_match' && (
+                      <span className="text-amber-400" title="Metrics from a similar keyword — may not be exact">~</span>
+                    )}
                   </span>
                 )}
                 {page.difficulty !== undefined && page.difficulty > 0 && (
-                  <span className={`text-[11px] ${difficultyColor(page.difficulty)} bg-zinc-800 px-1.5 py-0.5 rounded font-mono`}>
+                  <span className={`text-[11px] ${difficultyColor(page.difficulty)} bg-zinc-800 px-1.5 py-0.5 rounded font-mono inline-flex items-center gap-1`}>
                     KD {page.difficulty}%
+                    {page.metricsSource === 'partial_match' && (
+                      <span className="text-amber-400" title="Metrics from a similar keyword — may not be exact">~</span>
+                    )}
                   </span>
                 )}
                 {page.currentPosition ? (
