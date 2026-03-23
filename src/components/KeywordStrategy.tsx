@@ -4,7 +4,7 @@ import {
   Loader2, Target, ChevronDown, ChevronRight, RefreshCw,
   AlertCircle, Sparkles, Briefcase,
   BarChart3, Users, Search, FileText,
-  Eye, MousePointerClick, Trophy,
+  Eye, MousePointerClick, Trophy, AlertTriangle,
 } from 'lucide-react';
 import { KeywordAnalysis } from './KeywordAnalysis';
 import { StatCard, AIContextIndicator } from './ui';
@@ -29,6 +29,8 @@ interface PageKeywordMap {
   volume?: number;
   difficulty?: number;
   cpc?: number;
+  metricsSource?: 'exact' | 'partial_match' | 'ai_estimate';
+  validated?: boolean;
   secondaryMetrics?: { keyword: string; volume: number; difficulty: number }[];
 }
 
@@ -640,6 +642,17 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
 
       {strategy && (
         <>
+          {/* ── Unvalidated Strategy Warning ── */}
+          {!strategy.pageMap.some(p => p.volume && p.volume > 0) && (
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3 flex items-start gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+              <div className="text-xs text-amber-300/90 leading-relaxed">
+                <strong className="text-amber-300">This strategy was generated without keyword volume validation.</strong>{' '}
+                Keywords, volume, and difficulty data may not reflect real search demand. Enable SEMRush integration for validated keyword recommendations.
+              </div>
+            </div>
+          )}
+
           {/* ── Summary Dashboard ── */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <StatCard label="Pages Mapped" value={strategy.pageMap.length} />
@@ -730,6 +743,9 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
               <h4 className="text-xs font-semibold text-zinc-300 mb-2 flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-teal-400" /> Keyword Opportunities
               </h4>
+              <p className="text-zinc-500 text-[10px] mb-2">
+                These opportunities are AI-generated suggestions based on your site's content and competitive landscape. Validate with keyword research before acting.
+              </p>
               <div className="space-y-1.5">
                 {strategy.opportunities.map((opp, i) => (
                   <div key={i} className="flex items-start gap-2 text-[11px] text-zinc-400">

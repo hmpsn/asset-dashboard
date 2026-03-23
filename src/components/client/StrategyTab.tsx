@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import {
   Zap, FileText, Sparkles, Target, CheckCircle2,
   TrendingUp, ChevronDown, Shield, BookOpen, Layers,
-  MessageCircle, BarChart3, Eye,
+  MessageCircle, BarChart3, Eye, AlertTriangle,
 } from 'lucide-react';
 import { TierGate, EmptyState, type Tier } from '../ui';
 import type { ClientKeywordStrategy, ClientContentRequest } from './types';
@@ -110,6 +110,16 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           <p className="text-sm text-zinc-500 mt-1">Generated {new Date(strategyData.generatedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
         </div>
       </div>
+
+      {/* Unvalidated strategy note */}
+      {!strategyData.pageMap.some(p => p.volume && p.volume > 0) && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3 flex items-start gap-2.5">
+          <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="text-xs text-amber-300/90 leading-relaxed">
+            Keyword volume and difficulty metrics are currently unavailable for this strategy. The recommendations are based on AI analysis and site content.
+          </div>
+        </div>
+      )}
 
       {/* Strategy Health Score Card */}
       <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
