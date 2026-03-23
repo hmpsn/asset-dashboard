@@ -27,8 +27,16 @@ import {
 } from '../webflow.js';
 import { getWorkspace, getTokenForSite, updatePageState } from '../workspaces.js';
 import { createLogger } from '../logger.js';
+import { validate, z } from '../middleware/validate.js';
 
 const log = createLogger('content-requests');
+
+const updateContentRequestSchema = z.object({
+  status: z.string().optional(),
+  internalNote: z.string().max(5000).optional(),
+  deliveryUrl: z.string().url().optional().or(z.literal('')),
+  deliveryNotes: z.string().max(5000).optional(),
+});
 
 // --- Internal Content Request Management ---
 router.get('/api/content-requests/:workspaceId', (req, res) => {
@@ -41,7 +49,7 @@ router.get('/api/content-requests/:workspaceId/:id', (req, res) => {
   res.json(request);
 });
 
-router.patch('/api/content-requests/:workspaceId/:id', (req, res) => {
+router.patch('/api/content-requests/:workspaceId/:id', validate(updateContentRequestSchema), (req, res) => {
   const { status, internalNote, deliveryUrl, deliveryNotes } = req.body;
   const updated = updateContentRequest(req.params.workspaceId, req.params.id, { status, internalNote, deliveryUrl, deliveryNotes });
   if (!updated) return res.status(404).json({ error: 'Request not found' });

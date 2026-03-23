@@ -20,6 +20,16 @@ import {
   type RequestAttachment,
 } from '../requests.js';
 import { getWorkspace } from '../workspaces.js';
+import { validate, z } from '../middleware/validate.js';
+
+const createRequestSchema = z.object({
+  title: z.string().min(1, 'Title is required').max(500),
+  description: z.string().min(1, 'Description is required').max(5000),
+  category: z.string().min(1, 'Category is required'),
+  priority: z.enum(['low', 'medium', 'high', 'urgent']).optional().default('medium'),
+  pageUrl: z.string().url().optional().or(z.literal('')),
+  submittedBy: z.string().max(200).optional(),
+});
 
 // --- Request Attachments ---
 function processUploadedAttachments(files: Express.Multer.File[]): RequestAttachment[] {
@@ -35,9 +45,8 @@ function processUploadedAttachments(files: Express.Multer.File[]): RequestAttach
 
 // --- Client Requests ---
 // Public: client creates a request
-router.post('/api/public/requests/:workspaceId', (req, res) => {
+router.post('/api/public/requests/:workspaceId', validate(createRequestSchema), (req, res) => {
   const { title, description, category, priority, pageUrl, submittedBy } = req.body;
-  if (!title || !description || !category) return res.status(400).json({ error: 'title, description, and category required' });
   const request = createRequest(req.params.workspaceId, { title, description, category, priority, pageUrl, submittedBy });
   broadcast('request:created', request);
   broadcastToWorkspace(req.params.workspaceId, 'request:created', { id: request.id });

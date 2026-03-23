@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getOptional } from '../api/client';
 import type { PageEditStatus } from '../components/ui/statusConfig';
 
@@ -28,69 +29,34 @@ export interface PageEditSummary {
   total: number;
 }
 
-// Module-level cache so multiple components share the same data
-const cache = new Map<string, { data: Record<string, PageEditState>; fetchedAt: number }>();
-const STALE_MS = 30_000;
-
-function getCached(wsId: string): Record<string, PageEditState> | null {
-  const entry = cache.get(wsId);
-  if (entry && Date.now() - entry.fetchedAt < STALE_MS) return entry.data;
-  return null;
-}
+/** React Query key for page edit states */
+export const pageEditStatesKey = (workspaceId: string, isPublic: boolean) =>
+  ['page-edit-states', workspaceId, isPublic ? 'public' : 'admin'] as const;
 
 /**
  * Shared hook for reading unified page edit states.
- * Caches at module level so multiple tools read the same data.
+ * Uses React Query for caching, deduplication, and background refetching.
  */
 export function usePageEditStates(workspaceId: string | undefined, isPublic = false) {
-  // Initialize from cache synchronously (no setState in effect needed)
-  const initialCache = workspaceId ? getCached(workspaceId) : null;
-  const [states, setStates] = useState<Record<string, PageEditState>>(
-    () => initialCache ?? {},
-  );
-  const [loading, setLoading] = useState(!initialCache && !!workspaceId);
-  const fetchRef = useRef(0);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    if (!workspaceId) return;
-    // If cache is fresh, we already have data from initializer — skip fetch
-    if (getCached(workspaceId)) return;
-
-    const id = ++fetchRef.current;
-    // loading was initialized to true when no cache — no need to set here
-    const url = isPublic
-      ? `/api/public/page-states/${workspaceId}`
-      : `/api/workspaces/${workspaceId}/page-states`;
-    getOptional<Record<string, PageEditState>>(url)
-      .then(data => {
-        if (id !== fetchRef.current) return;
-        const resolved = data ?? {};
-        if (!data) console.warn('[usePageEditStates] API returned null for', workspaceId);
-        cache.set(workspaceId, { data: resolved, fetchedAt: Date.now() });
-        setStates(resolved);
-      })
-      .catch((err) => { console.warn('[usePageEditStates] fetch error:', err); })
-      .finally(() => { if (id === fetchRef.current) setLoading(false); });
-  }, [workspaceId, isPublic]);
+  const { data: states = {}, isLoading: loading } = useQuery({
+    queryKey: pageEditStatesKey(workspaceId!, isPublic),
+    queryFn: async () => {
+      const url = isPublic
+        ? `/api/public/page-states/${workspaceId}`
+        : `/api/workspaces/${workspaceId}/page-states`;
+      const data = await getOptional<Record<string, PageEditState>>(url);
+      return data ?? {};
+    },
+    enabled: !!workspaceId,
+    staleTime: 30_000, // matches previous 30s cache TTL
+  });
 
   const refresh = useCallback(() => {
     if (!workspaceId) return;
-    cache.delete(workspaceId);
-    const id = ++fetchRef.current;
-    setLoading(true);
-    const url = isPublic
-      ? `/api/public/page-states/${workspaceId}`
-      : `/api/workspaces/${workspaceId}/page-states`;
-    getOptional<Record<string, PageEditState>>(url)
-      .then(data => {
-        if (id !== fetchRef.current) return;
-        const resolved = data ?? {};
-        cache.set(workspaceId, { data: resolved, fetchedAt: Date.now() });
-        setStates(resolved);
-      })
-      .catch((err) => { console.warn('[usePageEditStates] refresh error:', err); })
-      .finally(() => { if (id === fetchRef.current) setLoading(false); });
-  }, [workspaceId, isPublic]);
+    queryClient.invalidateQueries({ queryKey: pageEditStatesKey(workspaceId, isPublic) });
+  }, [workspaceId, isPublic, queryClient]);
 
   const getState = useCallback(
     (pageId: string): PageEditState | undefined => states[pageId],

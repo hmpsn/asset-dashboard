@@ -40,6 +40,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
   const [auditSearch, setAuditSearch] = useState('');
   const [requestedPages, setRequestedPages] = useState<Set<string>>(new Set());
   const [requestingPage, setRequestingPage] = useState<string | null>(null);
+  const [requestError, setRequestError] = useState<string | null>(null);
 
   const requestContentImprovement = async (page: { pageId: string; page: string; slug: string; issues: { check: string; message: string }[] }) => {
     if (!workspaceId || requestedPages.has(page.pageId)) return;
@@ -56,7 +57,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
       });
       setRequestedPages(prev => new Set(prev).add(page.pageId));
       onContentRequested?.();
-    } catch { /* silent fail */ }
+    } catch { setRequestError(page.pageId); }
     finally { setRequestingPage(null); }
   };
 
@@ -388,18 +389,23 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                               })}
                             </div>
                             {hasContentIssues(page.issues) && workspaceId && (
-                              <button
-                                onClick={() => requestContentImprovement(page)}
-                                disabled={requestedPages.has(page.pageId) || requestingPage === page.pageId}
-                                className={`mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
-                                  requestedPages.has(page.pageId)
-                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-default'
-                                    : 'bg-teal-600 hover:bg-teal-500 text-white'
-                                }`}
-                              >
-                                <FileEdit className="w-3 h-3" />
-                                {requestedPages.has(page.pageId) ? 'Request created' : requestingPage === page.pageId ? 'Creating...' : 'Request Content Fix'}
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => { setRequestError(null); requestContentImprovement(page); }}
+                                  disabled={requestedPages.has(page.pageId) || requestingPage === page.pageId}
+                                  className={`mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
+                                    requestedPages.has(page.pageId)
+                                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-default'
+                                      : 'bg-teal-600 hover:bg-teal-500 text-white'
+                                  }`}
+                                >
+                                  <FileEdit className="w-3 h-3" />
+                                  {requestedPages.has(page.pageId) ? 'Request created' : requestingPage === page.pageId ? 'Creating...' : 'Request Content Fix'}
+                                </button>
+                                {requestError === page.pageId && (
+                                  <p className="text-[11px] text-red-400 mt-1">Failed to create request. Please try again.</p>
+                                )}
+                              </>
                             )}
                           </div>
                         )}
@@ -480,18 +486,23 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                               })}
                             </div>
                             {hasContentIssues(page.issues) && workspaceId && (
-                              <button
-                                onClick={() => requestContentImprovement(page)}
-                                disabled={requestedPages.has(page.pageId) || requestingPage === page.pageId}
-                                className={`mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
-                                  requestedPages.has(page.pageId)
-                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-default'
-                                    : 'bg-teal-600 hover:bg-teal-500 text-white'
-                                }`}
-                              >
-                                <FileEdit className="w-3 h-3" />
-                                {requestedPages.has(page.pageId) ? 'Request created' : requestingPage === page.pageId ? 'Creating...' : 'Request Content Fix'}
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => { setRequestError(null); requestContentImprovement(page); }}
+                                  disabled={requestedPages.has(page.pageId) || requestingPage === page.pageId}
+                                  className={`mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
+                                    requestedPages.has(page.pageId)
+                                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-default'
+                                      : 'bg-teal-600 hover:bg-teal-500 text-white'
+                                  }`}
+                                >
+                                  <FileEdit className="w-3 h-3" />
+                                  {requestedPages.has(page.pageId) ? 'Request created' : requestingPage === page.pageId ? 'Creating...' : 'Request Content Fix'}
+                                </button>
+                                {requestError === page.pageId && (
+                                  <p className="text-[11px] text-red-400 mt-1">Failed to create request. Please try again.</p>
+                                )}
+                              </>
                             )}
                           </div>
                         )}

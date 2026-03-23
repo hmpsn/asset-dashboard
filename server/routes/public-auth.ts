@@ -22,8 +22,19 @@ import { signClientSession, clientLoginLimiter, IS_PROD, checkLoginLockout, reco
 import { verifyTurnstile } from '../middleware/turnstile.js';
 import { updateWorkspace, getWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
+import { validate, z } from '../middleware/validate.js';
 
 const log = createLogger('public-auth');
+
+const clientLoginSchema = z.object({
+  email: z.string().email('Valid email is required'),
+  password: z.string().min(1, 'Password is required'),
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1, 'Token is required'),
+  newPassword: z.string().min(8, 'Password must be at least 8 characters'),
+});
 
 router.post('/api/public/auth/:id', clientLoginLimiter, async (req, res) => {
   const ws = getWorkspace(req.params.id);
@@ -56,12 +67,11 @@ router.post('/api/public/auth/:id', clientLoginLimiter, async (req, res) => {
 // --- Client User Auth (individual logins) ---
 
 // Client user login (email + password, per workspace)
-router.post('/api/public/client-login/:id', clientLoginLimiter, verifyTurnstile, async (req, res) => {
+router.post('/api/public/client-login/:id', clientLoginLimiter, verifyTurnstile, validate(clientLoginSchema), async (req, res) => {
   try {
     const ws = getWorkspace(req.params.id);
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });
     const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ error: 'email and password are required' });
 
     // Credential stuffing protection: check if email is locked out
     const lockout = checkLoginLockout(email);
@@ -158,9 +168,8 @@ router.post('/api/public/forgot-password/:id', clientLoginLimiter, verifyTurnsti
 });
 
 // Complete password reset with token
-router.post('/api/public/reset-password', async (req, res) => {
+router.post('/api/public/reset-password', validate(resetPasswordSchema), async (req, res) => {
   const { token, newPassword } = req.body;
-  if (!token || !newPassword) return res.status(400).json({ error: 'Token and new password are required' });
   const result = await resetPasswordWithToken(token, newPassword);
   if (!result.success) return res.status(400).json({ error: result.error });
   res.json({ ok: true });

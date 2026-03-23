@@ -14,7 +14,7 @@ import { BackgroundTaskProvider } from './hooks/useBackgroundTasks';
 import { TaskPanel } from './components/TaskPanel';
 import { AdminChat } from './components/AdminChat';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { WorkspaceDataProvider } from './contexts/WorkspaceDataContext';
+// WorkspaceDataContext removed — React Query now handles admin-side caching
 import { NotificationBell } from './components/NotificationBell';
 import { CommandPalette } from './components/CommandPalette';
 import {
@@ -702,11 +702,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
             )}
             <ErrorBoundary label={tab}>
               <Suspense fallback={<ChunkFallback />}>
-                {selected ? (
-                  <WorkspaceDataProvider workspaceId={selected.id}>
-                    {renderContent()}
-                  </WorkspaceDataProvider>
-                ) : renderContent()}
+                {renderContent()}
               </Suspense>
             </ErrorBoundary>
           </div>

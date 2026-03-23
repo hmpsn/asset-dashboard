@@ -33,13 +33,34 @@ import {
 } from '../workspaces.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { createLogger } from '../logger.js';
+import { validate, z } from '../middleware/validate.js';
 
 const log = createLogger('approvals');
 
+const createBatchSchema = z.object({
+  siteId: z.string().min(1, 'siteId is required'),
+  name: z.string().optional().default('SEO Changes'),
+  items: z.array(z.object({
+    id: z.string().optional(),
+    pageId: z.string(),
+    pageSlug: z.string().optional(),
+    pageTitle: z.string().optional(),
+    field: z.string(),
+    currentValue: z.string().optional(),
+    proposedValue: z.string().optional(),
+    collectionId: z.string().optional(),
+  })).min(1, 'At least one item is required'),
+});
+
+const updateItemSchema = z.object({
+  status: z.enum(['approved', 'rejected', 'pending']).optional(),
+  clientValue: z.string().optional(),
+  clientNote: z.string().max(2000).optional(),
+});
+
 // --- Approvals (admin, authenticated) ---
-router.post('/api/approvals/:workspaceId', (req, res) => {
+router.post('/api/approvals/:workspaceId', validate(createBatchSchema), (req, res) => {
   const { siteId, name, items } = req.body;
-  if (!siteId || !items?.length) return res.status(400).json({ error: 'siteId and items required' });
   const batch = createBatch(req.params.workspaceId, siteId, name || 'SEO Changes', items);
   // Track all pages in this batch as in-review
   for (const item of items) {
@@ -96,7 +117,7 @@ router.get('/api/public/approvals/:workspaceId/:batchId', (req, res) => {
   res.json(batch);
 });
 
-router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', (req, res) => {
+router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', validate(updateItemSchema), (req, res) => {
   const { status, clientValue, clientNote } = req.body;
   const batch = updateItem(req.params.workspaceId, req.params.batchId, req.params.itemId, { status, clientValue, clientNote });
   if (!batch) return res.status(404).json({ error: 'Item not found' });

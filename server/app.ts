@@ -1,4 +1,5 @@
 import express from 'express';
+import compression from 'compression';
 import helmet from 'helmet';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -117,6 +118,9 @@ export function createApp(): express.Express {
       res.redirect(301, `https://${req.headers.host}${req.url}`);
     });
   }
+
+  // Compress JSON/text responses (70-80% smaller payloads)
+  app.use(compression());
 
   // Security headers via Helmet
   app.use(helmet({

@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { getOptional } from '../api/client';
 
 export interface Recommendation {
@@ -31,26 +32,18 @@ export interface Recommendation {
  * to filter them by page slug and type.
  */
 export function useRecommendations(workspaceId?: string) {
-  const [recs, setRecs] = useState<Recommendation[]>([]);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    if (!workspaceId) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const data = await getOptional<{ recommendations?: Recommendation[] }>(`/api/public/recommendations/${workspaceId}?status=pending`);
-        if (!cancelled && data && Array.isArray(data.recommendations)) {
-          setRecs(data.recommendations);
-        }
-      } catch { /* non-critical */ }
-      if (!cancelled) setLoaded(true);
-    })();
-    return () => { cancelled = true; };
-  }, [workspaceId]);
+  const { data: recs = [], isSuccess: loaded } = useQuery({
+    queryKey: ['recommendations', workspaceId],
+    queryFn: async () => {
+      const data = await getOptional<{ recommendations?: Recommendation[] }>(`/api/public/recommendations/${workspaceId}?status=pending`);
+      return data && Array.isArray(data.recommendations) ? data.recommendations : [];
+    },
+    enabled: !!workspaceId,
+    staleTime: 60_000,
+  });
 
   /** Get recommendations relevant to a specific page slug */
-  const forPage = (slug: string): Recommendation[] => {
+  const forPage = useCallback((slug: string): Recommendation[] => {
     if (!slug) return [];
     const normalized = slug.startsWith('/') ? slug : `/${slug}`;
     return recs.filter(r =>
@@ -59,15 +52,15 @@ export function useRecommendations(workspaceId?: string) {
         return np === normalized || normalized.includes(np) || np.includes(normalized);
       })
     );
-  };
+  }, [recs]);
 
   /** Get recommendations of a specific type */
-  const ofType = (type: Recommendation['type']): Recommendation[] =>
-    recs.filter(r => r.type === type);
+  const ofType = useCallback((type: Recommendation['type']): Recommendation[] =>
+    recs.filter(r => r.type === type), [recs]);
 
   /** Get recommendations matching both page and type */
-  const forPageAndType = (slug: string, type: Recommendation['type']): Recommendation[] =>
-    forPage(slug).filter(r => r.type === type);
+  const forPageAndType = useCallback((slug: string, type: Recommendation['type']): Recommendation[] =>
+    forPage(slug).filter(r => r.type === type), [forPage]);
 
   return { recs, loaded, forPage, ofType, forPageAndType };
 }

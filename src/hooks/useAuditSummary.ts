@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getOptional } from '../api/client';
 
 export interface AuditSummaryData {
@@ -12,62 +13,33 @@ export interface AuditSummaryData {
   scoreHistory?: Array<{ id: string; createdAt: string; siteScore: number; errors: number; warnings: number }>;
 }
 
-// Module-level cache so multiple components share the same data
-const cache = new Map<string, { data: AuditSummaryData; fetchedAt: number }>();
-const STALE_MS = 60_000; // 1 min
-
-function getCached(wsId: string): AuditSummaryData | null {
-  const entry = cache.get(wsId);
-  if (entry && Date.now() - entry.fetchedAt < STALE_MS) return entry.data;
-  return null;
-}
+/** React Query key for audit summary */
+export const auditSummaryKey = (workspaceId: string) =>
+  ['audit-summary', workspaceId] as const;
 
 /**
- * Shared hook for fetching audit summary with module-level caching.
- * Used by WorkspaceHome, ClientDashboard, and any component needing site health data.
+ * Shared hook for fetching audit summary.
+ * Uses React Query for caching, deduplication, and background refetching.
  */
 export function useAuditSummary(workspaceId: string | undefined) {
-  const initialCache = workspaceId ? getCached(workspaceId) : null;
-  const [data, setData] = useState<AuditSummaryData | null>(() => initialCache);
-  const [loading, setLoading] = useState(!initialCache && !!workspaceId);
-  const [error, setError] = useState<string | null>(null);
-  const fetchRef = useRef(0);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    if (!workspaceId) return;
-    if (getCached(workspaceId)) return;
+  const { data: audit = null, isLoading: loading, error: queryError } = useQuery({
+    queryKey: auditSummaryKey(workspaceId!),
+    queryFn: async () => {
+      const d = await getOptional<AuditSummaryData>(`/api/public/audit-summary/${workspaceId}`);
+      return d?.id ? d : null;
+    },
+    enabled: !!workspaceId,
+    staleTime: 60_000,
+  });
 
-    const id = ++fetchRef.current;
-    getOptional<AuditSummaryData>(`/api/public/audit-summary/${workspaceId}`)
-      .then(d => {
-        if (id !== fetchRef.current) return;
-        if (d?.id) {
-          cache.set(workspaceId, { data: d, fetchedAt: Date.now() });
-          setData(d);
-          setError(null);
-        }
-      })
-      .catch(() => { if (id === fetchRef.current) setError('Unable to load site health data'); })
-      .finally(() => { if (id === fetchRef.current) setLoading(false); });
-  }, [workspaceId]);
+  const error = queryError ? 'Unable to load site health data' : null;
 
   const refresh = useCallback(() => {
     if (!workspaceId) return;
-    cache.delete(workspaceId);
-    const id = ++fetchRef.current;
-    setLoading(true);
-    getOptional<AuditSummaryData>(`/api/public/audit-summary/${workspaceId}`)
-      .then(d => {
-        if (id !== fetchRef.current) return;
-        if (d?.id) {
-          cache.set(workspaceId, { data: d, fetchedAt: Date.now() });
-          setData(d);
-          setError(null);
-        }
-      })
-      .catch(() => { if (id === fetchRef.current) setError('Unable to load site health data'); })
-      .finally(() => { if (id === fetchRef.current) setLoading(false); });
-  }, [workspaceId]);
+    queryClient.invalidateQueries({ queryKey: auditSummaryKey(workspaceId) });
+  }, [workspaceId, queryClient]);
 
-  return { audit: data, loading, error, refresh };
+  return { audit, loading, error, refresh };
 }

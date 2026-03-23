@@ -60,6 +60,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const loadFeedback = async () => {
     try {
@@ -76,6 +77,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
   const handleSubmit = async () => {
     if (!title.trim() || !description.trim()) return;
     setSubmitting(true);
+    setSubmitError(null);
     try {
       const context = {
         currentTab,
@@ -89,7 +91,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
       setTitle('');
       setDescription('');
       setTimeout(() => { setSubmitted(false); setView('list'); loadFeedback(); }, 1500);
-    } catch { /* silent */ }
+    } catch { setSubmitError('Failed to submit feedback. Please try again.'); }
     finally { setSubmitting(false); }
   };
 
@@ -100,7 +102,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
       setReplyText('');
       setReplyingTo(null);
       loadFeedback();
-    } catch { /* silent */ }
+    } catch { setSubmitError('Failed to send reply. Please try again.'); }
   };
 
   const unreadCount = items.filter(i => i.replies.some(r => r.author === 'team') && i.status !== 'fixed' && i.status !== 'wontfix').length;
@@ -200,6 +202,10 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
                 Context auto-attached: current tab, browser, screen size
               </div>
 
+              {/* Error */}
+              {submitError && (
+                <p className="text-[11px] text-red-400">{submitError}</p>
+              )}
               {/* Submit */}
               <button
                 onClick={handleSubmit}

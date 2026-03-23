@@ -59,6 +59,9 @@ Every completed task — no matter how small — must include these steps:
 - **AI** — OpenAI GPT-4.1/4.1-mini/4.1-nano via `server/openai-helpers.ts` (`callOpenAI`), Anthropic Claude via `server/anthropic-helpers.ts` (`callAnthropic`) for creative prose
 - **Payments** — Stripe Checkout (not Payment Intents). Config encrypted on disk (AES-256-GCM). Admin UI for keys + products.
 - **Auth** — Dual system: internal JWT (7-day, admin) + client JWT (24h, per-workspace). Legacy shared-password still supported. Turnstile CAPTCHA on client login/forgot-password (optional).
+- **Validation** — **Zod v3** (`server/middleware/validate.ts`) for Express request body validation. Schemas declared per-route, middleware returns structured 400 errors.
+- **Caching** — **React Query** (`@tanstack/react-query`) for frontend data fetching/caching in hooks. `QueryClientProvider` in `main.tsx`. Partially migrated (3 hooks); new hooks should use React Query.
+- **Compression** — `compression` middleware in `server/app.ts` for gzip responses.
 - **Monetization** — 3 tiers (Free/Growth/Premium), per-item content purchases, 14-day Growth trial, UX soft-gating via `<TierGate>`
 - **Logging** — **Pino** structured JSON logging (`server/logger.ts`). `createLogger(module)` for child loggers. Pretty-print in dev, JSON in prod.
 - **Error monitoring** — **Sentry** (`server/sentry.ts` + frontend `@sentry/react`). Auto-tags errors with `workspaceId`. Conditional source maps.
@@ -81,7 +84,7 @@ Every completed task — no matter how small — must include these steps:
 | `routes/` | **62 Express Router files** | One file per domain: `auth.ts`, `webflow.ts`, `webflow-alt-text.ts`, `webflow-audit.ts`, `webflow-cms.ts`, `webflow-keywords.ts`, `webflow-organize.ts`, `webflow-pagespeed.ts`, `webflow-schema.ts`, `webflow-seo.ts`, `webflow-analysis.ts`, `aeo-review.ts`, `feedback.ts`, `public-feedback.ts`, `content-decay.ts`, `content-publish.ts`, `content-subscriptions.ts`, `content-templates.ts`, `content-matrices.ts`, `content-plan-review.ts`, `seo-change-tracker.ts`, `site-architecture.ts`, `backlinks.ts`, `brand-docs.ts`, `data-export.ts`, `revenue.ts`, `workspace-badges.ts`, `workspace-home.ts`, `keyword-strategy.ts`, `google.ts`, `health.ts`, `llms-txt.ts`, `rewrite-chat.ts`, etc. |
 | `helpers.ts` | Shared pure functions | `sanitizeString`, `validateEnum`, `parseDateRange`, `applySuppressionsToAudit`, `buildSchemaContext`, `getAuditTrafficForWorkspace`, `readEnvFile`, `writeEnvFile` |
 | `middleware.ts` | Shared middleware + auth (single source of truth) | Rate limiters, `signClientSession`/`verifyClientSession`, `signAdminToken`/`verifyAdminToken`, `upload` (multer), `moveUploadedFiles`, `IS_PROD`, `APP_PASSWORD` |
-| `middleware/` | **Extracted middleware modules** | `fingerprint.ts` (request fingerprinting), `request-logger.ts` (pino HTTP request logging), `turnstile.ts` (Cloudflare Turnstile CAPTCHA verification) |
+| `middleware/` | **Extracted middleware modules** | `fingerprint.ts` (request fingerprinting), `request-logger.ts` (pino HTTP request logging), `turnstile.ts` (Cloudflare Turnstile CAPTCHA verification), `validate.ts` (Zod request body validation — `validate(schema)` middleware + re-exports `z`) |
 | `broadcast.ts` | WebSocket broadcast singleton | `setBroadcast()` called in index.ts, `broadcast()`/`broadcastToWorkspace()` imported by route files |
 | `workspaces.ts` | Workspace CRUD (SQLite), `Workspace` interface, `PageEditState` model, `KeywordStrategy` types | Core data model. `WorkspaceRow`→`rowToWorkspace()` mapper. `page_edit_states` + `seo_edit_tracking` in separate DB tables with FK→workspaces. |
 | `seo-context.ts` | `buildSeoContext()`, `buildKeywordMapContext()`, `buildKnowledgeBase()` | Shared AI prompt builders — used by chat, briefs, schema |
@@ -260,8 +263,8 @@ Every completed task — no matter how small — must include these steps:
 | `components/ui/` | **16 shared UI primitives** (14 components + 2 config files) | See § 4 below |
 | `components/client/` | **Client tab components** (29 files) | `types.ts`, `helpers.tsx`, `utils.ts`, `index.ts`, `OverviewTab.tsx`, `SearchTab.tsx`, `AnalyticsTab.tsx`, `PerformanceTab.tsx` (merged Search+Analytics), `StrategyTab.tsx`, `ContentTab.tsx`, `ApprovalsTab.tsx`, `RequestsTab.tsx`, `PlansTab.tsx`, `InboxTab.tsx` (composes Approvals+Requests+Content), `HealthTab.tsx`, `InsightsDigest.tsx`, `InsightsEngine.tsx`, `MonthlySummary.tsx`, `DataSnapshots.tsx`, `ROIDashboard.tsx`, `OrderStatus.tsx`, `FixRecommendations.tsx`, `SeoCart.tsx`, `useCart.tsx`, `OnboardingWizard.tsx`, `BetaContext.tsx` (beta mode feature flag), `ClientOnboardingQuestionnaire.tsx`, `FeedbackWidget.tsx`, `SeoGlossary.tsx` |
 | `components/shared/` | **Shared cross-dashboard components** | `RankTable.tsx` (position colors, history chart, rank change indicators) |
-| `contexts/` | **React context providers** | `WorkspaceDataContext.tsx` — cached data fetching for workspace-level data (GSC, GA4, audit, ranks, activity, annotations). Provides `useWorkspaceData()` hook with per-key caching + loading states. |
-| `hooks/` | **Shared React hooks** (15 files) | `useAuth.ts`, `useWebSocket.ts`, `useBackgroundTasks.tsx`, `useAuditSummary.ts`, `useSearchData.ts`, `useGA4Overview.ts`, `usePageEditStates.ts`, `useRecommendations.ts`, `useWorkspaceEvents.ts`, `useChat.ts`, `useClientAuth.ts`, `useClientData.ts`, `useContentRequests.ts`, `usePayments.ts`, `useToast.ts` |
+| `lib/` | **Shared utilities** | `queryClient.ts` — React Query `QueryClient` singleton (60s staleTime, 5min gcTime, refetchOnWindowFocus) |
+| `hooks/` | **Shared React hooks** (15 files) | `useAuth.ts`, `useWebSocket.ts`, `useBackgroundTasks.tsx`, `useAuditSummary.ts` *(React Query)*, `useSearchData.ts`, `useGA4Overview.ts`, `usePageEditStates.ts` *(React Query)*, `useRecommendations.ts` *(React Query)*, `useWorkspaceEvents.ts`, `useChat.ts`, `useClientAuth.ts`, `useClientData.ts`, `useContentRequests.ts`, `usePayments.ts`, `useToast.ts` |
 
 ### Shared (`shared/`)
 
@@ -482,6 +485,8 @@ These will be addressed in a dedicated cleanup pass. **Do not attempt to fix the
 - **Comments**: don't add or remove unless explicitly asked
 - **Imports**: always at top of file, never mid-file
 - **Large edits**: break into multiple smaller edits if > 300 lines
+- **Route validation**: use Zod schemas via `validate()` middleware from `server/middleware/validate.ts` — not hand-written `if (!field)` checks. Import as `import { validate, z } from '../middleware/validate.js'`
+- **Frontend data fetching**: new hooks should use `useQuery`/`useMutation` from `@tanstack/react-query`. Don't hand-roll `useState` + `useEffect` + fetch patterns. See `useAuditSummary.ts` for the canonical pattern.
 
 ---
 

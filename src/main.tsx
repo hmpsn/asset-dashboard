@@ -1,8 +1,10 @@
 import React, { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { QueryClientProvider } from '@tanstack/react-query';
 import * as Sentry from '@sentry/react';
 import './index.css';
 import App from './App';
+import { queryClient } from './lib/queryClient';
 
 // Initialize Sentry for frontend error monitoring (no-op if DSN not set)
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
@@ -36,8 +38,10 @@ const SentryErrorBoundary = SENTRY_DSN ? Sentry.ErrorBoundary : ({ children }: {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <SentryErrorBoundary fallback={<div style={{ padding: '2rem', textAlign: 'center' }}><h1>Something went wrong</h1><p>The error has been reported. Please refresh the page.</p></div>}>
-      <App />
-    </SentryErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <SentryErrorBoundary fallback={<div style={{ padding: '2rem', textAlign: 'center' }}><h1>Something went wrong</h1><p>The error has been reported. Please refresh the page.</p></div>}>
+        <App />
+      </SentryErrorBoundary>
+    </QueryClientProvider>
   </StrictMode>,
 );

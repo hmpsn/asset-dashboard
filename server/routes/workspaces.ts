@@ -8,6 +8,7 @@ const router = Router();
 import bcrypt from 'bcryptjs';
 import express from 'express';
 import { listBatches } from '../approvals.js';
+import { validate, z } from '../middleware/validate.js';
 import { requireWorkspaceAccess } from '../auth.js';
 import { broadcast, broadcastToWorkspace } from '../broadcast.js';
 import {
@@ -141,9 +142,14 @@ router.get('/api/workspaces/:id', requireWorkspaceAccess(), (req, res) => {
   res.json(safe);
 });
 
-router.post('/api/workspaces', (req, res) => {
+const createWorkspaceSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(200),
+  webflowSiteId: z.string().optional(),
+  webflowSiteName: z.string().optional(),
+});
+
+router.post('/api/workspaces', validate(createWorkspaceSchema), (req, res) => {
   const { name, webflowSiteId, webflowSiteName } = req.body;
-  if (!name) return res.status(400).json({ error: 'Name required' });
   const ws = createWorkspace(name, webflowSiteId, webflowSiteName);
   broadcast('workspace:created', ws);
   res.json(ws);
@@ -492,11 +498,17 @@ router.get('/api/workspaces/:id/audit-suppressions', requireWorkspaceAccess(), (
   res.json(ws.auditSuppressions || []);
 });
 
-router.post('/api/workspaces/:id/audit-suppressions', requireWorkspaceAccess(), (req, res) => {
+const auditSuppressionSchema = z.object({
+  check: z.string().min(1, 'check is required'),
+  pageSlug: z.string().optional(),
+  pagePattern: z.string().optional(),
+  reason: z.string().max(500).optional(),
+}).refine(d => d.pageSlug || d.pagePattern, { message: 'pageSlug or pagePattern is required' });
+
+router.post('/api/workspaces/:id/audit-suppressions', requireWorkspaceAccess(), validate(auditSuppressionSchema), (req, res) => {
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Not found' });
   const { check, pageSlug, pagePattern, reason } = req.body;
-  if (!check || (!pageSlug && !pagePattern)) return res.status(400).json({ error: 'check and (pageSlug or pagePattern) required' });
   const suppressions = ws.auditSuppressions || [];
   // Deduplicate: check for existing exact or pattern match
   if (pagePattern) {
@@ -514,11 +526,10 @@ router.post('/api/workspaces/:id/audit-suppressions', requireWorkspaceAccess(), 
   res.json({ ok: true, suppressions });
 });
 
-router.delete('/api/workspaces/:id/audit-suppressions', requireWorkspaceAccess(), (req, res) => {
+router.delete('/api/workspaces/:id/audit-suppressions', requireWorkspaceAccess(), validate(auditSuppressionSchema), (req, res) => {
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Not found' });
   const { check, pageSlug, pagePattern } = req.body;
-  if (!check || (!pageSlug && !pagePattern)) return res.status(400).json({ error: 'check and (pageSlug or pagePattern) required' });
   const suppressions = (ws.auditSuppressions || []).filter(s => {
     if (pagePattern) return !(s.check === check && s.pagePattern === pagePattern);
     return !(s.check === check && s.pageSlug === pageSlug && !s.pagePattern);
@@ -535,13 +546,43 @@ router.get('/api/workspaces/:id/seo-edit-tracking', requireWorkspaceAccess(), (r
   res.json(ws.seoEditTracking || {});
 });
 
+const seoEditTrackingSchema = z.object({
+  pageId: z.string().min(1, 'pageId is required'),
+  status: z.enum(['flagged', 'in-review', 'live']),
+  fields: z.array(z.string()).optional(),
+});
+
+const pageStateUpdateSchema = z.object({
+  status: z.enum(['clean', 'issue-detected', 'fix-proposed', 'in-review', 'approved', 'rejected', 'live']).optional(),
+  fields: z.array(z.string()).optional(),
+  auditIssues: z.array(z.string()).optional(),
+  source: z.string().optional(),
+  approvalBatchId: z.string().optional(),
+  contentRequestId: z.string().optional(),
+  workOrderId: z.string().optional(),
+  rejectionNote: z.string().max(2000).optional(),
+  updatedBy: z.string().optional(),
+});
+
+const createClientUserSchema = z.object({
+  email: z.string().email('Valid email is required'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  name: z.string().min(1, 'Name is required').max(200),
+  role: z.enum(['client_owner', 'client_member']).optional().default('client_member'),
+});
+
+const updateClientUserSchema = z.object({
+  name: z.string().max(200).optional(),
+  email: z.string().email().optional(),
+  role: z.enum(['client_owner', 'client_member']).optional(),
+  avatarUrl: z.string().url().optional().or(z.literal('')),
+});
+
 // PATCH: manually set status for a page
-router.patch('/api/workspaces/:id/seo-edit-tracking', requireWorkspaceAccess(), (req, res) => {
+router.patch('/api/workspaces/:id/seo-edit-tracking', requireWorkspaceAccess(), validate(seoEditTrackingSchema), (req, res) => {
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Not found' });
   const { pageId, status, fields } = req.body;
-  if (!pageId || !status) return res.status(400).json({ error: 'pageId and status required' });
-  if (!['flagged', 'in-review', 'live'].includes(status)) return res.status(400).json({ error: 'status must be flagged, in-review, or live' });
   const tracking = ws.seoEditTracking || {};
   tracking[pageId] = { status, updatedAt: new Date().toISOString(), fields };
   updateWorkspace(req.params.id, { seoEditTracking: tracking });
@@ -574,7 +615,7 @@ router.get('/api/workspaces/:id/page-states/:pageId', requireWorkspaceAccess(), 
 });
 
 // PATCH: update page state (admin)
-router.patch('/api/workspaces/:id/page-states/:pageId', requireWorkspaceAccess(), (req, res) => {
+router.patch('/api/workspaces/:id/page-states/:pageId', requireWorkspaceAccess(), validate(pageStateUpdateSchema), (req, res) => {
   const result = updatePageState(req.params.id, req.params.pageId, req.body);
   if (!result) return res.status(404).json({ error: 'Workspace not found' });
   res.json(result);
@@ -588,9 +629,10 @@ router.delete('/api/workspaces/:id/page-states/:pageId', requireWorkspaceAccess(
 });
 
 // POST: bulk clear page states by status (admin)
-router.post('/api/workspaces/:id/page-states/clear', requireWorkspaceAccess(), (req, res) => {
+router.post('/api/workspaces/:id/page-states/clear', requireWorkspaceAccess(), validate(z.object({
+  status: z.string().min(1, 'status is required'),
+})), (req, res) => {
   const { status } = req.body;
-  if (!status) return res.status(400).json({ error: 'status required' });
   const cleared = clearPageStatesByStatus(req.params.id, status);
   res.json({ ok: true, cleared });
 });
@@ -603,11 +645,9 @@ router.get('/api/workspaces/:id/client-users', requireWorkspaceAccess(), (_req, 
 });
 
 // Create/invite a client user
-router.post('/api/workspaces/:id/client-users', requireWorkspaceAccess(), express.json(), async (req, res) => {
+router.post('/api/workspaces/:id/client-users', requireWorkspaceAccess(), express.json(), validate(createClientUserSchema), async (req, res) => {
   try {
     const { email, password, name, role } = req.body;
-    if (!email || !password || !name) return res.status(400).json({ error: 'email, password, and name are required' });
-    if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
     const invitedBy = req.user?.id;
     const user = await createClientUser(email, password, name, req.params.id, role || 'client_member', invitedBy);
     // Send welcome email to the new client user
@@ -624,7 +664,7 @@ router.post('/api/workspaces/:id/client-users', requireWorkspaceAccess(), expres
 });
 
 // Update a client user
-router.patch('/api/workspaces/:id/client-users/:userId', requireWorkspaceAccess(), express.json(), async (req, res) => {
+router.patch('/api/workspaces/:id/client-users/:userId', requireWorkspaceAccess(), express.json(), validate(updateClientUserSchema), async (req, res) => {
   try {
     const { name, email, role, avatarUrl } = req.body;
     const user = await updateClientUser(req.params.userId, { name, email, role, avatarUrl });
