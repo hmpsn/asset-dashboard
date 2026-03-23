@@ -42,7 +42,7 @@ interface StrategyTabProps {
 
 export function StrategyTab({ strategyData, requestedTopics, contentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal, contentPlanKeywords, onTabChange, workspaceId, setToast, onContentRequested }: StrategyTabProps) {
   const betaMode = useBetaMode();
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['content-opportunities', 'growth-opportunities']));
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['content-opportunities', 'quick-wins', 'growth-opportunities', 'keyword-opportunities', 'target-keywords']));
 
   // Refs for scroll-to-section
   const contentOpportunitiesRef = useRef<HTMLDivElement>(null);
@@ -335,7 +335,58 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       </div>
       )}
 
-      {/* ── GROWTH OPPORTUNITIES (expanded by default) ── */}
+      {/* ── QUICK WINS ── */}
+      {strategyData.quickWins && strategyData.quickWins.length > 0 && (
+      <div ref={quickWinsRef}>
+        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+          <button 
+            onClick={() => toggleSection('quick-wins')}
+            className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                <Zap className="w-3.5 h-3.5 text-amber-400" />
+              </div>
+              <div className="text-left">
+                <div className="text-sm font-medium text-zinc-200">Quick Wins</div>
+                <div className="text-[11px] text-zinc-500">{strategyData.quickWins.length} low-effort improvements</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">{strategyData.quickWins.length}</span>
+              <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${expandedSections.has('quick-wins') ? '' : '-rotate-90'}`} />
+            </div>
+          </button>
+
+          {expandedSections.has('quick-wins') && (
+            <div className="px-4 pb-4 space-y-2 border-t border-zinc-800/50">
+              {strategyData.quickWins.slice(0, expandedSections.has('quick-wins-all') ? undefined : 3).map((qw, i) => {
+                const impactColor = qw.estimatedImpact === 'high' ? 'text-green-400 bg-green-500/15 border-green-500/30' : qw.estimatedImpact === 'medium' ? 'text-amber-400 bg-amber-500/15 border-amber-500/30' : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
+                return (
+                  <div key={i} className="px-3 py-2.5 rounded-lg bg-zinc-950/50 border border-zinc-800/80">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-mono text-zinc-500">{qw.pagePath}</span>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${impactColor}`}>{qw.estimatedImpact}</span>
+                    </div>
+                    <div className="text-[11px] text-zinc-200 mt-1 font-medium">{qw.action}</div>
+                  </div>
+                );
+              })}
+              {strategyData.quickWins.length > 3 && (
+                <button 
+                  onClick={() => toggleSection('quick-wins-all')}
+                  className="w-full text-center py-2 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
+                >
+                  {expandedSections.has('quick-wins-all') ? 'Show fewer' : `View all ${strategyData.quickWins.length}`}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+      )}
+
+      {/* ── GROWTH OPPORTUNITIES ── */}
       <div ref={growthOpportunitiesRef}>
       {(() => {
         const unranked = strategyData.pageMap
@@ -459,57 +510,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       })()}
       </div>
 
-      {/* ── QUICK WINS (individual section) ── */}
-      {strategyData.quickWins && strategyData.quickWins.length > 0 && (
-      <div ref={quickWinsRef}>
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-          <button 
-            onClick={() => toggleSection('quick-wins')}
-            className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-lg bg-amber-500/20 flex items-center justify-center">
-                <Zap className="w-3.5 h-3.5 text-amber-400" />
-              </div>
-              <div className="text-left">
-                <div className="text-sm font-medium text-zinc-200">Quick Wins</div>
-                <div className="text-[11px] text-zinc-500">{strategyData.quickWins.length} low-effort improvements</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">{strategyData.quickWins.length}</span>
-              <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${expandedSections.has('quick-wins') ? '' : '-rotate-90'}`} />
-            </div>
-          </button>
-
-          {expandedSections.has('quick-wins') && (
-            <div className="px-4 pb-4 space-y-2 border-t border-zinc-800/50">
-              {strategyData.quickWins.slice(0, expandedSections.has('quick-wins-all') ? undefined : 3).map((qw, i) => {
-                const impactColor = qw.estimatedImpact === 'high' ? 'text-green-400 bg-green-500/15 border-green-500/30' : qw.estimatedImpact === 'medium' ? 'text-amber-400 bg-amber-500/15 border-amber-500/30' : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
-                return (
-                  <div key={i} className="px-3 py-2.5 rounded-lg bg-zinc-950/50 border border-zinc-800/80">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-mono text-zinc-500">{qw.pagePath}</span>
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${impactColor}`}>{qw.estimatedImpact}</span>
-                    </div>
-                    <div className="text-[11px] text-zinc-200 mt-1 font-medium">{qw.action}</div>
-                  </div>
-                );
-              })}
-              {strategyData.quickWins.length > 3 && (
-                <button 
-                  onClick={() => toggleSection('quick-wins-all')}
-                  className="w-full text-center py-2 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
-                >
-                  {expandedSections.has('quick-wins-all') ? 'Show fewer' : `View all ${strategyData.quickWins.length}`}
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-      )}
-
+      {/* ── KEYWORD OPPS + TARGET KEYWORDS (2-col grid) ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {strategyData.opportunities.length > 0 && (
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
           <button 
@@ -544,7 +546,6 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         </div>
       )}
 
-      {/* ── TARGET KEYWORDS (individual section) ── */}
       <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
         <button 
           onClick={() => toggleSection('target-keywords')}
@@ -577,8 +578,9 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           </div>
         )}
       </div>
+      </div>
 
-      {/* ── COMPETITOR KEYWORD GAPS (individual section) ── */}
+      {/* ── COMPETITOR KEYWORD GAPS ── */}
       {strategyData.keywordGaps && strategyData.keywordGaps.length > 0 && (
         <TierGate tier={effectiveTier} required="premium" feature="Competitor Keyword Gaps" teaser={`${strategyData.keywordGaps.length} keyword gaps found — upgrade to Premium`}>
           <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">

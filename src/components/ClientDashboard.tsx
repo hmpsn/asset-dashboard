@@ -825,18 +825,15 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         )}
 
         {/* ════════════ SITE HEALTH TAB ════════════ */}
-        {tab === 'health' && (<>
+        {tab === 'health' && (
           <ErrorBoundary label="Site Health">
-            <HealthTab audit={audit} auditDetail={auditDetail} liveDomain={ws.liveDomain} tier={effectiveTier} workspaceId={workspaceId} initialSeverity={(() => { const s = new URLSearchParams(window.location.search).get('severity'); return s && ['error','warning','info'].includes(s) ? s as 'error' | 'warning' | 'info' : 'all'; })()} onContentRequested={() => setToast({ message: 'Content improvement request created! Check the Content tab to track progress.', type: 'success' })} />
-          </ErrorBoundary>
-          {workspaceId && auditDetail && (
-            <div className="mt-5">
+            <HealthTab audit={audit} auditDetail={auditDetail} liveDomain={ws.liveDomain} workspaceId={workspaceId} initialSeverity={(() => { const s = new URLSearchParams(window.location.search).get('severity'); return s && ['error','warning','info'].includes(s) ? s as 'error' | 'warning' | 'info' : 'all'; })()} onContentRequested={() => setToast({ message: 'Content improvement request created! Check the Content tab to track progress.', type: 'success' })} actionPlanSlot={workspaceId && auditDetail ? (
               <ErrorBoundary label="Action Plan">
                 <InsightsEngine workspaceId={workspaceId} tier={effectiveTier} />
               </ErrorBoundary>
-            </div>
-          )}
-        </>)}
+            ) : undefined} />
+          </ErrorBoundary>
+        )}
 
         {/* ════════════ SEO STRATEGY TAB ════════════ */}
         {tab === 'strategy' && (
