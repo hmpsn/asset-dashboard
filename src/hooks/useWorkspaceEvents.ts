@@ -55,14 +55,15 @@ export function useWorkspaceEvents(
         const authToken = localStorage.getItem('auth_token');
         if (authToken) {
           ws.send(JSON.stringify({ action: 'authenticate', token: authToken }));
-        }
-        // Subscribe to the workspace
-        ws.send(JSON.stringify({ action: 'subscribe', workspaceId }));
-        currentSubRef.current = workspaceId;
-        // Send identity for presence tracking if provided
-        const id = identityRef.current;
-        if (id) {
-          ws.send(JSON.stringify({ action: 'identify', workspaceId, ...id }));
+          // subscribe will be sent after 'authenticated' response in onmessage
+        } else {
+          // No auth token — subscribe immediately (legacy/public behavior)
+          ws.send(JSON.stringify({ action: 'subscribe', workspaceId }));
+          currentSubRef.current = workspaceId;
+          const id = identityRef.current;
+          if (id) {
+            ws.send(JSON.stringify({ action: 'identify', workspaceId, ...id }));
+          }
         }
         // Heartbeat every 30s to keep presence alive
         clearInterval(heartbeatInterval);
@@ -76,6 +77,16 @@ export function useWorkspaceEvents(
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
+          // Handle authentication response — subscribe after confirmed
+          if (msg.action === 'authenticated' && msg.ok) {
+            ws.send(JSON.stringify({ action: 'subscribe', workspaceId }));
+            currentSubRef.current = workspaceId;
+            const id = identityRef.current;
+            if (id) {
+              ws.send(JSON.stringify({ action: 'identify', workspaceId, ...id }));
+            }
+            return;
+          }
           // Only process messages for this workspace (or global events without workspaceId)
           if (msg.workspaceId && msg.workspaceId !== workspaceId) return;
           const handler = handlersRef.current[msg.event];

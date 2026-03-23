@@ -50,7 +50,7 @@ setInterval(() => {
 
 // Pre-built rate limiters
 export const loginLimiter = rateLimit(60 * 1000, 5); // 5 attempts per minute
-export const publicApiLimiter = rateLimit(60 * 1000, 60, 'global');
+export const publicApiLimiter = rateLimit(60 * 1000, 60);
 export const publicWriteLimiter = rateLimit(60 * 1000, 10);
 export const checkoutLimiter = rateLimit(60 * 1000, 5);
 export const clientLoginLimiter = rateLimit(60 * 1000, 5); // 5 attempts per minute per IP

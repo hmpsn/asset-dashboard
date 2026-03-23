@@ -7,6 +7,7 @@ import { initAnomalyBroadcast } from './anomaly-detection.js';
 import { initStripeBroadcast } from './stripe.js';
 import { startWatcher } from './processor.js';
 import { verifyToken, type JwtPayload } from './auth.js';
+import { getUserById } from './users.js';
 
 // --- WebSocket state ---
 const clients = new Set<WebSocket>();
@@ -89,16 +90,10 @@ export function initWebSocket(server: Server): WebSocketServer {
         if (msg.action === 'authenticate' && typeof msg.token === 'string') {
           const payload = verifyToken(msg.token);
           if (payload) {
-            // Import getUserById to get workspaceIds
-            import('./users.js').then(({ getUserById }) => {
-              const user = getUserById(payload.userId);
-              const wsIds = user?.workspaceIds;
-              authenticatedClients.set(ws, { ...payload, workspaceIds: wsIds });
-              ws.send(JSON.stringify({ action: 'authenticated', ok: true }));
-            }).catch(() => {
-              authenticatedClients.set(ws, { ...payload });
-              ws.send(JSON.stringify({ action: 'authenticated', ok: true }));
-            });
+            const user = getUserById(payload.userId);
+            const wsIds = user?.workspaceIds;
+            authenticatedClients.set(ws, { ...payload, workspaceIds: wsIds });
+            ws.send(JSON.stringify({ action: 'authenticated', ok: true }));
           } else {
             ws.send(JSON.stringify({ action: 'authenticated', ok: false }));
           }
