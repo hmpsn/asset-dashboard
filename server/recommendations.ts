@@ -638,6 +638,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     }
 
     // Auto-resolve: old pending/in_progress recs whose source is gone (issue fixed!)
+    const autoResolvedRecs: typeof existing.recommendations = [];
     for (const oldRec of existing.recommendations) {
       if (oldRec.status === 'completed' || oldRec.status === 'dismissed') continue;
       const key = oldRec.source.startsWith('strategy:')
@@ -652,18 +653,31 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           insight: `✓ Auto-resolved — this issue is no longer detected in the latest audit. ${oldRec.insight}`,
         });
         autoResolved++;
-        // Mark affected pages as live
-        if (oldRec.affectedPages && oldRec.affectedPages.length > 0) {
-          for (const pageSlug of oldRec.affectedPages) {
-            const resolvedPageId = slugToPageId.get(pageSlug)
-              ?? getPageIdBySlug(workspaceId, pageSlug)
-              ?? pageSlug;
-            updatePageState(workspaceId, resolvedPageId, {
-              status: 'live',
-              source: 'recommendation',
-              recommendationId: oldRec.id,
-            });
-          }
+        autoResolvedRecs.push(oldRec);
+      }
+    }
+
+    // Build set of pages that still have active (non-completed, non-dismissed) recs
+    const pagesWithActiveRecs = new Set<string>();
+    for (const r of recs) {
+      if (r.status !== 'completed' && r.status !== 'dismissed') {
+        for (const p of r.affectedPages) pagesWithActiveRecs.add(p);
+      }
+    }
+
+    // Only mark pages as live if they have no other active recommendations
+    for (const oldRec of autoResolvedRecs) {
+      if (oldRec.affectedPages && oldRec.affectedPages.length > 0) {
+        for (const pageSlug of oldRec.affectedPages) {
+          if (pagesWithActiveRecs.has(pageSlug)) continue;
+          const resolvedPageId = slugToPageId.get(pageSlug)
+            ?? getPageIdBySlug(workspaceId, pageSlug)
+            ?? pageSlug;
+          updatePageState(workspaceId, resolvedPageId, {
+            status: 'live',
+            source: 'recommendation',
+            recommendationId: oldRec.id,
+          });
         }
       }
     }

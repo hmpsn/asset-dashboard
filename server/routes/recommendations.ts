@@ -69,7 +69,18 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', (req, res) => {
         }
       }
     }
+    // Check which pages still have other active recommendations
+    const allRecs = loadRecommendations(workspaceId);
+    const pagesWithActiveRecs = new Set<string>();
+    if (allRecs) {
+      for (const r of allRecs.recommendations) {
+        if (r.id !== rec.id && r.status !== 'completed' && r.status !== 'dismissed') {
+          for (const p of r.affectedPages) pagesWithActiveRecs.add(p);
+        }
+      }
+    }
     for (const pageSlug of rec.affectedPages) {
+      if (pagesWithActiveRecs.has(pageSlug)) continue;
       const resolvedPageId = slugToPageId.get(pageSlug)
         ?? getPageIdBySlug(workspaceId, pageSlug)
         ?? pageSlug;
