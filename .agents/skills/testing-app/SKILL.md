@@ -1,68 +1,105 @@
 # Testing asset-dashboard Locally
 
-## Local Development Setup
+## Dev Server Setup
 
-1. Copy `.env.example` to `.env` (most values are optional for local dev)
-2. Start the backend: `npm run dev:server` (runs on port 3001)
-3. Start the frontend: `npm run dev` (Vite on port 5173)
-4. Or run both: `npm run dev:all` (uses concurrently)
+1. Install dependencies: `npm install`
+2. Start the server: `npm run dev:server` (Express on port 3001)
+3. Start the frontend: `npx vite --host 0.0.0.0` (Vite on port 5173)
+4. Or use `npm run dev:all` to start both concurrently
 
-The server creates a SQLite database automatically on first run at `~/.asset-dashboard/`. No external API keys are required to start the app — features that need them (GSC, GA4, Stripe, etc.) will show placeholder states.
+The server creates a SQLite database and data directory at `~/.asset-dashboard/` on first run. Migrations run automatically.
 
-## Authentication
+## Authentication Mechanisms
 
-- In dev mode with no `APP_PASSWORD` set, the app skips the login screen entirely
-- `JWT_SECRET` falls back to an insecure hardcoded value in dev
-- No credentials needed for local testing
+### Admin Auth
+- Controlled by `APP_PASSWORD` env var
+- If `APP_PASSWORD` is NOT set, admin auth is bypassed entirely (`POST /api/auth/login` returns `{ok: true}` with no token)
+- If `APP_PASSWORD` IS set, login returns a JWT token in both the response body and an `auth_token` httpOnly cookie
+
+### User-based JWT Auth
+- Create the first owner user via `POST /api/auth/setup` with `{email, password, name}`
+- This returns a JWT token that can be used for WebSocket authentication and API calls
+- Subsequent users are invited via admin workspace routes
+
+### Client Portal Auth
+- Client portal users authenticate via httpOnly cookies (`client_session_<wsId>` and `client_user_token_<wsId>`)
+- They do NOT have `auth_token` in localStorage
+- Shared password login: `POST /api/public/auth/<wsId>` with `{password}`
+- Client user login: `POST /api/public/client-login/<wsId>` with `{email, password}`
 
 ## Creating Test Data
 
-- **Create a workspace**: Click the workspace selector dropdown in the sidebar header, then "New workspace" → type a name → click "Add"
-- Many features require a Webflow site to be linked (`needsSite: true` in nav config). Without a linked site, those pages show "Link a Webflow site to use this tool"
-- You can still navigate to these pages directly via URL to verify routing works
+```bash
+# Create a workspace
+curl -X POST http://localhost:3001/api/workspaces \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Test Workspace"}'
 
-## Sidebar Navigation Structure
+# Create a client user (use workspace ID from above)
+curl -X POST http://localhost:3001/api/workspaces/<wsId>/client-users \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"test@example.com","password":"testpass123","name":"Test User","role":"client_owner"}'
 
-The sidebar groups are defined in `src/App.tsx` in the `navGroups` array (~line 348). Current structure:
+# Set client password on workspace
+curl -X PATCH http://localhost:3001/api/workspaces/<wsId> \
+  -H 'Content-Type: application/json' \
+  -d '{"clientPassword":"portal123"}'
 
-- **Home** (no group)
-- **ANALYTICS**: Search Console, Google Analytics, Rank Tracker
-- **SITE HEALTH**: Site Audit, Performance, Links, Assets
-- **SEO**: Brand & AI, Strategy, SEO Editor, Schema
-- **CONTENT**: Content Pipeline, Calendar, Requests, Content Perf
+# Create owner user (for JWT token)
+curl -X POST http://localhost:3001/api/auth/setup \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"admin@test.com","password":"adminpass123","name":"Admin User"}'
+```
 
-Note: "Annotations" is NOT a separate sidebar item — it's embedded as a collapsible panel inside Search Console.
+## WebSocket Testing
 
-## Key Routes
+The WebSocket endpoint is at `ws://localhost:3001/ws`. Use the `ws` npm package (already in node_modules) for programmatic testing:
 
-- Workspace home: `/ws/{workspaceId}`
-- Content Pipeline: `/ws/{workspaceId}/content-pipeline` (tabbed wrapper with Briefs/Posts/Subscriptions)
-- Requests: `/ws/{workspaceId}/requests`
-- All routes defined in `src/routes.ts` as the `Page` type union
-- Route rendering in `src/App.tsx` `renderContent()` function (~line 401)
+```javascript
+const WebSocket = require('ws');
+const ws = new WebSocket('ws://localhost:3001/ws');
 
-## Aggregated Endpoints
+// Admin auth flow:
+ws.on('open', () => {
+  ws.send(JSON.stringify({ action: 'authenticate', token: '<jwt_token>' }));
+});
+ws.on('message', (data) => {
+  const msg = JSON.parse(data.toString());
+  if (msg.action === 'authenticated' && msg.ok) {
+    ws.send(JSON.stringify({ action: 'subscribe', workspaceId: '<wsId>' }));
+  }
+});
 
-- `GET /api/workspace-home/:id` — returns all WorkspaceHome data in a single response (ranks, requests, contentRequests, activity, annotations, churnSignals, workOrders, searchData, ga4Data, comparison)
-- `GET /api/workspace-badges/:id` — lightweight badge counts for sidebar
-- Server routes in `server/routes/workspace-home.ts` and `server/routes/workspace-badges.ts`
+// Client portal flow (no auth needed):
+ws.on('open', () => {
+  ws.send(JSON.stringify({ action: 'subscribe', workspaceId: '<wsId>' }));
+});
+```
 
-## Testing Network Requests
+## Testing JWT_SECRET Production Check
 
-To verify API call consolidation:
-1. Open Chrome DevTools Network tab
-2. Filter by "Fetch/XHR"
-3. Navigate to workspace Home
-4. Filter for "workspace-home" — should see exactly 1 aggregated call
-5. Filter for "activity", "annotations", "rank-tracking" — should see 0 results (no redundant individual fetches)
+```bash
+NODE_ENV=production npx tsx server/index.ts
+# Should crash with: "JWT_SECRET environment variable must be set in production"
+```
 
-## Running Checks
+## Build & Test Commands
 
-- TypeScript: `npx tsc --noEmit --skipLibCheck`
 - Build: `npx vite build`
-- Tests: `npx vitest run` (597+ tests)
-- No separate lint command configured
+- Tests: `npx vitest run` (616+ tests across 56 files)
+- TypeScript check: `npx tsc --noEmit --skipLibCheck`
+
+## Known Limitations
+
+- **No Webflow API**: Without `WEBFLOW_API_TOKEN`, site audits, page listing, and SEO features that depend on Webflow data won't work. SeoAudit tab will show empty state.
+- **No OpenAI API**: Knowledge base generation, brand voice generation, and AI-powered features require `OPENAI_API_KEY`.
+- **No Stripe**: Payment features require `STRIPE_SECRET_KEY`.
+- **GUI browser might not be available**: In some environments, the CDP proxy at port 29229 may not be running. Use programmatic testing (curl, Node.js WebSocket client) as a fallback.
+- **Rate limiting**: The `publicApiLimiter` uses per-path mode. The `globalPublicLimiter` is IP-based at 200 req/min. Avoid changing `publicApiLimiter` to global mode as it shares the same bucket key format with `globalPublicLimiter`, causing double-counting.
 
 ## Devin Secrets Needed
 
-None required for basic local testing. External integrations (Webflow, Google, Stripe) need their respective API keys from `.env.example` but are optional.
+No secrets are required for basic local testing. Optional secrets for extended testing:
+- `WEBFLOW_API_TOKEN` — for testing Webflow-dependent features
+- `OPENAI_API_KEY` — for testing AI features
+- `STRIPE_SECRET_KEY` — for testing payment flows
