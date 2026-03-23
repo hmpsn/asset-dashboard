@@ -15,7 +15,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import db from './db/index.js';
-import { getWorkspace } from './workspaces.js';
+import { getWorkspace, updatePageState, getPageIdBySlug } from './workspaces.js';
 import type { Workspace, QuickWin, ContentGap } from './workspaces.js';
 import { getLatestSnapshot } from './reports.js';
 import type { AuditSnapshot } from './reports.js';
@@ -588,6 +588,17 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     }
   }
 
+  // ── Build slug→pageId map from audit for resolving affectedPages ──
+  const slugToPageId = new Map<string, string>();
+  if (audit) {
+    for (const page of audit.audit.pages) {
+      const slug = page.slug.replace(/^\//, '');
+      slugToPageId.set(slug, page.pageId);
+      // Also store with leading slash for lookups
+      slugToPageId.set(`/${slug}`, page.pageId);
+    }
+  }
+
   // ── Merge with existing recommendations ──
   // Preserve statuses from previous run and auto-resolve issues no longer detected
   const existing = loadRecommendations(workspaceId);
@@ -627,6 +638,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     }
 
     // Auto-resolve: old pending/in_progress recs whose source is gone (issue fixed!)
+    const autoResolvedRecs: typeof existing.recommendations = [];
     for (const oldRec of existing.recommendations) {
       if (oldRec.status === 'completed' || oldRec.status === 'dismissed') continue;
       const key = oldRec.source.startsWith('strategy:')
@@ -641,6 +653,32 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           insight: `✓ Auto-resolved — this issue is no longer detected in the latest audit. ${oldRec.insight}`,
         });
         autoResolved++;
+        autoResolvedRecs.push(oldRec);
+      }
+    }
+
+    // Build set of pages that still have active (non-completed, non-dismissed) recs
+    const pagesWithActiveRecs = new Set<string>();
+    for (const r of recs) {
+      if (r.status !== 'completed' && r.status !== 'dismissed') {
+        for (const p of r.affectedPages) pagesWithActiveRecs.add(p);
+      }
+    }
+
+    // Only mark pages as live if they have no other active recommendations
+    for (const oldRec of autoResolvedRecs) {
+      if (oldRec.affectedPages && oldRec.affectedPages.length > 0) {
+        for (const pageSlug of oldRec.affectedPages) {
+          if (pagesWithActiveRecs.has(pageSlug)) continue;
+          const resolvedPageId = slugToPageId.get(pageSlug)
+            ?? getPageIdBySlug(workspaceId, pageSlug)
+            ?? pageSlug;
+          updatePageState(workspaceId, resolvedPageId, {
+            status: 'live',
+            source: 'recommendation',
+            recommendationId: oldRec.id,
+          });
+        }
       }
     }
   }

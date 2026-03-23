@@ -11,7 +11,8 @@ import {
   updateRecommendationStatus,
   dismissRecommendation,
 } from '../recommendations.js';
-import { updatePageState } from '../workspaces.js';
+import { getLatestSnapshot } from '../reports.js';
+import { updatePageState, getPageIdBySlug, getWorkspace } from '../workspaces.js';
 
 // ─── Recommendation Engine ─────────────────────────────────────────
 // Generate (or re-generate) prioritized recommendations for a workspace
@@ -54,8 +55,36 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', (req, res) => {
   if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
   // When recommendation is completed, mark affected pages as live
   if (status === 'completed' && rec.affectedPages && rec.affectedPages.length > 0) {
+    const workspaceId = req.params.workspaceId;
+    // Build slug→pageId map from audit snapshot
+    const slugToPageId = new Map<string, string>();
+    const ws = getWorkspace(workspaceId);
+    if (ws?.webflowSiteId) {
+      const snapshot = getLatestSnapshot(ws.webflowSiteId);
+      if (snapshot) {
+        for (const page of snapshot.audit.pages) {
+          const slug = page.slug.replace(/^\//, '');
+          slugToPageId.set(slug, page.pageId);
+          slugToPageId.set(`/${slug}`, page.pageId);
+        }
+      }
+    }
+    // Check which pages still have other active recommendations
+    const allRecs = loadRecommendations(workspaceId);
+    const pagesWithActiveRecs = new Set<string>();
+    if (allRecs) {
+      for (const r of allRecs.recommendations) {
+        if (r.id !== rec.id && r.status !== 'completed' && r.status !== 'dismissed') {
+          for (const p of r.affectedPages) pagesWithActiveRecs.add(p);
+        }
+      }
+    }
     for (const pageSlug of rec.affectedPages) {
-      updatePageState(req.params.workspaceId, pageSlug, {
+      if (pagesWithActiveRecs.has(pageSlug)) continue;
+      const resolvedPageId = slugToPageId.get(pageSlug)
+        ?? getPageIdBySlug(workspaceId, pageSlug)
+        ?? pageSlug;
+      updatePageState(workspaceId, resolvedPageId, {
         status: 'live',
         source: 'recommendation',
         recommendationId: rec.id,

@@ -37,7 +37,7 @@ router.get('/api/webflow/seo-audit/:siteId', async (req, res) => {
     if (auditWs) {
       for (const page of result.pages) {
         if (page.issues.length > 0) {
-          updatePageState(auditWs.id, page.pageId, { status: 'issue-detected', source: 'audit', auditIssues: page.issues.map((i: { check: string }) => i.check), updatedBy: 'system' });
+          updatePageState(auditWs.id, page.pageId, { status: 'issue-detected', source: 'audit', slug: page.slug, auditIssues: page.issues.map((i: { check: string }) => i.check), updatedBy: 'system' });
         }
       }
     }

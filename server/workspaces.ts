@@ -326,6 +326,14 @@ function clearAllSeoEditTrackingStmt() {
   return _clearAllSeoEditTracking;
 }
 
+let _getPageIdBySlug: ReturnType<typeof db.prepare> | null = null;
+function getPageIdBySlugStmt() {
+  if (!_getPageIdBySlug) {
+    _getPageIdBySlug = db.prepare(`SELECT page_id FROM page_edit_states WHERE workspace_id = ? AND slug = ?`);
+  }
+  return _getPageIdBySlug;
+}
+
 // ── Helper: convert Workspace to DB params ──
 
 function workspaceToParams(ws: Workspace) {
@@ -543,6 +551,25 @@ export function getWorkspace(id: string): Workspace | undefined {
 
 export function getUploadRoot() { return UPLOAD_ROOT; }
 export function getOptRoot() { return OPT_ROOT; }
+
+/** Resolve a URL slug to a Webflow page ID via the page_edit_states table. */
+export function getPageIdBySlug(workspaceId: string, slug: string): string | undefined {
+  const row = getPageIdBySlugStmt().get(workspaceId, slug) as { page_id: string } | undefined;
+  if (row) return row.page_id;
+  // Try with leading slash stripped
+  const stripped = slug.replace(/^\//, '');
+  if (stripped !== slug) {
+    const row2 = getPageIdBySlugStmt().get(workspaceId, stripped) as { page_id: string } | undefined;
+    if (row2) return row2.page_id;
+  }
+  // Try with leading slash added
+  if (!slug.startsWith('/')) {
+    const withSlash = `/${slug}`;
+    const row3 = getPageIdBySlugStmt().get(workspaceId, withSlash) as { page_id: string } | undefined;
+    if (row3) return row3.page_id;
+  }
+  return undefined;
+}
 
 // --- Unified Page Edit State helpers ---
 
