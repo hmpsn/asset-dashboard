@@ -93,7 +93,12 @@ export function runMigrations(): void {
 
   for (const file of files) {
     if (applied.has(file)) continue;
+    // Temporarily disable FK checks so migrations that recreate tables with
+    // new FK constraints can copy existing data (which may include orphaned
+    // workspace_id refs). PRAGMA foreign_keys must be set OUTSIDE transactions.
+    db.pragma('foreign_keys = OFF');
     applyMigration(file);
+    db.pragma('foreign_keys = ON');
   }
 }
 

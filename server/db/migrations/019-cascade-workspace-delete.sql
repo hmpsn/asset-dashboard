@@ -427,6 +427,34 @@ DROP TABLE IF EXISTS schema_snapshots;
 ALTER TABLE schema_snapshots_new RENAME TO schema_snapshots;
 CREATE INDEX IF NOT EXISTS idx_schema_snapshots_site ON schema_snapshots(site_id);
 
+-- ── Cleanup orphaned rows ──────────────────────────────────────
+-- Production data may contain rows referencing deleted workspaces.
+-- Now that FK constraints exist, clean up orphans to prevent runtime errors.
+
+DELETE FROM client_users WHERE workspace_id NOT IN (SELECT id FROM workspaces);
+DELETE FROM reset_tokens WHERE workspace_id NOT IN (SELECT id FROM workspaces);
+DELETE FROM activity_log WHERE workspace_id NOT IN (SELECT id FROM workspaces);
+DELETE FROM requests WHERE workspace_id NOT IN (SELECT id FROM workspaces);
+DELETE FROM churn_signals WHERE workspace_id NOT IN (SELECT id FROM workspaces);
+DELETE FROM anomalies WHERE workspace_id NOT IN (SELECT id FROM workspaces);
+DELETE FROM audit_schedules WHERE workspace_id NOT IN (SELECT id FROM workspaces);
+DELETE FROM approval_batches WHERE workspace_id NOT IN (SELECT id FROM workspaces);
+DELETE FROM content_briefs WHERE workspace_id NOT IN (SELECT id FROM workspaces);
+DELETE FROM content_topic_requests WHERE workspace_id NOT IN (SELECT id FROM workspaces);
+DELETE FROM content_posts WHERE workspace_id NOT IN (SELECT id FROM workspaces);
+DELETE FROM work_orders WHERE workspace_id NOT IN (SELECT id FROM workspaces);
+DELETE FROM recommendation_sets WHERE workspace_id NOT IN (SELECT id FROM workspaces);
+DELETE FROM annotations WHERE workspace_id NOT IN (SELECT id FROM workspaces);
+DELETE FROM seo_changes WHERE workspace_id NOT IN (SELECT id FROM workspaces);
+DELETE FROM decay_analyses WHERE workspace_id NOT IN (SELECT id FROM workspaces);
+DELETE FROM roi_snapshots WHERE workspace_id NOT IN (SELECT id FROM workspaces);
+DELETE FROM feedback WHERE workspace_id NOT IN (SELECT id FROM workspaces);
+DELETE FROM rank_tracking_config WHERE workspace_id NOT IN (SELECT id FROM workspaces);
+DELETE FROM rank_snapshots WHERE workspace_id NOT IN (SELECT id FROM workspaces);
+DELETE FROM chat_sessions WHERE workspace_id NOT IN (SELECT id FROM workspaces);
+DELETE FROM usage_tracking WHERE workspace_id NOT IN (SELECT id FROM workspaces);
+DELETE FROM schema_snapshots WHERE workspace_id NOT IN (SELECT id FROM workspaces);
+
 -- ── 006-jobs ────────────────────────────────────────────────────
 
 -- (jobs table uses workspace_id but it's nullable — skip CASCADE)
