@@ -473,6 +473,27 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
       } catch { /* skip */ }
     }
 
+    // Build SEMRush keyword reference for batch prompts — give the AI real search terms to pick from
+    let semrushBatchRef = '';
+    const semrushByPath = new Map<string, typeof semrushDomainData>();
+    if (semrushDomainData.length > 0) {
+      // Group domain keywords by URL path for per-page matching
+      for (const k of semrushDomainData) {
+        try {
+          const p = new URL(k.url).pathname;
+          if (!semrushByPath.has(p)) semrushByPath.set(p, []);
+          semrushByPath.get(p)!.push(k);
+        } catch { /* skip */ }
+      }
+      // Also provide top domain keywords as general reference
+      const topDomainKws = [...semrushDomainData]
+        .sort((a, b) => b.volume - a.volume)
+        .slice(0, 40)
+        .map(k => `"${k.keyword}" (vol: ${k.volume}/mo, KD: ${k.difficulty}%)`)
+        .join(', ');
+      semrushBatchRef = `\n\nREAL SEARCH DATA — keywords this domain actually ranks for (prefer these over invented terms):\n${topDomainKws}`;
+    }
+
     const runBatch = async (batch: typeof pageInfo, batchIdx: number) => {
       const batchPages = batch.map(p => {
         let entry = `- ${p.path}: "${p.title}"`;
@@ -484,11 +505,17 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
           const topGsc = pageGsc.sort((a, b) => b.impressions - a.impressions).slice(0, 5);
           entry += `\n  GSC: ${topGsc.map(g => `"${g.query}" pos:${g.position.toFixed(1)} clicks:${g.clicks} imp:${g.impressions}`).join(', ')}`;
         }
+        // Add per-page SEMRush keywords so the AI sees what this page actually ranks for
+        const pageSem = semrushByPath.get(p.path);
+        if (pageSem && pageSem.length > 0) {
+          const topSem = pageSem.sort((a, b) => b.volume - a.volume).slice(0, 3);
+          entry += `\n  SEMRush: ${topSem.map(s => `"${s.keyword}" vol:${s.volume} KD:${s.difficulty}% pos:#${s.position}`).join(', ')}`;
+        }
         return entry;
       }).join('\n');
 
       const batchPrompt = `You are an expert SEO strategist. Analyze these ${batch.length} web pages and assign optimal keyword targets for each.
-${businessSection}
+${businessSection}${semrushBatchRef}
 Pages to analyze:
 ${batchPages}
 
@@ -504,11 +531,11 @@ Return a JSON array with one entry per page:
 ]
 
 Rules:
+- CRITICAL: primaryKeyword MUST be a term real people actually search for on Google. Use short, generic industry terms (2-5 words) that have real search volume — NOT branded phrases, NOT page titles, NOT product names. Good: "engineering productivity metrics", "DORA metrics dashboard". Bad: "Faros AI product updates", "configurable team pages for engineering teams".
+- If GSC data is available for a page, PREFER the highest-impression GSC query as the primaryKeyword — that's proven search demand. High impressions + poor position = biggest opportunity.
 - Each primaryKeyword must be UNIQUE across all pages — no keyword cannibalization
-- Keywords should be specific and high-intent, NOT generic
 - LOCATION TARGETING: If a page's URL, title, or content references a specific city/state/region (e.g. /houston, /san-antonio, "Houston Office"), that page's keywords MUST target THAT location — NOT the business headquarters or any other location. Each location page gets its own city. Do NOT default all pages to the same city.
 - For non-location pages (e.g. /about, /services), use the broadest relevant geographic scope from the business context (nationwide, statewide, or primary city as appropriate)
-- If GSC data is available, leverage it: high impressions + poor position = opportunity
 - Cover ALL ${batch.length} pages — do not skip any
 - Return ONLY valid JSON array, no markdown, no explanation`;
 
@@ -717,7 +744,7 @@ Return JSON with this EXACT structure (do NOT include a pageMap — it's already
 
 Rules:
 - siteKeywords: 8-15 broad themes covering the full site
-- contentGaps: 6-10 NEW pages/posts to create that DO NOT overlap with existing pages listed above. Before suggesting a content gap, verify no current page already targets that keyword or covers that topic. If an existing page is thin or weak on a topic, suggest it as a quickWin improvement instead of creating a competing new page. Vary intent (informational, commercial, transactional). Mix high and medium priority${hasSemrush ? '. Prioritize competitor gap keywords.' : ''}
+- contentGaps: 6-10 NEW pages/posts to create that DO NOT overlap with existing pages listed above. CRITICAL: Every targetKeyword MUST be a short, generic industry term (2-5 words) that real people search for on Google — NOT branded phrases, NOT ultra-specific long-tail phrases nobody searches. If SEMRush or GSC data is available, prefer keywords that appear in that data. Before suggesting a content gap, verify no current page already targets that keyword or covers that topic. If an existing page is thin or weak on a topic, suggest it as a quickWin improvement instead of creating a competing new page. Vary intent (informational, commercial, transactional). Mix high and medium priority${hasSemrush ? '. Prioritize competitor gap keywords.' : ''}
 - suggestedPageType: Choose the best page type for each content gap. Use "blog" for informational articles, "landing" for conversion pages, "service" for service descriptions, "location" for local SEO, "product" for product pages, "pillar" for topic hubs, "resource" for guides/downloads.
 - quickWins: 3-5 existing pages where small changes boost rankings. Use GSC data if available (high impressions + poor position = opportunity).
 - If DEVICE BREAKDOWN shows mobile ranking gaps, include a mobile-optimization quick win.
@@ -948,6 +975,33 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
         } catch { /* non-critical */ }
       }
       siteKeywordMetrics = found;
+    }
+
+    // ── Impact-based filtering & sorting ──────────────────────────
+    // Remove content gaps with zero search volume (nobody's searching for them)
+    // and sort remaining by impact: volume descending, then priority
+    if (strategy.contentGaps?.length) {
+      const prioWeight = (p: string) => p === 'high' ? 3 : p === 'medium' ? 2 : 1;
+      strategy.contentGaps = strategy.contentGaps
+        .filter((cg: { volume?: number; impressions?: number }) =>
+          (cg.volume && cg.volume > 0) || (cg.impressions && cg.impressions > 0)
+        )
+        .sort((a: { volume?: number; priority: string }, b: { volume?: number; priority: string }) =>
+          (b.volume || 0) - (a.volume || 0) || prioWeight(b.priority) - prioWeight(a.priority)
+        );
+      log.info(`Content gaps after zero-volume filter: ${strategy.contentGaps.length}`);
+    }
+
+    // Sort pageMap by volume (highest impact first)
+    if (strategy.pageMap?.length) {
+      strategy.pageMap.sort((a: { volume?: number; impressions?: number }, b: { volume?: number; impressions?: number }) =>
+        ((b.volume || 0) + (b.impressions || 0)) - ((a.volume || 0) + (a.impressions || 0))
+      );
+    }
+
+    // Sort siteKeywordMetrics by volume
+    if (siteKeywordMetrics.length > 0) {
+      siteKeywordMetrics.sort((a, b) => b.volume - a.volume);
     }
 
     // 7. Save to workspace

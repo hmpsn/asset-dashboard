@@ -26,7 +26,15 @@ export interface ContentGapsProps {
 export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGapsProps) {
   const navigate = useNavigate();
 
-  if (contentGaps.length === 0) return null;
+  // Sort by impact: volume descending, then priority
+  const sorted = [...contentGaps].sort((a, b) => {
+    const volDiff = (b.volume || 0) - (a.volume || 0);
+    if (volDiff !== 0) return volDiff;
+    const prioW = (p: string) => p === 'high' ? 3 : p === 'medium' ? 2 : 1;
+    return prioW(b.priority) - prioW(a.priority);
+  });
+
+  if (sorted.length === 0) return null;
 
   return (
     <div className="bg-zinc-900 rounded-xl border border-blue-500/20 p-4">
@@ -35,7 +43,7 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
       </h4>
       <p className="text-[11px] text-zinc-500 mb-3">New content to create — topics with search demand but no page on the site.</p>
       <div className="space-y-2">
-        {contentGaps.map((gap, i) => {
+        {sorted.map((gap, i) => {
           const prioColor = gap.priority === 'high' ? 'text-red-400 bg-red-500/10 border-red-500/20' : gap.priority === 'medium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
           return (
             <div key={i} className="px-3 py-2.5 bg-zinc-800/40 rounded-lg border border-zinc-800">
