@@ -397,7 +397,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
           // Get related keywords for top 5 seed terms
           try {
             sendProgress('semrush', 'Fetching related keyword ideas...', 0.65);
-            const seedKeywords = semrushDomainData.slice(0, 5).map(k => k.keyword);
+            const seedKeywords = semrushDomainData.filter(k => k.keyword?.trim()).slice(0, 5).map(k => k.keyword);
             for (const seed of seedKeywords) {
               const related = await getRelatedKeywords(seed, ws.id, 10);
               relatedKws.push(...related);
@@ -437,7 +437,8 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     };
 
     // Keepalive pings to prevent Render proxy from killing idle SSE connection
-    const keepalive = wantsStream ? setInterval(() => {
+    // Declared at outer scope so it can be cleared in both success and error paths
+    let keepalive: ReturnType<typeof setInterval> | null = wantsStream ? setInterval(() => {
       try { res.write(`: keepalive\n\n`); } catch { /* connection closed */ }
     }, 10_000) : null;
 
@@ -795,8 +796,9 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
     };
     log.info(`Final strategy: ${strategy.pageMap.length} pages, ${strategy.siteKeywords.length} site keywords, ${strategy.contentGaps.length} content gaps, ${strategy.quickWins.length} quick wins`);
 
-    } finally {
+    } catch (batchErr) {
       if (keepalive) clearInterval(keepalive);
+      throw batchErr;
     }
 
     if (!strategy?.pageMap) {
@@ -978,18 +980,27 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
     }
 
     // ── Impact-based filtering & sorting ──────────────────────────
-    // Remove content gaps with zero search volume (nobody's searching for them)
-    // and sort remaining by impact: volume descending, then priority
+    // Prefer content gaps with real search volume; if filtering would remove ALL, keep originals sorted by priority
     if (strategy.contentGaps?.length) {
       const prioWeight = (p: string) => p === 'high' ? 3 : p === 'medium' ? 2 : 1;
-      strategy.contentGaps = strategy.contentGaps
+      const withVolume = strategy.contentGaps
         .filter((cg: { volume?: number; impressions?: number }) =>
           (cg.volume && cg.volume > 0) || (cg.impressions && cg.impressions > 0)
-        )
-        .sort((a: { volume?: number; priority: string }, b: { volume?: number; priority: string }) =>
-          (b.volume || 0) - (a.volume || 0) || prioWeight(b.priority) - prioWeight(a.priority)
         );
-      log.info(`Content gaps after zero-volume filter: ${strategy.contentGaps.length}`);
+      if (withVolume.length > 0) {
+        // Sort by volume descending, then priority
+        strategy.contentGaps = withVolume.sort(
+          (a: { volume?: number; priority: string }, b: { volume?: number; priority: string }) =>
+            (b.volume || 0) - (a.volume || 0) || prioWeight(b.priority) - prioWeight(a.priority)
+        );
+      } else {
+        // No volume data available — keep all but sort by priority
+        strategy.contentGaps = strategy.contentGaps.sort(
+          (a: { priority: string }, b: { priority: string }) =>
+            prioWeight(b.priority) - prioWeight(a.priority)
+        );
+      }
+      log.info(`Content gaps: ${withVolume.length} with volume data, ${strategy.contentGaps.length} total kept`);
     }
 
     // Sort pageMap by volume (highest impact first)
@@ -1025,12 +1036,15 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
     updateWorkspace(ws.id, { keywordStrategy });
     incrementUsage(ws.id, 'strategy_generations');
 
+    if (keepalive) clearInterval(keepalive);
+
     if (wantsStream) {
       res.write(`data: ${JSON.stringify({ done: true, strategy: keywordStrategy })}\n\n`);
       return res.end();
     }
     res.json(keywordStrategy);
   } catch (err) {
+    if (keepalive) clearInterval(keepalive);
     const msg = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error ? err.stack : '';
     log.error({ detail: msg, stack }, 'Keyword strategy error');
