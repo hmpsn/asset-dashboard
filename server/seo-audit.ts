@@ -421,6 +421,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
         message: `Duplicate title across ${pgs.length} pages`,
         recommendation: `Make each page title unique. Pages sharing this title: ${pgs.join(', ')}`,
         value: title,
+        affectedPages: pgs,
       });
     }
   }
@@ -438,6 +439,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
         message: `Duplicate meta description across ${pgs.length} pages`,
         recommendation: `Write unique descriptions for each page. Pages sharing: ${pgs.join(', ')}`,
         value: desc.slice(0, 80) + (desc.length > 80 ? '...' : ''),
+        affectedPages: pgs,
       });
     }
   }
@@ -475,6 +477,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
       check: 'orphan-pages', severity: orphanPages.length > 3 ? 'error' : 'warning',
       message: `${orphanPages.length} orphan page${orphanPages.length > 1 ? 's' : ''} with no internal links`,
       recommendation: `These pages have no internal links pointing to them, making them hard for search engines to discover: ${orphanPages.slice(0, 10).join(', ')}${orphanPages.length > 10 ? ` (+${orphanPages.length - 10} more)` : ''}. Add internal links from related pages.`,
+      affectedPages: orphanPages,
     });
   }
 

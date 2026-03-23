@@ -16,6 +16,7 @@ export interface SeoIssue {
   recommendation: string;
   value?: string;
   suggestedFix?: string;
+  affectedPages?: string[];
 }
 
 export interface PageSeoResult {

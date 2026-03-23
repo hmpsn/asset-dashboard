@@ -95,7 +95,7 @@ export const schemaPlan = {
 // ── Keywords / Strategy ─────────────────────────────────────────
 export const keywords = {
   analyze: (body: Record<string, unknown>) =>
-    post<unknown>('/api/keyword-analysis', body),
+    post<unknown>('/api/webflow/keyword-analysis', body),
 
   strategy: (wsId: string) =>
     getOptional<unknown>(`/api/public/seo-strategy/${wsId}`),
@@ -253,11 +253,14 @@ export const aeoReview = {
 
 // ── Competitor analysis ─────────────────────────────────────────
 export const competitor = {
-  analyze: (wsId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/competitor-analysis/${wsId}`, body),
+  compare: (body: Record<string, unknown>) =>
+    post<unknown>('/api/competitor-compare', body),
 
-  history: (wsId: string) =>
-    getSafe<unknown[]>(`/api/competitor-analysis/${wsId}/history`, []),
+  snapshot: (myUrl: string, competitorUrl: string) =>
+    getOptional<unknown>(`/api/competitor-compare-snapshot?myUrl=${encodeURIComponent(myUrl)}&competitorUrl=${encodeURIComponent(competitorUrl)}`),
+
+  latest: (myUrl: string) =>
+    getOptional<unknown>(`/api/competitor-compare-latest?myUrl=${encodeURIComponent(myUrl)}`),
 };
 
 // ── SEO change tracker ──────────────────────────────────────────
@@ -266,7 +269,7 @@ export const seoChangeTracker = {
     getSafe<unknown[]>(`/api/seo-changes/${wsId}`, []),
 
   impact: (wsId: string) =>
-    getSafe<unknown[]>(`/api/seo-changes/${wsId}/impact`, []),
+    getSafe<unknown[]>(`/api/seo-change-impact/${wsId}`, []),
 };
 
 // ── Schema impact tracking ──────────────────────────────────────

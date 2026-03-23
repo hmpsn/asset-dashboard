@@ -2806,6 +2806,26 @@
           "notes": "Shipped — New PendingApprovals component shows all pending/partial approval batches with Retract button. Inline confirmation dialog prevents accidental deletes. Expandable item details show per-item approval status. Wired into SeoEditor (nameFilter='SEO'), SchemaSuggester (nameFilter='Schema'), CmsEditor (nameFilter='CMS'). Each tool auto-refreshes the panel after sending new batches. API client method approvals.remove() calls existing DELETE /api/approvals/:workspaceId/:batchId endpoint that had no frontend wiring before. Also added approvals.list() admin endpoint wrapper.",
           "status": "done",
           "shippedAt": "2026-03-20"
+        },
+        {
+          "id": 314,
+          "title": "Audit cleanup: CASCADE migration, stale API modules, recommendation specificity, noindex filtering",
+          "source": "AUDIT REVIEW",
+          "est": "1.5h",
+          "priority": "P1",
+          "notes": "Shipped — (1) Migration 019: ON DELETE CASCADE for 20+ workspace_id FKs that previously orphaned rows on workspace delete. (2) Fixed stale API module paths: recommendations, keywords.analyze, seoChangeTracker.impact, competitor endpoints now match actual backend routes. (3) Site-wide recommendations (duplicate titles, orphan pages) now list specific affected pages with traffic data instead of 'affects all pages'. affectedPages field added to SeoIssue type. (4) 'Pages needing attention' on HealthTab now filters out noindex pages since their issues don't affect search performance.",
+          "status": "done",
+          "shippedAt": "2026-03-23"
+        },
+        {
+          "id": 315,
+          "title": "Content gap enrichment: SEMRush volume/KD + GSC impressions on content opportunities",
+          "source": "USER REQUEST",
+          "est": "1h",
+          "priority": "P1",
+          "notes": "Shipped — ContentGap type extended with volume, difficulty, impressions fields. Strategy generation enriches content gaps from SEMRush domain data + bulk getKeywordOverview fallback for volume/KD, and GSC query data for existing site impressions (exact + partial keyword match). UI shows KD (color-coded green/amber/red), volume (searches/mo), and existing impressions on content opportunity cards in both admin ContentGaps.tsx and client StrategyTab.tsx. Public content endpoint passes through new fields. Existing strategies will show metrics after next regeneration.",
+          "status": "done",
+          "shippedAt": "2026-03-23"
         }
       ]
     }

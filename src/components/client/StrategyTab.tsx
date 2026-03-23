@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import {
   Zap, FileText, Sparkles, Target, CheckCircle2,
   TrendingUp, ChevronDown, Shield, BookOpen, Layers,
-  MessageCircle,
+  MessageCircle, BarChart3, Eye,
 } from 'lucide-react';
 import { TierGate, EmptyState, type Tier } from '../ui';
 import type { ClientKeywordStrategy, ClientContentRequest } from './types';
@@ -39,6 +39,9 @@ interface StrategyTabProps {
   setToast?: (msg: string) => void;
   onContentRequested?: () => void;
 }
+
+const kdColor = (kd?: number) => !kd ? 'text-zinc-500' : kd <= 30 ? 'text-green-400' : kd <= 60 ? 'text-amber-400' : 'text-red-400';
+const fmtNum = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString();
 
 export function StrategyTab({ strategyData, requestedTopics, contentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal, contentPlanKeywords, onTabChange, workspaceId, setToast, onContentRequested }: StrategyTabProps) {
   const betaMode = useBetaMode();
@@ -273,6 +276,13 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                           <span className="text-[10px] text-zinc-600 uppercase tracking-wider">{gap.intent}</span>
                         </div>
                       </div>
+                      {(gap.volume != null || gap.difficulty != null || (gap.impressions != null && gap.impressions > 0)) && (
+                        <div className="flex items-center gap-3 mb-1.5">
+                          {gap.volume != null && <span className="text-[10px] text-zinc-400 flex items-center gap-0.5"><BarChart3 className="w-3 h-3" />{fmtNum(gap.volume)}/mo</span>}
+                          {gap.difficulty != null && <span className={`text-[10px] font-medium ${kdColor(gap.difficulty)}`}>KD {gap.difficulty}</span>}
+                          {gap.impressions != null && gap.impressions > 0 && <span className="text-[10px] text-blue-400 flex items-center gap-0.5"><Eye className="w-3 h-3" />{fmtNum(gap.impressions)} existing impr</span>}
+                        </div>
+                      )}
                       <div className="text-[11px] text-zinc-500 leading-snug mb-2">{gap.rationale}</div>
                       <div className="flex items-center justify-between mt-auto">
                         <div className="flex items-center gap-1.5 min-w-0">

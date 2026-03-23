@@ -453,6 +453,20 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       const impactScore = isCrit ? 80 : 50;
       const priority: RecPriority = isCrit ? 'fix_now' : 'fix_soon';
 
+      const pages = issue.affectedPages || [];
+      const pageTraffic = pages.reduce((sum, slug) => {
+        const t = getTrafficForSlug(traffic, slug.replace(/^\//, ''));
+        return sum + t.clicks;
+      }, 0);
+      const pageImpressions = pages.reduce((sum, slug) => {
+        const t = getTrafficForSlug(traffic, slug.replace(/^\//, ''));
+        return sum + t.impressions;
+      }, 0);
+
+      const estimatedGain = pages.length > 0
+        ? `Affects ${pages.length} page${pages.length !== 1 ? 's' : ''} on the site`
+        : 'Affects the entire site';
+
       recs.push({
         id: `rec_${crypto.randomBytes(6).toString('hex')}`,
         workspaceId,
@@ -465,10 +479,10 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         effort: 'low',
         impactScore,
         source: `audit:site-wide:${issue.check}`,
-        affectedPages: [],
-        trafficAtRisk: 0,
-        impressionsAtRisk: 0,
-        estimatedGain: 'Affects all pages on the site',
+        affectedPages: pages.map(p => p.replace(/^\//, '')),
+        trafficAtRisk: pageTraffic,
+        impressionsAtRisk: pageImpressions,
+        estimatedGain,
         actionType: 'manual',
         status: 'pending',
         assignedTo,

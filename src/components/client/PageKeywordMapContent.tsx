@@ -1,6 +1,13 @@
 import { useState, useMemo } from 'react';
-import { ArrowUpRight, ArrowDownRight, Minus, Layers, MessageCircle } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Minus, Layers, MessageCircle, ChevronDown, Search } from 'lucide-react';
 import { post } from '../../api';
+
+interface GscKeyword {
+  query: string;
+  clicks: number;
+  impressions: number;
+  position: number;
+}
 
 interface PageMapItem {
   pagePath: string;
@@ -13,6 +20,7 @@ interface PageMapItem {
   clicks?: number;
   difficulty?: number;
   searchIntent?: string;
+  gscKeywords?: GscKeyword[];
 }
 
 interface PageKeywordMapContentProps {
@@ -44,9 +52,27 @@ function getPageFolder(path: string): string {
          parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
 }
 
+function positionColor(pos: number): string {
+  if (pos <= 3) return 'text-emerald-400';
+  if (pos <= 10) return 'text-emerald-400/70';
+  if (pos <= 20) return 'text-amber-400';
+  if (pos <= 50) return 'text-amber-400/70';
+  return 'text-zinc-500';
+}
+
 export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onContentRequested }: PageKeywordMapContentProps) {
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['Blog', 'Services']));
+  const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
+
+  const togglePage = (path: string) => {
+    setExpandedPages(prev => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  };
 
   const filteredPages = useMemo(() => {
     switch (activeFilter) {
@@ -151,92 +177,139 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                     const trend = getTrendIndicator(page.currentPosition, page.previousPosition);
                     const TrendIcon = trend?.icon;
                     const isOpportunity = !page.currentPosition && (page.impressions || 0) > 0;
+                    const isExpanded = expandedPages.has(page.pagePath);
+                    const kwCount = page.gscKeywords?.length || 0;
                     
                     return (
-                      <div key={page.pagePath} className="px-4 py-2.5 hover:bg-zinc-800/20 transition-colors">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <div className="text-[11px] text-zinc-300 font-medium truncate">
-                                {page.pageTitle || page.pagePath.split('/').pop() || page.pagePath}
+                      <div key={page.pagePath} className={`transition-all ${isExpanded ? 'bg-zinc-800/20' : ''}`}>
+                        <button
+                          onClick={() => togglePage(page.pagePath)}
+                          className="w-full px-4 py-2.5 hover:bg-zinc-800/20 transition-colors text-left"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <div className="text-[11px] text-zinc-300 font-medium truncate">
+                                  {page.pageTitle || page.pagePath.split('/').pop() || page.pagePath}
+                                </div>
+                                {isOpportunity && (
+                                  <span className="text-[9px] bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/20">
+                                    Opportunity
+                                  </span>
+                                )}
                               </div>
-                              {isOpportunity && (
-                                <span className="text-[9px] bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/20">
-                                  Opportunity
+                              <div className="text-[10px] text-zinc-500 font-mono truncate">{page.pagePath}</div>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                              {page.impressions != null && page.impressions > 0 && (
+                                <span className="text-[10px] text-zinc-500">{page.impressions.toLocaleString()} imp</span>
+                              )}
+                              {page.clicks != null && page.clicks > 0 && (
+                                <span className="text-[10px] text-zinc-400">{page.clicks.toLocaleString()} clicks</span>
+                              )}
+                              {trend && TrendIcon && (
+                                <span className={`flex items-center gap-0.5 text-[10px] ${trend.color}`}>
+                                  <TrendIcon className="w-3 h-3" />
+                                  {trend.label}
                                 </span>
                               )}
+                              {page.currentPosition ? (
+                                <span className={`text-[11px] font-mono font-medium px-1.5 py-0.5 rounded bg-zinc-800 ${positionColor(page.currentPosition)}`}>
+                                  #{Math.round(page.currentPosition)}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded font-mono">&mdash;</span>
+                              )}
+                              <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
                             </div>
-                            <div className="text-[10px] text-zinc-500 font-mono truncate">{page.pagePath}</div>
                           </div>
-                          <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-                            {trend && TrendIcon && (
-                              <span className={`flex items-center gap-0.5 text-[10px] ${trend.color}`}>
-                                <TrendIcon className="w-3 h-3" />
-                                {trend.label}
-                              </span>
-                            )}
-                            {page.currentPosition ? (
-                              <span className={`text-[11px] font-mono font-medium px-1.5 py-0.5 rounded bg-zinc-800 ${
-                                page.currentPosition <= 10 ? 'text-emerald-400' : 
-                                page.currentPosition <= 20 ? 'text-amber-400' : 'text-zinc-400'
-                              }`}>
-                                #{Math.round(page.currentPosition)}
-                              </span>
-                            ) : (
-                              <span className="text-[10px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded font-mono">—</span>
-                            )}
-                          </div>
-                        </div>
-                        
-                        {/* Keywords & Metrics Row */}
-                        <div className="flex items-center justify-between mt-1.5">
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                          
+                          {/* Summary row: primary keyword + keyword count */}
+                          <div className="flex items-center gap-2 mt-1">
                             {page.primaryKeyword && (
                               <span className="text-[10px] text-teal-400/80 truncate">{page.primaryKeyword}</span>
                             )}
-                            {page.secondaryKeywords && page.secondaryKeywords.length > 0 && (
-                              <span className="text-[10px] text-zinc-600">+{page.secondaryKeywords.length}</span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            {page.impressions != null && page.impressions > 0 && (
-                              <span className="text-[10px] text-zinc-500">{page.impressions.toLocaleString()} imp</span>
-                            )}
-                            {page.clicks != null && page.clicks > 0 && (
-                              <span className="text-[10px] text-zinc-500">{page.clicks.toLocaleString()} clicks</span>
+                            {kwCount > 0 && (
+                              <span className="text-[10px] text-zinc-600 flex items-center gap-0.5">
+                                <Search className="w-2.5 h-2.5" />
+                                {kwCount} keywords
+                              </span>
                             )}
                             {page.difficulty != null && page.difficulty > 0 && (
-                              <span className={`text-[10px] ${
-                                page.difficulty <= 30 ? 'text-green-400' : 
-                                page.difficulty <= 60 ? 'text-amber-400' : 'text-red-400'
-                              }`}>
+                              <span className={`text-[10px] ${page.difficulty <= 30 ? 'text-green-400' : page.difficulty <= 60 ? 'text-amber-400' : 'text-red-400'}`}>
                                 KD {page.difficulty}
                               </span>
                             )}
                           </div>
-                        </div>
+                        </button>
 
-                        {/* Action for Opportunities */}
-                        {isOpportunity && workspaceId && (
-                          <div className="mt-2 pt-2 border-t border-zinc-800/30 flex justify-end">
-                            <button
-                              onClick={() => {
-                                post(`/api/public/content-request/${workspaceId}`, {
-                                  type: 'meeting_discussion',
-                                  targetPage: page.pagePath,
-                                  targetKeyword: page.primaryKeyword,
-                                  notes: 'Page getting impressions but not ranking - discuss optimization strategy',
-                                  priority: 'high'
-                                }).then(() => {
-                                  setToast?.('Added to meeting agenda');
-                                  onContentRequested?.();
-                                }).catch(() => setToast?.('Failed to add to agenda'));
-                              }}
-                              className="px-2 py-1 rounded text-[10px] font-medium text-zinc-300 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 transition-colors flex items-center gap-1"
-                            >
-                              <MessageCircle className="w-3 h-3" />
-                              Discuss
-                            </button>
+                        {/* Expanded: per-keyword GSC data */}
+                        {isExpanded && (
+                          <div className="px-4 pb-3">
+                            {page.gscKeywords && page.gscKeywords.length > 0 ? (
+                              <div className="rounded-lg border border-zinc-800/50 overflow-hidden">
+                                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 px-3 py-1.5 bg-zinc-950/50 border-b border-zinc-800/50 text-[9px] font-medium text-zinc-500 uppercase tracking-wider">
+                                  <span>Keyword</span>
+                                  <span className="text-right">Position</span>
+                                  <span className="text-right">Impressions</span>
+                                  <span className="text-right">Clicks</span>
+                                </div>
+                                {page.gscKeywords.map((kw, i) => (
+                                  <div key={i} className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 px-3 py-1.5 border-b border-zinc-800/30 last:border-b-0 hover:bg-zinc-800/20">
+                                    <span className="text-[11px] text-zinc-300 truncate">{kw.query}</span>
+                                    <span className={`text-[11px] font-mono text-right ${positionColor(kw.position)}`}>
+                                      {kw.position.toFixed(1)}
+                                    </span>
+                                    <span className="text-[11px] text-zinc-500 font-mono text-right">
+                                      {kw.impressions.toLocaleString()}
+                                    </span>
+                                    <span className="text-[11px] text-zinc-400 font-mono text-right">
+                                      {kw.clicks.toLocaleString()}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-[11px] text-zinc-500 py-2">
+                                {page.secondaryKeywords && page.secondaryKeywords.length > 0 ? (
+                                  <div>
+                                    <div className="text-[10px] text-zinc-400 mb-1.5">Target keywords (no GSC data yet):</div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      <span className="text-[10px] text-teal-400/80 bg-teal-500/10 border border-teal-500/20 px-2 py-0.5 rounded">{page.primaryKeyword}</span>
+                                      {page.secondaryKeywords.map((kw, i) => (
+                                        <span key={i} className="text-[10px] text-zinc-400 bg-zinc-800 border border-zinc-700/50 px-2 py-0.5 rounded">{kw}</span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <span>No keyword data available. Regenerate strategy with GSC connected to see per-keyword metrics.</span>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Action for Opportunities */}
+                            {isOpportunity && workspaceId && (
+                              <div className="mt-2 pt-2 border-t border-zinc-800/30 flex justify-end">
+                                <button
+                                  onClick={() => {
+                                    post(`/api/public/content-request/${workspaceId}`, {
+                                      type: 'meeting_discussion',
+                                      targetPage: page.pagePath,
+                                      targetKeyword: page.primaryKeyword,
+                                      notes: 'Page getting impressions but not ranking - discuss optimization strategy',
+                                      priority: 'high'
+                                    }).then(() => {
+                                      setToast?.('Added to meeting agenda');
+                                      onContentRequested?.();
+                                    }).catch(() => setToast?.('Failed to add to agenda'));
+                                  }}
+                                  className="px-2 py-1 rounded text-[10px] font-medium text-zinc-300 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 transition-colors flex items-center gap-1"
+                                >
+                                  <MessageCircle className="w-3 h-3" />
+                                  Discuss
+                                </button>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

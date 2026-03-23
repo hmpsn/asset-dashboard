@@ -25,6 +25,8 @@ export interface PageKeywordMap {
   currentPosition?: number;
   impressions?: number;
   clicks?: number;
+  // GSC per-keyword data (stored during strategy enrichment)
+  gscKeywords?: { query: string; clicks: number; impressions: number; position: number }[];
   // SEMRush enrichment
   volume?: number;
   difficulty?: number;
@@ -47,6 +49,11 @@ export interface ContentGap {
   priority: 'high' | 'medium' | 'low';
   rationale: string;       // why this content should be created
   suggestedPageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource';
+  // SEMRush enrichment
+  volume?: number;         // monthly search volume
+  difficulty?: number;     // keyword difficulty (0-100)
+  // GSC enrichment (impressions the site already gets for this keyword, even without a dedicated page)
+  impressions?: number;
 }
 
 export interface QuickWin {

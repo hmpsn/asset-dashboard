@@ -791,6 +791,11 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
           pm.currentPosition = best.position;
           pm.impressions = matchingRows.reduce((s, r) => s + r.impressions, 0);
           pm.clicks = matchingRows.reduce((s, r) => s + r.clicks, 0);
+          // Store per-keyword GSC data (top 20 by impressions)
+          pm.gscKeywords = matchingRows
+            .sort((a, b) => b.impressions - a.impressions)
+            .slice(0, 20)
+            .map(r => ({ query: r.query, clicks: r.clicks, impressions: r.impressions, position: Math.round(r.position * 10) / 10 }));
         }
       }
     }
@@ -830,13 +835,18 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
     }
 
     // If we still have keywords without volume data and SEMRush is available, bulk-fetch them
+    // Prioritize growth opportunity pages (no currentPosition) since domain_organic won't cover them
     if (isSemrushConfigured() && semrushMode !== 'none') {
-      const needsVolume = strategy.pageMap
-        .filter((pm: { volume?: number; primaryKeyword: string }) => !pm.volume)
-        .map((pm: { primaryKeyword: string }) => pm.primaryKeyword);
+      const pagesNeedingVolume = strategy.pageMap
+        .filter((pm: { volume?: number; primaryKeyword: string }) => !pm.volume);
+      // Sort: growth opportunities (no position) first, then the rest
+      pagesNeedingVolume.sort((a: { currentPosition?: number }, b: { currentPosition?: number }) =>
+        (a.currentPosition ? 1 : 0) - (b.currentPosition ? 1 : 0)
+      );
+      const needsVolume = pagesNeedingVolume.map((pm: { primaryKeyword: string }) => pm.primaryKeyword);
       if (needsVolume.length > 0) {
         try {
-          const metrics = await getKeywordOverview(needsVolume.slice(0, 30), ws.id);
+          const metrics = await getKeywordOverview(needsVolume.slice(0, 100), ws.id);
           const metricMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m]));
           for (const pm of strategy.pageMap) {
             if (!pm.volume) {
@@ -850,6 +860,67 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
           }
         } catch (err) {
           log.error({ err: err }, 'Keyword overview enrichment error');
+        }
+      }
+    }
+
+    // Enrich contentGaps with SEMRush volume/difficulty + GSC impressions
+    if (strategy.contentGaps && strategy.contentGaps.length > 0) {
+      // SEMRush: look up volume/KD from existing domain data first, then bulk-fetch missing
+      const kwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k]));
+      const missingCgKws: string[] = [];
+      for (const cg of strategy.contentGaps) {
+        const m = kwLookup.get(cg.targetKeyword.toLowerCase());
+        if (m) {
+          cg.volume = m.volume;
+          cg.difficulty = m.difficulty;
+        } else {
+          missingCgKws.push(cg.targetKeyword);
+        }
+      }
+      if (missingCgKws.length > 0 && isSemrushConfigured() && semrushMode !== 'none') {
+        try {
+          const cgMetrics = await getKeywordOverview(missingCgKws.slice(0, 30), ws.id);
+          const cgMap = new Map(cgMetrics.map(m => [m.keyword.toLowerCase(), m]));
+          for (const cg of strategy.contentGaps) {
+            if (!cg.volume) {
+              const m = cgMap.get(cg.targetKeyword.toLowerCase());
+              if (m) {
+                cg.volume = m.volume;
+                cg.difficulty = m.difficulty;
+              }
+            }
+          }
+        } catch (err) {
+          log.error({ err }, 'Content gap keyword enrichment error');
+        }
+      }
+      // GSC: check if the site already gets impressions for content gap keywords
+      if (gscData.length > 0) {
+        const gscByQuery = new Map<string, { impressions: number }>();
+        for (const row of gscData) {
+          const q = row.query.toLowerCase();
+          const existing = gscByQuery.get(q);
+          if (existing) {
+            existing.impressions += row.impressions;
+          } else {
+            gscByQuery.set(q, { impressions: row.impressions });
+          }
+        }
+        for (const cg of strategy.contentGaps) {
+          const exact = gscByQuery.get(cg.targetKeyword.toLowerCase());
+          if (exact) {
+            cg.impressions = exact.impressions;
+          } else {
+            // Partial match: sum impressions from queries containing the target keyword
+            let totalImpr = 0;
+            for (const [q, data] of gscByQuery) {
+              if (q.includes(cg.targetKeyword.toLowerCase()) || cg.targetKeyword.toLowerCase().includes(q)) {
+                totalImpr += data.impressions;
+              }
+            }
+            if (totalImpr > 0) cg.impressions = totalImpr;
+          }
         }
       }
     }

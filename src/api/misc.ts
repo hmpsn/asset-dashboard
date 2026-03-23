@@ -146,10 +146,10 @@ export const roadmap = {
 // ── Recommendations ─────────────────────────────────────────────
 export const recommendations = {
   list: (wsId: string) =>
-    getOptional<unknown>(`/api/recommendations/${wsId}`),
+    getOptional<unknown>(`/api/public/recommendations/${wsId}`),
 
   generate: (wsId: string) =>
-    post<unknown>(`/api/recommendations/${wsId}/generate`),
+    post<unknown>(`/api/public/recommendations/${wsId}/generate`),
 
   update: (wsId: string, recId: string, body: Record<string, unknown>) =>
     patch<unknown>(`/api/public/recommendations/${wsId}/${recId}`, body),

@@ -283,12 +283,15 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
         }).slice(0, 5);
 
         // Sort pages by issue count (worst first) for the cards
-        const sortedPages = [...auditDetail.audit.pages].sort((a, b) => {
-          const aErrs = a.issues.filter(i => i.severity === 'error').length;
-          const bErrs = b.issues.filter(i => i.severity === 'error').length;
-          if (aErrs !== bErrs) return bErrs - aErrs;
-          return b.issues.length - a.issues.length;
-        }).slice(0, 3);
+        // Exclude noindex pages — their issues don't affect search performance
+        const sortedPages = [...auditDetail.audit.pages]
+          .filter(p => !p.noindex)
+          .sort((a, b) => {
+            const aErrs = a.issues.filter(i => i.severity === 'error').length;
+            const bErrs = b.issues.filter(i => i.severity === 'error').length;
+            if (aErrs !== bErrs) return bErrs - aErrs;
+            return b.issues.length - a.issues.length;
+          }).slice(0, 3);
 
         return (
           <>

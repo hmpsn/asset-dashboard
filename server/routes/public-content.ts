@@ -54,6 +54,9 @@ router.get('/api/public/seo-strategy/:workspaceId', (req, res) => {
       priority: g.priority,
       rationale: g.rationale,
       suggestedPageType: g.suggestedPageType || 'blog',
+      volume: g.volume,
+      difficulty: g.difficulty,
+      impressions: g.impressions,
     })),
     quickWins: (strategy.quickWins || []).map(q => ({
       pagePath: q.pagePath,
