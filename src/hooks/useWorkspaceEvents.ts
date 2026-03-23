@@ -78,12 +78,18 @@ export function useWorkspaceEvents(
         try {
           const msg = JSON.parse(event.data);
           // Handle authentication response — subscribe after confirmed
-          if (msg.action === 'authenticated' && msg.ok) {
-            ws.send(JSON.stringify({ action: 'subscribe', workspaceId }));
-            currentSubRef.current = workspaceId;
-            const id = identityRef.current;
-            if (id) {
-              ws.send(JSON.stringify({ action: 'identify', workspaceId, ...id }));
+          if (msg.action === 'authenticated') {
+            if (msg.ok) {
+              ws.send(JSON.stringify({ action: 'subscribe', workspaceId }));
+              currentSubRef.current = workspaceId;
+              const id = identityRef.current;
+              if (id) {
+                ws.send(JSON.stringify({ action: 'identify', workspaceId, ...id }));
+              }
+            } else {
+              // Auth failed (expired/invalid token) — subscribe without auth (fallback)
+              ws.send(JSON.stringify({ action: 'subscribe', workspaceId }));
+              currentSubRef.current = workspaceId;
             }
             return;
           }

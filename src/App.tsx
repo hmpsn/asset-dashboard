@@ -343,7 +343,8 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
         return next;
       });
     }
-  }, [tab, navGroups, collapsedGroups]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
 
   // ── Sidebar navigation groups ──
   const navGroups: Array<{ label: string; groupIcon?: typeof Globe; groupColor?: string; activeBg?: string; activeText?: string; activeIcon?: string; inactiveIcon?: string; hoverBg?: string; hoverText?: string; items: Array<{ id: Page; label: string; icon: typeof Globe; desc?: string; needsSite?: boolean; hidden?: boolean }> }> = [

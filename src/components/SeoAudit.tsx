@@ -413,7 +413,8 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     }
     setAuditError(null);
     loadHistory();
-  }, [siteId, loadHistory, jobs, data, workspaceId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [siteId, loadHistory]);
 
   const handleSaveAndShare = async () => {
     if (!data) return;
