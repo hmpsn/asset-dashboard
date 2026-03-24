@@ -117,6 +117,12 @@ router.delete('/api/semrush/cache/:workspaceId', (req, res) => {
   res.json({ ok: true });
 });
 
+// GET-based cache clear (browser-friendly — just visit this URL)
+router.get('/api/semrush/clear-cache/:workspaceId', (req, res) => {
+  clearSemrushCache(req.params.workspaceId);
+  res.json({ ok: true, message: 'SEMRush cache cleared. Go back and click Refresh on Competitive Intelligence.' });
+});
+
 // --- Diagnostic: verify domain resolution + cache without calling SEMRush API ---
 router.get('/api/semrush/diagnose/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
