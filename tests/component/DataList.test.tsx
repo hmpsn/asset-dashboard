@@ -43,9 +43,9 @@ describe('DataList', () => {
     expect(screen.queryByText('3')).toBeNull();
   });
 
-  it('renders "No data" when items array is empty', () => {
+  it('renders "No data available" when items array is empty', () => {
     render(<DataList items={[]} />);
-    expect(screen.getByText('No data')).toBeInTheDocument();
+    expect(screen.getByText('No data available')).toBeInTheDocument();
   });
 
   it('renders extra content when provided', () => {
