@@ -99,7 +99,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
     if (shareOpen && workspaceId && reports.length === 0) {
       getSafe<Array<{ id: string; type: 'audit' | 'monthly'; title: string; createdAt: string; score?: number; permalink: string }>>(`/api/public/reports/${workspaceId}`, []).then(setReports);
     }
-  }, [shareOpen, workspaceId]);
+  }, [shareOpen, workspaceId, reports.length]);
 
   useEffect(() => {
     if (!shareOpen) return;

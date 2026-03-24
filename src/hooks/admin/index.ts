@@ -10,3 +10,11 @@ export { useWorkspaces, useCreateWorkspace, useDeleteWorkspace, useLinkSite, use
 export { useHealthCheck, HEALTH_KEY } from './useHealthCheck';
 export type { HealthStatus } from './useHealthCheck';
 export { useQueue, QUEUE_KEY } from './useQueue';
+
+// New React Query migration hooks
+export { useContentCalendar } from './useContentCalendar';
+export { useCmsEditor } from './useCmsEditor';
+export { useContentPipeline } from './useContentPipeline';
+export { useAnomalyAlerts } from './useAnomalyAlerts';
+export { useKeywordStrategy } from './useKeywordStrategy';
+export { useSeoEditor } from './useSeoEditor';

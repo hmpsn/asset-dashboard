@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
+import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { Clipboard, FileText, RefreshCw, Map, Bot, Download, ChevronDown, Layers, HelpCircle, X, TrendingDown } from 'lucide-react';
-import { contentBriefs, contentPosts, contentMatrices, contentDecay } from '../api/content';
+import { useContentPipeline } from '../hooks/admin';
 import { ContentBriefs } from './ContentBriefs';
 import { ContentManager } from './ContentManager';
 import { ContentSubscriptions } from './ContentSubscriptions';
@@ -57,37 +57,12 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext 
   const [guideOpen, setGuideOpen] = useState(false);
   const [decayDismissed, setDecayDismissed] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
-  const [summary, setSummary] = useState<PipelineSummary | null>(null);
-  const [decay, setDecay] = useState<DecaySummary | null>(null);
 
-  const fetchSummary = useCallback(async () => {
-    try {
-      const [briefs, posts, matrices, decayData] = await Promise.all([
-        contentBriefs.list(workspaceId).catch(() => []),
-        contentPosts.list(workspaceId).catch(() => []),
-        contentMatrices.list(workspaceId).catch(() => []),
-        contentDecay.get(workspaceId).catch(() => null),
-      ]);
-      const briefArr = Array.isArray(briefs) ? briefs : [];
-      const postArr = Array.isArray(posts) ? posts : [];
-      const matrixArr = Array.isArray(matrices) ? matrices as { cells?: { status?: string }[] }[] : [];
-      const allCells = matrixArr.flatMap(m => m.cells || []);
-      setSummary({
-        briefs: briefArr.length,
-        posts: postArr.length,
-        matrices: matrixArr.length,
-        cells: allCells.length,
-        published: allCells.filter(c => c.status === 'published').length,
-      });
-      // Decay analysis
-      const d = decayData as { summary?: DecaySummary } | null;
-      if (d?.summary && d.summary.totalDecaying > 0) {
-        setDecay(d.summary);
-      }
-    } catch (err) { console.error('ContentPipeline operation failed:', err); }
-  }, [workspaceId]);
-
-  useEffect(() => { void fetchSummary(); }, [fetchSummary]);
+  // React Query hook replaces manual data fetching
+  const { data: pipelineData, isLoading } = useContentPipeline(workspaceId);
+  
+  const summary = pipelineData?.summary;
+  const decay = pipelineData?.decay;
 
   useEffect(() => {
     if (!exportOpen) return;

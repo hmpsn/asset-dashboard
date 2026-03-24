@@ -90,6 +90,7 @@ import contentPlanReviewRoutes from './routes/content-plan-review.js';
 import siteArchitectureRoutes from './routes/site-architecture.js';
 import llmsTxtRoutes from './routes/llms-txt.js';
 import competitorSchemaRoutes from './routes/competitor-schema.js';
+import { aiStatsRoutes } from './routes/ai-stats.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -318,6 +319,7 @@ export function createApp(): express.Express {
   app.use(siteArchitectureRoutes);
   app.use(llmsTxtRoutes);
   app.use(competitorSchemaRoutes);
+  app.use('/api/ai-stats', verifyAdminToken, aiStatsRoutes);
 
   // --- Sentry error handler (must be after all route mounts, before frontend catch-all) ---
   setupSentryErrorHandler(app);

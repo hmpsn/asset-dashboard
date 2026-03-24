@@ -6,6 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { getDataDir } from './data-dir.js';
 import { createLogger } from './logger.js';
+import { aiDeduplicator } from './ai-deduplication.js';
 
 const log = createLogger('openai');
 
@@ -235,9 +236,49 @@ interface OpenAIChatResult {
 
 /**
  * Call OpenAI Chat Completions with automatic retry on 429/5xx,
- * exponential backoff, timeout, and token tracking.
+ * exponential backoff, timeout, token tracking, and request deduplication.
  */
 export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatResult> {
+  const {
+    model = 'gpt-4.1-mini',
+    messages,
+    maxTokens = 1000,
+    temperature = 0.7,
+    feature,
+    workspaceId,
+    maxRetries = 3,
+    timeoutMs = 60_000,
+  } = opts;
+
+  // Create deduplication key from request parameters
+  const { AIRequestDeduplicator } = await import('./ai-deduplication.js');
+  const dedupeKey = AIRequestDeduplicator.createKey({
+    model,
+    messages: messages.map(m => ({ role: m.role, content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) })),
+    temperature,
+    maxTokens,
+    workspaceId,
+    feature,
+  });
+
+  // Use deduplication with 5-minute cache for most requests
+  // Skip cache for one-time operations like content generation
+  const shouldSkipCache = ['content-brief', 'content-post'].includes(feature);
+  
+  return aiDeduplicator.deduplicate(
+    dedupeKey,
+    () => executeOpenAICall({ model, messages, maxTokens, temperature, feature, workspaceId, maxRetries, timeoutMs }),
+    {
+      cacheTtlMs: 5 * 60 * 1000, // 5 minutes
+      skipCache: shouldSkipCache,
+    }
+  );
+}
+
+/**
+ * Internal function that actually calls OpenAI API
+ */
+async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatResult> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY not configured');
 

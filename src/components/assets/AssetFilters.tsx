@@ -5,7 +5,7 @@
 import { Search, ChevronDown } from 'lucide-react';
 
 type SortField = 'fileName' | 'fileSize' | 'createdOn';
-type FilterType = 'all' | 'missing-alt' | 'oversized' | 'images' | 'svg' | 'unused';
+type FilterType = 'all' | 'missing-alt' | 'oversized' | 'images' | 'svg' | 'unused' | 'used';
 
 export interface AssetFiltersProps {
   search: string;
@@ -45,6 +45,7 @@ export function AssetFilters({
           <option value="images">Images</option>
           <option value="svg">SVG</option>
           <option value="unused">Unused</option>
+          <option value="used">Used</option>
         </select>
         <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
       </div>

@@ -36,7 +36,7 @@ function formatSize(bytes: number): string {
 }
 
 type SortField = 'fileName' | 'fileSize' | 'createdOn';
-type FilterType = 'all' | 'missing-alt' | 'oversized' | 'images' | 'svg' | 'unused';
+type FilterType = 'all' | 'missing-alt' | 'oversized' | 'images' | 'svg' | 'unused' | 'used';
 
 function AssetBrowser({ siteId }: Props) {
   const queryClient = useQueryClient();
@@ -90,6 +90,7 @@ function AssetBrowser({ siteId }: Props) {
       if (filter === 'images') return a.contentType?.startsWith('image/') && !a.contentType?.includes('svg');
       if (filter === 'svg') return a.contentType?.includes('svg');
       if (filter === 'unused') return unusedIds ? unusedIds.has(a.id) : false;
+      if (filter === 'used') return unusedIds ? !unusedIds.has(a.id) : true;
       return true;
     })
     .sort((a, b) => {

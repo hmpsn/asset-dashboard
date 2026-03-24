@@ -149,11 +149,14 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   useEffect(() => {
     const state = location.state as { fixContext?: FixContext } | null;
     if (state?.fixContext) {
-      setFixContext(state.fixContext);
-      // Clear the state so it doesn't re-trigger on back/forward
-      navigate(location.pathname + location.search, { replace: true, state: {} });
+      // Use setTimeout to avoid synchronous setState
+      setTimeout(() => {
+        setFixContext(state.fixContext || null);
+        // Clear the state so it doesn't re-trigger on back/forward
+        navigate(location.pathname + location.search, { replace: true, state: {} });
+      }, 0);
     }
-  }, [location.state]);
+  }, [location.state, location.pathname, location.search, navigate]);
 
   const [clipboardStatus, setClipboardStatus] = useState<string | null>(null);
   const [pendingContentRequests, setPendingContentRequests] = useState(0);
@@ -190,7 +193,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selected]);
+  }, [selected, navigate]);
 
   // Global clipboard paste handler (⌘V)
   useEffect(() => {

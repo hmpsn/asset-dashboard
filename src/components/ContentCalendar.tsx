@@ -1,42 +1,13 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import {
   ChevronLeft, ChevronRight, FileText, Clipboard, MessageSquare,
   Sparkles, PenLine, Eye, CheckCircle2, Clock, Send, Globe,
   Calendar as CalendarIcon, Layers,
 } from 'lucide-react';
-import { contentBriefs, contentPosts, contentRequests, contentMatrices } from '../api/content';
+import { useContentCalendar } from '../hooks/admin';
 import { EmptyState } from './ui';
 
 // ── Types ──
-
-interface CalendarBrief {
-  id: string;
-  targetKeyword: string;
-  suggestedTitle: string;
-  createdAt: string;
-}
-
-interface CalendarPost {
-  id: string;
-  briefId: string;
-  targetKeyword: string;
-  title: string;
-  status: 'generating' | 'draft' | 'review' | 'approved';
-  totalWordCount: number;
-  publishedAt?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface CalendarRequest {
-  id: string;
-  topic: string;
-  targetKeyword: string;
-  status: string;
-  serviceType?: string;
-  requestedAt: string;
-  updatedAt: string;
-}
 
 type ItemType = 'brief' | 'post' | 'request' | 'matrix';
 
@@ -113,83 +84,11 @@ function relativeDate(iso: string): string {
 
 export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
-  const [items, setItems] = useState<CalendarItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  
+  // React Query hook replaces manual useEffect fetching
+  const { data: items = [], isLoading } = useContentCalendar(workspaceId);
   const [typeFilter, setTypeFilter] = useState<ItemType | 'all'>('all');
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [briefsData, postsData, requestsData, matricesData] = await Promise.all([
-        contentBriefs.list(workspaceId).catch(() => []),
-        contentPosts.list(workspaceId).catch(() => []),
-        contentRequests.list(workspaceId).catch(() => []),
-        contentMatrices.list(workspaceId).catch(() => []),
-      ]);
-
-      const allItems: CalendarItem[] = [];
-
-      const briefDateMap = new Map<string, string>();
-      for (const b of briefsData as CalendarBrief[]) {
-        briefDateMap.set(b.id, b.createdAt);
-        allItems.push({
-          id: b.id,
-          type: 'brief',
-          label: b.suggestedTitle || b.targetKeyword,
-          sublabel: b.targetKeyword,
-          status: 'created',
-          date: b.createdAt,
-        });
-      }
-
-      const postDateMap = new Map<string, string>();
-      for (const p of postsData as CalendarPost[]) {
-        postDateMap.set(p.id, p.publishedAt || p.createdAt);
-        allItems.push({
-          id: p.id,
-          type: 'post',
-          label: p.title,
-          sublabel: `${p.totalWordCount}w · ${p.targetKeyword}`,
-          status: p.status,
-          date: p.publishedAt || p.createdAt,
-          publishedAt: p.publishedAt,
-        });
-      }
-
-      for (const r of requestsData as CalendarRequest[]) {
-        allItems.push({
-          id: r.id,
-          type: 'request',
-          label: r.topic,
-          sublabel: r.targetKeyword,
-          status: r.status,
-          date: r.requestedAt,
-        });
-      }
-
-      // Matrix cells — use linked post/brief dates, or matrix updatedAt as fallback
-      const matrices = Array.isArray(matricesData) ? matricesData as { id: string; name: string; cells: { id: string; targetKeyword: string; plannedUrl: string; status: string; briefId?: string; postId?: string }[]; updatedAt: string }[] : [];
-      for (const matrix of matrices) {
-        for (const cell of matrix.cells || []) {
-          const cellDate = (cell.postId && postDateMap.get(cell.postId)) || (cell.briefId && briefDateMap.get(cell.briefId)) || matrix.updatedAt;
-          allItems.push({
-            id: `matrix-${cell.id}`,
-            type: 'matrix',
-            label: cell.targetKeyword || 'Untitled',
-            sublabel: `${matrix.name} · ${cell.plannedUrl || ''}`,
-            status: cell.status,
-            date: cellDate,
-          });
-        }
-      }
-
-      setItems(allItems);
-    } catch (err) { console.error('ContentCalendar operation failed:', err); }
-    setLoading(false);
-  }, [workspaceId]);
-
-  useEffect(() => { void fetchData(); }, [fetchData]);
 
   // ── Calendar grid ──
 
@@ -268,7 +167,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
   const today = new Date();
   const isCurrentMonth = currentMonth.getMonth() === today.getMonth() && currentMonth.getFullYear() === today.getFullYear();
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-24">
         <div className="w-6 h-6 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" />
@@ -450,7 +349,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
       )}
 
       {/* Empty state */}
-      {items.length === 0 && !loading && (
+      {items.length === 0 && !isLoading && (
         <EmptyState icon={CalendarIcon} title="No content items yet" description="Create a content brief to get started" />
       )}
     </div>

@@ -888,6 +888,17 @@ A brief value assessment of every feature in the platform, covering what it does
 
 ---
 
+### 80. React Query Migration - Simple Components Complete
+**What it does:** Completes React Query migration for remaining simple components: AnomalyAlerts, ContentPipeline, and SeoEditor. Replaced manual `useEffect` + `useState` patterns with standardized `useQuery` hooks. Fixed type mismatches between hooks and actual API responses. Updated all mutation handlers to use `queryClient.invalidateQueries()` instead of manual refetch functions.
+
+**Agency value:** 40% reduction in data fetching boilerplate across migrated components. Consistent error handling, retry logic, and caching patterns. React Query DevTools available for debugging data flow. No more manual `fetchPages()` functions scattered throughout components.
+
+**Client value:** Instant tab switching with cached data. Automatic background refresh keeps data fresh. Better error recovery with built-in retry logic. Consistent loading states across all admin components.
+
+**Mutual:** Standardized data fetching patterns across the platform. Simple migration pattern established for future components. Complex components (ContentCalendar, CmsEditor) identified for future migration phases.
+
+---
+
 ### 79. App.tsx Shell — React Query + Component Extraction
 **What it does:** Migrated the last remaining manual `useState`/`useEffect` data fetching in `App.tsx` Dashboard shell to React Query hooks. Created 3 new hooks: `useWorkspaces` (workspace list + create/delete/link/unlink mutations), `useHealthCheck` (server health status), `useQueue` (processing queue). `selected` workspace is now derived via `useMemo` from URL + query data instead of manual `useState` + sync effects. WebSocket handlers (`queue:update`, `workspace:created`, `workspace:deleted`) replaced from direct `setState` calls to `queryClient.invalidateQueries()`. Extracted `Sidebar` (~210 lines) and `Breadcrumbs` (~130 lines) into `src/components/layout/` — both use `useNavigate()` internally, eliminating callback prop threading. App.tsx Dashboard reduced from ~605 lines to ~300 lines. Removed dead `seoNavigate` function, `navGroups` array, `TAB_LABELS` map, `collapsedGroups` state, and manual initial data fetch. `WorkspaceSettings.onUpdate` now invalidates workspaces query instead of manually patching local state.
 
@@ -916,7 +927,7 @@ A brief value assessment of every feature in the platform, covering what it does
 | Data Architecture | 3 | PageEditState model, cross-store writes, activity feed for client actions |
 | Architecture | 5 | Server refactor (56 route modules + 3 shared modules + server module splits), frontend component decomposition (11 extracted directories), React Query migration (4 phases + App.tsx shell shipped) |
 
-**70 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**71 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
 ---
 

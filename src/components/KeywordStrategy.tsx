@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { KeywordAnalysis } from './KeywordAnalysis';
 import { StatCard, AIContextIndicator } from './ui';
+import { useKeywordStrategy } from '../hooks/admin';
 import { BacklinkProfile } from './strategy/BacklinkProfile';
 import { CompetitiveIntel } from './strategy/CompetitiveIntel';
 import { PageKeywordMapPanel } from './strategy/PageKeywordMap';
@@ -114,10 +115,11 @@ type StrategyTab = 'strategy' | 'analysis';
 export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<StrategyTab>('strategy');
-  const [strategy, setStrategy] = useState<KeywordStrategy | null>(null);
-  const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // React Query hook replaces manual data fetching
+  const { data: strategy, isLoading: loading } = useKeywordStrategy(workspaceId);
   const [expandedPages, setExpandedPages] = useState<Set<number>>(new Set());
   const [editingPage, setEditingPage] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<{ primary: string; secondary: string }>({ primary: '', secondary: '' });
@@ -150,24 +152,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
     complete: 'Complete',
   };
 
-  const fetchStrategy = async () => {
-    if (!workspaceId) return;
-    setLoading(true);
-    try {
-      const data = await keywords.webflowStrategy(workspaceId) as KeywordStrategy & { siteKeywords?: string[] };
-      if (data && data.siteKeywords) {
-        setStrategy(data);
-      }
-    } catch (err) {
-      console.error('KeywordStrategy operation failed:', err);
-      // No strategy yet
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { fetchStrategy(); }, [workspaceId]);
-
+  
   // Check SEMRush availability
   useEffect(() => {
     keywords.semrushStatus().then(d => {

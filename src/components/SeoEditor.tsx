@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
-import { get, put, post } from '../api/client';
+import { put, post } from '../api/client';
+import { useQueryClient } from '@tanstack/react-query';
 import {
-  Loader2, Upload, ChevronDown, ChevronRight,
-  Check, AlertCircle, Wand2, AlertTriangle,
+  Loader2, Upload, Check, AlertCircle, Wand2,
 } from 'lucide-react';
 import type { FixContext } from '../App';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { usePageEditStates } from '../hooks/usePageEditStates';
+import { useSeoEditor } from '../hooks/admin';
 import { StatusBadge } from './ui/StatusBadge';
 import { PageEditRow } from './editor/PageEditRow';
 import { BulkOperations } from './editor/BulkOperations';
@@ -35,8 +36,11 @@ interface Props {
 
 export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const { forPage: recsForPage, loaded: recsLoaded } = useRecommendations(workspaceId);
-  const [pages, setPages] = useState<PageMeta[]>([]);  
-  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
+  
+  // React Query hook replaces manual data fetching
+  const { data: pages = [], isLoading: loading } = useSeoEditor(siteId);
+  
   const [edits, setEdits] = useState<Record<string, EditState>>({});
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState<Set<string>>(new Set());
@@ -66,29 +70,18 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
   const [bulkSource, setBulkSource] = useState<'pattern' | 'ai'>('pattern');
 
-  const fetchPages = async () => {
-    setLoading(true);
-    try {
-      const data = await get<PageMeta[]>(`/api/webflow/pages/${siteId}`);
-      setPages(data);
-      const editMap: Record<string, EditState> = {};
-      for (const p of data) {
-        editMap[p.id] = {
-          seoTitle: p.seo?.title || '',
-          seoDescription: p.seo?.description || '',
-          dirty: false,
-        };
-      }
-      setEdits(editMap);
-    } catch (err) {
-      console.error('SeoEditor operation failed:', err);
-      setPages([]);
-    } finally {
-      setLoading(false);
+  // Update edits when pages data changes from React Query
+  useEffect(() => {
+    const editMap: Record<string, EditState> = {};
+    for (const p of pages) {
+      editMap[p.id] = {
+        seoTitle: p.seo?.title || '',
+        seoDescription: p.seo?.description || '',
+        dirty: false,
+      };
     }
-  };
-
-  useEffect(() => { fetchPages(); }, [siteId]); // fetchPages is stable — only reads siteId from closure
+    setEdits(editMap);
+  }, [pages]);
 
   // Auto-expand target page from audit Fix→
   const fixConsumed = useRef(false);
@@ -215,7 +208,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       });
       const applied = data.results?.filter((r: { applied: boolean }) => r.applied).length || 0;
       setBulkResults(`AI generated ${field === 'title' ? 'titles' : 'descriptions'} for ${applied} of ${pagesNeedingFix.length} pages and pushed to Webflow.`);
-      fetchPages();
+      queryClient.invalidateQueries({ queryKey: ['seo-editor', siteId] });
       setTimeout(() => setBulkResults(null), 5000);
     } catch (err) {
       console.error('SeoEditor operation failed:', err);
@@ -273,7 +266,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       );
       const applied = data.results?.filter(r => r.applied).length || 0;
       setBulkResults(`Pattern applied to ${applied}/${bulkPreview.length} pages.`);
-      fetchPages();
+      queryClient.invalidateQueries({ queryKey: ['seo-editor', siteId] });
     } catch { setBulkResults('Pattern apply failed.'); }
     finally { setBulkMode('idle'); setBulkPreview([]); setPatternText(''); setTimeout(() => setBulkResults(null), 5000); }
   };
@@ -302,7 +295,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       } else {
         const applied = data.results?.filter(r => r.applied).length || 0;
         setBulkResults(`AI rewrote ${applied}/${selectedPages.length} ${field === 'title' ? 'titles' : 'descriptions'}.`);
-        fetchPages();
+        queryClient.invalidateQueries({ queryKey: ['seo-editor', siteId] });
         setBulkMode('idle');
         setTimeout(() => setBulkResults(null), 5000);
       }
@@ -324,7 +317,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         setBulkProgress(prev => ({ ...prev, done: prev.done + 1 }));
       }
       setBulkResults(`Applied ${bulkPreview.length} ${bulkField === 'title' ? 'title' : 'description'} changes.`);
-      fetchPages();
+      queryClient.invalidateQueries({ queryKey: ['seo-editor', siteId] });
     } catch { setBulkResults('Apply failed.'); }
     finally { setBulkMode('idle'); setBulkPreview([]); setTimeout(() => setBulkResults(null), 5000); }
   };

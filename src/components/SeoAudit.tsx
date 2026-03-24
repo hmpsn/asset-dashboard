@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { post, put, del, getSafe, getOptional } from '../api/client';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
@@ -9,7 +8,7 @@ import {
   Loader2, ChevronDown, ChevronRight,
   CheckCircle, Globe, FileText,
   X, Clock, Share2, Copy, ExternalLink,
-  TrendingDown, Sparkles, EyeOff,
+  TrendingDown, Sparkles, EyeOff, AlertTriangle,
 } from 'lucide-react';
 import { StatCard, scoreColorClass, scoreBgBarClass } from './ui';
 import { StatusBadge } from './ui/StatusBadge';
@@ -41,7 +40,6 @@ interface Props {
 type AuditSubTab = 'audit' | 'links' | 'history' | 'aeo-review' | 'content-decay';
 
 function SeoAudit({ siteId, workspaceId, siteName }: Props) {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { startJob, jobs } = useBackgroundTasks();
   const auditJobId = useRef<string | null>(null);
@@ -340,6 +338,12 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     }
   };
 
+  const loadHistory = useCallback(() => {
+    getSafe<SnapshotSummary[]>(`/api/reports/${siteId}/history`, [])
+      .then(h => setHistory(Array.isArray(h) ? h : []))
+      .catch(() => {});
+  }, [siteId]);
+
   // Watch for audit job completion via WebSocket-driven jobs array
   useEffect(() => {
     if (!auditJobId.current) return;
@@ -360,13 +364,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
       setLoading(false);
       auditJobId.current = null;
     }
-  }, [jobs]);
-
-  const loadHistory = useCallback(() => {
-    getSafe<SnapshotSummary[]>(`/api/reports/${siteId}/history`, [])
-      .then(h => setHistory(Array.isArray(h) ? h : []))
-      .catch(() => {});
-  }, [siteId]);
+  }, [jobs, loadHistory]);
 
   useEffect(() => {
     // Check for existing completed or running seo-audit job for this site
@@ -398,8 +396,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     }
     setAuditError(null);
     loadHistory();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [siteId, loadHistory]);
+  }, [siteId, loadHistory, data, jobs, workspaceId]);
 
   const handleSaveAndShare = async () => {
     if (!data) return;

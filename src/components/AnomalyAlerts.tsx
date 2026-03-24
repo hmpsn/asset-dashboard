@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { AlertTriangle, TrendingUp, TrendingDown, Activity, X, Check, RefreshCw, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
+import { useAnomalyAlerts } from '../hooks/admin';
 import { get, post } from '../api/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface Anomaly {
   id: string;
@@ -73,52 +75,45 @@ function timeAgo(dateStr: string): string {
 }
 
 export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }: AnomalyAlertsProps) {
-  const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
-  const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
+  const queryClient = useQueryClient();
 
-  const fetchAnomalies = useCallback(async () => {
-    try {
-      const endpoint = isAdmin
-        ? `/api/anomalies/${workspaceId}`
-        : `/api/public/anomalies/${workspaceId}`;
-      const data = await get<Anomaly[]>(endpoint);
-      setAnomalies(Array.isArray(data) ? data : []);
-    } catch (err) { console.error('AnomalyAlerts operation failed:', err); }
-    finally { setLoading(false); }
-  }, [workspaceId, isAdmin]);
-
-  useEffect(() => { fetchAnomalies(); }, [fetchAnomalies]);
+  // React Query hook replaces manual useEffect fetching
+  const { data: anomalies = [], isLoading, error } = useAnomalyAlerts(workspaceId, isAdmin);
 
   useWorkspaceEvents(workspaceId, {
-    'anomalies:update': () => fetchAnomalies(),
+    'anomalies:update': () => {
+      queryClient.invalidateQueries({ queryKey: ['anomaly-alerts', workspaceId] });
+    },
   });
 
   const handleDismiss = async (id: string) => {
     try {
       await post(`/api/anomalies/${id}/dismiss`);
-      setAnomalies(prev => prev.filter(a => a.id !== id));
+      queryClient.invalidateQueries({ queryKey: ['anomaly-alerts', workspaceId] });
     } catch (err) { console.error('AnomalyAlerts operation failed:', err); }
   };
 
   const handleAcknowledge = async (id: string) => {
     try {
       await post(`/api/anomalies/${id}/acknowledge`);
-      setAnomalies(prev => prev.map(a => a.id === id ? { ...a, acknowledgedAt: new Date().toISOString() } : a));
+      queryClient.invalidateQueries({ queryKey: ['anomaly-alerts', workspaceId] });
     } catch (err) { console.error('AnomalyAlerts operation failed:', err); }
+  };
+
+  const handleRefresh = async () => {
+    queryClient.invalidateQueries({ queryKey: ['anomaly-alerts', workspaceId] });
   };
 
   const handleScan = async () => {
-    setLoading(true);
     try {
       await post('/api/anomalies/scan');
-      await fetchAnomalies();
+      await handleRefresh();
     } catch (err) { console.error('AnomalyAlerts operation failed:', err); }
-    finally { setLoading(false); }
   };
 
-  if (loading && anomalies.length === 0) return null;
+  if (isLoading && anomalies.length === 0) return null;
   if (anomalies.length === 0) return null;
 
   const critical = anomalies.filter(a => a.severity === 'critical');
@@ -168,9 +163,9 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
           {collapsed ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
         </button>
         {isAdmin && (
-          <button onClick={handleScan} disabled={loading} title="Re-scan now"
+          <button onClick={handleScan} disabled={isLoading} title="Re-scan now"
             className="p-1 text-zinc-500 hover:text-zinc-300 transition-colors disabled:opacity-50">
-            <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
         )}
       </div>
