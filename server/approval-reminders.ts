@@ -2,6 +2,7 @@ import { listWorkspaces, getClientPortalUrl } from './workspaces.js';
 import { listBatches } from './approvals.js';
 import { isEmailConfigured, sendEmail } from './email.js';
 import { renderApprovalReminder } from './email-templates.js';
+import { canSend, recordSend } from './email-throttle.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('approval-reminder');
@@ -49,9 +50,17 @@ async function checkStaleApprovals() {
 
       const dashUrl = getClientPortalUrl(ws);
 
+      // Throttle: respect global daily cap
+      const throttle = canSend(ws.clientEmail, 'action');
+      if (!throttle.allowed) {
+        log.info(`Throttled approval reminder to ${ws.clientEmail}: ${throttle.reason}`);
+        continue;
+      }
+
       log.info(`Sending reminder for batch "${batch.name}" to ${ws.clientEmail} (${staleDays} days stale)`);
       try {
         await sendApprovalReminderEmail(ws.clientEmail, ws.name, batch.name, pendingItems.length, staleDays, dashUrl);
+        recordSend(ws.clientEmail, 'action', 'approval_reminder', ws.id, 1);
         sentReminders.set(batch.id, now);
       } catch (err) {
         log.error({ err: err }, `Failed to send:`);

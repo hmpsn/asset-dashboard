@@ -7,6 +7,7 @@ import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 import { addActivity } from '../activity-log.js';
+import { canSend, recordSend } from '../email-throttle.js';
 import {
   createBatch,
   listBatches,
@@ -123,12 +124,19 @@ router.post('/api/approvals/:workspaceId/:batchId/remind', requireWorkspaceAcces
   const staleDays = Math.max(1, Math.floor((Date.now() - new Date(batch.createdAt).getTime()) / 86400000));
   const dashUrl = getClientPortalUrl(ws);
 
+  // Throttle check
+  const throttle = canSend(ws.clientEmail, 'action');
+  if (!throttle.allowed) {
+    return res.status(429).json({ error: `Email throttled: ${throttle.reason}. Try again tomorrow.` });
+  }
+
   try {
     const { renderApprovalReminder } = await import('../email-templates.js');
     const { isEmailConfigured, sendEmail } = await import('../email.js');
     if (!isEmailConfigured()) return res.status(400).json({ error: 'Email not configured' });
     const { subject, html } = renderApprovalReminder({ workspaceName: ws.name, batchName: batch.name, pendingCount: pendingItems.length, staleDays, dashboardUrl: dashUrl });
     await sendEmail(ws.clientEmail, subject, html);
+    recordSend(ws.clientEmail, 'action', 'approval_reminder', workspaceId, 1);
     log.info({ workspaceId, batchId, clientEmail: ws.clientEmail }, 'Manual approval reminder sent');
     res.json({ ok: true, sentTo: ws.clientEmail });
   } catch (err) {

@@ -3041,6 +3041,15 @@
           "priority": "P2",
           "notes": "Shipped — useWorkspaces (6), useHealthCheck (3), useQueue (3), Sidebar (12), Breadcrumbs (13). All 37 pass. First hook tests in codebase using renderHook + QueryClientProvider.",
           "status": "done"
+        },
+        {
+          "id": 339,
+          "title": "Email throttle & anti-spam system — per-category rate limits + morning digest",
+          "source": "INTERNAL",
+          "est": "2h",
+          "priority": "P1",
+          "notes": "Shipped — status emails: 1/day morning digest at 9am ET. Audit emails: max 1/14 days. Action emails: max 3/day. Alert emails: max 1/day. Global cap: 5 non-transactional/day per client. Transactional (password reset, welcome, trial) never throttled. SQLite email_sends table with 30-day auto-cleanup. Integrated into batching queue, approval reminders, manual remind endpoint (429 if throttled), monthly reports.",
+          "status": "done"
         }
       ]
     }

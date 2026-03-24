@@ -5,6 +5,7 @@ import { listActivity } from './activity-log.js';
 import { listRequests } from './requests.js';
 import { listBatches } from './approvals.js';
 import { isEmailConfigured, sendEmail } from './email.js';
+import { recordSend } from './email-throttle.js';
 import { renderMonthlyReport } from './email-templates.js';
 import { getSearchPeriodComparison } from './search-console.js';
 import { getGA4PeriodComparison } from './google-analytics.js';
@@ -211,6 +212,7 @@ async function sendMonthlyReportEmail(ws: Workspace, data: MonthlyData) {
     trialDaysRemaining,
   });
   await sendEmail(ws.clientEmail, subject, html);
+  recordSend(ws.clientEmail, 'report', 'monthly_report', ws.id, 1);
 }
 
 async function checkAndSendReports() {
@@ -279,6 +281,7 @@ export async function triggerMonthlyReport(workspaceId: string): Promise<{ sent:
   const reportId = saveMonthlyReport(workspaceId, ws.name, html, data);
   if (ws.clientEmail && isEmailConfigured()) {
     await sendMonthlyReportEmail(ws, data);
+    recordSend(ws.clientEmail, 'report', 'monthly_report', workspaceId, 1);
     return { sent: true, html, reportId };
   }
   return { sent: false, html, reportId };

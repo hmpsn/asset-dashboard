@@ -1,4 +1,5 @@
 import { initEmailQueue } from './email.js';
+import { startThrottleCleanup } from './email-throttle.js';
 import { startScheduler } from './scheduled-audits.js';
 import { startApprovalReminders } from './approval-reminders.js';
 import { startMonthlyReports } from './monthly-report.js';
@@ -11,6 +12,7 @@ import { startAnomalyDetection } from './anomaly-detection.js';
 /** Start all background schedulers and queues. */
 export function startSchedulers() {
   initEmailQueue();
+  startThrottleCleanup();
   startScheduler();
   startApprovalReminders();
   startMonthlyReports();

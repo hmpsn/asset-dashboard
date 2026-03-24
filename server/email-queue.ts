@@ -11,6 +11,13 @@ import fs from 'fs';
 import path from 'path';
 import { getDataDir } from './data-dir.js';
 import { renderDigest, type EmailEvent, type EmailEventType } from './email-templates.js';
+import {
+  getThrottleCategory,
+  canSend,
+  recordSend,
+  msUntilMorning,
+  isOverdueForMorning,
+} from './email-throttle.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('email-queue');
@@ -87,6 +94,16 @@ async function flushBucket(key: string) {
   const events = [...bucket.events];
   const recipient = events[0].recipient;
   const type = events[0].type;
+  const category = getThrottleCategory(type);
+
+  // ── Throttle check ──
+  const throttle = canSend(recipient, category);
+  if (!throttle.allowed) {
+    log.info(`Throttled ${type} to ${recipient}: ${throttle.reason} (${events.length} event${events.length !== 1 ? 's' : ''} dropped)`);
+    buckets.delete(key);
+    persistQueue();
+    return;
+  }
 
   // Clear bucket before sending (so new events during send get a fresh batch)
   buckets.delete(key);
@@ -105,6 +122,8 @@ async function flushBucket(key: string) {
     }
     const ok = await sendFn(recipient, subject, html);
     if (ok) {
+      // Record send for throttle tracking
+      recordSend(recipient, category, type, events[0].workspaceId, events.length);
       log.info(`Sent batched ${type} email to ${recipient} (${events.length} event${events.length !== 1 ? 's' : ''})`);
     } else {
       log.error(`Failed to send ${type} email to ${recipient}`);
@@ -132,9 +151,17 @@ export function queueEmail(event: EmailEvent) {
 
   // Reset the batch timer on each new event (sliding window)
   if (bucket.timer) clearTimeout(bucket.timer);
-  bucket.timer = setTimeout(() => flushBucket(key), BATCH_WINDOW_MS);
 
-  log.info(`Queued ${event.type} for ${event.recipient} (${bucket.events.length} in batch, flushing in ${BATCH_WINDOW_MS / 1000}s)`);
+  // Status events use a longer window — held until next morning digest
+  const category = getThrottleCategory(event.type);
+  const delay = category === 'status' ? msUntilMorning() : BATCH_WINDOW_MS;
+
+  bucket.timer = setTimeout(() => flushBucket(key), delay);
+
+  const delayLabel = delay > 60 * 60 * 1000
+    ? `${Math.round(delay / (60 * 60 * 1000))}h (morning digest)`
+    : `${Math.round(delay / 1000)}s`;
+  log.info(`Queued ${event.type} for ${event.recipient} (${bucket.events.length} in batch, flushing in ${delayLabel})`);
 }
 
 /**
@@ -160,8 +187,24 @@ export function restoreQueue() {
 
   log.info(`Restoring ${events.length} persisted event(s)`);
   for (const event of events) {
-    queueEmail(event);
+    // Status events that missed their morning window get sent soon instead of waiting another day
+    const cat = getThrottleCategory(event.type);
+    if (cat === 'status' && event.createdAt && isOverdueForMorning(event.createdAt)) {
+      const key = bucketKey(event.recipient, event.type, event.workspaceId);
+      let bucket = buckets.get(key);
+      if (!bucket) {
+        bucket = { key, events: [], timer: null };
+        buckets.set(key, bucket);
+      }
+      bucket.events.push(event);
+      if (bucket.timer) clearTimeout(bucket.timer);
+      bucket.timer = setTimeout(() => flushBucket(key), BATCH_WINDOW_MS);
+      log.info(`Restored overdue status event for ${event.recipient} (sending in ${BATCH_WINDOW_MS / 1000}s)`);
+    } else {
+      queueEmail(event);
+    }
   }
+  persistQueue();
 }
 
 /**

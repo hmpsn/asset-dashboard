@@ -166,7 +166,7 @@ function deriveLogoUrl(dashUrl?: string): string | undefined {
   if (!dashUrl) return undefined;
   try {
     const u = new URL(dashUrl);
-    return `${u.origin}/logo.svg`;
+    return `${u.origin}/hmpsn-studio-logo-wordmark-navy.png`;
   } catch { return undefined; }
 }
 
