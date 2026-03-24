@@ -404,6 +404,17 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
           const name = String(item.fieldData['name'] || '').toLowerCase();
           const slug = String(item.fieldData['slug'] || '').toLowerCase();
           return name.includes(q) || slug.includes(q);
+        }).sort((a, b) => {
+          const seoFields = coll.seoFields.filter(f => f.slug !== 'name' && f.slug !== 'slug');
+          const tf = seoFields.find(f => f.slug.includes('title'));
+          const df = seoFields.find(f => f.slug.includes('description') || f.slug.includes('desc'));
+          const scoreA = (!String(a.fieldData['name'] || '').trim() ? 3 : 0)
+            + (tf && !String(a.fieldData[tf.slug] || '').trim() ? 2 : 0)
+            + (df && !String(a.fieldData[df.slug] || '').trim() ? 2 : 0);
+          const scoreB = (!String(b.fieldData['name'] || '').trim() ? 3 : 0)
+            + (tf && !String(b.fieldData[tf.slug] || '').trim() ? 2 : 0)
+            + (df && !String(b.fieldData[df.slug] || '').trim() ? 2 : 0);
+          return scoreB - scoreA;
         });
         if (filteredItems.length === 0 && search) return null;
         const isExpanded = expandedCollections.has(coll.collectionId);

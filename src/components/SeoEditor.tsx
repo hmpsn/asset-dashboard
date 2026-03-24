@@ -408,6 +408,10 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     if (!search) return true;
     const q = search.toLowerCase();
     return p.title.toLowerCase().includes(q) || (p.slug || '').toLowerCase().includes(q);
+  }).sort((a, b) => {
+    const scoreA = (!a.seo?.title ? 2 : 0) + (!a.seo?.description ? 2 : 0) + (recsLoaded ? recsForPage(a.slug).filter((r: { type: string }) => r.type === 'metadata').length : 0);
+    const scoreB = (!b.seo?.title ? 2 : 0) + (!b.seo?.description ? 2 : 0) + (recsLoaded ? recsForPage(b.slug).filter((r: { type: string }) => r.type === 'metadata').length : 0);
+    return scoreB - scoreA;
   });
 
   if (loading) {

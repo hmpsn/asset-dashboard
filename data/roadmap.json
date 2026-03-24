@@ -2930,6 +2930,24 @@
           "priority": "P0",
           "notes": "Shipped — Upvote/downvote arrows on content gap cards. Votes stored per-workspace per-keyword in SQLite. Signals topic priority to agency. Migration 021.",
           "status": "done"
+        },
+        {
+          "id": 327,
+          "title": "CMS SEO Editor issue highlighting (match static editor)",
+          "source": "USER REQUEST",
+          "est": "1h",
+          "priority": "P1",
+          "notes": "Shipped — Color-coded left borders (amber for issues, status-based for tracking). 'No title'/'No desc' badges on collapsed rows. Collection-level issue counts. Character count color coding on Name field. Unsaved badge. Matches PageEditRow pattern from static editor.",
+          "status": "done"
+        },
+        {
+          "id": 328,
+          "title": "SEMRush domain www. fix + credit-exhausted circuit breaker",
+          "source": "BUG FIX",
+          "est": "1h",
+          "priority": "P0",
+          "notes": "Shipped — cleanDomainForSemrush() strips www. prefix from all 6 domain-based functions. Circuit breaker pauses calls for 5min when credits exhausted. Diagnostic + cache-clear endpoints added.",
+          "status": "done"
         }
       ]
     }

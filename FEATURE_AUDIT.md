@@ -789,6 +789,28 @@ A brief value assessment of every feature in the platform, covering what it does
 
 ---
 
+### 70. CMS SEO Editor Issue Highlighting
+**What it does:** The CMS SEO Editor now matches the static page SEO editor's color-highlight system. Item rows show color-coded left borders (amber for SEO issues, status-colored for tracking state). Collapsed rows display "No title" (amber) and "No desc" (red) badges. Collection headers surface aggregate issue counts (missing names, SEO titles, meta descriptions). Character counts on Name and SEO fields use green/amber/red color coding with target thresholds. Unsaved changes shown as blue badges. Untitled items rendered in red italic.
+
+**Agency value:** At-a-glance visual scanning of CMS collection health — immediately see which items need attention without expanding every row. Same mental model as the static page editor.
+
+**Client value:** N/A (admin-only view).
+
+**Mutual:** Consistency across both SEO editors reduces cognitive load and speeds up bulk editing workflows.
+
+---
+
+### 71. SEMRush Domain Fix + Credit-Exhausted Circuit Breaker
+**What it does:** Fixed competitive intelligence showing all zeros by stripping `www.` prefix from domains before SEMRush API queries (SEMRush treats `www.domain.com` and `domain.com` as distinct). Added a shared `cleanDomainForSemrush()` helper applied to all 6 domain-based functions. Also added a credit-exhausted circuit breaker: when any SEMRush call returns "API UNITS BALANCE IS ZERO", all further calls pause for 5 minutes (cached results still served). Diagnostic and cache-clear endpoints added for debugging.
+
+**Agency value:** Competitive intelligence data actually works. Circuit breaker prevents burning API calls when credits run out — no more floods of failed requests in logs.
+
+**Client value:** Accurate competitor data in the dashboard when viewing competitive intelligence.
+
+**Mutual:** Reliable data + smart API usage = better ROI on SEMRush subscription.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
