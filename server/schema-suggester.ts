@@ -34,7 +34,7 @@ export interface SchemaSuggestion {
 }
 
 // Page type hints for tailored schema generation
-export type SchemaPageType = 'auto' | 'homepage' | 'pillar' | 'service' | 'audience' | 'lead-gen' | 'blog' | 'about' | 'contact' | 'location' | 'product' | 'partnership' | 'faq' | 'case-study' | 'comparison' | 'generic';
+export type SchemaPageType = 'auto' | 'homepage' | 'pillar' | 'service' | 'audience' | 'lead-gen' | 'blog' | 'about' | 'contact' | 'location' | 'product' | 'partnership' | 'faq' | 'case-study' | 'comparison' | 'author' | 'generic';
 
 export const PAGE_TYPE_LABELS: Record<SchemaPageType, string> = {
   auto: 'Auto-detect',
@@ -52,6 +52,7 @@ export const PAGE_TYPE_LABELS: Record<SchemaPageType, string> = {
   faq: 'FAQ',
   'case-study': 'Case Study',
   comparison: 'Comparison',
+  author: 'Author Profile',
   generic: 'General Page',
 };
 
@@ -59,19 +60,20 @@ export const PAGE_TYPE_LABELS: Record<SchemaPageType, string> = {
 export const PAGE_TYPE_SCHEMA_MAP: Record<SchemaPageType, { primary: string[]; secondary: string[] }> = {
   auto: { primary: [], secondary: [] },
   homepage: { primary: ['Organization', 'WebSite'], secondary: ['SiteNavigationElement'] },
-  pillar: { primary: ['Article', 'CollectionPage'], secondary: ['BreadcrumbList'] },
+  pillar: { primary: ['Article', 'CollectionPage'], secondary: ['Person', 'BreadcrumbList'] },
   service: { primary: ['Service'], secondary: ['Offer', 'BreadcrumbList'] },
   audience: { primary: ['WebPage'], secondary: ['BreadcrumbList'] },
   'lead-gen': { primary: ['WebPage'], secondary: ['BreadcrumbList'] },
-  blog: { primary: ['BlogPosting'], secondary: ['BreadcrumbList', 'speakable'] },
+  blog: { primary: ['BlogPosting'], secondary: ['Person', 'BreadcrumbList', 'speakable'] },
   about: { primary: ['AboutPage', 'Organization'], secondary: ['Person', 'BreadcrumbList'] },
   contact: { primary: ['ContactPage'], secondary: ['Organization', 'BreadcrumbList'] },
   location: { primary: ['LocalBusiness'], secondary: ['Place', 'GeoCoordinates', 'BreadcrumbList'] },
   product: { primary: ['Product'], secondary: ['Offer', 'AggregateRating', 'BreadcrumbList'] },
   partnership: { primary: ['WebPage'], secondary: ['Organization', 'BreadcrumbList'] },
   faq: { primary: ['FAQPage'], secondary: ['BreadcrumbList'] },
-  'case-study': { primary: ['Article'], secondary: ['CreativeWork', 'BreadcrumbList'] },
+  'case-study': { primary: ['Article'], secondary: ['Person', 'CreativeWork', 'BreadcrumbList'] },
   comparison: { primary: ['WebPage'], secondary: ['ItemList', 'BreadcrumbList'] },
+  author: { primary: ['Person', 'ProfilePage'], secondary: ['BreadcrumbList'] },
   generic: { primary: ['WebPage'], secondary: ['BreadcrumbList'] },
 };
 
@@ -1023,6 +1025,14 @@ function getPageTypeInstructions(pageType: SchemaPageType | undefined, siteUrl: 
 - Use WebPage with "about": {"@id": "..."} referencing the canonical product entity — do NOT create a duplicate Service/SoftwareApplication
 - Include "mentions" for competitor products if named, using minimal Thing or SoftwareApplication nodes with just name + url
 - BreadcrumbList: Home → [Comparisons] → Page Title`,
+
+    author: `PAGE TYPE INSTRUCTIONS (Author Profile):
+- MUST include Person as mainEntity with: name, jobTitle, description, image, sameAs (LinkedIn, Twitter, personal site from page content)
+- Include ProfilePage as WebPage @type (use "@type": ["WebPage", "ProfilePage"]) with "mainEntity": {"@id": "#person"}
+- If expertise areas/specialties are mentioned, include "knowsAbout" array with specific topics
+- If publications/works are listed, include "hasOccupation" with CreativeWork nodes or use "creator" relationships
+- If this author works for the company, include "worksFor": {"@id": "${siteUrl}/#organization"}
+- BreadcrumbList: Home → [Team/About] → Author Name`,
 
     generic: `PAGE TYPE INSTRUCTIONS (General Page):
 - Use WebPage + BreadcrumbList as the baseline
