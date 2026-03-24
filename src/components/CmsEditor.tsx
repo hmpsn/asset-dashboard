@@ -6,7 +6,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useCmsEditor } from '../hooks/admin';
-import { EmptyState } from './ui';
+import { EmptyState, LoadingState, ErrorState, CharacterCounter, SerpPreview, SocialPreview } from './ui';
 import { StatusBadge } from './ui/StatusBadge';
 import { statusBorderClass } from './ui/statusConfig';
 import { patch, post } from '../api/client';
@@ -85,6 +85,8 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
   const [historyExpanded, setHistoryExpanded] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errorStates, setErrorStates] = useState<Record<string, { type: string; message: string }>>({});
+  const [previewExpanded, setPreviewExpanded] = useState<Set<string>>(new Set());
     const [aiLoading, setAiLoading] = useState<Set<string>>(new Set());
   const [publishing, setPublishing] = useState<Set<string>>(new Set());
   const [published, setPublished] = useState<Set<string>>(new Set());
@@ -259,7 +261,20 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
         }
       }
       if (items.length === 0) {
-        alert('No changes detected on selected items. Edit fields first.');
+        setErrorStates(prev => ({ 
+          ...prev, 
+          approval: { 
+            type: 'validation', 
+            message: 'No changes detected on selected items. Edit fields first.' 
+          } 
+        }));
+        setTimeout(() => {
+          setErrorStates(prev => { 
+            const next = { ...prev }; 
+            delete next.approval; 
+            return next; 
+          });
+        }, 5000);
         setSendingApproval(false);
         return;
       }
@@ -271,7 +286,20 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
       setTimeout(() => setApprovalSent(false), 4000);
     } catch (err) {
       console.error('Failed to send for approval:', err);
-      alert('Failed to send for approval');
+      setErrorStates(prev => ({ 
+        ...prev, 
+        approval: { 
+          type: 'network', 
+          message: 'Failed to send for approval. Please check your connection and try again.' 
+        } 
+      }));
+      setTimeout(() => {
+        setErrorStates(prev => { 
+          const next = { ...prev }; 
+          delete next.approval; 
+          return next; 
+        });
+      }, 5000);
     } finally {
       setSendingApproval(false);
     }
@@ -293,12 +321,20 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
     });
   };
 
+  const togglePreview = (itemId: string) => {
+    setPreviewExpanded(prev => {
+      const n = new Set(prev);
+      if (n.has(itemId)) n.delete(itemId); else n.add(itemId);
+      return n;
+    });
+  };
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-6 h-6 animate-spin text-teal-400" />
-        <span className="ml-3 text-sm text-zinc-400">Loading CMS collections...</span>
-      </div>
+      <LoadingState 
+        message="Loading CMS collections..."
+        size="lg"
+      />
     );
   }
 
@@ -347,6 +383,15 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
           )}
         </div>
       </div>
+
+      {/* Error States */}
+      {errorStates.approval && (
+        <ErrorState
+          type={errorStates.approval.type as 'network' | 'data' | 'permission'}
+          title={errorStates.approval.type === 'network' ? 'Connection Error' : errorStates.approval.type === 'permission' ? 'Permission Error' : 'Error'}
+          message={errorStates.approval.message}
+        />
+      )}
 
       {/* Pending CMS approval batches sent to client */}
       {workspaceId && (
@@ -508,6 +553,13 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                           {isDirty && <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400">Unsaved</span>}
                           {isSaved && !isDirty && <Check className="w-3 h-3 text-emerald-400" />}
                           {error && <AlertCircle className="w-3 h-3 text-red-400" />}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); togglePreview(item.id); }}
+                            className="flex items-center gap-1 px-2 py-1 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
+                            title="Toggle preview"
+                          >
+                            👁️
+                          </button>
                         </div>
                       </button>
 
@@ -518,7 +570,11 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                             <div className="flex items-center justify-between mb-1">
                               <label className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Name (Title)</label>
                               <div className="flex items-center gap-1">
-                                <span className={`text-[11px] ${(() => { const len = (edits[item.id]?.['name'] || '').length; return len === 0 ? 'text-red-400' : len > 60 ? 'text-red-400' : len > 50 ? 'text-amber-400' : 'text-green-400'; })()}`}>{(edits[item.id]?.['name'] || '').length}/60</span>
+                                <CharacterCounter 
+                              current={(edits[item.id]?.['name'] || '').length} 
+                              max={60} 
+                              size="sm" 
+                            />
                                 <button
                                   onClick={() => aiRewrite(coll.collectionId, item.id, 'name')}
                                   disabled={!!aiLoading[`${item.id}-name`]}
@@ -549,7 +605,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                                     }`}
                                   >
                                     <span className="text-zinc-500 mr-1">{vi + 1}.</span>{v}
-                                    <span className={`ml-2 text-[10px] ${v.length > 60 ? 'text-red-400' : 'text-emerald-400'}`}>{v.length}</span>
+                                    <CharacterCounter current={v.length} max={60} size="sm" className="ml-2" />
                                   </button>
                                 ))}
                               </div>
@@ -571,17 +627,17 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                           {extraSeoFields.map(field => {
                             const val = edits[item.id]?.[field.slug] || '';
                             const isTitle = field.slug.includes('title');
-                            const charTarget = isTitle ? '30-60' : '50-160';
-                            const charColor = isTitle
-                              ? (val.length >= 30 && val.length <= 60 ? 'text-emerald-400' : val.length > 0 ? 'text-amber-400' : 'text-red-400')
-                              : (val.length >= 50 && val.length <= 160 ? 'text-emerald-400' : val.length > 0 ? 'text-amber-400' : 'text-red-400');
 
                             return (
                               <div key={field.slug}>
                                 <div className="flex items-center justify-between mb-1">
                                   <label className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">{field.displayName}</label>
                                   <div className="flex items-center gap-1">
-                                    <span className={`text-[11px] ${charColor}`}>{val.length} chars ({charTarget})</span>
+                                    <CharacterCounter 
+                                    current={val.length} 
+                                    max={isTitle ? 60 : 160} 
+                                    size="sm" 
+                                  />
                                     <button
                                       onClick={() => aiRewrite(coll.collectionId, item.id, field.slug)}
                                       disabled={!!aiLoading[`${item.id}-${field.slug}`]}
@@ -623,7 +679,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                                           }`}
                                         >
                                           <span className="text-zinc-500 mr-1">{vi + 1}.</span>{v}
-                                          <span className={`ml-2 text-[10px] ${v.length > maxLen ? 'text-red-400' : 'text-emerald-400'}`}>{v.length}/{maxLen}</span>
+                                          <CharacterCounter current={v.length} max={maxLen} size="sm" className="ml-2" />
                                         </button>
                                       );
                                     })}
@@ -712,6 +768,47 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                               </div>
                             );
                           })()}
+
+                          {/* Preview Section */}
+                          {previewExpanded.has(item.id) && (
+                            <div className="border-t border-zinc-800 pt-4 mt-4 space-y-4">
+                              <div className="flex items-center justify-between mb-2">
+                                <h4 className="text-sm font-medium text-zinc-300">Preview</h4>
+                                <button
+                                  onClick={() => togglePreview(item.id)}
+                                  className="text-zinc-500 hover:text-zinc-300 text-xs"
+                                >
+                                  Hide
+                                </button>
+                              </div>
+                              
+                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                {/* Google Search Preview */}
+                                <div>
+                                  <div className="text-xs font-medium text-zinc-400 mb-2">Google Search</div>
+                                  <SerpPreview
+                                    title={edits[item.id]?.['name'] || itemName}
+                                    description={titleField ? (edits[item.id]?.[titleField.slug] || '') : ''}
+                                    url={`/${coll.collectionSlug}/${itemSlug}`}
+                                    siteName="Your Site"
+                                    size="sm"
+                                  />
+                                </div>
+                                
+                                {/* Social Media Preview */}
+                                <div>
+                                  <div className="text-xs font-medium text-zinc-400 mb-2">Facebook</div>
+                                  <SocialPreview
+                                    title={edits[item.id]?.['name'] || itemName}
+                                    description={titleField ? (edits[item.id]?.[titleField.slug] || '') : ''}
+                                    siteName="Your Site"
+                                    platform="facebook"
+                                    size="sm"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
