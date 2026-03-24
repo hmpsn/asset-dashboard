@@ -48,6 +48,20 @@ function logCreditUsage(entry: Omit<SemrushCreditEntry, 'timestamp'>): void {
 // Flush on normal process exit (graceful shutdown handles SIGTERM/SIGINT)
 process.on('beforeExit', flushCreditsToDisk);
 
+// ── Credit-exhausted circuit breaker ──
+// When SEMRush returns "API UNITS BALANCE IS ZERO", stop making calls for 5 min
+let creditExhaustedUntil = 0;
+const CREDIT_COOLDOWN_MS = 5 * 60 * 1000;
+
+function markCreditsExhausted(): void {
+  creditExhaustedUntil = Date.now() + CREDIT_COOLDOWN_MS;
+  log.warn(`SEMRush credits exhausted — pausing API calls for ${CREDIT_COOLDOWN_MS / 1000}s`);
+}
+
+function areCreditsExhausted(): boolean {
+  return Date.now() < creditExhaustedUntil;
+}
+
 /**
  * Load ALL credit entries from disk files for the given time range, plus any pending writes.
  * Authoritative data source — no truncation.
@@ -210,6 +224,7 @@ export async function getKeywordOverview(
   }
 
   // Batch fetch uncached keywords (one at a time to avoid rate limits)
+  if (areCreditsExhausted()) return results;
   for (const kw of uncached) {
     try {
       const params = new URLSearchParams({
@@ -229,6 +244,7 @@ export async function getKeywordOverview(
 
       const csv = await res.text();
       if (csv.startsWith('ERROR')) {
+        if (csv.includes('BALANCE IS ZERO')) { markCreditsExhausted(); return results; }
         log.error({ detail: csv }, `SEMRush error for "${kw}":`);
         continue;
       }
@@ -293,6 +309,7 @@ export async function getDomainOrganicKeywords(
     return cached;
   }
 
+  if (areCreditsExhausted()) return [];
   const params = new URLSearchParams({
     type: 'domain_organic',
     key: apiKey,
@@ -311,6 +328,7 @@ export async function getDomainOrganicKeywords(
 
   const csv = await res.text();
   if (csv.startsWith('ERROR')) {
+    if (csv.includes('BALANCE IS ZERO')) { markCreditsExhausted(); return []; }
     if (csv.includes('NOTHING FOUND')) {
       log.info(`No organic data found for "${cleanDomain}"`);
     } else {
@@ -449,6 +467,7 @@ export async function getRelatedKeywords(
 
   const csv = await res.text();
   if (csv.startsWith('ERROR')) {
+    if (csv.includes('BALANCE IS ZERO')) { markCreditsExhausted(); return []; }
     // NOTHING FOUND is normal for obscure/made-up keywords — not a real error
     if (csv.includes('NOTHING FOUND')) {
       log.info(`No related keywords found for "${keyword}"`);
@@ -513,6 +532,7 @@ export async function getQuestionKeywords(
 
   const csv = await res.text();
   if (csv.startsWith('ERROR')) {
+    if (csv.includes('BALANCE IS ZERO')) { markCreditsExhausted(); return []; }
     if (csv.includes('NOTHING FOUND')) {
       log.info(`No question keywords found for "${seedKeyword}"`);
     } else {
@@ -618,6 +638,7 @@ export async function getDomainOverview(
 
   const csv = await res.text();
   if (csv.startsWith('ERROR')) {
+    if (csv.includes('BALANCE IS ZERO')) { markCreditsExhausted(); return null; }
     if (csv.includes('NOTHING FOUND')) {
       log.info(`No domain overview data for "${cleanDomain}"`);
     } else {
@@ -690,6 +711,7 @@ export async function getBacklinksOverview(
 
   const csv = await res.text();
   if (csv.startsWith('ERROR')) {
+    if (csv.includes('BALANCE IS ZERO')) { markCreditsExhausted(); return null; }
     if (csv.includes('NOTHING FOUND')) {
       log.info(`No backlink data found for "${cleanDomain}"`);
     } else {
@@ -762,6 +784,7 @@ export async function getTopReferringDomains(
 
   const csv = await res.text();
   if (csv.startsWith('ERROR')) {
+    if (csv.includes('BALANCE IS ZERO')) { markCreditsExhausted(); return []; }
     if (csv.includes('NOTHING FOUND')) {
       log.info(`No referring domains found for "${cleanDomain}"`);
     } else {
@@ -828,6 +851,7 @@ export async function getOrganicCompetitors(
     return cached;
   }
 
+  if (areCreditsExhausted()) return [];
   const params = new URLSearchParams({
     type: 'domain_organic_organic',
     key: apiKey,
@@ -846,6 +870,7 @@ export async function getOrganicCompetitors(
 
   const csv = await res.text();
   if (csv.startsWith('ERROR')) {
+    if (csv.includes('BALANCE IS ZERO')) { markCreditsExhausted(); return []; }
     if (csv.includes('NOTHING FOUND')) {
       log.info(`No organic competitors found for "${cleanDomain}"`);
       return [];
