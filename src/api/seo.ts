@@ -115,6 +115,12 @@ export const keywords = {
   semrushStatus: () =>
     getOptional<unknown>('/api/semrush/status'),
 
+  discoverCompetitors: (wsId: string) =>
+    get<{ competitors: Array<{ domain: string; relevance: number; commonKeywords: number; organicKeywords: number; organicTraffic: number }> }>(`/api/semrush/discover-competitors/${wsId}`),
+
+  saveCompetitors: (wsId: string, domains: string[]) =>
+    post<{ saved: number }>(`/api/semrush/competitors/${wsId}`, { domains }),
+
   seoCopy: (body: Record<string, unknown>) =>
     post<unknown>('/api/webflow/seo-copy', body),
 };

@@ -1,8 +1,8 @@
 import { useState, useRef } from 'react';
 import {
   Zap, FileText, Sparkles, Target, CheckCircle2,
-  TrendingUp, ChevronDown, Shield, BookOpen, Layers,
-  MessageCircle, BarChart3, Eye, AlertTriangle,
+  TrendingUp, TrendingDown, Minus, ChevronDown, Shield, BookOpen, Layers,
+  MessageCircle, BarChart3, Eye, AlertTriangle, Award, MessageCircleQuestion,
 } from 'lucide-react';
 import { TierGate, EmptyState, type Tier } from '../ui';
 import type { ClientKeywordStrategy, ClientContentRequest } from './types';
@@ -293,6 +293,27 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                           {gap.impressions != null && gap.impressions > 0 && <span className="text-[10px] text-blue-400 flex items-center gap-0.5"><Eye className="w-3 h-3" />{fmtNum(gap.impressions)} existing impr</span>}
                         </div>
                       )}
+                      {/* Trend + SERP + Competitor badges */}
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        {gap.trendDirection === 'rising' && (
+                          <span className="flex items-center gap-0.5 text-[10px] text-green-400 font-medium"><TrendingUp className="w-3 h-3" />Rising</span>
+                        )}
+                        {gap.trendDirection === 'declining' && (
+                          <span className="flex items-center gap-0.5 text-[10px] text-red-400 font-medium"><TrendingDown className="w-3 h-3" />Declining</span>
+                        )}
+                        {gap.trendDirection === 'stable' && gap.volume && gap.volume > 0 && (
+                          <span className="flex items-center gap-0.5 text-[10px] text-zinc-400 font-medium"><Minus className="w-3 h-3" />Stable</span>
+                        )}
+                        {gap.serpFeatures?.includes('featured_snippet') && (
+                          <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 font-medium"><Award className="w-3 h-3" />Featured Snippet</span>
+                        )}
+                        {gap.serpFeatures?.includes('people_also_ask') && (
+                          <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-medium"><MessageCircleQuestion className="w-3 h-3" />PAA</span>
+                        )}
+                        {gap.competitorProof && (
+                          <span className="text-[10px] text-orange-400 font-medium">{gap.competitorProof}</span>
+                        )}
+                      </div>
                       <div className="text-[11px] text-zinc-500 leading-snug mb-2">{gap.rationale}</div>
                       <div className="flex items-center justify-between mt-auto">
                         <div className="flex items-center gap-1.5 min-w-0">

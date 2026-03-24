@@ -54,8 +54,14 @@ export interface ContentGap {
   // SEMRush enrichment
   volume?: number;         // monthly search volume
   difficulty?: number;     // keyword difficulty (0-100)
+  trendDirection?: 'rising' | 'declining' | 'stable'; // 12-month volume trend
+  serpFeatures?: string[];  // SERP features present (featured_snippet, people_also_ask, etc.)
   // GSC enrichment (impressions the site already gets for this keyword, even without a dedicated page)
   impressions?: number;
+  // Competitor proof — which competitor ranks for this keyword and at what position
+  competitorProof?: string; // e.g. "competitor.com ranks #3"
+  // Question keywords related to this gap (for FAQ/AEO targeting)
+  questionKeywords?: string[];
 }
 
 export interface QuickWin {
@@ -66,6 +72,25 @@ export interface QuickWin {
   rationale: string;
 }
 
+export interface TopicCluster {
+  topic: string;                 // cluster name (e.g. "dental implants")
+  keywords: string[];            // all keywords in this cluster
+  ownedCount: number;            // keywords we rank for
+  totalCount: number;            // total keywords in cluster
+  coveragePercent: number;       // ownedCount / totalCount * 100
+  avgPosition?: number;          // average position for owned keywords
+  topCompetitor?: string;        // competitor with highest coverage in this cluster
+  topCompetitorCoverage?: number;
+  gap: string[];                 // keywords in cluster we DON'T rank for
+}
+
+export interface CannibalizationItem {
+  keyword: string;
+  pages: { path: string; position?: number; impressions?: number; clicks?: number; source: 'keyword_map' | 'gsc' }[];
+  severity: 'high' | 'medium' | 'low'; // high = 3+ pages, medium = 2 pages with close positions
+  recommendation: string;
+}
+
 export interface KeywordStrategy {
   siteKeywords: string[];        // top-level target keywords for the whole site
   siteKeywordMetrics?: { keyword: string; volume: number; difficulty: number }[]; // SEMRush data for site keywords
@@ -74,6 +99,9 @@ export interface KeywordStrategy {
   contentGaps?: ContentGap[];    // specific content pieces that should be created
   quickWins?: QuickWin[];        // low-effort, high-impact fixes
   keywordGaps?: KeywordGapItem[]; // keywords competitors rank for but we don't
+  topicClusters?: TopicCluster[];         // topical authority clusters
+  cannibalization?: CannibalizationItem[]; // keyword cannibalization issues
+  questionKeywords?: { seed: string; questions: { keyword: string; volume: number }[] }[]; // question-based keywords for FAQ/AEO
   businessContext?: string;      // user-provided context (locations, services, industry)
   semrushMode?: 'quick' | 'full' | 'none'; // which SEMRush mode was used
   generatedAt: string;

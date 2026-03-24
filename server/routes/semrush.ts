@@ -8,9 +8,9 @@ const router = Router();
 import {
   isSemrushConfigured, estimateCreditCost, clearSemrushCache,
   getDomainOverview, getDomainOrganicKeywords, getKeywordGap,
-  getBacklinksOverview,
+  getBacklinksOverview, getOrganicCompetitors,
 } from '../semrush.js';
-import { listWorkspaces } from '../workspaces.js';
+import { listWorkspaces, getWorkspace, updateWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('semrush-routes');
@@ -54,6 +54,49 @@ router.get('/api/semrush/competitive-intel/:workspaceId', async (req, res) => {
     log.error({ err }, 'Competitive intelligence fetch failed');
     res.status(500).json({ error: 'Failed to fetch competitive data' });
   }
+});
+
+// --- Competitor Auto-Discovery ---
+router.get('/api/semrush/discover-competitors/:workspaceId', async (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const myDomain = (ws.liveDomain || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  if (!myDomain) return res.status(400).json({ error: 'Workspace has no live domain configured' });
+
+  if (!isSemrushConfigured()) return res.status(400).json({ error: 'SEMRush API key not configured' });
+
+  try {
+    const competitors = await getOrganicCompetitors(myDomain, ws.id, 10);
+    // Filter out the site's own domain and subdomains
+    const filtered = competitors.filter(c =>
+      !c.domain.includes(myDomain) && !myDomain.includes(c.domain)
+    );
+    res.json({ competitors: filtered, domain: myDomain });
+  } catch (err) {
+    log.error({ err }, 'Competitor discovery failed');
+    res.status(500).json({ error: 'Failed to discover competitors' });
+  }
+});
+
+// --- Save competitor domains to workspace ---
+router.post('/api/semrush/competitors/:workspaceId', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const { domains, competitors } = req.body as { domains?: string[]; competitors?: string[] };
+  const domainList = domains || competitors;
+  if (!Array.isArray(domainList)) return res.status(400).json({ error: 'domains must be an array of domain strings' });
+
+  // Clean and deduplicate
+  const cleaned = [...new Set(
+    domainList
+      .map(d => d.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim().toLowerCase())
+      .filter(Boolean)
+  )];
+
+  updateWorkspace(ws.id, { competitorDomains: cleaned });
+  res.json({ competitors: cleaned });
 });
 
 // --- SEMRush Utilities ---

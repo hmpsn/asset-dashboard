@@ -2826,6 +2826,73 @@
           "notes": "Shipped — ContentGap type extended with volume, difficulty, impressions fields. Strategy generation enriches content gaps from SEMRush domain data + bulk getKeywordOverview fallback for volume/KD, and GSC query data for existing site impressions (exact + partial keyword match). UI shows KD (color-coded green/amber/red), volume (searches/mo), and existing impressions on content opportunity cards in both admin ContentGaps.tsx and client StrategyTab.tsx. Public content endpoint passes through new fields. Existing strategies will show metrics after next regeneration.",
           "status": "done",
           "shippedAt": "2026-03-23"
+        },
+        {
+          "id": 316,
+          "title": "AI Keyword Assignment Engine + Competitor-Enriched Strategy",
+          "source": "USER REQUEST",
+          "est": "4-5h",
+          "priority": "P0",
+          "notes": "Shipped — Overhauled keyword strategy from AI keyword inventor to keyword assigner. Pool built from 5 sources (SEMRush domain, GSC, competitor keywords, keyword gaps, related keywords). AI batch prompt enforces pool assignment. Pre-enrichment skips redundant SEMRush lookups. Lookups capped at 30. Auto-discovery of organic competitors via SEMRush domain_organic_organic. Competitor keywords fetched in quick+full modes. Master prompt requires competitorProof on content gaps. Auto-discover UI button in strategy settings. Saved competitors persist between runs. Orange competitor proof badges in admin + client content gap cards.",
+          "status": "done",
+          "shippedAt": "2026-03-23"
+        },
+        {
+          "id": 317,
+          "title": "SEMRush Question Keywords + Trend Direction + SERP Feature Targeting",
+          "source": "USER REQUEST",
+          "est": "3h",
+          "priority": "P0",
+          "notes": "Shipped — Three new enrichments: (1) Question keywords via phrase_questions API in full mode, injected into AI context and attached to content gaps. (2) Trend direction computed from 12-month Td field (rising/declining/stable ±15%). (3) SERP features parsed from Fk field, 18 feature types mapped. Content gap cards badged with trend arrows, Featured Snippet/PAA badges in admin and client views.",
+          "status": "done",
+          "shippedAt": "2026-03-23"
+        },
+        {
+          "id": 318,
+          "title": "Topical Authority Clustering",
+          "source": "USER REQUEST",
+          "est": "2h",
+          "priority": "P0",
+          "notes": "Shipped — Groups keyword pool into topic clusters via 2-word phrase frequency. Coverage bars (owned/total), avg position, competitor coverage alerts, gap keyword pills. Up to 15 clusters, min 4 keywords each. Sorted by lowest coverage = biggest opportunity.",
+          "status": "done",
+          "shippedAt": "2026-03-23"
+        },
+        {
+          "id": 319,
+          "title": "Keyword Cannibalization Detection",
+          "source": "USER REQUEST",
+          "est": "2h",
+          "priority": "P0",
+          "notes": "Shipped — Cross-references keyword map + GSC data to detect multiple pages competing for same keyword. Severity scoring (high: 3+ pages or 2 in top 20). Per-page position, impressions, clicks, source labels. Auto-generates consolidation recommendations.",
+          "status": "done",
+          "shippedAt": "2026-03-23"
+        },
+        {
+          "id": 320,
+          "title": "Competitor Content Monitoring (Scheduled Job)",
+          "source": "USER REQUEST",
+          "est": "4h",
+          "priority": "P2",
+          "notes": "Future — Scheduled job to periodically fetch new competitor keywords and alert when competitors gain new rankings.",
+          "status": "pending"
+        },
+        {
+          "id": 321,
+          "title": "Authority-Adjusted Difficulty Filtering",
+          "source": "USER REQUEST",
+          "est": "3h",
+          "priority": "P2",
+          "notes": "Future — Contextualize keyword difficulty (KD) by site's domain authority/rating. A KD of 40% means different things for a DR-20 site vs a DR-60 site.",
+          "status": "pending"
+        },
+        {
+          "id": 322,
+          "title": "URL-Level Keyword Intelligence (url_organic API)",
+          "source": "USER REQUEST",
+          "est": "3h",
+          "priority": "P2",
+          "notes": "Future — Use SEMRush url_organic API to get per-page keyword data instead of domain-level. More precise keyword assignments for individual pages.",
+          "status": "pending"
         }
       ]
     }

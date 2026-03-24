@@ -26,6 +26,10 @@ import {
   getDomainOrganicKeywords,
   getKeywordGap,
   getRelatedKeywords,
+  getOrganicCompetitors,
+  getQuestionKeywords,
+  trendDirection,
+  hasSerpOpportunity,
 } from '../semrush.js';
 import { checkUsageLimit, incrementUsage } from '../usage-tracking.js';
 import {
@@ -354,10 +358,14 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     }
 
     // 5. SEMRush data gathering (based on mode)
+    // The keyword pool paradigm: SEMRush provides the keyword universe, AI assigns them to pages
     let semrushContext = '';
     let semrushDomainData: Awaited<ReturnType<typeof getDomainOrganicKeywords>> = [];
     let keywordGaps: Awaited<ReturnType<typeof getKeywordGap>> = [];
     const relatedKws: Awaited<ReturnType<typeof getRelatedKeywords>> = [];
+    const allQuestionKws: { seed: string; questions: { keyword: string; volume: number }[] }[] = [];
+    // Competitor keyword data — used to enrich the keyword pool and give competitor proof to content gaps
+    const competitorKeywordData: Array<{ keyword: string; volume: number; difficulty: number; domain: string; position: number }> = [];
 
     if (semrushMode !== 'none' && isSemrushConfigured()) {
       sendProgress('semrush', 'Fetching SEMRush keyword intelligence...', 0.55);
@@ -381,16 +389,76 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
           log.error({ err: err }, 'Domain organic error');
         }
 
-        // Full mode: competitor gap analysis + related keywords
-        if (semrushMode === 'full' && competitorDomains.length > 0) {
+        // Both quick and full: auto-discover competitors if none provided
+        if (competitorDomains.length === 0) {
           try {
-            sendProgress('semrush', `Running competitor gap analysis vs ${competitorDomains.length} competitors...`, 0.60);
+            sendProgress('semrush', 'Auto-discovering organic competitors...', 0.57);
+            const discovered = await getOrganicCompetitors(siteDomain, ws.id, 5);
+            const autoCompetitors = discovered
+              .filter(c => !c.domain.includes(siteDomain) && !siteDomain.includes(c.domain))
+              .slice(0, 3)
+              .map(c => c.domain);
+            if (autoCompetitors.length > 0) {
+              competitorDomains.push(...autoCompetitors);
+              log.info(`Auto-discovered ${autoCompetitors.length} competitors: ${autoCompetitors.join(', ')}`);
+              // Save discovered competitors to workspace for next time
+              updateWorkspace(ws.id, { competitorDomains });
+            }
+          } catch (err) {
+            log.error({ err: err }, 'Competitor auto-discovery error');
+          }
+        }
+
+        // Both quick and full: fetch competitor keywords (their top terms become our keyword pool)
+        if (competitorDomains.length > 0) {
+          try {
+            const compLimit = semrushMode === 'full' ? 100 : 50;
+            sendProgress('semrush', `Fetching competitor keywords (${competitorDomains.length} competitors)...`, 0.58);
+            for (const comp of competitorDomains.slice(0, 3)) {
+              const cleanComp = comp.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+              try {
+                const compKws = await getDomainOrganicKeywords(cleanComp, ws.id, compLimit);
+                for (const ck of compKws) {
+                  competitorKeywordData.push({
+                    keyword: ck.keyword,
+                    volume: ck.volume,
+                    difficulty: ck.difficulty,
+                    domain: cleanComp,
+                    position: ck.position,
+                  });
+                }
+                log.info(`Got ${compKws.length} keywords from competitor ${cleanComp}`);
+              } catch (err) {
+                log.warn({ err }, `Failed to fetch keywords for competitor ${cleanComp}`);
+              }
+            }
+
+            if (competitorKeywordData.length > 0) {
+              semrushContext += `\n\nCOMPETITOR KEYWORDS (what your competitors rank for — these are proven industry terms):\n`;
+              // Deduplicate and sort by volume, show top 50
+              const seen = new Set<string>();
+              const deduped = competitorKeywordData
+                .filter(k => { const lc = k.keyword.toLowerCase(); if (seen.has(lc)) return false; seen.add(lc); return true; })
+                .sort((a, b) => b.volume - a.volume);
+              semrushContext += deduped.slice(0, 50).map(k =>
+                `- "${k.keyword}" (vol: ${k.volume}/mo, KD: ${k.difficulty}%) — ${k.domain} ranks #${k.position}`
+              ).join('\n');
+            }
+          } catch (err) {
+            log.error({ err: err }, 'Competitor keywords error');
+          }
+        }
+
+        // Both quick and full: keyword gap analysis
+        if (competitorDomains.length > 0) {
+          try {
+            sendProgress('semrush', `Running keyword gap analysis vs ${competitorDomains.length} competitors...`, 0.60);
             log.info(`Running keyword gap analysis vs ${competitorDomains.join(', ')}...`);
             keywordGaps = await getKeywordGap(siteDomain, competitorDomains, ws.id, 50);
             log.info(`Found ${keywordGaps.length} keyword gaps`);
 
             if (keywordGaps.length > 0) {
-              semrushContext += `\n\nCOMPETITOR KEYWORD GAPS (keywords competitors rank for but YOU don't — high-priority opportunities):\n`;
+              semrushContext += `\n\nCOMPETITOR KEYWORD GAPS (keywords competitors rank for but YOU don't — HIGHEST priority opportunities):\n`;
               semrushContext += keywordGaps.slice(0, 30).map(g =>
                 `- "${g.keyword}" (vol: ${g.volume}/mo, KD: ${g.difficulty}%) — ${g.competitorDomain} ranks #${g.competitorPosition}`
               ).join('\n');
@@ -398,8 +466,10 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
           } catch (err) {
             log.error({ err: err }, 'Keyword gap error');
           }
+        }
 
-          // Get related keywords for top 5 seed terms
+        // Full mode only: related keywords for deeper topic expansion
+        if (semrushMode === 'full') {
           try {
             sendProgress('semrush', 'Fetching related keyword ideas...', 0.65);
             const seedKeywords = semrushDomainData.filter(k => k.keyword?.trim()).slice(0, 5).map(k => k.keyword);
@@ -416,6 +486,30 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
             }
           } catch (err) {
             log.error({ err: err }, 'Related keywords error');
+          }
+
+          // Full mode only: question keywords for FAQ/AEO targeting
+          try {
+            sendProgress('semrush', 'Fetching question-based keywords for FAQ/AEO...', 0.67);
+            const qSeeds = semrushDomainData.filter(k => k.keyword?.trim() && k.volume > 100).slice(0, 5).map(k => k.keyword);
+            for (const seed of qSeeds) {
+              const questions = await getQuestionKeywords(seed, ws.id, 10);
+              if (questions.length > 0) {
+                allQuestionKws.push({ seed, questions: questions.map(q => ({ keyword: q.keyword, volume: q.volume })) });
+              }
+            }
+            const allQs = allQuestionKws.flatMap(q => q.questions);
+            if (allQs.length > 0) {
+              const uniqueQs = allQs.filter((q, i, arr) => arr.findIndex(x => x.keyword === q.keyword) === i)
+                .sort((a, b) => b.volume - a.volume);
+              semrushContext += `\n\nQUESTION KEYWORDS (real questions people search — use for FAQ sections, AEO, featured snippets):\n`;
+              semrushContext += uniqueQs.slice(0, 20).map(q =>
+                `- "${q.keyword}" (${q.volume}/mo)`
+              ).join('\n');
+              log.info(`Found ${uniqueQs.length} unique question keywords from ${qSeeds.length} seeds`);
+            }
+          } catch (err) {
+            log.error({ err: err }, 'Question keywords error');
           }
         }
       }
@@ -445,6 +539,9 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     keepalive = wantsStream ? setInterval(() => {
       try { res.write(`: keepalive\n\n`); } catch { /* connection closed */ }
     }, 10_000) : null;
+
+    // Keyword pool — declared outside try so enrichment code can access it after batching
+    const keywordPool = new Map<string, { volume: number; difficulty: number; source: string }>();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let strategy: any;
@@ -481,6 +578,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     // Build SEMRush keyword reference for batch prompts — give the AI real search terms to pick from
     let semrushBatchRef = '';
     const semrushByPath = new Map<string, typeof semrushDomainData>();
+    // Populate keyword pool from ALL available data sources
     if (semrushDomainData.length > 0) {
       // Group domain keywords by URL path for per-page matching
       for (const k of semrushDomainData) {
@@ -489,14 +587,46 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
           if (!semrushByPath.has(p)) semrushByPath.set(p, []);
           semrushByPath.get(p)!.push(k);
         } catch { /* skip */ }
+        keywordPool.set(k.keyword.toLowerCase(), { volume: k.volume, difficulty: k.difficulty, source: 'semrush' });
       }
-      // Also provide top domain keywords as general reference
-      const topDomainKws = [...semrushDomainData]
-        .sort((a, b) => b.volume - a.volume)
-        .slice(0, 40)
-        .map(k => `"${k.keyword}" (vol: ${k.volume}/mo, KD: ${k.difficulty}%)`)
+    }
+    // Add GSC queries to the pool (these are proven search terms)
+    for (const r of gscData) {
+      const q = r.query.toLowerCase();
+      if (!keywordPool.has(q) && q.length > 3 && q.split(' ').length >= 2) {
+        keywordPool.set(q, { volume: r.impressions, difficulty: 0, source: 'gsc' });
+      }
+    }
+    // Add competitor keywords to the pool — these are proven industry terms with real volume
+    for (const ck of competitorKeywordData) {
+      const kw = ck.keyword.toLowerCase();
+      if (!keywordPool.has(kw) && ck.volume > 0) {
+        keywordPool.set(kw, { volume: ck.volume, difficulty: ck.difficulty, source: `competitor:${ck.domain}` });
+      }
+    }
+    // Add keyword gaps to the pool — highest priority since competitors rank and you don't
+    for (const gap of keywordGaps) {
+      const kw = gap.keyword.toLowerCase();
+      if (!keywordPool.has(kw) && gap.volume > 0) {
+        keywordPool.set(kw, { volume: gap.volume, difficulty: gap.difficulty, source: `gap:${gap.competitorDomain}` });
+      }
+    }
+    // Add related keywords to the pool
+    for (const rk of relatedKws) {
+      const kw = rk.keyword.toLowerCase();
+      if (!keywordPool.has(kw) && rk.volume > 0) {
+        keywordPool.set(kw, { volume: rk.volume, difficulty: rk.difficulty, source: 'related' });
+      }
+    }
+    log.info(`Keyword pool: ${keywordPool.size} unique terms (${semrushDomainData.length} domain + ${competitorKeywordData.length} competitor + ${keywordGaps.length} gaps + GSC)`);
+    if (keywordPool.size > 0) {
+      // Sort by volume descending and include ALL keywords
+      const poolList = [...keywordPool.entries()]
+        .sort((a, b) => b[1].volume - a[1].volume)
+        .slice(0, 200)
+        .map(([kw, m]) => `"${kw}" (${m.volume}/mo${m.difficulty ? ` KD:${m.difficulty}%` : ''})`)
         .join(', ');
-      semrushBatchRef = `\n\nREAL SEARCH DATA — keywords this domain actually ranks for (prefer these over invented terms):\n${topDomainKws}`;
+      semrushBatchRef = `\n\nKEYWORD POOL — VERIFIED search terms with real volume. You MUST pick primaryKeyword from this list when a reasonable match exists for the page topic. Only invent a new keyword if NONE of these are relevant:\n${poolList}`;
     }
 
     const runBatch = async (batch: typeof pageInfo, batchIdx: number) => {
@@ -519,7 +649,8 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         return entry;
       }).join('\n');
 
-      const batchPrompt = `You are an expert SEO strategist. Analyze these ${batch.length} web pages and assign optimal keyword targets for each.
+      const hasPool = keywordPool.size > 0;
+      const batchPrompt = `You are an SEO keyword ASSIGNMENT engine. Your job is to match each page to the BEST keyword from a verified keyword pool — NOT to invent keywords.
 ${businessSection}${semrushBatchRef}
 Pages to analyze:
 ${batchPages}
@@ -529,18 +660,21 @@ Return a JSON array with one entry per page:
   {
     "pagePath": "/exact-path",
     "pageTitle": "Page Title",
-    "primaryKeyword": "specific, high-intent keyword (unique per page, no cannibalization)",
-    "secondaryKeywords": ["4-6 supporting keywords: long-tail, question-based, location variants"],
+    "primaryKeyword": "keyword FROM THE POOL above",
+    "secondaryKeywords": ["3-5 related terms, preferably also from the pool"],
     "searchIntent": "commercial|informational|transactional|navigational"
   }
 ]
 
 Rules:
-- CRITICAL: primaryKeyword MUST be a term real people actually search for on Google. Use short, generic industry terms (2-5 words) that have real search volume — NOT branded phrases, NOT page titles, NOT product names. Good: "engineering productivity metrics", "DORA metrics dashboard". Bad: "Faros AI product updates", "configurable team pages for engineering teams".
-- If GSC data is available for a page, PREFER the highest-impression GSC query as the primaryKeyword — that's proven search demand. High impressions + poor position = biggest opportunity.
-- Each primaryKeyword must be UNIQUE across all pages — no keyword cannibalization
-- LOCATION TARGETING: If a page's URL, title, or content references a specific city/state/region (e.g. /houston, /san-antonio, "Houston Office"), that page's keywords MUST target THAT location — NOT the business headquarters or any other location. Each location page gets its own city. Do NOT default all pages to the same city.
-- For non-location pages (e.g. /about, /services), use the broadest relevant geographic scope from the business context (nationwide, statewide, or primary city as appropriate)
+${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL above. These are real, verified search terms with actual search volume. Do NOT invent keywords.
+- If a page has GSC data, the highest-impression GSC query IS your primaryKeyword (it's already in the pool).
+- If a page has SEMRush data, prefer those keywords (they're proven ranking terms).
+- If multiple pages could target the same keyword, assign it to the MOST relevant page. Other pages can share keywords — that's better than inventing fake ones.
+- ONLY if absolutely NO keyword in the pool is even remotely relevant to the page topic, you may suggest a SHORT generic industry term (2-4 words). Mark these with "(invented)" suffix so we can identify them.` : `- primaryKeyword must be a real search term people actually use on Google. Short, generic industry terms (2-4 words).
+- If GSC data is available, PREFER the highest-impression GSC query.`}
+- Blog posts, changelog entries, and update pages CAN share the same broader keyword — that's better than inventing a niche term nobody searches for.
+- LOCATION TARGETING: If a page references a specific city/state/region, keywords MUST target THAT location.
 - Cover ALL ${batch.length} pages — do not skip any
 - Return ONLY valid JSON array, no markdown, no explanation`;
 
@@ -555,8 +689,27 @@ Rules:
         log.info(`Batch ${batchIdx + 1} returned ${Array.isArray(parsed) ? parsed.length : 0} page mappings`);
         sendProgress('ai', `Batch ${batchIdx + 1}/${batches.length} complete (${Array.isArray(parsed) ? parsed.length : 0} pages)`, 0.55 + ((batchIdx + 1) / batches.length) * 0.20);
         // Strip AI-hallucinated volume/difficulty — those must come from SEMRush enrichment only
+        // Also strip "(invented)" suffix and pre-enrich keywords that are already in the pool
         if (Array.isArray(parsed)) {
-          for (const pm of parsed) { delete pm.volume; delete pm.difficulty; delete pm.cpc; }
+          let fromPool = 0;
+          let invented = 0;
+          for (const pm of parsed) {
+            delete pm.volume; delete pm.difficulty; delete pm.cpc;
+            // Strip "(invented)" marker the AI may add
+            if (pm.primaryKeyword) {
+              pm.primaryKeyword = pm.primaryKeyword.replace(/\s*\(invented\)\s*$/i, '').trim();
+            }
+            // Pre-enrich from pool — if the keyword is in our pool, apply the data now
+            const poolMatch = keywordPool.get(pm.primaryKeyword?.toLowerCase());
+            if (poolMatch) {
+              pm.volume = poolMatch.volume;
+              pm.difficulty = poolMatch.difficulty;
+              fromPool++;
+            } else {
+              invented++;
+            }
+          }
+          log.info(`Batch ${batchIdx + 1}: ${fromPool} keywords from pool, ${invented} invented`);
         }
         return Array.isArray(parsed) ? parsed : [];
       } catch {
@@ -766,11 +919,12 @@ Return JSON with this EXACT structure (do NOT include a pageMap — it's already
   "contentGaps": [
     {
       "topic": "New content piece to create",
-      "targetKeyword": "primary keyword",
+      "targetKeyword": "primary keyword (MUST be from SEMRush/GSC data when available)",
       "intent": "informational|commercial|transactional|navigational",
       "priority": "high|medium|low",
       "rationale": "Why and expected impact",
-      "suggestedPageType": "blog|landing|service|location|product|pillar|resource"
+      "suggestedPageType": "blog|landing|service|location|product|pillar|resource",
+      "competitorProof": "competitor.com ranks #3 (optional — cite if a competitor ranks for this keyword)"
     }
   ],
   "quickWins": [
@@ -788,7 +942,7 @@ Return JSON with this EXACT structure (do NOT include a pageMap — it's already
 
 Rules:
 - siteKeywords: 8-15 broad themes covering the full site
-- contentGaps: 6-10 NEW pages/posts to create that DO NOT overlap with existing pages listed above. CRITICAL: Every targetKeyword MUST be a short, generic industry term (2-5 words) that real people search for on Google — NOT branded phrases, NOT ultra-specific long-tail phrases nobody searches. If SEMRush or GSC data is available, prefer keywords that appear in that data. Before suggesting a content gap, verify no current page already targets that keyword or covers that topic. If an existing page is thin or weak on a topic, suggest it as a quickWin improvement instead of creating a competing new page. Vary intent (informational, commercial, transactional). Mix high and medium priority${hasSemrush ? '. Prioritize competitor gap keywords.' : ''}
+- contentGaps: 6-10 NEW pages/posts to create that DO NOT overlap with existing pages listed above. CRITICAL: Every targetKeyword MUST come from the SEMRush/GSC data above when available — do NOT invent keywords. ${hasSemrush ? 'PRIORITIZE keywords from COMPETITOR KEYWORD GAPS — these are keywords competitors rank for that this site doesn\'t. For each gap backed by competitor data, include competitorProof citing which competitor ranks and at what position. At least 50% of content gaps should come from competitor gap data.' : ''} Before suggesting a content gap, verify no current page already targets that keyword or covers that topic. If an existing page is thin or weak on a topic, suggest it as a quickWin improvement instead of creating a competing new page. Vary intent (informational, commercial, transactional). Mix high and medium priority
 - suggestedPageType: Choose the best page type for each content gap. Use "blog" for informational articles, "landing" for conversion pages, "service" for service descriptions, "location" for local SEO, "product" for product pages, "pillar" for topic hubs, "resource" for guides/downloads.
 - quickWins: 3-5 existing pages where small changes boost rankings. Use GSC data if available (high impressions + poor position = opportunity).
 - If DEVICE BREAKDOWN shows mobile ranking gaps, include a mobile-optimization quick win.
@@ -914,18 +1068,22 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
     }
 
     // If we still have keywords without volume data and SEMRush is available, bulk-fetch them
-    // Prioritize growth opportunity pages (no currentPosition) since domain_organic won't cover them
+    // Only look up keywords NOT already in the pool (those are "invented" by the AI)
+    // Cap at 30 to avoid burning credits on keywords that will mostly return NOTHING FOUND
     if (isSemrushConfigured() && semrushMode !== 'none') {
       const pagesNeedingVolume = strategy.pageMap
-        .filter((pm: { volume?: number; primaryKeyword: string }) => !pm.volume);
-      // Sort: growth opportunities (no position) first, then the rest
-      pagesNeedingVolume.sort((a: { currentPosition?: number }, b: { currentPosition?: number }) =>
-        (a.currentPosition ? 1 : 0) - (b.currentPosition ? 1 : 0)
-      );
-      const needsVolume = pagesNeedingVolume.map((pm: { primaryKeyword: string }) => pm.primaryKeyword);
+        .filter((pm: { volume?: number; primaryKeyword: string }) => !pm.volume && pm.primaryKeyword);
+      // Filter to reasonable keywords only (≤5 words, not too specific)
+      const lookupCandidates = pagesNeedingVolume
+        .filter((pm: { primaryKeyword: string }) => pm.primaryKeyword.split(/\s+/).length <= 5)
+        .map((pm: { primaryKeyword: string }) => pm.primaryKeyword);
+      // Deduplicate
+      const uniqueNeeds = [...new Set(lookupCandidates.map((k: string) => k.toLowerCase()))];
+      log.info(`Enrichment: ${strategy.pageMap.length} pages total, ${pagesNeedingVolume.length} need volume, ${uniqueNeeds.length} unique keywords to look up (capped at 30)`);
+      const needsVolume = uniqueNeeds.slice(0, 30);
       if (needsVolume.length > 0) {
         try {
-          const metrics = await getKeywordOverview(needsVolume.slice(0, 100), ws.id);
+          const metrics = await getKeywordOverview(needsVolume as string[], ws.id);
           const metricMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m]));
           for (const pm of strategy.pageMap) {
             if (!pm.volume) {
@@ -1008,6 +1166,182 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
       }
     }
 
+    // Enrich content gaps with trend direction + SERP features from domain data
+    if (strategy.contentGaps?.length && semrushDomainData.length > 0) {
+      const domainLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k]));
+      for (const cg of strategy.contentGaps) {
+        const match = domainLookup.get(cg.targetKeyword.toLowerCase());
+        if (match) {
+          cg.trendDirection = trendDirection(match.trend);
+          const serp = hasSerpOpportunity(match.serpFeatures);
+          const features: string[] = [];
+          if (serp.featuredSnippet) features.push('featured_snippet');
+          if (serp.paa) features.push('people_also_ask');
+          if (serp.video) features.push('video');
+          if (serp.localPack) features.push('local_pack');
+          if (features.length > 0) cg.serpFeatures = features;
+        }
+        // Attach related question keywords to each gap
+        if (allQuestionKws.length > 0) {
+          const relatedQs = allQuestionKws.flatMap(q => q.questions)
+            .filter(q => q.keyword.toLowerCase().includes(cg.targetKeyword.toLowerCase().split(' ')[0]))
+            .slice(0, 3)
+            .map(q => q.keyword);
+          if (relatedQs.length > 0) cg.questionKeywords = relatedQs;
+        }
+      }
+    }
+
+    // ── Cannibalization Detection ──────────────────────────────────
+    // Find keywords assigned to multiple pages (from keyword map) + GSC data showing multiple pages ranking
+    const cannibalization: Array<{ keyword: string; pages: Array<{ path: string; position?: number; impressions?: number; clicks?: number; source: 'keyword_map' | 'gsc' }>; severity: 'high' | 'medium' | 'low'; recommendation: string }> = [];
+    {
+      // Step 1: Check keyword map for duplicate primary keyword assignments
+      const kwPages = new Map<string, Array<{ path: string; source: 'keyword_map' | 'gsc' }>>();
+      for (const pm of strategy.pageMap) {
+        const kw = pm.primaryKeyword.toLowerCase();
+        if (!kwPages.has(kw)) kwPages.set(kw, []);
+        kwPages.get(kw)!.push({ path: pm.pagePath, source: 'keyword_map' });
+      }
+
+      // Step 2: Check GSC data for multiple pages ranking for same query
+      if (gscData.length > 0) {
+        const gscByQuery = new Map<string, Array<{ page: string; position: number; impressions: number; clicks: number }>>();
+        for (const r of gscData) {
+          const q = r.query.toLowerCase();
+          if (!gscByQuery.has(q)) gscByQuery.set(q, []);
+          try {
+            gscByQuery.get(q)!.push({ page: new URL(r.page).pathname, position: r.position, impressions: r.impressions, clicks: r.clicks });
+          } catch { /* skip */ }
+        }
+        // Find queries with 2+ pages getting impressions
+        for (const [query, pages] of gscByQuery) {
+          if (pages.length >= 2 && pages.some(p => p.impressions > 10)) {
+            const existing = kwPages.get(query);
+            if (existing) {
+              // Merge GSC data into existing keyword map entries
+              for (const p of pages) {
+                if (!existing.find(e => e.path === p.page)) {
+                  existing.push({ path: p.page, source: 'gsc' });
+                }
+              }
+            } else {
+              kwPages.set(query, pages.map(p => ({ path: p.page, source: 'gsc' as const })));
+            }
+          }
+        }
+
+        // Build cannibalization items
+        for (const [kw, pages] of kwPages) {
+          if (pages.length < 2) continue;
+          const gscQueryData = gscByQuery.get(kw);
+          const enrichedPages = pages.map(p => {
+            const gscMatch = gscQueryData?.find(g => g.page === p.path);
+            return {
+              path: p.path,
+              position: gscMatch?.position,
+              impressions: gscMatch?.impressions,
+              clicks: gscMatch?.clicks,
+              source: p.source,
+            };
+          });
+          const severity = pages.length >= 3 ? 'high' as const
+            : enrichedPages.filter(p => p.position && p.position < 20).length >= 2 ? 'high' as const
+            : 'medium' as const;
+          const bestPage = enrichedPages.sort((a, b) => (a.position || 100) - (b.position || 100))[0];
+          cannibalization.push({
+            keyword: kw,
+            pages: enrichedPages,
+            severity,
+            recommendation: `Consolidate "${kw}" to ${bestPage.path} (${bestPage.position ? `pos #${Math.round(bestPage.position)}` : 'best match'}). Other pages should target different keywords or redirect.`,
+          });
+        }
+      }
+      if (cannibalization.length > 0) {
+        cannibalization.sort((a, b) => (a.severity === 'high' ? 0 : 1) - (b.severity === 'high' ? 0 : 1));
+        log.info(`Found ${cannibalization.length} cannibalization issues (${cannibalization.filter(c => c.severity === 'high').length} high severity)`);
+      }
+    }
+
+    // ── Topical Authority Clustering ──────────────────────────────
+    // Group keywords from pool + domain data into topic clusters and measure coverage
+    const topicClusters: Array<{ topic: string; keywords: string[]; ownedCount: number; totalCount: number; coveragePercent: number; avgPosition?: number; topCompetitor?: string; topCompetitorCoverage?: number; gap: string[] }> = [];
+    if (semrushDomainData.length > 0 || keywordPool.size > 0) {
+      // Build owned keyword set (keywords we actually rank for)
+      const ownedKws = new Set(semrushDomainData.map(k => k.keyword.toLowerCase()));
+
+      // Simple word-based clustering: group by the most common 2-word phrases
+      const phraseCount = new Map<string, string[]>();
+      const allPoolKws = [...keywordPool.keys()];
+      for (const kw of allPoolKws) {
+        const words = kw.split(/\s+/).filter((w: string) => w.length > 2);
+        // Generate 2-word phrases from keyword
+        for (let i = 0; i < words.length - 1; i++) {
+          const phrase = `${words[i]} ${words[i + 1]}`;
+          if (!phraseCount.has(phrase)) phraseCount.set(phrase, []);
+          phraseCount.get(phrase)!.push(kw);
+        }
+      }
+
+      // Keep clusters with 4+ keywords (meaningful topic groups)
+      const significantPhrases = [...phraseCount.entries()]
+        .filter(([, kws]) => kws.length >= 4)
+        .sort((a, b) => b[1].length - a[1].length)
+        .slice(0, 15); // top 15 topic clusters
+
+      const usedKws = new Set<string>();
+      for (const [topic, kws] of significantPhrases) {
+        // Deduplicate and avoid overlapping clusters
+        const uniqueKws = kws.filter(k => !usedKws.has(k));
+        if (uniqueKws.length < 3) continue;
+        for (const k of uniqueKws) usedKws.add(k);
+
+        const owned = uniqueKws.filter(k => ownedKws.has(k));
+        const gap = uniqueKws.filter(k => !ownedKws.has(k));
+        const coverage = Math.round((owned.length / uniqueKws.length) * 100);
+
+        // Calculate avg position for owned keywords
+        let avgPos: number | undefined;
+        if (owned.length > 0) {
+          const positions = owned.map(k => semrushDomainData.find(d => d.keyword.toLowerCase() === k)?.position).filter(Boolean) as number[];
+          if (positions.length > 0) avgPos = Math.round(positions.reduce((s, p) => s + p, 0) / positions.length);
+        }
+
+        // Find which competitor has best coverage in this cluster
+        let topComp: string | undefined;
+        let topCompCov: number | undefined;
+        if (competitorKeywordData.length > 0) {
+          const compCoverage = new Map<string, number>();
+          for (const ck of competitorKeywordData) {
+            if (uniqueKws.includes(ck.keyword.toLowerCase())) {
+              compCoverage.set(ck.domain, (compCoverage.get(ck.domain) || 0) + 1);
+            }
+          }
+          const best = [...compCoverage.entries()].sort((a, b) => b[1] - a[1])[0];
+          if (best && best[1] > owned.length) {
+            topComp = best[0];
+            topCompCov = Math.round((best[1] / uniqueKws.length) * 100);
+          }
+        }
+
+        topicClusters.push({
+          topic,
+          keywords: uniqueKws,
+          ownedCount: owned.length,
+          totalCount: uniqueKws.length,
+          coveragePercent: coverage,
+          avgPosition: avgPos,
+          topCompetitor: topComp,
+          topCompetitorCoverage: topCompCov,
+          gap,
+        });
+      }
+      if (topicClusters.length > 0) {
+        topicClusters.sort((a, b) => a.coveragePercent - b.coveragePercent); // lowest coverage first = biggest opportunity
+        log.info(`Built ${topicClusters.length} topic clusters (lowest coverage: ${topicClusters[0].topic} at ${topicClusters[0].coveragePercent}%)`);
+      }
+    }
+
     // Enrich siteKeywords with volume/difficulty
     let siteKeywordMetrics: { keyword: string; volume: number; difficulty: number }[] = [];
     if (isSemrushConfigured() && semrushMode !== 'none' && strategy.siteKeywords?.length) {
@@ -1076,6 +1410,9 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
       ...strategy,
       siteKeywordMetrics: siteKeywordMetrics.length > 0 ? siteKeywordMetrics : undefined,
       keywordGaps: keywordGaps.length > 0 ? keywordGaps.slice(0, 30) : undefined,
+      topicClusters: topicClusters.length > 0 ? topicClusters : undefined,
+      cannibalization: cannibalization.length > 0 ? cannibalization.slice(0, 20) : undefined,
+      questionKeywords: allQuestionKws.length > 0 ? allQuestionKws : undefined,
       businessContext: businessContext || undefined,
       semrushMode: semrushMode as 'quick' | 'full' | 'none',
       // Enriched search signals

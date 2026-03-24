@@ -266,6 +266,8 @@ export interface DomainKeyword {
   url: string;
   traffic: number;
   trafficPercent: number;
+  trend?: number[];       // 12-month volume trend
+  serpFeatures?: string;  // comma-separated SERP feature codes
 }
 
 export async function getDomainOrganicKeywords(
@@ -291,7 +293,7 @@ export async function getDomainOrganicKeywords(
     domain: cleanDomain,
     database,
     display_limit: String(limit),
-    export_columns: 'Ph,Po,Nq,Kd,Cp,Ur,Tr,Tc',
+    export_columns: 'Ph,Po,Nq,Kd,Cp,Ur,Tr,Tc,Td,Fk',
   });
 
   const res = await fetch(`${SEMRUSH_API_BASE}?${params}`);
@@ -321,6 +323,8 @@ export async function getDomainOrganicKeywords(
     url: row['Ur'] || '',
     traffic: parseFloat(row['Tr'] || '0'),
     trafficPercent: parseFloat(row['Tc'] || '0'),
+    trend: row['Td'] ? row['Td'].split(',').map(Number) : undefined,
+    serpFeatures: row['Fk'] || undefined,
   }));
 
   logCreditUsage({ credits: results.length * 10, endpoint: 'domain_organic', query: cleanDomain, rowsReturned: results.length, workspaceId, cached: false });
@@ -459,6 +463,109 @@ export async function getRelatedKeywords(
   logCreditUsage({ credits: results.length * 10, endpoint: 'related_keywords', query: keyword, rowsReturned: results.length, workspaceId, cached: false });
   writeCache(workspaceId, cacheKey, results);
   return results;
+}
+
+// ── Question Keywords (question-based queries for FAQ/AEO targeting) ──
+export interface QuestionKeyword {
+  keyword: string;
+  volume: number;
+  difficulty: number;
+  cpc: number;
+}
+
+export async function getQuestionKeywords(
+  seedKeyword: string,
+  workspaceId: string,
+  limit = 20,
+  database = 'us'
+): Promise<QuestionKeyword[]> {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error('SEMRUSH_API_KEY not configured');
+
+  const cacheKey = `questions_${database}_${seedKeyword.toLowerCase().replace(/\s+/g, '_')}_${limit}`;
+  const cached = readCache<QuestionKeyword[]>(workspaceId, cacheKey);
+  if (cached) {
+    logCreditUsage({ credits: 0, endpoint: 'phrase_questions', query: seedKeyword, rowsReturned: cached.length, workspaceId, cached: true });
+    return cached;
+  }
+
+  const params = new URLSearchParams({
+    type: 'phrase_questions',
+    key: apiKey,
+    phrase: seedKeyword,
+    database,
+    display_limit: String(limit),
+    export_columns: 'Ph,Nq,Kd,Cp',
+  });
+
+  const res = await fetch(`${SEMRUSH_API_BASE}?${params}`);
+  if (!res.ok) {
+    const errText = await res.text();
+    log.warn(`Question keywords error for "${seedKeyword}": ${errText.slice(0, 200)}`);
+    return [];
+  }
+
+  const csv = await res.text();
+  if (csv.startsWith('ERROR')) {
+    if (csv.includes('NOTHING FOUND')) {
+      log.info(`No question keywords found for "${seedKeyword}"`);
+    } else {
+      log.warn(`Question keywords error for "${seedKeyword}": ${csv}`);
+    }
+    return [];
+  }
+
+  const rows = parseSemrushCSV(csv);
+  const results: QuestionKeyword[] = rows.map(row => ({
+    keyword: row['Ph'] || '',
+    volume: parseInt(row['Nq'] || '0', 10),
+    difficulty: parseFloat(row['Kd'] || '0'),
+    cpc: parseFloat(row['Cp'] || '0'),
+  }));
+
+  logCreditUsage({ credits: results.length * 10, endpoint: 'phrase_questions', query: seedKeyword, rowsReturned: results.length, workspaceId, cached: false });
+  writeCache(workspaceId, cacheKey, results);
+  return results;
+}
+
+// ── Trend Direction Helper ──
+/** Compute trend direction from 12-month volume array: 'rising' | 'declining' | 'stable' */
+export function trendDirection(trend?: number[]): 'rising' | 'declining' | 'stable' {
+  if (!trend || trend.length < 4) return 'stable';
+  // Compare average of last 3 months vs first 3 months
+  const recent = trend.slice(-3).reduce((s, v) => s + v, 0) / 3;
+  const early = trend.slice(0, 3).reduce((s, v) => s + v, 0) / 3;
+  if (early === 0) return recent > 0 ? 'rising' : 'stable';
+  const change = (recent - early) / early;
+  if (change > 0.15) return 'rising';
+  if (change < -0.15) return 'declining';
+  return 'stable';
+}
+
+// ── SERP Feature Parsing ──
+const SERP_FEATURE_MAP: Record<string, string> = {
+  '0': 'featured_snippet', '1': 'reviews', '2': 'sitelinks', '3': 'people_also_ask',
+  '4': 'image_pack', '5': 'video', '6': 'knowledge_panel', '7': 'twitter',
+  '8': 'news', '9': 'shopping', '10': 'top_stories', '11': 'local_pack',
+  '12': 'carousel', '13': 'instant_answer', '14': 'video_carousel',
+  '15': 'thumbnail', '16': 'ads_top', '17': 'ads_bottom',
+};
+
+/** Parse SEMRush SERP features string into human-readable labels */
+export function parseSerpFeatures(raw?: string): string[] {
+  if (!raw) return [];
+  return raw.split(',').map(code => SERP_FEATURE_MAP[code.trim()] || code.trim()).filter(Boolean);
+}
+
+/** Check if a keyword has a specific high-value SERP feature opportunity */
+export function hasSerpOpportunity(raw?: string): { featuredSnippet: boolean; paa: boolean; video: boolean; localPack: boolean } {
+  const features = parseSerpFeatures(raw);
+  return {
+    featuredSnippet: features.includes('featured_snippet'),
+    paa: features.includes('people_also_ask'),
+    video: features.includes('video') || features.includes('video_carousel'),
+    localPack: features.includes('local_pack'),
+  };
 }
 
 // ── Domain Overview (domain-level organic traffic & keyword metrics) ──
@@ -686,6 +793,75 @@ export function estimateCreditCost(opts: {
   const kwCost = (opts.keywordCount || 50) * 10;
   const relatedCost = 10 * 20 * 10; // 10 seed keywords, 20 related each
   return domainCost + compCost + kwCost + relatedCost;
+}
+
+// ── Organic Competitors (auto-discover competitor domains) ──
+export interface OrganicCompetitor {
+  domain: string;
+  competitorRelevance: number; // 0-100 relevance score
+  commonKeywords: number;
+  organicKeywords: number;
+  organicTraffic: number;
+  organicCost: number;
+}
+
+export async function getOrganicCompetitors(
+  domain: string,
+  workspaceId: string,
+  limit = 10,
+  database = 'us'
+): Promise<OrganicCompetitor[]> {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error('SEMRUSH_API_KEY not configured');
+
+  const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  const cacheKey = `organic_competitors_${database}_${cleanDomain.replace(/\./g, '_')}_${limit}`;
+  const cached = readCache<OrganicCompetitor[]>(workspaceId, cacheKey, 72); // 72h cache
+  if (cached) {
+    logCreditUsage({ credits: 0, endpoint: 'domain_organic_organic', query: cleanDomain, rowsReturned: cached.length, workspaceId, cached: true });
+    return cached;
+  }
+
+  const params = new URLSearchParams({
+    type: 'domain_organic_organic',
+    key: apiKey,
+    domain: cleanDomain,
+    database,
+    display_limit: String(limit),
+    export_columns: 'Dn,Cr,Np,Or,Ot,Oc',
+  });
+
+  const res = await fetch(`${SEMRUSH_API_BASE}?${params}`);
+  if (!res.ok) {
+    const errText = await res.text();
+    log.warn(`Organic competitors error for "${cleanDomain}": ${errText.slice(0, 200)}`);
+    return [];
+  }
+
+  const csv = await res.text();
+  if (csv.startsWith('ERROR')) {
+    if (csv.includes('NOTHING FOUND')) {
+      log.info(`No organic competitors found for "${cleanDomain}"`);
+      return [];
+    }
+    log.error({ detail: csv.slice(0, 200) }, `SEMRush organic competitors error for "${cleanDomain}":`);
+    return [];
+  }
+
+  const rows = parseSemrushCSV(csv);
+  const results: OrganicCompetitor[] = rows.map(row => ({
+    domain: row['Dn'] || '',
+    competitorRelevance: parseFloat(row['Cr'] || '0'),
+    commonKeywords: parseInt(row['Np'] || '0', 10),
+    organicKeywords: parseInt(row['Or'] || '0', 10),
+    organicTraffic: parseInt(row['Ot'] || '0', 10),
+    organicCost: parseFloat(row['Oc'] || '0'),
+  })).filter(r => r.domain);
+
+  writeCache(workspaceId, cacheKey, results);
+  logCreditUsage({ credits: 40, endpoint: 'domain_organic_organic', query: cleanDomain, rowsReturned: results.length, workspaceId, cached: false });
+  log.info(`Found ${results.length} organic competitors for "${cleanDomain}"`);
+  return results;
 }
 
 // ── Clear cache for a workspace ──

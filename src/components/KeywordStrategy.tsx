@@ -15,6 +15,8 @@ import { ContentGaps } from './strategy/ContentGaps';
 import { QuickWins } from './strategy/QuickWins';
 import { KeywordGaps } from './strategy/KeywordGaps';
 import { LowHangingFruit } from './strategy/LowHangingFruit';
+import { TopicClusters } from './strategy/TopicClusters';
+import { CannibalizationAlert } from './strategy/CannibalizationAlert';
 import { keywords } from '../api/seo';
 
 interface PageKeywordMap {
@@ -58,6 +60,25 @@ interface QuickWin {
   rationale: string;
 }
 
+interface TopicCluster {
+  topic: string;
+  keywords: string[];
+  ownedCount: number;
+  totalCount: number;
+  coveragePercent: number;
+  avgPosition?: number;
+  topCompetitor?: string;
+  topCompetitorCoverage?: number;
+  gap: string[];
+}
+
+interface CannibalizationItem {
+  keyword: string;
+  pages: { path: string; position?: number; impressions?: number; clicks?: number; source: 'keyword_map' | 'gsc' }[];
+  severity: 'high' | 'medium' | 'low';
+  recommendation: string;
+}
+
 interface KeywordStrategy {
   siteKeywords: string[];
   siteKeywordMetrics?: { keyword: string; volume: number; difficulty: number }[];
@@ -66,6 +87,9 @@ interface KeywordStrategy {
   contentGaps?: ContentGap[];
   quickWins?: QuickWin[];
   keywordGaps?: KeywordGapItem[];
+  topicClusters?: TopicCluster[];
+  cannibalization?: CannibalizationItem[];
+  questionKeywords?: { seed: string; questions: { keyword: string; volume: number }[] }[];
   businessContext?: string;
   semrushMode?: 'quick' | 'full' | 'none';
   generatedAt: string;
@@ -104,6 +128,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
   const [semrushMode, setSemrushMode] = useState<'none' | 'quick' | 'full'>('none');
   const [maxPages, setMaxPages] = useState<number>(500);
   const [competitors, setCompetitors] = useState('');
+  const [discoveringCompetitors, setDiscoveringCompetitors] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [progressStep, setProgressStep] = useState('');
   const [progressDetail, setProgressDetail] = useState('');
@@ -154,6 +179,19 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
       }
     }).catch((err) => { console.error('KeywordStrategy operation failed:', err); });
   }, []);
+
+  // Load saved competitor domains from workspace
+  useEffect(() => {
+    if (!workspaceId) return;
+    import('../api/workspaces').then(({ workspaces: wsApi }) => {
+      wsApi.getById(workspaceId).then((ws: unknown) => {
+        const w = ws as { competitorDomains?: string[] } | null;
+        if (w?.competitorDomains?.length && !competitors) {
+          setCompetitors(w.competitorDomains.join(', '));
+        }
+      }).catch(() => {});
+    });
+  }, [workspaceId]);
 
   // Sync business context + competitors from loaded strategy
   useEffect(() => {
@@ -550,9 +588,30 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
             {/* Competitor Domains */}
             {semrushAvailable && (
               <div>
-                <div className="flex items-center gap-1.5 mb-1">
-                  <Users className="w-3.5 h-3.5 text-orange-400" />
-                  <span className="text-[11px] text-zinc-400 font-semibold uppercase tracking-wider">Competitor Domains</span>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-orange-400" />
+                    <span className="text-[11px] text-zinc-400 font-semibold uppercase tracking-wider">Competitor Domains</span>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      setDiscoveringCompetitors(true);
+                      try {
+                        const result = await keywords.discoverCompetitors(workspaceId);
+                        if (result?.competitors?.length) {
+                          const domains = result.competitors.slice(0, 5).map(c => c.domain);
+                          setCompetitors(domains.join(', '));
+                          await keywords.saveCompetitors(workspaceId, domains);
+                        }
+                      } catch { /* ignore */ }
+                      setDiscoveringCompetitors(false);
+                    }}
+                    disabled={discoveringCompetitors}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded bg-orange-500/10 border border-orange-500/20 text-[10px] text-orange-400 font-medium hover:bg-orange-500/20 transition-all disabled:opacity-50"
+                  >
+                    {discoveringCompetitors ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
+                    {discoveringCompetitors ? 'Discovering...' : 'Auto-Discover'}
+                  </button>
                 </div>
                 <input
                   type="text"
@@ -561,7 +620,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                   placeholder="e.g. competitor1.com, competitor2.com"
                   className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-orange-500"
                 />
-                <p className="text-[11px] text-zinc-500 mt-1">Comma-separated. SEMRush will find keywords they rank for that you don't (max 3).</p>
+                <p className="text-[11px] text-zinc-500 mt-1">Comma-separated (max 5). Auto-discover uses SEMRush to find your organic competitors. These persist between strategy runs.</p>
               </div>
             )}
 
@@ -789,6 +848,16 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
             onGenerateSeoCopy={generateSeoCopy}
             onCopyText={copyText}
           />
+
+          {/* ── Cannibalization Alert ── */}
+          {strategy.cannibalization && strategy.cannibalization.length > 0 && (
+            <CannibalizationAlert items={strategy.cannibalization} />
+          )}
+
+          {/* ── Topical Authority ── */}
+          {strategy.topicClusters && strategy.topicClusters.length > 0 && (
+            <TopicClusters clusters={strategy.topicClusters} />
+          )}
 
           {/* Keyword Gaps */}
           <KeywordGaps keywordGaps={strategy.keywordGaps || []} difficultyColor={difficultyColor} />
