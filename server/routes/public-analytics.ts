@@ -41,6 +41,8 @@ import {
   getSearchPeriodComparison,
 } from '../search-console.js';
 import { buildSeoContext, buildKeywordMapContext, buildKnowledgeBase, RICH_BLOCKS_PROMPT } from '../seo-context.js';
+import { listTemplates } from '../content-templates.js';
+import { listMatrices } from '../content-matrices.js';
 import { incrementUsage } from '../usage-tracking.js';
 import { getWorkspace, getBrandName } from '../workspaces.js';
 
@@ -192,6 +194,30 @@ router.post('/api/public/search-chat/:workspaceId', async (req, res) => {
     const seoCtx = buildSeoContext(ws.id);
     const seoContextBlock = seoCtx.keywordBlock + seoCtx.brandVoiceBlock + buildKeywordMapContext(ws.id) + buildKnowledgeBase(ws.id);
 
+    // Content plan context (templates + matrices) — fetched server-side
+    let contentPlanSection = '';
+    try {
+      const matrices = listMatrices(ws.id);
+      const templates = listTemplates(ws.id);
+      if (matrices.length > 0 || templates.length > 0) {
+        const parts: string[] = [];
+        if (matrices.length > 0) {
+          const totalCells = matrices.reduce((s, m) => s + m.stats.total, 0);
+          const totalPublished = matrices.reduce((s, m) => s + m.stats.published, 0);
+          const totalPlanned = matrices.reduce((s, m) => s + m.stats.planned, 0);
+          const totalInProgress = totalCells - totalPlanned - totalPublished;
+          parts.push(`${matrices.length} content matrices with ${totalCells} planned pages (${totalPublished} published, ${totalInProgress} in progress, ${totalPlanned} planned)`);
+          for (const m of matrices.slice(0, 5)) {
+            parts.push(`  • "${m.name}" — ${m.stats.total} pages: ${m.stats.published} published, ${m.stats.briefGenerated + m.stats.drafted + m.stats.reviewed} in progress, ${m.stats.planned} planned`);
+          }
+        }
+        if (templates.length > 0) {
+          parts.push(`${templates.length} content templates: ${templates.slice(0, 5).map(t => `"${t.name}" (${t.pageType})`).join(', ')}`);
+        }
+        contentPlanSection = '\n\nCONTENT PLAN:\n' + parts.join('\n');
+      }
+    } catch { /* non-critical */ }
+
     // --- Data inventory (shared across modes) ---
     const dataInventory = `DATA YOU HAVE ACCESS TO:
 ${hasSearch ? '✅ **Google Search Console** — search queries, clicks, impressions, CTR, positions, top pages, search trend over time' : ''}
@@ -204,6 +230,7 @@ ${hasHealth ? '✅ **Site Health Audit** — site score, errors, warnings, page-
 ${context?.siteHealthDetail ? '✅ **Audit Detail** — site-wide issues, top problem pages with specific issue descriptions' : ''}
 ${context?.siteHealthDetail?.cwvSummary ? '✅ **Core Web Vitals** — mobile and desktop page speed assessment (LCP, INP, CLS) with pass/fail ratings from Google' : ''}
 ${clientAuditTrafficSection ? '✅ **Audit Traffic Intelligence** — high-traffic pages that have SEO issues' : ''}
+${contentPlanSection ? '✅ **Content Plan** — planned content templates and matrices with production status' : ''}
 ${hasStrategy ? '✅ **SEO Strategy** — keyword-to-page mapping, content gaps, quick wins, opportunities' : ''}
 ${hasRankings ? '✅ **Rank Tracking** — tracked keyword positions, clicks, impressions, position changes' : ''}
 ${hasActivity ? '✅ **Activity Log** — recent actions taken on the site' : ''}
@@ -211,6 +238,7 @@ ${hasApprovals ? `✅ **Pending Approvals** — ${context.pendingApprovals} SEO 
 ${hasRequests ? '✅ **Active Requests** — open client requests with categories and statuses' : ''}
 ${context?.detectedAnomalies && Array.isArray(context.detectedAnomalies) && context.detectedAnomalies.length > 0 ? '✅ **Detected Anomalies** — AI-flagged significant changes in traffic, conversions, or site health. Reference these when the user asks about recent changes or drops.' : ''}
 ${clientAuditTrafficSection}
+${contentPlanSection}
 ${priorContext}`;
 
     // --- Revenue hooks vs beta-safe recommendations ---

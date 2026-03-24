@@ -14,6 +14,8 @@
 import { listPages, filterPublishedPages, getSiteSubdomain, discoverCmsUrls, buildStaticPathSet } from './webflow-pages.js';
 import { getWorkspace } from './workspaces.js';
 import { listMatrices } from './content-matrices.js';
+import { listBriefs } from './content-brief.js';
+import { listContentRequests } from './content-requests.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('llms-txt');
@@ -162,21 +164,29 @@ export async function generateLlmsTxt(workspaceId: string): Promise<LlmsTxtResul
     lines.push('');
   }
 
-  // Planned content (from matrices)
+  // Planned content (from matrices) — with status labels
   const matrices = listMatrices(workspaceId);
   const plannedPages = matrices.flatMap(m =>
     m.cells.filter(c => c.plannedUrl && c.status !== 'published')
-      .map(c => ({ url: c.plannedUrl, keyword: c.targetKeyword }))
+      .map(c => ({ url: c.plannedUrl, keyword: c.targetKeyword, status: c.status }))
   );
 
   if (plannedPages.length > 0) {
     lines.push('## Upcoming Content');
     lines.push('');
-    lines.push('> The following pages are planned but not yet published.');
+    lines.push('> The following pages are planned or in production.');
     lines.push('');
+
+    const statusLabel: Record<string, string> = {
+      planned: 'Planned', keyword_validated: 'Planned',
+      brief_generated: 'Brief Ready', draft: 'In Draft',
+      review: 'In Review', approved: 'Approved',
+    };
+
     for (const p of plannedPages.slice(0, 50)) {
       const url = baseUrl ? `${baseUrl}${p.url.startsWith('/') ? p.url : '/' + p.url}` : p.url;
-      lines.push(`- [${p.keyword}](${url})`);
+      const label = statusLabel[p.status] || 'Planned';
+      lines.push(`- [${p.keyword}](${url}) — ${label}`);
     }
     if (plannedPages.length > 50) {
       lines.push(`- ... and ${plannedPages.length - 50} more planned pages`);
@@ -184,9 +194,42 @@ export async function generateLlmsTxt(workspaceId: string): Promise<LlmsTxtResul
     lines.push('');
   }
 
-  const content = lines.join('\n');
+  // Approved / in-progress content requests not already covered by matrix cells
+  const matrixKeywords = new Set(plannedPages.map(p => p.keyword.toLowerCase()));
+  try {
+    const requests = listContentRequests(workspaceId);
+    const briefs = listBriefs(workspaceId);
+    const briefMap = new Map(briefs.map(b => [b.id, b]));
 
-  log.info({ workspaceId, pageCount: pages.length, plannedCount: plannedPages.length }, 'LLMs.txt generated');
+    const activeRequests = requests.filter(r =>
+      ['brief_generated', 'client_review', 'approved', 'in_progress'].includes(r.status) &&
+      !matrixKeywords.has((r.targetKeyword || r.topic || '').toLowerCase())
+    );
+
+    if (activeRequests.length > 0) {
+      lines.push('## Content In Production');
+      lines.push('');
+      lines.push('> Approved or in-progress content not yet published.');
+      lines.push('');
+
+      const statusLabel: Record<string, string> = {
+        brief_generated: 'Brief Ready', client_review: 'Client Review',
+        approved: 'Approved', in_progress: 'In Progress',
+      };
+
+      for (const r of activeRequests.slice(0, 30)) {
+        const brief = r.briefId ? briefMap.get(r.briefId) : undefined;
+        const title = brief?.suggestedTitle || r.topic || r.targetKeyword || 'Untitled';
+        lines.push(`- ${title} — ${statusLabel[r.status] || r.status}`);
+      }
+      lines.push('');
+    }
+  } catch { /* non-critical */ }
+
+  const content = lines.join('\n');
+  const briefCount = plannedPages.length;
+
+  log.info({ workspaceId, pageCount: pages.length, plannedCount: briefCount }, 'LLMs.txt generated');
 
   return {
     content,

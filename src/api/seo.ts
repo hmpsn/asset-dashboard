@@ -90,7 +90,7 @@ export const schemaPlan = {
     put<SchemaSitePlan>(`/api/webflow/schema-plan/${siteId}`, { pageRoles, canonicalEntities }),
 
   sendToClient: (siteId: string) =>
-    post<{ plan: SchemaSitePlan; batch: unknown }>(`/api/webflow/schema-plan/${siteId}/send-to-client`),
+    post<{ plan: SchemaSitePlan }>(`/api/webflow/schema-plan/${siteId}/send-to-client`),
 
   activate: (siteId: string) =>
     post<SchemaSitePlan>(`/api/webflow/schema-plan/${siteId}/activate`),

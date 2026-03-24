@@ -888,6 +888,17 @@ A brief value assessment of every feature in the platform, covering what it does
 
 ---
 
+### 79. App.tsx Shell — React Query + Component Extraction
+**What it does:** Migrated the last remaining manual `useState`/`useEffect` data fetching in `App.tsx` Dashboard shell to React Query hooks. Created 3 new hooks: `useWorkspaces` (workspace list + create/delete/link/unlink mutations), `useHealthCheck` (server health status), `useQueue` (processing queue). `selected` workspace is now derived via `useMemo` from URL + query data instead of manual `useState` + sync effects. WebSocket handlers (`queue:update`, `workspace:created`, `workspace:deleted`) replaced from direct `setState` calls to `queryClient.invalidateQueries()`. Extracted `Sidebar` (~210 lines) and `Breadcrumbs` (~130 lines) into `src/components/layout/` — both use `useNavigate()` internally, eliminating callback prop threading. App.tsx Dashboard reduced from ~605 lines to ~300 lines. Removed dead `seoNavigate` function, `navGroups` array, `TAB_LABELS` map, `collapsedGroups` state, and manual initial data fetch. `WorkspaceSettings.onUpdate` now invalidates workspaces query instead of manually patching local state.
+
+**Agency value:** App.tsx is now a thin orchestrator — all data fetching is in hooks, all layout in extracted components. Easier to reason about, modify, and debug. Consistent React Query patterns across the entire frontend.
+
+**Client value:** No user-facing changes — this is a pure refactor. Same behavior, better maintainability.
+
+**Mutual:** Zero manual `useState`/`useEffect` fetch boilerplate remains anywhere in the frontend. The React Query migration is fully complete — all data fetching uses `useQuery`/`useMutation` with shared cache, automatic retry, and stale-while-revalidate.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
@@ -903,9 +914,9 @@ A brief value assessment of every feature in the platform, covering what it does
 | Monetization | 1 | Stripe Checkout, admin settings, payment tracking, trials, encrypted config |
 | Platform & UX | 10 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home, page state model, work orders, request linkage |
 | Data Architecture | 3 | PageEditState model, cross-store writes, activity feed for client actions |
-| Architecture | 4 | Server refactor (56 route modules + 3 shared modules + server module splits), frontend component decomposition (11 extracted directories), React Query migration (4 phases shipped) |
+| Architecture | 5 | Server refactor (56 route modules + 3 shared modules + server module splits), frontend component decomposition (11 extracted directories), React Query migration (4 phases + App.tsx shell shipped) |
 
-**69 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**70 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
 ---
 
@@ -2077,6 +2088,30 @@ Current feature count: **174**. Last updated: March 2026 (schema integration spr
 **153. Keyword Cannibalization Detection + Canonical Recommender**
 **What it does:** Detects keyword cannibalization by cross-referencing the keyword map (primary keyword assignments) with GSC data (multiple pages ranking for same query). Two detection layers: (1) keyword map — flags when AI assigns the same primary keyword to 2+ pages; (2) GSC — identifies queries where 2+ pages receive >10 impressions. Merges both sources. Severity: `high` (3+ pages or 2 pages both in top 20), `medium` (2 pages). Each item includes per-page position, impressions, clicks, and data source. **Canonical Recommender:** Analyzes page metrics to determine the best canonical page and recommends one of four actions: `canonical_tag` (secondary pages have some traffic — add `<link rel="canonical">` to preserve them), `redirect_301` (secondary pages have no traffic — consolidate authority), `differentiate` (both pages rank competitively — retarget secondary to long-tail variant), or `noindex`. Recommendation includes the specific canonical URL and action-specific guidance. Admin UI: `CannibalizationAlert` component with severity badges, per-page metrics, source labels (GSC/map), action type badges (Canonical Tag/301 Redirect/Differentiate/Noindex with icons), canonical path display, and actionable recommendations.
 **Files:** `server/routes/keyword-strategy.ts` (cannibalization detection + canonical recommender logic), `shared/types/workspace.ts` (`CannibalizationItem` interface, `cannibalization` on KeywordStrategy), `src/components/strategy/CannibalizationAlert.tsx` (component with action badges), `src/components/KeywordStrategy.tsx` (wiring), `src/components/client/types.ts` (updated type)
+
+**154. Churn Signals 'At Risk' Badge in Workspace Overview**
+**What it does:** Surfaces churn risk directly on workspace cards in the Command Center. The `/api/workspace-overview` endpoint now returns `churnSignals: { critical, warning }` counts per workspace. Cards show a red/amber "At Risk" badge (with Flag icon) when critical or warning churn signals exist. Card borders highlight red for critical, amber for warning. The Needs Attention section also shows an aggregate "X workspaces at risk of churn" alert item, priority-sorted between anomalies and requests.
+**Files:** `server/routes/workspaces.ts` (churn signal aggregation in workspace-overview), `src/hooks/admin/useWorkspaceOverview.ts` (`churnSignals` on `WorkspaceSummary`), `src/components/WorkspaceOverview.tsx` (At Risk badge, border logic, attention item)
+
+**155. Content Decay Alert Card in Pipeline**
+**What it does:** Shows a dismissible alert banner in the Content Pipeline when decaying pages are detected. Fetches `/api/content-decay/:wsId` alongside the pipeline summary on mount. Displays total decaying pages, critical/warning counts, and average decline percentage. Red styling for critical, amber for warning. Dismissible per session via X button.
+**Files:** `src/components/ContentPipeline.tsx` (decay fetch, alert card rendering, dismiss state)
+
+**156. Approval Reminders 'Send Reminder' Button**
+**What it does:** Adds a manual "Remind" button to each pending approval batch in the PendingApprovals component. Clicking sends an approval reminder email to the workspace's client email via `POST /api/approvals/:wsId/:batchId/remind`. The endpoint validates the batch has pending items, calculates stale days, and sends a branded reminder email using `renderApprovalReminder()`. Button shows loading state while sending and transitions to a green "Sent" confirmation after success. Appears only when a batch has pending items.
+**Files:** `server/routes/approvals.ts` (remind endpoint), `src/api/misc.ts` (`approvals.remind()`), `src/components/PendingApprovals.tsx` (Remind button, state management)
+
+**157. Schema Strategy Isolation — Removed from Client Inbox**
+**What it does:** Schema strategy plans no longer create approval batches in the client Inbox tab. The `POST /api/webflow/schema-plan/:siteId/send-to-client` endpoint now updates plan status to `sent_to_client` and sends email notification without creating approval items. Schema strategy review lives exclusively in the dedicated Schema tab (`SchemaReviewTab`) with condensed page-role view, gut-check approve/reject, and comment support. Individual per-page schema approvals (JSON-LD implementations) still use the standard approval system for future 1-by-1 review.
+**Files:** `server/routes/webflow-schema.ts` (removed `createBatch` call, removed `SCHEMA_ROLE_CLIENT_DESC` import), `src/api/seo.ts` (updated `sendToClient` return type), `src/components/client/SchemaReviewTab.tsx` (migrated empty state to `EmptyState` component), `src/components/client/ApprovalsTab.tsx` (migrated empty state to `EmptyState` component)
+
+**158. SearchTab Redesign — Insight-First Layout**
+**What it does:** Redesigned the client Search Performance tab with an insight-first hierarchy. Added AI-style natural language takeaway summary (Sparkles icon + `buildTakeaway()`) at the top. Insight cards now render full-width for single cards or 2-col grid for multiple. Raw queries/pages tables moved to a collapsible "Raw Data" section (default collapsed) with chevron toggle and count summary. Visual flow: takeaway → metrics bar → insights → health summary → trend chart → rank tracking → annotations → collapsible tables.
+**Files:** `src/components/client/SearchTab.tsx` (full redesign with collapsible tables, AI takeaway, responsive insight cards)
+
+**159. Test Coverage — Admin Hooks + Layout Components**
+**What it does:** Added 37 new component/hook tests covering: `useWorkspaces` (6 tests: fetch, create, delete, link, unlink), `useHealthCheck` (3 tests: fetch, both-keys, error), `useQueue` (3 tests: fetch, empty, error), `Sidebar` (12 tests: nav rendering, group labels, active tab highlighting, disabled states, badge counts, navigation, theme toggle, logout, collapsible groups), `Breadcrumbs` (13 tests: Command Center link, workspace display, tab labels, back arrow, global tabs, request badges, notification bell, command palette trigger).
+**Files:** `tests/component/useWorkspaces.test.tsx`, `tests/component/useHealthCheck.test.tsx`, `tests/component/useQueue.test.tsx`, `tests/component/Sidebar.test.tsx`, `tests/component/Breadcrumbs.test.tsx`
 
 **150. AI Keyword Assignment Engine + Competitor-Enriched Strategy**
 **What it does:** Overhauls the keyword strategy generator from an AI keyword *inventor* to a keyword *assigner*. The AI now picks keywords from a verified pool of real search terms (SEMRush domain keywords, GSC queries, competitor keywords, keyword gaps, related keywords) instead of hallucinating them. Reduces SEMRush "ERROR 50 :: NOTHING FOUND" responses (wasted API credits on non-existent keywords). Key changes: (1) Keyword pool built from 5 data sources — SEMRush domain organic, GSC queries, competitor domain keywords, keyword gap analysis, and related keywords. (2) AI batch prompt rewritten to enforce pool assignment with `(invented)` suffix for any keywords not in pool. (3) Pre-enrichment: keywords from pool get real volume/difficulty immediately without extra SEMRush lookups. (4) SEMRush lookups capped at 30 and filtered to ≤5-word keywords. (5) Auto-discovery of organic competitors via SEMRush `domain_organic_organic` API when none provided. (6) Competitor keywords fetched in both quick and full modes. (7) Keyword gap analysis runs in both modes. (8) Related keywords in full mode only. (9) Master prompt enhanced: content gaps must cite competitorProof (which competitor ranks and at what position). (10) Auto-discovered competitors persisted to workspace. (11) Frontend: Auto-Discover button in strategy settings calls SEMRush API, saves results, pre-populates competitor input. Saved competitors load on mount. Content gap cards display orange competitor proof badges in both admin and client views.

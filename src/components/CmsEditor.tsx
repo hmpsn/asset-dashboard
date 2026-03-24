@@ -4,6 +4,7 @@ import {
   Search, Sparkles, Wand2, Upload, Send, Clock, ArrowRight,
 } from 'lucide-react';
 import { usePageEditStates } from '../hooks/usePageEditStates';
+import { EmptyState } from './ui';
 import { StatusBadge } from './ui/StatusBadge';
 import { statusBorderClass } from './ui/statusConfig';
 import { get, patch, post, getSafe } from '../api/client';
@@ -316,9 +317,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
 
   if (collections.length === 0) {
     return (
-      <div className="text-center py-16 text-zinc-500 text-sm">
-        No CMS collections with items found for this site.
-      </div>
+      <EmptyState icon={Search} title="No CMS collections with items found for this site" />
     );
   }
 

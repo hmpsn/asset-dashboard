@@ -21,6 +21,7 @@ interface WorkspaceSummary {
   approvals: { pending: number; total: number };
   contentRequests?: { pending: number; inProgress: number; delivered: number; total: number };
   workOrders?: { pending: number; total: number };
+  churnSignals?: { critical: number; warning: number };
   pageStates?: { issueDetected: number; inReview: number; approved: number; rejected: number; live: number; total: number };
   tier?: 'free' | 'growth' | 'premium';
   isTrial?: boolean;

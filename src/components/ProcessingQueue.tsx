@@ -1,4 +1,5 @@
 import { Loader2, CheckCircle2, AlertCircle, Sparkles, Upload, Copy } from 'lucide-react';
+import { EmptyState } from './ui';
 import { cn } from '../lib/utils';
 
 export interface QueueItem {
@@ -32,10 +33,7 @@ function copyToClipboard(text: string) {
 export function ProcessingQueue({ items }: Props) {
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-zinc-500">
-        <p className="text-sm">No files processed yet</p>
-        <p className="text-xs mt-1">Drop files above to get started</p>
-      </div>
+      <EmptyState icon={Upload} title="No files processed yet" description="Drop files above to get started" className="py-12" />
     );
   }
 

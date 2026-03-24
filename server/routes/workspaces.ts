@@ -32,6 +32,7 @@ import {
 } from '../webflow.js';
 import { listWorkOrders } from '../work-orders.js';
 import { listMatrices } from '../content-matrices.js';
+import { listChurnSignals } from '../churn-signals.js';
 import {
   listWorkspaces,
   createWorkspace,
@@ -108,6 +109,15 @@ router.get('/api/workspace-overview', (_req, res) => {
       total: stateVals.length,
     };
 
+    // Churn signals
+    let churnCritical = 0;
+    let churnWarning = 0;
+    try {
+      const signals = listChurnSignals(ws.id);
+      churnCritical = signals.filter(s => s.severity === 'critical').length;
+      churnWarning = signals.filter(s => s.severity === 'warning').length;
+    } catch { /* non-critical */ }
+
     const trialEnd = ws.trialEndsAt ? new Date(ws.trialEndsAt) : null;
     const isTrial = trialEnd ? trialEnd > new Date() : false;
     const trialDaysRemaining = isTrial && trialEnd ? Math.max(0, Math.ceil((trialEnd.getTime() - Date.now()) / 86400000)) : undefined;
@@ -129,6 +139,7 @@ router.get('/api/workspace-overview', (_req, res) => {
       contentRequests: { pending: pendingContentReqs, inProgress: inProgressContentReqs, delivered: deliveredContentReqs, total: contentReqs.length },
       workOrders: { pending: pendingWorkOrders, total: workOrders.length },
       contentPlan: { review: reviewCells },
+      churnSignals: { critical: churnCritical, warning: churnWarning },
       pageStates,
     };
   });

@@ -2,7 +2,7 @@ import {
   Activity, Globe, FileText, ClipboardCheck, MessageSquare,
   Pencil, Code2, CornerDownRight, Target, TrendingUp, TrendingDown, AlertTriangle,
 } from 'lucide-react';
-import { SectionCard } from '../ui';
+import { SectionCard, EmptyState } from '../ui';
 
 interface ActivityEntry {
   id: string;
@@ -69,7 +69,7 @@ export function ActivityFeed({ activity, className }: ActivityFeedProps) {
           })}
         </div>
       ) : (
-        <div className="px-4 py-8 text-center text-xs text-zinc-500">No activity recorded yet</div>
+        <EmptyState icon={Activity} title="No activity recorded yet" className="py-8" />
       )}
     </SectionCard>
   );

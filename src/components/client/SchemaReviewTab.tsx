@@ -5,6 +5,7 @@
  */
 import { useState, useEffect } from 'react';
 import { getOptional, post } from '../../api/client';
+import { EmptyState } from '../ui';
 import {
   Loader2, CheckCircle, Globe, ChevronDown, ChevronRight,
   MessageSquare, Sparkles, Shield,
@@ -122,15 +123,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
   // No plan — nothing to review (snapshot alone is stale data from a retracted plan)
   if (!plan) {
     return (
-      <div className="text-center py-16">
-        <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4">
-          <Globe className="w-8 h-8 text-zinc-700" />
-        </div>
-        <h3 className="text-sm font-medium text-zinc-400 mb-1">No schema strategy yet</h3>
-        <p className="text-[11px] text-zinc-500 max-w-xs mx-auto">
-          Your agency will create a structured data strategy for your site. Once ready, you'll be able to review it here.
-        </p>
-      </div>
+      <EmptyState icon={Globe} title="No schema strategy yet" description="Your agency will create a structured data strategy for your site. Once ready, you'll be able to review it here." />
     );
   }
 

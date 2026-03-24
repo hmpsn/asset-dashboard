@@ -4,8 +4,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useWebflowAssets, useAssetAudit } from '../hooks/admin';
 import {
   Image, AlertTriangle, Trash2, Sparkles, X,
-  Loader2, Minimize2, FolderOpen,
+  Loader2, Minimize2, FolderOpen, Search,
 } from 'lucide-react';
+import { EmptyState } from './ui';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { OrganizePreview } from './assets/OrganizePreview';
 import { AssetFilters } from './assets/AssetFilters';
@@ -622,9 +623,7 @@ function AssetBrowser({ siteId }: Props) {
         ))}
 
         {filtered.length === 0 && (
-          <div className="text-center py-10 text-zinc-500 text-sm">
-            {search ? 'No assets match your search' : 'No assets found'}
-          </div>
+          <EmptyState icon={search ? Search : Image} title={search ? 'No assets match your search' : 'No assets found'} className="py-10" />
         )}
       </div>
     </div>

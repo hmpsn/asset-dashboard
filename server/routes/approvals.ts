@@ -107,6 +107,36 @@ router.delete('/api/approvals/:workspaceId/:batchId', requireWorkspaceAccess('wo
   res.json({ ok: true });
 });
 
+// --- Send Reminder (admin, authenticated) ---
+router.post('/api/approvals/:workspaceId/:batchId/remind', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+  const { workspaceId, batchId } = req.params;
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (!ws.clientEmail) return res.status(400).json({ error: 'No client email configured for this workspace' });
+
+  const batch = getBatch(workspaceId, batchId);
+  if (!batch) return res.status(404).json({ error: 'Batch not found' });
+
+  const pendingItems = batch.items.filter(i => i.status === 'pending');
+  if (pendingItems.length === 0) return res.status(400).json({ error: 'No pending items in this batch' });
+
+  const staleDays = Math.max(1, Math.floor((Date.now() - new Date(batch.createdAt).getTime()) / 86400000));
+  const dashUrl = getClientPortalUrl(ws);
+
+  try {
+    const { renderApprovalReminder } = await import('../email-templates.js');
+    const { isEmailConfigured, sendEmail } = await import('../email.js');
+    if (!isEmailConfigured()) return res.status(400).json({ error: 'Email not configured' });
+    const { subject, html } = renderApprovalReminder({ workspaceName: ws.name, batchName: batch.name, pendingCount: pendingItems.length, staleDays, dashboardUrl: dashUrl });
+    await sendEmail(ws.clientEmail, subject, html);
+    log.info({ workspaceId, batchId, clientEmail: ws.clientEmail }, 'Manual approval reminder sent');
+    res.json({ ok: true, sentTo: ws.clientEmail });
+  } catch (err) {
+    log.error({ err }, 'Failed to send reminder');
+    res.status(500).json({ error: 'Failed to send reminder email' });
+  }
+});
+
 // --- Public Approvals (client dashboard, no auth required) ---
 router.get('/api/public/approvals/:workspaceId', (req, res) => {
   res.json(listBatches(req.params.workspaceId));

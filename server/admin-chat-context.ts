@@ -17,6 +17,8 @@ import { listBatches } from './approvals.js';
 import { getLatestRanks, getTrackedKeywords } from './rank-tracking.js';
 import { loadDecayAnalysis } from './content-decay.js';
 import { listWorkOrders } from './work-orders.js';
+import { listTemplates } from './content-templates.js';
+import { listMatrices } from './content-matrices.js';
 import { getSeoChanges } from './seo-change-tracker.js';
 import { loadRecommendations } from './recommendations.js';
 import { listChurnSignals } from './churn-signals.js';
@@ -61,7 +63,7 @@ const CATEGORY_PATTERNS: Record<ContextCategory, RegExp[]> = {
   search: [/search/i, /gsc/i, /quer(y|ies)/i, /impression/i, /click/i, /ctr/i, /position/i, /serp/i, /google.*search/i],
   analytics: [/analytics/i, /ga4/i, /traffic/i, /user(s)?/i, /session/i, /bounce/i, /conversion/i, /source/i, /device/i, /organic/i, /visitor/i, /pageview/i],
   audit: [/audit/i, /health/i, /seo.*issue/i, /error/i, /warning/i, /fix/i, /broken/i, /issue/i, /score/i],
-  content: [/content/i, /brief/i, /blog/i, /article/i, /pipeline/i, /deliverable/i, /writing/i, /draft/i, /post/i],
+  content: [/content/i, /brief/i, /blog/i, /article/i, /pipeline/i, /deliverable/i, /writing/i, /draft/i, /post/i, /template/i, /matrix/i, /planner/i, /content.*plan/i],
   strategy: [/strategy/i, /keyword/i, /opportunit/i, /content.*gap/i, /quick.*win/i, /target/i],
   performance: [/pagespeed/i, /speed/i, /core.*web.*vital/i, /performance/i, /load.*time/i, /weight/i, /lighthouse/i],
   approvals: [/approval/i, /pending/i, /review/i, /approve/i, /reject/i, /batch/i, /sign.*off/i],
@@ -525,6 +527,33 @@ export async function assembleAdminContext(
         }));
         sections.push(`WORK ORDERS (${orders.length} total):\n${JSON.stringify(orderSummary, null, 1)}`);
         dataSources.push('Work Orders');
+      }
+    } catch { /* non-critical */ }
+
+    // Content Plan (templates + matrices)
+    try {
+      const templates = listTemplates(workspaceId);
+      const matrices = listMatrices(workspaceId);
+      if (templates.length > 0 || matrices.length > 0) {
+        const planParts: string[] = [];
+        if (templates.length > 0) {
+          const tplSummary = templates.slice(0, 10).map(t => ({
+            name: t.name, pageType: t.pageType, variables: t.variables.length, sections: t.sections.length,
+          }));
+          planParts.push(`Templates (${templates.length}): ${JSON.stringify(tplSummary, null, 1)}`);
+        }
+        if (matrices.length > 0) {
+          const mtxSummary = matrices.slice(0, 10).map(m => ({
+            name: m.name, cells: m.stats.total,
+            planned: m.stats.planned, briefGenerated: m.stats.briefGenerated,
+            drafted: m.stats.drafted, reviewed: m.stats.reviewed, published: m.stats.published,
+          }));
+          const totalCells = matrices.reduce((s, m) => s + m.stats.total, 0);
+          const totalPublished = matrices.reduce((s, m) => s + m.stats.published, 0);
+          planParts.push(`Matrices (${matrices.length}, ${totalCells} cells, ${totalPublished} published): ${JSON.stringify(mtxSummary, null, 1)}`);
+        }
+        sections.push(`CONTENT PLAN:\n${planParts.join('\n')}`);
+        dataSources.push(`Content Plan (${templates.length} templates, ${matrices.length} matrices)`);
       }
     } catch { /* non-critical */ }
   }

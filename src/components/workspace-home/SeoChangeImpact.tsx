@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { TrendingUp, TrendingDown, Clock, Pencil, Minus } from 'lucide-react';
-import { SectionCard } from '../ui';
+import { SectionCard, EmptyState } from '../ui';
 import { getOptional } from '../../api/client';
 
 interface SeoChangeEvent {
@@ -174,7 +174,7 @@ export function SeoChangeImpact({ workspaceId, hasGsc }: SeoChangeImpactProps) {
               </div>
             ))
           ) : impact && impact.length === 0 ? (
-            <div className="text-center py-6 text-zinc-500 text-xs">No impact data available yet</div>
+            <EmptyState icon={TrendingUp} title="No impact data available yet" className="py-6" />
           ) : null}
         </div>
       )}

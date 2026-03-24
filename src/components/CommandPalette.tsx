@@ -4,7 +4,7 @@ import {
   Search, Globe, BarChart3, Shield, Gauge, Pencil, Link2,
   Target, Code2, Clipboard, Image, Flag, TrendingUp, Sparkles, FileText,
   LayoutDashboard, Settings, Command, ArrowUp, ArrowDown, CornerDownLeft,
-  Zap, FileSearch, MessageSquare,
+  Zap, FileSearch, MessageSquare, LayoutTemplate, Grid3X3, ListChecks,
 } from 'lucide-react';
 import { type Workspace } from './WorkspaceSelector';
 import { type Page, adminPath } from '../routes';
@@ -40,6 +40,7 @@ const NAV_ITEMS: Array<{ id: Page; label: string; icon: typeof Search; group: st
   { id: 'seo-schema', label: 'Schema', icon: Code2, group: 'SEO', needsSite: true },
   { id: 'seo-briefs', label: 'Content Briefs', icon: Clipboard, group: 'Content', needsSite: true },
   { id: 'content', label: 'Content', icon: FileText, group: 'Content', needsSite: true },
+  { id: 'content-pipeline', label: 'Content Pipeline', icon: ListChecks, group: 'Content', needsSite: true },
   { id: 'content-perf', label: 'Content Performance', icon: BarChart3, group: 'Content', needsSite: true },
   { id: 'requests', label: 'Requests', icon: MessageSquare, group: '' },
   { id: 'settings', label: 'Settings', icon: Settings, group: '' },
@@ -144,6 +145,30 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
         icon: Zap,
         type: 'action',
         action: () => { fetch('/api/anomalies/scan', { method: 'POST' }); addRecent('action:scan-anomalies'); },
+      });
+      result.push({
+        id: 'action:create-template',
+        label: 'Create Content Template',
+        sub: 'Open the content planner',
+        icon: LayoutTemplate,
+        type: 'action',
+        action: () => { navigate(adminPath(selectedWorkspace!.id, 'content-pipeline')); addRecent('action:create-template'); },
+      });
+      result.push({
+        id: 'action:build-matrix',
+        label: 'Build Content Matrix',
+        sub: 'Plan content at scale',
+        icon: Grid3X3,
+        type: 'action',
+        action: () => { navigate(adminPath(selectedWorkspace!.id, 'content-pipeline')); addRecent('action:build-matrix'); },
+      });
+      result.push({
+        id: 'action:view-content-plan',
+        label: 'View Content Plan',
+        sub: 'Review planned content',
+        icon: ListChecks,
+        type: 'action',
+        action: () => { navigate(adminPath(selectedWorkspace!.id, 'content-pipeline')); addRecent('action:view-content-plan'); },
       });
     }
 

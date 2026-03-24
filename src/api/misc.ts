@@ -50,6 +50,9 @@ export const approvals = {
   remove: (wsId: string, batchId: string) =>
     del<{ ok: boolean }>(`/api/approvals/${wsId}/${batchId}`),
 
+  remind: (wsId: string, batchId: string) =>
+    post<{ ok: boolean; sentTo: string }>(`/api/approvals/${wsId}/${batchId}/remind`),
+
   publicList: (wsId: string) =>
     getSafe<unknown[]>(`/api/public/approvals/${wsId}`, []),
 

@@ -1,28 +1,23 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
-import { get, post, patch, del, postForm } from './api/client';
+import { get, postForm } from './api/client';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, useSearchParams, useParams } from 'react-router-dom';
 import { type Page, adminPath, clientPath } from './routes';
-import { WorkspaceSelector, type Workspace } from './components/WorkspaceSelector';
-import { type QueueItem } from './components/ProcessingQueue';
 import { StatusBar } from './components/StatusBar';
 import { LoginScreen } from './components/LoginScreen';
 import { MobileGuard } from './components/MobileGuard';
 import { useAuth } from './hooks/useAuth';
 import { useWebSocket } from './hooks/useWebSocket';
+import { useWorkspaces, useCreateWorkspace, useDeleteWorkspace, useLinkSite, useUnlinkSite, WORKSPACES_KEY, useHealthCheck, useQueue, QUEUE_KEY } from './hooks/admin';
+import { useQueryClient } from '@tanstack/react-query';
 import { ToastProvider } from './components/Toast';
 import { BackgroundTaskProvider } from './hooks/useBackgroundTasks';
 import { TaskPanel } from './components/TaskPanel';
 import { AdminChat } from './components/AdminChat';
 import { ErrorBoundary } from './components/ErrorBoundary';
-// WorkspaceDataContext removed — React Query now handles admin-side caching
-import { NotificationBell } from './components/NotificationBell';
 import { CommandPalette } from './components/CommandPalette';
-import {
-  Settings, Clipboard, BarChart3, Globe, Image, Gauge, Search, FileText,
-  Pencil, Target, Code2, LogOut, TrendingUp, Link2, MessageSquare,
-  Sun, Moon, LayoutDashboard, ChevronRight, Sparkles, Activity, Shield,
-  Zap, BookOpen, RefreshCw, CalendarDays, DollarSign, ArrowLeft,
-} from 'lucide-react';
+import { Sidebar } from './components/layout/Sidebar';
+import { Breadcrumbs } from './components/layout/Breadcrumbs';
+import { Clipboard, Globe } from 'lucide-react';
 
 // ── Lazy-loaded route-level chunks ──
 const ClientDashboard = lazy(() => import('./components/ClientDashboard').then(m => ({ default: m.ClientDashboard })));
@@ -127,11 +122,12 @@ function AdminApp() {
 function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; theme: 'dark' | 'light'; toggleTheme: () => void }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [selected, setSelected] = useState<Workspace | null>(null);
-  const [queue, setQueue] = useState<QueueItem[]>([]);
-  const [health, setHealth] = useState({ hasOpenAIKey: false, hasWebflowToken: false });
-  const [connected, setConnected] = useState(false);
+  const queryClient = useQueryClient();
+
+  // ── Server state via React Query ──
+  const { data: workspaces = [] } = useWorkspaces();
+  const { data: health = { hasOpenAIKey: false, hasWebflowToken: false }, isSuccess: connected } = useHealthCheck();
+  const { data: queue = [] } = useQueue();
 
   // Derive tab and workspace ID from URL path
   const GLOBAL_TABS = useMemo(() => new Set(['settings', 'roadmap', 'prospect', 'ai-usage', 'revenue']), []);
@@ -163,48 +159,11 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   const [pendingContentRequests, setPendingContentRequests] = useState(0);
   const [hasContentItems, setHasContentItems] = useState(false);
 
-  // Sync selected workspace from URL
-  useEffect(() => {
-    if (urlWorkspaceId && workspaces.length > 0) {
-      if (!selected || selected.id !== urlWorkspaceId) {
-        const ws = workspaces.find(w => w.id === urlWorkspaceId);
-        if (ws) setSelected(ws);
-      }
-    } else if (!urlWorkspaceId && !GLOBAL_TABS.has(tab)) {
-      if (selected) setSelected(null);
-    }
-  }, [urlWorkspaceId, workspaces, GLOBAL_TABS, selected, tab]);
-
-  // ── Collapsible sidebar groups (#160) ──
-  const ALL_GROUP_LABELS = ['ANALYTICS', 'SITE HEALTH', 'SEO', 'CONTENT'];
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
-    try {
-      const stored = localStorage.getItem('admin-sidebar-collapsed');
-      return stored ? new Set(JSON.parse(stored)) : new Set();
-    } catch { return new Set(); }
-  });
-  const toggleGroup = useCallback((label: string) => {
-    setCollapsedGroups(prev => {
-      const next = new Set(prev);
-      if (next.has(label)) next.delete(label); else next.add(label);
-      try { localStorage.setItem('admin-sidebar-collapsed', JSON.stringify([...next])); } catch (err) { console.error('App operation failed:', err); }
-      return next;
-    });
-  }, []);
-
-  const refreshHealth = useCallback(() => {
-    get<{ hasOpenAIKey: boolean; hasWebflowToken: boolean }>('/api/health').then(h => {
-      setHealth({ hasOpenAIKey: h.hasOpenAIKey, hasWebflowToken: h.hasWebflowToken });
-      setConnected(true);
-    }).catch(() => setConnected(false));
-  }, []);
-
-  // Fetch initial data
-  useEffect(() => {
-    get<Workspace[]>('/api/workspaces').then(setWorkspaces).catch((err) => { console.error('App operation failed:', err); });
-    get<QueueItem[]>('/api/queue').then(setQueue).catch((err) => { console.error('App operation failed:', err); });
-    refreshHealth();
-  }, [refreshHealth]);
+  // Derive selected workspace from URL + React Query data
+  const selected = useMemo(() => {
+    if (!urlWorkspaceId) return null;
+    return workspaces.find(w => w.id === urlWorkspaceId) || null;
+  }, [urlWorkspaceId, workspaces]);
 
   // Fetch badge counts via dedicated lightweight endpoint
   useEffect(() => {
@@ -273,29 +232,20 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     return () => window.removeEventListener('paste', handlePaste);
   }, [selected]);
 
-  // WebSocket handlers
-  const handleQueueUpdate = useCallback((data: unknown) => {
-    const item = data as QueueItem;
-    setQueue(prev => {
-      const idx = prev.findIndex(q => q.id === item.id);
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = item;
-        return next;
-      }
-      return [...prev, item];
-    });
-  }, []);
+  // WebSocket → React Query invalidation
+  const handleQueueUpdate = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: QUEUE_KEY });
+  }, [queryClient]);
 
-  const handleWorkspaceCreated = useCallback((data: unknown) => {
-    setWorkspaces(prev => [...prev, data as Workspace]);
-  }, []);
+  const handleWorkspaceCreated = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: WORKSPACES_KEY });
+  }, [queryClient]);
 
   const handleWorkspaceDeleted = useCallback((data: unknown) => {
     const { id } = data as { id: string };
-    setWorkspaces(prev => prev.filter(w => w.id !== id));
-    setSelected(prev => prev?.id === id ? null : prev);
-  }, []);
+    queryClient.invalidateQueries({ queryKey: WORKSPACES_KEY });
+    if (urlWorkspaceId === id) navigate('/');
+  }, [queryClient, urlWorkspaceId, navigate]);
 
   useWebSocket({
     'queue:update': handleQueueUpdate,
@@ -303,111 +253,42 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     'workspace:deleted': handleWorkspaceDeleted,
   });
 
-  // Actions
+  // Actions via React Query mutations
+  const createMutation = useCreateWorkspace();
+  const deleteMutation = useDeleteWorkspace();
+  const linkMutation = useLinkSite();
+  const unlinkMutation = useUnlinkSite();
+
   const handleCreate = async (name: string, siteId?: string, siteName?: string) => {
-    const ws = await post<Workspace>('/api/workspaces', { name, webflowSiteId: siteId, webflowSiteName: siteName });
-    // WebSocket 'workspace:created' handler adds it to state; just select it here
-    setSelected(ws);
+    const ws = await createMutation.mutateAsync({ name, webflowSiteId: siteId, webflowSiteName: siteName });
+    navigate(adminPath(ws.id));
   };
 
   const handleDelete = async (id: string) => {
-    await del(`/api/workspaces/${id}`);
-    setWorkspaces(prev => prev.filter(w => w.id !== id));
-    if (selected?.id === id) setSelected(null);
+    await deleteMutation.mutateAsync(id);
+    if (urlWorkspaceId === id) navigate('/');
   };
 
   const handleLinkSite = async (workspaceId: string, siteId: string, siteName: string, token?: string) => {
-    const updated = await patch<Workspace>(`/api/workspaces/${workspaceId}`, { webflowSiteId: siteId, webflowSiteName: siteName, webflowToken: token });
-    setWorkspaces(prev => prev.map(w => w.id === workspaceId ? updated : w));
-    if (selected?.id === workspaceId) setSelected(updated);
+    await linkMutation.mutateAsync({ workspaceId, siteId, siteName, token });
   };
 
   const handleUnlinkSite = async (workspaceId: string) => {
-    const updated = await patch<Workspace>(`/api/workspaces/${workspaceId}`, { webflowSiteId: '', webflowSiteName: '' });
-    setWorkspaces(prev => prev.map(w => w.id === workspaceId ? updated : w));
-    if (selected?.id === workspaceId) setSelected(updated);
+    await unlinkMutation.mutateAsync(workspaceId);
   };
 
   const workspaceQueue = selected
     ? queue.filter(q => q.workspace === selected.folder)
     : queue;
 
-  // Auto-expand sidebar group containing active tab (#160)
-  useEffect(() => {
-    const activeGroup = navGroups.find(g => g.label && g.items.some(i => i.id === tab));
-    if (activeGroup && collapsedGroups.has(activeGroup.label)) {
-      setCollapsedGroups(prev => {
-        const next = new Set(prev);
-        next.delete(activeGroup.label);
-        try { localStorage.setItem('admin-sidebar-collapsed', JSON.stringify([...next])); } catch (err) { console.error('App operation failed:', err); }
-        return next;
-      });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab]);
-
-  // ── Sidebar navigation groups ──
-  const navGroups: Array<{ label: string; groupIcon?: typeof Globe; groupColor?: string; activeBg?: string; activeText?: string; activeIcon?: string; inactiveIcon?: string; hoverBg?: string; hoverText?: string; items: Array<{ id: Page; label: string; icon: typeof Globe; desc?: string; needsSite?: boolean; hidden?: boolean }> }> = [
-    { label: '', items: [
-      { id: 'home', label: 'Home', icon: LayoutDashboard, desc: 'Workspace overview and quick actions' },
-    ]},
-    { label: 'ANALYTICS', groupIcon: Activity, groupColor: 'text-blue-400',
-      activeBg: 'bg-blue-500/10', activeText: 'text-blue-300', activeIcon: 'text-blue-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-blue-500/5', hoverText: 'hover:text-blue-300',
-      items: [
-      { id: 'search', label: 'Search Console', icon: Search, needsSite: true, desc: 'Google Search Console queries, pages, and click data' },
-      { id: 'analytics', label: 'Google Analytics', icon: BarChart3, needsSite: true, desc: 'GA4 traffic, events, sources, and user behavior' },
-      { id: 'seo-ranks', label: 'Rank Tracker', icon: TrendingUp, needsSite: true, desc: 'Track keyword rankings over time' },
-    ]},
-    { label: 'SITE HEALTH', groupIcon: Shield, groupColor: 'text-emerald-400',
-      activeBg: 'bg-emerald-500/10', activeText: 'text-emerald-300', activeIcon: 'text-emerald-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-emerald-500/5', hoverText: 'hover:text-emerald-300',
-      items: [
-      { id: 'seo-audit', label: 'Site Audit', icon: Globe, needsSite: true, desc: 'Comprehensive SEO audit with AI recommendations' },
-      { id: 'performance', label: 'Performance', icon: Gauge, needsSite: true, desc: 'PageSpeed scores, Core Web Vitals, and load times' },
-      { id: 'links', label: 'Links', icon: Link2, needsSite: true, desc: 'Internal links, broken links, and redirect management' },
-      { id: 'media', label: 'Assets', icon: Image, desc: 'Images, alt text, and media optimization' },
-    ]},
-    { label: 'SEO', groupIcon: Zap, groupColor: 'text-teal-400',
-      activeBg: 'bg-teal-500/10', activeText: 'text-teal-300', activeIcon: 'text-teal-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-teal-500/5', hoverText: 'hover:text-teal-300',
-      items: [
-      { id: 'brand', label: 'Brand & AI', icon: Sparkles, needsSite: false, desc: 'Brand voice, knowledge base, and audience personas' },
-      { id: 'seo-strategy', label: 'Strategy', icon: Target, needsSite: true, desc: 'Keyword strategy with page-keyword mapping' },
-      { id: 'seo-editor', label: 'SEO Editor', icon: Pencil, needsSite: true, desc: 'Edit titles, descriptions, and meta tags' },
-      { id: 'seo-schema', label: 'Schema', icon: Code2, needsSite: true, desc: 'Structured data and schema markup' },
-      { id: 'rewrite', label: 'Page Rewriter', icon: Pencil, needsSite: true, desc: 'AI-assisted page rewriting with playbook instructions' },
-    ]},
-    { label: 'CONTENT', groupIcon: BookOpen, groupColor: 'text-amber-400',
-      activeBg: 'bg-amber-500/10', activeText: 'text-amber-300', activeIcon: 'text-amber-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-amber-500/5', hoverText: 'hover:text-amber-300',
-      items: [
-      { id: 'content-pipeline', label: 'Content Pipeline', icon: Clipboard, needsSite: true, desc: 'Briefs, posts, and subscriptions in one view' },
-      { id: 'calendar', label: 'Calendar', icon: CalendarDays, needsSite: true, hidden: !hasContentItems, desc: 'Content calendar with briefs, posts, and requests' },
-      { id: 'requests', label: 'Requests', icon: MessageSquare, needsSite: true, desc: 'Client content requests and feedback' },
-      { id: 'content-perf', label: 'Content Perf', icon: BarChart3, needsSite: true, desc: 'Post-publish content performance metrics' },
-    ]},
-  ];
-
-  // ── Breadcrumb tab label map ──
-  const TAB_LABELS: Record<string, string> = {
-    home: 'Home', media: 'Assets', 'seo-audit': 'Site Audit', 'seo-editor': 'SEO Editor',
-    links: 'Links', 'seo-strategy': 'Strategy',
-    'seo-schema': 'Schema', 'seo-briefs': 'Content Briefs', content: 'Content', calendar: 'Calendar', subscriptions: 'Subscriptions', brand: 'Brand & AI', 'content-pipeline': 'Content Pipeline',
-    'seo-ranks': 'Rank Tracker', search: 'Search Console', analytics: 'Google Analytics',
-    annotations: 'Annotations', performance: 'Performance', 'content-perf': 'Content Performance',
-    rewrite: 'Page Rewriter', 'workspace-settings': 'Workspace Settings', prospect: 'Prospect', roadmap: 'Roadmap',
-    'ai-usage': 'AI Usage', requests: 'Requests', settings: 'Settings', revenue: 'Revenue',
-  };
-
   // ── Content renderer ──
   const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'links', 'seo-strategy', 'seo-schema', 'seo-briefs', 'seo-ranks', 'content-perf', 'content', 'calendar', 'subscriptions', 'brand', 'content-pipeline']);
   const needsSite = !!(SEO_TABS.has(tab) || tab === 'search' || tab === 'analytics' || tab === 'performance');
-  const seoNavigate = (t: string, ctx?: FixContext) => { setFixContext(ctx || null); if (selected) navigate(adminPath(selected.id, t as Page)); };
-
   const renderContent = () => {
     if (tab === 'settings') return <SettingsPanel />;
     if (tab === 'roadmap') return <Roadmap />;
-    if (tab === 'workspace-settings' && selected) return <WorkspaceSettings key={`ws-settings-${selected.id}`} workspaceId={selected.id} workspaceName={selected.name} webflowSiteId={selected.webflowSiteId} webflowSiteName={selected.webflowSiteName} onUpdate={(patch) => {
-      const updated = { ...selected, ...patch } as typeof selected;
-      setSelected(updated);
-      setWorkspaces(prev => prev.map(w => w.id === selected.id ? updated : w));
+    if (tab === 'workspace-settings' && selected) return <WorkspaceSettings key={`ws-settings-${selected.id}`} workspaceId={selected.id} workspaceName={selected.name} webflowSiteId={selected.webflowSiteId} webflowSiteName={selected.webflowSiteName} onUpdate={() => {
+      queryClient.invalidateQueries({ queryKey: WORKSPACES_KEY });
     }} />;
     if (tab === 'prospect') return <SalesReport />;
     if (tab === 'ai-usage') return <AIUsagePage />;
@@ -415,8 +296,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
 
     if (!selected) {
       return <WorkspaceOverview onSelectWorkspace={(id) => {
-        const ws = workspaces.find(w => w.id === id);
-        if (ws) { setSelected(ws); navigate(adminPath(ws.id)); }
+        navigate(adminPath(id));
       }} />;
     }
 
@@ -458,224 +338,29 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
 
   return (
     <div className="flex h-screen bg-[#0f1219] text-zinc-200">
-      {/* ── Global sidebar ── */}
-      <aside className="w-[200px] flex-shrink-0 flex flex-col border-r border-zinc-800">
-        {/* Logo → Command Center */}
-        <button
-          onClick={() => { setSelected(null); navigate('/'); }}
-          className="px-4 pt-4 pb-3 block hover:opacity-80 transition-opacity"
-          title="Command Center"
-        >
-          <img src="/logo.svg" alt="hmpsn.studio" className="h-7" style={theme === 'light' ? { filter: 'invert(1) brightness(0.3)' } : undefined} />
-        </button>
-
-        {/* Workspace selector */}
-        <div className="px-3 pb-2 border-b border-zinc-800">
-          <WorkspaceSelector
-            workspaces={workspaces}
-            selected={selected}
-            onSelect={(ws) => { setSelected(ws); if (GLOBAL_TABS.has(tab)) navigate(adminPath(ws.id)); else navigate(adminPath(ws.id, tab)); }}
-            onCreate={handleCreate}
-            onDelete={handleDelete}
-            onLinkSite={handleLinkSite}
-            onUnlinkSite={handleUnlinkSite}
-          />
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-1">
-          {navGroups.map((group, gi) => {
-            const isCollapsed = !!group.label && collapsedGroups.has(group.label);
-            const groupBadgeCount = group.items.reduce((sum, item) =>
-              item.id === 'content-pipeline' ? sum + pendingContentRequests : sum, 0);
-
-            return (
-              <div key={group.label || `group-${gi}`} className={group.label ? 'mt-3' : ''}>
-                {group.label ? (
-                  <button
-                    onClick={() => toggleGroup(group.label)}
-                    className="w-full flex items-center gap-1.5 px-2 py-1.5 mb-0.5 rounded-md hover:bg-zinc-800/30 transition-colors group/hdr"
-                  >
-                    {group.groupIcon && (() => {
-                      const GIcon = group.groupIcon;
-                      return <GIcon className={`w-3.5 h-3.5 ${group.groupColor || 'text-zinc-500'} opacity-70 group-hover/hdr:opacity-100 transition-opacity`} />;
-                    })()}
-                    <span className="text-[11px] text-zinc-500 font-semibold tracking-widest flex-1 text-left">{group.label}</span>
-                    <ChevronRight className={`w-3 h-3 text-zinc-600 transition-transform duration-150 ${!isCollapsed ? 'rotate-90' : ''}`} />
-                    {isCollapsed && groupBadgeCount > 0 && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 tabular-nums min-w-[18px] text-center leading-tight">
-                        {groupBadgeCount}
-                      </span>
-                    )}
-                  </button>
-                ) : null}
-                {!isCollapsed && group.items.filter(item => !item.hidden).map(item => {
-                  const Icon = item.icon;
-                  const active = tab === item.id;
-                  const disabled = !selected || (item.needsSite && !selected.webflowSiteId);
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => !disabled && selected && navigate(adminPath(selected.id, item.id))}
-                      title={item.desc}
-                      className={`w-full flex items-center gap-2.5 px-2.5 py-[5px] rounded-lg text-[12px] font-medium transition-all ${
-                        active
-                          ? `${group.activeBg || 'bg-teal-500/10'} ${group.activeText || 'text-teal-300'}`
-                          : disabled
-                            ? 'text-zinc-700 cursor-not-allowed'
-                            : `text-zinc-300 ${group.hoverText || 'hover:text-zinc-100'} ${group.hoverBg || 'hover:bg-zinc-800/50'}`
-                      }`}
-                    >
-                      <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${active ? (group.activeIcon || 'text-teal-400') : (group.inactiveIcon || '')}`} />
-                      <span className="truncate">{item.label}</span>
-                      {item.id === 'content-pipeline' && pendingContentRequests > 0 && (
-                        <span className="ml-auto text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 tabular-nums flex-shrink-0 min-w-[20px] text-center leading-tight">
-                          {pendingContentRequests}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </nav>
-
-        {/* Bottom: icon-only utility bar */}
-        <div className="px-3 py-2.5 border-t border-zinc-800 flex items-center justify-center gap-1">
-          <button
-            onClick={() => navigate('/revenue')}
-            title="Revenue"
-            className={`p-2 rounded-lg transition-all ${tab === 'revenue' ? 'text-teal-400 bg-teal-500/10' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'}`}
-          >
-            <DollarSign className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => navigate('/settings')}
-            title="Settings"
-            className={`p-2 rounded-lg transition-all ${tab === 'settings' ? 'text-teal-400 bg-teal-500/10' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'}`}
-          >
-            <Settings className="w-4 h-4" />
-          </button>
-          <button
-            onClick={toggleTheme}
-            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            className="p-2 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-all"
-          >
-            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </button>
-          {onLogout && (
-            <button
-              onClick={() => { fetch('/api/auth/logout', { method: 'POST' }); onLogout(); }}
-              title="Log out"
-              className="p-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/5 transition-all"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-      </aside>
+      <Sidebar
+        workspaces={workspaces}
+        selected={selected}
+        tab={tab}
+        theme={theme}
+        pendingContentRequests={pendingContentRequests}
+        hasContentItems={hasContentItems}
+        onCreate={handleCreate}
+        onDelete={handleDelete}
+        onLinkSite={handleLinkSite}
+        onUnlinkSite={handleUnlinkSite}
+        toggleTheme={toggleTheme}
+        onLogout={onLogout}
+      />
 
       {/* ── Main content area ── */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Breadcrumb bar (#165) + header widgets */}
-        <div className="flex items-center gap-1.5 px-5 py-2 border-b border-zinc-800 text-[11px] min-h-[36px]">
-          {selected && tab !== 'home' && (
-            <button
-              onClick={() => navigate(adminPath(selected.id))}
-              className="p-1 -ml-1 mr-0.5 rounded text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800/50 transition-colors"
-              title="Back to workspace home"
-            >
-              <ArrowLeft className="w-3 h-3" />
-            </button>
-          )}
-          <button
-            onClick={() => { setSelected(null); navigate('/'); }}
-            className={`font-medium transition-colors ${!selected ? 'text-teal-400' : 'text-zinc-500 hover:text-zinc-300'}`}
-          >
-            Command Center
-          </button>
-          {selected && (
-            <>
-              <span className="text-zinc-700">/</span>
-              <div className="relative group">
-                <button className="font-medium text-zinc-300 hover:text-teal-400 transition-colors flex items-center gap-1">
-                  {selected.webflowSiteName || selected.name}
-                  <ChevronRight className="w-2.5 h-2.5 text-zinc-600 rotate-90" />
-                </button>
-                <div className="absolute top-full left-0 mt-1 w-48 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 py-1">
-                  {workspaces.map(ws => (
-                    <button
-                      key={ws.id}
-                      onClick={() => { setSelected(ws); navigate(adminPath(ws.id)); }}
-                      className={`w-full text-left px-3 py-1.5 text-[11px] transition-colors ${
-                        ws.id === selected.id ? 'text-teal-400 bg-teal-500/5' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
-                      }`}
-                    >
-                      <span className="truncate block">{ws.webflowSiteName || ws.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {tab !== 'home' && (
-                <>
-                  <span className="text-zinc-700">/</span>
-                  <span className="text-zinc-500">
-                    {TAB_LABELS[tab] || tab}
-                  </span>
-                </>
-              )}
-            </>
-          )}
-          {!selected && tab !== 'home' && (
-            <>
-              <span className="text-zinc-700">/</span>
-              <span className="text-zinc-500">
-                {TAB_LABELS[tab] || tab}
-              </span>
-            </>
-          )}
-
-          {/* ── Header widgets (right side) ── */}
-          <div className="ml-auto flex items-center gap-1">
-            {/* Command Palette trigger */}
-            <button
-              onClick={() => {
-                // Programmatically trigger the ⌘K keyboard shortcut
-                const event = new KeyboardEvent('keydown', {
-                  key: 'k',
-                  metaKey: true,
-                  bubbles: true,
-                });
-                window.dispatchEvent(event);
-              }}
-              title="Command Palette (⌘K)"
-              className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-all"
-            >
-              <Search className="w-3.5 h-3.5" />
-            </button>
-            {/* Requests widget */}
-            {selected && (
-              <button
-                onClick={() => selected && navigate(adminPath(selected.id, 'requests'))}
-                title="Client Requests"
-                className={`relative p-1.5 rounded-lg transition-all ${tab === 'requests' ? 'text-teal-400 bg-teal-500/10' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'}`}
-              >
-                <MessageSquare className="w-3.5 h-3.5" />
-                {pendingContentRequests > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 text-[9px] font-bold px-1 py-0 rounded-full bg-amber-500/90 text-[#0f1219] min-w-[14px] text-center leading-[14px]">
-                    {pendingContentRequests}
-                  </span>
-                )}
-              </button>
-            )}
-            {/* Notification bell */}
-            <NotificationBell onSelectWorkspace={(wsId) => {
-              const ws = workspaces.find(w => w.id === wsId);
-              if (ws) setSelected(ws);
-            }} />
-          </div>
-        </div>
+        <Breadcrumbs
+          workspaces={workspaces}
+          selected={selected}
+          tab={tab}
+          pendingContentRequests={pendingContentRequests}
+        />
         {clipboardStatus && (
           <div className="flex items-center gap-1.5 px-5 py-1.5 text-[11px] font-medium bg-teal-500/10 text-teal-400 border-b border-zinc-800">
             <Clipboard className="w-3 h-3" /> {clipboardStatus}
@@ -717,7 +402,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
       <CommandPalette
         workspaces={workspaces}
         selectedWorkspace={selected}
-        onSelectWorkspace={(ws) => { setSelected(ws); navigate(adminPath(ws.id)); }}
+        onSelectWorkspace={(ws) => navigate(adminPath(ws.id))}
       />
       {selected && health.hasOpenAIKey && (
         <ErrorBoundary label="Admin Chat">

@@ -4,6 +4,7 @@ import {
   Target, ArrowUp, ArrowDown,
 } from 'lucide-react';
 import { get, post, patch, del } from '../api/client';
+import { EmptyState } from './ui';
 
 interface TrackedKeyword {
   query: string;
@@ -193,17 +194,9 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
           ))}
         </div>
       ) : keywords.length > 0 ? (
-        <div className="text-center py-8">
-          <TrendingUp className="w-7 h-7 text-zinc-700 mx-auto mb-2" />
-          <p className="text-xs text-zinc-500">Keywords added but no rank data yet</p>
-          <p className="text-[11px] text-zinc-500 mt-1">Capture a snapshot to start tracking</p>
-        </div>
+        <EmptyState icon={TrendingUp} title="Keywords added but no rank data yet" description="Capture a snapshot to start tracking" className="py-8" />
       ) : (
-        <div className="text-center py-8">
-          <Target className="w-7 h-7 text-zinc-700 mx-auto mb-2" />
-          <p className="text-xs text-zinc-500">No keywords tracked yet</p>
-          <p className="text-[11px] text-zinc-500 mt-1">Add keywords above, or generate a <strong className="text-teal-400">Keyword Strategy</strong> from the sidebar to discover target keywords</p>
-        </div>
+        <EmptyState icon={Target} title="No keywords tracked yet" description="Add keywords above, or generate a Keyword Strategy from the sidebar to discover target keywords" className="py-8" />
       )}
 
       {/* Keywords without rank data */}

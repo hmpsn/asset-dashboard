@@ -9,7 +9,7 @@ import {
   Globe, Shield, MessageSquare, ClipboardCheck, AlertTriangle,
   CheckCircle2, ArrowUpRight, ArrowDownRight, Minus, Loader2,
   Search, BarChart3, Lock, ExternalLink, Bell, Activity, FileText, Zap,
-  Map, Rocket, FileSearch, Clock, DollarSign,
+  Map, Rocket, FileSearch, Clock, DollarSign, Flag,
   TrendingDown, MessageSquarePlus, Bug, Lightbulb, MessageCircle, Send,
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
@@ -110,6 +110,8 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
   if (lowScoreWorkspaces.length > 0) attentionItems.push({ label: `${lowScoreWorkspaces.length} workspace${lowScoreWorkspaces.length > 1 ? 's' : ''} with health score below 60`, value: 'Health', color: 'text-red-400', icon: AlertTriangle, priority: 7 });
   const unlinkWorkspaces = data.filter(w => !w.webflowSiteId);
   if (unlinkWorkspaces.length > 0) attentionItems.push({ label: `${unlinkWorkspaces.length} workspace${unlinkWorkspaces.length > 1 ? 's' : ''} with no site linked`, value: 'Setup', color: 'text-amber-400', icon: Globe, priority: 8 });
+  const atRiskWorkspaces = data.filter(w => (w.churnSignals?.critical || 0) > 0 || (w.churnSignals?.warning || 0) > 0);
+  if (atRiskWorkspaces.length > 0) attentionItems.push({ label: `${atRiskWorkspaces.length} workspace${atRiskWorkspaces.length > 1 ? 's' : ''} at risk of churn`, value: 'Churn', color: atRiskWorkspaces.some(w => (w.churnSignals?.critical || 0) > 0) ? 'text-red-400' : 'text-amber-400', icon: Flag, priority: 1.5 });
   attentionItems.sort((a, b) => a.priority - b.priority);
 
   return (
@@ -214,13 +216,14 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
             const scoreDelta = ws.audit && ws.audit.previousScore != null ? ws.audit.score - ws.audit.previousScore : null;
             const wsAnomalies = anomalyByWorkspace[ws.id];
             const hasAnomalies = wsAnomalies && (wsAnomalies.critical > 0 || wsAnomalies.warning > 0);
+            const isAtRisk = (ws.churnSignals?.critical || 0) > 0 || (ws.churnSignals?.warning || 0) > 0;
             const onlineUsers = presence[ws.id] || [];
 
             return (
               <button
                 key={ws.id}
                 onClick={() => onSelectWorkspace(ws.id)}
-                className={`w-full text-left rounded-xl p-5 transition-all hover:scale-[1.005] hover:shadow-lg group relative bg-zinc-900 border ${onlineUsers.length > 0 ? 'border-green-500/40' : hasAnomalies && wsAnomalies?.critical ? 'border-red-500/30' : hasAlerts ? 'border-amber-500/30' : 'border-zinc-800'}`}
+                className={`w-full text-left rounded-xl p-5 transition-all hover:scale-[1.005] hover:shadow-lg group relative bg-zinc-900 border ${onlineUsers.length > 0 ? 'border-green-500/40' : hasAnomalies && wsAnomalies?.critical ? 'border-red-500/30' : isAtRisk && (ws.churnSignals?.critical || 0) > 0 ? 'border-red-500/30' : hasAlerts || isAtRisk ? 'border-amber-500/30' : 'border-zinc-800'}`}
               >
                 {/* New request badge */}
                 {ws.requests.new > 0 && (
@@ -254,6 +257,16 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                       }`}>
                         <TrendingDown className="w-2.5 h-2.5" />
                         {wsAnomalies.critical > 0 ? `${wsAnomalies.critical} critical` : `${wsAnomalies.warning} warning`}
+                      </span>
+                    )}
+                    {isAtRisk && (
+                      <span className={`flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md border ${
+                        (ws.churnSignals?.critical || 0) > 0
+                          ? 'bg-red-500/15 text-red-400 border-red-500/20'
+                          : 'bg-amber-500/15 text-amber-400 border-amber-500/20'
+                      }`}>
+                        <Flag className="w-2.5 h-2.5" />
+                        At Risk
                       </span>
                     )}
                     {ws.isTrial && (

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { TrendingDown, RefreshCw, AlertTriangle, AlertCircle, Eye, Sparkles, ArrowDown, ArrowUp } from 'lucide-react';
 import { contentDecay } from '../api/content';
+import { EmptyState } from './ui';
 
 interface DecayingPage {
   page: string;
@@ -114,10 +115,8 @@ export default function ContentDecay({ workspaceId }: Props) {
       </div>
 
       {!analysis && !analyzing && (
-        <div className="text-center py-12 bg-zinc-900 rounded-xl border border-zinc-800">
-          <TrendingDown className="w-10 h-10 text-zinc-700 mx-auto mb-3" />
-          <p className="text-sm text-zinc-400">No decay analysis yet</p>
-          <p className="text-xs text-zinc-500 mt-1">Run an analysis to detect content losing search traffic</p>
+        <div className="bg-zinc-900 rounded-xl border border-zinc-800">
+          <EmptyState icon={TrendingDown} title="No decay analysis yet" description="Run an analysis to detect content losing search traffic" className="py-12" />
         </div>
       )}
 

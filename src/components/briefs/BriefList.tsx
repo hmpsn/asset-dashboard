@@ -2,6 +2,7 @@ import {
   ChevronDown, ChevronUp, FileText, Copy, Download, Trash2, Search,
 } from 'lucide-react';
 import { BriefDetail } from './BriefDetail';
+import { EmptyState } from '../ui';
 
 interface ContentBrief {
   id: string;
@@ -111,17 +112,11 @@ export function BriefList({
     <>
       {/* Briefs list */}
       {standaloneBriefs.length === 0 && !briefSearch.trim() ? (
-        <div className="text-center py-12">
-          <FileText className="w-8 h-8 text-zinc-700 mx-auto mb-2" />
-          <p className="text-sm text-zinc-500">No standalone briefs yet</p>
-          <p className="text-xs text-zinc-500 mt-1">Generate a brief above, or briefs linked to requests will appear in the request cards</p>
-        </div>
+        <EmptyState icon={FileText} title="No standalone briefs yet" description="Generate a brief above, or briefs linked to requests will appear in the request cards" className="py-12" />
       ) : standaloneBriefs.length === 0 && briefSearch.trim() ? (
-        <div className="text-center py-8">
-          <Search className="w-6 h-6 text-zinc-700 mx-auto mb-2" />
-          <p className="text-sm text-zinc-500">No briefs match &ldquo;{briefSearch}&rdquo;</p>
-          <button onClick={() => onSetBriefSearch('')} className="text-xs text-teal-400 mt-1 hover:underline">Clear search</button>
-        </div>
+        <EmptyState icon={Search} title={`No briefs match \u201c${briefSearch}\u201d`} className="py-8" action={
+          <button onClick={() => onSetBriefSearch('')} className="text-xs text-teal-400 hover:underline">Clear search</button>
+        } />
       ) : (
         <div className="space-y-2">
           {standaloneBriefs.map(brief => (

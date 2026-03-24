@@ -12,8 +12,7 @@ import { getCachedArchitecture } from '../site-architecture.js';
 import { getSchemaSnapshot, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, getSchemaPlan, updateSchemaPlanStatus, updateSchemaPlanRoles, deleteSchemaPlan, deleteSchemaSnapshot, removePageFromSnapshot } from '../schema-store.js';
 import { generateSchemaSuggestions, generateSchemaForPage, generateCmsTemplateSchema } from '../schema-suggester.js';
 import { generateSchemaPlan } from '../schema-plan.js';
-import { createBatch, deleteBatch } from '../approvals.js';
-import { SCHEMA_ROLE_CLIENT_DESC } from '../../shared/types/schema-plan.ts';
+import { deleteBatch } from '../approvals.js';
 import type { SchemaSitePlan } from '../../shared/types/schema-plan.ts';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { notifyApprovalReady } from '../email.js';
@@ -318,7 +317,7 @@ router.put('/api/webflow/schema-plan/:siteId', requireWorkspaceAccessFromQuery()
   res.json(plan);
 });
 
-// POST: send plan preview to client for approval
+// POST: send plan preview to client for review (in dedicated Schema tab, not Inbox)
 router.post('/api/webflow/schema-plan/:siteId/send-to-client', requireWorkspaceAccessFromQuery(), (req, res) => {
   try {
     const plan = getSchemaPlan(req.params.siteId);
@@ -327,40 +326,25 @@ router.post('/api/webflow/schema-plan/:siteId/send-to-client', requireWorkspaceA
     const ws = getWorkspace(plan.workspaceId);
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
-    // Build approval items from page roles — translated to client-friendly descriptions
-    const items = plan.pageRoles.map(pr => ({
-      id: `plan_${pr.pagePath.replace(/\//g, '_') || 'home'}`,
-      pageId: pr.pagePath,
-      pageTitle: pr.pageTitle,
-      pageSlug: pr.pagePath,
-      field: 'schema-plan',
-      currentValue: '',
-      proposedValue: SCHEMA_ROLE_CLIENT_DESC[pr.role] || 'Basic page info',
-      status: 'pending' as const,
-      reason: pr.notes || undefined,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }));
+    // Update plan status — no approval batch; client reviews in the Schema tab
+    const updated = updateSchemaPlanStatus(req.params.siteId, 'sent_to_client');
 
-    const batch = createBatch(ws.id, plan.siteId, 'Schema Strategy Preview', items);
-    updateSchemaPlanStatus(req.params.siteId, 'sent_to_client', batch.id);
-
-    // Notify client
+    // Notify client via email, directing to the Schema tab
     if (ws.clientEmail) {
       const dashUrl = getClientPortalUrl(ws);
       notifyApprovalReady({
         clientEmail: ws.clientEmail,
         workspaceName: ws.name,
         workspaceId: ws.id,
-        batchName: 'Schema Strategy Preview',
-        itemCount: items.length,
+        batchName: 'Schema Strategy Review',
+        itemCount: plan.pageRoles.length,
         dashboardUrl: dashUrl,
       });
     }
 
-    broadcastToWorkspace(ws.id, 'approval:update', { batchId: batch.id, action: 'created' });
-    addActivity(ws.id, 'schema_plan_sent', 'Schema strategy preview sent to client', `${items.length} pages for review`);
-    res.json({ plan, batch });
+    broadcastToWorkspace(ws.id, 'schema:plan_sent', { siteId: req.params.siteId });
+    addActivity(ws.id, 'schema_plan_sent', 'Schema strategy sent to client for review', `${plan.pageRoles.length} pages`);
+    res.json({ plan: updated || plan });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     log.error({ detail: msg, err }, 'Send schema plan to client error');

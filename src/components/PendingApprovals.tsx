@@ -3,7 +3,7 @@
  * Reusable across SeoEditor, SchemaSuggester, CmsEditor, and any tool that creates approval batches.
  */
 import { useState, useEffect, useCallback } from 'react';
-import { Send, Trash2, ChevronDown } from 'lucide-react';
+import { Send, Trash2, ChevronDown, Bell, Check } from 'lucide-react';
 import { approvals } from '../api/misc';
 import type { ApprovalBatch } from '../../shared/types/approvals';
 
@@ -23,6 +23,8 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
   const [batches, setBatches] = useState<ApprovalBatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [retracting, setRetracting] = useState<string | null>(null);
+  const [reminding, setReminding] = useState<string | null>(null);
+  const [reminderSent, setReminderSent] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
@@ -51,6 +53,15 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
       onRetracted?.(batchId);
     } catch (err) { console.error('PendingApprovals operation failed:', err); }
     finally { setRetracting(null); }
+  };
+
+  const sendReminder = async (batchId: string) => {
+    setReminding(batchId);
+    try {
+      await approvals.remind(workspaceId, batchId);
+      setReminderSent(prev => new Set(prev).add(batchId));
+    } catch (err) { console.error('PendingApprovals reminder failed:', err); }
+    finally { setReminding(null); }
   };
 
   const toggleExpand = (id: string) => {
@@ -125,13 +136,31 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
                     </button>
                   </div>
                 ) : (
-                  <button
-                    onClick={() => setConfirmId(batch.id)}
-                    className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-red-400 hover:bg-red-500/10 transition-colors flex-shrink-0"
-                    title="Retract — remove this from the client's view"
-                  >
-                    <Trash2 className="w-3 h-3" /> Retract
-                  </button>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {pendingCount > 0 && (
+                      reminderSent.has(batch.id) ? (
+                        <span className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-green-400">
+                          <Check className="w-3 h-3" /> Sent
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => sendReminder(batch.id)}
+                          disabled={reminding === batch.id}
+                          className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-amber-400 hover:bg-amber-500/10 transition-colors disabled:opacity-50"
+                          title="Send reminder email to client"
+                        >
+                          <Bell className="w-3 h-3" /> {reminding === batch.id ? 'Sending...' : 'Remind'}
+                        </button>
+                      )
+                    )}
+                    <button
+                      onClick={() => setConfirmId(batch.id)}
+                      className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-red-400 hover:bg-red-500/10 transition-colors"
+                      title="Retract — remove this from the client's view"
+                    >
+                      <Trash2 className="w-3 h-3" /> Retract
+                    </button>
+                  </div>
                 )}
               </div>
               {isExpanded && (

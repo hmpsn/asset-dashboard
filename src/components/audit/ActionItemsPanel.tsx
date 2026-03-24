@@ -6,6 +6,7 @@ import {
   Loader2, CheckCircle, Plus, ListChecks, Trash2, Circle,
 } from 'lucide-react';
 import { get, post, patch, del } from '../../api/client';
+import { EmptyState } from '../ui';
 
 interface ActionItem {
   id: string;
@@ -169,9 +170,7 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
           );
         })}
         {items.length === 0 && !adding && (
-          <div className="px-4 py-6 text-center text-xs text-zinc-500">
-            No action items yet. Click "Add" to track work for this report.
-          </div>
+          <EmptyState icon={ListChecks} title="No action items yet" description='Click "Add" to track work for this report.' className="py-6" />
         )}
       </div>
     </div>

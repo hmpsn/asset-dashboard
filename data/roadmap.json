@@ -362,8 +362,9 @@
           "source": "UI_UX_AUDIT §Backend Capabilities",
           "est": "1-2h",
           "priority": "P1",
-          "notes": "Backend has churn-signals.ts that detects client risk based on activity patterns. Not exposed in UI. Add 'At Risk' badge/filter to workspace cards in Command Center. Show churn risk factors (low activity, pending approvals aging, etc.).",
-          "status": "pending"
+          "notes": "Shipped — At Risk badge on workspace cards (red critical / amber warning), border highlighting, Needs Attention churn alert. Server returns churnSignals counts in /api/workspace-overview. Feature #154.",
+          "status": "done",
+          "shippedAt": "2026-03-26"
         },
         {
           "id": 505,
@@ -399,8 +400,9 @@
           "source": "UI_UX_AUDIT §Backend Capabilities",
           "est": "1-2h",
           "priority": "P2",
-          "notes": "ContentDecay exists as buried sub-tab. Add decay alert card to Content Pipeline main view. Show pages with declining traffic and 'Refresh' action button.",
-          "status": "pending"
+          "notes": "Shipped — Dismissible decay alert card in ContentPipeline between summary bar and tabs. Shows total decaying pages, critical/warning counts, avg decline %. Feature #155.",
+          "status": "done",
+          "shippedAt": "2026-03-26"
         },
         {
           "id": 509,
@@ -408,8 +410,9 @@
           "source": "UI_UX_AUDIT §Backend Capabilities",
           "est": "1-2h",
           "priority": "P2",
-          "notes": "Backend has approval-reminders.ts. Add 'Send reminder' button to pending approval batches. Show reminder history (last sent, count).",
-          "status": "pending"
+          "notes": "Shipped — 'Remind' button on PendingApprovals batches with pending items. POST /api/approvals/:wsId/:batchId/remind sends branded email. Loading + 'Sent' confirmation states. Feature #156.",
+          "status": "done",
+          "shippedAt": "2026-03-26"
         },
         {
           "id": 510,
@@ -3010,6 +3013,33 @@
           "est": "3h",
           "priority": "P3",
           "notes": "Shipped — Migrated WorkspaceHome (12 useState→1 useQuery), WorkspaceOverview (6→1), SeoAudit (3 useEffect→3 useQuery), SchemaSuggester (2→2), AssetBrowser (2→2). Created 4 hook files: useWorkspaceHome, useWorkspaceOverview, useAdminSeo (5 hooks), useAdminAssets (2 hooks). All mutations use queryClient.setQueryData for optimistic updates. Completes React Query migration across entire frontend.",
+          "status": "done"
+        },
+        {
+          "id": 336,
+          "title": "Schema strategy isolation — removed from client Inbox",
+          "source": "INTERNAL",
+          "est": "1h",
+          "priority": "P1",
+          "notes": "Shipped — Schema strategy no longer creates approval batch items. send-to-client endpoint updates plan status and sends email without approval items. Strategy review lives in dedicated Schema tab only. Individual per-page schema approvals still use approval system.",
+          "status": "done"
+        },
+        {
+          "id": 337,
+          "title": "SearchTab redesign — insight-first, tables secondary",
+          "source": "CLIENT_DASHBOARD_UX_AUDIT",
+          "est": "1.5h",
+          "priority": "P2",
+          "notes": "Shipped — AI-style natural language takeaway at top, insight cards promoted to hero section (full-width for 1, 2-col for 2+), raw queries/pages tables collapsed by default behind chevron toggle. Visual flow: takeaway → metrics → insights → trend → rank tracking → annotations → collapsible tables.",
+          "status": "done"
+        },
+        {
+          "id": 338,
+          "title": "Test coverage — admin hooks + layout components (37 tests)",
+          "source": "INTERNAL",
+          "est": "1h",
+          "priority": "P2",
+          "notes": "Shipped — useWorkspaces (6), useHealthCheck (3), useQueue (3), Sidebar (12), Breadcrumbs (13). All 37 pass. First hook tests in codebase using renderHook + QueryClientProvider.",
           "status": "done"
         }
       ]

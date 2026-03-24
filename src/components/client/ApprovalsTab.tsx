@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   ClipboardCheck, Check, CheckCircle2, Edit3, X, Loader2, ChevronDown, ChevronRight,
 } from 'lucide-react';
-import { TierGate, type Tier } from '../ui';
+import { TierGate, EmptyState, type Tier } from '../ui';
 import { StatusBadge } from '../ui/StatusBadge';
 import { usePageEditStates } from '../../hooks/usePageEditStates';
 import type { ApprovalBatch, ApprovalItem } from './types';
@@ -93,13 +93,7 @@ export function ApprovalsTab({
       )}
 
       {!approvalsLoading && approvalBatches.length === 0 && (
-        <div className="text-center py-16">
-          <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4">
-            <ClipboardCheck className="w-8 h-8 text-zinc-700" />
-          </div>
-          <h3 className="text-sm font-medium text-zinc-400 mb-1">No pending approvals</h3>
-          <p className="text-[11px] text-zinc-500">Your agency will send SEO changes here for your review.</p>
-        </div>
+        <EmptyState icon={ClipboardCheck} title="No pending approvals" description="Your agency will send SEO changes here for your review." />
       )}
 
       {approvalBatches.map(batch => {

@@ -5,6 +5,7 @@ import {
   Calendar as CalendarIcon, Layers,
 } from 'lucide-react';
 import { contentBriefs, contentPosts, contentRequests, contentMatrices } from '../api/content';
+import { EmptyState } from './ui';
 
 // ── Types ──
 
@@ -450,11 +451,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
 
       {/* Empty state */}
       {items.length === 0 && !loading && (
-        <div className="text-center py-16">
-          <CalendarIcon className="w-10 h-10 text-zinc-700 mx-auto mb-3" />
-          <div className="text-sm text-zinc-400 mb-1">No content items yet</div>
-          <div className="text-[11px] text-zinc-600">Create a content brief to get started</div>
-        </div>
+        <EmptyState icon={CalendarIcon} title="No content items yet" description="Create a content brief to get started" />
       )}
     </div>
   );

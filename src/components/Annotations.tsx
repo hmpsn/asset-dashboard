@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Flag, Plus, Trash2, Loader2 } from 'lucide-react';
 import { annotations as annotationsApi } from '../api/misc';
+import { EmptyState } from './ui';
 
 interface Annotation {
   id: string;
@@ -113,11 +114,7 @@ export function Annotations({ workspaceId }: { workspaceId: string }) {
           ))}
         </div>
       ) : (
-        <div className="text-center py-8">
-          <Flag className="w-6 h-6 text-zinc-700 mx-auto mb-2" />
-          <p className="text-xs text-zinc-500">No annotations yet</p>
-          <p className="text-[11px] text-zinc-500 mt-0.5">Add events like algorithm updates, site launches, or marketing campaigns</p>
-        </div>
+        <EmptyState icon={Flag} title="No annotations yet" description="Add events like algorithm updates, site launches, or marketing campaigns" className="py-8" />
       )}
     </div>
   );

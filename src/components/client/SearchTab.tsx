@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Search, Target, Shield, TrendingDown, AlertTriangle,
-  ArrowUpDown, Activity,
+  ArrowUpDown, Activity, ChevronDown, ChevronRight, Sparkles, Table2,
 } from 'lucide-react';
 import { RankTrackingSection } from '../shared/RankTable';
 import { CompactStatBar, EmptyState } from '../ui';
@@ -30,6 +30,23 @@ interface SearchTabProps {
   insights: SearchInsights | null;
 }
 
+function buildTakeaway(overview: SearchOverview, comparison: SearchComparison | null, insights: SearchInsights | null): string {
+  const parts: string[] = [];
+  if (comparison) {
+    const clickDelta = comparison.changePercent.clicks;
+    if (clickDelta > 10) parts.push(`Clicks are up ${clickDelta}% — nice momentum.`);
+    else if (clickDelta < -10) parts.push(`Clicks dropped ${Math.abs(clickDelta)}% — worth investigating.`);
+    else parts.push('Traffic is holding steady.');
+  }
+  if (insights) {
+    if (insights.lowHanging.length > 3) parts.push(`${insights.lowHanging.length} keywords are close to page 1 — easy wins.`);
+    if (insights.ctrOpps.length > 2) parts.push(`${insights.ctrOpps.length} page-1 keywords have low CTR — title/description improvements could help.`);
+    if (insights.top3 >= 5) parts.push(`${insights.top3} keywords in top 3 — strong authority.`);
+  }
+  if (parts.length === 0) parts.push(`Your site received ${overview.totalClicks.toLocaleString()} clicks from ${overview.totalImpressions.toLocaleString()} impressions this period.`);
+  return parts.join(' ');
+}
+
 export function SearchTab({
   overview, searchComparison, trend, annotations,
   rankHistory, latestRanks, insights,
@@ -37,6 +54,7 @@ export function SearchTab({
   const [sortKey, setSortKey] = useState<SortKey>('clicks');
   const [sortAsc, setSortAsc] = useState(false);
   const [searchSubTab, setSearchSubTab] = useState<'queries' | 'pages'>('queries');
+  const [showRawData, setShowRawData] = useState(false);
 
   const handleSort = (key: SortKey) => { if (sortKey === key) setSortAsc(!sortAsc); else { setSortKey(key); setSortAsc(false); } };
   const sortedQueries = () => {
@@ -52,10 +70,24 @@ export function SearchTab({
     return <EmptyState icon={Search} title="Search data coming soon" description="Once Google Search Console is connected, you'll see how people find your site through Google — keywords, clicks, and ranking positions." />;
   }
 
+  const insightCards = insights ? [
+    insights.lowHanging.length > 0 ? { icon: Target, color: 'amber', title: 'Low-Hanging Fruit', count: insights.lowHanging.length, desc: 'Ranking 5-20 with impressions — push to page 1', items: insights.lowHanging.slice(0, 8).map(q => ({ label: q.query, value: `#${q.position}`, sub: `${q.impressions} imp` })) } : null,
+    insights.topPerformers.length > 0 ? { icon: Shield, color: 'green', title: 'Top Performers', count: insights.topPerformers.length, desc: 'Top 3 with real clicks — protect these', items: insights.topPerformers.slice(0, 8).map(q => ({ label: q.query, value: `#${q.position}`, sub: `${q.clicks} clicks` })) } : null,
+    insights.ctrOpps.length > 0 ? { icon: TrendingDown, color: 'red', title: 'CTR Opportunities', count: insights.ctrOpps.length, desc: 'Page 1 but CTR under 3%', items: insights.ctrOpps.slice(0, 8).map(q => ({ label: q.query, value: `${q.ctr}% CTR`, sub: `#${q.position}` })) } : null,
+    insights.highImpLowClick.length > 0 ? { icon: AlertTriangle, color: 'orange', title: 'Visibility Without Clicks', count: insights.highImpLowClick.length, desc: '100+ impressions, under 5 clicks', items: insights.highImpLowClick.slice(0, 8).map(q => ({ label: q.query, value: `${q.clicks} clicks`, sub: `${q.impressions} imp` })) } : null,
+  ].filter(Boolean) as { icon: React.ComponentType<{ className?: string }>; color: string; title: string; count: number; desc: string; items: { label: string; value: string; sub: string }[] }[] : [];
+
   return (<>
+    {/* Header with takeaway */}
     <div className="mb-2">
       <h2 className="text-xl font-semibold text-zinc-100">Search Performance</h2>
       <p className="text-sm text-zinc-500 mt-1">{overview.dateRange.start} — {overview.dateRange.end}</p>
+    </div>
+
+    {/* AI-style takeaway */}
+    <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl px-5 py-3.5 flex items-start gap-3">
+      <Sparkles className="w-4 h-4 text-teal-400 mt-0.5 shrink-0" />
+      <p className="text-xs text-zinc-300 leading-relaxed">{buildTakeaway(overview, searchComparison, insights)}</p>
     </div>
 
     {/* Compact metrics bar */}
@@ -66,18 +98,10 @@ export function SearchTab({
       { label: 'Avg Position', value: String(overview.avgPosition), valueColor: 'text-amber-400', sub: searchComparison ? `${searchComparison.change.position < 0 ? '↑' : searchComparison.change.position > 0 ? '↓' : ''}${Math.abs(searchComparison.change.position)}` : undefined, subColor: searchComparison ? (searchComparison.change.position <= 0 ? 'text-emerald-400' : 'text-red-400') : undefined },
     ]} />
 
-    {trend.length > 2 && (
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-medium text-zinc-400">Performance Trend</span>
-          <span className="text-[11px] text-zinc-500">{overview.dateRange.start} — {overview.dateRange.end}</span>
-        </div>
-        <DualTrendChart data={trend} annotations={annotations} />
-      </div>
-    )}
-
+    {/* Insights — the hero section */}
     {insights && (
       <div className="space-y-3">
+        {/* Search Health Summary */}
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
           <div className="text-sm font-semibold text-zinc-200 mb-3">Search Health Summary</div>
           <div className="grid grid-cols-4 gap-3">
@@ -103,65 +127,31 @@ export function SearchTab({
             </div>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          {insights.lowHanging.length > 0 && <InsightCard icon={Target} color="amber" title="Low-Hanging Fruit" count={insights.lowHanging.length} desc="Ranking 5-20 with impressions — push to page 1" items={insights.lowHanging.slice(0, 8).map(q => ({ label: q.query, value: `#${q.position}`, sub: `${q.impressions} imp` }))} />}
-          {insights.topPerformers.length > 0 && <InsightCard icon={Shield} color="green" title="Top Performers" count={insights.topPerformers.length} desc="Top 3 with real clicks — protect these" items={insights.topPerformers.slice(0, 8).map(q => ({ label: q.query, value: `#${q.position}`, sub: `${q.clicks} clicks` }))} />}
-          {insights.ctrOpps.length > 0 && <InsightCard icon={TrendingDown} color="red" title="CTR Opportunities" count={insights.ctrOpps.length} desc="Page 1 but CTR under 3%" items={insights.ctrOpps.slice(0, 8).map(q => ({ label: q.query, value: `${q.ctr}% CTR`, sub: `#${q.position}` }))} />}
-          {insights.highImpLowClick.length > 0 && <InsightCard icon={AlertTriangle} color="orange" title="Visibility Without Clicks" count={insights.highImpLowClick.length} desc="100+ impressions, under 5 clicks" items={insights.highImpLowClick.slice(0, 8).map(q => ({ label: q.query, value: `${q.clicks} clicks`, sub: `${q.impressions} imp` }))} />}
+
+        {/* Insight cards — full-width for 1, 2-col for 2+ */}
+        {insightCards.length === 1 ? (
+          <InsightCard {...insightCards[0]} />
+        ) : insightCards.length > 1 ? (
+          <div className="grid grid-cols-2 gap-3">
+            {insightCards.map((card, i) => <InsightCard key={i} {...card} />)}
+          </div>
+        ) : null}
+      </div>
+    )}
+
+    {/* Trend chart */}
+    {trend.length > 2 && (
+      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-sm font-medium text-zinc-400">Performance Trend</span>
+          <span className="text-[11px] text-zinc-500">{overview.dateRange.start} — {overview.dateRange.end}</span>
         </div>
+        <DualTrendChart data={trend} annotations={annotations} />
       </div>
     )}
 
     {/* Rank Tracking */}
     <RankTrackingSection rankHistory={rankHistory} latestRanks={latestRanks} />
-
-    <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-      <div className="flex items-center gap-1 px-4 pt-3 pb-1">
-        {(['queries', 'pages'] as const).map(st => (
-          <button key={st} onClick={() => setSearchSubTab(st)}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${searchSubTab === st ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}
-          >{st === 'queries' ? 'Queries' : 'Pages'}</button>
-        ))}
-      </div>
-      <table className="w-full text-xs">
-        <thead><tr className="border-b border-zinc-800">
-          <th className="text-left py-3 px-4 text-zinc-500 font-medium">{searchSubTab === 'queries' ? 'Query' : 'Page'}</th>
-          {(['clicks', 'impressions', 'ctr', 'position'] as SortKey[]).map(key => (
-            <th key={key} className="text-right py-3 px-3 text-zinc-500 font-medium">
-              <button onClick={() => handleSort(key)} className="flex items-center gap-1 ml-auto hover:text-zinc-300">
-                {key === 'ctr' ? 'CTR' : key.charAt(0).toUpperCase() + key.slice(1)}
-                <Explainer term={key === 'ctr' ? 'ctr' : key} />
-                {sortKey === key && <ArrowUpDown className="w-3 h-3" />}
-              </button>
-            </th>
-          ))}
-        </tr></thead>
-        <tbody>
-          {searchSubTab === 'queries' && sortedQueries().map((q, i) => (
-            <tr key={i} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-              <td className="py-2.5 px-4 text-zinc-300 font-medium">{q.query}</td>
-              <td className="py-2.5 px-3 text-right text-blue-400 font-semibold">{q.clicks}</td>
-              <td className="py-2.5 px-3 text-right text-zinc-400">{q.impressions.toLocaleString()}</td>
-              <td className="py-2.5 px-3 text-right text-emerald-400">{q.ctr}%</td>
-              <td className="py-2.5 px-3 text-right"><span className={q.position <= 10 ? 'text-green-400' : q.position <= 20 ? 'text-amber-400' : 'text-red-400'}>{q.position}</span></td>
-            </tr>
-          ))}
-          {searchSubTab === 'pages' && sortedPages().map((p, i) => {
-            let pagePath: string;
-            try { pagePath = new URL(p.page).pathname; } catch { pagePath = p.page; }
-            return (
-              <tr key={i} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                <td className="py-2.5 px-4 text-zinc-300 font-medium max-w-xs truncate">{pagePath}</td>
-                <td className="py-2.5 px-3 text-right text-blue-400 font-semibold">{p.clicks}</td>
-                <td className="py-2.5 px-3 text-right text-zinc-400">{p.impressions.toLocaleString()}</td>
-                <td className="py-2.5 px-3 text-right text-emerald-400">{p.ctr}%</td>
-                <td className="py-2.5 px-3 text-right"><span className={p.position <= 10 ? 'text-green-400' : p.position <= 20 ? 'text-amber-400' : 'text-red-400'}>{p.position}</span></td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
 
     {/* Annotations (read-only, managed from admin) */}
     {annotations.length > 0 && (
@@ -183,5 +173,67 @@ export function SearchTab({
         </div>
       </div>
     )}
+
+    {/* Raw data tables — collapsible, secondary */}
+    <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+      <button
+        onClick={() => setShowRawData(!showRawData)}
+        className="w-full px-5 py-3.5 flex items-center gap-2 hover:bg-zinc-800/30 transition-colors text-left"
+      >
+        {showRawData ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500" />}
+        <Table2 className="w-4 h-4 text-zinc-400" />
+        <span className="text-sm font-medium text-zinc-300">Raw Data</span>
+        <span className="text-[11px] text-zinc-500 ml-1">{overview.topQueries.length} queries, {overview.topPages.length} pages</span>
+      </button>
+      {showRawData && (
+        <>
+          <div className="flex items-center gap-1 px-4 pb-1 border-t border-zinc-800">
+            {(['queries', 'pages'] as const).map(st => (
+              <button key={st} onClick={() => setSearchSubTab(st)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${searchSubTab === st ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}
+              >{st === 'queries' ? 'Queries' : 'Pages'}</button>
+            ))}
+          </div>
+          <table className="w-full text-xs">
+            <thead><tr className="border-b border-zinc-800">
+              <th className="text-left py-3 px-4 text-zinc-500 font-medium">{searchSubTab === 'queries' ? 'Query' : 'Page'}</th>
+              {(['clicks', 'impressions', 'ctr', 'position'] as SortKey[]).map(key => (
+                <th key={key} className="text-right py-3 px-3 text-zinc-500 font-medium">
+                  <button onClick={() => handleSort(key)} className="flex items-center gap-1 ml-auto hover:text-zinc-300">
+                    {key === 'ctr' ? 'CTR' : key.charAt(0).toUpperCase() + key.slice(1)}
+                    <Explainer term={key === 'ctr' ? 'ctr' : key} />
+                    {sortKey === key && <ArrowUpDown className="w-3 h-3" />}
+                  </button>
+                </th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {searchSubTab === 'queries' && sortedQueries().map((q, i) => (
+                <tr key={i} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                  <td className="py-2.5 px-4 text-zinc-300 font-medium">{q.query}</td>
+                  <td className="py-2.5 px-3 text-right text-blue-400 font-semibold">{q.clicks}</td>
+                  <td className="py-2.5 px-3 text-right text-zinc-400">{q.impressions.toLocaleString()}</td>
+                  <td className="py-2.5 px-3 text-right text-emerald-400">{q.ctr}%</td>
+                  <td className="py-2.5 px-3 text-right"><span className={q.position <= 10 ? 'text-green-400' : q.position <= 20 ? 'text-amber-400' : 'text-red-400'}>{q.position}</span></td>
+                </tr>
+              ))}
+              {searchSubTab === 'pages' && sortedPages().map((p, i) => {
+                let pagePath: string;
+                try { pagePath = new URL(p.page).pathname; } catch { pagePath = p.page; }
+                return (
+                  <tr key={i} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                    <td className="py-2.5 px-4 text-zinc-300 font-medium max-w-xs truncate">{pagePath}</td>
+                    <td className="py-2.5 px-3 text-right text-blue-400 font-semibold">{p.clicks}</td>
+                    <td className="py-2.5 px-3 text-right text-zinc-400">{p.impressions.toLocaleString()}</td>
+                    <td className="py-2.5 px-3 text-right text-emerald-400">{p.ctr}%</td>
+                    <td className="py-2.5 px-3 text-right"><span className={p.position <= 10 ? 'text-green-400' : p.position <= 20 ? 'text-amber-400' : 'text-red-400'}>{p.position}</span></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </>
+      )}
+    </div>
   </>);
 }

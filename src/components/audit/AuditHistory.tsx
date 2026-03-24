@@ -6,7 +6,7 @@ import {
   CheckCircle, Globe, RefreshCw, Copy, ExternalLink, Clock,
   TrendingUp, TrendingDown, Minus,
 } from 'lucide-react';
-import { scoreColorClass } from '../ui';
+import { scoreColorClass, EmptyState } from '../ui';
 import { ScoreTrendChart } from './ScoreTrendChart';
 import { ActionItemsPanel } from './ActionItemsPanel';
 import type { SnapshotSummary } from './types';
@@ -26,15 +26,7 @@ export function AuditHistory({ siteId, history, onRefresh }: { siteId: string; h
 
   if (history.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-4">
-        <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center">
-          <Clock className="w-8 h-8 text-zinc-500" />
-        </div>
-        <p className="text-zinc-400 text-sm">No audit history yet</p>
-        <p className="text-xs text-zinc-500 max-w-md text-center">
-          Run an SEO audit and click "Save & Share" to start tracking changes over time
-        </p>
-      </div>
+      <EmptyState icon={Clock} title="No audit history yet" description="Run an SEO audit and click 'Save & Share' to start tracking changes over time" />
     );
   }
 

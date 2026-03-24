@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { EmptyState } from './ui';
 import {
   Loader2, FileText, PenLine, Clock, CheckCircle2, Eye, Send,
   Trash2, Download, Search, ArrowUpDown, Filter,
@@ -198,26 +199,14 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
 
       {/* Empty state */}
       {posts.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-16 gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center">
-            <FileText className="w-8 h-8 text-zinc-600" />
-          </div>
-          <p className="text-sm text-zinc-400">No content generated yet</p>
-          <p className="text-xs text-zinc-500 max-w-md text-center">
-            Generate content from a Content Brief — once created, all generated pieces will appear here for review and approval.
-          </p>
-        </div>
+        <EmptyState icon={FileText} title="No content generated yet" description="Generate content from a Content Brief — once created, all generated pieces will appear here for review and approval." />
       )}
 
       {/* Filtered empty state */}
       {posts.length > 0 && filtered.length === 0 && (
-        <div className="flex flex-col items-center py-8 gap-2">
-          <Filter className="w-5 h-5 text-zinc-600" />
-          <p className="text-xs text-zinc-500">No content matches your filters</p>
-          <button onClick={() => { setSearch(''); setStatusFilter('all'); }} className="text-[11px] text-teal-400 hover:text-teal-300">
-            Clear filters
-          </button>
-        </div>
+        <EmptyState icon={Filter} title="No content matches your filters" className="py-8" action={
+          <button onClick={() => { setSearch(''); setStatusFilter('all'); }} className="text-[11px] text-teal-400 hover:text-teal-300">Clear filters</button>
+        } />
       )}
 
       {/* Post list */}

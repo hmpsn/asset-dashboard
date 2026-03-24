@@ -1,6 +1,6 @@
 import { TrendingUp, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { SectionCard } from '../ui';
+import { SectionCard, EmptyState } from '../ui';
 import { adminPath } from '../../routes';
 
 interface RankEntry {
@@ -44,9 +44,7 @@ export function RankingsSnapshot({ ranks, gscPropertyUrl, workspaceId, className
           ))}
         </div>
       ) : (
-        <div className="px-4 py-8 text-center text-xs text-zinc-500">
-          {gscPropertyUrl ? 'No keywords tracked yet' : 'Connect GSC to track rankings'}
-        </div>
+        <EmptyState icon={TrendingUp} title={gscPropertyUrl ? 'No keywords tracked yet' : 'Connect GSC to track rankings'} className="py-8" />
       )}
     </SectionCard>
   );
