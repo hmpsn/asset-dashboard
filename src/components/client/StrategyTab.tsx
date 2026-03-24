@@ -3,7 +3,7 @@ import {
   Zap, FileText, Sparkles, Target, CheckCircle2,
   TrendingUp, TrendingDown, Minus, ChevronDown, Shield, BookOpen, Layers,
   MessageCircle, BarChart3, Eye, AlertTriangle, Award, MessageCircleQuestion,
-  ThumbsUp, ThumbsDown, Undo2, Ban, ArrowUp, ArrowDown, Plus, X, Briefcase,
+  ThumbsUp, ThumbsDown, Undo2, Ban, Plus, X, Briefcase,
 } from 'lucide-react';
 import { TierGate, EmptyState, type Tier } from '../ui';
 import type { ClientKeywordStrategy, ClientContentRequest } from './types';
@@ -86,7 +86,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         next.set(kw, status);
         return next;
       });
-      setToast?.(status === 'approved' ? `"${keyword}" approved — we'll prioritize this keyword` : `"${keyword}" declined — it won't appear in future strategies`);
+      setToast?.(status === 'approved' ? `"${keyword}" marked relevant — we'll prioritize this keyword` : `"${keyword}" declined — it won't appear in future strategies`);
     } catch {
       setToast?.('Failed to save feedback');
     } finally {
@@ -123,10 +123,12 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const [newPriorityCategory, setNewPriorityCategory] = useState('growth');
   const [savingPriorities, setSavingPriorities] = useState(false);
 
-  // ── Content Gap Voting State ──
-  const [gapVotes, setGapVotes] = useState<Record<string, 'up' | 'down'>>({});
+  // ── Tracked Keywords State ──
+  const [trackedKeywords, setTrackedKeywords] = useState<{ query: string; pinned: boolean; addedAt: string }[]>([]);
+  const [newTrackedKeyword, setNewTrackedKeyword] = useState('');
+  const [addingKeyword, setAddingKeyword] = useState(false);
 
-  // Load business priorities + gap votes on mount
+  // Load business priorities + tracked keywords on mount
   useEffect(() => {
     if (!workspaceId) return;
     fetch(`/api/public/business-priorities/${workspaceId}`)
@@ -137,14 +139,10 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       })
       .catch(() => setPrioritiesLoaded(true));
 
-    fetch(`/api/public/content-gap-votes/${workspaceId}`)
-      .then(r => r.ok ? r.json() : { votes: {} })
-      .then((data: { votes: Record<string, string> }) => {
-        const v: Record<string, 'up' | 'down'> = {};
-        for (const [k, val] of Object.entries(data.votes)) {
-          if (val === 'up' || val === 'down') v[k] = val;
-        }
-        setGapVotes(v);
+    fetch(`/api/public/tracked-keywords/${workspaceId}`)
+      .then(r => r.ok ? r.json() : { keywords: [] })
+      .then((data: { keywords: { query: string; pinned: boolean; addedAt: string }[] }) => {
+        setTrackedKeywords(data.keywords || []);
       })
       .catch(() => { /* silent */ });
   }, [workspaceId]);
@@ -163,21 +161,6 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
     }
   }, [workspaceId, setToast]);
 
-  const voteOnGap = useCallback(async (keyword: string, vote: 'up' | 'down' | 'none') => {
-    if (!workspaceId) return;
-    const kw = keyword.toLowerCase().trim();
-    try {
-      await post(`/api/public/content-gap-vote/${workspaceId}`, { keyword: kw, vote });
-      setGapVotes(prev => {
-        const next = { ...prev };
-        if (vote === 'none') delete next[kw];
-        else next[kw] = vote;
-        return next;
-      });
-    } catch {
-      setToast?.('Failed to save vote');
-    }
-  }, [workspaceId, setToast]);
 
   // Refs for scroll-to-section
   const contentOpportunitiesRef = useRef<HTMLDivElement>(null);
@@ -518,25 +501,6 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                     <div key={i} className="px-3.5 py-2.5 rounded-lg bg-zinc-950/50 border border-zinc-800/80 hover:border-teal-500/30 transition-all group flex flex-col">
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-1.5 flex-1 min-w-0 mr-2">
-                          {/* Content gap voting */}
-                          {workspaceId && (
-                            <div className="flex flex-col items-center gap-px flex-shrink-0 -ml-1">
-                              <button
-                                onClick={() => voteOnGap(gap.targetKeyword, gapVotes[gap.targetKeyword.toLowerCase().trim()] === 'up' ? 'none' : 'up')}
-                                className={`p-0.5 rounded transition-colors ${gapVotes[gap.targetKeyword.toLowerCase().trim()] === 'up' ? 'text-teal-400 bg-teal-500/20' : 'text-zinc-600 hover:text-teal-400 hover:bg-teal-500/10'}`}
-                                title="Interested in this topic"
-                              >
-                                <ArrowUp className="w-3 h-3" />
-                              </button>
-                              <button
-                                onClick={() => voteOnGap(gap.targetKeyword, gapVotes[gap.targetKeyword.toLowerCase().trim()] === 'down' ? 'none' : 'down')}
-                                className={`p-0.5 rounded transition-colors ${gapVotes[gap.targetKeyword.toLowerCase().trim()] === 'down' ? 'text-red-400 bg-red-500/20' : 'text-zinc-600 hover:text-red-400 hover:bg-red-500/10'}`}
-                                title="Not interested in this topic"
-                              >
-                                <ArrowDown className="w-3 h-3" />
-                              </button>
-                            </div>
-                          )}
                           <span className="text-xs font-semibold text-zinc-100 truncate">{gap.topic}</span>
                         </div>
                         <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -599,7 +563,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                               disabled={loading}
                               className="flex items-center gap-1 px-2 py-1 rounded text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
                             >
-                              <ThumbsUp className="w-3 h-3" /> Approve
+                              <ThumbsUp className="w-3 h-3" /> Relevant
                             </button>
                             <button
                               onClick={() => { setDeclineReason({ keyword: gap.targetKeyword, source: 'content_gap' }); setDeclineReasonText(''); }}
@@ -754,7 +718,11 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
 
             return { ...p, reasons, actions, priority, hasImpressions };
           })
-          .sort((a, b) => b.priority - a.priority);
+          .sort((a, b) => {
+            // "Almost there" (has impressions) always first
+            if (a.hasImpressions !== b.hasImpressions) return a.hasImpressions ? -1 : 1;
+            return b.priority - a.priority;
+          });
 
         if (unranked.length === 0) return null;
 
@@ -902,7 +870,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
 
         {expandedSections.has('target-keywords') && (
           <div className="px-4 pb-4">
-            <div className="flex flex-wrap gap-2">
+            <p className="text-[11px] text-zinc-500 mb-3">Keywords from your strategy are automatically tracked. You can also add your own keywords below.</p>
+            <div className="flex flex-wrap gap-2 mb-3">
               {strategyData.siteKeywords.slice(0, 15).map(kw => (
                 <span key={kw} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-zinc-800 border border-zinc-700 text-[11px] text-zinc-400">
                   {kw}
@@ -912,6 +881,81 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 <span className="text-[11px] text-zinc-500 px-2 py-1">+{strategyData.siteKeywords.length - 15} more</span>
               )}
             </div>
+            {/* Client-added keywords */}
+            {(() => {
+              const strategySet = new Set(strategyData.siteKeywords.map(k => k.toLowerCase().trim()));
+              const clientAdded = trackedKeywords.filter(tk => !strategySet.has(tk.query.toLowerCase().trim()));
+              return clientAdded.length > 0 ? (
+                <div className="mb-3">
+                  <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">Your keywords</div>
+                  <div className="flex flex-wrap gap-2">
+                    {clientAdded.map(tk => (
+                      <span key={tk.query} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-teal-500/10 border border-teal-500/20 text-[11px] text-teal-400">
+                        {tk.query}
+                        <button
+                          onClick={async () => {
+                            try {
+                              const res = await fetch(`/api/public/tracked-keywords/${workspaceId}`, {
+                                method: 'DELETE',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ keyword: tk.query }),
+                              });
+                              if (res.ok) {
+                                const data = await res.json();
+                                setTrackedKeywords(data.keywords || []);
+                                setToast?.(`"${tk.query}" removed from tracking`);
+                              }
+                            } catch { setToast?.('Failed to remove keyword'); }
+                          }}
+                          className="text-zinc-500 hover:text-red-400 transition-colors"
+                          title="Remove keyword"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null;
+            })()}
+            {/* Add keyword input */}
+            {workspaceId && (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const kw = newTrackedKeyword.trim();
+                  if (!kw || kw.length < 2 || addingKeyword) return;
+                  setAddingKeyword(true);
+                  try {
+                    const res = await post(`/api/public/tracked-keywords/${workspaceId}`, { keyword: kw });
+                    setTrackedKeywords((res as { keywords: typeof trackedKeywords }).keywords || []);
+                    setNewTrackedKeyword('');
+                    setToast?.(`"${kw}" added to keyword tracking`);
+                  } catch {
+                    setToast?.('Failed to add keyword');
+                  } finally {
+                    setAddingKeyword(false);
+                  }
+                }}
+                className="flex items-center gap-2"
+              >
+                <input
+                  type="text"
+                  value={newTrackedKeyword}
+                  onChange={e => setNewTrackedKeyword(e.target.value)}
+                  placeholder="Add a keyword to track..."
+                  className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-[11px] text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-teal-500 transition-colors"
+                  maxLength={120}
+                />
+                <button
+                  type="submit"
+                  disabled={addingKeyword || newTrackedKeyword.trim().length < 2}
+                  className="px-3 py-1.5 rounded-lg bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 font-medium hover:bg-teal-600/30 transition-colors disabled:opacity-50 flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" /> Track
+                </button>
+              </form>
+            )}
           </div>
         )}
       </div>

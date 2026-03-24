@@ -23,6 +23,7 @@ export interface PageKeywordMap {
   secondaryKeywords: string[];
   searchIntent?: string;
   currentPosition?: number;
+  previousPosition?: number;
   impressions?: number;
   clicks?: number;
   // GSC per-keyword data (stored during strategy enrichment)

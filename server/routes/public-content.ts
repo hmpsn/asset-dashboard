@@ -21,6 +21,7 @@ import { sanitizeString, validateEnum } from '../helpers.js';
 import { getClientActor } from '../middleware.js';
 import { getPageTrend, getQueryPageData } from '../search-console.js';
 import { getWorkspace } from '../workspaces.js';
+import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword } from '../rank-tracking.js';
 import { handleContentPerformance } from './content-requests.js';
 
 // --- Public SEO Strategy (client dashboard, gated behind seoClientView) ---
@@ -41,12 +42,14 @@ router.get('/api/public/seo-strategy/:workspaceId', (req, res) => {
       secondaryKeywords: p.secondaryKeywords || [],
       searchIntent: p.searchIntent,
       currentPosition: p.currentPosition,
+      previousPosition: p.previousPosition,
       impressions: p.impressions,
       clicks: p.clicks,
       volume: p.volume,
       difficulty: p.difficulty,
       metricsSource: p.metricsSource,
       validated: p.validated,
+      gscKeywords: p.gscKeywords || [],
     })),
     opportunities: strategy.opportunities || [],
     contentGaps: (strategy.contentGaps || []).map(g => ({
@@ -339,6 +342,32 @@ router.get('/api/public/content-performance/:workspaceId', async (req, res) => {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     res.status(err instanceof Error && msg === 'Workspace not found' ? 404 : 500).json({ error: msg });
   }
+});
+
+// --- Public Tracked Keywords (client can view/add/remove) ---
+router.get('/api/public/tracked-keywords/:workspaceId', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  res.json({ keywords: getTrackedKeywords(ws.id) });
+});
+
+router.post('/api/public/tracked-keywords/:workspaceId', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const keyword = sanitizeString(req.body?.keyword || '').toLowerCase().trim();
+  if (!keyword || keyword.length < 2) return res.status(400).json({ error: 'Keyword must be at least 2 characters' });
+  if (keyword.length > 120) return res.status(400).json({ error: 'Keyword too long' });
+  const keywords = addTrackedKeyword(ws.id, keyword);
+  res.json({ keywords });
+});
+
+router.delete('/api/public/tracked-keywords/:workspaceId', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const keyword = sanitizeString(req.body?.keyword || '').toLowerCase().trim();
+  if (!keyword) return res.status(400).json({ error: 'Keyword required' });
+  const keywords = removeTrackedKeyword(ws.id, keyword);
+  res.json({ keywords });
 });
 
 export default router;

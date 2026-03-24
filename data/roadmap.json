@@ -3050,6 +3050,15 @@
           "priority": "P1",
           "notes": "Shipped — status emails: 1/day morning digest at 9am ET. Audit emails: max 1/14 days. Action emails: max 3/day. Alert emails: max 1/day. Global cap: 5 non-transactional/day per client. Transactional (password reset, welcome, trial) never throttled. SQLite email_sends table with 30-day auto-cleanup. Integrated into batching queue, approval reminders, manual remind endpoint (429 if throttled), monthly reports.",
           "status": "done"
+        },
+        {
+          "id": 340,
+          "title": "Client strategy UI refinements — voting simplification, growth sort, GSC fix, keyword tracking auto-seed + client add",
+          "source": "CLIENT_FEEDBACK",
+          "est": "1.5h",
+          "priority": "P1",
+          "notes": "Shipped — (1) Content Opportunities: removed duplicative up/down arrows, kept Relevant/Not relevant buttons. (2) Growth Opportunities: 'Almost there' items sorted to top. (3) Page Performance Map: fixed 'No GSC data' bug — gscKeywords + previousPosition were stripped from public endpoint. (4) Keyword Tracking: auto-seed from strategy keywords on generation + client-facing add/remove UI with new public endpoints. (5) Client keywords → content pipeline: tracked keywords injected into strategy keyword pool with source:'client', AI batch prompt highlights them for priority page assignment, master prompt ensures content gaps are generated for uncovered client keywords.",
+          "status": "done"
         }
       ]
     }

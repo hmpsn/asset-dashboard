@@ -20,6 +20,7 @@ import {
   getSearchCountryBreakdown,
   getSearchPeriodComparison,
 } from '../search-console.js';
+import { addTrackedKeyword, getTrackedKeywords } from '../rank-tracking.js';
 import {
   isSemrushConfigured,
   getKeywordOverview,
@@ -635,7 +636,17 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         keywordPool.set(kw, { volume: rk.volume, difficulty: rk.difficulty, source: 'related' });
       }
     }
-    log.info(`Keyword pool: ${keywordPool.size} unique terms (${semrushDomainData.length} domain + ${competitorKeywordData.length} competitor + ${keywordGaps.length} gaps + GSC)`);
+    // Add client-tracked keywords to the pool — these are keywords the client explicitly wants to target
+    const clientTracked = getTrackedKeywords(ws.id);
+    let clientKeywordsAdded = 0;
+    for (const tk of clientTracked) {
+      const kw = tk.query.toLowerCase().trim();
+      if (!keywordPool.has(kw) && kw.length > 1) {
+        keywordPool.set(kw, { volume: 0, difficulty: 0, source: 'client' });
+        clientKeywordsAdded++;
+      }
+    }
+    log.info(`Keyword pool: ${keywordPool.size} unique terms (${semrushDomainData.length} domain + ${competitorKeywordData.length} competitor + ${keywordGaps.length} gaps + ${clientKeywordsAdded} client + GSC)`);
     if (keywordPool.size > 0) {
       // Sort by volume descending and include ALL keywords
       const poolList = [...keywordPool.entries()]
@@ -643,7 +654,12 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         .slice(0, 200)
         .map(([kw, m]) => `"${kw}" (${m.volume}/mo${m.difficulty ? ` KD:${m.difficulty}%` : ''})`)
         .join(', ');
-      semrushBatchRef = `\n\nKEYWORD POOL — VERIFIED search terms with real volume. You MUST pick primaryKeyword from this list when a reasonable match exists for the page topic. Only invent a new keyword if NONE of these are relevant:\n${poolList}`;
+      // Call out client-requested keywords so AI gives them priority
+      const clientKws = [...keywordPool.entries()].filter(([, m]) => m.source === 'client').map(([kw]) => `"${kw}"`);
+      const clientNote = clientKws.length > 0
+        ? `\n\nCLIENT-REQUESTED KEYWORDS — The client specifically wants to target these keywords. Give them PRIORITY when assigning to relevant pages, and ensure they appear in content gap suggestions if no existing page covers them:\n${clientKws.join(', ')}`
+        : '';
+      semrushBatchRef = `\n\nKEYWORD POOL — VERIFIED search terms with real volume. You MUST pick primaryKeyword from this list when a reasonable match exists for the page topic. Only invent a new keyword if NONE of these are relevant:\n${poolList}${clientNote}`;
     }
 
     const runBatch = async (batch: typeof pageInfo, batchIdx: number) => {
@@ -959,7 +975,7 @@ Return JSON with this EXACT structure (do NOT include a pageMap — it's already
 
 Rules:
 - siteKeywords: 8-15 broad themes covering the full site
-- contentGaps: 6-10 NEW pages/posts to create that DO NOT overlap with existing pages listed above. CRITICAL: Every targetKeyword MUST come from the SEMRush/GSC data above when available — do NOT invent keywords. ${hasSemrush ? 'PRIORITIZE keywords from COMPETITOR KEYWORD GAPS — these are keywords competitors rank for that this site doesn\'t. For each gap backed by competitor data, include competitorProof citing which competitor ranks and at what position. At least 50% of content gaps should come from competitor gap data.' : ''} Before suggesting a content gap, verify no current page already targets that keyword or covers that topic. If an existing page is thin or weak on a topic, suggest it as a quickWin improvement instead of creating a competing new page. Vary intent (informational, commercial, transactional). Mix high and medium priority
+- contentGaps: 6-10 NEW pages/posts to create that DO NOT overlap with existing pages listed above. CRITICAL: Every targetKeyword MUST come from the SEMRush/GSC data above when available — do NOT invent keywords. ${hasSemrush ? 'PRIORITIZE keywords from COMPETITOR KEYWORD GAPS — these are keywords competitors rank for that this site doesn\'t. For each gap backed by competitor data, include competitorProof citing which competitor ranks and at what position. At least 50% of content gaps should come from competitor gap data.' : ''}${clientKeywordsAdded > 0 ? ` CLIENT-REQUESTED KEYWORDS get HIGH PRIORITY: if any client-requested keyword from the pool has no existing page covering it, it MUST appear as a content gap. The client specifically wants to rank for these terms.` : ''} Before suggesting a content gap, verify no current page already targets that keyword or covers that topic. If an existing page is thin or weak on a topic, suggest it as a quickWin improvement instead of creating a competing new page. Vary intent (informational, commercial, transactional). Mix high and medium priority
 - suggestedPageType: Choose the best page type for each content gap. Use "blog" for informational articles, "landing" for conversion pages, "service" for service descriptions, "location" for local SEO, "product" for product pages, "pillar" for topic hubs, "resource" for guides/downloads.
 - quickWins: 3-5 existing pages where small changes boost rankings. Use GSC data if available (high impressions + poor position = opportunity).
 - If DEVICE BREAKDOWN shows mobile ranking gaps, include a mobile-optimization quick win.
@@ -1509,6 +1525,19 @@ Rules:
     };
     updateWorkspace(ws.id, { keywordStrategy });
     incrementUsage(ws.id, 'strategy_generations');
+
+    // Auto-seed rank tracking with strategy keywords (deduplicates internally)
+    try {
+      const seedKeywords = new Set<string>();
+      for (const kw of keywordStrategy.siteKeywords || []) seedKeywords.add(kw.toLowerCase().trim());
+      for (const pm of keywordStrategy.pageMap || []) {
+        if (pm.primaryKeyword) seedKeywords.add(pm.primaryKeyword.toLowerCase().trim());
+      }
+      for (const kw of seedKeywords) addTrackedKeyword(ws.id, kw);
+      log.info(`Auto-seeded ${seedKeywords.size} keywords into rank tracking for ${ws.name}`);
+    } catch (seedErr) {
+      log.warn({ err: seedErr }, 'Failed to auto-seed rank tracking keywords');
+    }
 
     if (keepalive) clearInterval(keepalive);
 
