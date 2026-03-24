@@ -15,7 +15,7 @@ interface ApprovalsTabProps {
   pendingApprovals: number;
   effectiveTier: Tier;
   setApprovalBatches: React.Dispatch<React.SetStateAction<ApprovalBatch[]>>;
-  loadApprovals: (wsId: string) => Promise<void>;
+  loadApprovals: (wsId: string) => void;
   setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
 }
 

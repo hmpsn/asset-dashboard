@@ -2975,6 +2975,42 @@
           "priority": "P2",
           "notes": "Shipped — Fixed all ESLint errors in ClientDashboard.tsx (10 errors → 0). Replaced ~25 unknown[] types across useClientData.ts, analytics.ts, content.ts, seo.ts with proper typed interfaces. Added 8 new shared type exports. Fixed setPricingData/setAuthMode/setClientUser type mismatches, Date.now() purity violation, Toast type incompatibility.",
           "status": "done"
+        },
+        {
+          "id": 332,
+          "title": "React Query Migration — Phase 1: Client Portal (useClientData)",
+          "source": "INTERNAL",
+          "est": "3h",
+          "priority": "P1",
+          "notes": "Shipped — Created 3 React Query hook files (useClientSearch, useClientGA4, useClientQueries) + barrel index in src/hooks/client/. Rewrote useClientData.ts as backward-compatible facade composing 15 useQuery hooks. Replaced loadDashboardData with dataEnabled gate, refetchClient with queryClient.invalidateQueries, loadSearchData/loadGA4Data with query-key-driven refetch. Simplified audit:complete WS handler. Fixed loadApprovals prop types in ApprovalsTab + InboxTab. 130 component tests pass, tsc + vite build clean.",
+          "status": "done"
+        },
+        {
+          "id": 333,
+          "title": "React Query Migration — Phase 2: Analytics (GoogleAnalytics + SearchConsole)",
+          "source": "INTERNAL",
+          "est": "2h",
+          "priority": "P2",
+          "notes": "Shipped — Created useAdminGA4 (11 queries) and useAdminSearch (6 queries) in src/hooks/admin/. Rewrote GoogleAnalytics.tsx: removed 14 useState + useCallback + useEffect, replaced with useAdminGA4 hook. Rewrote SearchConsole.tsx: removed 9 useState + useEffect + loadData, replaced with useAdminSearch hook. Removed 3 duplicate local interfaces (use shared types). Fixed GA4PeriodComparison type bug. 130 tests pass, tsc + vite build clean.",
+          "status": "done"
+        },
+        {
+          "id": 334,
+          "title": "React Query Migration — Phase 3: Content Pipeline",
+          "source": "INTERNAL",
+          "est": "2.5h",
+          "priority": "P2",
+          "notes": "Migrate ContentBriefs.tsx (15 useState), ContentManager.tsx (5), PostEditor.tsx (5). Convert brief generation and post generation to useMutation. Brief/post lists become useQuery with cache invalidation on create/update/delete.",
+          "status": "pending"
+        },
+        {
+          "id": 335,
+          "title": "React Query Migration — Phase 4: SEO Tools + Admin Dashboards",
+          "source": "INTERNAL",
+          "est": "3h",
+          "priority": "P3",
+          "notes": "Migrate SeoAudit.tsx (15 useState), SchemaSuggester.tsx (15), WorkspaceHome.tsx (12), WorkspaceOverview.tsx (6), AssetBrowser.tsx (11). Lower priority — admin-facing surfaces with less frequent usage. Completes the migration for all Tier 1+2 components (~110 fetch-related useState calls total across all phases).",
+          "status": "pending"
         }
       ]
     }

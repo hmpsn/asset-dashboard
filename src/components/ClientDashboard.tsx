@@ -44,7 +44,6 @@ import {
   QUICK_QUESTIONS, LEARN_SEO_QUESTIONS,
   type WorkspaceInfo,
   type ClientTab,
-  type AuditSummary,
   type ClientContentRequest,
 } from './client/types';
 
@@ -68,7 +67,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   // ── Data hook (dashboard state + data loading) ──
   const {
     ws, setWs,
-    overview, trend, audit, setAudit, auditDetail,
+    overview, trend, audit, auditDetail,
     loading, setLoading, error, setError,
     strategyData, requestedTopics, setRequestedTopics,
     requestingTopic, setRequestingTopic, // eslint-disable-line @typescript-eslint/no-unused-vars
@@ -209,8 +208,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     'content-request:created': () => refetchClient('content', `/api/public/content-requests/${workspaceId}`),
     'content-request:update': () => refetchClient('content', `/api/public/content-requests/${workspaceId}`),
     'audit:complete': () => {
-      getOptional<AuditSummary>(`/api/public/audit-summary/${workspaceId}`).then(a => { if (a?.id) setAudit(a); }).catch((err) => { console.error('ClientDashboard operation failed:', err); });
-      refetchClient('activity', `/api/public/activity/${workspaceId}?limit=20`);
+      refetchClient('audit', '');
+      refetchClient('activity', '');
     },
     'workspace:updated': () => {
       getOptional<WorkspaceInfo>(`/api/public/workspace/${workspaceId}`).then(data => { if (data?.id) setWs(data); }).catch((err) => { console.error('ClientDashboard operation failed:', err); });

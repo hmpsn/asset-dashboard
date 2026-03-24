@@ -844,6 +844,28 @@ A brief value assessment of every feature in the platform, covering what it does
 
 ---
 
+### 75. React Query Migration — Phase 1 (Client Portal)
+**What it does:** Replaced the monolithic `useClientData.ts` (312 lines, 32 `useState`, 6 `useCallback` fetch functions) with React Query-backed individual hooks composed via a backward-compatible facade. Created `src/hooks/client/useClientSearch.ts` (GSC overview, trend, comparison, devices), `src/hooks/client/useClientGA4.ts` (12 GA4 endpoints), and `src/hooks/client/useClientQueries.ts` (activity, ranks, annotations, anomalies, approvals, requests, content requests, audit, strategy, pricing, content plan). All data fetching now goes through `useQuery` with automatic caching (60s stale, 5min GC), stale-while-revalidate on tab focus, and per-query error states. WebSocket handlers now use `queryClient.invalidateQueries` instead of manual re-fetches. Date range changes trigger automatic refetch via query key changes. Return interface unchanged — `ClientDashboard.tsx` required only removal of `setAudit`/`AuditSummary` (now unused) and simplified `audit:complete` handler.
+
+**Agency value:** Individual hooks are 15-25 lines each vs the previous 312-line monolith. New features no longer need to thread state through `useClientData`. WebSocket integration is one-liners. React Query DevTools available for debugging.
+
+**Client value:** Stale-while-revalidate means instant tab switching with background refresh. Per-section loading instead of one spinner for 15+ endpoints.
+
+**Mutual:** Foundation for Phases 2-4 (analytics, content, SEO tools) and future component-level hook imports.
+
+---
+
+### 76. React Query Migration — Phase 2 (Admin Analytics)
+**What it does:** Migrated `GoogleAnalytics.tsx` (14 `useState`, 1 `useCallback`, 1 `useEffect`, 611 lines) and `SearchConsole.tsx` (9 `useState`, 1 `useEffect`, 610 lines) from manual `Promise.all` data fetching to React Query hooks. Created `src/hooks/admin/useAdminGA4.ts` (11 parallel queries) and `src/hooks/admin/useAdminSearch.ts` (6 parallel queries). Removed 23 `useState` declarations and all manual `loadData` functions. Removed 3 duplicate local interfaces from `SearchConsole.tsx` (already in shared types). Fixed `GA4PeriodComparison` type error in `GoogleAnalytics.tsx` (should have been `GA4Comparison`). Date range changes now trigger automatic refetch via query key changes instead of imperative `loadData` calls.
+
+**Agency value:** Both components dropped ~50 lines of state management boilerplate. Admin analytics hooks are reusable across any admin view. Retry is built into React Query (1 automatic retry) instead of manual retry buttons.
+
+**Client value:** Instant cached data when switching between admin tabs. Background refresh on window focus.
+
+**Mutual:** Consistent React Query patterns across client portal and admin analytics.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |

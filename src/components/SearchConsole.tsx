@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Loader2, Search, TrendingUp, TrendingDown, Eye, MousePointer,
   BarChart3, ExternalLink, ArrowUpDown,
@@ -8,32 +8,8 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'rec
 import { PageHeader, StatCard, SectionCard, TabBar, DateRangeSelector, EmptyState } from './ui';
 import { Annotations } from './Annotations';
 import { DATE_PRESETS_SEARCH } from './ui/constants';
-import { gscAdmin } from '../api/analytics';
-import type { SearchOverview, PerformanceTrend, SearchComparison, SearchQuery, SearchPage } from '../../shared/types/analytics';
-
-interface DeviceBreakdown {
-  device: string;
-  clicks: number;
-  impressions: number;
-  ctr: number;
-  position: number;
-}
-
-interface CountryBreakdown {
-  country: string;
-  clicks: number;
-  impressions: number;
-  ctr: number;
-  position: number;
-}
-
-interface SearchTypeBreakdown {
-  searchType: string;
-  clicks: number;
-  impressions: number;
-  ctr: number;
-  position: number;
-}
+import type { PerformanceTrend, SearchQuery, SearchPage } from '../../shared/types/analytics';
+import { useAdminSearch } from '../hooks/admin';
 
 interface Props {
   siteId: string;
@@ -93,56 +69,16 @@ type DataTab = 'queries' | 'pages' | 'insights';
 
 
 export function SearchConsole({ siteId, workspaceId, gscPropertyUrl }: Props) {
-  const [overview, setOverview] = useState<SearchOverview | null>(null);
-  const [trend, setTrend] = useState<PerformanceTrend[]>([]);
-  const [devices, setDevices] = useState<DeviceBreakdown[]>([]);
-  const [countries, setCountries] = useState<CountryBreakdown[]>([]);
-  const [searchTypes, setSearchTypes] = useState<SearchTypeBreakdown[]>([]);
-  const [comparison, setComparison] = useState<SearchComparison | null>(null);
-  const [dataLoading, setDataLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<DataTab>('queries');
   const [days, setDays] = useState(28);
   const [sortKey, setSortKey] = useState<SortKey>('clicks');
   const [sortAsc, setSortAsc] = useState(false);
   const [annotationsOpen, setAnnotationsOpen] = useState(false);
 
-
-  // Load data when gscPropertyUrl is available
-  useEffect(() => {
-    if (gscPropertyUrl) {
-      loadData(gscPropertyUrl);
-    }
-  }, [siteId, gscPropertyUrl]);
-
-  const loadData = async (gscUrl?: string, d?: number) => {
-    const siteUrl = gscUrl || gscPropertyUrl;
-    const numDays = d || days;
-    if (!siteUrl) return;
-    setDataLoading(true);
-    setError(null);
-    try {
-      const [overviewData, trendData, devicesData, countriesData, typesData, compData] = await Promise.all([
-        gscAdmin.overview(siteId, siteUrl, numDays),
-        gscAdmin.trend(siteId, siteUrl, numDays),
-        gscAdmin.devices(siteId, siteUrl, numDays),
-        gscAdmin.countries(siteId, siteUrl, numDays),
-        gscAdmin.searchTypes(siteId, siteUrl, numDays),
-        gscAdmin.comparison(siteId, siteUrl, numDays),
-      ]);
-      if (overviewData) setOverview(overviewData);
-      else if (!overview) setError('Failed to load search overview');
-      setTrend(Array.isArray(trendData) ? trendData : []);
-      if (Array.isArray(devicesData)) setDevices(devicesData as DeviceBreakdown[]);
-      if (Array.isArray(countriesData)) setCountries(countriesData as CountryBreakdown[]);
-      if (Array.isArray(typesData)) setSearchTypes(typesData as SearchTypeBreakdown[]);
-      if (compData) setComparison(compData);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load data');
-    } finally {
-      setDataLoading(false);
-    }
-  };
+  const {
+    overview, trend, devices, countries, searchTypes, comparison,
+    isLoading: dataLoading, error,
+  } = useAdminSearch(siteId, gscPropertyUrl, days);
 
 
   const handleSort = (key: SortKey) => {
@@ -209,7 +145,7 @@ export function SearchConsole({ siteId, workspaceId, gscPropertyUrl }: Props) {
           <DateRangeSelector
             options={DATE_PRESETS_SEARCH}
             selected={days}
-            onChange={d => { setDays(d); loadData(undefined, d); }}
+            onChange={d => setDays(d)}
           />
         </>}
       />

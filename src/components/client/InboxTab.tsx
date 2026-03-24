@@ -21,7 +21,7 @@ interface InboxTabProps {
   approvalsLoading: boolean;
   pendingApprovals: number;
   setApprovalBatches: React.Dispatch<React.SetStateAction<ApprovalBatch[]>>;
-  loadApprovals: (wsId: string) => Promise<void>;
+  loadApprovals: (wsId: string) => void;
   // Requests
   requests: ClientRequest[];
   requestsLoading: boolean;

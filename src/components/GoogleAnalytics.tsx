@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Loader2, Users, Eye, Clock, ArrowUpDown, Globe, Monitor, Smartphone, Tablet,
   TrendingUp, TrendingDown, BarChart3, Zap, Target, Leaf, ArrowRight,
@@ -8,12 +9,8 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'rec
 import { PageHeader, StatCard, SectionCard, TabBar, DateRangeSelector, DataList, EmptyState } from './ui';
 import { DATE_PRESETS_FULL } from './ui/constants';
 import { fmtNum as formatNumber } from '../utils/formatNumbers';
-import { ga4 } from '../api/analytics';
-import type {
-  GA4Overview, GA4DailyTrend, GA4TopPage, GA4TopSource,
-  GA4DeviceBreakdown, GA4CountryBreakdown, GA4Comparison,
-  GA4NewVsReturning, GA4OrganicOverview, GA4LandingPage, GA4ConversionSummary,
-} from '../../shared/types/analytics';
+import type { GA4DailyTrend } from '../../shared/types/analytics';
+import { useAdminGA4 } from '../hooks/admin';
 
 type DataTab = 'overview' | 'events' | 'insights';
 
@@ -76,61 +73,18 @@ function formatDuration(seconds: number): string {
 
 function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
   const [days, setDays] = useState(28);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [overview, setOverview] = useState<GA4Overview | null>(null);
-  const [trend, setTrend] = useState<GA4DailyTrend[]>([]);
-  const [topPages, setTopPages] = useState<GA4TopPage[]>([]);
-  const [sources, setSources] = useState<GA4TopSource[]>([]);
-  const [devices, setDevices] = useState<GA4DeviceBreakdown[]>([]);
-  const [countries, setCountries] = useState<GA4CountryBreakdown[]>([]);
-  const [comparison, setComparison] = useState<GA4PeriodComparison | null>(null);
-  const [newVsReturning, setNewVsReturning] = useState<GA4NewVsReturning[]>([]);
-  const [organic, setOrganic] = useState<GA4OrganicOverview | null>(null);
-  const [landingPages, setLandingPages] = useState<GA4LandingPage[]>([]);
-  const [conversions, setConversions] = useState<GA4ConversionSummary[]>([]);
   const [trendMetric, setTrendMetric] = useState<'users' | 'sessions' | 'pageviews'>('users');
   const [tab, setTab] = useState<DataTab>('overview');
 
-  const loadData = useCallback(async (numDays: number) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [ov, tr, tp, sr, dv, ct, cmp, nvr, org, lp, conv] = await Promise.all([
-        ga4.overview(workspaceId, numDays),
-        ga4.trend(workspaceId, numDays),
-        ga4.topPages(workspaceId, numDays),
-        ga4.sources(workspaceId, numDays),
-        ga4.devices(workspaceId, numDays),
-        ga4.countries(workspaceId, numDays),
-        ga4.comparison(workspaceId, numDays),
-        ga4.newVsReturning(workspaceId, numDays),
-        ga4.organic(workspaceId, numDays),
-        ga4.landingPages(workspaceId, numDays),
-        ga4.conversions(workspaceId, numDays),
-      ]);
-      if (ov) setOverview(ov);
-      else if (!overview) setError('Failed to load analytics overview');
-      setTrend(tr);
-      setTopPages(tp);
-      setSources(sr);
-      setDevices(dv);
-      setCountries(ct);
-      if (cmp) setComparison(cmp);
-      setNewVsReturning(nvr);
-      if (org) setOrganic(org);
-      setLandingPages(lp);
-      setConversions(conv);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load analytics data');
-    } finally {
-      setLoading(false);
-    }
-  }, [workspaceId]);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    if (ga4PropertyId) loadData(days);
-  }, [ga4PropertyId, loadData, days]);
+  const {
+    overview, trend, topPages, sources, devices, countries,
+    comparison, newVsReturning, organic, landingPages, conversions,
+    isLoading: loading, error,
+  } = useAdminGA4(workspaceId, days, !!ga4PropertyId);
+
+  const retry = () => queryClient.invalidateQueries({ queryKey: ['admin-ga4-overview', workspaceId] });
 
   // ── Not configured state ──
   if (!ga4PropertyId) {
@@ -159,7 +113,7 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
           <p className="text-red-400 text-sm font-medium mb-1">Failed to Load Analytics</p>
           <p className="text-xs text-red-400/70">{error}</p>
         </div>
-        <button onClick={() => loadData(days)} className="px-4 py-2 rounded-lg text-sm font-medium bg-teal-600 hover:bg-teal-500 transition-colors">
+        <button onClick={retry} className="px-4 py-2 rounded-lg text-sm font-medium bg-teal-600 hover:bg-teal-500 transition-colors">
           Retry
         </button>
       </div>

@@ -1,20 +1,30 @@
-import { useState, useCallback } from 'react';
-import { get, getOptional, getSafe } from '../api/client';
-import { gsc, ga4 } from '../api/analytics';
+import { useState, useCallback, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type {
-  SearchOverview, PerformanceTrend, WorkspaceInfo, AuditSummary, AuditDetail,
+  WorkspaceInfo, AuditSummary, AuditDetail,
+  ClientContentRequest, ClientKeywordStrategy, ClientRequest, ApprovalBatch,
+  SearchOverview, PerformanceTrend, SearchComparison,
   GA4Overview, GA4DailyTrend, GA4TopPage, GA4TopSource, GA4DeviceBreakdown,
   GA4CountryBreakdown, GA4Event, GA4ConversionSummary,
-  ClientContentRequest, ClientKeywordStrategy, ClientRequest, ApprovalBatch,
-  SearchComparison, GA4Comparison, GA4NewVsReturning, GA4OrganicOverview, GA4LandingPage,
+  GA4Comparison, GA4NewVsReturning, GA4OrganicOverview, GA4LandingPage,
 } from '../components/client/types';
 import type { PricingData } from './usePayments';
+import { useClientSearch } from './client/useClientSearch';
+import { useClientGA4 } from './client/useClientGA4';
+import {
+  useClientActivity, useClientRankHistory, useClientLatestRanks,
+  useClientAnnotations, useClientAnomalies, useClientApprovals,
+  useClientRequests as useClientRequestsQuery, useClientContentRequests,
+  useClientAuditSummary, useClientAuditDetail,
+  useClientStrategy, useClientPricing, useClientContentPlan,
+} from './client/useClientQueries';
 
-export interface ActivityLogItem { id: string; type: string; title: string; description?: string; actorName?: string; createdAt: string }
+// ── Exported type interfaces (consumed by other modules) ──────────
+export interface ActivityLogItem { id: string; workspaceId?: string; type: string; title: string; description?: string; metadata?: Record<string, unknown>; actorId?: string; actorName?: string; createdAt: string }
 export interface RankHistoryEntry { date: string; positions: Record<string, number> }
 export interface LatestRank { query: string; position: number; clicks: number; impressions: number; ctr: number; change?: number }
-export interface AnnotationItem { id: string; date: string; label: string; description?: string; color?: string }
-export interface AnomalyItem { type: string; severity: string; title: string; description: string; source: string; changePct: number }
+export interface AnnotationItem { id: string; date: string; label: string; description?: string; color?: string; createdAt: string }
+export interface AnomalyItem { id: string; workspaceId?: string; workspaceName?: string; type: string; severity: string; title: string; description: string; metric: string; currentValue: number; previousValue: number; changePct: number; aiSummary?: string; detectedAt: string; dismissedAt?: string; acknowledgedAt?: string; source: string }
 
 export interface ContentPlanReviewCell {
   cellId: string;
@@ -26,277 +36,232 @@ export interface ContentPlanReviewCell {
   variableValues?: Record<string, string>;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function useClientData(_workspaceId: string) {
+/**
+ * Client dashboard data hook — React Query facade.
+ *
+ * Internally composes individual React Query hooks for each data domain.
+ * Returns the same interface as the previous manual useState/useEffect version
+ * so that ClientDashboard.tsx (and downstream consumers) need minimal changes.
+ *
+ * Benefits over the old approach:
+ * - Automatic caching (60s stale time, 5min gc)
+ * - Stale-while-revalidate on tab focus
+ * - Independent per-section loading/error states
+ * - Date range changes trigger automatic refetch (query key changes)
+ * - WebSocket invalidation via queryClient.invalidateQueries
+ */
+export function useClientData(workspaceId: string) {
+  const queryClient = useQueryClient();
+
+  // ── Workspace + global UI state (not fetch-driven) ──────────────
   const [ws, setWs] = useState<WorkspaceInfo | null>(null);
-  const [overview, setOverview] = useState<SearchOverview | null>(null);
-  const [trend, setTrend] = useState<PerformanceTrend[]>([]);
-  const [audit, setAudit] = useState<AuditSummary | null>(null);
-  const [auditDetail, setAuditDetail] = useState<AuditDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [strategyData, setStrategyData] = useState<ClientKeywordStrategy | null>(null);
   const [requestedTopics, setRequestedTopics] = useState<Set<string>>(new Set());
   const [requestingTopic, setRequestingTopic] = useState<string | null>(null);
   const [days, setDays] = useState(28);
   const [customDateRange, setCustomDateRange] = useState<{ startDate: string; endDate: string } | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [ga4Overview, setGa4Overview] = useState<GA4Overview | null>(null);
-  const [ga4Trend, setGa4Trend] = useState<GA4DailyTrend[]>([]);
-  const [ga4Pages, setGa4Pages] = useState<GA4TopPage[]>([]);
-  const [ga4Sources, setGa4Sources] = useState<GA4TopSource[]>([]);
-  const [ga4Devices, setGa4Devices] = useState<GA4DeviceBreakdown[]>([]);
-  const [ga4Countries, setGa4Countries] = useState<GA4CountryBreakdown[]>([]);
-  const [ga4Events, setGa4Events] = useState<GA4Event[]>([]);
-  const [ga4Conversions, setGa4Conversions] = useState<GA4ConversionSummary[]>([]);
-  const [searchComparison, setSearchComparison] = useState<SearchComparison | null>(null);
-  const [ga4Comparison, setGa4Comparison] = useState<GA4Comparison | null>(null);
-  const [ga4NewVsReturning, setGa4NewVsReturning] = useState<GA4NewVsReturning[]>([]);
-  const [ga4Organic, setGa4Organic] = useState<GA4OrganicOverview | null>(null);
-  const [ga4LandingPages, setGa4LandingPages] = useState<GA4LandingPage[]>([]);
-  const [anomalies, setAnomalies] = useState<AnomalyItem[]>([]);
-  const [approvalBatches, setApprovalBatches] = useState<ApprovalBatch[]>([]);
-  const [approvalsLoading, setApprovalsLoading] = useState(false);
-  const [activityLog, setActivityLog] = useState<ActivityLogItem[]>([]);
-  const [rankHistory, setRankHistory] = useState<RankHistoryEntry[]>([]);
-  const [latestRanks, setLatestRanks] = useState<LatestRank[]>([]);
-  const [annotations, setAnnotations] = useState<AnnotationItem[]>([]);
-  const [requests, setRequests] = useState<ClientRequest[]>([]);
-  const [requestsLoading, setRequestsLoading] = useState(false);
-  const [contentRequests, setContentRequests] = useState<ClientContentRequest[]>([]);
-  const [sectionErrors, setSectionErrors] = useState<Record<string, string>>({});
-  const [contentPlanSummary, setContentPlanSummary] = useState<{ totalCells: number; publishedCells: number; reviewCells: number; approvedCells: number; inProgressCells: number; matrixCount: number } | null>(null);
-  const [contentPlanKeywords, setContentPlanKeywords] = useState<Map<string, string>>(new Map());
-  const [contentPlanReviewCells, setContentPlanReviewCells] = useState<ContentPlanReviewCell[]>([]);
 
-  const setSectionError = useCallback((key: string, msg: string) => {
-    setSectionErrors(prev => ({ ...prev, [key]: msg }));
-  }, []);
+  // ── Data-fetching gate (enabled after auth + workspace load) ────
+  const [dataEnabled, setDataEnabled] = useState(false);
 
-  const clearSectionError = useCallback((key: string) => {
-    setSectionErrors(prev => { const n = { ...prev }; delete n[key]; return n; });
-  }, []);
+  // ── React Query hooks ───────────────────────────────────────────
+  const dateRange = customDateRange ?? undefined;
 
-  const loadRequests = useCallback(async (wsId: string) => {
-    setRequestsLoading(true);
-    try {
-      const data = await getSafe<ClientRequest[]>(`/api/public/requests/${wsId}`, []);
-      if (Array.isArray(data)) setRequests(data);
-    } catch { setSectionError('requests', 'Unable to load requests'); }
-    finally { setRequestsLoading(false); }
-  }, [setSectionError]);
+  const search = useClientSearch(workspaceId, days, dateRange, dataEnabled && !!ws?.gscPropertyUrl);
+  const ga4Data = useClientGA4(workspaceId, days, dateRange, dataEnabled && !!ws?.ga4PropertyId);
 
-  const loadApprovals = useCallback(async (wsId: string) => {
-    setApprovalsLoading(true);
-    try {
-      const data = await getSafe<ApprovalBatch[]>(`/api/public/approvals/${wsId}`, []);
-      if (Array.isArray(data)) setApprovalBatches(data);
-    } catch { setSectionError('approvals', 'Unable to load approvals'); }
-    setApprovalsLoading(false);
-  }, [setSectionError]);
+  const activityQ = useClientActivity(workspaceId, dataEnabled);
+  const rankHistoryQ = useClientRankHistory(workspaceId, dataEnabled);
+  const latestRanksQ = useClientLatestRanks(workspaceId, dataEnabled);
+  const annotationsQ = useClientAnnotations(workspaceId, dataEnabled);
+  const anomaliesQ = useClientAnomalies(workspaceId, dataEnabled);
+  const approvalsQ = useClientApprovals(workspaceId, dataEnabled);
+  const requestsQ = useClientRequestsQuery(workspaceId, dataEnabled);
+  const contentReqQ = useClientContentRequests(workspaceId, dataEnabled);
+  const auditSummaryQ = useClientAuditSummary(workspaceId, dataEnabled);
+  const auditDetailQ = useClientAuditDetail(workspaceId, dataEnabled);
+  const strategyQ = useClientStrategy(workspaceId, dataEnabled && !!ws?.seoClientView);
+  useClientPricing(workspaceId, dataEnabled); // fires query; data consumed via queryClient.getQueryData in loadDashboardData
+  const contentPlanQ = useClientContentPlan(workspaceId, dataEnabled);
 
-  const loadSearchData = useCallback(async (wsId: string, numDays: number, dateRange?: { startDate: string; endDate: string }) => {
-    try {
-      const [ovData, trData, cmpData] = await Promise.all([
-        gsc.overview(wsId, numDays, dateRange),
-        gsc.trend(wsId, numDays, dateRange),
-        gsc.comparison(wsId, numDays, dateRange),
-        gsc.devices(wsId, numDays, dateRange),
-      ]);
-      if (ovData) setOverview(ovData as SearchOverview);
-      setTrend(Array.isArray(trData) ? trData : []);
-      if (cmpData) setSearchComparison(cmpData);
-    } catch (err) {
-      console.error('Search data load error:', err);
-    }
-  }, []);
+  // ── Derived: content request topics ─────────────────────────────
+  const contentRequests = useMemo(() => contentReqQ.data ?? [], [contentReqQ.data]);
+  const derivedTopics = useMemo(() => {
+    if (contentRequests.length === 0) return requestedTopics;
+    return new Set(contentRequests.map(r => r.targetKeyword));
+  }, [contentRequests, requestedTopics]);
 
-  const loadGA4Data = useCallback(async (wsId: string, numDays: number, dateRange?: { startDate: string; endDate: string }) => {
-    clearSectionError('analytics');
-    const dr = dateRange;
+  // ── Section errors (aggregated from React Query error states) ───
+  const sectionErrors = useMemo(() => {
+    const errs: Record<string, string> = {};
+    if (activityQ.error) errs.activity = 'Unable to load activity';
+    if (latestRanksQ.error) errs.ranks = 'Unable to load ranking data';
+    if (auditSummaryQ.error) errs.audit = 'Unable to load site health data';
+    if (approvalsQ.error) errs.approvals = 'Unable to load approvals';
+    if (requestsQ.error) errs.requests = 'Unable to load requests';
+    if (contentReqQ.error) errs.content = 'Unable to load content requests';
+    if (strategyQ.error) errs.strategy = 'Unable to load SEO strategy';
+    if (ga4Data.sectionError) errs.analytics = ga4Data.sectionError;
+    return errs;
+  }, [activityQ.error, latestRanksQ.error, auditSummaryQ.error, approvalsQ.error,
+      requestsQ.error, contentReqQ.error, strategyQ.error, ga4Data.sectionError]);
 
-    const entries: Array<{ key: string; promise: Promise<unknown> }> = [
-      { key: 'overview', promise: ga4.overview(wsId, numDays, dr) },
-      { key: 'trend', promise: ga4.trend(wsId, numDays, dr) },
-      { key: 'pages', promise: ga4.topPages(wsId, numDays, dr) },
-      { key: 'sources', promise: ga4.sources(wsId, numDays, dr) },
-      { key: 'devices', promise: ga4.devices(wsId, numDays, dr) },
-      { key: 'countries', promise: ga4.countries(wsId, numDays, dr) },
-      { key: 'events', promise: ga4.events(wsId, numDays, dr) },
-      { key: 'conversions', promise: ga4.conversions(wsId, numDays, dr) },
-      { key: 'comparison', promise: ga4.comparison(wsId, numDays, dr) },
-      { key: 'nvr', promise: ga4.newVsReturning(wsId, numDays, dr) },
-      { key: 'organic', promise: ga4.organic(wsId, numDays, dr) },
-      { key: 'landing', promise: ga4.landingPages(wsId, numDays, { dateRange: dr, organic: true, limit: 15 }) },
-    ];
-
-    // Use Promise.allSettled for coordinated loading — partial failures don't block others
-    const results = await Promise.allSettled(entries.map(e => e.promise));
-    const failedSections: string[] = [];
-
-    results.forEach((result, i) => {
-      const key = entries[i].key;
-      if (result.status === 'rejected') { failedSections.push(key); return; }
-      const d = result.value;
-      switch (key) {
-        case 'overview': if (d) setGa4Overview(d as GA4Overview); else failedSections.push(key); break;
-        case 'trend': if (Array.isArray(d)) setGa4Trend(d as GA4DailyTrend[]); break;
-        case 'pages': if (Array.isArray(d)) setGa4Pages(d as GA4TopPage[]); break;
-        case 'sources': if (Array.isArray(d)) setGa4Sources(d as GA4TopSource[]); break;
-        case 'devices': if (Array.isArray(d)) setGa4Devices(d as GA4DeviceBreakdown[]); break;
-        case 'countries': if (Array.isArray(d)) setGa4Countries(d as GA4CountryBreakdown[]); break;
-        case 'events': if (Array.isArray(d)) setGa4Events(d as GA4Event[]); break;
-        case 'conversions': if (Array.isArray(d)) setGa4Conversions(d as GA4ConversionSummary[]); break;
-        case 'comparison': if (d) setGa4Comparison(d as GA4Comparison); break;
-        case 'nvr': if (Array.isArray(d)) setGa4NewVsReturning(d as GA4NewVsReturning[]); break;
-        case 'organic': if (d) setGa4Organic(d as GA4OrganicOverview); break;
-        case 'landing': if (Array.isArray(d)) setGa4LandingPages(d as GA4LandingPage[]); break;
-      }
+  // ── Compatibility setters (update React Query cache directly) ───
+  const setAudit = useCallback((val: AuditSummary | null | ((prev: AuditSummary | null) => AuditSummary | null)) => {
+    queryClient.setQueryData(['client-audit-summary', workspaceId], (prev: AuditSummary | null | undefined) => {
+      return typeof val === 'function' ? val(prev ?? null) : val;
     });
+  }, [queryClient, workspaceId]);
 
-    if (failedSections.length > 0) {
-      const msg = failedSections.length === entries.length
-        ? 'Unable to load analytics data'
-        : `Partial analytics load — failed: ${failedSections.join(', ')}`;
-      setSectionError('analytics', msg);
-    }
-  }, [setSectionError, clearSectionError]);
+  const setApprovalBatches = useCallback((val: ApprovalBatch[] | ((prev: ApprovalBatch[]) => ApprovalBatch[])) => {
+    queryClient.setQueryData(['client-approvals', workspaceId], (prev: ApprovalBatch[] | undefined) => {
+      return typeof val === 'function' ? val(prev ?? []) : val;
+    });
+  }, [queryClient, workspaceId]);
 
-  /** Load all dashboard data for a workspace. Accepts optional setPricingData callback for payment hook integration. */
+  const setContentRequests = useCallback((val: ClientContentRequest[] | ((prev: ClientContentRequest[]) => ClientContentRequest[])) => {
+    queryClient.setQueryData(['client-content-requests', workspaceId], (prev: ClientContentRequest[] | undefined) => {
+      return typeof val === 'function' ? val(prev ?? []) : val;
+    });
+  }, [queryClient, workspaceId]);
+
+  // ── Compatibility: section error setters (mostly no-ops now) ────
+  const setSectionErrors = useState<Record<string, string>>({})[1]; // placeholder for backward compat
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const setSectionError = useCallback((key: string, msg: string) => { /* errors now derived from React Query */ }, []);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const clearSectionError = useCallback((key: string) => { /* errors now derived from React Query */ }, []);
+
+  // ── loadDashboardData: enables React Query hooks + sets pricing ─
   const loadDashboardData = useCallback((data: WorkspaceInfo, setPricingData?: (p: PricingData | null) => void) => {
-    if (data.gscPropertyUrl) loadSearchData(data.id, 28);
-    getOptional<AuditSummary>(`/api/public/audit-summary/${data.id}`).then(a => { if (a?.id) { setAudit(a); clearSectionError('audit'); } }).catch(() => setSectionError('audit', 'Unable to load site health data'));
-    getOptional<AuditDetail>(`/api/public/audit-detail/${data.id}`).then(d => { if (d?.id) setAuditDetail(d); }).catch((err) => { console.error('useClientData operation failed:', err); });
-    if (data.ga4PropertyId) loadGA4Data(data.id, 28);
-    loadApprovals(data.id);
-    loadRequests(data.id);
-    getSafe<ActivityLogItem[]>(`/api/public/activity/${data.id}?limit=20`, []).then(a => { if (Array.isArray(a)) setActivityLog(a); }).catch(() => setSectionError('activity', 'Unable to load activity'));
-    getSafe<RankHistoryEntry[]>(`/api/public/rank-tracking/${data.id}/history`, []).then(h => { if (Array.isArray(h)) setRankHistory(h); }).catch((err) => { console.error('useClientData operation failed:', err); });
-    getSafe<LatestRank[]>(`/api/public/rank-tracking/${data.id}/latest`, []).then(l => { if (Array.isArray(l)) setLatestRanks(l); }).catch(() => setSectionError('ranks', 'Unable to load ranking data'));
-    getSafe<AnnotationItem[]>(`/api/public/annotations/${data.id}`, []).then(a => { if (Array.isArray(a)) setAnnotations(a); }).catch((err) => { console.error('useClientData operation failed:', err); });
-    if (data.seoClientView) {
-      getOptional<ClientKeywordStrategy>(`/api/public/seo-strategy/${data.id}`).then(s => { if (s) setStrategyData(s); }).catch(() => setSectionError('strategy', 'Unable to load SEO strategy'));
+    setWs(data);
+    setDataEnabled(true);
+    // Pricing callback for usePayments integration
+    if (setPricingData) {
+      // When pricing query resolves, pass to the payments hook
+      const checkPricing = () => {
+        const cached = queryClient.getQueryData<PricingData | null>(['client-pricing', data.id]);
+        if (cached) setPricingData(cached);
+      };
+      // Check once after a short delay (query will have fired), then observe
+      setTimeout(checkPricing, 500);
+      const unsub = queryClient.getQueryCache().subscribe((event) => {
+        if (event.type === 'updated' && event.query.queryKey[0] === 'client-pricing') {
+          const d = event.query.state.data as PricingData | null;
+          if (d) setPricingData(d);
+          unsub();
+        }
+      });
     }
-    getOptional<PricingData>(`/api/public/pricing/${data.id}`).then(p => { if (p && setPricingData) setPricingData(p); }).catch((err) => { console.error('useClientData operation failed:', err); });
-    getSafe<AnomalyItem[]>(`/api/public/anomalies/${data.id}`, []).then(a => { if (Array.isArray(a)) setAnomalies(a); }).catch((err) => { console.error('useClientData operation failed:', err); });
-    getSafe<ClientContentRequest[]>(`/api/public/content-requests/${data.id}`, []).then((reqs) => {
-      if (Array.isArray(reqs) && reqs.length > 0) {
-        setContentRequests(reqs);
-        setRequestedTopics(new Set(reqs.map(r => r.targetKeyword)));
-      }
-    }).catch(() => setSectionError('content', 'Unable to load content requests'));
-    getSafe<Array<{ id: string; name: string; cells?: Array<{ id: string; status: string; targetKeyword?: string; plannedUrl?: string; variableValues?: Record<string, string> }> }>>(`/api/public/content-plan/${data.id}`, []).then((plans) => {
-      if (Array.isArray(plans)) {
-        const allCells = plans.flatMap(p => p.cells || []);
-        setContentPlanSummary({
-          totalCells: allCells.length,
-          publishedCells: allCells.filter(c => c.status === 'published').length,
-          reviewCells: allCells.filter(c => c.status === 'review' || c.status === 'flagged').length,
-          approvedCells: allCells.filter(c => c.status === 'approved').length,
-          inProgressCells: allCells.filter(c => c.status === 'brief_generated' || c.status === 'in_progress').length,
-          matrixCount: plans.length,
-        });
-        const kwMap = new Map<string, string>();
-        for (const c of allCells) {
-          if (c.targetKeyword) kwMap.set(c.targetKeyword.toLowerCase(), c.status);
-        }
-        setContentPlanKeywords(kwMap);
-        // Store review/flagged cells for Inbox
-        const reviewCells: ContentPlanReviewCell[] = [];
-        for (const plan of plans) {
-          for (const c of (plan.cells || [])) {
-            if (c.status === 'review' || c.status === 'flagged') {
-              reviewCells.push({
-                cellId: c.id,
-                matrixId: plan.id,
-                matrixName: plan.name,
-                targetKeyword: c.targetKeyword || '',
-                plannedUrl: c.plannedUrl,
-                status: c.status,
-                variableValues: c.variableValues,
-              });
-            }
-          }
-        }
-        setContentPlanReviewCells(reviewCells);
-      }
-    }).catch((err) => { console.error('useClientData operation failed:', err); });
-  }, [loadSearchData, loadGA4Data, loadApprovals, loadRequests, clearSectionError, setSectionError]);
+  }, [queryClient]);
 
+  // ── loadSearchData / loadGA4Data: now just change date params ───
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const loadSearchData = useCallback((wsId: string, numDays: number, dateRange?: { startDate: string; endDate: string }) => {
+    setDays(numDays);
+    if (dateRange) setCustomDateRange(dateRange);
+    // React Query auto-refetches when query key (days/dateRange) changes
+  }, []);
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const loadGA4Data = useCallback((wsId: string, numDays: number, dateRange?: { startDate: string; endDate: string }) => {
+    setDays(numDays);
+    if (dateRange) setCustomDateRange(dateRange);
+  }, []);
+
+  // ── loadRequests / loadApprovals: invalidate queries ────────────
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const loadRequests = useCallback((wsId: string) => {
+    queryClient.invalidateQueries({ queryKey: ['client-requests', workspaceId] });
+  }, [queryClient, workspaceId]);
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const loadApprovals = useCallback((wsId: string) => {
+    queryClient.invalidateQueries({ queryKey: ['client-approvals', workspaceId] });
+  }, [queryClient, workspaceId]);
+
+  // ── changeDays / applyCustomRange ───────────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const changeDays = useCallback((d: number, currentWs: WorkspaceInfo | null) => {
     setDays(d);
     setCustomDateRange(null);
     setShowDatePicker(false);
-    if (currentWs) {
-      loadSearchData(currentWs.id, d);
-      if (currentWs.ga4PropertyId) loadGA4Data(currentWs.id, d);
-    }
-  }, [loadSearchData, loadGA4Data]);
+    // React Query auto-refetches — query keys include days + dateRange
+  }, []);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const applyCustomRange = useCallback((startDate: string, endDate: string, currentWs: WorkspaceInfo | null) => {
     const dr = { startDate, endDate };
     const spanDays = Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24));
     setCustomDateRange(dr);
     setDays(spanDays);
     setShowDatePicker(false);
-    if (currentWs) {
-      loadSearchData(currentWs.id, spanDays, dr);
-      if (currentWs.ga4PropertyId) loadGA4Data(currentWs.id, spanDays, dr);
-    }
-  }, [loadSearchData, loadGA4Data]);
-
-  const refetchClient = useCallback(async (key: string, url: string) => {
-    try {
-      const d = await getOptional<unknown[]>(url);
-      if (!d || !Array.isArray(d)) return;
-      if (key === 'activity') setActivityLog(d as ActivityLogItem[]);
-      if (key === 'approvals') setApprovalBatches(d as ApprovalBatch[]);
-      if (key === 'requests') setRequests(d as ClientRequest[]);
-      if (key === 'content') { setContentRequests(d as ClientContentRequest[]); setRequestedTopics(new Set((d as ClientContentRequest[]).map(r => r.targetKeyword))); }
-    } catch (err) { console.error('useClientData operation failed:', err); }
   }, []);
+
+  // ── refetchClient: invalidate the appropriate query ─────────────
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const refetchClient = useCallback((key: string, url: string) => {
+    const keyMap: Record<string, string> = {
+      activity: 'client-activity',
+      approvals: 'client-approvals',
+      requests: 'client-requests',
+      content: 'client-content-requests',
+      audit: 'client-audit-summary',
+      'audit-detail': 'client-audit-detail',
+    };
+    const qk = keyMap[key];
+    if (qk) queryClient.invalidateQueries({ queryKey: [qk, workspaceId] });
+  }, [queryClient, workspaceId]);
+
+  // ── Content plan derived data ───────────────────────────────────
+  const planResult = contentPlanQ.data;
+
+  // ── No-op setters for backward compat (data is React Query driven) ──
+  const noop = useCallback(() => {}, []);
 
   return {
     ws, setWs,
-    overview, setOverview,
-    trend, setTrend,
-    audit, setAudit,
-    auditDetail, setAuditDetail,
+    overview: search.overview, setOverview: noop as unknown as React.Dispatch<React.SetStateAction<SearchOverview | null>>,
+    trend: search.trend, setTrend: noop as unknown as React.Dispatch<React.SetStateAction<PerformanceTrend[]>>,
+    audit: auditSummaryQ.data ?? null, setAudit,
+    auditDetail: auditDetailQ.data ?? null, setAuditDetail: noop as unknown as React.Dispatch<React.SetStateAction<AuditDetail | null>>,
     loading, setLoading,
     error, setError,
-    strategyData, setStrategyData,
-    requestedTopics, setRequestedTopics,
+    strategyData: strategyQ.data ?? null, setStrategyData: noop as unknown as React.Dispatch<React.SetStateAction<ClientKeywordStrategy | null>>,
+    requestedTopics: derivedTopics, setRequestedTopics,
     requestingTopic, setRequestingTopic,
     days, setDays,
     customDateRange, setCustomDateRange,
     showDatePicker, setShowDatePicker,
-    ga4Overview, setGa4Overview,
-    ga4Trend, setGa4Trend,
-    ga4Pages, setGa4Pages,
-    ga4Sources, setGa4Sources,
-    ga4Devices, setGa4Devices,
-    ga4Countries, setGa4Countries,
-    ga4Events, setGa4Events,
-    ga4Conversions, setGa4Conversions,
-    searchComparison, setSearchComparison,
-    ga4Comparison, setGa4Comparison,
-    ga4NewVsReturning, setGa4NewVsReturning,
-    ga4Organic, setGa4Organic,
-    ga4LandingPages, setGa4LandingPages,
-    anomalies, setAnomalies,
-    approvalBatches, setApprovalBatches,
-    approvalsLoading, setApprovalsLoading,
-    activityLog, setActivityLog,
-    rankHistory, setRankHistory,
-    latestRanks, setLatestRanks,
-    annotations, setAnnotations,
-    requests, setRequests,
-    requestsLoading, setRequestsLoading,
+    ga4Overview: ga4Data.ga4Overview, setGa4Overview: noop as unknown as React.Dispatch<React.SetStateAction<GA4Overview | null>>,
+    ga4Trend: ga4Data.ga4Trend, setGa4Trend: noop as unknown as React.Dispatch<React.SetStateAction<GA4DailyTrend[]>>,
+    ga4Pages: ga4Data.ga4Pages, setGa4Pages: noop as unknown as React.Dispatch<React.SetStateAction<GA4TopPage[]>>,
+    ga4Sources: ga4Data.ga4Sources, setGa4Sources: noop as unknown as React.Dispatch<React.SetStateAction<GA4TopSource[]>>,
+    ga4Devices: ga4Data.ga4Devices, setGa4Devices: noop as unknown as React.Dispatch<React.SetStateAction<GA4DeviceBreakdown[]>>,
+    ga4Countries: ga4Data.ga4Countries, setGa4Countries: noop as unknown as React.Dispatch<React.SetStateAction<GA4CountryBreakdown[]>>,
+    ga4Events: ga4Data.ga4Events, setGa4Events: noop as unknown as React.Dispatch<React.SetStateAction<GA4Event[]>>,
+    ga4Conversions: ga4Data.ga4Conversions, setGa4Conversions: noop as unknown as React.Dispatch<React.SetStateAction<GA4ConversionSummary[]>>,
+    searchComparison: search.comparison, setSearchComparison: noop as unknown as React.Dispatch<React.SetStateAction<SearchComparison | null>>,
+    ga4Comparison: ga4Data.ga4Comparison, setGa4Comparison: noop as unknown as React.Dispatch<React.SetStateAction<GA4Comparison | null>>,
+    ga4NewVsReturning: ga4Data.ga4NewVsReturning, setGa4NewVsReturning: noop as unknown as React.Dispatch<React.SetStateAction<GA4NewVsReturning[]>>,
+    ga4Organic: ga4Data.ga4Organic, setGa4Organic: noop as unknown as React.Dispatch<React.SetStateAction<GA4OrganicOverview | null>>,
+    ga4LandingPages: ga4Data.ga4LandingPages, setGa4LandingPages: noop as unknown as React.Dispatch<React.SetStateAction<GA4LandingPage[]>>,
+    anomalies: anomaliesQ.data ?? [], setAnomalies: noop as unknown as React.Dispatch<React.SetStateAction<AnomalyItem[]>>,
+    approvalBatches: approvalsQ.data ?? [], setApprovalBatches,
+    approvalsLoading: approvalsQ.isLoading, setApprovalsLoading: noop as unknown as React.Dispatch<React.SetStateAction<boolean>>,
+    activityLog: activityQ.data ?? [], setActivityLog: noop as unknown as React.Dispatch<React.SetStateAction<ActivityLogItem[]>>,
+    rankHistory: rankHistoryQ.data ?? [], setRankHistory: noop as unknown as React.Dispatch<React.SetStateAction<RankHistoryEntry[]>>,
+    latestRanks: latestRanksQ.data ?? [], setLatestRanks: noop as unknown as React.Dispatch<React.SetStateAction<LatestRank[]>>,
+    annotations: annotationsQ.data ?? [], setAnnotations: noop as unknown as React.Dispatch<React.SetStateAction<AnnotationItem[]>>,
+    requests: requestsQ.data ?? [], setRequests: noop as unknown as React.Dispatch<React.SetStateAction<ClientRequest[]>>,
+    requestsLoading: requestsQ.isLoading, setRequestsLoading: noop as unknown as React.Dispatch<React.SetStateAction<boolean>>,
     contentRequests, setContentRequests,
     sectionErrors, setSectionErrors,
-    contentPlanSummary, setContentPlanSummary,
-    contentPlanKeywords, setContentPlanKeywords,
-    contentPlanReviewCells, setContentPlanReviewCells,
+    contentPlanSummary: planResult?.summary ?? null, setContentPlanSummary: noop as unknown as React.Dispatch<React.SetStateAction<{ totalCells: number; publishedCells: number; reviewCells: number; approvedCells: number; inProgressCells: number; matrixCount: number } | null>>,
+    contentPlanKeywords: planResult?.keywords ?? new Map<string, string>(), setContentPlanKeywords: noop as unknown as React.Dispatch<React.SetStateAction<Map<string, string>>>,
+    contentPlanReviewCells: planResult?.reviewCells ?? [], setContentPlanReviewCells: noop as unknown as React.Dispatch<React.SetStateAction<ContentPlanReviewCell[]>>,
     setSectionError,
     clearSectionError,
     loadDashboardData,
