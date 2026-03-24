@@ -37,6 +37,7 @@ jobs:
         run: npx playwright test
         env:
           CI: true
+          JWT_SECRET: e2e-test-secret
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
