@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Shield, Search, BarChart3, TrendingUp, TrendingDown, ArrowUpRight,
   Loader2, Bell, FileText, AlertTriangle,
@@ -14,9 +15,7 @@ import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { AnomalyAlerts } from './AnomalyAlerts';
 import { SeoWorkStatus, ActivityFeed, RankingsSnapshot, ActiveRequestsAnnotations, SeoChangeImpact } from './workspace-home';
 import { type Page, adminPath } from '../routes';
-import { activity as activityApi, workOrders as workOrdersApi, workspaceHome } from '../api/misc';
-import { contentRequests as contentRequestsApi } from '../api/content';
-import { requests as requestsApi } from '../api/misc';
+import { useWorkspaceHomeData } from '../hooks/admin';
 
 interface WorkspaceHomeProps {
   workspaceId: string;
@@ -43,22 +42,10 @@ function fmt(n: number): string {
 
 export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webflowSiteName, gscPropertyUrl, ga4PropertyId }: WorkspaceHomeProps) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { summary: seoStatus } = usePageEditStates(workspaceId);
   const { audit } = useAuditSummary(workspaceId);
-  const [loading, setLoading] = useState(true);
-  const [searchData, setSearchData] = useState<{ totalClicks: number; totalImpressions: number; avgCtr: number; avgPosition: number } | null>(null);
-  const [ga4Data, setGa4Data] = useState<{ totalUsers: number; totalSessions: number; totalPageviews: number; newUserPercentage: number } | null>(null);
-  const [comparison, setComparison] = useState<{ users?: { current: number; previous: number }; sessions?: { current: number; previous: number } } | null>(null);
-  const [ranks, setRanks] = useState<Array<{ query: string; position: number; previousPosition?: number; change?: number }>>([]);
-  const [requests, setRequests] = useState<Array<{ id: string; title: string; status: string; category: string; createdAt: string }>>([]);
-  const [contentRequests, setContentRequests] = useState<Array<{ id: string; title?: string; status: string; category?: string }>>([]);
-  const [activity, setActivity] = useState<ActivityEntry[]>([]);
-  const [annotations, setAnnotations] = useState<Array<{ id: string; date: string; label: string; color?: string }>>([]);
-  const [churnSignals, setChurnSignals] = useState<Array<{ id: string; type: string; severity: string; title: string; description: string; detectedAt: string }>>([]);
-  const [workOrders, setWorkOrders] = useState<Array<{ id: string; status: string; productType: string }>>([]);
-  const [contentPipeline, setContentPipeline] = useState<{ templateCount: number; matrixCount: number; totalCells: number; publishedCells: number; reviewCells: number; approvedCells: number; inProgressCells: number } | null>(null);
-  const [lastFetched, setLastFetched] = useState<Date | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
+  const { data: homeData, isLoading: loading, isFetching: refreshing, dataUpdatedAt } = useWorkspaceHomeData(workspaceId);
   const [now, setNow] = useState(() => new Date());
 
   // Tick every 30s so relative timestamps stay fresh
@@ -67,54 +54,33 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
     return () => clearInterval(t);
   }, []);
 
-  // Refetch a single key when a real-time event arrives
-  const refetch = useCallback(async (key: string) => {
-    try {
-      if (key === 'activity') { const d = await activityApi.list(workspaceId); if (Array.isArray(d)) setActivity(d as ActivityEntry[]); }
-      if (key === 'requests') { const d = await requestsApi.list({ workspaceId }); if (Array.isArray(d)) setRequests(d as typeof requests); }
-      if (key === 'content') { const d = await contentRequestsApi.list(workspaceId); if (Array.isArray(d)) setContentRequests(d as typeof contentRequests); }
-      if (key === 'workOrders') { const d = await workOrdersApi.list(workspaceId); if (Array.isArray(d)) setWorkOrders(d as typeof workOrders); }
-    } catch (err) { console.error('WorkspaceHome operation failed:', err); }
-  }, [workspaceId]);
-
-  // Real-time workspace events
+  // Real-time workspace events — invalidate the single query
+  const invalidateHome = () => queryClient.invalidateQueries({ queryKey: ['admin-workspace-home', workspaceId] });
   useWorkspaceEvents(workspaceId, {
-    'activity:new': () => refetch('activity'),
-    'approval:update': () => refetch('activity'),
-    'approval:applied': () => refetch('activity'),
-    'request:created': () => refetch('requests'),
-    'request:update': () => refetch('requests'),
-    'content-request:created': () => refetch('content'),
-    'content-request:update': () => refetch('content'),
-    'audit:complete': (data) => {
-      const d = data as { score?: number; previousScore?: number };
-      if (d?.score != null) {
-        refetch('activity');
-      }
-    },
+    'activity:new': invalidateHome,
+    'approval:update': invalidateHome,
+    'approval:applied': invalidateHome,
+    'request:created': invalidateHome,
+    'request:update': invalidateHome,
+    'content-request:created': invalidateHome,
+    'content-request:update': invalidateHome,
+    'audit:complete': invalidateHome,
   });
 
-  // Single aggregated fetch replaces 10+ parallel calls
-  useEffect(() => {
-    let cancelled = false;
-    workspaceHome.get(workspaceId).then(d => {
-      if (cancelled) return;
-      if (Array.isArray(d.ranks)) setRanks(d.ranks.slice(0, 10) as typeof ranks);
-      if (Array.isArray(d.requests)) setRequests(d.requests as typeof requests);
-      if (Array.isArray(d.contentRequests)) setContentRequests(d.contentRequests as typeof contentRequests);
-      if (Array.isArray(d.activity)) setActivity(d.activity as ActivityEntry[]);
-      if (Array.isArray(d.annotations)) setAnnotations(d.annotations.slice(0, 5) as typeof annotations);
-      if (Array.isArray(d.churnSignals)) setChurnSignals((d.churnSignals as Array<{ id: string; type: string; severity: string; title: string; description: string; detectedAt: string }>).filter(s => s.severity === 'critical' || s.severity === 'warning'));
-      if (Array.isArray(d.workOrders)) setWorkOrders(d.workOrders as typeof workOrders);
-      if (d.searchData) setSearchData(d.searchData);
-      if (d.ga4Data) setGa4Data(d.ga4Data);
-      if (d.comparison) setComparison(d.comparison);
-      if (d.contentPipeline) setContentPipeline(d.contentPipeline);
-      setLoading(false);
-      setLastFetched(new Date());
-    }).catch(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [workspaceId]);
+  // Derive data from query result
+  const d = homeData;
+  const searchData = d?.searchData ?? null;
+  const ga4Data = d?.ga4Data ?? null;
+  const comparison = d?.comparison ?? null;
+  const ranks = (Array.isArray(d?.ranks) ? d.ranks.slice(0, 10) : []) as Array<{ query: string; position: number; previousPosition?: number; change?: number }>;
+  const requests = (Array.isArray(d?.requests) ? d.requests : []) as Array<{ id: string; title: string; status: string; category: string; createdAt: string }>;
+  const contentRequests = (Array.isArray(d?.contentRequests) ? d.contentRequests : []) as Array<{ id: string; title?: string; status: string; category?: string }>;
+  const activity = (Array.isArray(d?.activity) ? d.activity : []) as ActivityEntry[];
+  const annotations = (Array.isArray(d?.annotations) ? d.annotations.slice(0, 5) : []) as Array<{ id: string; date: string; label: string; color?: string }>;
+  const churnSignals = (Array.isArray(d?.churnSignals) ? (d.churnSignals as Array<{ id: string; type: string; severity: string; title: string; description: string; detectedAt: string }>).filter(s => s.severity === 'critical' || s.severity === 'warning') : []);
+  const workOrders = (Array.isArray(d?.workOrders) ? d.workOrders : []) as Array<{ id: string; status: string; productType: string }>;
+  const contentPipeline = d?.contentPipeline ?? null;
+  const lastFetched = dataUpdatedAt ? new Date(dataUpdatedAt) : null;
 
   if (loading) {
     return (
@@ -152,25 +118,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   const isStale = ageMs > 60 * 60 * 1000; // >1 hour
   const freshnessLabel = !lastFetched ? '' : ageMs < 60_000 ? 'Just now' : ageMs < 3_600_000 ? `${Math.floor(ageMs / 60_000)}m ago` : `${Math.floor(ageMs / 3_600_000)}h ago`;
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    try {
-      const d = await workspaceHome.get(workspaceId);
-      if (Array.isArray(d.ranks)) setRanks(d.ranks.slice(0, 10) as typeof ranks);
-      if (Array.isArray(d.requests)) setRequests(d.requests as typeof requests);
-      if (Array.isArray(d.contentRequests)) setContentRequests(d.contentRequests as typeof contentRequests);
-      if (Array.isArray(d.activity)) setActivity(d.activity as ActivityEntry[]);
-      if (Array.isArray(d.annotations)) setAnnotations(d.annotations.slice(0, 5) as typeof annotations);
-      if (Array.isArray(d.churnSignals)) setChurnSignals((d.churnSignals as Array<{ id: string; type: string; severity: string; title: string; description: string; detectedAt: string }>).filter(s => s.severity === 'critical' || s.severity === 'warning'));
-      if (Array.isArray(d.workOrders)) setWorkOrders(d.workOrders as typeof workOrders);
-      if (d.searchData) setSearchData(d.searchData);
-      if (d.ga4Data) setGa4Data(d.ga4Data);
-      if (d.comparison) setComparison(d.comparison);
-      if (d.contentPipeline) setContentPipeline(d.contentPipeline);
-      setLastFetched(new Date());
-    } catch (err) { console.error('WorkspaceHome operation failed:', err); }
-    setRefreshing(false);
-  };
+  const handleRefresh = () => queryClient.invalidateQueries({ queryKey: ['admin-workspace-home', workspaceId] });
 
   const pendingOrders = workOrders.filter(o => o.status === 'pending' || o.status === 'in_progress');
   if (pendingOrders.length > 0) actions.push({ label: `${pendingOrders.length} purchased fix${pendingOrders.length > 1 ? 'es' : ''} awaiting fulfillment`, sub: 'Complete work orders from client purchases', color: 'teal', icon: Clipboard, tab: 'workspace-settings' });

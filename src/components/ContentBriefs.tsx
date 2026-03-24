@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { get, post, patch, del, getSafe } from '../api/client';
 import {
   Loader2, Trash2, AlertTriangle, PenLine, Clipboard, Search, X, ArrowUpDown,
@@ -8,6 +9,7 @@ import { PostEditor } from './PostEditor';
 import { BriefGenerator } from './briefs/BriefGenerator';
 import { RequestList } from './briefs/RequestList';
 import { BriefList } from './briefs/BriefList';
+import { useAdminBriefsList, useAdminRequestsList, useAdminPostsList } from '../hooks/admin';
 
 interface ContentBrief {
   id: string;
@@ -68,9 +70,22 @@ interface ContentTopicRequest {
 }
 
 export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }: { workspaceId: string; onRequestCountChange?: (pending: number) => void; fixContext?: FixContext | null }) {
-  const [briefs, setBriefs] = useState<ContentBrief[]>([]);
-  const [clientRequests, setClientRequests] = useState<ContentTopicRequest[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const briefsQ = useAdminBriefsList(workspaceId);
+  const requestsQ = useAdminRequestsList(workspaceId);
+  const postsQ = useAdminPostsList(workspaceId);
+  interface PostSummary { id: string; briefId: string; targetKeyword: string; title: string; totalWordCount: number; status: string; createdAt: string; updatedAt: string }
+  const briefs = (briefsQ.data ?? []) as ContentBrief[];
+  const clientRequests = (requestsQ.data ?? []) as ContentTopicRequest[];
+  const posts = (postsQ.data ?? []) as PostSummary[];
+  const loading = briefsQ.isLoading || requestsQ.isLoading;
+
+  // Notify parent of pending request count whenever requests data changes
+  useEffect(() => {
+    onRequestCountChange?.(clientRequests.filter(r => r.status === 'requested').length);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientRequests]);
+
   const [generating, setGenerating] = useState(false);
   const [generatingBriefFor, setGeneratingBriefFor] = useState<string | null>(null);
   const [keyword, setKeyword] = useState('');
@@ -98,8 +113,6 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
   const [generatingPostFor, setGeneratingPostFor] = useState<string | null>(null);
   const [regeneratingBrief, setRegeneratingBrief] = useState<string | null>(null);
   const [sendingToClient, setSendingToClient] = useState<string | null>(null);
-  interface PostSummary { id: string; briefId: string; targetKeyword: string; title: string; totalWordCount: number; status: string; createdAt: string; updatedAt: string }
-  const [posts, setPosts] = useState<PostSummary[]>([]);
   const [deliveringReqId, setDeliveringReqId] = useState<string | null>(null);
   const [deliveryUrl, setDeliveryUrl] = useState('');
   const [deliveryNotes, setDeliveryNotes] = useState('');
@@ -111,7 +124,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
     setRegeneratingBrief(briefId);
     try {
       const newBrief = await post<ContentBrief>(`/api/content-briefs/${workspaceId}/${briefId}/regenerate`, { feedback });
-      setBriefs(prev => [newBrief, ...prev]);
+      queryClient.setQueryData<ContentBrief[]>(['admin-briefs', workspaceId], old => [newBrief, ...(old ?? [])]);
       setExpanded(newBrief.id);
     } catch (err) { console.error('ContentBriefs operation failed:', err); }
     setRegeneratingBrief(null);
@@ -120,7 +133,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
   const saveBriefField = async (briefId: string, updates: Partial<ContentBrief>) => {
     try {
       const updated = await patch<ContentBrief>(`/api/content-briefs/${workspaceId}/${briefId}`, updates);
-      setBriefs(prev => prev.map(b => b.id === briefId ? updated : b));
+      queryClient.setQueryData<ContentBrief[]>(['admin-briefs', workspaceId], old => (old ?? []).map(b => b.id === briefId ? updated : b));
     } catch (err) { console.error('ContentBriefs operation failed:', err); }
   };
 
@@ -137,7 +150,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
       const url = `/api/content-briefs/${workspaceId}/${briefId}`;
       try {
         const brief = await get<ContentBrief>(url);
-        setBriefs(prev => [brief, ...prev.filter(b => b.id !== brief.id)]);
+        queryClient.setQueryData<ContentBrief[]>(['admin-briefs', workspaceId], old => [brief, ...(old ?? []).filter(b => b.id !== brief.id)]);
         setLoadingBrief(null);
         setExpandedRequest(reqId);
         return;
@@ -147,7 +160,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
         try {
           const allBriefs = await getSafe<ContentBrief[]>(`/api/content-briefs/${workspaceId}`, []);
           if (Array.isArray(allBriefs)) {
-            setBriefs(allBriefs);
+            queryClient.setQueryData<ContentBrief[]>(['admin-briefs', workspaceId], allBriefs);
             const found = allBriefs.find((b: ContentBrief) => b.id === briefId);
             if (found) {
               setLoadingBrief(null);
@@ -170,11 +183,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
   const handleDeleteRequest = async (reqId: string) => {
     try {
       await del(`/api/content-requests/${workspaceId}/${reqId}`);
-      setClientRequests(prev => {
-        const next = prev.filter(r => r.id !== reqId);
-        onRequestCountChange?.(next.filter(r => r.status === 'requested').length);
-        return next;
-      });
+      queryClient.setQueryData<ContentTopicRequest[]>(['admin-requests', workspaceId], old => (old ?? []).filter(r => r.id !== reqId));
       if (expandedRequest === reqId) setExpandedRequest(null);
     } catch (err) { console.error('ContentBriefs operation failed:', err); }
   };
@@ -231,55 +240,19 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
     try {
       const result = await post<{ ok: boolean; requestId: string }>(`/api/content-briefs/${workspaceId}/${b.id}/send-to-client`);
       if (result.ok) {
-        // Refresh requests list to show the new request
-        const reqs = await getSafe<ContentTopicRequest[]>(`/api/content-requests/${workspaceId}`, []);
-        if (Array.isArray(reqs)) {
-          setClientRequests(reqs);
-          onRequestCountChange?.(reqs.filter(r => r.status === 'requested').length);
-        }
+        queryClient.invalidateQueries({ queryKey: ['admin-requests', workspaceId] });
       }
     } catch (err) { console.error('ContentBriefs operation failed:', err); }
     setSendingToClient(null);
   };
 
-  const fetchPosts = () => {
-    getSafe<PostSummary[]>(`/api/content-posts/${workspaceId}`, [])
-      .then(r => { if (Array.isArray(r)) setPosts(r); })
-      .catch((err) => { console.error('ContentBriefs operation failed:', err); });
-  };
-
-  useEffect(() => {
-    let done = 0;
-    const checkDone = () => { if (++done >= 2) setLoading(false); };
-
-    getSafe<ContentBrief[]>(`/api/content-briefs/${workspaceId}`, [])
-      .then(parsed => { if (Array.isArray(parsed)) setBriefs(parsed); })
-      .catch((err) => { console.error('ContentBriefs operation failed:', err); })
-      .finally(checkDone);
-
-    getSafe<ContentTopicRequest[]>(`/api/content-requests/${workspaceId}`, [])
-      .then(r => {
-        if (Array.isArray(r)) {
-          setClientRequests(r);
-          onRequestCountChange?.(r.filter((req: ContentTopicRequest) => req.status === 'requested').length);
-        }
-      })
-      .catch((err) => { console.error('ContentBriefs operation failed:', err); })
-      .finally(checkDone);
-
-    fetchPosts();
-  }, [workspaceId]);
 
   const handleGenerateBriefForRequest = async (req: ContentTopicRequest) => {
     setGeneratingBriefFor(req.id);
     try {
       const brief = await post<ContentBrief>(`/api/content-requests/${workspaceId}/${req.id}/generate-brief`);
-      setBriefs(prev => [brief, ...prev]);
-      setClientRequests(prev => {
-        const next = prev.map(r => r.id === req.id ? { ...r, status: 'brief_generated' as const, briefId: brief.id } : r);
-        onRequestCountChange?.(next.filter(r => r.status === 'requested').length);
-        return next;
-      });
+      queryClient.setQueryData<ContentBrief[]>(['admin-briefs', workspaceId], old => [brief, ...(old ?? [])]);
+      queryClient.setQueryData<ContentTopicRequest[]>(['admin-requests', workspaceId], old => (old ?? []).map(r => r.id === req.id ? { ...r, status: 'brief_generated' as const, briefId: brief.id } : r));
       setExpandedRequest(req.id);
     } catch (err) { console.error('ContentBriefs operation failed:', err); }
     setGeneratingBriefFor(null);
@@ -289,7 +262,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
     setGeneratingPostFor(briefId);
     try {
       const skeleton = await post<PostSummary>(`/api/content-posts/${workspaceId}/generate`, { briefId });
-      setPosts(prev => [skeleton, ...prev]);
+      queryClient.setQueryData(['admin-posts', workspaceId], (old: unknown) => [skeleton, ...(Array.isArray(old) ? old : [])]);
       setActivePostId(skeleton.id);
     } catch (err) { console.error('ContentBriefs operation failed:', err); }
     setGeneratingPostFor(null);
@@ -298,11 +271,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
   const handleUpdateRequestStatus = async (reqId: string, status: ContentTopicRequest['status'], extra?: { deliveryUrl?: string; deliveryNotes?: string }) => {
     try {
       const updated = await patch<ContentTopicRequest>(`/api/content-requests/${workspaceId}/${reqId}`, { status, ...extra });
-      setClientRequests(prev => {
-        const next = prev.map(r => r.id === reqId ? updated : r);
-        onRequestCountChange?.(next.filter(r => r.status === 'requested').length);
-        return next;
-      });
+      queryClient.setQueryData<ContentTopicRequest[]>(['admin-requests', workspaceId], old => (old ?? []).map(r => r.id === reqId ? updated : r));
     } catch (err) { console.error('ContentBriefs operation failed:', err); }
   };
 
@@ -319,7 +288,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
         pageType: pageType || undefined,
         referenceUrls: refUrls.trim() ? refUrls.split('\n').map(u => u.trim()).filter(u => u.startsWith('http')) : undefined,
       });
-      setBriefs(prev => [brief, ...prev]);
+      queryClient.setQueryData<ContentBrief[]>(['admin-briefs', workspaceId], old => [brief, ...(old ?? [])]);
       setKeyword('');
       setExpanded(brief.id);
     } catch (err) {
@@ -331,7 +300,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
 
   const handleDelete = async (briefId: string) => {
     await del(`/api/content-briefs/${workspaceId}/${briefId}`);
-    setBriefs(prev => prev.filter(b => b.id !== briefId));
+    queryClient.setQueryData<ContentBrief[]>(['admin-briefs', workspaceId], old => (old ?? []).filter(b => b.id !== briefId));
     if (expanded === briefId) setExpanded(null);
     setDeleteConfirm(null);
   };
@@ -397,7 +366,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
             workspaceId={workspaceId}
             postId={activePostId}
             onClose={() => setActivePostId(null)}
-            onDelete={() => { fetchPosts(); setActivePostId(null); }}
+            onDelete={() => { queryClient.invalidateQueries({ queryKey: ['admin-posts', workspaceId] }); setActivePostId(null); }}
           />
         </div>
       )}
@@ -524,7 +493,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
       {/* Briefs list (standalone — not linked to a request) */}
       <BriefList
         briefs={briefs}
-        clientRequests={clientRequests}
+        clientRequests={clientRequests as any}
         expanded={expanded}
         briefSearch={briefSearch}
         briefSort={briefSort}
@@ -538,7 +507,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
         onSetEditingBrief={setEditingBrief}
         onSaveBriefField={saveBriefField}
         onGeneratePost={handleGeneratePost}
-        onRegenerate={handleRegenerateBrief}
+        onRegenerateBrief={handleRegenerateBrief}
         onCopyAsMarkdown={copyAsMarkdown}
         onExportClientHTML={exportClientHTML}
         onSendToClient={handleSendToClient}

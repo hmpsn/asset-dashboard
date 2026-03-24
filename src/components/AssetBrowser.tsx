@@ -1,5 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { get, post, patch, getSafe } from '../api/client';
+import { useState, useEffect, useRef } from 'react';
+import { get, post, patch } from '../api/client';
+import { useQueryClient } from '@tanstack/react-query';
+import { useWebflowAssets, useAssetAudit } from '../hooks/admin';
 import {
   Image, AlertTriangle, Trash2, Sparkles, X,
   Loader2, Minimize2, FolderOpen,
@@ -36,10 +38,15 @@ type SortField = 'fileName' | 'fileSize' | 'createdOn';
 type FilterType = 'all' | 'missing-alt' | 'oversized' | 'images' | 'svg' | 'unused';
 
 function AssetBrowser({ siteId }: Props) {
+  const queryClient = useQueryClient();
   const { startJob, jobs } = useBackgroundTasks();
   const bulkCompressJobId = useRef<string | null>(null);
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: assets = [], isLoading: loading } = useWebflowAssets(siteId);
+  const { data: unusedIds = null } = useAssetAudit(siteId, assets.length > 0);
+
+  const updateAssets = (updater: (prev: Asset[]) => Asset[]) =>
+    queryClient.setQueryData<Asset[]>(['admin-webflow-assets', siteId], old => updater(old ?? []));
+  const refreshAssets = () => queryClient.invalidateQueries({ queryKey: ['admin-webflow-assets', siteId] });
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
   const [sort, setSort] = useState<SortField>('createdOn');
@@ -57,9 +64,7 @@ function AssetBrowser({ siteId }: Props) {
   const [renameLoading, setRenameLoading] = useState<Set<string>>(new Set());
   const [bulkRenameProgress, setBulkRenameProgress] = useState<{ done: number; total: number } | null>(null);
   const [bulkCompressProgress, setBulkCompressProgress] = useState<{ done: number; total: number; saved: number } | null>(null);
-  const [unusedIds, setUnusedIds] = useState<Set<string> | null>(null);
   const [altError, setAltError] = useState<string | null>(null);
-  const unusedLoadingRef = useRef(false);
 
   // Organize state
   const [organizePreview, setOrganizePreview] = useState<{
@@ -71,31 +76,6 @@ function AssetBrowser({ siteId }: Props) {
   const [organizeExecuting, setOrganizeExecuting] = useState(false);
   const [organizeResult, setOrganizeResult] = useState<{ moved: number; failed: number; total: number } | null>(null);
 
-  const loadAssets = useCallback(() => {
-    getSafe<Asset[]>(`/api/webflow/assets/${siteId}`, [])
-      .then(data => setAssets(Array.isArray(data) ? data : []))
-      .catch((err) => { console.error('AssetBrowser operation failed:', err); })
-      .finally(() => setLoading(false));
-  }, [siteId]);
-
-  useEffect(() => {
-    loadAssets();
-  }, [loadAssets]);
-
-  // Load unused asset IDs in background after assets load
-  useEffect(() => {
-    if (assets.length === 0 || unusedIds || unusedLoadingRef.current) return;
-    unusedLoadingRef.current = true;
-    get<{ issues?: Array<{ issues: string[]; assetId: string }> }>(`/api/webflow/audit/${siteId}`)
-      .then(data => {
-        const ids = new Set<string>(
-          (data.issues || []).filter((i) => i.issues.includes('unused')).map((i) => i.assetId)
-        );
-        setUnusedIds(ids);
-      })
-      .catch((err) => { console.error('AssetBrowser operation failed:', err); })
-      .finally(() => { unusedLoadingRef.current = false; });
-  }, [assets.length, unusedIds, siteId]);
 
   const filtered = assets
     .filter(a => {
@@ -141,7 +121,7 @@ function AssetBrowser({ siteId }: Props) {
         setAltError(`Failed to save alt text: ${data.error || 'Unknown error'}`);
         return;
       }
-      setAssets(prev => prev.map(a => a.id === assetId ? { ...a, altText: altDraft } : a));
+      updateAssets(prev => prev.map(a => a.id === assetId ? { ...a, altText: altDraft } : a));
       setEditingAlt(null);
     } catch (err) {
       console.error('AssetBrowser operation failed:', err);
@@ -160,7 +140,7 @@ function AssetBrowser({ siteId }: Props) {
       if (data.error) {
         setAltError(`Alt text generation failed: ${data.error}`);
       } else if (data.altText) {
-        setAssets(prev => prev.map(a => a.id === asset.id ? { ...a, altText: data.altText } : a));
+        updateAssets(prev => prev.map(a => a.id === asset.id ? { ...a, altText: data.altText } : a));
         if (data.writeError) {
           setAltError(`Alt text generated but failed to save to Webflow: ${data.writeError}`);
         } else {
@@ -228,7 +208,7 @@ function AssetBrowser({ siteId }: Props) {
               setBulkProgress({ done: event.done, total: event.total });
               // Apply alt text immediately as each image completes
               if (event.altText) {
-                setAssets(prev => prev.map(a =>
+                updateAssets(prev => prev.map(a =>
                   a.id === event.assetId ? { ...a, altText: event.altText } : a
                 ));
                 if (event.updated) successCount++;
@@ -266,10 +246,10 @@ function AssetBrowser({ siteId }: Props) {
       });
       if (data.success) {
         // Replace the asset in our list
-        setAssets(prev => prev.map(a => a.id === asset.id ? {
+        updateAssets(prev => prev.map(a => a.id === asset.id ? {
           ...a,
-          id: data.newAssetId,
-          size: data.newSize,
+          id: data.newAssetId || a.id,
+          size: data.newSize ?? a.size,
           hostedUrl: data.newHostedUrl,
           displayName: data.newFileName,
         } : a));
@@ -311,7 +291,7 @@ function AssetBrowser({ siteId }: Props) {
         setAltError(`Rename failed: ${data.error || 'Unknown error'}`);
         return;
       }
-      setAssets(prev => prev.map(a => a.id === assetId ? { ...a, displayName: renameDraft.trim() } : a));
+      updateAssets(prev => prev.map(a => a.id === assetId ? { ...a, displayName: renameDraft.trim() } : a));
     } catch (err) {
       console.error('AssetBrowser operation failed:', err);
       setAltError('Network error renaming asset');
@@ -337,7 +317,7 @@ function AssetBrowser({ siteId }: Props) {
         });
         if (data.fullName) {
           await patch(`/api/webflow/rename/${asset.id}`, { displayName: data.fullName, siteId });
-          setAssets(prev => prev.map(a => a.id === asset.id ? { ...a, displayName: data.fullName } : a));
+          updateAssets(prev => prev.map(a => a.id === asset.id ? { ...a, displayName: data.fullName } : a));
         }
       } catch (err) { console.error('AssetBrowser operation failed:', err); }
       setRenameLoading(prev => { const n = new Set(prev); n.delete(asset.id); return n; });
@@ -385,13 +365,13 @@ function AssetBrowser({ siteId }: Props) {
       setBulkCompressProgress(null);
       bulkCompressJobId.current = null;
       // Refresh asset list to pick up new asset IDs/sizes
-      loadAssets();
+      refreshAssets();
     } else if (job.status === 'error') {
       setAltError(job.error || 'Bulk compress failed');
       setBulkCompressProgress(null);
       bulkCompressJobId.current = null;
     }
-  }, [jobs, loadAssets]);
+  }, [jobs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleOrganizePreview = async () => {
     setOrganizeLoading(true);
@@ -435,7 +415,7 @@ function AssetBrowser({ siteId }: Props) {
     if (!confirm(`Delete ${selected.size} assets permanently from Webflow?`)) return;
     setDeleting(true);
     await post('/api/webflow/assets/bulk-delete', { assetIds: [...selected], siteId });
-    setAssets(prev => prev.filter(a => !selected.has(a.id)));
+    updateAssets(prev => prev.filter(a => !selected.has(a.id)));
     setSelected(new Set());
     setDeleting(false);
   };

@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Loader2, Copy, Download, FileText, Check,
   Pencil, X, Eye, Hash, Clock, Sparkles, AlertTriangle, Trash2, Globe, ExternalLink,
   History,
 } from 'lucide-react';
 import { contentPosts } from '../api/content';
-import { workspaces as workspacesApi } from '../api/workspaces';
+import { useAdminPost, useAdminPostVersions, usePublishTarget } from '../hooks/admin';
 import { SectionEditor } from './post-editor/SectionEditor';
 import { PostPreview } from './post-editor/PostPreview';
 import { VersionHistory } from './post-editor/VersionHistory';
@@ -77,9 +78,17 @@ function PostStatusBadge({ status }: { status: GeneratedPost['status'] }) {
 }
 
 export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEditorProps) {
-  const [post, setPost] = useState<GeneratedPost | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const queryClient = useQueryClient();
+  const postQ = useAdminPost(workspaceId, postId);
+  const post = (postQ.data ?? null) as GeneratedPost | null;
+  const loading = postQ.isLoading;
+  const error = postQ.error ? (postQ.error instanceof Error ? postQ.error.message : 'Failed to load') : '';
+  const hasPublishTarget = usePublishTarget(workspaceId).data ?? false;
+  const [showVersions, setShowVersions] = useState(false);
+  const versionsQ = useAdminPostVersions(workspaceId, postId, showVersions);
+  const versions = (versionsQ.data ?? []) as Array<{ id: string; versionNumber: number; trigger: string; triggerDetail?: string; totalWordCount: number; createdAt: string }>;
+  const versionsLoading = versionsQ.isLoading;
+
   const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set());
   const [editingSection, setEditingSection] = useState<number | null>(null);
   const [editBuffer, setEditBuffer] = useState('');
@@ -93,22 +102,25 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   const [showPreview, setShowPreview] = useState(false);
   const [copied, setCopied] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
-  const [hasPublishTarget, setHasPublishTarget] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [publishConfirm, setPublishConfirm] = useState(false);
   const [publishError, setPublishError] = useState('');
   const [showChecklist, setShowChecklist] = useState(false);
-  const [showVersions, setShowVersions] = useState(false);
-  const [versions, setVersions] = useState<Array<{ id: string; versionNumber: number; trigger: string; triggerDetail?: string; totalWordCount: number; createdAt: string }>>([]);
-  const [versionsLoading, setVersionsLoading] = useState(false);
   const [reverting, setReverting] = useState<string | null>(null);
 
-  // Check if workspace has publish target configured
+  const invalidatePost = () => queryClient.invalidateQueries({ queryKey: ['admin-post', workspaceId, postId] });
+  const invalidateVersions = () => queryClient.invalidateQueries({ queryKey: ['admin-post-versions', workspaceId, postId] });
+
+  // Auto-expand all done sections on first load
+  const postLoaded = !!post;
   useEffect(() => {
-    workspacesApi.getById(workspaceId)
-      .then((ws: Record<string, unknown>) => { if (ws && 'publishTarget' in ws && ws.publishTarget) setHasPublishTarget(true); })
-      .catch((err) => { console.error('PostEditor operation failed:', err); });
-  }, [workspaceId]);
+    if (!postLoaded) return;
+    const sections = post!.sections;
+    if (sections.some(s => s.status === 'done')) {
+      setExpandedSections(new Set(sections.filter(s => s.status === 'done').map(s => s.index)));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postLoaded]);
 
   const handlePublish = async (generateImage = false) => {
     if (!post) return;
@@ -120,8 +132,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
         setPublishError(data.error || 'Publish failed');
       } else {
         setPublishConfirm(false);
-        if (data.post) setPost(data.post as GeneratedPost);
-        else fetchPost();
+        invalidatePost();
       }
     } catch (err) {
       setPublishError(err instanceof Error ? err.message : 'Publish failed');
@@ -129,38 +140,11 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     setPublishing(false);
   };
 
-  const fetchPost = useCallback(async () => {
-    try {
-      const data = await contentPosts.getById(workspaceId, postId) as GeneratedPost;
-      setPost(data);
-      // Auto-expand all done sections on first load
-      if (loading) {
-        const done = new Set<number>(data.sections.filter((s: PostSection) => s.status === 'done').map((s: PostSection) => s.index));
-        setExpandedSections(done);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load');
-    } finally {
-      setLoading(false);
-    }
-  }, [workspaceId, postId, loading]);
-
-  // Initial fetch + poll while generating
-  useEffect(() => {
-    fetchPost();
-  }, [fetchPost]);
-
-  useEffect(() => {
-    if (!post || post.status !== 'generating') return;
-    const interval = setInterval(fetchPost, 3000);
-    return () => clearInterval(interval);
-  }, [post?.status, fetchPost]);
-
   const saveField = async (updates: Record<string, unknown>) => {
     if (!post) return;
     try {
       const updated = await contentPosts.update(workspaceId, postId, updates) as GeneratedPost;
-      setPost(updated);
+      queryClient.setQueryData(['admin-post', workspaceId, postId], updated);
     } catch (err) { console.error('PostEditor operation failed:', err); }
   };
 
@@ -168,7 +152,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     setRegenerating(sectionIndex);
     try {
       const updated = await contentPosts.regenerateSection(workspaceId, postId, { sectionIndex }) as GeneratedPost;
-      setPost(updated);
+      queryClient.setQueryData(['admin-post', workspaceId, postId], updated);
     } catch (err) { console.error('PostEditor operation failed:', err); }
     setRegenerating(null);
   };
@@ -235,21 +219,12 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     onClose();
   };
 
-  const fetchVersions = useCallback(async () => {
-    setVersionsLoading(true);
-    try {
-      const data = await contentPosts.versions(workspaceId, postId);
-      setVersions(data as Array<{ id: string; versionNumber: number; trigger: string; triggerDetail?: string; totalWordCount: number; createdAt: string }>);
-    } catch (err) { console.error('PostEditor operation failed:', err); }
-    setVersionsLoading(false);
-  }, [workspaceId, postId]);
-
   const handleRevert = async (versionId: string) => {
     setReverting(versionId);
     try {
       const reverted = await contentPosts.revertVersion(workspaceId, postId, versionId) as GeneratedPost;
-      setPost(reverted);
-      fetchVersions();
+      queryClient.setQueryData(['admin-post', workspaceId, postId], reverted);
+      invalidateVersions();
     } catch (err) { console.error('PostEditor operation failed:', err); }
     setReverting(null);
   };
@@ -352,7 +327,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
               <button onClick={exportPDF} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
                 <Download className="w-3 h-3" /> Export PDF
               </button>
-              <button onClick={() => { setShowVersions(!showVersions); if (!showVersions && versions.length === 0) fetchVersions(); }} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-colors ${showVersions ? 'bg-violet-600/20 border-violet-500/30 text-violet-300' : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-200'}`}>
+              <button onClick={() => setShowVersions(!showVersions)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-colors ${showVersions ? 'bg-violet-600/20 border-violet-500/30 text-violet-300' : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-200'}`}>
                 <History className="w-3 h-3" /> History
               </button>
               {hasPublishTarget && (post.status === 'approved' || post.status === 'draft' || post.status === 'review') && (

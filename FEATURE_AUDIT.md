@@ -866,6 +866,28 @@ A brief value assessment of every feature in the platform, covering what it does
 
 ---
 
+### 77. React Query Migration — Phase 3 (Content Pipeline)
+**What it does:** Migrated the three content pipeline components — `ContentBriefs.tsx`, `ContentManager.tsx`, and `PostEditor.tsx` — from manual `useState`/`useEffect` data fetching to React Query hooks. Created `src/hooks/admin/useAdminBriefs.ts` (2 hooks: briefs list, requests list) and `src/hooks/admin/useAdminPosts.ts` (4 hooks: posts list with auto-poll for generating status, single post with auto-poll, post versions, publish target check). `ContentBriefs.tsx` removed 4 data `useState` + `useEffect` initial load + `fetchPosts` callback; all 10 mutation handlers now use `queryClient.setQueryData`/`invalidateQueries`; `onRequestCountChange` derived automatically via `useEffect` on requests data. `ContentManager.tsx` removed 3 `useState` + `useEffect` + manual polling interval. `PostEditor.tsx` removed 4 `useState` + `useEffect` + manual `setInterval` polling; replaced with `refetchInterval` on the query.
+
+**Agency value:** Content pipeline hooks are 15-25 lines each. Mutations instantly update the cache without waiting for refetch. `refetchInterval` replaces manual `setInterval` boilerplate. Shared query keys (`admin-posts`, `admin-briefs`, `admin-requests`) mean ContentBriefs and ContentManager automatically share cached data.
+
+**Client value:** Faster perceived updates — optimistic cache writes mean the UI updates instantly after mutations. Stale-while-revalidate on tab focus keeps content lists fresh.
+
+**Mutual:** Phases 1-3 now cover client portal, admin analytics, and content pipeline. Only Phase 4 (SEO tools + admin dashboards) remains.
+
+---
+
+### 78. React Query Migration — Phase 4 (SEO Tools + Admin Dashboards)
+**What it does:** Migrated the five remaining SEO/admin components — `WorkspaceHome.tsx`, `WorkspaceOverview.tsx`, `SeoAudit.tsx`, `SchemaSuggester.tsx`, and `AssetBrowser.tsx` — from manual `useState`/`useEffect` data fetching to React Query hooks. Created 4 new hook files: `src/hooks/admin/useWorkspaceHome.ts` (1 aggregated query replacing 12 `useState`), `src/hooks/admin/useWorkspaceOverview.ts` (1 aggregated query replacing 6 `useState` + `Promise.all`), `src/hooks/admin/useAdminSeo.ts` (5 hooks: audit traffic map, audit suppressions, audit schedule, schema snapshot, webflow pages), `src/hooks/admin/useAdminAssets.ts` (2 hooks: webflow assets, asset audit). `WorkspaceHome.tsx` replaced 12 data `useState` + `useEffect` + `useCallback` refetch + manual refresh handler with single `useWorkspaceHomeData` hook; WebSocket events now invalidate the query instead of per-key manual refetches. `WorkspaceOverview.tsx` replaced 6 data `useState` + `Promise.all` `useEffect` with `useWorkspaceOverviewData`; feedback mutations use `queryClient.setQueryData` for instant UI updates; WebSocket presence uses state override pattern. `SeoAudit.tsx` replaced 3 `useEffect` fetches (traffic map, suppressions, schedule) with 3 React Query hooks; all suppression/schedule mutations use `queryClient.setQueryData`. `SchemaSuggester.tsx` replaced 2 `useEffect` fetches (schema snapshot, webflow pages) with React Query hooks. `AssetBrowser.tsx` replaced 2 `useEffect` fetches (assets, unused audit) with React Query hooks; all 8 mutation handlers use `queryClient.setQueryData` for optimistic updates; `loadAssets` replaced by `queryClient.invalidateQueries`.
+
+**Agency value:** Completes the React Query migration across the entire platform. All 5 components now benefit from automatic caching, stale-while-revalidate, retry logic, and React Query DevTools. WorkspaceHome dropped from ~170 lines of state/fetch boilerplate to ~20 lines of derived data.
+
+**Client value:** Instant cached data on tab switching. Background refresh on window focus keeps dashboards fresh. Reduced re-renders from optimistic cache updates.
+
+**Mutual:** All 4 phases shipped. The entire frontend now uses React Query for data fetching — consistent patterns, shared caching, and zero manual `useEffect` fetch boilerplate.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
@@ -881,9 +903,9 @@ A brief value assessment of every feature in the platform, covering what it does
 | Monetization | 1 | Stripe Checkout, admin settings, payment tracking, trials, encrypted config |
 | Platform & UX | 10 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home, page state model, work orders, request linkage |
 | Data Architecture | 3 | PageEditState model, cross-store writes, activity feed for client actions |
-| Architecture | 2 | Server refactor (56 route modules + 3 shared modules + server module splits), frontend component decomposition (11 extracted directories) |
+| Architecture | 4 | Server refactor (56 route modules + 3 shared modules + server module splits), frontend component decomposition (11 extracted directories), React Query migration (4 phases shipped) |
 
-**67 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**69 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
 ---
 

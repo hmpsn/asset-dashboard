@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { get, patch, post, getSafe, getOptional } from '../api/client';
+import { patch, post, getOptional } from '../api/client';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { useWorkspaceOverviewData } from '../hooks/admin';
+import type { FeedbackItem, PresenceMap, WorkspaceOverviewData } from '../hooks/admin/useWorkspaceOverview';
 import {
   Globe, Shield, MessageSquare, ClipboardCheck, AlertTriangle,
   CheckCircle2, ArrowUpRight, ArrowDownRight, Minus, Loader2,
@@ -12,65 +15,7 @@ import {
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import { MetricRingSvg, PageHeader, SectionCard, Badge, StatCard } from './ui';
 
-interface ActivityEntry {
-  id: string;
-  workspaceId: string;
-  type: string;
-  title: string;
-  description?: string;
-  createdAt: string;
-}
-
-interface WorkspaceSummary {
-  id: string;
-  name: string;
-  webflowSiteId: string | null;
-  webflowSiteName: string | null;
-  hasGsc: boolean;
-  hasGa4: boolean;
-  hasPassword: boolean;
-  audit: {
-    score: number;
-    totalPages: number;
-    errors: number;
-    warnings: number;
-    previousScore?: number;
-    lastAuditDate?: string;
-  } | null;
-  requests: { total: number; new: number; active: number; latestDate: string | null };
-  approvals: { pending: number; total: number };
-  contentRequests?: { pending: number; inProgress: number; delivered: number; total: number };
-  workOrders?: { pending: number; total: number };
-  pageStates?: { issueDetected: number; inReview: number; approved: number; rejected: number; live: number; total: number };
-  tier?: 'free' | 'growth' | 'premium';
-  isTrial?: boolean;
-  trialDaysRemaining?: number;
-}
-
-
-interface FeedbackItem {
-  id: string;
-  workspaceId: string;
-  type: 'bug' | 'feature' | 'general';
-  title: string;
-  description: string;
-  status: 'new' | 'acknowledged' | 'fixed' | 'wontfix';
-  context?: { currentTab?: string };
-  submittedBy?: string;
-  replies: Array<{ id: string; author: 'team' | 'client'; content: string; createdAt: string }>;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface AnomalySummary {
-  id: string;
-  workspaceId: string;
-  workspaceName: string;
-  severity: 'critical' | 'warning' | 'positive';
-  title: string;
-  acknowledgedAt?: string;
-  dismissedAt?: string;
-}
+// Types imported from useWorkspaceOverview hook
 
 // ScoreRing replaced by unified <MetricRingSvg /> from ./ui
 const ScoreRing = MetricRingSvg;
@@ -89,39 +34,25 @@ function timeAgo(dateStr: string): string {
 
 export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (id: string) => void }) {
   const navigate = useNavigate();
-  const [data, setData] = useState<WorkspaceSummary[]>([]);
-  const [recentActivity, setRecentActivity] = useState<ActivityEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [anomalies, setAnomalies] = useState<AnomalySummary[]>([]);
-  const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
+  const queryClient = useQueryClient();
+  const { data: overviewData, isLoading: loading } = useWorkspaceOverviewData();
   const [feedbackReply, setFeedbackReply] = useState<Record<string, string>>({});
-  const [presence, setPresence] = useState<Record<string, Array<{ userId: string; email: string; name?: string; role: string; connectedAt: string; lastSeen: string }>>>({});
-  const [timeSaved, setTimeSaved] = useState<{ totalHoursSaved: number; operationCount: number } | null>(null);
 
-  type PresenceMap = typeof presence;
-  // Real-time presence updates via WebSocket
+  // Real-time presence: WebSocket overrides query data via a state + ref trigger
+  const [wsPresence, setWsPresence] = useState<PresenceMap | null>(null);
   const handlePresenceUpdate = useCallback((d: unknown) => {
-    if (d && typeof d === 'object') setPresence(d as PresenceMap);
+    if (d && typeof d === 'object') setWsPresence(d as PresenceMap);
   }, []);
   useWebSocket({ 'presence:update': handlePresenceUpdate });
 
-  useEffect(() => {
-    Promise.all([
-      get<WorkspaceSummary[]>('/api/workspace-overview'),
-      getSafe<ActivityEntry[]>('/api/activity?limit=15', []),
-      getSafe<AnomalySummary[]>('/api/anomalies', []),
-      getOptional<PresenceMap>('/api/presence').then(v => v ?? {}).catch(() => ({})),
-      getSafe<FeedbackItem[]>('/api/feedback', []),
-      getOptional<{ totalHoursSaved: number; operationCount: number }>(`/api/ai/time-saved?since=${new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()}`).catch(() => null),
-    ]).then(([d, act, anom, pres, fb, ts]) => {
-      if (Array.isArray(d)) setData(d);
-      if (Array.isArray(act)) setRecentActivity(act);
-      if (Array.isArray(anom)) setAnomalies(anom.filter((a: AnomalySummary) => !a.dismissedAt));
-      if (pres && typeof pres === 'object') setPresence(pres as PresenceMap);
-      if (Array.isArray(fb)) setFeedback(fb);
-      if (ts && typeof ts === 'object') setTimeSaved(ts as { totalHoursSaved: number; operationCount: number });
-    }).catch((err) => { console.error('WorkspaceOverview operation failed:', err); }).finally(() => setLoading(false));
-  }, []);
+  // Derive data from query result
+  const data = overviewData?.workspaces ?? [];
+  const recentActivity = overviewData?.recentActivity ?? [];
+  const anomalies = overviewData?.anomalies ?? [];
+  const feedback = overviewData?.feedback ?? [];
+  const timeSaved = overviewData?.timeSaved ?? null;
+  // Prefer live WebSocket presence, fall back to query snapshot
+  const presence: PresenceMap = wsPresence ?? overviewData?.presence ?? {};
 
   if (loading) {
     return (
@@ -458,14 +389,20 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
 
         const handleStatusChange = async (wsId: string, id: string, status: string) => {
           const updated = await patch<FeedbackItem>(`/api/feedback/${wsId}/${id}`, { status });
-          setFeedback(prev => prev.map(f => f.id === updated.id ? updated : f));
+          queryClient.setQueryData<WorkspaceOverviewData>(['admin-workspace-overview'], old => {
+            if (!old) return old;
+            return { ...old, feedback: old.feedback.map(f => f.id === updated.id ? updated : f) };
+          });
         };
 
         const handleReply = async (wsId: string, id: string) => {
           const content = feedbackReply[id]?.trim();
           if (!content) return;
           const updated = await post<FeedbackItem>(`/api/feedback/${wsId}/${id}/reply`, { content });
-          setFeedback(prev => prev.map(f => f.id === updated.id ? updated : f));
+          queryClient.setQueryData<WorkspaceOverviewData>(['admin-workspace-overview'], old => {
+            if (!old) return old;
+            return { ...old, feedback: old.feedback.map(f => f.id === updated.id ? updated : f) };
+          });
           setFeedbackReply(prev => ({ ...prev, [id]: '' }));
         };
 

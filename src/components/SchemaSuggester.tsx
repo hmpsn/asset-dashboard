@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { get, post, put, getSafe } from '../api/client';
+import { post, put, getSafe } from '../api/client';
 import { schema as schemaApi, schemaImpact as schemaImpactApi, type SchemaImpactData, type SchemaDeploymentImpact } from '../api/seo';
 import type { FixContext } from '../App';
+import { useSchemaSnapshot, useWebflowPages } from '../hooks/admin';
 import {
   Loader2, CheckCircle,
   AlertCircle, Info, Sparkles, RefreshCw, Plus, Database, HelpCircle,
@@ -131,39 +132,25 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
   // Unified page edit states
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
 
-  // Load saved schema snapshot on mount
+  // Load saved schema snapshot — React Query
+  const { data: snapshotData } = useSchemaSnapshot(siteId);
   const [snapshotDate, setSnapshotDate] = useState<string | null>(null);
+  // Hydrate local state from snapshot query when it arrives
   useEffect(() => {
-    (async () => {
-      try {
-        const snapshot = await get<{ results?: SchemaPageSuggestion[]; createdAt?: string }>(`/api/webflow/schema-snapshot/${siteId}`);
-        if (snapshot && snapshot.results && snapshot.results.length > 0) {
-          setData(snapshot.results);
-          setSnapshotDate(snapshot.createdAt ?? null);
-          setStarted(true);
-        }
-      } catch (err) { console.error('SchemaSuggester operation failed:', err); }
-    })();
-  }, [siteId]);
+    if (snapshotData && snapshotData.results.length > 0 && !data) {
+      setData(snapshotData.results as SchemaPageSuggestion[]);
+      setSnapshotDate(snapshotData.createdAt);
+      setStarted(true);
+    }
+  }, [snapshotData]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-load all pages on mount so user can assign types before generating
+  // Auto-load all pages — React Query
+  const { data: fetchedPages = [] } = useWebflowPages(siteId);
   useEffect(() => {
-    if (availablePages.length > 0) return;
-    (async () => {
-      setLoadingPages(true);
-      try {
-        const pages = await getSafe<Array<{ _id?: string; id?: string; title?: string; slug?: string }>>(`/api/webflow/pages/${siteId}`, []);
-        if (Array.isArray(pages)) {
-          setAvailablePages(pages.map((p: { _id?: string; id?: string; title?: string; slug?: string }) => ({
-            id: p._id || p.id || '',
-            title: p.title || p.slug || 'Untitled',
-            slug: p.slug || '',
-          })));
-        }
-      } catch (err) { console.error('SchemaSuggester operation failed:', err); }
-      setLoadingPages(false);
-    })();
-  }, [siteId, availablePages.length]);
+    if (fetchedPages.length > 0 && availablePages.length === 0) {
+      setAvailablePages(fetchedPages);
+    }
+  }, [fetchedPages]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Stream partial results from background job via WebSocket
   useEffect(() => {

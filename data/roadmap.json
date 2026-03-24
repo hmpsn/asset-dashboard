@@ -3000,8 +3000,8 @@
           "source": "INTERNAL",
           "est": "2.5h",
           "priority": "P2",
-          "notes": "Migrate ContentBriefs.tsx (15 useState), ContentManager.tsx (5), PostEditor.tsx (5). Convert brief generation and post generation to useMutation. Brief/post lists become useQuery with cache invalidation on create/update/delete.",
-          "status": "pending"
+          "notes": "Shipped — Created useAdminBriefs.ts (2 hooks), useAdminPosts.ts (4 hooks: list, single, versions, publish-target). Migrated ContentBriefs.tsx (removed 4 data useState + useEffect data-loading + fetchPosts, all mutations use queryClient.setQueryData/invalidateQueries, onRequestCountChange derived via useEffect). Migrated ContentManager.tsx (removed 3 useState + useEffect + polling, replaced with useAdminPostsList + usePublishTarget). Migrated PostEditor.tsx (removed 4 useState + useEffect + polling, replaced with useAdminPost + useAdminPostVersions + usePublishTarget, refetchInterval for generating status).",
+          "status": "done"
         },
         {
           "id": 335,
@@ -3009,8 +3009,8 @@
           "source": "INTERNAL",
           "est": "3h",
           "priority": "P3",
-          "notes": "Migrate SeoAudit.tsx (15 useState), SchemaSuggester.tsx (15), WorkspaceHome.tsx (12), WorkspaceOverview.tsx (6), AssetBrowser.tsx (11). Lower priority — admin-facing surfaces with less frequent usage. Completes the migration for all Tier 1+2 components (~110 fetch-related useState calls total across all phases).",
-          "status": "pending"
+          "notes": "Shipped — Migrated WorkspaceHome (12 useState→1 useQuery), WorkspaceOverview (6→1), SeoAudit (3 useEffect→3 useQuery), SchemaSuggester (2→2), AssetBrowser (2→2). Created 4 hook files: useWorkspaceHome, useWorkspaceOverview, useAdminSeo (5 hooks), useAdminAssets (2 hooks). All mutations use queryClient.setQueryData for optimistic updates. Completes React Query migration across entire frontend.",
+          "status": "done"
         }
       ]
     }

@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Loader2, FileText, PenLine, Clock, CheckCircle2, Eye, Send,
   Trash2, Download, Search, ArrowUpDown, Filter,
@@ -6,7 +7,7 @@ import {
 } from 'lucide-react';
 import { PostEditor } from './PostEditor';
 import { contentPosts } from '../api/content';
-import { workspaces as workspacesApi } from '../api/workspaces';
+import { useAdminPostsList, usePublishTarget } from '../hooks/admin';
 
 interface PostSummary {
   id: string;
@@ -34,8 +35,12 @@ const STATUS_CONFIG: Record<string, { icon: typeof Clock; color: string; label: 
 };
 
 export function ContentManager({ workspaceId }: { workspaceId: string }) {
-  const [posts, setPosts] = useState<PostSummary[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const postsQ = useAdminPostsList(workspaceId);
+  const posts = (postsQ.data ?? []) as PostSummary[];
+  const loading = postsQ.isLoading;
+  const hasPublishTarget = usePublishTarget(workspaceId).data ?? false;
+
   const [activePostId, setActivePostId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState<SortField>('date');
@@ -43,48 +48,24 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
-  const [hasPublishTarget, setHasPublishTarget] = useState(false);
   const [publishingPost, setPublishingPost] = useState<string | null>(null);
 
-  const fetchPosts = useCallback(async () => {
-    try {
-      const data = await contentPosts.list(workspaceId);
-      setPosts(Array.isArray(data) ? data as PostSummary[] : []);
-    } catch (err) { console.error('ContentManager operation failed:', err); }
-    setLoading(false);
-  }, [workspaceId]);
-
-  useEffect(() => { void fetchPosts(); }, [fetchPosts]);
-
-  // Check if workspace has publish target configured
-  useEffect(() => {
-    workspacesApi.getById(workspaceId)
-      .then((ws: Record<string, unknown>) => { if (ws && 'publishTarget' in ws && ws.publishTarget) setHasPublishTarget(true); })
-      .catch((err) => { console.error('ContentManager operation failed:', err); });
-  }, [workspaceId]);
+  const invalidatePosts = () => queryClient.invalidateQueries({ queryKey: ['admin-posts', workspaceId] });
 
   const publishPost = async (postId: string) => {
     setPublishingPost(postId);
     try {
       const result = await contentPosts.publishToWebflow(workspaceId, postId, {});
-      if (result.success) fetchPosts();
+      if (result.success) invalidatePosts();
     } catch (err) { console.error('ContentManager operation failed:', err); }
     setPublishingPost(null);
   };
 
-  // Auto-refresh generating posts
-  useEffect(() => {
-    const hasGenerating = posts.some(p => p.status === 'generating');
-    if (!hasGenerating) return;
-    const interval = setInterval(fetchPosts, 5000);
-    return () => clearInterval(interval);
-  }, [posts, fetchPosts]);
-
   const updateStatus = async (postId: string, status: string) => {
     setUpdatingStatus(postId);
     try {
-      const updated = await contentPosts.update(workspaceId, postId, { status }) as PostSummary;
-      setPosts(prev => prev.map(p => p.id === postId ? { ...p, ...updated } : p));
+      await contentPosts.update(workspaceId, postId, { status });
+      invalidatePosts();
     } catch (err) { console.error('ContentManager operation failed:', err); }
     setUpdatingStatus(null);
   };
@@ -92,7 +73,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
   const deletePost = async (postId: string) => {
     try {
       await contentPosts.remove(workspaceId, postId);
-      setPosts(prev => prev.filter(p => p.id !== postId));
+      invalidatePosts();
       setDeleteConfirm(null);
     } catch (err) { console.error('ContentManager operation failed:', err); }
   };
@@ -133,7 +114,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
     return (
       <div className="space-y-4">
         <button
-          onClick={() => { setActivePostId(null); fetchPosts(); }}
+          onClick={() => { setActivePostId(null); invalidatePosts(); }}
           className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
         >
           ← Back to Content
@@ -142,8 +123,8 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
           <PostEditor
             workspaceId={workspaceId}
             postId={activePostId}
-            onClose={() => { setActivePostId(null); fetchPosts(); }}
-            onDelete={() => { setActivePostId(null); fetchPosts(); }}
+            onClose={() => { setActivePostId(null); invalidatePosts(); }}
+            onDelete={() => { setActivePostId(null); invalidatePosts(); }}
           />
         </div>
       </div>
