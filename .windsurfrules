@@ -55,12 +55,12 @@ Every completed task — no matter how small — must include these steps:
 - **Routing** — **React Router DOM 7** (`src/routes.ts` defines `Page` + `ClientTab` types, `adminPath()` + `clientPath()` helpers). Admin: `/ws/:workspaceId/:tab?`, Client: `/client/:workspaceId/:tab?`, global tabs: `/settings`, `/roadmap`, `/prospect`, `/ai-usage`.
 - **API Client** — Typed fetch wrappers in `src/api/` (7 modules). All components import from `src/api/` — no raw `fetch()` calls in components. `ApiError` class with `.status` for error handling.
 - **Shared Types** — `shared/types/` (11 modules) shared between client and server. Canonical interfaces for workspace, analytics, content, payments, approvals, schema-plan, etc.
-- **Storage** — **SQLite** via `better-sqlite3` (WAL mode, foreign keys ON) at `DATA_BASE/dashboard.db`. 19 migrations merged to `main` — 95+ server modules use SQLite. See § 2a below.
+- **Storage** — **SQLite** via `better-sqlite3` (WAL mode, foreign keys ON) at `DATA_BASE/dashboard.db`. 21 migrations merged to `main` — 95+ server modules use SQLite. See § 2a below.
 - **AI** — OpenAI GPT-4.1/4.1-mini/4.1-nano via `server/openai-helpers.ts` (`callOpenAI`), Anthropic Claude via `server/anthropic-helpers.ts` (`callAnthropic`) for creative prose
 - **Payments** — Stripe Checkout (not Payment Intents). Config encrypted on disk (AES-256-GCM). Admin UI for keys + products.
 - **Auth** — Dual system: internal JWT (7-day, admin) + client JWT (24h, per-workspace). Legacy shared-password still supported. Turnstile CAPTCHA on client login/forgot-password (optional).
 - **Validation** — **Zod v3** (`server/middleware/validate.ts`) for Express request body validation. Schemas declared per-route, middleware returns structured 400 errors.
-- **Caching** — **React Query** (`@tanstack/react-query`) for frontend data fetching/caching in hooks. `QueryClientProvider` in `main.tsx`. Partially migrated (3 hooks); new hooks should use React Query.
+- **Caching** — **React Query** (`@tanstack/react-query`) for all frontend data fetching/caching. `QueryClientProvider` in `main.tsx`. **Migration complete** (4 phases shipped) — entire frontend uses React Query. 50+ hooks in `src/hooks/admin/` and `src/hooks/client/`. Query key prefixes: `client-*`, `admin-ga4-*`, `admin-gsc-*`, `admin-workspace-*`, `admin-audit-*`, `admin-posts`, `admin-briefs`.
 - **Compression** — `compression` middleware in `server/app.ts` for gzip responses.
 - **Monetization** — 3 tiers (Free/Growth/Premium), per-item content purchases, 14-day Growth trial, UX soft-gating via `<TierGate>`
 - **Logging** — **Pino** structured JSON logging (`server/logger.ts`). `createLogger(module)` for child loggers. Pretty-print in dev, JSON in prod.
@@ -176,7 +176,7 @@ Every completed task — no matter how small — must include these steps:
 
 ### § 2a. SQLite Database (`server/db/`)
 
-**All 95+ server modules** now use SQLite via `better-sqlite3` (19 migrations merged).
+**All 95+ server modules** now use SQLite via `better-sqlite3` (21 migrations merged).
 
 | File | Purpose |
 |------|---------|
@@ -201,6 +201,8 @@ Every completed task — no matter how small — must include these steps:
 | `db/migrations/017-template-schema-types.sql` | `expectedSchemaTypes` on template→schema type mapping (D2) |
 | `db/migrations/018-pending-schemas.sql` | `pending_schemas` queue table for D7 schema pre-generation |
 | `db/migrations/019-cascade-workspace-delete.sql` | CASCADE workspace deletes + schema comments documenting column counts |
+| `db/migrations/020-keyword-feedback.sql` | Keyword feedback tracking |
+| `db/migrations/021-client-participation.sql` | Client participation tracking |
 
 **Key patterns (follow these when writing new DB code):**
 - **Lazy prepared statements:** `let _stmt: ... | null = null;` cached at module level
@@ -276,7 +278,9 @@ Every completed task — no matter how small — must include these steps:
 | `components/client/` | **Client tab components** (32 files) | `types.ts`, `helpers.tsx`, `utils.ts`, `index.ts`, `OverviewTab.tsx`, `SearchTab.tsx`, `AnalyticsTab.tsx`, `PerformanceTab.tsx` (merged Search+Analytics), `StrategyTab.tsx`, `ContentTab.tsx`, `ContentPlanTab.tsx` (content plan matrix view), `ApprovalsTab.tsx`, `RequestsTab.tsx`, `PlansTab.tsx`, `InboxTab.tsx` (composes Approvals+Requests+Content), `HealthTab.tsx`, `InsightsDigest.tsx`, `InsightsEngine.tsx`, `MonthlySummary.tsx`, `DataSnapshots.tsx`, `ROIDashboard.tsx`, `OrderStatus.tsx`, `FixRecommendations.tsx`, `SeoCart.tsx`, `useCart.tsx`, `OnboardingWizard.tsx`, `BetaContext.tsx` (beta mode feature flag), `ClientOnboardingQuestionnaire.tsx`, `FeedbackWidget.tsx`, `SeoGlossary.tsx`, `MatrixProgressView.tsx` (content matrix progress), `PageKeywordMapContent.tsx` (keyword map client view), `SeoEducationTip.tsx` (contextual SEO tips) |
 | `components/shared/` | **Shared cross-dashboard components** | `RankTable.tsx` (position colors, history chart, rank change indicators) |
 | `lib/` | **Shared utilities** (2 files) | `queryClient.ts` — React Query `QueryClient` singleton (60s staleTime, 5min gcTime, refetchOnWindowFocus). `utils.ts` — shared formatting/helper utilities. |
-| `hooks/` | **Shared React hooks** (13 files) | `useAuth.ts`, `useWebSocket.ts`, `useBackgroundTasks.tsx`, `useAuditSummary.ts` *(React Query)*, `usePageEditStates.ts` *(React Query)*, `useRecommendations.ts` *(React Query)*, `useWorkspaceEvents.ts`, `useChat.ts`, `useClientAuth.ts`, `useClientData.ts`, `useContentRequests.ts`, `usePayments.ts`, `useToast.ts` |
+| `hooks/` | **Shared React hooks** (13 root + 2 subdirs) | `useAuth.ts`, `useWebSocket.ts`, `useBackgroundTasks.tsx`, `useAuditSummary.ts`, `usePageEditStates.ts`, `useRecommendations.ts`, `useWorkspaceEvents.ts`, `useChat.ts`, `useClientAuth.ts`, `useClientData.ts`, `useContentRequests.ts`, `usePayments.ts`, `useToast.ts` |
+| `hooks/admin/` | **Admin React Query hooks** (9 files) | `useAdminGA4.ts` (11 queries), `useAdminSearch.ts` (6 queries), `useAdminBriefs.ts` (2 hooks), `useAdminPosts.ts` (4 hooks), `useAdminSeo.ts` (5 hooks), `useAdminAssets.ts` (2 hooks), `useWorkspaceHome.ts` (1 aggregated), `useWorkspaceOverview.ts` (1 aggregated), `index.ts` (barrel) |
+| `hooks/client/` | **Client React Query hooks** (4 files) | `useClientSearch.ts` (4 GSC queries), `useClientGA4.ts` (12 GA4 queries), `useClientQueries.ts` (13 hooks — activity, ranks, annotations, anomalies, approvals, requests, audit, strategy, pricing, content plan), `index.ts` (barrel) |
 
 ### Shared (`shared/`)
 
@@ -489,7 +493,7 @@ These will be addressed in a dedicated cleanup pass. **Do not attempt to fix the
 - **Imports**: always at top of file, never mid-file
 - **Large edits**: break into multiple smaller edits if > 300 lines
 - **Route validation**: use Zod schemas via `validate()` middleware from `server/middleware/validate.ts` — not hand-written `if (!field)` checks. Import as `import { validate, z } from '../middleware/validate.js'`
-- **Frontend data fetching**: new hooks should use `useQuery`/`useMutation` from `@tanstack/react-query`. Don't hand-roll `useState` + `useEffect` + fetch patterns. See `useAuditSummary.ts` for the canonical pattern.
+- **Frontend data fetching**: all hooks use `useQuery`/`useMutation` from `@tanstack/react-query`. Don't hand-roll `useState` + `useEffect` + fetch patterns. See `src/hooks/admin/` and `src/hooks/client/` for canonical patterns. Query keys follow `admin-*` / `client-*` prefix conventions.
 
 ---
 
