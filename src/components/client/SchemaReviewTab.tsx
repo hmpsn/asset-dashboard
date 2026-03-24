@@ -119,8 +119,8 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
     );
   }
 
-  // No plan and no snapshot — nothing to review
-  if (!plan && !snapshot) {
+  // No plan — nothing to review (snapshot alone is stale data from a retracted plan)
+  if (!plan) {
     return (
       <div className="text-center py-16">
         <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4">

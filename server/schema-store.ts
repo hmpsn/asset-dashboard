@@ -353,6 +353,20 @@ export function deleteSchemaPlan(siteId: string): boolean {
   return result.changes > 0;
 }
 
+let _snapshotDeleteBySite: ReturnType<typeof db.prepare> | null = null;
+function snapshotDeleteBySiteStmt() {
+  if (!_snapshotDeleteBySite) {
+    _snapshotDeleteBySite = db.prepare('DELETE FROM schema_snapshots WHERE site_id = ?');
+  }
+  return _snapshotDeleteBySite;
+}
+
+export function deleteSchemaSnapshot(siteId: string): boolean {
+  const result = snapshotDeleteBySiteStmt().run(siteId);
+  log.info(`Deleted schema snapshot for site ${siteId} (${result.changes} rows)`);
+  return result.changes > 0;
+}
+
 export function removePageFromSnapshot(siteId: string, pageId: string): boolean {
   const snapshot = getSchemaSnapshot(siteId);
   if (!snapshot) return false;

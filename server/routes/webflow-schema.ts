@@ -9,7 +9,7 @@ const router = Router();
 import { addActivity } from '../activity-log.js';
 import { buildSchemaContext } from '../helpers.js';
 import { getCachedArchitecture } from '../site-architecture.js';
-import { getSchemaSnapshot, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, getSchemaPlan, updateSchemaPlanStatus, updateSchemaPlanRoles, deleteSchemaPlan, removePageFromSnapshot } from '../schema-store.js';
+import { getSchemaSnapshot, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, getSchemaPlan, updateSchemaPlanStatus, updateSchemaPlanRoles, deleteSchemaPlan, deleteSchemaSnapshot, removePageFromSnapshot } from '../schema-store.js';
 import { generateSchemaSuggestions, generateSchemaForPage, generateCmsTemplateSchema } from '../schema-suggester.js';
 import { generateSchemaPlan } from '../schema-plan.js';
 import { createBatch } from '../approvals.js';
@@ -379,6 +379,9 @@ router.post('/api/webflow/schema-plan/:siteId/activate', requireWorkspaceAccessF
 router.delete('/api/webflow/schema-plan/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
   const deleted = deleteSchemaPlan(req.params.siteId);
   if (!deleted) return res.status(404).json({ error: 'No plan found for this site' });
+
+  // Also clear the schema snapshot so the client dashboard doesn't show stale data
+  deleteSchemaSnapshot(req.params.siteId);
 
   const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
   if (ws) {
