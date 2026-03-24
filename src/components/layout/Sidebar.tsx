@@ -2,6 +2,7 @@ import { useCallback, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { type Page, adminPath } from '../../routes';
 import { WorkspaceSelector, type Workspace } from '../WorkspaceSelector';
+import { NotificationBell } from '../NotificationBell';
 import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, Search,
   Pencil, Target, Code2, LogOut, TrendingUp, Link2, MessageSquare,
@@ -214,6 +215,7 @@ export function Sidebar({
 
       {/* Bottom: icon-only utility bar */}
       <div className="px-3 py-2.5 border-t border-zinc-800 flex items-center justify-center gap-1">
+        <NotificationBell onSelectWorkspace={(workspaceId) => navigate(adminPath(workspaceId))} />
         <button
           onClick={() => navigate('/revenue')}
           title="Revenue"

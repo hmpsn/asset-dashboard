@@ -138,6 +138,38 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
         }
       />
 
+      {/* ── Global Anomaly Banner ── */}
+      {(criticalAnomalies.length > 0 || warningAnomalies.length > 0) && (
+        <SectionCard noPadding>
+          <div className={`p-4 flex items-center gap-3 ${criticalAnomalies.length > 0 ? 'bg-red-500/5 border-red-500/20' : 'bg-amber-500/5 border-amber-500/20'} border rounded-xl`}>
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${criticalAnomalies.length > 0 ? 'bg-red-500/15' : 'bg-amber-500/15'}`}>
+              <TrendingDown className={`w-4 h-4 ${criticalAnomalies.length > 0 ? 'text-red-400' : 'text-amber-400'}`} />
+            </div>
+            <div className="flex-1">
+              <h3 className={`text-sm font-semibold ${criticalAnomalies.length > 0 ? 'text-red-300' : 'text-amber-300'}`}>
+                {criticalAnomalies.length > 0 ? 'Critical anomalies detected' : 'Warning anomalies detected'}
+              </h3>
+              <p className="text-[11px] text-zinc-500 mt-0.5">
+                {criticalAnomalies.length > 0 
+                  ? `${criticalAnomalies.length} critical issue${criticalAnomalies.length > 1 ? 's' : ''} across ${new Set(criticalAnomalies.map(a => a.workspaceId)).size} workspace${new Set(criticalAnomalies.map(a => a.workspaceId)).size > 1 ? 's' : ''} - immediate attention required`
+                  : `${warningAnomalies.length} warning${warningAnomalies.length > 1 ? 's' : ''} detected across ${new Set(warningAnomalies.map(a => a.workspaceId)).size} workspace${new Set(warningAnomalies.map(a => a.workspaceId)).size > 1 ? 's' : ''}`
+                }
+              </p>
+            </div>
+            <button 
+              onClick={() => {
+                // Navigate to the first workspace with anomalies
+                const firstAnomalyWorkspace = criticalAnomalies.length > 0 ? criticalAnomalies[0].workspaceId : warningAnomalies[0].workspaceId;
+                onSelectWorkspace(firstAnomalyWorkspace);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${criticalAnomalies.length > 0 ? 'bg-red-600 hover:bg-red-500 text-white' : 'bg-amber-600 hover:bg-amber-500 text-white'}`}
+            >
+              View Anomalies
+            </button>
+          </div>
+        </SectionCard>
+      )}
+
       {/* ── Needs Attention ── */}
       {attentionItems.length > 0 && (
         <SectionCard title="Needs Attention" titleIcon={<AlertTriangle className="w-4 h-4 text-amber-400" />} noPadding>

@@ -1,6 +1,6 @@
 import {
   AlertTriangle, Users, MousePointerClick, Eye, BarChart3, Shield, Target,
-  Sparkles, Activity, FileText,
+  Sparkles, Activity, FileText, Search,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { StatCard } from '../ui';
@@ -175,6 +175,84 @@ export function OverviewTab({
       );
     })()}
 
+    {/* Primary CTA Banner - contextual next action */}
+    {(() => {
+      // Determine the most valuable next action
+      if (strategyData && contentRequests.filter(r => r.status === 'client_review').length === 0) {
+        return (
+          <div className="bg-gradient-to-r from-teal-600/10 via-zinc-900 to-emerald-600/10 border border-teal-500/20 rounded-xl px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-teal-500/15 flex items-center justify-center">
+                  <FileText className="w-4 h-4 text-teal-400" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-zinc-200">Ready to create content?</h3>
+                  <p className="text-[11px] text-zinc-500">Your keyword strategy is set up. Generate your first content brief.</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => navigate(clientPath(workspaceId, 'inbox', betaMode))}
+                className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-lg text-xs font-medium transition-colors"
+              >
+                Generate Brief
+              </button>
+            </div>
+          </div>
+        );
+      }
+      
+      if (audit && audit.siteScore < 80) {
+        return (
+          <div className="bg-gradient-to-r from-amber-600/10 via-zinc-900 to-orange-600/10 border border-amber-500/20 rounded-xl px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center">
+                  <Shield className="w-4 h-4 text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-zinc-200">Improve your site health</h3>
+                  <p className="text-[11px] text-zinc-500">Your site score is {audit.siteScore}/100. Fix issues to boost rankings.</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => navigate(clientPath(workspaceId, 'health', betaMode))}
+                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 rounded-lg text-xs font-medium transition-colors"
+              >
+                View Issues
+              </button>
+            </div>
+          </div>
+        );
+      }
+      
+      if (overview && overview.totalClicks < 100) {
+        return (
+          <div className="bg-gradient-to-r from-blue-600/10 via-zinc-900 to-cyan-600/10 border border-blue-500/20 rounded-xl px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/15 flex items-center justify-center">
+                  <Target className="w-4 h-4 text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-zinc-200">Grow your search traffic</h3>
+                  <p className="text-[11px] text-zinc-500">You got {overview.totalClicks} clicks last month. Let's increase that.</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => navigate(clientPath(workspaceId, 'search', betaMode))}
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-xs font-medium transition-colors"
+              >
+                Find Keywords
+              </button>
+            </div>
+          </div>
+        );
+      }
+      
+      return null;
+    })()}
+
     {/* Main content: insights + sidebar */}
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
       {/* Left column (3/5) — Insights feed */}
@@ -200,12 +278,37 @@ export function OverviewTab({
           />
         </ErrorBoundary>
 
-        {/* Empty state */}
+        {/* Empty state with setup guidance */}
         {!overview && !audit && !ga4Overview && (
-          <div className="bg-gradient-to-br from-teal-500/10 via-zinc-900 to-emerald-500/10 rounded-xl border border-zinc-800 p-8 text-center">
+          <div className="bg-gradient-to-br from-teal-500/10 via-zinc-900 to-emerald-500/10 rounded-xl border border-zinc-800 p-8">
             <div className="w-12 h-12 rounded-2xl bg-teal-500/10 flex items-center justify-center mx-auto mb-4"><BarChart3 className="w-6 h-6 text-teal-400" /></div>
             <h2 className="text-lg font-semibold text-zinc-200 mb-2">{ws.name}</h2>
-            <p className="text-sm text-zinc-400">We're getting everything set up for you. Your performance data and insights will start appearing here shortly.</p>
+            <p className="text-sm text-zinc-400 mb-6">We're getting everything set up for you. Here's what we need:</p>
+            
+            <div className="space-y-3 max-w-md mx-auto">
+              <div className="flex items-center gap-3 text-sm">
+                <div className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center flex-shrink-0">
+                  <Search className="w-3 h-3 text-zinc-500" />
+                </div>
+                <span className="text-zinc-300">Connect Google Search Console</span>
+              </div>
+              <div className="flex items-center gap-3 text-sm">
+                <div className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center flex-shrink-0">
+                  <BarChart3 className="w-3 h-3 text-zinc-500" />
+                </div>
+                <span className="text-zinc-300">Connect Google Analytics</span>
+              </div>
+              <div className="flex items-center gap-3 text-sm">
+                <div className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center flex-shrink-0">
+                  <Shield className="w-3 h-3 text-zinc-500" />
+                </div>
+                <span className="text-zinc-300">Run first site audit</span>
+              </div>
+            </div>
+            
+            <div className="mt-6 pt-6 border-t border-zinc-800">
+              <p className="text-xs text-zinc-500">Once connected, you'll see traffic data, SEO insights, and actionable recommendations here.</p>
+            </div>
           </div>
         )}
       </div>

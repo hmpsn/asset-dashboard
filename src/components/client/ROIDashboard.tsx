@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import {
   DollarSign, BarChart3, Target, TrendingUp,
-  Loader2, Lock, Shield, MousePointerClick, Eye, Layers,
+  Lock, Shield, MousePointerClick, Eye, Layers,
 } from 'lucide-react';
 import { EmptyState } from '../ui';
 import { fmtMoney, fmtMoneyFull } from '../../utils/formatNumbers';
 import { get } from '../../api/client';
+import { LoadingState } from '../ui';
 
 interface PageROI {
   pagePath: string;
@@ -81,9 +82,8 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
 
   if (loading) {
     return (
-      <div className="bg-zinc-900/60 rounded-xl border border-zinc-800 p-8 flex items-center justify-center">
-        <Loader2 className="w-5 h-5 animate-spin text-teal-400 mr-2" />
-        <span className="text-sm text-zinc-400">Calculating ROI...</span>
+      <div className="bg-zinc-900/60 rounded-xl border border-zinc-800 p-8">
+        <LoadingState message="Calculating your traffic value..." size="md" />
       </div>
     );
   }

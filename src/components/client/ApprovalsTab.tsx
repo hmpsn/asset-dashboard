@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import {
-  ClipboardCheck, Check, CheckCircle2, Edit3, X, Loader2, ChevronDown, ChevronRight,
+  ClipboardCheck, Check, CheckCircle2, Edit3, X, ChevronDown, ChevronRight, Loader2,
 } from 'lucide-react';
-import { TierGate, EmptyState, type Tier } from '../ui';
+import { TierGate, EmptyState, LoadingState, type Tier } from '../ui';
 import { StatusBadge } from '../ui/StatusBadge';
 import { usePageEditStates } from '../../hooks/usePageEditStates';
 import type { ApprovalBatch, ApprovalItem } from './types';
@@ -89,7 +89,7 @@ export function ApprovalsTab({
       </div>
 
       {approvalsLoading && (
-        <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-teal-400" /></div>
+        <LoadingState message="Loading approvals..." size="md" />
       )}
 
       {!approvalsLoading && approvalBatches.length === 0 && (
