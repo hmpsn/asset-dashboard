@@ -1,7 +1,8 @@
 // ── Analytics API (GA4 + GSC) ──────────────────────────────────────
-import { get, post, getSafe, getOptional } from './client';
+import { post, getSafe, getOptional } from './client';
 import type {
   SearchOverview, PerformanceTrend, SearchComparison,
+  SearchDeviceBreakdown, SearchCountryBreakdown, SearchTypeBreakdown,
   GA4Overview, GA4DailyTrend, GA4TopPage, GA4TopSource,
   GA4DeviceBreakdown, GA4CountryBreakdown, GA4Event, GA4EventTrend,
   GA4ConversionSummary, GA4EventPageBreakdown, GA4Comparison,
@@ -26,7 +27,7 @@ export const gsc = {
     getSafe<SearchComparison | null>(`/api/public/search-comparison/${wsId}${qs(days, dateRange)}`, null),
 
   devices: (wsId: string, days: number, dateRange?: { startDate: string; endDate: string }) =>
-    getSafe<unknown[]>(`/api/public/search-devices/${wsId}${qs(days, dateRange)}`, []),
+    getSafe<SearchDeviceBreakdown[]>(`/api/public/search-devices/${wsId}${qs(days, dateRange)}`, []),
 };
 
 // ── Google Analytics 4 (GA4) ───────────────────────────────────────
@@ -91,13 +92,13 @@ export const gscAdmin = {
     getSafe<PerformanceTrend[]>(`/api/google/performance-trend/${siteId}?${gscQs(gscSiteUrl, days)}`, []),
 
   devices: (siteId: string, gscSiteUrl: string, days: number) =>
-    getSafe<unknown[]>(`/api/google/search-devices/${siteId}?${gscQs(gscSiteUrl, days)}`, []),
+    getSafe<SearchDeviceBreakdown[]>(`/api/google/search-devices/${siteId}?${gscQs(gscSiteUrl, days)}`, []),
 
   countries: (siteId: string, gscSiteUrl: string, days: number) =>
-    getSafe<unknown[]>(`/api/google/search-countries/${siteId}?${gscQs(gscSiteUrl, days)}`, []),
+    getSafe<SearchCountryBreakdown[]>(`/api/google/search-countries/${siteId}?${gscQs(gscSiteUrl, days)}`, []),
 
   searchTypes: (siteId: string, gscSiteUrl: string, days: number) =>
-    getSafe<unknown[]>(`/api/google/search-types/${siteId}?${gscQs(gscSiteUrl, days)}`, []),
+    getSafe<SearchTypeBreakdown[]>(`/api/google/search-types/${siteId}?${gscQs(gscSiteUrl, days)}`, []),
 
   comparison: (siteId: string, gscSiteUrl: string, days: number) =>
     getSafe<SearchComparison | null>(`/api/google/search-comparison/${siteId}?${gscQs(gscSiteUrl, days)}`, null),

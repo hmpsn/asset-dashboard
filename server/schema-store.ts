@@ -339,6 +339,42 @@ export function updateSchemaPlanStatus(
   return saveSchemaPlan(plan);
 }
 
+let _planDeleteBySite: ReturnType<typeof db.prepare> | null = null;
+function planDeleteBySiteStmt() {
+  if (!_planDeleteBySite) {
+    _planDeleteBySite = db.prepare('DELETE FROM schema_site_plans WHERE site_id = ?');
+  }
+  return _planDeleteBySite;
+}
+
+export function deleteSchemaPlan(siteId: string): boolean {
+  const result = planDeleteBySiteStmt().run(siteId);
+  log.info(`Deleted schema plan for site ${siteId} (${result.changes} rows)`);
+  return result.changes > 0;
+}
+
+export function removePageFromSnapshot(siteId: string, pageId: string): boolean {
+  const snapshot = getSchemaSnapshot(siteId);
+  if (!snapshot) return false;
+
+  const filtered = snapshot.results.filter(r => r.pageId !== pageId);
+  if (filtered.length === snapshot.results.length) return false;
+
+  const row = getBySiteStmt().get(siteId) as SchemaRow | undefined;
+  if (!row) return false;
+
+  upsertStmt().run({
+    id: row.id,
+    site_id: siteId,
+    workspace_id: row.workspace_id,
+    created_at: row.created_at,
+    results: JSON.stringify(filtered),
+    page_count: filtered.length,
+  });
+  log.info(`Removed page ${pageId} from schema snapshot for site ${siteId}`);
+  return true;
+}
+
 export function updateSchemaPlanRoles(
   siteId: string,
   pageRoles: PageRoleAssignment[],

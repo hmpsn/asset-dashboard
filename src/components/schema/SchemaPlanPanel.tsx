@@ -5,7 +5,7 @@
 import { useState, useEffect } from 'react';
 import {
   Loader2, Sparkles, Send, CheckCircle, AlertCircle,
-  ChevronDown, ChevronRight, Globe, Zap, HelpCircle,
+  ChevronDown, ChevronRight, Globe, Zap, HelpCircle, Trash2,
 } from 'lucide-react';
 import { schemaPlan } from '../../api/seo';
 import type { SchemaSitePlan, SchemaPageRole } from '../../../shared/types/schema-plan';
@@ -52,6 +52,8 @@ export function SchemaPlanPanel({ siteId }: Props) {
   const [showEntities, setShowEntities] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
+  const [retracting, setRetracting] = useState(false);
+  const [confirmRetract, setConfirmRetract] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -265,6 +267,45 @@ export function SchemaPlanPanel({ siteId }: Props) {
               >
                 {activating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
                 Activate Plan
+              </button>
+            )}
+            {confirmRetract ? (
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-red-400">Delete this plan?</span>
+                <button
+                  onClick={async () => {
+                    setRetracting(true);
+                    setError(null);
+                    try {
+                      await schemaPlan.retract(siteId);
+                      setPlan(null);
+                      setSuccess('Schema plan retracted');
+                      setTimeout(() => setSuccess(null), 4000);
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : 'Failed to retract plan');
+                    }
+                    setRetracting(false);
+                    setConfirmRetract(false);
+                  }}
+                  disabled={retracting}
+                  className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-red-600 hover:bg-red-500 text-white transition-colors disabled:opacity-50"
+                >
+                  {retracting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                  Yes, delete
+                </button>
+                <button
+                  onClick={() => setConfirmRetract(false)}
+                  className="px-2 py-1 rounded-md text-[11px] text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmRetract(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 transition-colors"
+              >
+                <Trash2 className="w-3 h-3" /> Retract Plan
               </button>
             )}
           </div>

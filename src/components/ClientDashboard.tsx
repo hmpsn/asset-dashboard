@@ -22,6 +22,7 @@ import { OnboardingWizard } from './client/OnboardingWizard';
 import { ClientOnboardingQuestionnaire, type OnboardingData } from './client/ClientOnboardingQuestionnaire';
 import { ROIDashboard } from './client/ROIDashboard';
 import { FeedbackWidget } from './client/FeedbackWidget';
+import { SchemaReviewTab } from './client/SchemaReviewTab';
 import { PlansTab } from './client/PlansTab';
 import { ContentPlanTab } from './client/ContentPlanTab';
 import { StrategyTab } from './client/StrategyTab';
@@ -43,7 +44,13 @@ import {
   QUICK_QUESTIONS, LEARN_SEO_QUESTIONS,
   type WorkspaceInfo,
   type ClientTab,
+  type AuditSummary,
+  type ClientContentRequest,
 } from './client/types';
+
+// Module-level date defaults — computed once at import time (not during render)
+const MODULE_DEFAULT_START = new Date(Date.now() - 28 * 86400000).toISOString().split('T')[0];
+const MODULE_TODAY = new Date().toISOString().split('T')[0];
 
 export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: { workspaceId: string; betaMode?: boolean; initialTab?: string }) {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
@@ -61,7 +68,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   // ── Data hook (dashboard state + data loading) ──
   const {
     ws, setWs,
-    overview, trend, audit, auditDetail,
+    overview, trend, audit, setAudit, auditDetail,
     loading, setLoading, error, setError,
     strategyData, requestedTopics, setRequestedTopics,
     requestingTopic, setRequestingTopic, // eslint-disable-line @typescript-eslint/no-unused-vars
@@ -89,6 +96,10 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     confirmPricingAndSubmit,
   } = usePayments(workspaceId, ws, setToast, setContentRequests, setRequestedTopics, setRequestingTopic);
 
+  // ── Turnstile state (declared before useClientAuth which references them) ──
+  const turnstileTokenRef = useRef<string | undefined>(undefined);
+  const [turnstileReset, setTurnstileReset] = useState(0);
+
   // ── Auth hook ──
   const {
     authenticated, setAuthenticated,
@@ -105,9 +116,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     resetConfirm, setResetConfirm, resetDone, setResetDone,
     passwordInput, setPasswordInput,
     handlePasswordSubmit, handleClientUserLogin, handleClientLogout,
-  } = useClientAuth(workspaceId, ws, (data: WorkspaceInfo) => loadDashboardData(data, setPricingData), () => turnstileTokenRef.current, () => setTurnstileReset(r => r + 1));
-  const turnstileTokenRef = useRef<string | undefined>(undefined);
-  const [turnstileReset, setTurnstileReset] = useState(0);
+  } = useClientAuth(workspaceId, ws, (data: WorkspaceInfo) => loadDashboardData(data, setPricingData), () => turnstileTokenRef.current, () => setTurnstileReset((r: number) => r + 1));
 
   // ── Chat hook ──
   const chatDeps = useMemo(() => ({
@@ -140,7 +149,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   const tab: ClientTab = (() => {
     const t = initialTab;
     if (t === 'search' || t === 'analytics') return 'performance' as ClientTab;
-    if (t && ['overview','performance','health','strategy','inbox','approvals','requests','content','plans','roi','content-plan'].includes(t)) return t as ClientTab;
+    if (t && ['overview','performance','health','strategy','inbox','approvals','requests','content','plans','roi','content-plan','schema-review'].includes(t)) return t as ClientTab;
     return 'overview';
   })();
   const setTab = (t: ClientTab) => {
@@ -166,7 +175,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     if (ws?.requiresPassword) {
       try {
         const stored = localStorage.getItem(`portal_email_${workspaceId}`);
-        if (!stored) setEmailGateOpen(true);
+        if (!stored) queueMicrotask(() => setEmailGateOpen(true));
       } catch (err) { console.error('ClientDashboard operation failed:', err); }
     }
   }, [authenticated, clientUser, ws, workspaceId]);
@@ -200,7 +209,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     'content-request:created': () => refetchClient('content', `/api/public/content-requests/${workspaceId}`),
     'content-request:update': () => refetchClient('content', `/api/public/content-requests/${workspaceId}`),
     'audit:complete': () => {
-      getOptional<{ id?: string }>(`/api/public/audit-summary/${workspaceId}`).then(a => { if (a?.id) setAudit(a); }).catch((err) => { console.error('ClientDashboard operation failed:', err); });
+      getOptional<AuditSummary>(`/api/public/audit-summary/${workspaceId}`).then(a => { if (a?.id) setAudit(a); }).catch((err) => { console.error('ClientDashboard operation failed:', err); });
       refetchClient('activity', `/api/public/activity/${workspaceId}?limit=20`);
     },
     'workspace:updated': () => {
@@ -246,9 +255,9 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
         // Fetch auth mode (shared password vs individual accounts)
         try {
-          const am = await getOptional<{ hasClientUsers?: boolean }>(`/api/public/auth-mode/${workspaceId}`);
+          const am = await getOptional<{ hasSharedPassword?: boolean; hasClientUsers?: boolean }>(`/api/public/auth-mode/${workspaceId}`);
           if (am) {
-            setAuthMode(am);
+            setAuthMode({ hasSharedPassword: am.hasSharedPassword ?? !!data.requiresPassword, hasClientUsers: am.hasClientUsers ?? false });
             setLoginTab(am.hasClientUsers ? 'user' : 'password');
           }
         } catch (err) { console.error('ClientDashboard operation failed:', err); }
@@ -257,9 +266,9 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         let autoAuthed = false;
         let resolvedUserId: string | undefined;
         try {
-          const meData = await getOptional<{ user?: { id: string; email: string; name: string } }>(`/api/public/client-me/${workspaceId}`);
+          const meData = await getOptional<{ user?: { id: string; email: string; name: string; role?: string } }>(`/api/public/client-me/${workspaceId}`);
           if (meData?.user) {
-            setClientUser(meData.user);
+            setClientUser({ ...meData.user, role: meData.user.role || 'client' });
             resolvedUserId = meData.user.id;
             setAuthenticated(true);
             autoAuthed = true;
@@ -321,7 +330,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         }
       })
       .catch((err) => { setError(err instanceof ApiError && err.status === 403 ? 'This dashboard is currently unavailable. Please contact hmpsn studio for access.' : 'Failed to load dashboard'); setLoading(false); });
-  }, [workspaceId]); // large init effect — only re-runs on workspace change
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaceId]); // large init effect — only re-runs on workspace change; missing deps are stable useState setters
 
 
   const eventDisplayName = (eventName: string): string => {
@@ -626,6 +636,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     ...(isPaid ? [{ id: 'strategy' as ClientTab, label: 'SEO Strategy', icon: Target, locked: strategyLocked }] : []),
     ...(isPaid && contentPlanSummary && contentPlanSummary.totalCells > 0 ? [{ id: 'content-plan' as ClientTab, label: 'Content Plan', icon: Layers, locked: false }] : []),
     ...(isPaid ? [{ id: 'inbox' as ClientTab, label: 'Inbox', icon: Zap, locked: false }] : []),
+    ...(isPaid ? [{ id: 'schema-review' as ClientTab, label: 'Schema', icon: Shield, locked: false }] : []),
     ...(!betaMode ? [{ id: 'plans' as ClientTab, label: 'Plans', icon: CreditCard, locked: false }] : []),
     ...(isPaid && !betaMode && strategyData ? [{ id: 'roi' as ClientTab, label: 'ROI', icon: Trophy, locked: false }] : []),
   ];
@@ -707,16 +718,16 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                       <label className="block">
                         <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Start date</span>
                         <input type="date" ref={customStartRef}
-                          defaultValue={customDateRange?.startDate || new Date(Date.now() - 28 * 86400000).toISOString().split('T')[0]}
-                          max={new Date().toISOString().split('T')[0]}
+                          defaultValue={customDateRange?.startDate || MODULE_DEFAULT_START}
+                          max={MODULE_TODAY}
                           className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm sm:text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
                         />
                       </label>
                       <label className="block">
                         <span className="text-[10px] text-zinc-500 uppercase tracking-wider">End date</span>
                         <input type="date" ref={customEndRef}
-                          defaultValue={customDateRange?.endDate || new Date().toISOString().split('T')[0]}
-                          max={new Date().toISOString().split('T')[0]}
+                          defaultValue={customDateRange?.endDate || MODULE_TODAY}
+                          max={MODULE_TODAY}
                           className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm sm:text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
                         />
                       </label>
@@ -836,7 +847,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
         {/* ════════════ SEO STRATEGY TAB ════════════ */}
         {tab === 'strategy' && (
-          <StrategyTab strategyData={strategyData} requestedTopics={requestedTopics} contentRequests={contentRequests} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} contentPlanKeywords={contentPlanKeywords} onTabChange={(t) => setTab(t as ClientTab)} workspaceId={workspaceId} setToast={setToast} />
+          <StrategyTab strategyData={strategyData} requestedTopics={requestedTopics} contentRequests={contentRequests} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} contentPlanKeywords={contentPlanKeywords} onTabChange={(t) => setTab(t as ClientTab)} workspaceId={workspaceId} setToast={(msg: string) => setToast({ message: msg, type: 'success' })} />
         )}
 
 
@@ -994,6 +1005,13 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         {tab === 'roi' && (
           <ErrorBoundary label="ROI Dashboard">
             <ROIDashboard workspaceId={workspaceId} tier={effectiveTier} />
+          </ErrorBoundary>
+        )}
+
+        {/* ════════════ SCHEMA REVIEW TAB ════════════ */}
+        {tab === 'schema-review' && (
+          <ErrorBoundary label="Schema Review">
+            <SchemaReviewTab workspaceId={workspaceId} setToast={setToast} />
           </ErrorBoundary>
         )}
 
@@ -1172,7 +1190,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
               setStripePayment(null);
               setToast({ message: `Payment successful! Your ${stripePayment.productName.toLowerCase()} is being prepared.`, type: 'success' });
               // Refresh content requests
-              getSafe<unknown[]>(`/api/public/content-requests/${workspaceId}`, []).then(setContentRequests).catch((err) => { console.error('ClientDashboard operation failed:', err); });
+              getSafe<ClientContentRequest[]>(`/api/public/content-requests/${workspaceId}`, []).then(setContentRequests).catch((err) => { console.error('ClientDashboard operation failed:', err); });
             }}
             onClose={() => setStripePayment(null)}
           />

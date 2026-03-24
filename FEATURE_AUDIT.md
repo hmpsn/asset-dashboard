@@ -811,6 +811,39 @@ A brief value assessment of every feature in the platform, covering what it does
 
 ---
 
+### 72. Schema Retract (Plan + Individual Pages)
+**What it does:** Adds the ability to retract (remove) published JSON-LD schemas from individual Webflow pages and delete entire schema site plans. Per-page retract strips all JSON-LD script blocks from the page's custom code via Webflow API, removes the page from the local snapshot, and resets the page edit state to clean. Plan retract deletes the schema site plan from SQLite, resetting the site to a "no plan" state. Both actions are confirmation-gated to prevent accidental deletion. Activity log entries track all retractions.
+
+**Agency value:** Undo capability for schema deployments. If a schema causes validation issues or the client changes direction, retract it in one click instead of manually editing Webflow custom code. Plan retract lets you start fresh without leftover role assignments.
+
+**Client value:** N/A (admin-only).
+
+**Mutual:** Safety net for the schema workflow. Reduces risk of deploying schemas since they can be cleanly removed.
+
+---
+
+### 73. Client Schema Review Tab
+**What it does:** Adds a "Schema" tab to the client portal that shows the site-wide structured data strategy in a clean, client-friendly format. Replaces the need to send 250+ individual approval notifications. Shows page roles grouped by type with plain-English descriptions of what each schema type does for Google visibility. Clients can approve the strategy or request changes with notes — feedback flows to the activity log and broadcasts to the admin in real-time. Includes an educational blurb explaining structured data for non-technical clients. Public API endpoints: `GET /api/public/schema-plan/:workspaceId`, `GET /api/public/schema-snapshot/:workspaceId`, `POST /api/public/schema-plan/:workspaceId/feedback`.
+
+**Agency value:** Schema plans get reviewed faster — clients see the full strategy in one clean view instead of wading through hundreds of approval notifications. Approval/rejection flows back to the admin dashboard via WebSocket.
+
+**Client value:** Understand what structured data is being added to their site and why. Approve or request changes at the strategy level, not per-page.
+
+**Mutual:** Better client understanding → fewer revision cycles → faster deployment.
+
+---
+
+### 74. Type Safety & Lint Cleanup
+**What it does:** Fixed all ESLint errors in `ClientDashboard.tsx` (10 errors, 1 warning → 0). Replaced ~25 `unknown[]` type annotations across `useClientData.ts`, `src/api/analytics.ts`, `src/api/content.ts`, and `src/api/seo.ts` with proper typed interfaces. Added 8 new shared type exports (`ActivityLogItem`, `RankHistoryEntry`, `LatestRank`, `AnnotationItem`, `AnomalyItem`, `SearchDeviceBreakdown`, `SearchCountryBreakdown`, `SearchTypeBreakdown`). Fixed `setPricingData` type propagation through `loadDashboardData`, `setAuthMode`/`setClientUser` type mismatches, `Date.now()` purity violation, and Toast type incompatibility.
+
+**Agency value:** Fewer runtime surprises, better autocomplete, faster onboarding for contributors.
+
+**Client value:** Indirect — fewer bugs from type coercion errors.
+
+**Mutual:** Healthier codebase → faster iteration on features.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |

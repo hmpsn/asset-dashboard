@@ -1,6 +1,7 @@
 // ── SEO API (audit, schema, keywords, webflow, etc.) ──────────────
 import { get, post, put, patch, del, getSafe, getOptional } from './client';
 import type { SchemaSitePlan, PageRoleAssignment, CanonicalEntity } from '../../shared/types/schema-plan';
+import type { LatestRank, RankHistoryEntry } from '../hooks/useClientData';
 
 // ── Audit ───────────────────────────────────────────────────────
 export const audit = {
@@ -67,6 +68,9 @@ export const schema = {
   remove: (wsId: string, pageId: string) =>
     del(`/api/schema/${wsId}/${pageId}`),
 
+  retract: (siteId: string, pageId: string) =>
+    del(`/api/webflow/schema-retract/${siteId}/${pageId}`),
+
   bulkGenerate: (wsId: string, body: Record<string, unknown>) =>
     post<unknown>(`/api/schema/${wsId}/bulk-generate`, body),
 
@@ -90,6 +94,9 @@ export const schemaPlan = {
 
   activate: (siteId: string) =>
     post<SchemaSitePlan>(`/api/webflow/schema-plan/${siteId}/activate`),
+
+  retract: (siteId: string) =>
+    del(`/api/webflow/schema-plan/${siteId}`),
 };
 
 // ── Keywords / Strategy ─────────────────────────────────────────
@@ -128,13 +135,13 @@ export const keywords = {
 // ── Rank tracking ───────────────────────────────────────────────
 export const rankTracking = {
   keywords: (wsId: string) =>
-    get<unknown[]>(`/api/rank-tracking/${wsId}/keywords`),
+    get<Array<{ query: string; pinned?: boolean; addedAt?: string }>>(`/api/rank-tracking/${wsId}/keywords`),
 
   latest: (wsId: string) =>
-    getSafe<unknown[]>(`/api/rank-tracking/${wsId}/latest`, []),
+    getSafe<LatestRank[]>(`/api/rank-tracking/${wsId}/latest`, []),
 
   history: (wsId: string) =>
-    getSafe<unknown[]>(`/api/public/rank-tracking/${wsId}/history`, []),
+    getSafe<RankHistoryEntry[]>(`/api/public/rank-tracking/${wsId}/history`, []),
 
   addKeyword: (wsId: string, body: Record<string, unknown>) =>
     post<unknown>(`/api/rank-tracking/${wsId}/keywords`, body),
@@ -149,7 +156,7 @@ export const rankTracking = {
     post<unknown>(`/api/rank-tracking/${wsId}/snapshot`),
 
   publicLatest: (wsId: string) =>
-    getSafe<unknown[]>(`/api/public/rank-tracking/${wsId}/latest`, []),
+    getSafe<LatestRank[]>(`/api/public/rank-tracking/${wsId}/latest`, []),
 };
 
 // ── Webflow ─────────────────────────────────────────────────────

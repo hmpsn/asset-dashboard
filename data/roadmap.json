@@ -2948,6 +2948,33 @@
           "priority": "P0",
           "notes": "Shipped — cleanDomainForSemrush() strips www. prefix from all 6 domain-based functions. Circuit breaker pauses calls for 5min when credits exhausted. Diagnostic + cache-clear endpoints added.",
           "status": "done"
+        },
+        {
+          "id": 329,
+          "title": "Schema retract (plan + individual pages)",
+          "source": "USER REQUEST",
+          "est": "1.5h",
+          "priority": "P1",
+          "notes": "Shipped — Retract published JSON-LD schemas from individual pages via Webflow Custom Code API. Delete entire schema site plans from SQLite. Confirmation-gated UI in SchemaPlanPanel + SchemaPageCard. Activity log + page state tracking. DELETE /api/webflow/schema-plan/:siteId and DELETE /api/webflow/schema-retract/:siteId/:pageId.",
+          "status": "done"
+        },
+        {
+          "id": 330,
+          "title": "Client Schema Review Tab",
+          "source": "USER REQUEST",
+          "est": "1.5h",
+          "priority": "P1",
+          "notes": "Shipped — New 'Schema' tab in client portal showing the schema plan in a client-friendly grouped-by-role view. Replaces 250+ individual approval notifications. Clients approve or request changes at the strategy level. Public endpoints for plan, snapshot, and feedback. SchemaReviewTab.tsx + 3 public API endpoints.",
+          "status": "done"
+        },
+        {
+          "id": 331,
+          "title": "Type Safety & Lint Cleanup",
+          "source": "INTERNAL",
+          "est": "1h",
+          "priority": "P2",
+          "notes": "Shipped — Fixed all ESLint errors in ClientDashboard.tsx (10 errors → 0). Replaced ~25 unknown[] types across useClientData.ts, analytics.ts, content.ts, seo.ts with proper typed interfaces. Added 8 new shared type exports. Fixed setPricingData/setAuthMode/setClientUser type mismatches, Date.now() purity violation, Toast type incompatibility.",
+          "status": "done"
         }
       ]
     }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { get, post, put, getSafe } from '../api/client';
-import { schemaImpact as schemaImpactApi, type SchemaImpactData, type SchemaDeploymentImpact } from '../api/seo';
+import { schema as schemaApi, schemaImpact as schemaImpactApi, type SchemaImpactData, type SchemaDeploymentImpact } from '../api/seo';
 import type { FixContext } from '../App';
 import {
   Loader2, CheckCircle,
@@ -89,6 +89,8 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
   const [loadingPages, setLoadingPages] = useState(false);
   const [generatingSingle, setGeneratingSingle] = useState<string | null>(null);
   const [pageTypes, setPageTypes] = useState<Record<string, string>>({});
+  const [retractingPages, setRetractingPages] = useState<Set<string>>(new Set());
+  const [retractedPages, setRetractedPages] = useState<Set<string>>(new Set());
   const { jobs, startJob, cancelJob } = useBackgroundTasks();
   const jobIdRef = useRef<string | null>(null);
 
@@ -982,6 +984,20 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
               onConfirmPublish={setConfirmPublish}
               onSendToClient={sendSingleSchemaToClient}
               onSaveAsTemplate={saveAsTemplate}
+              onRetract={async (pageId: string) => {
+                setRetractingPages(prev => new Set(prev).add(pageId));
+                try {
+                  await schemaApi.retract(siteId, pageId);
+                  setRetractedPages(prev => new Set(prev).add(pageId));
+                  setPublished(prev => { const n = new Set(prev); n.delete(pageId); return n; });
+                } catch (err) {
+                  setPublishError(prev => ({ ...prev, [pageId]: err instanceof Error ? err.message : 'Retract failed' }));
+                } finally {
+                  setRetractingPages(prev => { const n = new Set(prev); n.delete(pageId); return n; });
+                }
+              }}
+              retracting={retractingPages.has(page.pageId)}
+              retracted={retractedPages.has(page.pageId)}
               getEffectiveSchema={getEffectiveSchema}
             />
           );

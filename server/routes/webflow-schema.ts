@@ -9,11 +9,12 @@ const router = Router();
 import { addActivity } from '../activity-log.js';
 import { buildSchemaContext } from '../helpers.js';
 import { getCachedArchitecture } from '../site-architecture.js';
-import { getSchemaSnapshot, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, getSchemaPlan, updateSchemaPlanStatus, updateSchemaPlanRoles } from '../schema-store.js';
+import { getSchemaSnapshot, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, getSchemaPlan, updateSchemaPlanStatus, updateSchemaPlanRoles, deleteSchemaPlan, removePageFromSnapshot } from '../schema-store.js';
 import { generateSchemaSuggestions, generateSchemaForPage, generateCmsTemplateSchema } from '../schema-suggester.js';
 import { generateSchemaPlan } from '../schema-plan.js';
 import { createBatch } from '../approvals.js';
 import { SCHEMA_ROLE_CLIENT_DESC } from '../../shared/types/schema-plan.ts';
+import type { SchemaSitePlan } from '../../shared/types/schema-plan.ts';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { notifyApprovalReady } from '../email.js';
 import {
@@ -22,6 +23,7 @@ import {
   publishSite,
   publishSchemaToPage,
   publishRawSchemaToPage,
+  retractSchemaFromPage,
 } from '../webflow.js';
 import { listWorkspaces, getTokenForSite, updatePageState, getWorkspace, getClientPortalUrl } from '../workspaces.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
@@ -370,6 +372,101 @@ router.post('/api/webflow/schema-plan/:siteId/send-to-client', requireWorkspaceA
 router.post('/api/webflow/schema-plan/:siteId/activate', requireWorkspaceAccessFromQuery(), (req, res) => {
   const plan = updateSchemaPlanStatus(req.params.siteId, 'active');
   if (!plan) return res.status(404).json({ error: 'No plan found' });
+  res.json(plan);
+});
+
+// DELETE: retract (delete) the entire schema plan for a site
+router.delete('/api/webflow/schema-plan/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+  const deleted = deleteSchemaPlan(req.params.siteId);
+  if (!deleted) return res.status(404).json({ error: 'No plan found for this site' });
+
+  const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+  if (ws) {
+    addActivity(ws.id, 'schema_plan_generated', 'Schema site plan retracted', 'Plan deleted by admin');
+  }
+  res.json({ success: true });
+});
+
+// DELETE: retract (remove) published schema from a specific page
+router.delete('/api/webflow/schema-retract/:siteId/:pageId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+  const { siteId, pageId } = req.params;
+  try {
+    const token = getTokenForSite(siteId) || undefined;
+    const result = await retractSchemaFromPage(siteId, pageId, token);
+    if (!result.success) {
+      return res.status(500).json({ error: result.error || 'Failed to retract schema' });
+    }
+
+    // Optionally publish the site so the removal goes live
+    if (req.query.publish === 'true') {
+      await publishSite(siteId, token);
+    }
+
+    // Remove from snapshot so it doesn't show as "existing" on reload
+    removePageFromSnapshot(siteId, pageId);
+
+    // Update page state + activity
+    const ws = listWorkspaces().find(w => w.webflowSiteId === siteId);
+    if (ws) {
+      addActivity(ws.id, 'schema_published', 'Schema retracted from page', `Page ${pageId.slice(0, 8)}… — ${result.removed} script(s) removed`, { pageId });
+      updatePageState(ws.id, pageId, { status: 'clean', source: 'schema', fields: ['schema'], updatedBy: 'admin' });
+    }
+
+    res.json({ success: true, removed: result.removed });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log.error({ detail: msg, err }, 'Schema retract error');
+    res.status(500).json({ error: `Schema retract failed: ${msg}` });
+  }
+});
+
+// ── Public (client-facing) schema endpoints ──
+
+// GET: client-readable schema snapshot (read-only)
+router.get('/api/public/schema-snapshot/:workspaceId', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws?.webflowSiteId) return res.status(404).json({ error: 'No site linked' });
+  const snapshot = getSchemaSnapshot(ws.webflowSiteId);
+  if (!snapshot) return res.json(null);
+  // Return a simplified view — page titles, slugs, schema types only
+  const pages = snapshot.results.map(r => ({
+    pageId: r.pageId,
+    pageTitle: r.pageTitle,
+    slug: r.slug,
+    url: r.url,
+    existingSchemas: r.existingSchemas || [],
+    schemaTypes: (r.suggestedSchemas?.[0]?.template?.['@graph'] as Array<{ '@type'?: string }> || [])
+      .map(n => String(n['@type'])).filter(Boolean),
+    priority: r.suggestedSchemas?.[0]?.priority || 'medium',
+  }));
+  res.json({ pages, pageCount: snapshot.pageCount, createdAt: snapshot.createdAt });
+});
+
+// GET: client-readable schema plan (read-only)
+router.get('/api/public/schema-plan/:workspaceId', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws?.webflowSiteId) return res.status(404).json({ error: 'No site linked' });
+  const plan = getSchemaPlan(ws.webflowSiteId);
+  if (!plan) return res.json(null);
+  res.json(plan);
+});
+
+// POST: client feedback on schema plan (approve / request changes)
+router.post('/api/public/schema-plan/:workspaceId/feedback', (req, res) => {
+  const { action, note } = req.body;
+  if (!action || !['approve', 'request_changes'].includes(action)) {
+    return res.status(400).json({ error: 'action must be "approve" or "request_changes"' });
+  }
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws?.webflowSiteId) return res.status(404).json({ error: 'No site linked' });
+
+  const newStatus = action === 'approve' ? 'client_approved' : 'client_changes_requested';
+  const plan = updateSchemaPlanStatus(ws.webflowSiteId, newStatus as SchemaSitePlan['status']);
+  if (!plan) return res.status(404).json({ error: 'No plan found' });
+
+  const label = action === 'approve' ? 'approved' : 'requested changes on';
+  addActivity(ws.id, 'changes_requested', `Client ${label} schema plan`, note || undefined);
+  broadcastToWorkspace(ws.id, 'approval:update', { action: 'schema_plan_feedback', status: newStatus });
   res.json(plan);
 });
 

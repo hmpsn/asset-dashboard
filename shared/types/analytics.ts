@@ -41,6 +41,31 @@ export interface SearchComparison {
   changePercent: { clicks: number; impressions: number; ctr: number; position: number };
 }
 
+// ── GSC breakdown types ──────────────────────────────────────────
+export interface SearchDeviceBreakdown {
+  device: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+}
+
+export interface SearchCountryBreakdown {
+  country: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+}
+
+export interface SearchTypeBreakdown {
+  searchType: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+}
+
 export interface GA4Overview {
   totalUsers: number;
   totalSessions: number;

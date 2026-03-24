@@ -282,6 +282,42 @@ export async function publishRawSchemaToPage(
   return { success: true };
 }
 
+/**
+ * Retract (remove) all JSON-LD schema scripts from a page's custom code.
+ */
+export async function retractSchemaFromPage(
+  siteId: string,
+  pageId: string,
+  tokenOverride?: string,
+): Promise<{ success: boolean; removed: number; error?: string }> {
+  const allScripts = await listRegisteredScripts(siteId, tokenOverride);
+  const schemaScriptIds = new Set(
+    allScripts
+      .filter(s => s.displayName.startsWith(SCHEMA_SCRIPT_PREFIX))
+      .map(s => s.id),
+  );
+
+  if (schemaScriptIds.size === 0) {
+    return { success: true, removed: 0 };
+  }
+
+  const existingBlocks = await getPageCustomCode(pageId, tokenOverride);
+  const toKeep = existingBlocks.filter(block => !schemaScriptIds.has(block.id));
+  const removedCount = existingBlocks.length - toKeep.length;
+
+  if (removedCount === 0) {
+    return { success: true, removed: 0 };
+  }
+
+  const applied = await upsertPageCustomCode(pageId, toKeep, tokenOverride);
+  if (!applied) {
+    return { success: false, removed: 0, error: 'Failed to update page custom code' };
+  }
+
+  log.info(`Retracted ${removedCount} schema script(s) from page ${pageId}`);
+  return { success: true, removed: removedCount };
+}
+
 export async function listSites(tokenOverride?: string): Promise<Array<{ id: string; displayName: string; shortName: string }>> {
   const token = tokenOverride || getToken();
   if (!token) return [];

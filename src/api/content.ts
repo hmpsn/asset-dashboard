@@ -1,16 +1,17 @@
 // ── Content API (briefs, posts, content requests) ─────────────────
 import { get, post, patch, put, del, getSafe, getOptional } from './client';
-import type { ContentTemplate, ContentMatrix, KeywordCandidate } from '../../shared/types/content';
+import type { ContentBrief, GeneratedPost, ContentTopicRequest, ContentTemplate, ContentMatrix, KeywordCandidate } from '../../shared/types/content';
+import type { ClientContentRequest } from '../components/client/types';
 
 export const contentBriefs = {
   list: (wsId: string) =>
-    get<unknown[]>(`/api/content-briefs/${wsId}`),
+    get<ContentBrief[]>(`/api/content-briefs/${wsId}`),
 
   generate: (wsId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/content-briefs/${wsId}/generate`, body),
+    post<ContentBrief>(`/api/content-briefs/${wsId}/generate`, body),
 
   update: (wsId: string, briefId: string, body: Record<string, unknown>) =>
-    patch<unknown>(`/api/content-briefs/${wsId}/${briefId}`, body),
+    patch<ContentBrief>(`/api/content-briefs/${wsId}/${briefId}`, body),
 
   remove: (wsId: string, briefId: string) =>
     del(`/api/content-briefs/${wsId}/${briefId}`),
@@ -28,28 +29,28 @@ export const contentBriefs = {
 
 export const contentPosts = {
   list: (wsId: string) =>
-    get<unknown[]>(`/api/content-posts/${wsId}`),
+    get<GeneratedPost[]>(`/api/content-posts/${wsId}`),
 
   generate: (wsId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/content-posts/${wsId}/generate`, body),
+    post<GeneratedPost>(`/api/content-posts/${wsId}/generate`, body),
 
   update: (wsId: string, postId: string, body: Record<string, unknown>) =>
-    patch<unknown>(`/api/content-posts/${wsId}/${postId}`, body),
+    patch<GeneratedPost>(`/api/content-posts/${wsId}/${postId}`, body),
 
   remove: (wsId: string, postId: string) =>
     del(`/api/content-posts/${wsId}/${postId}`),
 
   getById: (wsId: string, postId: string) =>
-    get<unknown>(`/api/content-posts/${wsId}/${postId}`),
+    get<GeneratedPost>(`/api/content-posts/${wsId}/${postId}`),
 
   regenerateSection: (wsId: string, postId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/content-posts/${wsId}/${postId}/regenerate-section`, body),
+    post<GeneratedPost>(`/api/content-posts/${wsId}/${postId}/regenerate-section`, body),
 
   versions: (wsId: string, postId: string) =>
-    getSafe<unknown[]>(`/api/content-posts/${wsId}/${postId}/versions`, []),
+    getSafe<Array<{ id: string; createdAt: string; totalWordCount: number }>>(`/api/content-posts/${wsId}/${postId}/versions`, []),
 
   revertVersion: (wsId: string, postId: string, versionId: string) =>
-    post<unknown>(`/api/content-posts/${wsId}/${postId}/versions/${versionId}/revert`),
+    post<GeneratedPost>(`/api/content-posts/${wsId}/${postId}/versions/${versionId}/revert`),
 
   publishToWebflow: (wsId: string, postId: string, body?: { generateImage?: boolean }) =>
     post<{ success: boolean; itemId?: string; slug?: string; isUpdate?: boolean; error?: string; post?: unknown }>(
@@ -64,22 +65,23 @@ export const contentPosts = {
 
 export const contentRequests = {
   list: (wsId: string) =>
-    get<unknown[]>(`/api/content-requests/${wsId}`),
+    get<ContentTopicRequest[]>(`/api/content-requests/${wsId}`),
 
   create: (wsId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/content-requests/${wsId}`, body),
+    post<ContentTopicRequest>(`/api/content-requests/${wsId}`, body),
 
   update: (wsId: string, reqId: string, body: Record<string, unknown>) =>
-    patch<unknown>(`/api/content-requests/${wsId}/${reqId}`, body),
+    patch<ContentTopicRequest>(`/api/content-requests/${wsId}/${reqId}`, body),
 
   remove: (wsId: string, reqId: string) =>
     del(`/api/content-requests/${wsId}/${reqId}`),
 };
 
 // ── Public content endpoints (client portal) ────────────────────
+
 export const publicContent = {
   requests: (wsId: string) =>
-    getSafe<unknown[]>(`/api/public/content-requests/${wsId}`, []),
+    getSafe<ClientContentRequest[]>(`/api/public/content-requests/${wsId}`, []),
 
   requestTopic: (wsId: string, body: Record<string, unknown>) =>
     post<unknown>(`/api/public/content-requests/${wsId}`, body),

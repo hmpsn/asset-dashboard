@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronRight, Copy, CheckCircle,
   AlertCircle, Sparkles, RefreshCw, Upload, Send,
   ArrowRight, GitCompareArrows, Pencil, AlertTriangle,
-  Loader2, Save,
+  Loader2, Save, Trash2,
 } from 'lucide-react';
 import { StatusBadge } from '../ui/StatusBadge';
 import { statusBorderClass } from '../ui/statusConfig';
@@ -74,6 +74,9 @@ export interface SchemaPageCardProps {
   onConfirmPublish: (pageId: string | null) => void;
   onSendToClient: (page: SchemaPageSuggestion) => void;
   onSaveAsTemplate: (pageId: string) => void;
+  onRetract: (pageId: string) => void;
+  retracting: boolean;
+  retracted: boolean;
   getEffectiveSchema: (pageId: string, original: Record<string, unknown>) => Record<string, unknown>;
 }
 
@@ -86,7 +89,8 @@ export function SchemaPageCard({
   onPageTypeChange,
   onToggleExpand, onRegenerate, onToggleDiff, onToggleSchemaEdit,
   onSchemaJsonChange, onCopyTemplate, onPublish, onConfirmPublish,
-  onSendToClient, onSaveAsTemplate, getEffectiveSchema,
+  onSendToClient, onSaveAsTemplate, onRetract, retracting, retracted,
+  getEffectiveSchema,
 }: SchemaPageCardProps) {
   const hasErrors = (page.validationErrors?.length || 0) > 0;
   const schema = page.suggestedSchemas[0];
@@ -359,6 +363,21 @@ export function SchemaPageCard({
                     )}
                   </button>
                 )
+              )}
+              {published && !retracted && (
+                <button
+                  onClick={() => onRetract(page.pageId)}
+                  disabled={retracting}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30"
+                >
+                  {retracting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                  Retract
+                </button>
+              )}
+              {retracted && (
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-500/10 text-zinc-400 border border-zinc-500/20">
+                  <Trash2 className="w-3.5 h-3.5" /> Retracted
+                </span>
               )}
               {publishError && (
                 <span className="text-xs text-red-400">{publishError}</span>

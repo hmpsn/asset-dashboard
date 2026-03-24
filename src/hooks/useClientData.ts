@@ -8,6 +8,13 @@ import type {
   ClientContentRequest, ClientKeywordStrategy, ClientRequest, ApprovalBatch,
   SearchComparison, GA4Comparison, GA4NewVsReturning, GA4OrganicOverview, GA4LandingPage,
 } from '../components/client/types';
+import type { PricingData } from './usePayments';
+
+export interface ActivityLogItem { id: string; type: string; title: string; description?: string; actorName?: string; createdAt: string }
+export interface RankHistoryEntry { date: string; positions: Record<string, number> }
+export interface LatestRank { query: string; position: number; clicks: number; impressions: number; ctr: number; change?: number }
+export interface AnnotationItem { id: string; date: string; label: string; description?: string; color?: string }
+export interface AnomalyItem { type: string; severity: string; title: string; description: string; source: string; changePct: number }
 
 export interface ContentPlanReviewCell {
   cellId: string;
@@ -47,13 +54,13 @@ export function useClientData(_workspaceId: string) {
   const [ga4NewVsReturning, setGa4NewVsReturning] = useState<GA4NewVsReturning[]>([]);
   const [ga4Organic, setGa4Organic] = useState<GA4OrganicOverview | null>(null);
   const [ga4LandingPages, setGa4LandingPages] = useState<GA4LandingPage[]>([]);
-  const [anomalies, setAnomalies] = useState<Array<{ type: string; severity: string; title: string; description: string; source: string; changePct: number }>>([]);
+  const [anomalies, setAnomalies] = useState<AnomalyItem[]>([]);
   const [approvalBatches, setApprovalBatches] = useState<ApprovalBatch[]>([]);
   const [approvalsLoading, setApprovalsLoading] = useState(false);
-  const [activityLog, setActivityLog] = useState<{ id: string; type: string; title: string; description?: string; actorName?: string; createdAt: string }[]>([]);
-  const [rankHistory, setRankHistory] = useState<{ date: string; positions: Record<string, number> }[]>([]);
-  const [latestRanks, setLatestRanks] = useState<{ query: string; position: number; clicks: number; impressions: number; ctr: number; change?: number }[]>([]);
-  const [annotations, setAnnotations] = useState<{ id: string; date: string; label: string; description?: string; color?: string }[]>([]);
+  const [activityLog, setActivityLog] = useState<ActivityLogItem[]>([]);
+  const [rankHistory, setRankHistory] = useState<RankHistoryEntry[]>([]);
+  const [latestRanks, setLatestRanks] = useState<LatestRank[]>([]);
+  const [annotations, setAnnotations] = useState<AnnotationItem[]>([]);
   const [requests, setRequests] = useState<ClientRequest[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(false);
   const [contentRequests, setContentRequests] = useState<ClientContentRequest[]>([]);
@@ -73,8 +80,8 @@ export function useClientData(_workspaceId: string) {
   const loadRequests = useCallback(async (wsId: string) => {
     setRequestsLoading(true);
     try {
-      const data = await getSafe<unknown[]>(`/api/public/requests/${wsId}`, []);
-      if (Array.isArray(data)) setRequests(data as ClientRequest[]);
+      const data = await getSafe<ClientRequest[]>(`/api/public/requests/${wsId}`, []);
+      if (Array.isArray(data)) setRequests(data);
     } catch { setSectionError('requests', 'Unable to load requests'); }
     finally { setRequestsLoading(false); }
   }, [setSectionError]);
@@ -82,8 +89,8 @@ export function useClientData(_workspaceId: string) {
   const loadApprovals = useCallback(async (wsId: string) => {
     setApprovalsLoading(true);
     try {
-      const data = await getSafe<unknown[]>(`/api/public/approvals/${wsId}`, []);
-      if (Array.isArray(data)) setApprovalBatches(data as ApprovalBatch[]);
+      const data = await getSafe<ApprovalBatch[]>(`/api/public/approvals/${wsId}`, []);
+      if (Array.isArray(data)) setApprovalBatches(data);
     } catch { setSectionError('approvals', 'Unable to load approvals'); }
     setApprovalsLoading(false);
   }, [setSectionError]);
@@ -156,22 +163,22 @@ export function useClientData(_workspaceId: string) {
   }, [setSectionError, clearSectionError]);
 
   /** Load all dashboard data for a workspace. Accepts optional setPricingData callback for payment hook integration. */
-  const loadDashboardData = useCallback((data: WorkspaceInfo, setPricingData?: (p: unknown) => void) => {
+  const loadDashboardData = useCallback((data: WorkspaceInfo, setPricingData?: (p: PricingData | null) => void) => {
     if (data.gscPropertyUrl) loadSearchData(data.id, 28);
     getOptional<AuditSummary>(`/api/public/audit-summary/${data.id}`).then(a => { if (a?.id) { setAudit(a); clearSectionError('audit'); } }).catch(() => setSectionError('audit', 'Unable to load site health data'));
     getOptional<AuditDetail>(`/api/public/audit-detail/${data.id}`).then(d => { if (d?.id) setAuditDetail(d); }).catch((err) => { console.error('useClientData operation failed:', err); });
     if (data.ga4PropertyId) loadGA4Data(data.id, 28);
     loadApprovals(data.id);
     loadRequests(data.id);
-    getSafe<unknown[]>(`/api/public/activity/${data.id}?limit=20`, []).then(a => { if (Array.isArray(a)) setActivityLog(a as typeof activityLog); }).catch(() => setSectionError('activity', 'Unable to load activity'));
-    getSafe<unknown[]>(`/api/public/rank-tracking/${data.id}/history`, []).then(h => { if (Array.isArray(h)) setRankHistory(h as typeof rankHistory); }).catch((err) => { console.error('useClientData operation failed:', err); });
-    getSafe<unknown[]>(`/api/public/rank-tracking/${data.id}/latest`, []).then(l => { if (Array.isArray(l)) setLatestRanks(l as typeof latestRanks); }).catch(() => setSectionError('ranks', 'Unable to load ranking data'));
-    getSafe<unknown[]>(`/api/public/annotations/${data.id}`, []).then(a => { if (Array.isArray(a)) setAnnotations(a as typeof annotations); }).catch((err) => { console.error('useClientData operation failed:', err); });
+    getSafe<ActivityLogItem[]>(`/api/public/activity/${data.id}?limit=20`, []).then(a => { if (Array.isArray(a)) setActivityLog(a); }).catch(() => setSectionError('activity', 'Unable to load activity'));
+    getSafe<RankHistoryEntry[]>(`/api/public/rank-tracking/${data.id}/history`, []).then(h => { if (Array.isArray(h)) setRankHistory(h); }).catch((err) => { console.error('useClientData operation failed:', err); });
+    getSafe<LatestRank[]>(`/api/public/rank-tracking/${data.id}/latest`, []).then(l => { if (Array.isArray(l)) setLatestRanks(l); }).catch(() => setSectionError('ranks', 'Unable to load ranking data'));
+    getSafe<AnnotationItem[]>(`/api/public/annotations/${data.id}`, []).then(a => { if (Array.isArray(a)) setAnnotations(a); }).catch((err) => { console.error('useClientData operation failed:', err); });
     if (data.seoClientView) {
       getOptional<ClientKeywordStrategy>(`/api/public/seo-strategy/${data.id}`).then(s => { if (s) setStrategyData(s); }).catch(() => setSectionError('strategy', 'Unable to load SEO strategy'));
     }
-    getOptional<unknown>(`/api/public/pricing/${data.id}`).then(p => { if (p && setPricingData) setPricingData(p); }).catch((err) => { console.error('useClientData operation failed:', err); });
-    getSafe<unknown[]>(`/api/public/anomalies/${data.id}`, []).then(a => { if (Array.isArray(a)) setAnomalies(a as typeof anomalies); }).catch((err) => { console.error('useClientData operation failed:', err); });
+    getOptional<PricingData>(`/api/public/pricing/${data.id}`).then(p => { if (p && setPricingData) setPricingData(p); }).catch((err) => { console.error('useClientData operation failed:', err); });
+    getSafe<AnomalyItem[]>(`/api/public/anomalies/${data.id}`, []).then(a => { if (Array.isArray(a)) setAnomalies(a); }).catch((err) => { console.error('useClientData operation failed:', err); });
     getSafe<ClientContentRequest[]>(`/api/public/content-requests/${data.id}`, []).then((reqs) => {
       if (Array.isArray(reqs) && reqs.length > 0) {
         setContentRequests(reqs);
@@ -241,11 +248,11 @@ export function useClientData(_workspaceId: string) {
   const refetchClient = useCallback(async (key: string, url: string) => {
     try {
       const d = await getOptional<unknown[]>(url);
-      if (!d) return;
-      if (key === 'activity' && Array.isArray(d)) setActivityLog(d as typeof activityLog);
-      if (key === 'approvals' && Array.isArray(d)) setApprovalBatches(d as ApprovalBatch[]);
-      if (key === 'requests' && Array.isArray(d)) setRequests(d as ClientRequest[]);
-      if (key === 'content' && Array.isArray(d)) { setContentRequests(d as ClientContentRequest[]); setRequestedTopics(new Set((d as ClientContentRequest[]).map(r => r.targetKeyword))); }
+      if (!d || !Array.isArray(d)) return;
+      if (key === 'activity') setActivityLog(d as ActivityLogItem[]);
+      if (key === 'approvals') setApprovalBatches(d as ApprovalBatch[]);
+      if (key === 'requests') setRequests(d as ClientRequest[]);
+      if (key === 'content') { setContentRequests(d as ClientContentRequest[]); setRequestedTopics(new Set((d as ClientContentRequest[]).map(r => r.targetKeyword))); }
     } catch (err) { console.error('useClientData operation failed:', err); }
   }, []);
 
