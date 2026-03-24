@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { StatusBadge } from './ui/StatusBadge';
+import { statusBorderClass } from './ui/statusConfig';
 import { get, patch, post, getSafe } from '../api/client';
 import { PendingApprovals } from './PendingApprovals';
 
@@ -219,9 +220,9 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
         field: isTitle ? 'title' : 'description',
         workspaceId,
       });
-      if (data.variations?.length > 1) {
+      if (data.variations && data.variations.length > 1) {
         updateField(itemId, fieldSlug, data.variations[0]);
-        setVariations(prev => ({ ...prev, [itemId]: { fieldSlug, options: data.variations } }));
+        setVariations(prev => ({ ...prev, [itemId]: { fieldSlug, options: data.variations! } }));
       } else if (data.text) {
         updateField(itemId, fieldSlug, data.text);
       }
@@ -408,6 +409,11 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
         const isExpanded = expandedCollections.has(coll.collectionId);
         const collSavedIds = coll.items.filter(i => saved.has(i.id)).map(i => i.id);
         const extraSeoFields = coll.seoFields.filter(f => f.slug !== 'name' && f.slug !== 'slug');
+        const titleField = extraSeoFields.find(f => f.slug.includes('title'));
+        const descField = extraSeoFields.find(f => f.slug.includes('description') || f.slug.includes('desc'));
+        const missingTitles = titleField ? coll.items.filter(i => !String(i.fieldData[titleField.slug] || '').trim()).length : 0;
+        const missingDescs = descField ? coll.items.filter(i => !String(i.fieldData[descField.slug] || '').trim()).length : 0;
+        const missingNames = coll.items.filter(i => !String(i.fieldData['name'] || '').trim()).length;
 
         return (
           <div key={coll.collectionId} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
@@ -416,7 +422,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
               onClick={() => toggleCollection(coll.collectionId)}
               className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/30 transition-colors"
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 {isExpanded ? <ChevronDown className="w-4 h-4 text-zinc-500" /> : <ChevronRight className="w-4 h-4 text-zinc-500" />}
                 <span className="text-sm font-medium text-zinc-200">{coll.collectionName}</span>
                 <span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">/{coll.collectionSlug}</span>
@@ -424,6 +430,21 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                 {extraSeoFields.length > 0 && (
                   <span className="text-[11px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded">
                     {extraSeoFields.map(f => f.displayName).join(', ')}
+                  </span>
+                )}
+                {missingNames > 0 && (
+                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400">
+                    {missingNames} missing names
+                  </span>
+                )}
+                {missingTitles > 0 && (
+                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                    {missingTitles} missing SEO titles
+                  </span>
+                )}
+                {missingDescs > 0 && (
+                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400">
+                    {missingDescs} missing meta desc
                   </span>
                 )}
               </div>
@@ -457,9 +478,14 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                   const isSaved = saved.has(item.id);
                   const isSaving = saving.has(item.id);
                   const error = errors[item.id];
+                  const trackingBorder = statusBorderClass(getState(item.id)?.status);
+                  const hasName = !!itemName.trim();
+                  const hasSeoTitle = titleField ? !!String(item.fieldData[titleField.slug] || '').trim() : true;
+                  const hasSeoDesc = descField ? !!String(item.fieldData[descField.slug] || '').trim() : true;
+                  const hasIssues = !hasName || !hasSeoTitle || !hasSeoDesc;
 
                   return (
-                    <div key={item.id} className="border-b border-zinc-800/50 last:border-b-0">
+                    <div key={item.id} className={`border-b border-zinc-800/50 last:border-b-0 ${trackingBorder || (hasIssues ? 'border-l-2 border-l-amber-500/40' : '')}`}>
                       <button
                         onClick={() => toggleItem(item.id)}
                         className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-zinc-800/20 transition-colors"
@@ -475,25 +501,27 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                             />
                           )}
                           {isItemExpanded ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />}
-                          <span className="text-xs text-zinc-300 truncate">{itemName || '(untitled)'}</span>
+                          <span className={`text-xs truncate ${hasName ? 'text-zinc-300' : 'text-red-400 italic'}`}>{itemName || '(untitled)'}</span>
                           <span className="text-[11px] text-zinc-500 font-mono flex-shrink-0">/{coll.collectionSlug}/{itemSlug}</span>
                         </div>
                         <div className="flex items-center gap-1.5 flex-shrink-0">
                           <StatusBadge status={getState(item.id)?.status} />
-                          {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
-                          {isSaved && <Check className="w-3 h-3 text-emerald-400" />}
+                          {!hasSeoTitle && <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">No title</span>}
+                          {!hasSeoDesc && <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400">No desc</span>}
+                          {isDirty && <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400">Unsaved</span>}
+                          {isSaved && !isDirty && <Check className="w-3 h-3 text-emerald-400" />}
                           {error && <AlertCircle className="w-3 h-3 text-red-400" />}
                         </div>
                       </button>
 
                       {isItemExpanded && (
-                        <div className="px-4 pb-4 space-y-3">
+                        <div className="px-4 pb-4 space-y-3 bg-zinc-900/30">
                           {/* Name field */}
                           <div>
                             <div className="flex items-center justify-between mb-1">
                               <label className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Name (Title)</label>
                               <div className="flex items-center gap-1">
-                                <span className="text-[11px] text-zinc-500">{(edits[item.id]?.['name'] || '').length} chars</span>
+                                <span className={`text-[11px] ${(() => { const len = (edits[item.id]?.['name'] || '').length; return len === 0 ? 'text-red-400' : len > 60 ? 'text-red-400' : len > 50 ? 'text-amber-400' : 'text-green-400'; })()}`}>{(edits[item.id]?.['name'] || '').length}/60</span>
                                 <button
                                   onClick={() => aiRewrite(coll.collectionId, item.id, 'name')}
                                   disabled={!!aiLoading[`${item.id}-name`]}
