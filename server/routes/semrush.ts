@@ -136,6 +136,16 @@ router.get('/api/semrush/diagnose/:workspaceId', (req, res) => {
   const domainOverviewKeys = cacheFiles.filter((f: string) => f.startsWith('domain_overview'));
   const backlinkKeys = cacheFiles.filter((f: string) => f.startsWith('backlinks_'));
 
+  // Read contents of key cache files to see what data is stored
+  const cachedData: Record<string, unknown> = {};
+  const inspectKeys = [...domainOverviewKeys, ...backlinkKeys].slice(0, 10);
+  for (const f of inspectKeys) {
+    try {
+      const raw = JSON.parse(fs.readFileSync(path.join(cacheDir, f), 'utf-8'));
+      cachedData[f] = { cachedAt: raw.cachedAt, data: raw.data };
+    } catch { cachedData[f] = 'unreadable'; }
+  }
+
   res.json({
     configured: isSemrushConfigured(),
     rawLiveDomain: rawDomain,
@@ -147,6 +157,7 @@ router.get('/api/semrush/diagnose/:workspaceId', (req, res) => {
     domainOverviewCacheKeys: domainOverviewKeys,
     backlinkCacheKeys: backlinkKeys,
     allCacheKeys: cacheFiles,
+    cachedData,
     note: 'This endpoint makes ZERO SEMRush API calls. No credits used.',
   });
 });
