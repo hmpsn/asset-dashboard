@@ -5,10 +5,13 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { get } from '../../api/client.js';
+import { keywords } from '../../api/seo.js';
+import { workspaces } from '../../api/workspaces.js';
 
 interface KeywordStrategy {
   id: string;
   workspaceId: string;
+  businessContext?: string;
   primaryKeywords: Array<{
     keyword: string;
     volume: number;
@@ -31,12 +34,31 @@ interface KeywordStrategy {
   status: 'generating' | 'ready' | 'error';
 }
 
+interface WorkspaceData {
+  competitorDomains?: string[];
+}
+
+interface KeywordStrategyData {
+  strategy: KeywordStrategy | null;
+  semrushAvailable: boolean;
+  workspaceData: WorkspaceData | null;
+}
+
 export function useKeywordStrategy(workspaceId: string) {
   return useQuery({
     queryKey: ['keyword-strategy', workspaceId],
-    queryFn: async (): Promise<KeywordStrategy> => {
-      const response = await get<{ data: KeywordStrategy }>(`/api/keyword-strategy/${workspaceId}`);
-      return response.data;
+    queryFn: async (): Promise<KeywordStrategyData> => {
+      const [strategyResponse, semrushStatus, workspaceResponse] = await Promise.all([
+        workspaceId ? get<{ data: KeywordStrategy }>(`/api/keyword-strategy/${workspaceId}`).catch(() => ({ data: null })) : Promise.resolve({ data: null }),
+        keywords.semrushStatus().catch(() => ({ configured: false } as { configured?: boolean })),
+        workspaceId ? workspaces.getById(workspaceId).catch(() => null) : Promise.resolve(null)
+      ]);
+      
+      return {
+        strategy: strategyResponse.data || null,
+        semrushAvailable: (semrushStatus as { configured?: boolean })?.configured || false,
+        workspaceData: workspaceResponse as WorkspaceData | null
+      };
     },
     staleTime: 10 * 60 * 1000, // 10 minutes
     enabled: !!workspaceId,

@@ -119,14 +119,16 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   // React Query hook replaces manual data fetching
-  const { data: strategy, isLoading: loading } = useKeywordStrategy(workspaceId);
+  const { data: keywordData, isLoading: loading } = useKeywordStrategy(workspaceId);
+  const strategy = keywordData?.strategy || null;
+  const semrushAvailableFromHook = keywordData?.semrushAvailable || false;
   const [expandedPages, setExpandedPages] = useState<Set<number>>(new Set());
   const [editingPage, setEditingPage] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<{ primary: string; secondary: string }>({ primary: '', secondary: '' });
   const [saving, setSaving] = useState(false);
   const [businessContext, setBusinessContext] = useState('');
   const [contextOpen, setContextOpen] = useState(false);
-  const [semrushAvailable, setSemrushAvailable] = useState(false);
+  const [semrushAvailable, setSemrushAvailable] = useState(semrushAvailableFromHook);
   const [semrushMode, setSemrushMode] = useState<'none' | 'quick' | 'full'>('none');
   const [maxPages, setMaxPages] = useState<number>(500);
   const [competitors, setCompetitors] = useState('');
@@ -153,30 +155,21 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
   };
 
   
-  // Check SEMRush availability
+  // Initialize SEMRush availability from React Query hook
   useEffect(() => {
-    keywords.semrushStatus().then(d => {
-      const status = d as { configured?: boolean } | null;
-      if (status?.configured) {
-        setSemrushAvailable(true);
-        // Default to quick mode when SEMRush is available
-        setSemrushMode(prev => prev === 'none' ? 'quick' : prev);
-      }
-    }).catch((err) => { console.error('KeywordStrategy operation failed:', err); });
-  }, []);
+    if (semrushAvailableFromHook) {
+      setSemrushAvailable(true);
+      // Default to quick mode when SEMRush is available
+      setSemrushMode(prev => prev === 'none' ? 'quick' : prev);
+    }
+  }, [semrushAvailableFromHook]);
 
-  // Load saved competitor domains from workspace
+  // Load saved competitor domains from React Query hook data
   useEffect(() => {
-    if (!workspaceId) return;
-    import('../api/workspaces').then(({ workspaces: wsApi }) => {
-      wsApi.getById(workspaceId).then((ws: unknown) => {
-        const w = ws as { competitorDomains?: string[] } | null;
-        if (w?.competitorDomains?.length && !competitors) {
-          setCompetitors(w.competitorDomains.join(', '));
-        }
-      }).catch(() => {});
-    });
-  }, [workspaceId]);
+    if (keywordData?.workspaceData?.competitorDomains?.length && !competitors) {
+      setCompetitors(keywordData.workspaceData.competitorDomains.join(', '));
+    }
+  }, [keywordData?.workspaceData?.competitorDomains, competitors]);
 
   // Sync business context + competitors from loaded strategy
   useEffect(() => {

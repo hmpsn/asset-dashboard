@@ -139,6 +139,30 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
     // Quick actions (only if a workspace is selected)
     if (selectedWorkspace) {
       result.push({
+        id: 'action:run-audit',
+        label: 'Run Audit',
+        sub: 'Start SEO site audit',
+        icon: Shield,
+        type: 'action',
+        action: () => { fetch(`/api/audit-schedule/${selectedWorkspace!.id}`, { method: 'POST' }); addRecent('action:run-audit'); },
+      });
+      result.push({
+        id: 'action:generate-schema',
+        label: 'Generate Schema',
+        sub: 'Create schema for current page',
+        icon: Code2,
+        type: 'action',
+        action: () => { navigate(adminPath(selectedWorkspace!.id, 'seo-schema')); addRecent('action:generate-schema'); },
+      });
+      result.push({
+        id: 'action:create-brief',
+        label: 'Create Brief',
+        sub: 'Generate content brief for keyword',
+        icon: FileText,
+        type: 'action',
+        action: () => { navigate(adminPath(selectedWorkspace!.id, 'seo-briefs')); addRecent('action:create-brief'); },
+      });
+      result.push({
         id: 'action:scan-anomalies',
         label: 'Scan for Anomalies',
         sub: 'Run anomaly detection now',
@@ -161,14 +185,6 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
         icon: Grid3X3,
         type: 'action',
         action: () => { navigate(adminPath(selectedWorkspace!.id, 'content-pipeline')); addRecent('action:build-matrix'); },
-      });
-      result.push({
-        id: 'action:view-content-plan',
-        label: 'View Content Plan',
-        sub: 'Review planned content',
-        icon: ListChecks,
-        type: 'action',
-        action: () => { navigate(adminPath(selectedWorkspace!.id, 'content-pipeline')); addRecent('action:view-content-plan'); },
       });
     }
 

@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import { FileText } from 'lucide-react';
+import { EmptyState } from './EmptyState';
 
 interface DataListItem {
   label: string;
@@ -29,7 +31,7 @@ export function DataList({ items, ranked = true, maxHeight = '300px', className 
           {item.extra}
         </div>
       ))}
-      {items.length === 0 && <p className="text-xs text-zinc-500 py-2">No data</p>}
+      {items.length === 0 && <EmptyState icon={FileText} title="No data available" className="py-4" />}
     </div>
   );
 }

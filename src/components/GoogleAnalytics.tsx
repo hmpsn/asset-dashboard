@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   Loader2, Users, Eye, Clock, ArrowUpDown, Globe, Monitor, Smartphone, Tablet,
   TrendingUp, TrendingDown, BarChart3, Zap, Target, Leaf, ArrowRight,
-  AlertTriangle, UserPlus, UserCheck,
+  AlertTriangle, UserPlus, UserCheck, FileText,
 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import { PageHeader, StatCard, SectionCard, TabBar, DateRangeSelector, DataList, EmptyState } from './ui';
@@ -229,7 +229,7 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
                   <span className="text-[11px] text-zinc-500 w-14 text-right">{formatNumber(p.users)} u</span>
                 </div>
               ))}
-              {topPages.length === 0 && <p className="text-xs text-zinc-500">No data</p>}
+              {topPages.length === 0 && <EmptyState icon={FileText} title="No top pages data" description="No page data available for the selected time period." className="py-4" />}
             </div>
           </SectionCard>
 
@@ -249,7 +249,7 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
                   </div>
                 );
               })}
-              {sources.length === 0 && <p className="text-xs text-zinc-500">No data</p>}
+              {sources.length === 0 && <EmptyState icon={Globe} title="No traffic sources data" description="No source data available for the selected time period." className="py-4" />}
             </div>
           </SectionCard>
         </div>
@@ -273,7 +273,7 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
                   <span className="text-xs text-zinc-500 tabular-nums w-10 text-right">{formatNumber(d.users)}</span>
                 </div>
               ))}
-              {devices.length === 0 && <p className="text-xs text-zinc-500">No data</p>}
+              {devices.length === 0 && <EmptyState icon={Monitor} title="No device data" description="No device data available for the selected time period." className="py-4" />}
             </div>
           </SectionCard>
 
@@ -312,7 +312,7 @@ function GoogleAnalytics({ workspaceId, ga4PropertyId }: Props) {
                 })}
               </div>
             ) : (
-              <p className="text-xs text-zinc-500">No data</p>
+              <EmptyState icon={Target} title="No events data" description="No event data available for the selected time period." className="py-4" />
             )}
           </SectionCard>
         </div>

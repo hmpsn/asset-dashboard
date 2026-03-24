@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   BarChart3, MousePointer, Eye, Target,
-  Clock, FileText, Loader2, ChevronDown, ChevronRight, Users, Layers,
+  Clock, FileText, Loader2, ChevronDown, ChevronRight, Users, Layers, TrendingUp, Search,
 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from 'recharts';
 import { PageHeader, SectionCard, EmptyState, Badge } from './ui';
@@ -63,7 +63,7 @@ function MiniSparkline({ data, color, height = 32, width = 100 }: { data: number
 }
 
 function TrendChart({ trend }: { trend: TrendPoint[] }) {
-  if (trend.length < 2) return <p className="text-xs text-zinc-500 py-4">Not enough data for trend chart.</p>;
+  if (trend.length < 2) return <EmptyState icon={TrendingUp} title="Not enough data" description="Insufficient data points for trend chart." className="py-4" />;
   return (
     <div className="mt-3">
       <div className="flex items-center gap-4 mb-2">
@@ -357,7 +357,7 @@ export function ContentPerformance({ workspaceId }: Props) {
                               </div>
                             </div>
                           ) : (
-                            <p className="text-xs text-zinc-500">No search data available. This page may not have a matching slug in GSC.</p>
+                            <EmptyState icon={Search} title="No search data" description="This page may not have a matching slug in Google Search Console." className="py-2" />
                           )}
                         </div>
 
@@ -386,7 +386,7 @@ export function ContentPerformance({ workspaceId }: Props) {
                               </div>
                             </div>
                           ) : (
-                            <p className="text-xs text-zinc-500">No GA4 data available for this page.</p>
+                            <EmptyState icon={BarChart3} title="No analytics data" description="No Google Analytics data available for this page." className="py-2" />
                           )}
                         </div>
                       </div>

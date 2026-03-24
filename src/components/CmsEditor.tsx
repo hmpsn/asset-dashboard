@@ -3,11 +3,13 @@ import {
   Loader2, Save, ChevronDown, ChevronRight, Check, AlertCircle,
   Search, Sparkles, Wand2, Upload, Send, Clock, ArrowRight,
 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { usePageEditStates } from '../hooks/usePageEditStates';
+import { useCmsEditor } from '../hooks/admin';
 import { EmptyState } from './ui';
 import { StatusBadge } from './ui/StatusBadge';
 import { statusBorderClass } from './ui/statusConfig';
-import { get, patch, post, getSafe } from '../api/client';
+import { patch, post } from '../api/client';
 import { PendingApprovals } from './PendingApprovals';
 
 interface SeoField {
@@ -64,63 +66,48 @@ interface Props {
 }
 
 export function CmsEditor({ siteId, workspaceId }: Props) {
-  const [collections, setCollections] = useState<CmsCollection[]>([]);
-  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
+  const { data: cmsData, isLoading } = useCmsEditor(siteId, workspaceId);
+  const collections = cmsData?.collections || [];
+  const approvalBatches = cmsData?.approvalBatches || [];
+
   const [expandedCollections, setExpandedCollections] = useState<Set<string>>(new Set());
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [edits, setEdits] = useState<Record<string, Record<string, string>>>({});
   const [dirty, setDirty] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState<Set<string>>(new Set());
   const [saved, setSaved] = useState<Set<string>>(new Set());
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [publishing, setPublishing] = useState<Set<string>>(new Set());
-  const [published, setPublished] = useState<Set<string>>(new Set());
-  const [search, setSearch] = useState('');
-  const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
   const [approvalSelected, setApprovalSelected] = useState<Set<string>>(new Set());
   const [sendingApproval, setSendingApproval] = useState(false);
   const [approvalSent, setApprovalSent] = useState(false);
   const [approvalRefreshKey, setApprovalRefreshKey] = useState(0);
   const [variations, setVariations] = useState<Record<string, { fieldSlug: string; options: string[] }>>({});
-  const [approvalBatches, setApprovalBatches] = useState<ApprovalBatch[]>([]);
   const [historyExpanded, setHistoryExpanded] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+    const [aiLoading, setAiLoading] = useState<Set<string>>(new Set());
+  const [publishing, setPublishing] = useState<Set<string>>(new Set());
+  const [published, setPublished] = useState<Set<string>>(new Set());
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const data = await get<CmsCollection[]>(`/api/webflow/cms-seo/${siteId}`);
-      setCollections(data);
-      // Initialize edit state
-      const editMap: Record<string, Record<string, string>> = {};
-      for (const coll of data) {
-        for (const item of coll.items) {
-          const fields: Record<string, string> = {};
-          for (const sf of coll.seoFields) {
-            fields[sf.slug] = String(item.fieldData[sf.slug] || '');
-          }
-          editMap[item.id] = fields;
-        }
-      }
-      setEdits(editMap);
-      setDirty(new Set());
-      setSaved(new Set());
-      setErrors({});
-    } catch (err) {
-      console.error('CMS SEO fetch failed:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { fetchData(); }, [siteId]);
-
-  // Fetch approval batches for this workspace
+  // Initialize edit state when collections data loads
   useEffect(() => {
-    if (!workspaceId) return;
-    getSafe<ApprovalBatch[]>(`/api/approvals/${workspaceId}`, [])
-      .then(data => { if (Array.isArray(data)) setApprovalBatches(data); });
-  }, [workspaceId]);
+    if (!collections.length) return;
+    
+    const editMap: Record<string, Record<string, string>> = {};
+    for (const coll of collections) {
+      for (const item of coll.items) {
+        const fields: Record<string, string> = {};
+        for (const sf of coll.seoFields) {
+          fields[sf.slug] = String(item.fieldData[sf.slug] || '');
+        }
+        editMap[item.id] = fields;
+      }
+    }
+    setEdits(editMap);
+    setDirty(new Set());
+    setSaved(new Set());
+  }, [collections]);
 
   // Build per-item approval lookup: itemId → approval items across all batches
   const itemApprovalMap = useMemo(() => {
@@ -306,7 +293,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
     });
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="w-6 h-6 animate-spin text-teal-400" />

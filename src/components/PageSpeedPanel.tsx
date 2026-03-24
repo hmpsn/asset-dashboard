@@ -4,7 +4,7 @@ import {
   Zap, AlertTriangle, Info,
 } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
-import { MetricRing } from './ui';
+import { MetricRing, EmptyState } from './ui';
 import { pageWeight, webflow } from '../api/seo';
 
 interface CoreWebVitals {
@@ -391,7 +391,7 @@ export function PageSpeedPanel({ siteId }: Props) {
             <p className="text-xs text-red-400/70">{error}</p>
           </div>
         ) : (
-          <p className="text-zinc-400 text-sm">No results available</p>
+          <EmptyState icon={Zap} title="No results available" description="Run a PageSpeed test to see performance metrics." className="py-4" />
         )}
         <button
           onClick={() => { setHasRun(false); setError(null); }}

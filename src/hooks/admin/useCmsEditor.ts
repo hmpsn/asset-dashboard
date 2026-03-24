@@ -4,42 +4,90 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { get } from '../../api/client.js';
+import { get, getSafe } from '../../api/client.js';
 
-interface CmsPage {
+interface SeoField {
   id: string;
-  name: string;
   slug: string;
+  displayName: string;
+  type: string;
+}
+
+interface CmsItem {
+  id: string;
+  fieldData: Record<string, unknown>;
+}
+
+interface CmsCollection {
+  collectionId: string;
+  collectionName: string;
+  collectionSlug: string;
+  seoFields: SeoField[];
+  items: CmsItem[];
+  total: number;
+}
+
+interface ApprovalItem {
+  id: string;
+  pageId: string;
+  pageTitle: string;
+  pageSlug: string;
+  field: string;
   collectionId?: string;
-  lastPublished?: string;
-  isArchived: boolean;
-  isDraft: boolean;
+  currentValue: string;
+  proposedValue: string;
+  clientValue?: string;
+  status: 'pending' | 'approved' | 'rejected' | 'applied';
+  reason?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface ApprovalBatch {
   id: string;
+  workspaceId: string;
+  siteId: string;
   name: string;
-  itemCount: number;
-  status: 'pending' | 'approved' | 'rejected';
+  items: ApprovalItem[];
+  status: string;
   createdAt: string;
+  updatedAt: string;
 }
 
-export function useCmsEditor(siteId: string) {
+interface CmsEditorData {
+  collections: CmsCollection[];
+  approvalBatches: ApprovalBatch[];
+}
+
+export function useCmsEditor(siteId: string, workspaceId?: string) {
   return useQuery({
-    queryKey: ['cms-editor', siteId],
-    queryFn: async () => {
-      const [pages, batches] = await Promise.all([
-        get<{ data?: CmsPage[] }>(`/api/webflow/cms/${siteId}/pages`),
-        get<{ data?: ApprovalBatch[] }>(`/api/approvals/${siteId}/batches`)
+    queryKey: ['cms-editor', siteId, workspaceId],
+    queryFn: async (): Promise<CmsEditorData> => {
+      const [collectionsData, approvalBatchesData] = await Promise.all([
+        get<CmsCollection[]>(`/api/webflow/cms-seo/${siteId}`).catch(() => []),
+        workspaceId ? getSafe<ApprovalBatch[]>(`/api/approvals/${workspaceId}`, []).catch(() => []) : []
       ]);
       
       return {
-        pages: pages.data || [],
-        batches: batches.data || []
+        collections: collectionsData || [],
+        approvalBatches: Array.isArray(approvalBatchesData) ? approvalBatchesData : []
       };
     },
-    staleTime: 30 * 1000, // 30 seconds
+    staleTime: 2 * 60 * 1000, // 2 minutes
     enabled: !!siteId,
-    retry: 1,
+    retry: 2,
+  });
+}
+
+export function useCmsCollections(siteId: string) {
+  return useQuery({
+    queryKey: ['cms-collections', siteId],
+    queryFn: async (): Promise<CmsCollection[]> => {
+      const data = await get<CmsCollection[]>(`/api/webflow/cms-seo/${siteId}`);
+      return data;
+    },
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    enabled: !!siteId,
+    retry: 2,
   });
 }

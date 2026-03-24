@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import {
-  Loader2, BarChart3, ChevronDown, ChevronRight, Search, Images, ArrowRight,
+  Loader2, BarChart3, ChevronDown, ChevronRight, Search, Images, ArrowRight, Layers,
 } from 'lucide-react';
 import { pageWeight as pageWeightApi } from '../api/seo';
+import { EmptyState } from './ui';
 
 interface PageAsset {
   id: string;
@@ -130,7 +131,7 @@ function PageWeight({ siteId }: Props) {
             <p className="text-xs text-red-400/70">{error}</p>
           </div>
         ) : (
-          <p className="text-zinc-400 text-sm">No results available</p>
+          <EmptyState icon={Layers} title="No results available" description="Run a page weight analysis to see resource metrics." className="py-4" />
         )}
         <button
           onClick={() => { setHasRun(false); setError(null); }}

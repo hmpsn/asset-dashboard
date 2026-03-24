@@ -18,3 +18,4 @@ export { useContentPipeline } from './useContentPipeline';
 export { useAnomalyAlerts } from './useAnomalyAlerts';
 export { useKeywordStrategy } from './useKeywordStrategy';
 export { useSeoEditor } from './useSeoEditor';
+export { useAdminROI } from './useAdminROI';

@@ -3,7 +3,7 @@ import {
   ArrowLeft, ArrowRight, Check, FileText, Layers, Tag,
   Eye, Sparkles, X,
 } from 'lucide-react';
-import { SectionCard, Badge, PageHeader } from '../ui';
+import { SectionCard, Badge, PageHeader, EmptyState } from '../ui';
 import type { ContentTemplate, ContentMatrix, MatrixDimension, MatrixCell } from './types';
 
 interface MatrixBuilderProps {
@@ -259,10 +259,7 @@ export function MatrixBuilder({ workspaceId, templates, onComplete, onCancel }: 
               ))}
             </div>
           ) : (
-            <div className="text-center py-10">
-              <FileText className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
-              <p className="text-xs text-zinc-500">No templates available. Create a template first.</p>
-            </div>
+            <EmptyState icon={FileText} title="No templates available" description="Create a content template first to build your matrix." />
           )}
         </SectionCard>
       )}

@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   Shield, Search, BarChart3, TrendingUp, TrendingDown, ArrowUpRight,
   Loader2, Bell, FileText, AlertTriangle,
-  Globe, Clipboard, Flag, Clock, RefreshCw, Layers,
+  Globe, Clipboard, Flag, Clock, RefreshCw, Layers, DollarSign,
 } from 'lucide-react';
 import { StatCard, SectionCard, PageHeader } from './ui';
 import { InsightsEngine } from './client/InsightsEngine';
@@ -15,7 +15,7 @@ import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { AnomalyAlerts } from './AnomalyAlerts';
 import { SeoWorkStatus, ActivityFeed, RankingsSnapshot, ActiveRequestsAnnotations, SeoChangeImpact } from './workspace-home';
 import { type Page, adminPath } from '../routes';
-import { useWorkspaceHomeData } from '../hooks/admin';
+import { useWorkspaceHomeData, useAdminROI } from '../hooks/admin';
 
 interface WorkspaceHomeProps {
   workspaceId: string;
@@ -46,6 +46,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   const { summary: seoStatus } = usePageEditStates(workspaceId);
   const { audit } = useAuditSummary(workspaceId);
   const { data: homeData, isLoading: loading, isFetching: refreshing, dataUpdatedAt } = useWorkspaceHomeData(workspaceId);
+  const { data: roiData, isLoading: roiLoading } = useAdminROI(workspaceId);
   const [now, setNow] = useState(() => new Date());
 
   // Tick every 30s so relative timestamps stay fresh
@@ -219,6 +220,17 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
           onClick={ranks.length > 0 ? () => navigate(adminPath(workspaceId, 'seo-ranks')) : undefined}
         />
 
+        {roiData && (
+          <StatCard
+            label="Traffic Value"
+            value={`$${fmt(roiData.organicTrafficValue)}`}
+            icon={DollarSign}
+            iconColor="#22c55e"
+            sub={`≈ $${fmt(roiData.adSpendEquivalent)} ad spend`}
+            onClick={() => navigate(`/client/${workspaceId}/roi`)}
+          />
+        )}
+
         {contentPipeline && contentPipeline.totalCells > 0 && (() => {
           const pct = Math.round((contentPipeline.publishedCells / contentPipeline.totalCells) * 100);
           return (
@@ -226,9 +238,9 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
               label="Content Pipeline"
               value={`${pct}%`}
               icon={Layers}
-              iconColor={pct >= 80 ? '#4ade80' : pct >= 40 ? '#22d3ee' : '#a78bfa'}
-              sub={`${contentPipeline.publishedCells}/${contentPipeline.totalCells} pages · ${contentPipeline.matrixCount} plan${contentPipeline.matrixCount !== 1 ? 's' : ''}`}
-              onClick={() => navigate(adminPath(workspaceId, 'content-pipeline'))}
+              iconColor="#71717a"
+              sub={`${contentPipeline.publishedCells}/${contentPipeline.totalCells} published`}
+              onClick={() => navigate(adminPath(workspaceId, 'content'))}
             />
           );
         })()}
