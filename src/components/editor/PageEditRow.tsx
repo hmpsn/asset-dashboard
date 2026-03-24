@@ -6,7 +6,7 @@ import {
   Loader2, Save, Sparkles, ChevronDown, ChevronRight,
   Check, AlertTriangle, CheckSquare, Square, Send, X,
 } from 'lucide-react';
-import { StatusBadge } from '../ui/StatusBadge';
+import { StatusBadge, CharacterCounter, LoadingState, SerpPreview, SocialPreview } from '../ui';
 import { statusBorderClass } from '../ui/statusConfig';
 
 interface PageMeta {
@@ -61,6 +61,9 @@ export interface PageEditRowProps {
   onSelectVariation: (pageId: string, field: 'seoTitle' | 'seoDescription', value: string) => void;
   onClearVariations: (pageId: string) => void;
   onClearTracking?: (pageId: string) => void;
+  errorState?: { type: string; message: string } | null;
+  showPreview?: boolean;
+  onTogglePreview?: (pageId: string) => void;
 }
 
 export function PageEditRow({
@@ -68,7 +71,8 @@ export function PageEditRow({
   pageRecs, pageState, variations, showApprovalCheckbox,
   isSendingToClient, isSentToClient, hasChanges, onSendToClient,
   onToggleExpand, onToggleApprovalSelect, onUpdateField, onSave,
-  onAiRewrite, onSelectVariation, onClearVariations, onClearTracking,
+  onAiRewrite, onSelectVariation, onClearVariations, onClearTracking, errorState,
+  showPreview, onTogglePreview,
 }: PageEditRowProps) {
   const hasSeoTitle = !!(page.seo?.title);
   const hasSeoDesc = !!(page.seo?.description);
@@ -113,6 +117,13 @@ export function PageEditRow({
           {edit?.dirty && <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400">Unsaved</span>}
         </div>
       </button>
+      <button
+        onClick={() => onTogglePreview?.(page.id)}
+        className="flex items-center gap-1 px-2 py-1 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
+        title="Toggle preview"
+      >
+        👁️ Preview
+      </button>
       </div>
 
       {expanded && edit && (
@@ -139,14 +150,22 @@ export function PageEditRow({
               </span>
             </div>
           ))}
+          {/* Error State */}
+          {errorState && (
+            <ErrorState
+              type={errorState.type as 'network' | 'data' | 'permission'}
+              title={errorState.type === 'network' ? 'Connection Error' : errorState.type === 'permission' ? 'Permission Error' : 'Error'}
+              message={errorState.message}
+              size="sm"
+            />
+          )}
+
           {/* SEO Title */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="text-xs font-medium text-zinc-400">SEO Title</label>
               <div className="flex items-center gap-1">
-                <span className={`text-[11px] ${(edit.seoTitle.length > 60 || edit.seoTitle.length === 0) ? 'text-red-400' : edit.seoTitle.length > 50 ? 'text-amber-400' : 'text-green-400'}`}>
-                  {edit.seoTitle.length}/60
-                </span>
+                <CharacterCounter current={edit.seoTitle.length} max={60} size="sm" />
                 <button
                   onClick={() => onAiRewrite(page.id, 'title')}
                   disabled={!!isAiLoading}
@@ -179,7 +198,7 @@ export function PageEditRow({
                     }`}
                   >
                     <span className="text-zinc-500 mr-1.5">{i + 1}.</span>{v}
-                    <span className={`ml-2 text-[10px] ${v.length > 60 ? 'text-red-400' : v.length > 50 ? 'text-amber-400' : 'text-green-400'}`}>{v.length}/60</span>
+                    <CharacterCounter current={v.length} max={60} size="sm" className="ml-2" />
                   </button>
                 ))}
               </div>
@@ -191,9 +210,7 @@ export function PageEditRow({
             <div className="flex items-center justify-between mb-1">
               <label className="text-xs font-medium text-zinc-400">Meta Description</label>
               <div className="flex items-center gap-1">
-                <span className={`text-[11px] ${(edit.seoDescription.length > 160 || edit.seoDescription.length === 0) ? 'text-red-400' : edit.seoDescription.length > 150 ? 'text-amber-400' : 'text-green-400'}`}>
-                  {edit.seoDescription.length}/160
-                </span>
+                <CharacterCounter current={edit.seoDescription.length} max={160} size="sm" />
                 <button
                   onClick={() => onAiRewrite(page.id, 'description')}
                   disabled={!!isAiLoading}
@@ -226,7 +243,7 @@ export function PageEditRow({
                     }`}
                   >
                     <span className="text-zinc-500 mr-1.5">{i + 1}.</span>{v}
-                    <span className={`ml-2 text-[10px] ${v.length > 160 ? 'text-red-400' : v.length > 150 ? 'text-amber-400' : 'text-green-400'}`}>{v.length}/160</span>
+                    <CharacterCounter current={v.length} max={160} size="sm" className="ml-2" />
                   </button>
                 ))}
               </div>
@@ -257,6 +274,47 @@ export function PageEditRow({
               {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : isSaved ? <Check className="w-3 h-3" /> : <Save className="w-3 h-3" />}
               {isSaved ? 'Saved!' : isSaving ? 'Saving...' : 'Save to Webflow'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Preview Section */}
+      {showPreview && (
+        <div className="border-t border-zinc-800 p-4 space-y-4">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-sm font-medium text-zinc-300">Preview</h4>
+            <button
+              onClick={() => onTogglePreview?.(page.id)}
+              className="text-zinc-500 hover:text-zinc-300 text-xs"
+            >
+              Hide
+            </button>
+          </div>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Google Search Preview */}
+            <div>
+              <div className="text-xs font-medium text-zinc-400 mb-2">Google Search</div>
+              <SerpPreview
+                title={edit?.seoTitle || page.title}
+                description={edit?.seoDescription || ''}
+                url={`/${page.slug}`}
+                siteName="Your Site"
+                size="sm"
+              />
+            </div>
+            
+            {/* Social Media Preview */}
+            <div>
+              <div className="text-xs font-medium text-zinc-400 mb-2">Facebook</div>
+              <SocialPreview
+                title={edit?.seoTitle || page.title}
+                description={edit?.seoDescription || ''}
+                siteName="Your Site"
+                platform="facebook"
+                size="sm"
+              />
+            </div>
           </div>
         </div>
       )}

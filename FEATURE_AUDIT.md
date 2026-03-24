@@ -17,6 +17,28 @@ A brief value assessment of every feature in the platform, covering what it does
 
 ---
 
+### 87. Admin Notification Center
+**What it does:** NotificationBell component integrated into sidebar utility bar that aggregates pending work across all workspaces. Shows counts for anomalies, content requests, approvals, and other attention items. Real-time polling every 5 minutes with click-to-navigate functionality. Dropdown shows categorized items with direct links to relevant workspace + tool combinations.
+
+**Agency value:** Centralized visibility reduces time spent checking individual workspaces. Proactive issue detection prevents client escalations. Faster response times to urgent items.
+
+**Client value:** Faster agency response to their requests and issues. Problems get noticed and addressed sooner.
+
+**Mutual:** Improves agency efficiency while delivering better client service. Reduces missed deadlines and overlooked issues.
+
+---
+
+### 88. Command Center Anomaly Banner
+**What it does:** Global banner at top of WorkspaceOverview showing critical/warning anomalies across all workspaces. Severity-based styling (red for critical, amber for warning) with workspace count and direct navigation to first affected workspace. Appears only when anomalies exist, providing immediate visibility to systemic issues.
+
+**Agency value:** Proactive issue identification across entire client portfolio. Prioritizes critical issues that need immediate attention. Reduces time spent digging through individual workspace data.
+
+**Client value:** Faster resolution of site health and ranking issues. Agency can address problems before they impact traffic significantly.
+
+**Mutual:** Demonstrates proactive monitoring and quick response capabilities. Builds client trust through systematic issue management.
+
+---
+
 ### 2. Asset Manager
 **What it does:** Lists all Webflow site images with sizes, formats, and alt text. One-click compression and re-upload directly to Webflow.
 
@@ -228,6 +250,39 @@ A brief value assessment of every feature in the platform, covering what it does
 
 ---
 
+### 84. Client Dashboard Primary CTAs
+**What it does:** Contextual action banners in the Overview tab that guide clients to their next most valuable action. "Generate Brief" when keyword strategy exists but no briefs, "View Issues" when site health is below 80, "Find Keywords" when traffic is low. Color-coded banners (teal for content, amber for health, blue for growth) with direct navigation to relevant tabs.
+
+**Agency value:** Reduces "what should I do next?" questions. Clients self-discover next actions that align with agency revenue (content requests, strategy work, health improvements).
+
+**Client value:** Clear guidance on what to do next instead of overwhelming data. Action-oriented banners remove decision paralysis and provide immediate next steps.
+
+**Mutual:** Turns passive data consumption into active engagement. Higher feature adoption and client satisfaction through guided user journeys.
+
+---
+
+### 85. Client Empty State Enhancement
+**What it does:** Setup checklist for new workspaces replacing generic empty states. Shows "Connect Google Search Console", "Connect Google Analytics", "Run First Site Audit" with contextual icons and descriptions. Explains what data will appear once connected and why each connection matters.
+
+**Agency value:** Faster client onboarding - clients understand exactly what's needed and why. Reduces support tickets asking "why do I see nothing?"
+
+**Client value:** Clear onboarding path with specific actions. Understands the value of each integration before connecting.
+
+**Mutual:** Smoother activation process gets clients to value faster. Higher connection rates for GSC/GA4/Webflow integrations.
+
+---
+
+### 86. Client Loading & Error States
+**What it does:** Contextual loading messages that explain what's happening ("Calculating your traffic value...", "Loading approvals...") instead of generic spinners. Type-specific error states with recovery actions (retry buttons, network error guidance, permission explanations). Consistent visual design across all client-facing components.
+
+**Agency value:** More professional appearance reduces support burden. Clear error messages help clients self-resolve common issues.
+
+**Client value:** Better user experience with informative feedback. Clear recovery paths instead of confusing error states.
+
+**Mutual:** Higher perceived quality and reduced frustration. Better error handling builds trust in the platform.
+
+---
+
 ### 21. Client Content Hub
 **What it does:** Clients can request content topics (from strategy recommendations or their own ideas), review AI-generated briefs, approve/decline, request changes, upgrade from brief to full post, and track production status with comments. **Inline price visibility**: brief and full post prices displayed directly on request buttons ("Get a Brief $49"), bundle savings callouts surfaced contextually. Prices pulled from Stripe config or workspace content pricing. **Page type selection**: clients choose a page type (blog, landing, service, location, product, pillar, resource) when requesting content — pre-filled from strategy recommendations when available.
 
@@ -385,7 +440,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 32. Unified Design System
-**What it does:** Consistent teal/zinc color palette across all admin and client dashboard components. All inline CSS variable references replaced with Tailwind utility classes. Unified card backgrounds, sidebar styling, workspace selector, and button treatments. **Accessibility pass**: minimum `text-[11px]` font size enforced (was `text-[8px]` in some places), improved contrast ratios, `aria-label` attributes on all icon-only buttons. **Selective type size bump**: `text-[11px]`/`text-xs` → 13.5px, `text-sm` → 15.5px for improved readability. **MetricRing** background tracks use muted score-colored fills (15% opacity) instead of flat gray. **Global cursor-pointer** rule ensures all interactive elements show pointer cursor. **SectionCard** headings bumped to `font-semibold text-zinc-200`, **PageHeader** titles to `text-zinc-100`. Theme-aware `scoreColor()` returns WCAG-compliant colors in light mode. **Standardized typography hierarchy** across all 8 client dashboard tabs: page titles use `text-xl font-semibold text-zinc-100`, subtitles use `text-sm text-zinc-500`, section headers use `text-sm font-semibold text-zinc-200`. Every tab (Overview, Search, Analytics, Site Health, Strategy, Content, Requests, Approvals) now has a consistent page-level title.
+**What it does:** Consistent teal/zinc color palette across all admin and client dashboard components. All inline CSS variable references replaced with Tailwind utility classes. Unified card backgrounds, sidebar styling, workspace selector, and button treatments. **Accessibility pass**: minimum `text-[11px]` font size enforced (was `text-[8px]` in some places), improved contrast ratios, `aria-label` attributes on all icon-only buttons. **Selective type size bump**: `text-[11px]`/`text-xs` → 13.5px, `text-sm` → 15.5px for improved readability. **MetricRing** background tracks use muted score-colored fills (15% opacity) instead of flat gray. **Global cursor-pointer** rule ensures all interactive elements show pointer cursor. **SectionCard** headings bumped to `font-semibold text-zinc-200`, **PageHeader** titles to `text-zinc-100`. Theme-aware `scoreColor()` returns WCAG-compliant colors in light mode. **Standardized typography hierarchy** across all 8 client dashboard tabs: page titles use `text-xl font-semibold text-zinc-100`, subtitles use `text-sm text-zinc-500`, section headers use `text-sm font-semibold text-zinc-200`. Every tab (Overview, Search, Analytics, Site Health, Strategy, Content, Requests, Approvals) now has a consistent page-level title. **LoadingState & ErrorState components**: Contextual loading messages ("Calculating traffic value...", "Loading approvals...") and type-specific error handling with recovery actions. **EmptyState standardization**: Consistent "No data available" messages with context-appropriate icons and actions across all components.
 
 **Agency value:** Professional, cohesive appearance across every screen. No visual inconsistencies that undermine credibility.
 
@@ -396,7 +451,7 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 33. Component Styleguide
-**What it does:** Dedicated `/styleguide` route showcasing every UI primitive and pattern in one place — color palette, typography scale, MetricRings, StatCards, CompactStatBar, Badges, EmptyState, TabBar, DateRangeSelector, DataList, PageHeader, SectionCard, Line/Area Charts (single + dual trend), ChartPointDetail popovers, data tables, modals/dialogs, toast notifications (global + inline), form inputs (text, search, textarea, select, segmented toggle), loading states (page/inline/button/typing), progress bars (segmented, severity, bulk), and sidebar navigation. Includes a dark/light theme toggle for visual verification.
+**What it does:** Dedicated `/styleguide` route showcasing every UI primitive and pattern in one place — color palette, typography scale, MetricRings, StatCards, CompactStatBar, Badges, EmptyState, LoadingState, ErrorState, TabBar, DateRangeSelector, DataList, PageHeader, SectionCard, Line/Area Charts (single + dual trend), ChartPointDetail popovers, data tables, modals/dialogs, toast notifications (global + inline), form inputs (text, search, textarea, select, segmented toggle), loading states (page/inline/button/typing), progress bars (segmented, severity, bulk), and sidebar navigation. Includes a dark/light theme toggle for visual verification. **New UI primitives**: LoadingState with contextual messages and size variants, ErrorState with type-specific handling (network/data/permission) and recovery actions, TableSkeleton for structured loading states.
 
 **Agency value:** Single reference page for all UI patterns — accelerates development, catches inconsistencies, and onboards new team members instantly.
 

@@ -324,8 +324,9 @@
           "source": "UI_UX_AUDIT §4",
           "est": "4-6h",
           "priority": "P0",
-          "notes": "114 ad-hoc empty state implementations across 50 files. Audit each, migrate to EmptyState component with context-appropriate icon/title/description/action. Create variants: NoData, NoSearchResults, NeedsConnection.",
-          "status": "pending"
+          "notes": "Shipped — Replaced generic 'No data' messages with consistent EmptyState component across GoogleAnalytics, DataList, ContentPerformance, MatrixBuilder, PageSpeedPanel, PageWeight. Added context-appropriate icons and actions. Fixed DataList test to match new 'No data available' text.",
+          "status": "done",
+          "shippedAt": "2026-03-24"
         },
         {
           "id": 501,
@@ -368,15 +369,65 @@
         },
         {
           "id": 505,
+          "title": "Client Dashboard Primary CTAs — Contextual next actions",
+          "source": "UI_UX_AUDIT §Client Dashboard",
+          "est": "2-3h",
+          "priority": "P0",
+          "notes": "Shipped — Added contextual CTA banners in Overview tab: 'Generate Brief' when strategy exists, 'View Issues' when health < 80, 'Find Keywords' when traffic low. Color-coded banners with direct navigation to relevant tabs.",
+          "status": "done",
+          "shippedAt": "2026-03-24"
+        },
+        {
+          "id": 506,
+          "title": "Client Empty State Enhancement — Setup guidance checklist",
+          "source": "UI_UX_AUDIT §Client Dashboard",
+          "est": "1-2h",
+          "priority": "P0",
+          "notes": "Shipped — Replaced generic empty state with setup checklist: Connect GSC, Connect GA4, Run First Audit. Added contextual guidance and clear next steps for new workspaces.",
+          "status": "done",
+          "shippedAt": "2026-03-24"
+        },
+        {
+          "id": 507,
+          "title": "Loading & Error State Components — Contextual messaging",
+          "source": "UI_UX_AUDIT §Technical Polish",
+          "est": "3-4h",
+          "priority": "P1",
+          "notes": "Shipped — Created LoadingState and ErrorState components with contextual messages. Updated ROIDashboard ('Calculating traffic value...') and ApprovalsTab ('Loading approvals...'). Added recovery actions and type-specific error handling.",
+          "status": "done",
+          "shippedAt": "2026-03-24"
+        },
+        {
+          "id": 508,
+          "title": "Admin Notification Center — Global notification aggregation",
+          "source": "UI_UX_AUDIT §Admin Navigation",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — Added NotificationBell to sidebar utility bar. Aggregates anomalies, requests, approvals across all workspaces. Real-time updates every 5 minutes with click-to-navigate functionality.",
+          "status": "done",
+          "shippedAt": "2026-03-24"
+        },
+        {
+          "id": 509,
+          "title": "Command Center Anomaly Banner — Global issue visibility",
+          "source": "UI_UX_AUDIT §Admin Navigation",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped — Added global anomaly banner at top of Command Center. Shows critical/warning anomalies across workspaces with severity-based styling and direct navigation to first affected workspace.",
+          "status": "done",
+          "shippedAt": "2026-03-24"
+        },
+        {
+          "id": 510,
           "title": "Anomaly Detection Dashboard — Expose ML-based traffic/ranking anomalies",
           "source": "UI_UX_AUDIT §Backend Capabilities",
           "est": "2-3h",
           "priority": "P2",
-          "notes": "Backend has anomaly-detection.ts with ML-based anomaly detection. Currently barely visible. Create 'Insights' tab or section showing detected anomalies with explanations: 'Your LCP improved 23% this week', 'Traffic drop detected on [page]', 'Ranking anomaly for [keyword]'.",
+          "notes": "Backend has anomaly-detection.ts with ML-based anomaly detection. Currently barely visible. Create 'Insights' tab or section showing detected anomalies with explanations: 'Your LPC improved 23% this week', 'Traffic drop detected on [page]', 'Ranking anomaly for [keyword]'.",
           "status": "pending"
         },
         {
-          "id": 506,
+          "id": 511,
           "title": "ROI Dashboard in Admin — Show organic traffic value per workspace",
           "source": "UI_UX_AUDIT §Backend Capabilities",
           "est": "2h",
@@ -385,7 +436,7 @@
           "status": "pending"
         },
         {
-          "id": 507,
+          "id": 512,
           "title": "Cannibalization Detection UI — Surface keyword conflicts in Strategy tab",
           "source": "UI_UX_AUDIT §Backend Capabilities",
           "est": "2-3h",
@@ -395,7 +446,7 @@
           "shippedAt": "2026-03-23"
         },
         {
-          "id": 508,
+          "id": 513,
           "title": "Content Decay Prominence — Promote decaying content alert to main view",
           "source": "UI_UX_AUDIT §Backend Capabilities",
           "est": "1-2h",

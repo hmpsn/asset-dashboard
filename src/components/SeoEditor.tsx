@@ -8,7 +8,7 @@ import type { FixContext } from '../App';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useSeoEditor } from '../hooks/admin';
-import { StatusBadge } from './ui/StatusBadge';
+import { StatusBadge, LoadingState } from './ui';
 import { PageEditRow } from './editor/PageEditRow';
 import { BulkOperations } from './editor/BulkOperations';
 import { ApprovalPanel } from './editor/ApprovalPanel';
@@ -59,6 +59,8 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const [sendingPage, setSendingPage] = useState<Set<string>>(new Set());
   const [sentPage, setSentPage] = useState<Set<string>>(new Set());
   const [variations, setVariations] = useState<Record<string, { field: string; options: string[] }>>({});
+  const [errorStates, setErrorStates] = useState<Record<string, { type: string; message: string }>>({});
+  const [previewExpanded, setPreviewExpanded] = useState<Set<string>>(new Set());
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
 
   // Bulk operations state
@@ -123,7 +125,20 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       });
       if (data.success === false) {
         console.error('Save failed:', data.error);
-        alert(`Failed to save SEO: ${data.error || 'Unknown error'}`);
+        setErrorStates(prev => ({ 
+          ...prev, 
+          [pageId]: { 
+            type: 'validation', 
+            message: `Failed to save SEO: ${data.error || 'Unknown error'}` 
+          } 
+        }));
+        setTimeout(() => {
+          setErrorStates(prev => { 
+            const next = { ...prev }; 
+            delete next[pageId]; 
+            return next; 
+          });
+        }, 5000);
         return;
       }
       setEdits(prev => ({ ...prev, [pageId]: { ...prev[pageId], dirty: false } }));
@@ -133,7 +148,20 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       setTimeout(() => setSaved(prev => { const n = new Set(prev); n.delete(pageId); return n; }), 2000);
     } catch (err) {
       console.error('Save failed:', err);
-      alert('Network error saving SEO fields');
+      setErrorStates(prev => ({ 
+        ...prev, 
+        [pageId]: { 
+          type: 'network', 
+          message: 'Network error saving SEO fields. Please check your connection and try again.' 
+        } 
+      }));
+      setTimeout(() => {
+        setErrorStates(prev => { 
+          const next = { ...prev }; 
+          delete next[pageId]; 
+          return next; 
+        });
+      }, 5000);
     } finally {
       setSaving(prev => { const n = new Set(prev); n.delete(pageId); return n; });
     }
@@ -397,6 +425,14 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     });
   };
 
+  const togglePreview = (pageId: string) => {
+    setPreviewExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(pageId)) next.delete(pageId); else next.add(pageId);
+      return next;
+    });
+  };
+
   const filteredPages = pages.filter(p => {
     if (!search) return true;
     const q = search.toLowerCase();
@@ -409,10 +445,10 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-3 text-zinc-500">
-        <Loader2 className="w-6 h-6 animate-spin" />
-        <p className="text-sm">Loading page metadata...</p>
-      </div>
+      <LoadingState 
+        message="Loading page metadata..."
+        size="lg"
+      />
     );
   }
 
@@ -472,9 +508,11 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       </div>
 
       {bulkFixing && (
-        <div className="flex items-center gap-2 px-4 py-3 bg-teal-500/10 border border-teal-500/30 rounded-lg text-sm text-teal-300">
-          <Loader2 className="w-4 h-4 animate-spin" /> AI is generating content for {missingTitles + missingDescs} pages...
-        </div>
+        <LoadingState 
+          message={`AI is generating content for ${missingTitles + missingDescs} pages...`}
+          size="md"
+          className="border border-teal-500/30"
+        />
       )}
       {bulkResults && (
         <div className="flex items-center gap-2 px-4 py-3 bg-green-500/10 border border-green-500/30 rounded-lg text-sm text-green-300">
@@ -587,6 +625,9 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
                 if (res.ok) refreshStates();
               } catch (err) { console.error('SeoEditor operation failed:', err); }
             } : undefined}
+            errorState={errorStates[page.id] || null}
+            showPreview={previewExpanded.has(page.id)}
+            onTogglePreview={togglePreview}
           />
         ))}
       </div>
