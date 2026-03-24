@@ -163,11 +163,23 @@ export type EmailEventType =
 // ── Template renderers ──
 
 function deriveLogoUrl(dashUrl?: string): string | undefined {
-  if (!dashUrl) return undefined;
-  try {
-    const u = new URL(dashUrl);
-    return `${u.origin}/hmpsn-studio-logo-wordmark-navy.png`;
-  } catch { return undefined; }
+  // Try to derive from dashboard URL first
+  if (dashUrl) {
+    try {
+      const u = new URL(dashUrl);
+      return `${u.origin}/hmpsn-studio-logo-wordmark-navy.png`;
+    } catch { /* continue to fallback */ }
+  }
+  // Fallback: use APP_URL if available
+  const appUrl = process.env.APP_URL;
+  if (appUrl) {
+    try {
+      const u = new URL(appUrl);
+      return `${u.origin}/hmpsn-studio-logo-wordmark-navy.png`;
+    } catch { /* continue to fallback */ }
+  }
+  // Final fallback: return undefined (text fallback will be used)
+  return undefined;
 }
 
 export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subject: string; html: string } {
