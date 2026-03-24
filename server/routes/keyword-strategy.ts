@@ -42,6 +42,7 @@ import { buildKnowledgeBase } from '../seo-context.js';
 import { updateWorkspace, getWorkspace, getTokenForSite } from '../workspaces.js';
 import { validate, z } from '../middleware/validate.js';
 import { createLogger } from '../logger.js';
+import db from '../db/index.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -149,10 +150,19 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
 
     // Sitemap = authoritative list of live pages
     // Filter out utility/thin/legal pages that don't need keyword strategy
-    const SKIP_PATHS = new Set(['/404', '/search', '/password', '/offline', '/thank-you', '/thanks', '/confirmation']);
-    const SKIP_PREFIXES = ['/tag/', '/category/', '/author/', '/page/'];
+    const SKIP_PATHS = new Set([
+      '/404', '/search', '/password', '/offline', '/thank-you', '/thanks', '/confirmation',
+      // Legal pages — no SEO value to optimize
+      '/privacy', '/privacy-policy', '/terms', '/terms-of-service', '/terms-and-conditions',
+      '/cookie-policy', '/cookies', '/disclaimer', '/legal', '/gdpr', '/ccpa',
+      '/acceptable-use', '/acceptable-use-policy', '/dmca', '/refund-policy', '/returns-policy',
+      // Utility pages
+      '/login', '/signup', '/register', '/reset-password', '/forgot-password',
+      '/unsubscribe', '/opt-out', '/maintenance', '/coming-soon', '/under-construction',
+    ]);
+    const SKIP_PREFIXES = ['/tag/', '/category/', '/author/', '/page/', '/legal/', '/policies/'];
     const SKIP_SUFFIXES = ['/rss', '/feed', '/rss.xml', '/feed.xml'];
-    const SKIP_PATTERNS = [/\/404$/i, /\/search$/i, /\/password$/i];
+    const SKIP_PATTERNS = [/\/404$/i, /\/search$/i, /\/password$/i, /\/privacy[-_]?policy/i, /\/terms[-_]?(of[-_]?service|and[-_]?conditions)?$/i, /\/cookie[-_]?policy/i, /\/legal$/i];
 
     const allPaths = new Set<string>();
     if (baseUrl) {
@@ -543,6 +553,23 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     // Keyword pool — declared outside try so enrichment code can access it after batching
     const keywordPool = new Map<string, { volume: number; difficulty: number; source: string }>();
 
+    // Business context section — declared outside try so topic clustering can access it
+    let businessSection = '';
+    if (businessContext) {
+      businessSection = `\nBUSINESS CONTEXT: ${businessContext}\n`;
+    }
+    const knowledgeBlock = buildKnowledgeBase(ws.id);
+    if (knowledgeBlock) {
+      businessSection += knowledgeBlock + '\n';
+    }
+
+    // Inject client-declined keywords so AI avoids them
+    const declinedKeywords = getDeclinedKeywords(ws.id);
+    if (declinedKeywords.length > 0) {
+      businessSection += `\nDECLINED KEYWORDS (the client has explicitly rejected these — do NOT suggest them or close variants as primaryKeyword, secondaryKeywords, or content gap targets):\n${declinedKeywords.map(k => `- "${k}"`).join('\n')}\n`;
+      log.info(`Injecting ${declinedKeywords.length} declined keywords into AI prompt`);
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let strategy: any;
     try {
@@ -554,16 +581,6 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     }
     log.info(`Splitting ${pageInfo.length} pages into ${batches.length} batches of ~${BATCH_SIZE}`);
     sendProgress('ai', `Analyzing pages in ${batches.length} parallel batches...`, 0.55);
-
-    let businessSection = '';
-    if (businessContext) {
-      businessSection = `\nBUSINESS CONTEXT: ${businessContext}\n`;
-    }
-    // Add knowledge base for deeper business understanding (services, expertise, differentiators)
-    const knowledgeBlock = buildKnowledgeBase(ws.id);
-    if (knowledgeBlock) {
-      businessSection += knowledgeBlock + '\n';
-    }
 
     // Build per-page GSC context lookup
     const gscByPath = new Map<string, Array<{ query: string; position: number; clicks: number; impressions: number }>>();
@@ -1192,11 +1209,18 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
       }
     }
 
-    // ── Cannibalization Detection ──────────────────────────────────
-    // Find keywords assigned to multiple pages (from keyword map) + GSC data showing multiple pages ranking
-    const cannibalization: Array<{ keyword: string; pages: Array<{ path: string; position?: number; impressions?: number; clicks?: number; source: 'keyword_map' | 'gsc' }>; severity: 'high' | 'medium' | 'low'; recommendation: string }> = [];
+    // ── Cannibalization Detection + Canonical Recommender ────────
+    // Find keywords assigned to multiple pages, recommend canonical URLs and specific actions
+    const cannibalization: Array<{
+      keyword: string;
+      pages: Array<{ path: string; position?: number; impressions?: number; clicks?: number; source: 'keyword_map' | 'gsc' }>;
+      severity: 'high' | 'medium' | 'low';
+      recommendation: string;
+      canonicalPath?: string;
+      canonicalUrl?: string;
+      action: 'canonical_tag' | 'redirect_301' | 'differentiate' | 'noindex';
+    }> = [];
     {
-      // Step 1: Check keyword map for duplicate primary keyword assignments
       const kwPages = new Map<string, Array<{ path: string; source: 'keyword_map' | 'gsc' }>>();
       for (const pm of strategy.pageMap) {
         const kw = pm.primaryKeyword.toLowerCase();
@@ -1204,7 +1228,6 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
         kwPages.get(kw)!.push({ path: pm.pagePath, source: 'keyword_map' });
       }
 
-      // Step 2: Check GSC data for multiple pages ranking for same query
       if (gscData.length > 0) {
         const gscByQuery = new Map<string, Array<{ page: string; position: number; impressions: number; clicks: number }>>();
         for (const r of gscData) {
@@ -1214,12 +1237,10 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
             gscByQuery.get(q)!.push({ page: new URL(r.page).pathname, position: r.position, impressions: r.impressions, clicks: r.clicks });
           } catch { /* skip */ }
         }
-        // Find queries with 2+ pages getting impressions
         for (const [query, pages] of gscByQuery) {
           if (pages.length >= 2 && pages.some(p => p.impressions > 10)) {
             const existing = kwPages.get(query);
             if (existing) {
-              // Merge GSC data into existing keyword map entries
               for (const p of pages) {
                 if (!existing.find(e => e.path === p.page)) {
                   existing.push({ path: p.page, source: 'gsc' });
@@ -1231,7 +1252,6 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
           }
         }
 
-        // Build cannibalization items
         for (const [kw, pages] of kwPages) {
           if (pages.length < 2) continue;
           const gscQueryData = gscByQuery.get(kw);
@@ -1248,97 +1268,159 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
           const severity = pages.length >= 3 ? 'high' as const
             : enrichedPages.filter(p => p.position && p.position < 20).length >= 2 ? 'high' as const
             : 'medium' as const;
-          const bestPage = enrichedPages.sort((a, b) => (a.position || 100) - (b.position || 100))[0];
+
+          // Rank pages by composite score: best position → most clicks → most impressions
+          const scored = [...enrichedPages].sort((a, b) => {
+            const posA = a.position ?? 100, posB = b.position ?? 100;
+            if (posA !== posB) return posA - posB;
+            const clickA = a.clicks ?? 0, clickB = b.clicks ?? 0;
+            if (clickA !== clickB) return clickB - clickA;
+            return (b.impressions ?? 0) - (a.impressions ?? 0);
+          });
+          const bestPage = scored[0];
+          const otherPages = scored.slice(1);
+          const canonicalPath = bestPage.path;
+          const canonicalUrl = baseUrl ? `${baseUrl}${canonicalPath === '/' ? '' : canonicalPath}` : undefined;
+
+          // Determine action type:
+          // - Both pages have traffic + similar position → differentiate content
+          // - Secondary page has no traffic → safe to redirect or noindex
+          // - Secondary page has some traffic → canonical tag (preserves the page)
+          const secondaryHasTraffic = otherPages.some(p => (p.clicks ?? 0) > 5);
+          const positionsClose = otherPages.some(p =>
+            p.position && bestPage.position && Math.abs(p.position - bestPage.position) < 10
+          );
+          let action: 'canonical_tag' | 'redirect_301' | 'differentiate' | 'noindex';
+          let recommendation: string;
+
+          if (positionsClose && secondaryHasTraffic) {
+            action = 'differentiate';
+            recommendation = `Both ${canonicalPath} and ${otherPages.map(p => p.path).join(', ')} rank competitively for "${kw}". Differentiate content: retarget ${otherPages.length === 1 ? otherPages[0].path : 'secondary pages'} to a more specific long-tail variant of this keyword.`;
+          } else if (secondaryHasTraffic) {
+            action = 'canonical_tag';
+            recommendation = `Add <link rel="canonical" href="${canonicalUrl || canonicalPath}"> to ${otherPages.map(p => p.path).join(', ')}. This tells Google that ${canonicalPath} is the primary page for "${kw}" while preserving the secondary pages for users.`;
+          } else if (otherPages.every(p => !p.clicks && (p.impressions ?? 0) < 50)) {
+            action = 'redirect_301';
+            recommendation = `301 redirect ${otherPages.map(p => p.path).join(', ')} → ${canonicalPath}. The secondary page(s) have no meaningful traffic and are diluting ranking authority for "${kw}".`;
+          } else {
+            action = 'canonical_tag';
+            recommendation = `Set ${canonicalPath} as the canonical URL for "${kw}". Add <link rel="canonical" href="${canonicalUrl || canonicalPath}"> to ${otherPages.map(p => p.path).join(', ')}.`;
+          }
+
           cannibalization.push({
             keyword: kw,
             pages: enrichedPages,
             severity,
-            recommendation: `Consolidate "${kw}" to ${bestPage.path} (${bestPage.position ? `pos #${Math.round(bestPage.position)}` : 'best match'}). Other pages should target different keywords or redirect.`,
+            recommendation,
+            canonicalPath,
+            canonicalUrl,
+            action,
           });
         }
       }
       if (cannibalization.length > 0) {
         cannibalization.sort((a, b) => (a.severity === 'high' ? 0 : 1) - (b.severity === 'high' ? 0 : 1));
-        log.info(`Found ${cannibalization.length} cannibalization issues (${cannibalization.filter(c => c.severity === 'high').length} high severity)`);
+        log.info(`Found ${cannibalization.length} cannibalization issues (${cannibalization.filter(c => c.severity === 'high').length} high, actions: ${cannibalization.map(c => c.action).join(', ')})`);
       }
     }
 
-    // ── Topical Authority Clustering ──────────────────────────────
-    // Group keywords from pool + domain data into topic clusters and measure coverage
+    // ── Topical Authority Clustering (AI-powered) ───────────────
+    // Use AI to semantically group keywords into business-relevant topic areas,
+    // then measure coverage against owned keywords
     const topicClusters: Array<{ topic: string; keywords: string[]; ownedCount: number; totalCount: number; coveragePercent: number; avgPosition?: number; topCompetitor?: string; topCompetitorCoverage?: number; gap: string[] }> = [];
-    if (semrushDomainData.length > 0 || keywordPool.size > 0) {
-      // Build owned keyword set (keywords we actually rank for)
-      const ownedKws = new Set(semrushDomainData.map(k => k.keyword.toLowerCase()));
+    if (keywordPool.size >= 10) {
+      try {
+        sendProgress('enrichment', 'Building topical authority clusters...', 0.92);
+        const ownedKws = new Set(semrushDomainData.map(k => k.keyword.toLowerCase()));
 
-      // Simple word-based clustering: group by the most common 2-word phrases
-      const phraseCount = new Map<string, string[]>();
-      const allPoolKws = [...keywordPool.keys()];
-      for (const kw of allPoolKws) {
-        const words = kw.split(/\s+/).filter((w: string) => w.length > 2);
-        // Generate 2-word phrases from keyword
-        for (let i = 0; i < words.length - 1; i++) {
-          const phrase = `${words[i]} ${words[i + 1]}`;
-          if (!phraseCount.has(phrase)) phraseCount.set(phrase, []);
-          phraseCount.get(phrase)!.push(kw);
-        }
-      }
+        // Top keywords by volume for AI clustering
+        const poolForClustering = [...keywordPool.entries()]
+          .sort((a, b) => b[1].volume - a[1].volume)
+          .slice(0, 150)
+          .map(([kw, m]) => `"${kw}" (${m.volume}/mo)`);
 
-      // Keep clusters with 4+ keywords (meaningful topic groups)
-      const significantPhrases = [...phraseCount.entries()]
-        .filter(([, kws]) => kws.length >= 4)
-        .sort((a, b) => b[1].length - a[1].length)
-        .slice(0, 15); // top 15 topic clusters
+        const clusterPrompt = `You are a topical authority analyst. Group these keywords into 5-10 BUSINESS-RELEVANT topic clusters.
+${businessSection}
+KEYWORD POOL (${poolForClustering.length} keywords with search volume):
+${poolForClustering.join(', ')}
 
-      const usedKws = new Set<string>();
-      for (const [topic, kws] of significantPhrases) {
-        // Deduplicate and avoid overlapping clusters
-        const uniqueKws = kws.filter(k => !usedKws.has(k));
-        if (uniqueKws.length < 3) continue;
-        for (const k of uniqueKws) usedKws.add(k);
+Return JSON array:
+[
+  {
+    "topic": "Short descriptive topic name (2-4 words, specific to THIS business)",
+    "keywords": ["keyword1", "keyword2"]
+  }
+]
 
-        const owned = uniqueKws.filter(k => ownedKws.has(k));
-        const gap = uniqueKws.filter(k => !ownedKws.has(k));
-        const coverage = Math.round((owned.length / uniqueKws.length) * 100);
+Rules:
+- Each cluster must represent a distinct business capability, service area, product category, or content pillar that THIS business actually serves
+- Topic names must be specific — NOT generic phrases like "how to", "what is", "best tools"
+- Use the BUSINESS CONTEXT above to determine what matters to this business. If no context, infer from the keywords themselves
+- Every keyword should appear in exactly ONE cluster. Skip keywords that don't fit any meaningful business topic
+- Clusters should have 3-15 keywords each
+- Order clusters by strategic importance to the business
+- Return ONLY valid JSON array, no markdown`;
 
-        // Calculate avg position for owned keywords
-        let avgPos: number | undefined;
-        if (owned.length > 0) {
-          const positions = owned.map(k => semrushDomainData.find(d => d.keyword.toLowerCase() === k)?.position).filter(Boolean) as number[];
-          if (positions.length > 0) avgPos = Math.round(positions.reduce((s, p) => s + p, 0) / positions.length);
-        }
+        const clusterRaw = await callStrategyAI([
+          { role: 'system', content: 'You are a topical authority analyst. Return valid JSON only.' },
+          { role: 'user', content: clusterPrompt },
+        ], 2000, 'topic-clusters');
 
-        // Find which competitor has best coverage in this cluster
-        let topComp: string | undefined;
-        let topCompCov: number | undefined;
-        if (competitorKeywordData.length > 0) {
-          const compCoverage = new Map<string, number>();
-          for (const ck of competitorKeywordData) {
-            if (uniqueKws.includes(ck.keyword.toLowerCase())) {
-              compCoverage.set(ck.domain, (compCoverage.get(ck.domain) || 0) + 1);
+        const aiClusters = JSON.parse(clusterRaw);
+        if (Array.isArray(aiClusters)) {
+          for (const cluster of aiClusters) {
+            if (!cluster.topic || !Array.isArray(cluster.keywords) || cluster.keywords.length < 3) continue;
+
+            const normalizedKws = cluster.keywords
+              .map((k: string) => k.toLowerCase().trim())
+              .filter((k: string) => keywordPool.has(k));
+            if (normalizedKws.length < 3) continue;
+
+            const owned = normalizedKws.filter((k: string) => ownedKws.has(k));
+            const gap = normalizedKws.filter((k: string) => !ownedKws.has(k));
+            const coverage = Math.round((owned.length / normalizedKws.length) * 100);
+
+            let avgPos: number | undefined;
+            if (owned.length > 0) {
+              const positions = owned.map((k: string) => semrushDomainData.find(d => d.keyword.toLowerCase() === k)?.position).filter(Boolean) as number[];
+              if (positions.length > 0) avgPos = Math.round(positions.reduce((s, p) => s + p, 0) / positions.length);
             }
-          }
-          const best = [...compCoverage.entries()].sort((a, b) => b[1] - a[1])[0];
-          if (best && best[1] > owned.length) {
-            topComp = best[0];
-            topCompCov = Math.round((best[1] / uniqueKws.length) * 100);
+
+            let topComp: string | undefined;
+            let topCompCov: number | undefined;
+            if (competitorKeywordData.length > 0) {
+              const compCoverage = new Map<string, number>();
+              for (const ck of competitorKeywordData) {
+                if (normalizedKws.includes(ck.keyword.toLowerCase())) {
+                  compCoverage.set(ck.domain, (compCoverage.get(ck.domain) || 0) + 1);
+                }
+              }
+              const best = [...compCoverage.entries()].sort((a, b) => b[1] - a[1])[0];
+              if (best && best[1] > owned.length) {
+                topComp = best[0];
+                topCompCov = Math.round((best[1] / normalizedKws.length) * 100);
+              }
+            }
+
+            topicClusters.push({
+              topic: cluster.topic,
+              keywords: normalizedKws,
+              ownedCount: owned.length,
+              totalCount: normalizedKws.length,
+              coveragePercent: coverage,
+              avgPosition: avgPos,
+              topCompetitor: topComp,
+              topCompetitorCoverage: topCompCov,
+              gap,
+            });
           }
         }
-
-        topicClusters.push({
-          topic,
-          keywords: uniqueKws,
-          ownedCount: owned.length,
-          totalCount: uniqueKws.length,
-          coveragePercent: coverage,
-          avgPosition: avgPos,
-          topCompetitor: topComp,
-          topCompetitorCoverage: topCompCov,
-          gap,
-        });
-      }
-      if (topicClusters.length > 0) {
-        topicClusters.sort((a, b) => a.coveragePercent - b.coveragePercent); // lowest coverage first = biggest opportunity
-        log.info(`Built ${topicClusters.length} topic clusters (lowest coverage: ${topicClusters[0].topic} at ${topicClusters[0].coveragePercent}%)`);
+        if (topicClusters.length > 0) {
+          topicClusters.sort((a, b) => a.coveragePercent - b.coveragePercent);
+          log.info(`Built ${topicClusters.length} AI topic clusters (lowest coverage: ${topicClusters[0].topic} at ${topicClusters[0].coveragePercent}%)`);
+        }
+      } catch (err) {
+        log.warn({ err }, 'AI topic clustering failed — skipping');
       }
     }
 
@@ -1476,6 +1558,99 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', validate(patchStrateg
   const updated = { ...(ws.keywordStrategy || {}), ...req.body, generatedAt: new Date().toISOString() };
   updateWorkspace(ws.id, { keywordStrategy: updated });
   res.json(updated);
+});
+
+// ── Keyword Feedback (approve/decline) ──────────────────────────
+
+/** Get all declined keywords for a workspace (used by strategy generator to exclude) */
+export function getDeclinedKeywords(workspaceId: string): string[] {
+  const rows = db.prepare('SELECT keyword FROM keyword_feedback WHERE workspace_id = ? AND status = ?').all(workspaceId, 'declined') as { keyword: string }[];
+  return rows.map(r => r.keyword);
+}
+
+/** Get all keyword feedback for a workspace */
+function getAllFeedback(workspaceId: string) {
+  return db.prepare('SELECT * FROM keyword_feedback WHERE workspace_id = ? ORDER BY updated_at DESC').all(workspaceId);
+}
+
+// Admin: list all feedback for workspace
+router.get('/api/webflow/keyword-feedback/:workspaceId', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  res.json(getAllFeedback(ws.id));
+});
+
+// Admin or client: submit feedback on a keyword
+const feedbackSchema = z.object({
+  keyword: z.string().min(1),
+  status: z.enum(['approved', 'declined']),
+  reason: z.string().optional(),
+  source: z.enum(['content_gap', 'page_map', 'opportunity', 'topic_cluster', 'keyword_gap']).optional(),
+  declinedBy: z.string().optional(),
+});
+
+router.post('/api/webflow/keyword-feedback/:workspaceId', validate(feedbackSchema), (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const { keyword, status, reason, source, declinedBy } = req.body;
+  const kw = keyword.toLowerCase().trim();
+
+  db.prepare(`
+    INSERT INTO keyword_feedback (workspace_id, keyword, status, reason, source, declined_by)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(workspace_id, keyword) DO UPDATE SET
+      status = excluded.status,
+      reason = excluded.reason,
+      declined_by = excluded.declined_by,
+      updated_at = datetime('now')
+  `).run(ws.id, kw, status, reason || null, source || 'content_gap', declinedBy || null);
+
+  log.info(`Keyword feedback: "${kw}" → ${status} for workspace ${ws.id}${reason ? ` (reason: ${reason})` : ''}`);
+  res.json({ keyword: kw, status, reason: reason || null });
+});
+
+// Bulk feedback (approve/decline multiple keywords at once)
+const bulkFeedbackSchema = z.object({
+  keywords: z.array(z.object({
+    keyword: z.string().min(1),
+    status: z.enum(['approved', 'declined']),
+    reason: z.string().optional(),
+    source: z.string().optional(),
+  })).min(1).max(100),
+  declinedBy: z.string().optional(),
+});
+
+router.post('/api/webflow/keyword-feedback/:workspaceId/bulk', validate(bulkFeedbackSchema), (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const stmt = db.prepare(`
+    INSERT INTO keyword_feedback (workspace_id, keyword, status, reason, source, declined_by)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(workspace_id, keyword) DO UPDATE SET
+      status = excluded.status,
+      reason = excluded.reason,
+      declined_by = excluded.declined_by,
+      updated_at = datetime('now')
+  `);
+
+  const insert = db.transaction((items: typeof req.body.keywords) => {
+    for (const item of items) {
+      stmt.run(ws.id, item.keyword.toLowerCase().trim(), item.status, item.reason || null, item.source || 'content_gap', req.body.declinedBy || null);
+    }
+  });
+  insert(req.body.keywords);
+  log.info(`Bulk keyword feedback: ${req.body.keywords.length} keywords for workspace ${ws.id}`);
+  res.json({ updated: req.body.keywords.length });
+});
+
+// Delete feedback (un-decline a keyword)
+router.delete('/api/webflow/keyword-feedback/:workspaceId/:keyword', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const kw = decodeURIComponent(req.params.keyword).toLowerCase().trim();
+  db.prepare('DELETE FROM keyword_feedback WHERE workspace_id = ? AND keyword = ?').run(ws.id, kw);
+  res.json({ deleted: kw });
 });
 
 export default router;

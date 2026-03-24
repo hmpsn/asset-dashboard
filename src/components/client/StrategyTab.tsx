@@ -1,8 +1,9 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Zap, FileText, Sparkles, Target, CheckCircle2,
   TrendingUp, TrendingDown, Minus, ChevronDown, Shield, BookOpen, Layers,
   MessageCircle, BarChart3, Eye, AlertTriangle, Award, MessageCircleQuestion,
+  ThumbsUp, ThumbsDown, Undo2, Ban, ArrowUp, ArrowDown, Plus, X, Briefcase,
 } from 'lucide-react';
 import { TierGate, EmptyState, type Tier } from '../ui';
 import type { ClientKeywordStrategy, ClientContentRequest } from './types';
@@ -43,9 +44,140 @@ interface StrategyTabProps {
 const kdColor = (kd?: number) => !kd ? 'text-zinc-500' : kd <= 30 ? 'text-green-400' : kd <= 60 ? 'text-amber-400' : 'text-red-400';
 const fmtNum = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString();
 
+export interface KeywordFeedback {
+  keyword: string;
+  status: 'approved' | 'declined';
+  reason?: string;
+  source?: string;
+  created_at?: string;
+}
+
 export function StrategyTab({ strategyData, requestedTopics, contentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal, contentPlanKeywords, onTabChange, workspaceId, setToast, onContentRequested }: StrategyTabProps) {
   const betaMode = useBetaMode();
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['content-opportunities', 'quick-wins', 'growth-opportunities', 'keyword-opportunities', 'target-keywords']));
+
+  // ── Keyword Feedback State ──
+  const [keywordFeedback, setKeywordFeedback] = useState<Map<string, 'approved' | 'declined'>>(new Map());
+  const [feedbackLoading, setFeedbackLoading] = useState<Set<string>>(new Set());
+  const [declineReason, setDeclineReason] = useState<{ keyword: string; source: string } | null>(null);
+  const [declineReasonText, setDeclineReasonText] = useState('');
+
+  // Load existing feedback on mount
+  useEffect(() => {
+    if (!workspaceId) return;
+    fetch(`/api/public/keyword-feedback/${workspaceId}`)
+      .then(r => r.ok ? r.json() : [])
+      .then((items: KeywordFeedback[]) => {
+        const map = new Map<string, 'approved' | 'declined'>();
+        for (const item of items) map.set(item.keyword, item.status);
+        setKeywordFeedback(map);
+      })
+      .catch(() => { /* silent */ });
+  }, [workspaceId]);
+
+  const submitFeedback = useCallback(async (keyword: string, status: 'approved' | 'declined', source: string, reason?: string) => {
+    if (!workspaceId) return;
+    const kw = keyword.toLowerCase().trim();
+    setFeedbackLoading(prev => new Set(prev).add(kw));
+    try {
+      await post(`/api/public/keyword-feedback/${workspaceId}`, { keyword: kw, status, source, reason });
+      setKeywordFeedback(prev => {
+        const next = new Map(prev);
+        next.set(kw, status);
+        return next;
+      });
+      setToast?.(status === 'approved' ? `"${keyword}" approved — we'll prioritize this keyword` : `"${keyword}" declined — it won't appear in future strategies`);
+    } catch {
+      setToast?.('Failed to save feedback');
+    } finally {
+      setFeedbackLoading(prev => { const next = new Set(prev); next.delete(kw); return next; });
+    }
+  }, [workspaceId, setToast]);
+
+  const undoFeedback = useCallback(async (keyword: string) => {
+    if (!workspaceId) return;
+    const kw = keyword.toLowerCase().trim();
+    setFeedbackLoading(prev => new Set(prev).add(kw));
+    try {
+      await fetch(`/api/public/keyword-feedback/${workspaceId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyword: kw, status: 'approved' }),
+      });
+      setKeywordFeedback(prev => { const next = new Map(prev); next.delete(kw); return next; });
+      setToast?.(`"${keyword}" restored — it will appear in future strategies`);
+    } catch {
+      setToast?.('Failed to undo');
+    } finally {
+      setFeedbackLoading(prev => { const next = new Set(prev); next.delete(kw); return next; });
+    }
+  }, [workspaceId, setToast]);
+
+  const getFeedbackStatus = (keyword: string) => keywordFeedback.get(keyword.toLowerCase().trim());
+  const isLoadingFeedback = (keyword: string) => feedbackLoading.has(keyword.toLowerCase().trim());
+
+  // ── Business Priorities State ──
+  const [priorities, setPriorities] = useState<{ text: string; category: string }[]>([]);
+  const [prioritiesLoaded, setPrioritiesLoaded] = useState(false);
+  const [newPriority, setNewPriority] = useState('');
+  const [newPriorityCategory, setNewPriorityCategory] = useState('growth');
+  const [savingPriorities, setSavingPriorities] = useState(false);
+
+  // ── Content Gap Voting State ──
+  const [gapVotes, setGapVotes] = useState<Record<string, 'up' | 'down'>>({});
+
+  // Load business priorities + gap votes on mount
+  useEffect(() => {
+    if (!workspaceId) return;
+    fetch(`/api/public/business-priorities/${workspaceId}`)
+      .then(r => r.ok ? r.json() : { priorities: [] })
+      .then((data: { priorities: { text: string; category: string }[] }) => {
+        setPriorities(data.priorities || []);
+        setPrioritiesLoaded(true);
+      })
+      .catch(() => setPrioritiesLoaded(true));
+
+    fetch(`/api/public/content-gap-votes/${workspaceId}`)
+      .then(r => r.ok ? r.json() : { votes: {} })
+      .then((data: { votes: Record<string, string> }) => {
+        const v: Record<string, 'up' | 'down'> = {};
+        for (const [k, val] of Object.entries(data.votes)) {
+          if (val === 'up' || val === 'down') v[k] = val;
+        }
+        setGapVotes(v);
+      })
+      .catch(() => { /* silent */ });
+  }, [workspaceId]);
+
+  const savePriorities = useCallback(async (newList: { text: string; category: string }[]) => {
+    if (!workspaceId) return;
+    setSavingPriorities(true);
+    try {
+      await post(`/api/public/business-priorities/${workspaceId}`, { priorities: newList });
+      setPriorities(newList);
+      setToast?.('Business priorities saved — they\'ll shape your next strategy');
+    } catch {
+      setToast?.('Failed to save priorities');
+    } finally {
+      setSavingPriorities(false);
+    }
+  }, [workspaceId, setToast]);
+
+  const voteOnGap = useCallback(async (keyword: string, vote: 'up' | 'down' | 'none') => {
+    if (!workspaceId) return;
+    const kw = keyword.toLowerCase().trim();
+    try {
+      await post(`/api/public/content-gap-vote/${workspaceId}`, { keyword: kw, vote });
+      setGapVotes(prev => {
+        const next = { ...prev };
+        if (vote === 'none') delete next[kw];
+        else next[kw] = vote;
+        return next;
+      });
+    } catch {
+      setToast?.('Failed to save vote');
+    }
+  }, [workspaceId, setToast]);
 
   // Refs for scroll-to-section
   const contentOpportunitiesRef = useRef<HTMLDivElement>(null);
@@ -238,6 +370,111 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         })()}
       </div>
 
+      {/* ── BUSINESS PRIORITIES (client driver's seat) ── */}
+      {workspaceId && prioritiesLoaded && (
+        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+          <button
+            onClick={() => toggleSection('business-priorities')}
+            className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-violet-500/20 flex items-center justify-center">
+                <Briefcase className="w-3.5 h-3.5 text-violet-400" />
+              </div>
+              <div className="text-left">
+                <div className="text-sm font-medium text-zinc-200">Your Business Priorities</div>
+                <div className="text-[11px] text-zinc-500">
+                  {priorities.length > 0
+                    ? `${priorities.length} priorities shaping your strategy`
+                    : 'Tell us what matters most to your business'}
+                </div>
+              </div>
+            </div>
+            <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${expandedSections.has('business-priorities') ? '' : '-rotate-90'}`} />
+          </button>
+
+          {expandedSections.has('business-priorities') && (
+            <div className="px-4 pb-4 border-t border-zinc-800/50">
+              <p className="text-[11px] text-zinc-400 mt-3 mb-3 leading-relaxed">
+                Share your business goals and priorities. These will be factored into your next strategy generation so recommendations align with what matters most to you.
+              </p>
+
+              {/* Existing priorities */}
+              {priorities.length > 0 && (
+                <div className="space-y-1.5 mb-3">
+                  {priorities.map((p, i) => (
+                    <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-950/50 border border-zinc-800/50 group">
+                      <span className={`text-[9px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                        p.category === 'growth' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                        p.category === 'brand' ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20' :
+                        p.category === 'product' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                        p.category === 'audience' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                        p.category === 'competitive' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                        'bg-zinc-700/50 text-zinc-400 border border-zinc-600/30'
+                      }`}>{p.category}</span>
+                      <span className="text-[11px] text-zinc-300 flex-1">{p.text}</span>
+                      <button
+                        onClick={() => {
+                          const next = priorities.filter((_, j) => j !== i);
+                          savePriorities(next);
+                        }}
+                        disabled={savingPriorities}
+                        className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-red-400 transition-all disabled:opacity-50"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add new priority */}
+              <div className="flex items-center gap-2">
+                <select
+                  value={newPriorityCategory}
+                  onChange={e => setNewPriorityCategory(e.target.value)}
+                  className="bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-[11px] text-zinc-300 focus:outline-none focus:border-violet-500"
+                >
+                  <option value="growth">Growth</option>
+                  <option value="brand">Brand</option>
+                  <option value="product">Product</option>
+                  <option value="audience">Audience</option>
+                  <option value="competitive">Competitive</option>
+                  <option value="other">Other</option>
+                </select>
+                <input
+                  value={newPriority}
+                  onChange={e => setNewPriority(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && newPriority.trim()) {
+                      savePriorities([...priorities, { text: newPriority.trim(), category: newPriorityCategory }]);
+                      setNewPriority('');
+                    }
+                  }}
+                  placeholder="e.g., We're launching a new product line in Q3..."
+                  className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-[11px] text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-violet-500"
+                />
+                <button
+                  onClick={() => {
+                    if (newPriority.trim()) {
+                      savePriorities([...priorities, { text: newPriority.trim(), category: newPriorityCategory }]);
+                      setNewPriority('');
+                    }
+                  }}
+                  disabled={!newPriority.trim() || savingPriorities || priorities.length >= 10}
+                  className="px-3 py-1.5 rounded-lg bg-violet-600/20 border border-violet-500/30 text-[11px] text-violet-300 font-medium hover:bg-violet-600/30 transition-colors flex items-center gap-1 disabled:opacity-40"
+                >
+                  <Plus className="w-3 h-3" /> Add
+                </button>
+              </div>
+              {priorities.length >= 10 && (
+                <p className="text-[10px] text-zinc-600 mt-1.5">Maximum 10 priorities reached</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── CONTENT OPPORTUNITIES (always expanded - primary action area) ── */}
       {strategyData.contentGaps && strategyData.contentGaps.length > 0 && (
       <div ref={contentOpportunitiesRef}>
@@ -280,7 +517,28 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   return (
                     <div key={i} className="px-3.5 py-2.5 rounded-lg bg-zinc-950/50 border border-zinc-800/80 hover:border-teal-500/30 transition-all group flex flex-col">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-semibold text-zinc-100 flex-1 min-w-0 mr-2 truncate">{gap.topic}</span>
+                        <div className="flex items-center gap-1.5 flex-1 min-w-0 mr-2">
+                          {/* Content gap voting */}
+                          {workspaceId && (
+                            <div className="flex flex-col items-center gap-px flex-shrink-0 -ml-1">
+                              <button
+                                onClick={() => voteOnGap(gap.targetKeyword, gapVotes[gap.targetKeyword.toLowerCase().trim()] === 'up' ? 'none' : 'up')}
+                                className={`p-0.5 rounded transition-colors ${gapVotes[gap.targetKeyword.toLowerCase().trim()] === 'up' ? 'text-teal-400 bg-teal-500/20' : 'text-zinc-600 hover:text-teal-400 hover:bg-teal-500/10'}`}
+                                title="Interested in this topic"
+                              >
+                                <ArrowUp className="w-3 h-3" />
+                              </button>
+                              <button
+                                onClick={() => voteOnGap(gap.targetKeyword, gapVotes[gap.targetKeyword.toLowerCase().trim()] === 'down' ? 'none' : 'down')}
+                                className={`p-0.5 rounded transition-colors ${gapVotes[gap.targetKeyword.toLowerCase().trim()] === 'down' ? 'text-red-400 bg-red-500/20' : 'text-zinc-600 hover:text-red-400 hover:bg-red-500/10'}`}
+                                title="Not interested in this topic"
+                              >
+                                <ArrowDown className="w-3 h-3" />
+                              </button>
+                            </div>
+                          )}
+                          <span className="text-xs font-semibold text-zinc-100 truncate">{gap.topic}</span>
+                        </div>
                         <div className="flex items-center gap-1.5 flex-shrink-0">
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20 font-medium">{pageTypeLabel}</span>
                           <span className="text-[10px] text-zinc-600 uppercase tracking-wider">{gap.intent}</span>
@@ -315,6 +573,44 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                         )}
                       </div>
                       <div className="text-[11px] text-zinc-500 leading-snug mb-2">{gap.rationale}</div>
+                      {/* Keyword feedback controls */}
+                      {workspaceId && (() => {
+                        const fbStatus = getFeedbackStatus(gap.targetKeyword);
+                        const loading = isLoadingFeedback(gap.targetKeyword);
+                        if (fbStatus === 'declined') return (
+                          <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg bg-red-500/5 border border-red-500/20">
+                            <Ban className="w-3 h-3 text-red-400 flex-shrink-0" />
+                            <span className="text-[10px] text-red-400 flex-1">Keyword declined — won't appear in future strategies</span>
+                            <button onClick={() => undoFeedback(gap.targetKeyword)} disabled={loading} className="text-[10px] text-zinc-400 hover:text-zinc-200 flex items-center gap-0.5 transition-colors">
+                              <Undo2 className="w-3 h-3" /> Undo
+                            </button>
+                          </div>
+                        );
+                        if (fbStatus === 'approved') return (
+                          <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                            <ThumbsUp className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+                            <span className="text-[10px] text-emerald-400">Keyword approved — prioritized in strategy</span>
+                          </div>
+                        );
+                        return (
+                          <div className="flex items-center gap-1.5 mb-2">
+                            <button
+                              onClick={() => submitFeedback(gap.targetKeyword, 'approved', 'content_gap')}
+                              disabled={loading}
+                              className="flex items-center gap-1 px-2 py-1 rounded text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+                            >
+                              <ThumbsUp className="w-3 h-3" /> Approve
+                            </button>
+                            <button
+                              onClick={() => { setDeclineReason({ keyword: gap.targetKeyword, source: 'content_gap' }); setDeclineReasonText(''); }}
+                              disabled={loading}
+                              className="flex items-center gap-1 px-2 py-1 rounded text-[10px] text-red-400 bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                            >
+                              <ThumbsDown className="w-3 h-3" /> Not relevant
+                            </button>
+                          </div>
+                        );
+                      })()}
                       <div className="flex items-center justify-between mt-auto">
                         <div className="flex items-center gap-1.5 min-w-0">
                           {keywordDiffers && <span className="text-[10px] text-teal-400/70 truncate max-w-[140px]">&ldquo;{gap.targetKeyword}&rdquo;</span>}
@@ -690,10 +986,98 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               workspaceId={workspaceId}
               setToast={setToast}
               onContentRequested={onContentRequested}
+              keywordFeedback={keywordFeedback}
+              onApproveKeyword={(kw, source) => submitFeedback(kw, 'approved', source)}
+              onDeclineKeyword={(kw, source) => { setDeclineReason({ keyword: kw, source }); setDeclineReasonText(''); }}
+              onUndoFeedback={undoFeedback}
+              isLoadingFeedback={isLoadingFeedback}
             />
           )}
         </div>
       </TierGate>
+
+      {/* ── DECLINED KEYWORDS SUMMARY ── */}
+      {(() => {
+        const declined = [...keywordFeedback.entries()].filter(([, s]) => s === 'declined');
+        if (declined.length === 0) return null;
+        return (
+          <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+            <button
+              onClick={() => toggleSection('declined-keywords')}
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-red-500/20 flex items-center justify-center">
+                  <Ban className="w-3.5 h-3.5 text-red-400" />
+                </div>
+                <div className="text-left">
+                  <div className="text-sm font-medium text-zinc-300">Declined Keywords</div>
+                  <div className="text-[11px] text-zinc-500">{declined.length} keywords excluded from future strategies</div>
+                </div>
+              </div>
+              <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${expandedSections.has('declined-keywords') ? '' : '-rotate-90'}`} />
+            </button>
+
+            {expandedSections.has('declined-keywords') && (
+              <div className="px-4 pb-4 border-t border-zinc-800/50">
+                <p className="text-[11px] text-zinc-500 mt-3 mb-3">These keywords won't appear in future strategy recommendations. Click restore to bring them back.</p>
+                <div className="flex flex-wrap gap-2">
+                  {declined.map(([kw]) => (
+                    <div key={kw} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-red-500/5 border border-red-500/20">
+                      <span className="text-[11px] text-red-300">{kw}</span>
+                      <button
+                        onClick={() => undoFeedback(kw)}
+                        disabled={isLoadingFeedback(kw)}
+                        className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-0.5 disabled:opacity-50"
+                      >
+                        <Undo2 className="w-3 h-3" /> Restore
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* ── Decline Reason Modal ── */}
+      {declineReason && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setDeclineReason(null)}>
+          <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-5 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold text-zinc-200 mb-1">Decline keyword</h3>
+            <p className="text-[11px] text-zinc-500 mb-3">
+              <span className="text-red-400 font-medium">&ldquo;{declineReason.keyword}&rdquo;</span> will be excluded from future strategy recommendations.
+            </p>
+            <label className="block text-[11px] text-zinc-400 mb-1">Why isn't this keyword relevant? <span className="text-zinc-600">(optional)</span></label>
+            <textarea
+              value={declineReasonText}
+              onChange={e => setDeclineReasonText(e.target.value)}
+              placeholder="e.g., We don't offer this service, too competitive, not our target audience..."
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-teal-500 resize-none h-20"
+              autoFocus
+            />
+            <div className="flex items-center justify-end gap-2 mt-3">
+              <button
+                onClick={() => setDeclineReason(null)}
+                className="px-3 py-1.5 text-[11px] text-zinc-400 hover:text-zinc-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  submitFeedback(declineReason.keyword, 'declined', declineReason.source, declineReasonText || undefined);
+                  setDeclineReason(null);
+                  setDeclineReasonText('');
+                }}
+                className="px-4 py-1.5 rounded-lg bg-red-600/20 border border-red-500/30 text-[11px] text-red-300 font-medium hover:bg-red-600/30 transition-colors flex items-center gap-1"
+              >
+                <ThumbsDown className="w-3 h-3" /> Decline Keyword
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

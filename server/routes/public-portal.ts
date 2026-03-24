@@ -14,6 +14,7 @@ import { getAllGscPages } from '../search-console.js';
 import { isStripeConfigured, listProducts } from '../stripe.js';
 import { updateWorkspace, getWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
+import db from '../db/index.js';
 
 const log = createLogger('public-portal');
 
@@ -302,6 +303,215 @@ router.get('/api/public/audit-traffic/:workspaceId', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
+});
+
+// ── Client Keyword Feedback ──────────────────────────
+
+// Client: list their keyword feedback
+router.get('/api/public/keyword-feedback/:workspaceId', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const rows = db.prepare('SELECT keyword, status, reason, source, created_at, updated_at FROM keyword_feedback WHERE workspace_id = ? ORDER BY updated_at DESC').all(ws.id);
+  res.json(rows);
+});
+
+// Client: submit keyword feedback (approve/decline)
+router.post('/api/public/keyword-feedback/:workspaceId', (req, res) => {
+  const wsId = req.params.workspaceId;
+  const sessionToken = req.cookies?.[`client_session_${wsId}`];
+  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
+  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
+  const clientPayload = clientUserToken ? verifyClientToken(clientUserToken) : null;
+  const hasClientUserAuth = clientPayload?.workspaceId === wsId;
+  if (!hasSession && !hasClientUserAuth) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  const ws = getWorkspace(wsId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const { keyword, status, reason, source } = req.body;
+  if (!keyword || !status || !['approved', 'declined'].includes(status)) {
+    return res.status(400).json({ error: 'keyword and status (approved|declined) required' });
+  }
+  const kw = keyword.toLowerCase().trim();
+  const declinedBy = clientPayload?.email || 'client';
+
+  db.prepare(`
+    INSERT INTO keyword_feedback (workspace_id, keyword, status, reason, source, declined_by)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(workspace_id, keyword) DO UPDATE SET
+      status = excluded.status,
+      reason = excluded.reason,
+      declined_by = excluded.declined_by,
+      updated_at = datetime('now')
+  `).run(ws.id, kw, status, reason || null, source || 'content_gap', declinedBy);
+
+  log.info(`Client keyword feedback: "${kw}" → ${status} for workspace ${ws.id}`);
+  res.json({ keyword: kw, status, reason: reason || null });
+});
+
+// Client: bulk feedback
+router.post('/api/public/keyword-feedback/:workspaceId/bulk', (req, res) => {
+  const wsId = req.params.workspaceId;
+  const sessionToken = req.cookies?.[`client_session_${wsId}`];
+  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
+  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
+  const clientPayload = clientUserToken ? verifyClientToken(clientUserToken) : null;
+  const hasClientUserAuth = clientPayload?.workspaceId === wsId;
+  if (!hasSession && !hasClientUserAuth) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  const ws = getWorkspace(wsId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const { keywords } = req.body;
+  if (!Array.isArray(keywords) || keywords.length === 0) {
+    return res.status(400).json({ error: 'keywords array required' });
+  }
+  const declinedBy = clientPayload?.email || 'client';
+
+  const stmt = db.prepare(`
+    INSERT INTO keyword_feedback (workspace_id, keyword, status, reason, source, declined_by)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(workspace_id, keyword) DO UPDATE SET
+      status = excluded.status,
+      reason = excluded.reason,
+      declined_by = excluded.declined_by,
+      updated_at = datetime('now')
+  `);
+
+  const insert = db.transaction((items: { keyword: string; status: string; reason?: string; source?: string }[]) => {
+    for (const item of items) {
+      if (!item.keyword || !['approved', 'declined'].includes(item.status)) continue;
+      stmt.run(ws.id, item.keyword.toLowerCase().trim(), item.status, item.reason || null, item.source || 'content_gap', declinedBy);
+    }
+  });
+  insert(keywords);
+  log.info(`Client bulk keyword feedback: ${keywords.length} keywords for workspace ${ws.id}`);
+  res.json({ updated: keywords.length });
+});
+
+// ── Client Business Priorities ──────────────────────────
+// Clients can share their business priorities which get injected into future strategy generations
+
+router.get('/api/public/business-priorities/:workspaceId', (req, res) => {
+  const wsId = req.params.workspaceId;
+  const ws = getWorkspace(wsId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  // Load from db
+  const row = db.prepare('SELECT priorities, updated_at FROM client_business_priorities WHERE workspace_id = ?').get(wsId) as { priorities: string; updated_at: string } | undefined;
+  if (!row) return res.json({ priorities: [], updatedAt: null });
+
+  try {
+    const priorities = JSON.parse(row.priorities);
+    res.json({ priorities, updatedAt: row.updated_at });
+  } catch {
+    res.json({ priorities: [], updatedAt: null });
+  }
+});
+
+router.post('/api/public/business-priorities/:workspaceId', (req, res) => {
+  const wsId = req.params.workspaceId;
+  const sessionToken = req.cookies?.[`client_session_${wsId}`];
+  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
+  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
+  const clientPayload = clientUserToken ? verifyClientToken(clientUserToken) : null;
+  const hasClientUserAuth = clientPayload?.workspaceId === wsId;
+  if (!hasSession && !hasClientUserAuth) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const ws = getWorkspace(wsId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const { priorities } = req.body as { priorities: { text: string; category: string }[] };
+  if (!Array.isArray(priorities)) return res.status(400).json({ error: 'priorities must be an array' });
+
+  // Validate and sanitize
+  const clean = priorities
+    .filter(p => p.text && typeof p.text === 'string')
+    .slice(0, 10) // Max 10 priorities
+    .map(p => ({
+      text: p.text.trim().slice(0, 500),
+      category: ['growth', 'brand', 'product', 'audience', 'competitive', 'other'].includes(p.category) ? p.category : 'other',
+    }));
+
+  // Upsert into db
+  db.prepare(`
+    INSERT INTO client_business_priorities (workspace_id, priorities, updated_at)
+    VALUES (?, ?, datetime('now'))
+    ON CONFLICT(workspace_id) DO UPDATE SET
+      priorities = excluded.priorities,
+      updated_at = datetime('now')
+  `).run(wsId, JSON.stringify(clean));
+
+  // Also inject a summary into workspace businessContext so it's available for AI prompts
+  if (clean.length > 0) {
+    const priorityText = clean.map(p => `[${p.category}] ${p.text}`).join('; ');
+    const existingContext = ws.keywordStrategy?.businessContext || '';
+    const marker = '\n--- CLIENT PRIORITIES ---\n';
+    const base = existingContext.includes(marker)
+      ? existingContext.split(marker)[0]
+      : existingContext;
+    const newContext = `${base}${marker}${priorityText}`;
+
+    if (ws.keywordStrategy) {
+      updateWorkspace(wsId, { keywordStrategy: { ...ws.keywordStrategy, businessContext: newContext } });
+    }
+  }
+
+  log.info(`Client submitted ${clean.length} business priorities for workspace ${wsId}`);
+  res.json({ saved: clean.length });
+});
+
+// ── Content Gap Voting ──────────────────────────
+// Clients can upvote content gaps to signal priority
+
+router.post('/api/public/content-gap-vote/:workspaceId', (req, res) => {
+  const wsId = req.params.workspaceId;
+  const sessionToken = req.cookies?.[`client_session_${wsId}`];
+  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
+  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
+  const clientPayload = clientUserToken ? verifyClientToken(clientUserToken) : null;
+  const hasClientUserAuth = clientPayload?.workspaceId === wsId;
+  if (!hasSession && !hasClientUserAuth) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const ws = getWorkspace(wsId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const { keyword, vote } = req.body as { keyword: string; vote: 'up' | 'down' | 'none' };
+  if (!keyword || !['up', 'down', 'none'].includes(vote)) {
+    return res.status(400).json({ error: 'keyword and vote (up/down/none) required' });
+  }
+
+  const kw = keyword.toLowerCase().trim();
+
+  if (vote === 'none') {
+    db.prepare('DELETE FROM content_gap_votes WHERE workspace_id = ? AND keyword = ?').run(wsId, kw);
+  } else {
+    db.prepare(`
+      INSERT INTO content_gap_votes (workspace_id, keyword, vote, voted_by, updated_at)
+      VALUES (?, ?, ?, ?, datetime('now'))
+      ON CONFLICT(workspace_id, keyword) DO UPDATE SET
+        vote = excluded.vote,
+        voted_by = excluded.voted_by,
+        updated_at = datetime('now')
+    `).run(wsId, kw, vote, clientPayload?.email || 'client');
+  }
+
+  res.json({ ok: true });
+});
+
+router.get('/api/public/content-gap-votes/:workspaceId', (req, res) => {
+  const wsId = req.params.workspaceId;
+  const ws = getWorkspace(wsId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const rows = db.prepare('SELECT keyword, vote FROM content_gap_votes WHERE workspace_id = ?').all(wsId) as { keyword: string; vote: string }[];
+  const votes: Record<string, string> = {};
+  for (const r of rows) votes[r.keyword] = r.vote;
+  res.json({ votes });
 });
 
 export default router;

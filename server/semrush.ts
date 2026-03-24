@@ -7,6 +7,7 @@ import { createLogger } from './logger.js';
 const log = createLogger('semrush');
 
 const SEMRUSH_API_BASE = 'https://api.semrush.com/';
+const SEMRUSH_BACKLINKS_API_BASE = 'https://api.semrush.com/analytics/v1/';
 const UPLOAD_ROOT = getUploadRoot();
 
 // ── SEMRush Credit Usage Tracking (persisted to disk) ──
@@ -156,6 +157,11 @@ export function isSemrushConfigured(): boolean {
   return !!getApiKey();
 }
 
+/** Strip protocol, paths, and www. prefix for SEMRush API queries */
+function cleanDomainForSemrush(domain: string): string {
+  return domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '');
+}
+
 // Parse SEMRush CSV response into array of objects
 function parseSemrushCSV(csv: string): Record<string, string>[] {
   const lines = csv.trim().split('\n');
@@ -279,7 +285,7 @@ export async function getDomainOrganicKeywords(
   const apiKey = getApiKey();
   if (!apiKey) throw new Error('SEMRUSH_API_KEY not configured');
 
-  const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  const cleanDomain = cleanDomainForSemrush(domain);
   const cacheKey = `domain_organic_${database}_${cleanDomain.replace(/\./g, '_')}_${limit}`;
   const cached = readCache<DomainKeyword[]>(workspaceId, cacheKey);
   if (cached) {
@@ -356,7 +362,7 @@ export async function getKeywordGap(
   // For each competitor, get their organic keywords and find ones client doesn't rank for
   // We use domain_organic for each competitor and cross-reference
   for (const comp of competitorDomains.slice(0, 3)) {
-    const cleanComp = comp.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    const cleanComp = cleanDomainForSemrush(comp);
     const cacheKey = `gap_${database}_${clientDomain.replace(/\./g, '_')}_vs_${cleanComp.replace(/\./g, '_')}_${limit}`;
     const cached = readCache<KeywordGap[]>(workspaceId, cacheKey);
 
@@ -587,7 +593,7 @@ export async function getDomainOverview(
   const apiKey = getApiKey();
   if (!apiKey) throw new Error('SEMRUSH_API_KEY not configured');
 
-  const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  const cleanDomain = cleanDomainForSemrush(domain);
   const cacheKey = `domain_overview_${database}_${cleanDomain.replace(/\./g, '_')}`;
   const cached = readCache<DomainOverview>(workspaceId, cacheKey, 48);
   if (cached) {
@@ -659,7 +665,7 @@ export async function getBacklinksOverview(
   const apiKey = getApiKey();
   if (!apiKey) throw new Error('SEMRUSH_API_KEY not configured');
 
-  const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  const cleanDomain = cleanDomainForSemrush(domain);
   const cacheKey = `backlinks_overview_${database}_${cleanDomain.replace(/\./g, '_')}`;
   const cached = readCache<BacklinksOverview>(workspaceId, cacheKey, 48);
   if (cached) {
@@ -675,7 +681,7 @@ export async function getBacklinksOverview(
     export_columns: 'total,domains_num,urls_num,ips_num,follows_num,nofollows_num,texts_num,images_num,forms_num,frames_num',
   });
 
-  const res = await fetch(`${SEMRUSH_API_BASE}?${params}`);
+  const res = await fetch(`${SEMRUSH_BACKLINKS_API_BASE}?${params}`);
   if (!res.ok) {
     const errText = await res.text();
     log.warn(`Backlinks overview error for "${cleanDomain}": ${errText.slice(0, 200)}`);
@@ -729,7 +735,7 @@ export async function getTopReferringDomains(
   const apiKey = getApiKey();
   if (!apiKey) throw new Error('SEMRUSH_API_KEY not configured');
 
-  const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  const cleanDomain = cleanDomainForSemrush(domain);
   const cacheKey = `backlinks_refdomains_${database}_${cleanDomain.replace(/\./g, '_')}_${limit}`;
   const cached = readCache<ReferringDomain[]>(workspaceId, cacheKey, 48);
   if (cached) {
@@ -747,7 +753,7 @@ export async function getTopReferringDomains(
     export_columns: 'domain_ascore,domain,backlinks_num,first_seen,last_seen',
   });
 
-  const res = await fetch(`${SEMRUSH_API_BASE}?${params}`);
+  const res = await fetch(`${SEMRUSH_BACKLINKS_API_BASE}?${params}`);
   if (!res.ok) {
     const errText = await res.text();
     log.warn(`Referring domains error for "${cleanDomain}": ${errText.slice(0, 200)}`);
@@ -814,7 +820,7 @@ export async function getOrganicCompetitors(
   const apiKey = getApiKey();
   if (!apiKey) throw new Error('SEMRUSH_API_KEY not configured');
 
-  const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  const cleanDomain = cleanDomainForSemrush(domain);
   const cacheKey = `organic_competitors_${database}_${cleanDomain.replace(/\./g, '_')}_${limit}`;
   const cached = readCache<OrganicCompetitor[]>(workspaceId, cacheKey, 72); // 72h cache
   if (cached) {

@@ -767,13 +767,35 @@ A brief value assessment of every feature in the platform, covering what it does
 
 ---
 
+### 68. Client Keyword Feedback System
+**What it does:** Clients can approve or decline keywords directly from the Strategy tab. Declined keywords are stored in an AI memory bank — future strategy generations automatically exclude them. Approve/decline controls appear on content gap cards, page keyword map entries, and keyword opportunity pills. A "Declined Keywords" summary section shows all excluded keywords with one-click restore. Decline modal collects optional reasons. Page filtering also expanded to exclude legal pages, 404s, and utility pages from all recommendations.
+
+**Agency value:** Clients actively curate their keyword strategy instead of passively receiving it. Declined keywords never resurface, eliminating repeated "we don't want this" conversations. Optional decline reasons provide insight into client thinking.
+
+**Client value:** Direct control over which keywords shape the strategy. "Not relevant" button immediately removes keywords they don't care about. Approved keywords get prioritized. Feels like an active participant, not a recipient.
+
+**Mutual:** Strategy alignment happens asynchronously — no meeting required to say "we don't do that service." AI learns from client preferences over time.
+
+---
+
+### 69. Client Strategy Participation (Business Priorities + Content Gap Voting)
+**What it does:** Two new client-facing features in the Strategy tab: (1) **Business Priorities** — clients can add categorized business goals (growth, brand, product, audience, competitive) that get injected into the AI prompt for future strategy generations; (2) **Content Gap Voting** — upvote/downvote arrows on every content gap card let clients signal which topics matter most. Priorities stored in SQLite, votes tracked per-workspace per-keyword.
+
+**Agency value:** Client priorities are captured in a structured format that directly feeds AI strategy generation — no more "what did they say they wanted?" guessing. Gap votes create a natural prioritization signal for content planning.
+
+**Client value:** Business context is baked into the strategy engine, not lost in email threads. Voting on content gaps feels like steering the strategy, not just reviewing it.
+
+**Mutual:** Puts clients in the driver's seat. Strategy becomes a collaborative, living document shaped by both agency expertise and client business knowledge.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
 |----------|:---:|---|
 | SEO & Technical | 12 | Audit, fix, and optimize faster than manual tools |
 | Analytics & Tracking | 5 | Unified data view replaces platform-hopping |
-| Content & Strategy | 6 | Strategy → brief → AI post generation → review → delivery pipeline |
+| Content & Strategy | 8 | Strategy → brief → AI post generation → review → delivery pipeline + client feedback + participation |
 | Client Communication | 8 | Structured workflows + automated reports + expanded notifications + feedback widget |
 | Client Self-Service | 10 | 24/7 data access, onboarding, plans, cart, order tracking |
 | AI & Intelligence | 5 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine + context completeness |
@@ -784,7 +806,7 @@ A brief value assessment of every feature in the platform, covering what it does
 | Data Architecture | 3 | PageEditState model, cross-store writes, activity feed for client actions |
 | Architecture | 2 | Server refactor (56 route modules + 3 shared modules + server module splits), frontend component decomposition (11 extracted directories) |
 
-**65 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**67 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
 ---
 
@@ -1949,13 +1971,13 @@ Current feature count: **174**. Last updated: March 2026 (schema integration spr
 **What it does:** Adds three new data enrichments to the keyword strategy: (1) **Question Keywords** — fetches question-based search queries via SEMRush `phrase_questions` API (full mode only), injected into AI context as FAQ/AEO targeting opportunities. Top 5 seed keywords × 10 questions each. Cached 24h. Question keywords attached to relevant content gaps. (2) **Keyword Trend Direction** — parses 12-month volume trend from SEMRush `Td` field on domain organic keywords, computes `rising`/`declining`/`stable` (±15% threshold, comparing avg of first 3 vs last 3 months). Enriched onto content gaps. UI badges: green ↑ Rising, red ↓ Declining, gray — Stable. (3) **SERP Feature Targeting** — parses SEMRush `Fk` field (comma-separated SERP feature codes) into human-readable labels. Maps 18 feature types (featured_snippet, people_also_ask, video, local_pack, etc.). Content gaps badged with "Featured Snippet" (yellow) and "PAA" (cyan) when present. Both admin and client views show the new badges.
 **Files:** `server/semrush.ts` (`getQuestionKeywords()`, `trendDirection()`, `parseSerpFeatures()`, `hasSerpOpportunity()`, `QuestionKeyword` interface, `SERP_FEATURE_MAP`, `Td`/`Fk` on `DomainKeyword`), `server/routes/keyword-strategy.ts` (question keyword fetching, trend/SERP enrichment of content gaps, question keyword attachment), `shared/types/workspace.ts` (`trendDirection`, `serpFeatures`, `questionKeywords` on ContentGap, `questionKeywords` on KeywordStrategy), `src/components/strategy/ContentGaps.tsx` (trend/SERP/question badges), `src/components/client/StrategyTab.tsx` (trend/SERP badges), `src/components/client/types.ts` (updated ClientKeywordStrategy)
 
-**152. Topical Authority Clustering**
-**What it does:** Groups all keywords from the keyword pool into topic clusters using 2-word phrase frequency analysis, then measures site coverage per cluster. For each cluster: counts owned keywords (those the site ranks for in SEMRush), calculates coverage percentage, computes average position, identifies top competitor coverage, and lists gap keywords. Clusters sorted by lowest coverage first (biggest opportunity). Admin UI: new `TopicClusters` component with coverage bars (green ≥70%, amber ≥40%, red <40%), competitor alerts, and gap keyword pills. Up to 15 clusters, minimum 4 keywords per cluster.
-**Files:** `server/routes/keyword-strategy.ts` (topic clustering logic after strategy generation), `shared/types/workspace.ts` (`TopicCluster` interface, `topicClusters` on KeywordStrategy), `src/components/strategy/TopicClusters.tsx` (new component), `src/components/KeywordStrategy.tsx` (wiring), `src/components/client/types.ts` (updated type)
+**152. Topical Authority Clustering (AI-Powered)**
+**What it does:** Uses AI (GPT-4.1-mini via `callStrategyAI`) to semantically group keywords from the keyword pool into 5-10 business-relevant topic clusters, then measures site coverage per cluster. The AI prompt receives business context + knowledge base to ensure clusters align with actual business capabilities, service areas, and content pillars — not generic 2-word phrases. For each cluster: counts owned keywords (those the site ranks for in SEMRush), calculates coverage percentage, computes average position, identifies top competitor coverage, and lists gap keywords. Clusters sorted by lowest coverage first (biggest opportunity). Admin UI: `TopicClusters` component with coverage bars (green ≥70%, amber ≥40%, red <40%), competitor alerts, and gap keyword pills. Top 150 keywords by volume fed to AI. Gracefully skips if AI call fails. Requires ≥10 keywords in pool to activate.
+**Files:** `server/routes/keyword-strategy.ts` (AI topic clustering logic after strategy generation), `shared/types/workspace.ts` (`TopicCluster` interface, `topicClusters` on KeywordStrategy), `src/components/strategy/TopicClusters.tsx` (component), `src/components/KeywordStrategy.tsx` (wiring), `src/components/client/types.ts` (updated type)
 
-**153. Keyword Cannibalization Detection**
-**What it does:** Detects keyword cannibalization by cross-referencing the keyword map (primary keyword assignments) with GSC data (multiple pages ranking for same query). Two detection layers: (1) keyword map — flags when AI assigns the same primary keyword to 2+ pages; (2) GSC — identifies queries where 2+ pages receive >10 impressions. Merges both sources. Severity: `high` (3+ pages or 2 pages both in top 20), `medium` (2 pages). Each item includes per-page position, impressions, clicks, and data source. Auto-generates consolidation recommendation citing the best-performing page. Admin UI: new `CannibalizationAlert` component with severity badges, per-page metrics, source labels (GSC/map), and actionable recommendations.
-**Files:** `server/routes/keyword-strategy.ts` (cannibalization detection logic), `shared/types/workspace.ts` (`CannibalizationItem` interface, `cannibalization` on KeywordStrategy), `src/components/strategy/CannibalizationAlert.tsx` (new component), `src/components/KeywordStrategy.tsx` (wiring), `src/components/client/types.ts` (updated type)
+**153. Keyword Cannibalization Detection + Canonical Recommender**
+**What it does:** Detects keyword cannibalization by cross-referencing the keyword map (primary keyword assignments) with GSC data (multiple pages ranking for same query). Two detection layers: (1) keyword map — flags when AI assigns the same primary keyword to 2+ pages; (2) GSC — identifies queries where 2+ pages receive >10 impressions. Merges both sources. Severity: `high` (3+ pages or 2 pages both in top 20), `medium` (2 pages). Each item includes per-page position, impressions, clicks, and data source. **Canonical Recommender:** Analyzes page metrics to determine the best canonical page and recommends one of four actions: `canonical_tag` (secondary pages have some traffic — add `<link rel="canonical">` to preserve them), `redirect_301` (secondary pages have no traffic — consolidate authority), `differentiate` (both pages rank competitively — retarget secondary to long-tail variant), or `noindex`. Recommendation includes the specific canonical URL and action-specific guidance. Admin UI: `CannibalizationAlert` component with severity badges, per-page metrics, source labels (GSC/map), action type badges (Canonical Tag/301 Redirect/Differentiate/Noindex with icons), canonical path display, and actionable recommendations.
+**Files:** `server/routes/keyword-strategy.ts` (cannibalization detection + canonical recommender logic), `shared/types/workspace.ts` (`CannibalizationItem` interface, `cannibalization` on KeywordStrategy), `src/components/strategy/CannibalizationAlert.tsx` (component with action badges), `src/components/KeywordStrategy.tsx` (wiring), `src/components/client/types.ts` (updated type)
 
 **150. AI Keyword Assignment Engine + Competitor-Enriched Strategy**
 **What it does:** Overhauls the keyword strategy generator from an AI keyword *inventor* to a keyword *assigner*. The AI now picks keywords from a verified pool of real search terms (SEMRush domain keywords, GSC queries, competitor keywords, keyword gaps, related keywords) instead of hallucinating them. Reduces SEMRush "ERROR 50 :: NOTHING FOUND" responses (wasted API credits on non-existent keywords). Key changes: (1) Keyword pool built from 5 data sources — SEMRush domain organic, GSC queries, competitor domain keywords, keyword gap analysis, and related keywords. (2) AI batch prompt rewritten to enforce pool assignment with `(invented)` suffix for any keywords not in pool. (3) Pre-enrichment: keywords from pool get real volume/difficulty immediately without extra SEMRush lookups. (4) SEMRush lookups capped at 30 and filtered to ≤5-word keywords. (5) Auto-discovery of organic competitors via SEMRush `domain_organic_organic` API when none provided. (6) Competitor keywords fetched in both quick and full modes. (7) Keyword gap analysis runs in both modes. (8) Related keywords in full mode only. (9) Master prompt enhanced: content gaps must cite competitorProof (which competitor ranks and at what position). (10) Auto-discovered competitors persisted to workspace. (11) Frontend: Auto-Discover button in strategy settings calls SEMRush API, saves results, pre-populates competitor input. Saved competitors load on mount. Content gap cards display orange competitor proof badges in both admin and client views.

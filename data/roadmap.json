@@ -389,8 +389,9 @@
           "source": "UI_UX_AUDIT §Backend Capabilities",
           "est": "2-3h",
           "priority": "P2",
-          "notes": "Backend has cannibalization-detection.ts. Add report to Strategy tab showing pages competing for same keywords. Severity badges: critical (same keyword, both ranking), warning (overlap detected).",
-          "status": "pending"
+          "notes": "Shipped — CannibalizationAlert component in Strategy tab with severity badges, per-page metrics, GSC/map source labels, and canonical recommender (action types: canonical_tag, redirect_301, differentiate, noindex). Feature #153.",
+          "status": "done",
+          "shippedAt": "2026-03-23"
         },
         {
           "id": 508,
@@ -2853,7 +2854,7 @@
           "source": "USER REQUEST",
           "est": "2h",
           "priority": "P0",
-          "notes": "Shipped — Groups keyword pool into topic clusters via 2-word phrase frequency. Coverage bars (owned/total), avg position, competitor coverage alerts, gap keyword pills. Up to 15 clusters, min 4 keywords each. Sorted by lowest coverage = biggest opportunity.",
+          "notes": "Shipped — v2: AI-powered clustering via callStrategyAI (replaced mechanical 2-word phrase approach). Business context + knowledge base injected so clusters align with actual service areas and content pillars. 5-10 clusters, min 3 keywords each. Coverage bars, avg position, competitor alerts, gap pills.",
           "status": "done",
           "shippedAt": "2026-03-23"
         },
@@ -2863,7 +2864,7 @@
           "source": "USER REQUEST",
           "est": "2h",
           "priority": "P0",
-          "notes": "Shipped — Cross-references keyword map + GSC data to detect multiple pages competing for same keyword. Severity scoring (high: 3+ pages or 2 in top 20). Per-page position, impressions, clicks, source labels. Auto-generates consolidation recommendations.",
+          "notes": "Shipped — v2: Canonical Recommender added. Cross-references keyword map + GSC data. Severity scoring. Now recommends specific action per conflict: canonical_tag, redirect_301, differentiate, or noindex based on page metrics. Includes canonical URL and action-specific guidance. UI shows action type badges with icons.",
           "status": "done",
           "shippedAt": "2026-03-23"
         },
@@ -2893,6 +2894,42 @@
           "priority": "P2",
           "notes": "Future — Use SEMRush url_organic API to get per-page keyword data instead of domain-level. More precise keyword assignments for individual pages.",
           "status": "pending"
+        },
+        {
+          "id": 323,
+          "title": "Client keyword feedback system (approve/decline)",
+          "source": "USER REQUEST",
+          "est": "4h",
+          "priority": "P0",
+          "notes": "Shipped — Clients approve/decline keywords from Strategy tab. Declined keywords stored in AI memory bank, excluded from future strategy generations. Approve/decline on content gaps + page keyword map. Decline modal with optional reason. Declined Keywords summary section with restore. Migration 020.",
+          "status": "done"
+        },
+        {
+          "id": 324,
+          "title": "Filter legal pages, 404s, utility pages from strategy",
+          "source": "USER REQUEST",
+          "est": "30m",
+          "priority": "P0",
+          "notes": "Shipped — Expanded SKIP_PATHS, SKIP_PREFIXES, SKIP_PATTERNS in keyword-strategy.ts to exclude /privacy, /terms, /legal, /cookie-policy, /login, /signup, /maintenance, /coming-soon and more.",
+          "status": "done"
+        },
+        {
+          "id": 325,
+          "title": "Client business priorities input",
+          "source": "USER REQUEST",
+          "est": "3h",
+          "priority": "P0",
+          "notes": "Shipped — Clients add categorized business goals (growth/brand/product/audience/competitive) from Strategy tab. Stored in SQLite, injected into workspace businessContext for AI prompt. Migration 021.",
+          "status": "done"
+        },
+        {
+          "id": 326,
+          "title": "Content gap voting (upvote/downvote)",
+          "source": "USER REQUEST",
+          "est": "2h",
+          "priority": "P0",
+          "notes": "Shipped — Upvote/downvote arrows on content gap cards. Votes stored per-workspace per-keyword in SQLite. Signals topic priority to agency. Migration 021.",
+          "status": "done"
         }
       ]
     }

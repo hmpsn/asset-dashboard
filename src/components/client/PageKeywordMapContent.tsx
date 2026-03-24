@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { ArrowUpRight, ArrowDownRight, Minus, Layers, MessageCircle, ChevronDown, Search } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Minus, Layers, MessageCircle, ChevronDown, Search, ThumbsUp, ThumbsDown, Ban, Undo2 } from 'lucide-react';
 import { post } from '../../api';
 
 interface GscKeyword {
@@ -31,6 +31,11 @@ interface PageKeywordMapContentProps {
   workspaceId?: string;
   setToast?: (msg: string) => void;
   onContentRequested?: () => void;
+  keywordFeedback?: Map<string, 'approved' | 'declined'>;
+  onApproveKeyword?: (keyword: string, source: string) => void;
+  onDeclineKeyword?: (keyword: string, source: string) => void;
+  onUndoFeedback?: (keyword: string) => void;
+  isLoadingFeedback?: (keyword: string) => boolean;
 }
 
 type FilterTab = 'all' | 'ranking' | 'opportunities' | 'stagnant' | 'falling';
@@ -63,7 +68,7 @@ function positionColor(pos: number): string {
   return 'text-zinc-500';
 }
 
-export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onContentRequested }: PageKeywordMapContentProps) {
+export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onContentRequested, keywordFeedback, onApproveKeyword, onDeclineKeyword, onUndoFeedback, isLoadingFeedback }: PageKeywordMapContentProps) {
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['Blog', 'Services']));
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
@@ -237,6 +242,13 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                                     Unvalidated
                                   </span>
                                 )}
+                                {/* Inline feedback badge */}
+                                {keywordFeedback?.get(page.primaryKeyword.toLowerCase().trim()) === 'approved' && (
+                                  <span className="text-emerald-400 bg-emerald-500/10 px-1 py-px rounded border border-emerald-500/20 text-[9px] flex items-center gap-0.5"><ThumbsUp className="w-2.5 h-2.5" />Approved</span>
+                                )}
+                                {keywordFeedback?.get(page.primaryKeyword.toLowerCase().trim()) === 'declined' && (
+                                  <span className="text-red-400 bg-red-500/10 px-1 py-px rounded border border-red-500/20 text-[9px] flex items-center gap-0.5"><Ban className="w-2.5 h-2.5" />Declined</span>
+                                )}
                               </span>
                             )}
                             {kwCount > 0 && (
@@ -307,6 +319,49 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                                 )}
                               </div>
                             )}
+
+                            {/* Keyword feedback controls */}
+                            {page.primaryKeyword && onApproveKeyword && onDeclineKeyword && (() => {
+                              const kw = page.primaryKeyword!;
+                              const fbStatus = keywordFeedback?.get(kw.toLowerCase().trim());
+                              const loading = isLoadingFeedback?.(kw) ?? false;
+                              if (fbStatus === 'declined') return (
+                                <div className="flex items-center gap-2 mt-2 px-2 py-1.5 rounded-lg bg-red-500/5 border border-red-500/20">
+                                  <Ban className="w-3 h-3 text-red-400 flex-shrink-0" />
+                                  <span className="text-[10px] text-red-400 flex-1">Declined — excluded from future strategies</span>
+                                  {onUndoFeedback && (
+                                    <button onClick={() => onUndoFeedback(kw)} disabled={loading} className="text-[10px] text-zinc-400 hover:text-zinc-200 flex items-center gap-0.5 transition-colors disabled:opacity-50">
+                                      <Undo2 className="w-3 h-3" /> Restore
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                              if (fbStatus === 'approved') return (
+                                <div className="flex items-center gap-2 mt-2 px-2 py-1.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                                  <ThumbsUp className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+                                  <span className="text-[10px] text-emerald-400">Approved — prioritized in strategy</span>
+                                </div>
+                              );
+                              return (
+                                <div className="flex items-center gap-1.5 mt-2">
+                                  <span className="text-[10px] text-zinc-500 mr-1">Is this keyword relevant?</span>
+                                  <button
+                                    onClick={() => onApproveKeyword(kw, 'page_map')}
+                                    disabled={loading}
+                                    className="flex items-center gap-1 px-2 py-1 rounded text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+                                  >
+                                    <ThumbsUp className="w-3 h-3" /> Yes
+                                  </button>
+                                  <button
+                                    onClick={() => onDeclineKeyword(kw, 'page_map')}
+                                    disabled={loading}
+                                    className="flex items-center gap-1 px-2 py-1 rounded text-[10px] text-red-400 bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                                  >
+                                    <ThumbsDown className="w-3 h-3" /> Not relevant
+                                  </button>
+                                </div>
+                              );
+                            })()}
 
                             {/* Action for Opportunities */}
                             {isOpportunity && workspaceId && (

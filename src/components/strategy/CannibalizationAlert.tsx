@@ -1,10 +1,13 @@
-import { AlertTriangle, Copy } from 'lucide-react';
+import { AlertTriangle, Copy, Link2, ArrowRight, GitBranch, EyeOff } from 'lucide-react';
 
 interface CannibalizationItem {
   keyword: string;
   pages: { path: string; position?: number; impressions?: number; clicks?: number; source: 'keyword_map' | 'gsc' }[];
   severity: 'high' | 'medium' | 'low';
   recommendation: string;
+  canonicalPath?: string;
+  canonicalUrl?: string;
+  action?: 'canonical_tag' | 'redirect_301' | 'differentiate' | 'noindex';
 }
 
 export interface CannibalizationAlertProps {
@@ -15,6 +18,16 @@ const sevColor = (sev: string) =>
   sev === 'high' ? 'text-red-400 bg-red-500/10 border-red-500/20'
   : sev === 'medium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
   : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
+
+const actionLabel = (action?: string) => {
+  switch (action) {
+    case 'canonical_tag': return { label: 'Canonical Tag', icon: Link2, color: 'text-blue-400 bg-blue-500/10' };
+    case 'redirect_301': return { label: '301 Redirect', icon: ArrowRight, color: 'text-orange-400 bg-orange-500/10' };
+    case 'differentiate': return { label: 'Differentiate', icon: GitBranch, color: 'text-purple-400 bg-purple-500/10' };
+    case 'noindex': return { label: 'Noindex', icon: EyeOff, color: 'text-zinc-400 bg-zinc-700/30' };
+    default: return null;
+  }
+};
 
 export function CannibalizationAlert({ items }: CannibalizationAlertProps) {
   if (items.length === 0) return null;
@@ -55,7 +68,19 @@ export function CannibalizationAlert({ items }: CannibalizationAlertProps) {
                 </div>
               ))}
             </div>
-            <div className="flex items-start gap-1 mt-1.5">
+            {item.action && (() => {
+              const a = actionLabel(item.action);
+              if (!a) return null;
+              const Icon = a.icon;
+              return (
+                <div className={`flex items-center gap-1 mt-1.5 px-1.5 py-0.5 rounded text-[10px] font-medium ${a.color} w-fit`}>
+                  <Icon className="w-3 h-3" />
+                  {a.label}
+                  {item.canonicalPath && <span className="font-mono ml-1 opacity-70">→ {item.canonicalPath}</span>}
+                </div>
+              );
+            })()}
+            <div className="flex items-start gap-1 mt-1">
               <AlertTriangle className="w-3 h-3 text-amber-400 flex-shrink-0 mt-0.5" />
               <span className="text-[10px] text-amber-400">{item.recommendation}</span>
             </div>

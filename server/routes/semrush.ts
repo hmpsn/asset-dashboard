@@ -12,6 +12,9 @@ import {
 } from '../semrush.js';
 import { listWorkspaces, getWorkspace, updateWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
+import { getUploadRoot } from '../data-dir.js';
+import fs from 'fs';
+import path from 'path';
 
 const log = createLogger('semrush-routes');
 
@@ -24,7 +27,7 @@ router.get('/api/semrush/competitive-intel/:workspaceId', async (req, res) => {
   const ws = listWorkspaces().find(w => w.id === workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
-  const myDomain = (ws.liveDomain || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  const myDomain = (ws.liveDomain || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '');
   if (!myDomain) return res.status(400).json({ error: 'Workspace has no live domain configured' });
 
   try {
@@ -61,7 +64,7 @@ router.get('/api/semrush/discover-competitors/:workspaceId', async (req, res) =>
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
-  const myDomain = (ws.liveDomain || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  const myDomain = (ws.liveDomain || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '');
   if (!myDomain) return res.status(400).json({ error: 'Workspace has no live domain configured' });
 
   if (!isSemrushConfigured()) return res.status(400).json({ error: 'SEMRush API key not configured' });
@@ -112,6 +115,40 @@ router.post('/api/semrush/estimate', (req, res) => {
 router.delete('/api/semrush/cache/:workspaceId', (req, res) => {
   clearSemrushCache(req.params.workspaceId);
   res.json({ ok: true });
+});
+
+// --- Diagnostic: verify domain resolution + cache without calling SEMRush API ---
+router.get('/api/semrush/diagnose/:workspaceId', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const rawDomain = ws.liveDomain || '';
+  const cleanDomain = rawDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '');
+  const competitors = (ws.competitorDomains || []).map(d =>
+    d.replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '')
+  );
+
+  // Check cache directory for existing entries
+  const cacheDir = path.join(getUploadRoot(), ws.id, '.semrush-cache');
+  let cacheFiles: string[] = [];
+  try { cacheFiles = fs.readdirSync(cacheDir).sort(); } catch { /* no cache dir */ }
+
+  const domainOverviewKeys = cacheFiles.filter((f: string) => f.startsWith('domain_overview'));
+  const backlinkKeys = cacheFiles.filter((f: string) => f.startsWith('backlinks_'));
+
+  res.json({
+    configured: isSemrushConfigured(),
+    rawLiveDomain: rawDomain,
+    resolvedDomain: cleanDomain,
+    wwwStripped: rawDomain.includes('www.') && !cleanDomain.includes('www.'),
+    competitors,
+    cacheDir,
+    cacheFileCount: cacheFiles.length,
+    domainOverviewCacheKeys: domainOverviewKeys,
+    backlinkCacheKeys: backlinkKeys,
+    allCacheKeys: cacheFiles,
+    note: 'This endpoint makes ZERO SEMRush API calls. No credits used.',
+  });
 });
 
 export default router;

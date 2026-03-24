@@ -53,9 +53,9 @@ Every completed task — no matter how small — must include these steps:
 **hmpsn.studio** is an SEO/web analytics platform built with **React 19 + Vite 8 + TailwindCSS 4 + React Router DOM 7** (frontend) and **Express + TypeScript** (backend). It manages client websites via Webflow, Google Search Console, GA4, and SEMRush integrations.
 
 - **Routing** — **React Router DOM 7** (`src/routes.ts` defines `Page` + `ClientTab` types, `adminPath()` + `clientPath()` helpers). Admin: `/ws/:workspaceId/:tab?`, Client: `/client/:workspaceId/:tab?`, global tabs: `/settings`, `/roadmap`, `/prospect`, `/ai-usage`.
-- **API Client** — Typed fetch wrappers in `src/api/` (9 modules). All components import from `src/api/` — no raw `fetch()` calls in components. `ApiError` class with `.status` for error handling.
+- **API Client** — Typed fetch wrappers in `src/api/` (7 modules). All components import from `src/api/` — no raw `fetch()` calls in components. `ApiError` class with `.status` for error handling.
 - **Shared Types** — `shared/types/` (11 modules) shared between client and server. Canonical interfaces for workspace, analytics, content, payments, approvals, schema-plan, etc.
-- **Storage** — **SQLite** via `better-sqlite3` (WAL mode, foreign keys ON) at `DATA_BASE/dashboard.db`. 17 migrations merged to `main` — 90+ server modules use SQLite. See § 2a below.
+- **Storage** — **SQLite** via `better-sqlite3` (WAL mode, foreign keys ON) at `DATA_BASE/dashboard.db`. 19 migrations merged to `main` — 95+ server modules use SQLite. See § 2a below.
 - **AI** — OpenAI GPT-4.1/4.1-mini/4.1-nano via `server/openai-helpers.ts` (`callOpenAI`), Anthropic Claude via `server/anthropic-helpers.ts` (`callAnthropic`) for creative prose
 - **Payments** — Stripe Checkout (not Payment Intents). Config encrypted on disk (AES-256-GCM). Admin UI for keys + products.
 - **Auth** — Dual system: internal JWT (7-day, admin) + client JWT (24h, per-workspace). Legacy shared-password still supported. Turnstile CAPTCHA on client login/forgot-password (optional).
@@ -78,10 +78,10 @@ Every completed task — no matter how small — must include these steps:
 | File | Purpose | Notes |
 |------|---------|-------|
 | `index.ts` | **Server bootstrap** (~132 lines) | Thin entry point: Sentry init, run migrations, `createApp()`, HTTP server, WS init, start schedulers, graceful shutdown (flush email/AI/SEMRush, mark jobs interrupted, close DB). No route handlers. |
-| `app.ts` | **Express app factory** (~301 lines) | `createApp()`: helmet, CORS, cookie-parser, request logger, fingerprinting, Stripe webhook (raw body), JSON/static/SPA middleware, all route mounting, Sentry error handler. Extracted from index.ts for testability. |
+| `app.ts` | **Express app factory** (~335 lines) | `createApp()`: helmet, CORS, cookie-parser, request logger, fingerprinting, Stripe webhook (raw body), JSON/static/SPA middleware, all route mounting, Sentry error handler. Extracted from index.ts for testability. |
 | `websocket.ts` | **WebSocket server** (~130 lines) | `initWebSocket(server)`: connection handling, heartbeat, auth, workspace rooms, broadcast helpers. |
 | `startup.ts` | **Scheduler init** (~22 lines) | `startSchedulers()`: kicks off all background schedulers (churn, anomaly, trial reminders, backups, etc.). |
-| `routes/` | **62 Express Router files** | One file per domain: `auth.ts`, `webflow.ts`, `webflow-alt-text.ts`, `webflow-audit.ts`, `webflow-cms.ts`, `webflow-keywords.ts`, `webflow-organize.ts`, `webflow-pagespeed.ts`, `webflow-schema.ts`, `webflow-seo.ts`, `webflow-analysis.ts`, `aeo-review.ts`, `feedback.ts`, `public-feedback.ts`, `content-decay.ts`, `content-publish.ts`, `content-subscriptions.ts`, `content-templates.ts`, `content-matrices.ts`, `content-plan-review.ts`, `seo-change-tracker.ts`, `site-architecture.ts`, `backlinks.ts`, `brand-docs.ts`, `data-export.ts`, `revenue.ts`, `workspace-badges.ts`, `workspace-home.ts`, `keyword-strategy.ts`, `google.ts`, `health.ts`, `llms-txt.ts`, `rewrite-chat.ts`, etc. |
+| `routes/` | **63 Express Router files** | One file per domain: `auth.ts`, `webflow.ts`, `webflow-alt-text.ts`, `webflow-audit.ts`, `webflow-cms.ts`, `webflow-keywords.ts`, `webflow-organize.ts`, `webflow-pagespeed.ts`, `webflow-schema.ts`, `webflow-seo.ts`, `webflow-analysis.ts`, `aeo-review.ts`, `feedback.ts`, `public-feedback.ts`, `content-decay.ts`, `content-publish.ts`, `content-subscriptions.ts`, `content-templates.ts`, `content-matrices.ts`, `content-plan-review.ts`, `competitor-schema.ts`, `seo-change-tracker.ts`, `site-architecture.ts`, `backlinks.ts`, `brand-docs.ts`, `data-export.ts`, `revenue.ts`, `workspace-badges.ts`, `workspace-home.ts`, `keyword-strategy.ts`, `google.ts`, `health.ts`, `llms-txt.ts`, `rewrite-chat.ts`, etc. |
 | `helpers.ts` | Shared pure functions | `sanitizeString`, `validateEnum`, `parseDateRange`, `applySuppressionsToAudit`, `buildSchemaContext`, `getAuditTrafficForWorkspace`, `readEnvFile`, `writeEnvFile` |
 | `middleware.ts` | Shared middleware + auth (single source of truth) | Rate limiters, `signClientSession`/`verifyClientSession`, `signAdminToken`/`verifyAdminToken`, `upload` (multer), `moveUploadedFiles`, `IS_PROD`, `APP_PASSWORD` |
 | `middleware/` | **Extracted middleware modules** | `fingerprint.ts` (request fingerprinting), `request-logger.ts` (pino HTTP request logging), `turnstile.ts` (Cloudflare Turnstile CAPTCHA verification), `validate.ts` (Zod request body validation — `validate(schema)` middleware + re-exports `z`) |
@@ -103,11 +103,13 @@ Every completed task — no matter how small — must include these steps:
 | `performance-store.ts` | PageSpeed snapshot persistence | Stores PSI results over time |
 | `redirect-store.ts` | Redirect scan persistence | Stores redirect scan snapshots |
 | `schema-store.ts` | Schema snapshot + template + plan persistence | Stores schema snapshots, site templates (012), site plans (013) |
+| `schema-queue.ts` | Schema pre-generation queue | D7: queues and processes planned page schemas in background |
 | `schema-plan.ts` | Site-aware schema plan generation | AI assigns page roles + canonical entities. `generateSchemaPlan()`, `buildPlanContextForPage()` |
 | `site-architecture.ts` | Site architecture tree builder | `buildSiteArchitecture()` — merges Webflow pages, sitemap, strategy, matrices into unified tree. Schema coverage + priority queue endpoints. |
 | `content-matrices.ts` | Content matrix engine | Template-based content planning. `getSchemaTypesForTemplate()`, matrix CRUD, cell lifecycle |
 | `content-templates.ts` | Content template CRUD | Reusable content templates with variable schemas |
 | `keyword-recommendations.ts` | AI keyword recommendations | Auto-generated keyword suggestions per workspace |
+| `competitor-schema.ts` | Competitor schema intelligence | D4: analyze competitor structured data for schema improvement opportunities |
 | `cannibalization-detection.ts` | Keyword cannibalization detection | Identifies pages competing for same keywords |
 | `llms-txt-generator.ts` | LLMs.txt generator | Generates LLMs.txt file for AI crawler guidance |
 | `post-export-html.ts` | Post HTML export renderer | Branded HTML export for generated posts |
@@ -121,6 +123,7 @@ Every completed task — no matter how small — must include these steps:
 | `stripe-config.ts` | Encrypted on-disk Stripe config (AES-256-GCM) | Env vars as fallback |
 | `payments.ts` | Payment record CRUD (SQLite) | Per-workspace payment history |
 | `auth.ts` | JWT sign/verify (7-day), Express middleware | `requireAuth`, `requireRole`, `requireWorkspaceAccess`, `optionalAuth` |
+| `jwt-config.ts` | JWT secret configuration | Centralized JWT secret management, env var resolution |
 | `client-users.ts` | Client user model, per-workspace accounts | bcrypt, JWT (24h), CRUD |
 | `users.ts` | Internal user model (owner/admin/member) | bcrypt (12 rounds), SQLite persistence |
 | `openai-helpers.ts` | `callOpenAI` wrapper | Retry/backoff/timeout, `parseAIJson`, token tracking |
@@ -173,7 +176,7 @@ Every completed task — no matter how small — must include these steps:
 
 ### § 2a. SQLite Database (`server/db/`)
 
-**All 90+ server modules** now use SQLite via `better-sqlite3` (17 migrations merged).
+**All 95+ server modules** now use SQLite via `better-sqlite3` (19 migrations merged).
 
 | File | Purpose |
 |------|---------|
@@ -196,6 +199,8 @@ Every completed task — no matter how small — must include these steps:
 | `db/migrations/015-brief-keyword-tracking.sql` | Brief keyword tracking for content pipeline |
 | `db/migrations/016-content-matrices.sql` | `content_matrices`, `matrix_cells` tables for content planning |
 | `db/migrations/017-template-schema-types.sql` | `expectedSchemaTypes` on template→schema type mapping (D2) |
+| `db/migrations/018-pending-schemas.sql` | `pending_schemas` queue table for D7 schema pre-generation |
+| `db/migrations/019-cascade-workspace-delete.sql` | CASCADE workspace deletes + schema comments documenting column counts |
 
 **Key patterns (follow these when writing new DB code):**
 - **Lazy prepared statements:** `let _stmt: ... | null = null;` cached at module level
@@ -209,7 +214,7 @@ Every completed task — no matter how small — must include these steps:
 | File | Purpose | Notes |
 |------|---------|-------|
 | `routes.ts` | **Route definitions** | `Page` + `ClientTab` type unions, `adminPath()` + `clientPath()` helpers, `GLOBAL_TABS` set |
-| `api/` | **Typed API client** (9 modules) | `client.ts` (ApiError, get/post/patch/del/postForm), `analytics.ts`, `workspaces.ts`, `content.ts`, `seo.ts`, `payments.ts`, `auth.ts`, `misc.ts`, `index.ts` (barrel). All components import from here — no raw fetch. |
+| `api/` | **Typed API client** (7 modules) | `client.ts` (ApiError, get/post/patch/del/postForm), `analytics.ts`, `workspaces.ts`, `content.ts`, `seo.ts`, `misc.ts`, `index.ts` (barrel). All components import from here — no raw fetch. |
 | `App.tsx` | **BrowserRouter**, workspace selector, admin tabs (lazy-loaded) | Uses react-router-dom Routes/Route. Imports from `src/api/` and `src/routes.ts`. |
 | `components/ClientDashboard.tsx` | **Client portal shell** (~1,520 lines) | Login gate, shared state, tab routing, chat, Stripe modals. Tab rendering delegated to extracted components. |
 | `components/AdminChat.tsx` | Admin AI chat (purple accent) | Conversation memory + history |
@@ -241,12 +246,19 @@ Every completed task — no matter how small — must include these steps:
 | `components/settings/` | **WorkspaceSettings tab modules** | `ConnectionsTab.tsx` (integrations), `FeaturesTab.tsx` (feature toggles), `ClientDashboardTab.tsx` (client portal config, client users) |
 | `components/audit/` | **SeoAudit extracted modules** | `ScoreTrendChart.tsx`, `ActionItemsPanel.tsx`, `AuditHistory.tsx`, `AuditBatchActions.tsx`, `AuditFilters.tsx`, `AuditIssueRow.tsx`, `AuditReportExport.tsx`, `types.ts` (shared audit interfaces) |
 | `components/briefs/` | **ContentBriefs extracted modules** | `BriefDetail.tsx` (expanded brief view with all fields), `BriefGenerator.tsx` (brief generation form), `BriefList.tsx` (brief listing/status management), `RequestList.tsx` (content request queue) |
-| `components/schema/` | **SchemaSuggester extracted modules** | `CmsTemplatePanel.tsx` (CMS template schema UI), `BulkPublishPanel.tsx` (bulk schema publish), `PagePicker.tsx` (page selection for schema), `SchemaEditor.tsx` (inline schema editor), `SchemaPageCard.tsx` (per-page schema card) |
-| `components/strategy/` | **KeywordStrategy extracted modules** | `SeoCopyPanel.tsx` (SEO copy generation panel), `BacklinkProfile.tsx` (domain backlink overview), `CompetitiveIntel.tsx` (competitive intelligence hub), `ContentGaps.tsx` (content gap analysis), `KeywordGaps.tsx` (keyword gap panel), `LowHangingFruit.tsx` (quick-win keyword targets), `PageKeywordMap.tsx` (page-to-keyword mapping table), `QuickWins.tsx` (quick wins panel) |
+| `components/schema/` | **SchemaSuggester extracted modules** (7 files) | `CmsTemplatePanel.tsx`, `BulkPublishPanel.tsx`, `PagePicker.tsx`, `SchemaEditor.tsx`, `SchemaPageCard.tsx`, `SchemaPlanPanel.tsx` (plan admin panel), `SchemaWorkflowGuide.tsx` (in-app schema workflow guide) |
+| `components/strategy/` | **KeywordStrategy extracted modules** (10 files) | `SeoCopyPanel.tsx`, `BacklinkProfile.tsx`, `CompetitiveIntel.tsx`, `ContentGaps.tsx`, `KeywordGaps.tsx`, `LowHangingFruit.tsx`, `PageKeywordMap.tsx`, `QuickWins.tsx`, `CannibalizationAlert.tsx` (keyword cannibalization warnings), `TopicClusters.tsx` (topical cluster visualization) |
 | `components/assets/` | **AssetBrowser extracted modules** | `OrganizePreview.tsx` (asset organize preview), `AssetCard.tsx` (individual asset card), `AssetFilters.tsx` (asset filter controls), `BulkActions.tsx` (bulk asset operations) |
 | `components/editor/` | **SeoEditor extracted modules** | `ApprovalPanel.tsx` (approval workflow panel), `BulkOperations.tsx` (bulk SEO edit operations), `PageEditRow.tsx` (per-page edit row) |
 | `components/post-editor/` | **PostEditor extracted modules** | `PostPreview.tsx` (post HTML preview), `ReviewChecklist.tsx` (human-in-the-loop review), `SectionEditor.tsx` (per-section content editor), `VersionHistory.tsx` (post version history viewer) |
 | `components/workspace-home/` | **WorkspaceHome extracted modules** | `ActiveRequestsAnnotations.tsx`, `ActivityFeed.tsx`, `RankingsSnapshot.tsx`, `SeoWorkStatus.tsx`, `SeoChangeImpact.tsx`, `index.ts` (barrel) |
+| `components/CompetitorAnalysis.tsx` | Competitor analysis | SEMRush domain overview, keyword gaps, backlinks, competitor comparison |
+| `components/ContentPlanner.tsx` | Content planner | Matrix-based content planning with templates |
+| `components/ContentPipelineGuide.tsx` | Content pipeline guide | Step-by-step guide for content workflow |
+| `components/LlmsTxtGenerator.tsx` | LLMs.txt generator UI | Generate and manage LLMs.txt for AI crawler guidance |
+| `components/PageRewriteChat.tsx` | Page rewrite chat | AI-powered page content rewriting interface |
+| `components/PendingApprovals.tsx` | Pending approvals widget | Shows pending approval count + quick access |
+| `components/SiteArchitecture.tsx` | Site architecture viewer | Visual site tree, schema coverage, priority queue |
 | `components/AeoReview.tsx` | AEO page review | AI-powered per-page content change recommendations (lazy-loaded sub-tab in SeoAudit) |
 | `components/AnomalyAlerts.tsx` | Anomaly alert viewer | Displays traffic/ranking anomalies with severity badges |
 | `components/ContentDecay.tsx` | Content decay dashboard | Identifies declining pages, refresh recommendations |
@@ -261,10 +273,10 @@ Every completed task — no matter how small — must include these steps:
 | `components/LoginScreen.tsx` | Admin login UI | Setup flow + email/password |
 | `components/Styleguide.tsx` | Design system reference page | Color swatches, component demos |
 | `components/ui/` | **16 shared UI primitives** (14 components + 2 config files) | See § 4 below |
-| `components/client/` | **Client tab components** (29 files) | `types.ts`, `helpers.tsx`, `utils.ts`, `index.ts`, `OverviewTab.tsx`, `SearchTab.tsx`, `AnalyticsTab.tsx`, `PerformanceTab.tsx` (merged Search+Analytics), `StrategyTab.tsx`, `ContentTab.tsx`, `ApprovalsTab.tsx`, `RequestsTab.tsx`, `PlansTab.tsx`, `InboxTab.tsx` (composes Approvals+Requests+Content), `HealthTab.tsx`, `InsightsDigest.tsx`, `InsightsEngine.tsx`, `MonthlySummary.tsx`, `DataSnapshots.tsx`, `ROIDashboard.tsx`, `OrderStatus.tsx`, `FixRecommendations.tsx`, `SeoCart.tsx`, `useCart.tsx`, `OnboardingWizard.tsx`, `BetaContext.tsx` (beta mode feature flag), `ClientOnboardingQuestionnaire.tsx`, `FeedbackWidget.tsx`, `SeoGlossary.tsx` |
+| `components/client/` | **Client tab components** (32 files) | `types.ts`, `helpers.tsx`, `utils.ts`, `index.ts`, `OverviewTab.tsx`, `SearchTab.tsx`, `AnalyticsTab.tsx`, `PerformanceTab.tsx` (merged Search+Analytics), `StrategyTab.tsx`, `ContentTab.tsx`, `ContentPlanTab.tsx` (content plan matrix view), `ApprovalsTab.tsx`, `RequestsTab.tsx`, `PlansTab.tsx`, `InboxTab.tsx` (composes Approvals+Requests+Content), `HealthTab.tsx`, `InsightsDigest.tsx`, `InsightsEngine.tsx`, `MonthlySummary.tsx`, `DataSnapshots.tsx`, `ROIDashboard.tsx`, `OrderStatus.tsx`, `FixRecommendations.tsx`, `SeoCart.tsx`, `useCart.tsx`, `OnboardingWizard.tsx`, `BetaContext.tsx` (beta mode feature flag), `ClientOnboardingQuestionnaire.tsx`, `FeedbackWidget.tsx`, `SeoGlossary.tsx`, `MatrixProgressView.tsx` (content matrix progress), `PageKeywordMapContent.tsx` (keyword map client view), `SeoEducationTip.tsx` (contextual SEO tips) |
 | `components/shared/` | **Shared cross-dashboard components** | `RankTable.tsx` (position colors, history chart, rank change indicators) |
-| `lib/` | **Shared utilities** | `queryClient.ts` — React Query `QueryClient` singleton (60s staleTime, 5min gcTime, refetchOnWindowFocus) |
-| `hooks/` | **Shared React hooks** (15 files) | `useAuth.ts`, `useWebSocket.ts`, `useBackgroundTasks.tsx`, `useAuditSummary.ts` *(React Query)*, `useSearchData.ts`, `useGA4Overview.ts`, `usePageEditStates.ts` *(React Query)*, `useRecommendations.ts` *(React Query)*, `useWorkspaceEvents.ts`, `useChat.ts`, `useClientAuth.ts`, `useClientData.ts`, `useContentRequests.ts`, `usePayments.ts`, `useToast.ts` |
+| `lib/` | **Shared utilities** (2 files) | `queryClient.ts` — React Query `QueryClient` singleton (60s staleTime, 5min gcTime, refetchOnWindowFocus). `utils.ts` — shared formatting/helper utilities. |
+| `hooks/` | **Shared React hooks** (13 files) | `useAuth.ts`, `useWebSocket.ts`, `useBackgroundTasks.tsx`, `useAuditSummary.ts` *(React Query)*, `usePageEditStates.ts` *(React Query)*, `useRecommendations.ts` *(React Query)*, `useWorkspaceEvents.ts`, `useChat.ts`, `useClientAuth.ts`, `useClientData.ts`, `useContentRequests.ts`, `usePayments.ts`, `useToast.ts` |
 
 ### Shared (`shared/`)
 
@@ -415,20 +427,11 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 These pre-existing lint warnings are **not caused by current work** and should be ignored to avoid unproductive loops:
 
 **`ClientDashboard.tsx`:**
-- `'requestingTopic' is declared but its value is never read` (line ~57)
-- `'searchDevices' is declared but its value is never read` (line ~96)
-- `'upgradingReqId' is assigned a value but never used` (line ~147)
-- `React Hook useEffect has missing dependencies` (lines ~225, ~241)
-
-**`KeywordStrategy.tsx`:**
-- `'Wand2' is defined but never used`
-- `'Copy' is defined but never used`
-- `'Link' is defined but never used`
-- `'MessageSquare' is defined but never used`
-- `React Hook useEffect has missing dependencies` (fetchStrategy, businessContext)
+- `'requestingTopic' is declared but its value is never read` (line ~67, has eslint-disable comment)
+- `React Hook useEffect has missing dependencies` (intentional fire-once patterns)
 
 **`ContentPipeline.tsx`:**
-- `Calling setState synchronously within an effect can trigger cascading renders` (line ~75, `fetchSummary`)
+- `useEffect` with `fetchSummary` callback dependency (line ~75)
 
 These will be addressed in a dedicated cleanup pass. **Do not attempt to fix them during unrelated tasks.**
 
