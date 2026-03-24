@@ -12,7 +12,7 @@ import { getCachedArchitecture } from '../site-architecture.js';
 import { getSchemaSnapshot, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, getSchemaPlan, updateSchemaPlanStatus, updateSchemaPlanRoles, deleteSchemaPlan, deleteSchemaSnapshot, removePageFromSnapshot } from '../schema-store.js';
 import { generateSchemaSuggestions, generateSchemaForPage, generateCmsTemplateSchema } from '../schema-suggester.js';
 import { generateSchemaPlan } from '../schema-plan.js';
-import { createBatch } from '../approvals.js';
+import { createBatch, deleteBatch } from '../approvals.js';
 import { SCHEMA_ROLE_CLIENT_DESC } from '../../shared/types/schema-plan.ts';
 import type { SchemaSitePlan } from '../../shared/types/schema-plan.ts';
 import { broadcastToWorkspace } from '../broadcast.js';
@@ -377,11 +377,19 @@ router.post('/api/webflow/schema-plan/:siteId/activate', requireWorkspaceAccessF
 
 // DELETE: retract (delete) the entire schema plan for a site
 router.delete('/api/webflow/schema-plan/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
-  const deleted = deleteSchemaPlan(req.params.siteId);
-  if (!deleted) return res.status(404).json({ error: 'No plan found for this site' });
+  // Read plan first to grab the approval batch ID before deleting
+  const plan = getSchemaPlan(req.params.siteId);
+  if (!plan) return res.status(404).json({ error: 'No plan found for this site' });
+
+  deleteSchemaPlan(req.params.siteId);
 
   // Also clear the schema snapshot so the client dashboard doesn't show stale data
   deleteSchemaSnapshot(req.params.siteId);
+
+  // Delete the associated approval batch (sent-to-client preview) if one exists
+  if (plan.clientPreviewBatchId) {
+    deleteBatch(plan.workspaceId, plan.clientPreviewBatchId);
+  }
 
   const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
   if (ws) {
