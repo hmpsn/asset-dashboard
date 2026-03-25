@@ -45,6 +45,8 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState<Set<string>>(new Set());
   const [saved, setSaved] = useState<Set<string>>(new Set());
+  const [draftSaving, setDraftSaving] = useState<Set<string>>(new Set());
+  const [draftSaved, setDraftSaved] = useState<Set<string>>(new Set());
   const [aiLoading, setAiLoading] = useState<Record<string, string>>({});
   const [publishing, setPublishing] = useState(false);
   const [published, setPublished] = useState(false);
@@ -72,18 +74,41 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
   const [bulkSource, setBulkSource] = useState<'pattern' | 'ai'>('pattern');
 
-  // Update edits when pages data changes from React Query
+  // Load drafts and update edits when pages data changes from React Query
   useEffect(() => {
     const editMap: Record<string, EditState> = {};
     for (const p of pages) {
+      // Check for saved draft first
+      const draftKey = `seo-draft-${workspaceId}-${p.id}`;
+      let seoTitle = p.seo?.title || '';
+      let seoDescription = p.seo?.description || '';
+      let dirty = false;
+
+      try {
+        const draftData = localStorage.getItem(draftKey);
+        if (draftData) {
+          const draft = JSON.parse(draftData);
+          // Only use draft if it's newer than the current Webflow data
+          const draftDate = new Date(draft.savedAt);
+          const lastModified = new Date(); // We don't have page last modified, so use draft if it exists
+          if (draftDate <= lastModified) {
+            seoTitle = draft.seoTitle;
+            seoDescription = draft.seoDescription;
+            dirty = true; // Mark as dirty since it differs from Webflow
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load draft for page', p.id, err);
+      }
+
       editMap[p.id] = {
-        seoTitle: p.seo?.title || '',
-        seoDescription: p.seo?.description || '',
-        dirty: false,
+        seoTitle,
+        seoDescription,
+        dirty,
       };
     }
     setEdits(editMap);
-  }, [pages]);
+  }, [pages, workspaceId]);
 
   // Auto-expand target page from audit Fix→
   const fixConsumed = useRef(false);
@@ -111,6 +136,43 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       ...prev,
       [pageId]: { ...prev[pageId], [field]: value, dirty: true },
     }));
+  };
+
+  const saveDraft = async (pageId: string) => {
+    const edit = edits[pageId];
+    if (!edit) return;
+    setDraftSaving(prev => new Set(prev).add(pageId));
+    
+    try {
+      // Save to local storage as draft
+      const draftKey = `seo-draft-${workspaceId}-${pageId}`;
+      const draftData = {
+        seoTitle: edit.seoTitle,
+        seoDescription: edit.seoDescription,
+        savedAt: new Date().toISOString(),
+        pageId,
+        pageSlug: pages.find(p => p.id === pageId)?.slug || '',
+      };
+      localStorage.setItem(draftKey, JSON.stringify(draftData));
+      
+      // Mark as draft saved but keep dirty flag (since not published to Webflow)
+      setDraftSaved(prev => new Set(prev).add(pageId));
+      setTimeout(() => setDraftSaved(prev => { const n = new Set(prev); n.delete(pageId); return n; }), 2000);
+    } catch (err) {
+      console.error('Draft save failed:', err);
+      setErrorStates(prev => ({ 
+        ...prev, 
+        [pageId]: { 
+          type: 'validation', 
+          message: 'Failed to save draft locally' 
+        } 
+      }));
+      setTimeout(() => {
+        setErrorStates(prev => { const n = { ...prev }; delete n[pageId]; return n; });
+      }, 5000);
+    } finally {
+      setDraftSaving(prev => { const n = new Set(prev); n.delete(pageId); return n; });
+    }
   };
 
   const savePage = async (pageId: string) => {
@@ -607,16 +669,15 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
             key={page.id} page={page} edit={edits[page.id]}
             expanded={expanded.has(page.id)} isSaving={saving.has(page.id)}
             isSaved={saved.has(page.id)} isAiLoading={aiLoading[page.id]}
+            isDraftSaving={draftSaving.has(page.id)} isDraftSaved={draftSaved.has(page.id)}
             isSelected={approvalSelected.has(page.id)}
             pageRecs={recsLoaded ? recsForPage(page.slug) : []}
             pageState={getState(page.id)} variations={variations[page.id]}
-            showApprovalCheckbox={!!workspaceId}
-            isSendingToClient={sendingPage.has(page.id)}
-            isSentToClient={sentPage.has(page.id)}
-            hasChanges={!!(edits[page.id] && (edits[page.id].seoTitle !== (page.seo?.title || '') || edits[page.id].seoDescription !== (page.seo?.description || '')))}
+            showApprovalCheckbox={!!workspaceId} isSendingToClient={sendingPage.has(page.id)}
+            isSentToClient={sentPage.has(page.id)} hasChanges={!!(edits[page.id] && (edits[page.id].seoTitle !== (page.seo?.title || '') || edits[page.id].seoDescription !== (page.seo?.description || '')))}
             onSendToClient={sendPageToClient}
             onToggleExpand={toggleExpand} onToggleApprovalSelect={toggleApprovalSelect}
-            onUpdateField={updateField} onSave={savePage} onAiRewrite={aiRewrite}
+            onUpdateField={updateField} onSave={savePage} onSaveDraft={saveDraft} onAiRewrite={aiRewrite}
             onSelectVariation={(pageId, field, value) => updateField(pageId, field, value)}
             onClearVariations={(pageId) => setVariations(prev => { const n = { ...prev }; delete n[pageId]; return n; })}
             onClearTracking={workspaceId ? async (pageId) => {

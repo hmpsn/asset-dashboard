@@ -6,7 +6,7 @@ import {
   Loader2, Save, Sparkles, ChevronDown, ChevronRight,
   Check, AlertTriangle, CheckSquare, Square, Send, X,
 } from 'lucide-react';
-import { StatusBadge, CharacterCounter, LoadingState, SerpPreview, SocialPreview } from '../ui';
+import { StatusBadge, CharacterCounter, SerpPreview, SocialPreview } from '../ui';
 import { statusBorderClass } from '../ui/statusConfig';
 
 interface PageMeta {
@@ -44,6 +44,8 @@ export interface PageEditRowProps {
   isSaving: boolean;
   isSaved: boolean;
   isAiLoading: string | undefined;
+  isDraftSaving?: boolean;
+  isDraftSaved?: boolean;
   isSelected: boolean;
   pageRecs: Recommendation[];
   pageState: PageState | undefined;
@@ -57,6 +59,7 @@ export interface PageEditRowProps {
   onToggleApprovalSelect: (id: string) => void;
   onUpdateField: (pageId: string, field: 'seoTitle' | 'seoDescription', value: string) => void;
   onSave: (pageId: string) => void;
+  onSaveDraft?: (pageId: string) => void;
   onAiRewrite: (pageId: string, field: 'title' | 'description') => void;
   onSelectVariation: (pageId: string, field: 'seoTitle' | 'seoDescription', value: string) => void;
   onClearVariations: (pageId: string) => void;
@@ -67,10 +70,10 @@ export interface PageEditRowProps {
 }
 
 export function PageEditRow({
-  page, edit, expanded, isSaving, isSaved, isAiLoading, isSelected,
+  page, edit, expanded, isSaving, isSaved, isAiLoading, isDraftSaving, isDraftSaved, isSelected,
   pageRecs, pageState, variations, showApprovalCheckbox,
   isSendingToClient, isSentToClient, hasChanges, onSendToClient,
-  onToggleExpand, onToggleApprovalSelect, onUpdateField, onSave,
+  onToggleExpand, onToggleApprovalSelect, onUpdateField, onSave, onSaveDraft,
   onAiRewrite, onSelectVariation, onClearVariations, onClearTracking, errorState,
   showPreview, onTogglePreview,
 }: PageEditRowProps) {
@@ -78,7 +81,7 @@ export function PageEditRow({
   const hasSeoDesc = !!(page.seo?.description);
   const metaRecs = pageRecs.filter(r => r.type === 'metadata');
   const hasRecFlag = metaRecs.length > 0;
-  const trackingBorder = statusBorderClass(pageState?.status);
+  const trackingBorder = statusBorderClass(pageState?.status as any);
 
   return (
     <div id={`seo-editor-page-${page.id}`} className={`bg-zinc-900 rounded-xl border overflow-hidden ${trackingBorder || (hasRecFlag ? 'border-amber-500/30' : isSelected ? 'border-teal-500/40 bg-teal-500/5' : 'border-zinc-800')}`}>
@@ -101,7 +104,7 @@ export function PageEditRow({
           <div className="text-xs text-zinc-500 truncate">/{page.slug}</div>
         </div>
         <div className="flex items-center gap-2">
-          <StatusBadge status={pageState?.status} />
+          <StatusBadge status={pageState?.status as any} size="sm" />
           {pageState?.status && onClearTracking && (
             <button
               onClick={(e) => { e.stopPropagation(); onClearTracking(page.id); }}
@@ -113,7 +116,7 @@ export function PageEditRow({
           )}
           {hasRecFlag && <span className="flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400"><AlertTriangle className="w-3 h-3" />{metaRecs.length} rec{metaRecs.length > 1 ? 's' : ''}</span>}
           {!hasSeoTitle && <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">No title</span>}
-          {!hasSeoDesc && <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400">No desc</span>}
+          {!hasSeoDesc && <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400">Missing desc</span>}
           {edit?.dirty && <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400">Unsaved</span>}
         </div>
       </button>
@@ -152,12 +155,13 @@ export function PageEditRow({
           ))}
           {/* Error State */}
           {errorState && (
-            <ErrorState
-              type={errorState.type as 'network' | 'data' | 'permission'}
-              title={errorState.type === 'network' ? 'Connection Error' : errorState.type === 'permission' ? 'Permission Error' : 'Error'}
-              message={errorState.message}
-              size="sm"
-            />
+            <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-lg bg-red-500/5 border border-red-500/20">
+              <AlertTriangle className="w-3.5 h-3.5 text-red-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-medium text-red-300">{errorState.type === 'network' ? 'Connection Error' : errorState.type === 'permission' ? 'Permission Error' : 'Error'}</div>
+                <div className="text-[11px] text-zinc-400 mt-0.5">{errorState.message}</div>
+              </div>
+            </div>
           )}
 
           {/* SEO Title */}
@@ -262,6 +266,18 @@ export function PageEditRow({
               >
                 {isSendingToClient ? <Loader2 className="w-3 h-3 animate-spin" /> : isSentToClient ? <Check className="w-3 h-3" /> : <Send className="w-3 h-3" />}
                 {isSentToClient ? 'Sent!' : isSendingToClient ? 'Sending...' : 'Send to Client'}
+              </button>
+            )}
+            {onSaveDraft && (
+              <button
+                onClick={() => onSaveDraft(page.id)}
+                disabled={!edit.dirty || isDraftSaving}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  isDraftSaved ? 'bg-blue-600 text-white' : 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600 disabled:opacity-50 disabled:cursor-not-allowed'
+                }`}
+              >
+                {isDraftSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : isDraftSaved ? <Check className="w-3 h-3" /> : <Save className="w-3 h-3" />}
+                {isDraftSaved ? 'Draft Saved!' : isDraftSaving ? 'Saving...' : 'Save Draft'}
               </button>
             )}
             <button
