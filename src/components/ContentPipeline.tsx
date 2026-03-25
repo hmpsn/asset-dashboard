@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { useState, useRef, useEffect, Suspense } from 'react';
+import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { Clipboard, FileText, RefreshCw, Map, Bot, Download, ChevronDown, Layers, HelpCircle, X, TrendingDown } from 'lucide-react';
 import { useContentPipeline } from '../hooks/admin';
 import { ContentBriefs } from './ContentBriefs';
@@ -6,10 +7,10 @@ import { ContentManager } from './ContentManager';
 import { ContentSubscriptions } from './ContentSubscriptions';
 import type { FixContext } from '../App';
 
-const SiteArchitecture = lazy(() => import('./SiteArchitecture').then(m => ({ default: m.SiteArchitecture })));
-const LlmsTxtGenerator = lazy(() => import('./LlmsTxtGenerator').then(m => ({ default: m.LlmsTxtGenerator })));
-const ContentPlanner = lazy(() => import('./ContentPlanner').then(m => ({ default: m.ContentPlanner })));
-const ContentPipelineGuide = lazy(() => import('./ContentPipelineGuide').then(m => ({ default: m.ContentPipelineGuide })));
+const SiteArchitecture = lazyWithRetry(() => import('./SiteArchitecture').then(m => ({ default: m.SiteArchitecture })));
+const LlmsTxtGenerator = lazyWithRetry(() => import('./LlmsTxtGenerator').then(m => ({ default: m.LlmsTxtGenerator })));
+const ContentPlanner = lazyWithRetry(() => import('./ContentPlanner').then(m => ({ default: m.ContentPlanner })));
+const ContentPipelineGuide = lazyWithRetry(() => import('./ContentPipelineGuide').then(m => ({ default: m.ContentPipelineGuide })));
 
 interface Props {
   workspaceId: string;

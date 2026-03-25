@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, Suspense } from 'react';
+import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { useQueryClient } from '@tanstack/react-query';
 import { post, put, del, getSafe, getOptional } from '../api/client';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
@@ -26,9 +27,9 @@ import { AuditBatchActions } from './audit/AuditBatchActions';
 import { AuditToolbar, AuditCategoryFilter } from './audit/AuditFilters';
 
 // ── Lazy-loaded sub-tool (only LinkChecker used internally for Dead Links sub-tab) ──
-const LinkChecker = lazy(() => import('./LinkChecker').then(m => ({ default: m.LinkChecker })));
-const AeoReview = lazy(() => import('./AeoReview'));
-const ContentDecay = lazy(() => import('./ContentDecay'));
+const LinkChecker = lazyWithRetry(() => import('./LinkChecker').then(m => ({ default: m.LinkChecker })));
+const AeoReview = lazyWithRetry(() => import('./AeoReview'));
+const ContentDecay = lazyWithRetry(() => import('./ContentDecay'));
 
 
 interface Props {

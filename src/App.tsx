@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
+import { lazyWithRetry } from './lib/lazyWithRetry';
 import { get, postForm } from './api/client';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, useSearchParams, useParams } from 'react-router-dom';
 import { type Page, adminPath, clientPath } from './routes';
@@ -20,41 +21,41 @@ import { Breadcrumbs } from './components/layout/Breadcrumbs';
 import { Clipboard, Globe } from 'lucide-react';
 
 // ── Lazy-loaded route-level chunks ──
-const ClientDashboard = lazy(() => import('./components/ClientDashboard').then(m => ({ default: m.ClientDashboard })));
-const Styleguide = lazy(() => import('./components/Styleguide').then(m => ({ default: m.Styleguide })));
-const LandingPage = lazy(() => import('./components/LandingPage').then(m => ({ default: m.LandingPage })));
-const PageRewriteChat = lazy(() => import('./components/PageRewriteChat').then(m => ({ default: m.PageRewriteChat })));
+const ClientDashboard = lazyWithRetry(() => import('./components/ClientDashboard').then(m => ({ default: m.ClientDashboard })));
+const Styleguide = lazyWithRetry(() => import('./components/Styleguide').then(m => ({ default: m.Styleguide })));
+const LandingPage = lazyWithRetry(() => import('./components/LandingPage').then(m => ({ default: m.LandingPage })));
+const PageRewriteChat = lazyWithRetry(() => import('./components/PageRewriteChat').then(m => ({ default: m.PageRewriteChat })));
 
 // ── Lazy-loaded admin tab chunks ──
-const SettingsPanel = lazy(() => import('./components/SettingsPanel').then(m => ({ default: m.SettingsPanel })));
-const WorkspaceSettings = lazy(() => import('./components/WorkspaceSettings').then(m => ({ default: m.WorkspaceSettings })));
-const WorkspaceOverview = lazy(() => import('./components/WorkspaceOverview').then(m => ({ default: m.WorkspaceOverview })));
-const MediaTab = lazy(() => import('./components/MediaTab').then(m => ({ default: m.MediaTab })));
-const SeoAudit = lazy(() => import('./components/SeoAudit').then(m => ({ default: m.SeoAudit })));
-const SearchConsole = lazy(() => import('./components/SearchConsole').then(m => ({ default: m.SearchConsole })));
-const Performance = lazy(() => import('./components/Performance').then(m => ({ default: m.Performance })));
-const GoogleAnalytics = lazy(() => import('./components/GoogleAnalytics').then(m => ({ default: m.GoogleAnalytics })));
-const RequestManager = lazy(() => import('./components/RequestManager').then(m => ({ default: m.RequestManager })));
-const SalesReport = lazy(() => import('./components/SalesReport').then(m => ({ default: m.SalesReport })));
-const Roadmap = lazy(() => import('./components/Roadmap').then(m => ({ default: m.Roadmap })));
-const AIUsagePage = lazy(() => import('./components/WorkspaceOverview').then(m => ({ default: m.AIUsageSection })));
-const WorkspaceHome = lazy(() => import('./components/WorkspaceHome').then(m => ({ default: m.WorkspaceHome })));
+const SettingsPanel = lazyWithRetry(() => import('./components/SettingsPanel').then(m => ({ default: m.SettingsPanel })));
+const WorkspaceSettings = lazyWithRetry(() => import('./components/WorkspaceSettings').then(m => ({ default: m.WorkspaceSettings })));
+const WorkspaceOverview = lazyWithRetry(() => import('./components/WorkspaceOverview').then(m => ({ default: m.WorkspaceOverview })));
+const MediaTab = lazyWithRetry(() => import('./components/MediaTab').then(m => ({ default: m.MediaTab })));
+const SeoAudit = lazyWithRetry(() => import('./components/SeoAudit').then(m => ({ default: m.SeoAudit })));
+const SearchConsole = lazyWithRetry(() => import('./components/SearchConsole').then(m => ({ default: m.SearchConsole })));
+const Performance = lazyWithRetry(() => import('./components/Performance').then(m => ({ default: m.Performance })));
+const GoogleAnalytics = lazyWithRetry(() => import('./components/GoogleAnalytics').then(m => ({ default: m.GoogleAnalytics })));
+const RequestManager = lazyWithRetry(() => import('./components/RequestManager').then(m => ({ default: m.RequestManager })));
+const SalesReport = lazyWithRetry(() => import('./components/SalesReport').then(m => ({ default: m.SalesReport })));
+const Roadmap = lazyWithRetry(() => import('./components/Roadmap').then(m => ({ default: m.Roadmap })));
+const AIUsagePage = lazyWithRetry(() => import('./components/WorkspaceOverview').then(m => ({ default: m.AIUsageSection })));
+const WorkspaceHome = lazyWithRetry(() => import('./components/WorkspaceHome').then(m => ({ default: m.WorkspaceHome })));
 
 // ── Lazy-loaded SEO sub-tool chunks (split from SeoAudit #131) ──
-const SeoEditorWrapper = lazy(() => import('./components/SeoEditorWrapper').then(m => ({ default: m.SeoEditorWrapper })));
-const KeywordStrategyPanel = lazy(() => import('./components/KeywordStrategy').then(m => ({ default: m.KeywordStrategyPanel })));
-const PageIntelligence = lazy(() => import('./components/PageIntelligence').then(m => ({ default: m.PageIntelligence })));
-const SchemaSuggester = lazy(() => import('./components/SchemaSuggester').then(m => ({ default: m.SchemaSuggester })));
-const ContentBriefs = lazy(() => import('./components/ContentBriefs').then(m => ({ default: m.ContentBriefs })));
-const ContentPerformance = lazy(() => import('./components/ContentPerformance').then(m => ({ default: m.ContentPerformance })));
-const LinksPanel = lazy(() => import('./components/LinksPanel').then(m => ({ default: m.LinksPanel })));
-const RankTracker = lazy(() => import('./components/RankTracker').then(m => ({ default: m.RankTracker })));
-const ContentManager = lazy(() => import('./components/ContentManager').then(m => ({ default: m.ContentManager })));
-const ContentCalendar = lazy(() => import('./components/ContentCalendar').then(m => ({ default: m.ContentCalendar })));
-const ContentSubscriptions = lazy(() => import('./components/ContentSubscriptions').then(m => ({ default: m.ContentSubscriptions })));
-const ContentPipeline = lazy(() => import('./components/ContentPipeline').then(m => ({ default: m.ContentPipeline })));
-const BrandHub = lazy(() => import('./components/BrandHub').then(m => ({ default: m.BrandHub })));
-const RevenueDashboard = lazy(() => import('./components/RevenueDashboard').then(m => ({ default: m.RevenueDashboard })));
+const SeoEditorWrapper = lazyWithRetry(() => import('./components/SeoEditorWrapper').then(m => ({ default: m.SeoEditorWrapper })));
+const KeywordStrategyPanel = lazyWithRetry(() => import('./components/KeywordStrategy').then(m => ({ default: m.KeywordStrategyPanel })));
+const PageIntelligence = lazyWithRetry(() => import('./components/PageIntelligence').then(m => ({ default: m.PageIntelligence })));
+const SchemaSuggester = lazyWithRetry(() => import('./components/SchemaSuggester').then(m => ({ default: m.SchemaSuggester })));
+const ContentBriefs = lazyWithRetry(() => import('./components/ContentBriefs').then(m => ({ default: m.ContentBriefs })));
+const ContentPerformance = lazyWithRetry(() => import('./components/ContentPerformance').then(m => ({ default: m.ContentPerformance })));
+const LinksPanel = lazyWithRetry(() => import('./components/LinksPanel').then(m => ({ default: m.LinksPanel })));
+const RankTracker = lazyWithRetry(() => import('./components/RankTracker').then(m => ({ default: m.RankTracker })));
+const ContentManager = lazyWithRetry(() => import('./components/ContentManager').then(m => ({ default: m.ContentManager })));
+const ContentCalendar = lazyWithRetry(() => import('./components/ContentCalendar').then(m => ({ default: m.ContentCalendar })));
+const ContentSubscriptions = lazyWithRetry(() => import('./components/ContentSubscriptions').then(m => ({ default: m.ContentSubscriptions })));
+const ContentPipeline = lazyWithRetry(() => import('./components/ContentPipeline').then(m => ({ default: m.ContentPipeline })));
+const BrandHub = lazyWithRetry(() => import('./components/BrandHub').then(m => ({ default: m.BrandHub })));
+const RevenueDashboard = lazyWithRetry(() => import('./components/RevenueDashboard').then(m => ({ default: m.RevenueDashboard })));
 
 function ChunkFallback() {
   return <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>;

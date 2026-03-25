@@ -3290,6 +3290,15 @@
           "priority": "P2",
           "notes": "SeoAudit.tsx line 309-319: sequential for-loop pushing fixes to Webflow API. Similar to SeoEditor bulk apply — blocks UI, lose progress on navigation. Convert to server-side job. Uses AbortController currently which is good, but should be a proper cancellable background job.",
           "status": "pending"
+        },
+        {
+          "id": 360,
+          "title": "Stale Chunk Auto-Reload (lazyWithRetry)",
+          "source": "BUG FIX",
+          "est": "0.5h",
+          "priority": "P0",
+          "notes": "Shipped — After deploys, Vite chunk hashes change but cached HTML references old filenames → 'Failed to fetch dynamically imported module' errors. New lazyWithRetry() utility wraps React.lazy() with try/catch + single auto-reload via sessionStorage flag. Applied to all ~43 lazy imports across App.tsx, SeoAudit.tsx, ContentPipeline.tsx, ClientDashboard.tsx. Feature #173.",
+          "status": "done"
         }
       ]
     }

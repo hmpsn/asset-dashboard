@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
+import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { get, post, getOptional, getSafe } from '../api/client';
 import { ApiError } from '../api/client';
 import { useNavigate } from 'react-router-dom';
@@ -10,7 +11,7 @@ import {
   CheckCircle2, LineChart, Lock, Trophy, Check, Layers,
   Sun, Moon, Plus, FileText, Calendar, Clock, CreditCard, Mail,
 } from 'lucide-react';
-const LazyStripePaymentModal = lazy(() => import('./StripePaymentForm').then(m => ({ default: m.StripePaymentModal })));
+const LazyStripePaymentModal = lazyWithRetry(() => import('./StripePaymentForm').then(m => ({ default: m.StripePaymentModal })));
 import { type Tier, Skeleton, OverviewSkeleton } from './ui';
 import { RenderMarkdown } from './client/helpers';
 import { STUDIO_NAME } from '../constants';
