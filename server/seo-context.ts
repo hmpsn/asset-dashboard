@@ -244,6 +244,7 @@ export function buildPageAnalysisContext(workspaceId?: string, pagePath?: string
 
   const parts: string[] = [];
 
+  // Core analysis data (original)
   if (entry.optimizationIssues?.length) {
     parts.push(`ISSUES IDENTIFIED:\n${entry.optimizationIssues.map(i => `- ${i}`).join('\n')}`);
   }
@@ -252,6 +253,29 @@ export function buildPageAnalysisContext(workspaceId?: string, pagePath?: string
   }
   if (entry.contentGaps?.length) {
     parts.push(`CONTENT GAPS:\n${entry.contentGaps.map(g => `- ${g}`).join('\n')}`);
+  }
+
+  // Extended analysis data (enriches AI prompt quality)
+  if (entry.optimizationScore) {
+    parts.push(`OPTIMIZATION SCORE: ${entry.optimizationScore}/100`);
+  }
+  if (entry.primaryKeywordPresence) {
+    const p = entry.primaryKeywordPresence;
+    const missing = (['inTitle', 'inMeta', 'inContent', 'inSlug'] as const)
+      .filter(k => !p[k])
+      .map(k => ({ inTitle: 'title tag', inMeta: 'meta description', inContent: 'page content', inSlug: 'URL slug' }[k]));
+    if (missing.length > 0) {
+      parts.push(`PRIMARY KEYWORD MISSING FROM: ${missing.join(', ')}`);
+    }
+  }
+  if (entry.competitorKeywords?.length) {
+    parts.push(`COMPETITOR KEYWORDS TO CONSIDER: ${entry.competitorKeywords.join(', ')}`);
+  }
+  if (entry.topicCluster) {
+    parts.push(`TOPIC CLUSTER: ${entry.topicCluster}`);
+  }
+  if (entry.estimatedDifficulty) {
+    parts.push(`ESTIMATED DIFFICULTY: ${entry.estimatedDifficulty}`);
   }
 
   if (parts.length === 0) return '';
