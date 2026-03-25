@@ -957,9 +957,11 @@ router.post('/api/webflow/seo-copy', async (req, res) => {
   }
 
   // Find this page's keyword data
-  const pageKw = strategy?.pageMap?.find(
-    p => p.pagePath === pagePath || pagePath.includes(p.pagePath) || p.pagePath.includes(pagePath)
-  );
+  const pageKw = strategy?.pageMap?.find(p => {
+    const pNorm = p.pagePath.length > 1 && p.pagePath.endsWith('/') ? p.pagePath.slice(0, -1) : p.pagePath;
+    const qNorm = pagePath.length > 1 && pagePath.endsWith('/') ? pagePath.slice(0, -1) : pagePath;
+    return pNorm === qNorm;
+  });
 
   // Resolve brand name
   const copyWs = getWorkspace(workspaceId);

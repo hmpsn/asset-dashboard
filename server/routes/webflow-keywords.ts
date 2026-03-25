@@ -145,9 +145,11 @@ router.post('/api/webflow/keyword-analysis/persist', requireWorkspaceAccessFromQ
 
     // Find or create the page entry
     const normalized = pagePath.startsWith('/') ? pagePath : `/${pagePath}`;
-    const entry = pageMap.find(p =>
-      p.pagePath === normalized || normalized.includes(p.pagePath) || p.pagePath.includes(normalized)
-    );
+    const normNoTrail = normalized.length > 1 && normalized.endsWith('/') ? normalized.slice(0, -1) : normalized;
+    const entry = pageMap.find(p => {
+      const pNorm = p.pagePath.length > 1 && p.pagePath.endsWith('/') ? p.pagePath.slice(0, -1) : p.pagePath;
+      return pNorm === normNoTrail;
+    });
 
     const now = new Date().toISOString();
     if (entry) {

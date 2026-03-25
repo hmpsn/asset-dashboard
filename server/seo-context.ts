@@ -73,9 +73,11 @@ export function buildSeoContext(workspaceId?: string, pagePath?: string): SeoCon
 
   // Page-specific keywords (if pagePath provided) — these OVERRIDE general context
   if (pagePath && strategy.pageMap?.length) {
-    const pageKw = strategy.pageMap.find(
-      p => p.pagePath === pagePath || pagePath.includes(p.pagePath) || p.pagePath.includes(pagePath)
-    );
+    const pageKw = strategy.pageMap.find(p => {
+      const pNorm = p.pagePath.length > 1 && p.pagePath.endsWith('/') ? p.pagePath.slice(0, -1) : p.pagePath;
+      const qNorm = pagePath.length > 1 && pagePath.endsWith('/') ? pagePath.slice(0, -1) : pagePath;
+      return pNorm === qNorm;
+    });
     if (pageKw) {
       keywordBlock += `\n\nTHIS PAGE'S TARGET (overrides general context):`;
       keywordBlock += `\nPrimary keyword: "${pageKw.primaryKeyword}"`;
@@ -237,9 +239,11 @@ export function buildPageAnalysisContext(workspaceId?: string, pagePath?: string
   if (!pageMap?.length) return '';
 
   const normalized = pagePath.startsWith('/') ? pagePath : `/${pagePath}`;
-  const entry = pageMap.find(
-    p => p.pagePath === normalized || normalized.includes(p.pagePath) || p.pagePath.includes(normalized)
-  );
+  const normNoTrail = normalized.length > 1 && normalized.endsWith('/') ? normalized.slice(0, -1) : normalized;
+  const entry = pageMap.find(p => {
+    const pNorm = p.pagePath.length > 1 && p.pagePath.endsWith('/') ? p.pagePath.slice(0, -1) : p.pagePath;
+    return pNorm === normNoTrail;
+  });
   if (!entry) return '';
 
   const parts: string[] = [];
