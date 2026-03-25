@@ -346,15 +346,26 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
     }
   };
 
+  const CONCURRENCY = 5;
+
   const analyzeAllPages = async () => {
     cancelBulkRef.current = false;
-    const toAnalyze = unifiedPages.filter(p => !analyses[p.id]);
+    // Skip pages already analyzed in this session OR with persisted analysis
+    const toAnalyze = unifiedPages.filter(p =>
+      !analyses[p.id] && !(p.strategy?.optimizationScore && p.strategy.optimizationScore > 0)
+    );
     setBulkProgress({ done: 0, total: toAnalyze.length });
-    for (let i = 0; i < toAnalyze.length; i++) {
+
+    // Process in concurrent batches
+    let done = 0;
+    for (let i = 0; i < toAnalyze.length; i += CONCURRENCY) {
       if (cancelBulkRef.current) break;
-      setBulkProgress({ done: i, total: toAnalyze.length });
-      await analyzePage(toAnalyze[i]);
+      const batch = toAnalyze.slice(i, i + CONCURRENCY);
+      await Promise.all(batch.map(page => analyzePage(page)));
+      done += batch.length;
+      setBulkProgress({ done: Math.min(done, toAnalyze.length), total: toAnalyze.length });
     }
+
     setBulkProgress(prev => prev ? { ...prev, done: prev.total } : null);
     setTimeout(() => setBulkProgress(null), 3000);
   };
