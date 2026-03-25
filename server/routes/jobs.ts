@@ -670,9 +670,11 @@ router.post('/api/jobs', async (req, res) => {
               log.info({ existingMapSize: existingMap.length, withScore: existingMap.filter(e => e.optimizationScore && e.optimizationScore > 0).length }, 'Page analysis: existing pageMap stats');
               toAnalyze = pages.filter(p => {
                 const normalized = p.path.startsWith('/') ? p.path : `/${p.path}`;
-                const existing = existingMap.find(e =>
-                  e.pagePath === normalized || normalized.includes(e.pagePath) || e.pagePath.includes(normalized)
-                );
+                const normNoTrail = normalized.length > 1 && normalized.endsWith('/') ? normalized.slice(0, -1) : normalized;
+                const existing = existingMap.find(e => {
+                  const eNorm = e.pagePath.length > 1 && e.pagePath.endsWith('/') ? e.pagePath.slice(0, -1) : e.pagePath;
+                  return eNorm === normNoTrail;
+                });
                 return !existing?.optimizationScore || existing.optimizationScore <= 0;
               });
             }
@@ -816,7 +818,12 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
 
                   for (const { page, analysis } of batchResults) {
                     const normalized = page.path.startsWith('/') ? page.path : `/${page.path}`;
-                    const entry = pageMap.find(p => p.pagePath === normalized || normalized.includes(p.pagePath) || p.pagePath.includes(normalized));
+                    // Strip trailing slash for comparison (but keep '/' as-is)
+                    const normNoTrail = normalized.length > 1 && normalized.endsWith('/') ? normalized.slice(0, -1) : normalized;
+                    const entry = pageMap.find(p => {
+                      const pNorm = p.pagePath.length > 1 && p.pagePath.endsWith('/') ? p.pagePath.slice(0, -1) : p.pagePath;
+                      return pNorm === normNoTrail;
+                    });
                     log.info({ path: normalized, matched: !!entry, matchedPath: entry?.pagePath, score: analysis.optimizationScore }, 'Page analysis: persisting page');
 
                     if (entry) {
