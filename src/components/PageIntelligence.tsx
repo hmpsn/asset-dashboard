@@ -237,13 +237,22 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
     const result: UnifiedPage[] = [];
     const usedPaths = new Set<string>();
 
-    // Start with all webflow pages, enriched with strategy data
+    // Build a lookup map for strategy entries by normalized path
+    const strategyByPath = new Map<string, StrategyPage>();
+    for (const sp of pageMap) {
+      const norm = sp.pagePath.startsWith('/') ? sp.pagePath : `/${sp.pagePath}`;
+      if (!strategyByPath.has(norm)) strategyByPath.set(norm, sp);
+      // Also index without trailing slash for matching
+      const noTrail = norm.endsWith('/') && norm.length > 1 ? norm.slice(0, -1) : norm;
+      if (!strategyByPath.has(noTrail)) strategyByPath.set(noTrail, sp);
+    }
+
+    // Start with all webflow pages, enriched with strategy data (exact match only)
     for (const page of allPages) {
       const pagePath = `/${page.slug || ''}`;
-      const strategyMatch = pageMap.find((sp: StrategyPage) =>
-        sp.pagePath === pagePath || sp.pagePath === page.slug ||
-        pagePath.includes(sp.pagePath) || sp.pagePath.includes(pagePath.replace(/^\//,''))
-      );
+      const strategyMatch = strategyByPath.get(pagePath)
+        || (page.slug ? strategyByPath.get(`/${page.slug}`) : undefined)
+        || (page.publishedPath ? strategyByPath.get(page.publishedPath) : undefined);
       result.push({
         id: page.id,
         title: strategyMatch?.pageTitle || page.title,
@@ -260,6 +269,9 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
     // Add any strategy pages that aren't in webflow pages (e.g., discovered via GSC)
     for (const sp of pageMap) {
       if (!usedPaths.has(sp.pagePath)) {
+        // Deduplicate: skip if a page with this normalized path already exists
+        const norm = sp.pagePath.startsWith('/') ? sp.pagePath : `/${sp.pagePath}`;
+        if (result.some(r => r.path === norm || r.path === sp.pagePath)) continue;
         result.push({
           id: `strategy-${sp.pagePath}`,
           title: sp.pageTitle,
