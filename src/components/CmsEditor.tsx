@@ -87,9 +87,12 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [errorStates, setErrorStates] = useState<Record<string, { type: string; message: string }>>({});
   const [previewExpanded, setPreviewExpanded] = useState<Set<string>>(new Set());
-    const [aiLoading, setAiLoading] = useState<Set<string>>(new Set());
+    const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
   const [publishing, setPublishing] = useState<Set<string>>(new Set());
   const [published, setPublished] = useState<Set<string>>(new Set());
+  const [bulkMode, setBulkMode] = useState<'idle' | 'rewriting'>('idle');
+  const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
+  const [bulkResults, setBulkResults] = useState<string | null>(null);
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
 
   // Initialize edit state when collections data loads
@@ -219,6 +222,71 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
     } catch (err) { console.error('CmsEditor operation failed:', err); } finally {
       setAiLoading(prev => { const n = { ...prev }; delete n[key]; return n; });
     }
+  };
+
+  // ── Bulk AI Rewrite — calls single-page aiRewrite for each selected item ──
+  const bulkAiRewrite = async (targetField: 'name' | 'title' | 'description' | 'all') => {
+    const selectedIds = Array.from(approvalSelected).filter(id =>
+      collections.some(c => c.items.some(it => it.id === id))
+    );
+    if (selectedIds.length === 0) return;
+    setBulkMode('rewriting');
+    setBulkProgress({ done: 0, total: selectedIds.length });
+
+    // Auto-expand parent collections + selected items
+    setExpandedCollections(prev => {
+      const next = new Set(prev);
+      for (const id of selectedIds) {
+        const coll = collections.find(c => c.items.some(it => it.id === id));
+        if (coll) next.add(coll.collectionId);
+      }
+      return next;
+    });
+    setExpandedItems(prev => {
+      const next = new Set(prev);
+      for (const id of selectedIds) next.add(id);
+      return next;
+    });
+
+    let completed = 0;
+    let failed = 0;
+    const CONCURRENCY = 3;
+
+    for (let i = 0; i < selectedIds.length; i += CONCURRENCY) {
+      const batch = selectedIds.slice(i, i + CONCURRENCY);
+      const results = await Promise.allSettled(
+        batch.map(async (itemId) => {
+          const coll = collections.find(c => c.items.some(it => it.id === itemId));
+          if (!coll) return;
+          const extra = coll.seoFields.filter(f => f.slug !== 'name' && f.slug !== 'slug');
+          const titleF = extra.find(f => f.slug.includes('title'));
+          const descF = extra.find(f => f.slug.includes('description') || f.slug.includes('desc'));
+
+          const slugs: string[] = [];
+          if (targetField === 'name' || targetField === 'all') slugs.push('name');
+          if ((targetField === 'title' || targetField === 'all') && titleF) slugs.push(titleF.slug);
+          if ((targetField === 'description' || targetField === 'all') && descF) slugs.push(descF.slug);
+
+          for (const slug of slugs) {
+            await aiRewrite(coll.collectionId, itemId, slug);
+          }
+        })
+      );
+      for (const r of results) {
+        if (r.status === 'rejected') failed++;
+        completed++;
+      }
+      setBulkProgress({ done: completed, total: selectedIds.length });
+    }
+
+    const succeeded = completed - failed;
+    setBulkResults(
+      failed > 0
+        ? `Generated variations for ${succeeded}/${selectedIds.length} items (${failed} failed) — review below.`
+        : `Generated variations for ${succeeded}/${selectedIds.length} items — review in each card below.`
+    );
+    setBulkMode('idle');
+    setTimeout(() => setBulkResults(null), 8000);
   };
 
   const toggleApprovalItem = (itemId: string) => {
@@ -369,6 +437,21 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
               {savedCount} saved (draft)
             </span>
           )}
+          {approvalSelected.size > 0 && bulkMode === 'idle' && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-zinc-500 mr-1">AI Rewrite:</span>
+              <button onClick={() => bulkAiRewrite('name')} className="px-2 py-1 rounded text-[11px] font-medium bg-teal-600/20 text-teal-400 hover:bg-teal-600/30 transition-colors">Names</button>
+              <button onClick={() => bulkAiRewrite('title')} className="px-2 py-1 rounded text-[11px] font-medium bg-teal-600/20 text-teal-400 hover:bg-teal-600/30 transition-colors">Titles</button>
+              <button onClick={() => bulkAiRewrite('description')} className="px-2 py-1 rounded text-[11px] font-medium bg-teal-600/20 text-teal-400 hover:bg-teal-600/30 transition-colors">Descriptions</button>
+              <button onClick={() => bulkAiRewrite('all')} className="px-2 py-1 rounded text-[11px] font-medium bg-teal-500/20 text-teal-300 hover:bg-teal-500/30 transition-colors">All SEO</button>
+            </div>
+          )}
+          {bulkMode === 'rewriting' && (
+            <div className="flex items-center gap-2 text-[11px] text-teal-400">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Rewriting {bulkProgress.done}/{bulkProgress.total} items…
+            </div>
+          )}
           {workspaceId && (
             <button
               onClick={sendForApproval}
@@ -383,6 +466,14 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
           )}
         </div>
       </div>
+
+      {/* Bulk rewrite results */}
+      {bulkResults && (
+        <div className="bg-teal-500/10 border border-teal-500/30 rounded-lg px-3 py-2 text-xs text-teal-300 flex items-center gap-2">
+          <Sparkles className="w-3.5 h-3.5 flex-shrink-0" />
+          {bulkResults}
+        </div>
+      )}
 
       {/* Error States */}
       {errorStates.approval && (

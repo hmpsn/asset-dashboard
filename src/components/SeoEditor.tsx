@@ -16,14 +16,6 @@ import { ApprovalPanel } from './editor/ApprovalPanel';
 import { PendingApprovals } from './PendingApprovals';
 import { SeoSuggestionsPanel } from './editor/SeoSuggestionsPanel';
 
-interface PageMeta {
-  id: string;
-  title: string;
-  slug: string;
-  seo?: { title?: string; description?: string };
-  openGraph?: { title?: string; description?: string; titleCopied?: boolean; descriptionCopied?: boolean };
-}
-
 interface EditState {
   seoTitle: string;
   seoDescription: string;
@@ -462,30 +454,47 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     finally { setBulkMode('idle'); setBulkPreview([]); setPatternText(''); setTimeout(() => setBulkResults(null), 5000); }
   };
 
-  // ── Bulk AI Rewrite (generates 3 variations per page, stored server-side) ──
+  // ── Bulk AI Rewrite — calls the same single-page aiRewrite for each selected page ──
   const bulkAiRewrite = async (field: 'title' | 'description' | 'both') => {
-    const selectedPages = Array.from(approvalSelected).map(id => pages.find(p => p.id === id)).filter(Boolean) as PageMeta[];
-    if (selectedPages.length === 0) return;
+    const selectedIds = Array.from(approvalSelected).filter(id => pages.some(p => p.id === id));
+    if (selectedIds.length === 0) return;
     setBulkField(field === 'both' ? 'title' : field);
     setBulkMode('rewriting');
-    setBulkProgress({ done: 0, total: selectedPages.length });
-    try {
-      const pagesPayload = selectedPages.map(p => ({
-        pageId: p.id, title: p.title, slug: p.slug,
-        currentSeoTitle: edits[p.id]?.seoTitle || p.seo?.title,
-        currentDescription: edits[p.id]?.seoDescription || p.seo?.description,
-      }));
-      const data = await post<{ suggestions: unknown[]; errors: unknown[]; generated: number; total: number }>(
-        `/api/webflow/seo-bulk-rewrite/${siteId}`,
-        { pages: pagesPayload, field, workspaceId }
+    setBulkProgress({ done: 0, total: selectedIds.length });
+
+    // Auto-expand all selected pages so users can watch results appear
+    setExpanded(prev => {
+      const next = new Set(prev);
+      for (const id of selectedIds) next.add(id);
+      return next;
+    });
+
+    let completed = 0;
+    let failed = 0;
+    const CONCURRENCY = 3;
+
+    // Process pages in concurrent batches of 3
+    for (let i = 0; i < selectedIds.length; i += CONCURRENCY) {
+      const batch = selectedIds.slice(i, i + CONCURRENCY);
+      const results = await Promise.allSettled(
+        batch.map(pageId => aiRewrite(pageId, field))
       );
-      const fieldLabel = field === 'both' ? 'title + description' : field;
-      const pageCount = field === 'both' ? Math.floor(data.generated / 2) : data.generated;
-      setBulkResults(`Generated ${pageCount}/${data.total} ${fieldLabel} suggestions. Review and select below.`);
-      refetchSuggestions();
-      setBulkMode('idle');
-      setTimeout(() => setBulkResults(null), 8000);
-    } catch { setBulkResults('Bulk rewrite failed.'); setBulkMode('idle'); setTimeout(() => setBulkResults(null), 5000); }
+      for (const r of results) {
+        if (r.status === 'rejected') failed++;
+        completed++;
+      }
+      setBulkProgress({ done: completed, total: selectedIds.length });
+    }
+
+    const fieldLabel = field === 'both' ? 'title + description' : field;
+    const succeeded = completed - failed;
+    setBulkResults(
+      failed > 0
+        ? `Generated ${succeeded}/${selectedIds.length} ${fieldLabel} variations (${failed} failed) — review in each page card below.`
+        : `Generated ${succeeded}/${selectedIds.length} ${fieldLabel} variations — review in each page card below.`
+    );
+    setBulkMode('idle');
+    setTimeout(() => setBulkResults(null), 8000);
   };
 
   const applyBulkRewrite = async () => {

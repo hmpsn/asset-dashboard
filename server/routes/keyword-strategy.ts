@@ -388,7 +388,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         // Both quick and full: get domain organic keywords
         try {
           log.info(`Fetching domain organic keywords for ${siteDomain}...`);
-          semrushDomainData = await getDomainOrganicKeywords(siteDomain, ws.id, semrushMode === 'full' ? 200 : 100);
+          semrushDomainData = await getDomainOrganicKeywords(siteDomain, ws.id, 200);
           log.info(`Got ${semrushDomainData.length} domain keywords`);
 
           if (semrushDomainData.length > 0) {
@@ -782,27 +782,67 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
     log.info(`All batches complete: ${allPageMappings.length} total page mappings`);
 
     // --- Post-AI keyword validation via SEMRush bulk lookup ---
+    // Optimization: check domain organic data + existing page_keywords before calling API
     if (isSemrushConfigured() && semrushMode !== 'none') {
-      const allPrimaryKws = allPageMappings.map(pm => pm.primaryKeyword).filter(Boolean);
-      try {
-        const metrics = await getKeywordOverview(allPrimaryKws.slice(0, 100), ws.id);
-        const metricMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m]));
+      const domainKwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k]));
+      const existingPkLookup = new Map(
+        listPageKeywords(ws.id)
+          .filter(pk => pk.volume && pk.volume > 0)
+          .map(pk => [pk.primaryKeyword.toLowerCase(), pk])
+      );
 
-        let unvalidated = 0;
-        for (const pm of allPageMappings) {
-          const m = metricMap.get(pm.primaryKeyword.toLowerCase());
-          if (m && m.volume > 0) {
-            (pm as Record<string, unknown>).validated = true;
-            pm.volume = m.volume;
-            pm.difficulty = m.difficulty;
-          } else {
-            (pm as Record<string, unknown>).validated = false;
-            unvalidated++;
-          }
+      // First pass: enrich from already-fetched data (no API calls)
+      const needsApiLookup: string[] = [];
+      let preEnriched = 0;
+      for (const pm of allPageMappings) {
+        const kwLower = pm.primaryKeyword?.toLowerCase();
+        if (!kwLower) continue;
+        // Check domain organic data (already fetched this run)
+        const domainHit = domainKwLookup.get(kwLower);
+        if (domainHit && domainHit.volume > 0) {
+          (pm as Record<string, unknown>).validated = true;
+          pm.volume = domainHit.volume;
+          pm.difficulty = domainHit.difficulty;
+          preEnriched++;
+          continue;
         }
-        log.info(`Keyword validation: ${allPageMappings.length - unvalidated} validated, ${unvalidated} unvalidated`);
-      } catch (err) {
-        log.error({ err }, 'Post-AI keyword validation error');
+        // Check existing page_keywords from previous strategy runs
+        const pkHit = existingPkLookup.get(kwLower);
+        if (pkHit && pkHit.volume && pkHit.volume > 0) {
+          (pm as Record<string, unknown>).validated = true;
+          pm.volume = pkHit.volume;
+          pm.difficulty = pkHit.difficulty ?? 0;
+          preEnriched++;
+          continue;
+        }
+        needsApiLookup.push(pm.primaryKeyword);
+      }
+      log.info(`Keyword validation: ${preEnriched} pre-enriched from existing data, ${needsApiLookup.length} need API lookup`);
+
+      // Second pass: fetch remaining from SEMRush API
+      if (needsApiLookup.length > 0) {
+        try {
+          const uniqueNeeds = [...new Set(needsApiLookup.map(k => k.toLowerCase()))];
+          const metrics = await getKeywordOverview(uniqueNeeds.slice(0, 100), ws.id);
+          const metricMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m]));
+
+          let unvalidated = 0;
+          for (const pm of allPageMappings) {
+            if ((pm as Record<string, unknown>).validated != null) continue; // already handled
+            const m = metricMap.get(pm.primaryKeyword.toLowerCase());
+            if (m && m.volume > 0) {
+              (pm as Record<string, unknown>).validated = true;
+              pm.volume = m.volume;
+              pm.difficulty = m.difficulty;
+            } else {
+              (pm as Record<string, unknown>).validated = false;
+              unvalidated++;
+            }
+          }
+          log.info(`API validation: ${needsApiLookup.length - unvalidated} validated, ${unvalidated} unvalidated`);
+        } catch (err) {
+          log.error({ err }, 'Post-AI keyword validation error');
+        }
       }
     }
 

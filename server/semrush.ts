@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { getUploadRoot, getDataDir } from './data-dir.js';
+import { getCachedMetricsBatch, cacheMetrics } from './keyword-metrics-cache.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('semrush');
@@ -148,6 +149,14 @@ function getCachePath(workspaceId: string, key: string): string {
   return path.join(getCacheDir(workspaceId), `${key}.json`);
 }
 
+// ── Cache TTL constants (hours) ──
+const CACHE_TTL_KEYWORD = 720;         // 30 days — keyword volume/difficulty updates monthly
+const CACHE_TTL_RELATED = 720;         // 30 days — related/question keywords very stable
+const CACHE_TTL_DOMAIN_ORGANIC = 168;  // 7 days  — rankings shift weekly
+const CACHE_TTL_DOMAIN_OVERVIEW = 168; // 7 days  — traffic estimates update weekly
+const CACHE_TTL_BACKLINKS = 168;       // 7 days  — backlink profiles change slowly
+const CACHE_TTL_COMPETITORS = 336;     // 14 days — competitor landscape is stable
+
 function readCache<T>(workspaceId: string, key: string, maxAgeHours = 168): T | null {
   try {
     const fp = getCachePath(workspaceId, key);
@@ -211,12 +220,23 @@ export async function getKeywordOverview(
   const results: KeywordMetrics[] = [];
   const uncached: string[] = [];
 
-  // Check cache first
+  // L1: Check global SQLite cache (shared across all workspaces)
+  const globalHits = getCachedMetricsBatch(keywords, database, CACHE_TTL_KEYWORD);
+
+  // L2: Check per-workspace file cache for anything not in L1
   for (const kw of keywords) {
+    const globalHit = globalHits.get(kw.toLowerCase());
+    if (globalHit) {
+      results.push(globalHit as KeywordMetrics);
+      logCreditUsage({ credits: 0, endpoint: 'keyword_overview', query: kw, rowsReturned: 1, workspaceId, cached: true });
+      continue;
+    }
     const cacheKey = `kw_${database}_${kw.toLowerCase().replace(/\s+/g, '_')}`;
-    const cached = readCache<KeywordMetrics>(workspaceId, cacheKey);
+    const cached = readCache<KeywordMetrics>(workspaceId, cacheKey, CACHE_TTL_KEYWORD);
     if (cached) {
       results.push(cached);
+      // Backfill global cache from file cache hit
+      cacheMetrics(cached, database);
       logCreditUsage({ credits: 0, endpoint: 'keyword_overview', query: kw, rowsReturned: 1, workspaceId, cached: true });
     } else {
       uncached.push(kw);
@@ -266,6 +286,8 @@ export async function getKeywordOverview(
         };
 
         results.push(metrics);
+        // Write to both L1 (global SQLite) and L2 (per-workspace file) caches
+        cacheMetrics(metrics, database);
         const cacheKey = `kw_${database}_${kw.toLowerCase().replace(/\s+/g, '_')}`;
         writeCache(workspaceId, cacheKey, metrics);
         logCreditUsage({ credits: 10, endpoint: 'keyword_overview', query: kw, rowsReturned: rows.length, workspaceId, cached: false });
@@ -303,7 +325,7 @@ export async function getDomainOrganicKeywords(
 
   const cleanDomain = cleanDomainForSemrush(domain);
   const cacheKey = `domain_organic_${database}_${cleanDomain.replace(/\./g, '_')}_${limit}`;
-  const cached = readCache<DomainKeyword[]>(workspaceId, cacheKey);
+  const cached = readCache<DomainKeyword[]>(workspaceId, cacheKey, CACHE_TTL_DOMAIN_ORGANIC);
   if (cached) {
     logCreditUsage({ credits: 0, endpoint: 'domain_organic', query: cleanDomain, rowsReturned: cached.length, workspaceId, cached: true });
     return cached;
@@ -443,7 +465,7 @@ export async function getRelatedKeywords(
   if (!apiKey) throw new Error('SEMRUSH_API_KEY not configured');
 
   const cacheKey = `related_${database}_${keyword.toLowerCase().replace(/\s+/g, '_')}_${limit}`;
-  const cached = readCache<RelatedKeyword[]>(workspaceId, cacheKey);
+  const cached = readCache<RelatedKeyword[]>(workspaceId, cacheKey, CACHE_TTL_RELATED);
   if (cached) {
     logCreditUsage({ credits: 0, endpoint: 'related_keywords', query: keyword, rowsReturned: cached.length, workspaceId, cached: true });
     return cached;
@@ -508,7 +530,7 @@ export async function getQuestionKeywords(
   if (!apiKey) throw new Error('SEMRUSH_API_KEY not configured');
 
   const cacheKey = `questions_${database}_${seedKeyword.toLowerCase().replace(/\s+/g, '_')}_${limit}`;
-  const cached = readCache<QuestionKeyword[]>(workspaceId, cacheKey);
+  const cached = readCache<QuestionKeyword[]>(workspaceId, cacheKey, CACHE_TTL_RELATED);
   if (cached) {
     logCreditUsage({ credits: 0, endpoint: 'phrase_questions', query: seedKeyword, rowsReturned: cached.length, workspaceId, cached: true });
     return cached;
@@ -615,7 +637,7 @@ export async function getDomainOverview(
 
   const cleanDomain = cleanDomainForSemrush(domain);
   const cacheKey = `domain_overview_${database}_${cleanDomain.replace(/\./g, '_')}`;
-  const cached = readCache<DomainOverview>(workspaceId, cacheKey, 48);
+  const cached = readCache<DomainOverview>(workspaceId, cacheKey, CACHE_TTL_DOMAIN_OVERVIEW);
   if (cached) {
     logCreditUsage({ credits: 0, endpoint: 'domain_ranks', query: cleanDomain, rowsReturned: 1, workspaceId, cached: true });
     return cached;
@@ -688,7 +710,7 @@ export async function getBacklinksOverview(
 
   const cleanDomain = cleanDomainForSemrush(domain);
   const cacheKey = `backlinks_overview_${database}_${cleanDomain.replace(/\./g, '_')}`;
-  const cached = readCache<BacklinksOverview>(workspaceId, cacheKey, 48);
+  const cached = readCache<BacklinksOverview>(workspaceId, cacheKey, CACHE_TTL_BACKLINKS);
   if (cached) {
     logCreditUsage({ credits: 0, endpoint: 'backlinks_overview', query: cleanDomain, rowsReturned: 1, workspaceId, cached: true });
     return cached;
@@ -759,7 +781,7 @@ export async function getTopReferringDomains(
 
   const cleanDomain = cleanDomainForSemrush(domain);
   const cacheKey = `backlinks_refdomains_${database}_${cleanDomain.replace(/\./g, '_')}_${limit}`;
-  const cached = readCache<ReferringDomain[]>(workspaceId, cacheKey, 48);
+  const cached = readCache<ReferringDomain[]>(workspaceId, cacheKey, CACHE_TTL_BACKLINKS);
   if (cached) {
     logCreditUsage({ credits: 0, endpoint: 'backlinks_refdomains', query: cleanDomain, rowsReturned: cached.length, workspaceId, cached: true });
     return cached;
@@ -845,7 +867,7 @@ export async function getOrganicCompetitors(
 
   const cleanDomain = cleanDomainForSemrush(domain);
   const cacheKey = `organic_competitors_${database}_${cleanDomain.replace(/\./g, '_')}_${limit}`;
-  const cached = readCache<OrganicCompetitor[]>(workspaceId, cacheKey, 72); // 72h cache
+  const cached = readCache<OrganicCompetitor[]>(workspaceId, cacheKey, CACHE_TTL_COMPETITORS);
   if (cached) {
     logCreditUsage({ credits: 0, endpoint: 'domain_organic_organic', query: cleanDomain, rowsReturned: cached.length, workspaceId, cached: true });
     return cached;
