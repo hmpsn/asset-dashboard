@@ -128,13 +128,23 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
     } catch { /* best-effort — continue without content */ }
   }
 
-  // Enforce character limits helper
+  // Enforce character limits helper - STRICT enforcement
   const enforceLimit = (text: string, maxLen: number): string => {
-    let t = text.replace(/^["']|["']$/g, '').trim();
+    const t = text.replace(/^["']|["']$/g, '').trim();
     if (t.length > maxLen) {
+      // First try to end at a space, but don't go too far back
       const truncated = t.slice(0, maxLen);
       const lastSpace = truncated.lastIndexOf(' ');
-      t = lastSpace > maxLen * 0.6 ? truncated.slice(0, lastSpace) : truncated;
+      const lastPeriod = truncated.lastIndexOf('.');
+      const lastExclamation = truncated.lastIndexOf('!');
+      
+      // Prefer ending at punctuation if it's close enough, otherwise space
+      let cutPoint = maxLen;
+      if (lastSpace > maxLen * 0.7) cutPoint = lastSpace;
+      else if (lastPeriod > maxLen * 0.7) cutPoint = lastPeriod + 1;
+      else if (lastExclamation > maxLen * 0.7) cutPoint = lastExclamation + 1;
+      
+      return t.slice(0, cutPoint);
     }
     return t;
   };
@@ -151,7 +161,7 @@ Site context: ${siteContext || 'N/A'}
 Page content excerpt: ${resolvedPageContent || 'N/A'}${keywordContext}${brandVoiceBlock}${auditBlock}
 
 Requirements for EACH variation:
-- Between 150-160 characters (hard limit: 160)
+- STRICTLY 150-160 characters (HARD LIMIT: 160 - NO EXCEPTIONS)
 - Include a clear call to action or value proposition
 - Natural, not keyword-stuffed
 - Compelling enough to increase click-through rate from search results
@@ -159,6 +169,7 @@ Requirements for EACH variation:
 - LOCATION RULE: If this page's primary keyword targets a specific city/region, ALWAYS use THAT location. Never substitute the business HQ or a different city from the general business context. The page keyword is the authoritative location signal.
 ${brandName ? `- The brand name is "${brandName}" — use this exact name if referencing the brand (never use a shortened/abbreviated version)` : ''}
 - Each variation must be meaningfully different, not just a word swap
+- CRITICAL: Count characters carefully - NEVER exceed 160 characters
 
 Variation approaches:
 1. Benefit-focused: Lead with the key value proposition
@@ -176,13 +187,14 @@ Site context: ${siteContext || 'N/A'}
 Page content excerpt: ${resolvedPageContent || 'N/A'}${keywordContext}${brandVoiceBlock}${auditBlock}
 
 Requirements for EACH variation:
-- Between 50-60 characters (hard limit: 60)
+- STRICTLY 50-60 characters (HARD LIMIT: 60 - NO EXCEPTIONS)
 - Front-load the most important keywords
 ${brandName ? `- Brand name is "${brandName}" — use this exact name (NOT a shortened/abbreviated version) at the end with a pipe separator when appropriate` : '- Include brand name at end if appropriate (use pipe separator: |)'}
 - Compelling and descriptive
 - If keyword strategy is provided, front-load the primary keyword
 - LOCATION RULE: If this page's primary keyword targets a specific city/region, ALWAYS use THAT location. Never substitute the business HQ or a different city from the general business context. The page keyword is the authoritative location signal.
 - Each variation must be meaningfully different, not just a word swap
+- CRITICAL: Count characters carefully - NEVER exceed 60 characters
 
 Variation approaches:
 1. Keyword-forward: Primary keyword first, then context
@@ -195,7 +207,7 @@ Return ONLY a JSON array of 3 strings, e.g. ["title1","title2","title3"]. No exp
     const aiResult = await callOpenAI({
       model: 'gpt-4.1-mini',
       messages: [{ role: 'user', content: prompt }],
-      maxTokens: 500,
+      maxTokens: 300,
       temperature: 0.6,
       feature: 'seo-rewrite',
       workspaceId,
@@ -275,13 +287,13 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery
       const brandNote = inlineBrandName ? `\nBrand name is "${inlineBrandName}" — use this exact name, never an abbreviated version.` : '';
       const locationRule = `\n- LOCATION RULE: If this page's primary keyword targets a specific city/region, ALWAYS use THAT location. Never substitute the business HQ or a different city from the general business context.`;
       const prompt = field === 'description'
-        ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}".${contentSection}${keywordBlock}${bvBlock}${brandNote}\n\nRules:\n- 150-160 characters, hard limit 160\n- Include primary keyword naturally\n- Include a call-to-action or value proposition\n- Match the brand voice if provided${locationRule}\nReturn ONLY the text.`
-        : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}".${contentSection}${keywordBlock}${bvBlock}${brandNote}\n\nRules:\n- 50-60 characters, hard limit 60\n- Front-load the primary keyword\n- Match the brand voice if provided${locationRule}\nReturn ONLY the text.`;
+        ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}".${contentSection}${keywordBlock}${bvBlock}${brandNote}\n\nRules:\n- STRICTLY 150-160 characters (HARD LIMIT: 160 - NO EXCEPTIONS)\n- Include primary keyword naturally\n- Include a call-to-action or value proposition\n- Match the brand voice if provided${locationRule}\n- CRITICAL: Count characters carefully - NEVER exceed 160 characters\nReturn ONLY the text.`
+        : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}".${contentSection}${keywordBlock}${bvBlock}${brandNote}\n\nRules:\n- STRICTLY 50-60 characters (HARD LIMIT: 60 - NO EXCEPTIONS)\n- Front-load the primary keyword\n- Match the brand voice if provided${locationRule}\n- CRITICAL: Count characters carefully - NEVER exceed 60 characters\nReturn ONLY the text.`;
 
       const aiResult = await callOpenAI({
         model: 'gpt-4.1-mini',
         messages: [{ role: 'user', content: prompt }],
-        maxTokens: 200,
+        maxTokens: 150,
         temperature: 0.7,
         feature: 'seo-bulk-fix',
         workspaceId: workspaceId || ws?.id,
