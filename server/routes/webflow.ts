@@ -15,6 +15,9 @@ import {
   filterPublishedPages,
   updatePageSeo,
   publishSite,
+  getSiteSubdomain,
+  discoverCmsUrls,
+  buildStaticPathSet,
 } from '../webflow.js';
 import {
   listWorkspaces,
@@ -103,6 +106,60 @@ router.get('/api/webflow/pages/:siteId', requireWorkspaceAccessFromQuery(), asyn
     res.json(published);
   } catch (err) {
     log.error({ err: err }, 'Pages list error');
+    res.status(500).json({ error: 'Failed to list pages' });
+  }
+});
+
+// All pages (static + CMS) — for Page Analysis and bulk analysis features
+router.get('/api/webflow/all-pages/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+  try {
+    const { siteId } = req.params;
+    const token = getTokenForSite(siteId) || undefined;
+    const allPages = await listPages(siteId, token);
+    const published = filterPublishedPages(allPages);
+
+    // Build result from static pages
+    const result: Array<{ id: string; title: string; slug: string; publishedPath?: string | null; seo?: { title?: string; description?: string }; source: 'static' | 'cms' }> = published.map(p => ({
+      id: p.id,
+      title: p.title,
+      slug: p.slug || '',
+      publishedPath: p.publishedPath,
+      seo: p.seo ? { title: p.seo.title || undefined, description: p.seo.description || undefined } : undefined,
+      source: 'static' as const,
+    }));
+
+    // Discover CMS pages from sitemap
+    try {
+      const ws = listWorkspaces().find(w => w.webflowSiteId === siteId);
+      let baseUrl = '';
+      if (ws?.liveDomain) {
+        baseUrl = ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;
+      } else {
+        const sub = await getSiteSubdomain(siteId, token);
+        if (sub) baseUrl = `https://${sub}.webflow.io`;
+      }
+
+      if (baseUrl) {
+        const staticPaths = buildStaticPathSet(allPages);
+        const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, 100);
+        for (const cms of cmsUrls) {
+          result.push({
+            id: `cms-${cms.path.replace(/\//g, '-')}`,
+            title: cms.pageName,
+            slug: cms.path.replace(/^\//, ''),
+            publishedPath: cms.path,
+            source: 'cms',
+          });
+        }
+        log.info(`All pages: ${published.length} static + ${cmsUrls.length} CMS = ${result.length} total`);
+      }
+    } catch (err) {
+      log.warn({ err }, 'CMS page discovery failed — returning static pages only');
+    }
+
+    res.json(result);
+  } catch (err) {
+    log.error({ err }, 'All-pages list error');
     res.status(500).json({ error: 'Failed to list pages' });
   }
 });

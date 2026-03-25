@@ -429,7 +429,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
             </button>
           ))}
         </div>
-        <KeywordAnalysis siteId={siteId} />
+        <KeywordAnalysis siteId={siteId} workspaceId={workspaceId} />
       </div>
     );
   }

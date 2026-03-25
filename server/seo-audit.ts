@@ -1,7 +1,7 @@
 import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from './webflow.js';
 import { scanRedirects } from './redirect-scanner.js';
 import { runSinglePageSpeed } from './pagespeed.js';
-import { buildSeoContext } from './seo-context.js';
+import { buildSeoContext, buildPageAnalysisContext } from './seo-context.js';
 import { listWorkspaces, getBrandName } from './workspaces.js';
 import { callOpenAI } from './openai-helpers.js';
 import { extractMetaContent, extractLinks } from './seo-audit-html.js';
@@ -567,7 +567,7 @@ URL: ${pageResult.url}
 CURRENT TITLE: ${currentTitle || '(missing)'}
 CURRENT META DESCRIPTION: ${currentDesc || '(missing)'}
 
-${pageContent ? `PAGE CONTENT:\n${pageContent}\n` : ''}${fullContext}
+${pageContent ? `PAGE CONTENT:\n${pageContent}\n` : ''}${fullContext}${buildPageAnalysisContext(wsId, pagePath)}
 ISSUES TO FIX:
 ${titleIssue ? `- Title: ${titleIssue.message}` : ''}
 ${descIssue ? `- Meta Description: ${descIssue.message}` : ''}

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { put, post } from '../api/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Loader2, Upload, Check, AlertCircle, Wand2,
+  Loader2, Upload, Check, AlertCircle, Wand2, Sparkles,
 } from 'lucide-react';
 import type { FixContext } from '../App';
 import { seoSuggestions, keywords } from '../api/seo';
@@ -67,6 +67,8 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const [previewExpanded, setPreviewExpanded] = useState<Set<string>>(new Set());
   const [analyzing, setAnalyzing] = useState<Set<string>>(new Set());
   const [analyzedPages, setAnalyzedPages] = useState<Set<string>>(new Set());
+  const [bulkAnalyzeProgress, setBulkAnalyzeProgress] = useState<{ done: number; total: number } | null>(null);
+  const cancelBulkAnalyzeRef = useRef(false);
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
 
   // SEO Suggestions (persistent bulk rewrite variations)
@@ -343,6 +345,19 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     } finally {
       setAnalyzing(prev => { const n = new Set(prev); n.delete(pageId); return n; });
     }
+  };
+
+  const analyzeAllPages = async () => {
+    cancelBulkAnalyzeRef.current = false;
+    const toAnalyze = pages.filter(p => !analyzedPages.has(p.id));
+    setBulkAnalyzeProgress({ done: 0, total: toAnalyze.length });
+    for (let i = 0; i < toAnalyze.length; i++) {
+      if (cancelBulkAnalyzeRef.current) break;
+      setBulkAnalyzeProgress({ done: i, total: toAnalyze.length });
+      await analyzePage(toAnalyze[i].id);
+    }
+    setBulkAnalyzeProgress(prev => prev ? { ...prev, done: prev.total } : null);
+    setTimeout(() => setBulkAnalyzeProgress(null), 3000);
   };
 
   const handlePublish = async () => {
@@ -713,6 +728,35 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         >
           Reset page tracking
         </button>
+      )}
+
+      {/* Analyze All Pages */}
+      {workspaceId && (
+        <div className="flex items-center gap-3">
+          {bulkAnalyzeProgress ? (
+            <div className="flex items-center gap-2 px-3 py-2 bg-violet-500/10 border border-violet-500/30 rounded-lg">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-violet-400" />
+              <span className="text-xs text-zinc-300">Analyzing {bulkAnalyzeProgress.done}/{bulkAnalyzeProgress.total} pages...</span>
+              <button onClick={() => { cancelBulkAnalyzeRef.current = true; }} className="text-[11px] text-red-400 hover:text-red-300 ml-2">Cancel</button>
+            </div>
+          ) : (
+            <button
+              onClick={analyzeAllPages}
+              disabled={analyzing.size > 0 || analyzedPages.size === pages.length}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-violet-600/80 hover:bg-violet-500/80 text-white rounded-lg transition-colors disabled:opacity-40"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              {analyzedPages.size === pages.length && pages.length > 0
+                ? 'All Pages Analyzed'
+                : analyzedPages.size > 0
+                  ? `Analyze Remaining (${pages.length - analyzedPages.size})`
+                  : 'Analyze All Pages'}
+            </button>
+          )}
+          {analyzedPages.size > 0 && !bulkAnalyzeProgress && (
+            <span className="text-[11px] text-green-400">{analyzedPages.size}/{pages.length} pages have analysis on file</span>
+          )}
+        </div>
       )}
 
       {/* Search */}

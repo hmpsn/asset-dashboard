@@ -3155,6 +3155,24 @@
           "priority": "P0",
           "notes": "Shipped — field='both' mode for single + bulk SEO rewrite. AI generates 3 paired title/description sets per page. Frontend: 'AI Generate Both' button, paired variation picker, bulk 'AI Rewrite Both'. Feature #164.",
           "status": "done"
+        },
+        {
+          "id": 345,
+          "title": "Bulk Page Analysis + CMS Collection Pages",
+          "source": "USER REQUEST",
+          "est": "2h",
+          "priority": "P0",
+          "notes": "Shipped — 'Analyze All Pages' button in both SEO Editor and Page Analysis page. Sequential bulk analysis with progress + cancel. Auto-persist to keywordStrategy.pageMap. New /api/webflow/all-pages/:siteId endpoint discovers CMS pages from sitemap. CMS badge in page list. Feature #165.",
+          "status": "done"
+        },
+        {
+          "id": 346,
+          "title": "Page Analysis Context Wired into AI Features",
+          "source": "USER REQUEST",
+          "est": "0.5h",
+          "priority": "P1",
+          "notes": "Shipped — buildPageAnalysisContext() now injected into rewrite chat, content decay refresh recommendations, and SEO audit auto-fix prompts. 3 more AI features now address platform-flagged page issues. Feature #166.",
+          "status": "done"
         }
       ]
     }

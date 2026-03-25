@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Loader2, ChevronDown, ChevronRight, Target, AlertCircle,
   BarChart3, Sparkles, Search as SearchIcon, TrendingUp,
@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { scoreColorClass, scoreBgBarClass } from './ui';
 import { get, post } from '../api/client';
+import { keywords } from '../api/seo';
 
 interface PageMeta {
   id: string;
@@ -13,6 +14,7 @@ interface PageMeta {
   slug: string;
   publishedPath?: string | null;
   seo?: { title?: string | null; description?: string | null };
+  source?: 'static' | 'cms';
 }
 
 interface KeywordPresence {
@@ -54,6 +56,7 @@ interface ContentScore {
 
 interface Props {
   siteId: string;
+  workspaceId?: string;
 }
 
 
@@ -70,7 +73,7 @@ function intentIcon(intent: string): string {
   return '?';
 }
 
-export function KeywordAnalysis({ siteId }: Props) {
+export function KeywordAnalysis({ siteId, workspaceId }: Props) {
   const [pages, setPages] = useState<PageMeta[]>([]);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -78,12 +81,19 @@ export function KeywordAnalysis({ siteId }: Props) {
   const [contentScores, setContentScores] = useState<Record<string, ContentScore>>({});
   const [analyzing, setAnalyzing] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
+  const cancelBulkRef = useRef(false);
 
   useEffect(() => {
     setLoading(true);
-    get<PageMeta[]>(`/api/webflow/pages/${siteId}`)
+    get<PageMeta[]>(`/api/webflow/all-pages/${siteId}`)
       .then(data => setPages(data))
-      .catch(() => setPages([]))
+      .catch(() => {
+        // Fallback to static-only endpoint if all-pages not available
+        get<PageMeta[]>(`/api/webflow/pages/${siteId}`)
+          .then(data => setPages(data))
+          .catch(() => setPages([]));
+      })
       .finally(() => setLoading(false));
   }, [siteId]);
 
@@ -121,6 +131,24 @@ export function KeywordAnalysis({ siteId }: Props) {
 
       if (!kwData.error) {
         setAnalyses(prev => ({ ...prev, [page.id]: kwData }));
+        // Auto-persist analysis to workspace keyword strategy
+        if (workspaceId) {
+          try {
+            await keywords.persistAnalysis({
+              workspaceId,
+              pagePath: `/${page.slug || ''}`,
+              analysis: {
+                primaryKeyword: kwData.primaryKeyword,
+                secondaryKeywords: kwData.secondaryKeywords,
+                searchIntent: kwData.searchIntent,
+                optimizationIssues: kwData.optimizationIssues,
+                recommendations: kwData.recommendations,
+                contentGaps: kwData.contentGaps,
+                optimizationScore: kwData.optimizationScore,
+              },
+            });
+          } catch { /* persist is best-effort */ }
+        }
       }
       if (!csData.error) {
         setContentScores(prev => ({ ...prev, [page.id]: csData }));
@@ -130,6 +158,19 @@ export function KeywordAnalysis({ siteId }: Props) {
     } finally {
       setAnalyzing(prev => { const n = new Set(prev); n.delete(page.id); return n; });
     }
+  };
+
+  const analyzeAllPages = async () => {
+    cancelBulkRef.current = false;
+    const toAnalyze = pages.filter(p => !analyses[p.id]);
+    setBulkProgress({ done: 0, total: toAnalyze.length });
+    for (let i = 0; i < toAnalyze.length; i++) {
+      if (cancelBulkRef.current) break;
+      setBulkProgress({ done: i, total: toAnalyze.length });
+      await analyzePage(toAnalyze[i]);
+    }
+    setBulkProgress(prev => prev ? { ...prev, done: prev.total } : null);
+    setTimeout(() => setBulkProgress(null), 3000);
   };
 
   const toggleExpand = (id: string, page: PageMeta) => {
@@ -162,20 +203,36 @@ export function KeywordAnalysis({ siteId }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Stats */}
+      {/* Stats + Analyze All */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="text-sm text-zinc-400">
           <span className="font-medium text-zinc-200">{pages.length}</span> pages
+          {pages.some(p => p.source === 'cms') && (
+            <span className="text-[11px] text-violet-400 ml-1">({pages.filter(p => p.source === 'cms').length} CMS)</span>
+          )}
         </div>
         {analyzedCount > 0 && (
           <span className="text-xs px-2 py-0.5 rounded bg-teal-500/10 border border-teal-500/30 text-teal-400">
-            {analyzedCount} analyzed
+            {analyzedCount}/{pages.length} analyzed
           </span>
         )}
         <div className="flex-1" />
-        <div className="text-[11px] text-zinc-500 max-w-xs text-right">
-          Click a page to run AI keyword analysis. Each analysis uses GPT-4o-mini.
-        </div>
+        {bulkProgress ? (
+          <div className="flex items-center gap-2">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400" />
+            <span className="text-xs text-zinc-400">{bulkProgress.done}/{bulkProgress.total} pages...</span>
+            <button onClick={() => { cancelBulkRef.current = true; }} className="text-[11px] text-red-400 hover:text-red-300">Cancel</button>
+          </div>
+        ) : (
+          <button
+            onClick={analyzeAllPages}
+            disabled={analyzing.size > 0 || analyzedCount === pages.length}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-violet-600/80 hover:bg-violet-500/80 text-white rounded-lg transition-colors disabled:opacity-40"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            {analyzedCount === pages.length ? 'All Analyzed' : analyzedCount > 0 ? `Analyze Remaining (${pages.length - analyzedCount})` : 'Analyze All Pages'}
+          </button>
+        )}
       </div>
 
       {/* Search */}
@@ -212,7 +269,12 @@ export function KeywordAnalysis({ siteId }: Props) {
                   <ChevronRight className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
                 )}
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-zinc-200 truncate">{page.title}</div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-medium text-zinc-200 truncate">{page.title}</span>
+                    {page.source === 'cms' && (
+                      <span className="text-[9px] px-1 py-0.5 rounded bg-violet-500/15 text-violet-400 border border-violet-500/20 shrink-0">CMS</span>
+                    )}
+                  </div>
                   <div className="text-xs text-zinc-500 truncate">/{page.slug}</div>
                 </div>
                 {kw && (

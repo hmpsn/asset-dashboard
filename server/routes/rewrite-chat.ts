@@ -6,7 +6,7 @@
 import { Router } from 'express';
 import { getWorkspace } from '../workspaces.js';
 import { callOpenAI } from '../openai-helpers.js';
-import { buildSeoContext } from '../seo-context.js';
+import { buildSeoContext, buildPageAnalysisContext } from '../seo-context.js';
 import { getLatestSnapshot } from '../reports.js';
 import {
   addMessage,
@@ -171,7 +171,7 @@ Answer Engine Optimization (AEO) principles:
 - Include citations and data points
 - Use definition-style sentences that AI systems can extract
 - Avoid hidden content, dark patterns, and clickbait
-${seoCtx.keywordBlock}${seoCtx.brandVoiceBlock}${seoCtx.personasBlock}${knowledgeBase}${playbookBlock}${pageContextBlock}${issuesBlock}${priorContext ? `\n\nPREVIOUS CONVERSATION SUMMARY:\n${priorContext}` : ''}`;
+${seoCtx.keywordBlock}${seoCtx.brandVoiceBlock}${seoCtx.personasBlock}${knowledgeBase}${buildPageAnalysisContext(workspaceId, pageUrl ? new URL(pageUrl).pathname : undefined)}${playbookBlock}${pageContextBlock}${issuesBlock}${priorContext ? `\n\nPREVIOUS CONVERSATION SUMMARY:\n${priorContext}` : ''}`;
 
     const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
       { role: 'system', content: systemPrompt },
