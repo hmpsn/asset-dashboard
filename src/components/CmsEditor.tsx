@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Loader2, Save, ChevronDown, ChevronRight, Check, AlertCircle,
   Search, Sparkles, Wand2, Upload, Send, Clock, ArrowRight,
@@ -71,17 +71,37 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
   const collections = cmsData?.collections || [];
   const approvalBatches = cmsData?.approvalBatches || [];
 
-  const [expandedCollections, setExpandedCollections] = useState<Set<string>>(new Set());
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  const [edits, setEdits] = useState<Record<string, Record<string, string>>>({});
-  const [dirty, setDirty] = useState<Set<string>>(new Set());
+  // Session persistence: restore from RQ cache (survives admin tab switches)
+  const restoredFromCache = useRef(false);
+  const [expandedCollections, setExpandedCollections] = useState<Set<string>>(() => {
+    const cached = queryClient.getQueryData<string[]>(['cms-editor-expanded-colls', siteId]);
+    return cached ? new Set(cached) : new Set();
+  });
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(() => {
+    const cached = queryClient.getQueryData<string[]>(['cms-editor-expanded-items', siteId]);
+    return cached ? new Set(cached) : new Set();
+  });
+  const [edits, setEdits] = useState<Record<string, Record<string, string>>>(() => {
+    const cached = queryClient.getQueryData<Record<string, Record<string, string>>>(['cms-editor-edits', siteId]);
+    if (cached && Object.keys(cached).length > 0) {
+      restoredFromCache.current = true;
+      return cached;
+    }
+    return {};
+  });
+  const [dirty, setDirty] = useState<Set<string>>(() => {
+    const cached = queryClient.getQueryData<string[]>(['cms-editor-dirty', siteId]);
+    return cached ? new Set(cached) : new Set();
+  });
   const [saving, setSaving] = useState<Set<string>>(new Set());
   const [saved, setSaved] = useState<Set<string>>(new Set());
   const [approvalSelected, setApprovalSelected] = useState<Set<string>>(new Set());
   const [sendingApproval, setSendingApproval] = useState(false);
   const [approvalSent, setApprovalSent] = useState(false);
   const [approvalRefreshKey, setApprovalRefreshKey] = useState(0);
-  const [variations, setVariations] = useState<Record<string, { fieldSlug: string; options: string[] }>>({});
+  const [variations, setVariations] = useState<Record<string, { fieldSlug: string; options: string[] }>>(() => {
+    return queryClient.getQueryData(['cms-editor-vars', siteId]) || {};
+  });
   const [historyExpanded, setHistoryExpanded] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -95,10 +115,21 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
   const [bulkResults, setBulkResults] = useState<string | null>(null);
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
 
+  // Sync state to RQ cache for persistence across tab switches
+  useEffect(() => { if (Object.keys(edits).length > 0) queryClient.setQueryData(['cms-editor-edits', siteId], edits); }, [edits, queryClient, siteId]);
+  useEffect(() => { queryClient.setQueryData(['cms-editor-vars', siteId], variations); }, [variations, queryClient, siteId]);
+  useEffect(() => { queryClient.setQueryData(['cms-editor-expanded-colls', siteId], Array.from(expandedCollections)); }, [expandedCollections, queryClient, siteId]);
+  useEffect(() => { queryClient.setQueryData(['cms-editor-expanded-items', siteId], Array.from(expandedItems)); }, [expandedItems, queryClient, siteId]);
+  useEffect(() => { queryClient.setQueryData(['cms-editor-dirty', siteId], Array.from(dirty)); }, [dirty, queryClient, siteId]);
+
   // Initialize edit state when collections data loads
   useEffect(() => {
     if (!collections.length) return;
-    
+    // Skip re-initialization if restored from RQ cache (admin tab switch)
+    if (restoredFromCache.current) {
+      restoredFromCache.current = false;
+      return;
+    }
     const editMap: Record<string, Record<string, string>> = {};
     for (const coll of collections) {
       for (const item of coll.items) {

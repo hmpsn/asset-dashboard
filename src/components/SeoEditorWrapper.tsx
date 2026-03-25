@@ -36,8 +36,12 @@ export function SeoEditorWrapper({ siteId, workspaceId, fixContext }: Props) {
           </button>
         ))}
       </div>
-      {tab === 'pages' && <SeoEditor siteId={siteId} workspaceId={workspaceId} fixContext={fixContext} />}
-      {tab === 'cms' && <CmsEditor siteId={siteId} workspaceId={workspaceId} />}
+      <div style={{ display: tab === 'pages' ? undefined : 'none' }}>
+        <SeoEditor siteId={siteId} workspaceId={workspaceId} fixContext={fixContext} />
+      </div>
+      <div style={{ display: tab === 'cms' ? undefined : 'none' }}>
+        <CmsEditor siteId={siteId} workspaceId={workspaceId} />
+      </div>
     </div>
   );
 }
