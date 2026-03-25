@@ -3,7 +3,6 @@ import {
   Loader2, Save, ChevronDown, ChevronRight, Check, AlertCircle,
   Search, Sparkles, Wand2, Upload, Send, Clock, ArrowRight,
 } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useCmsEditor } from '../hooks/admin';
 import { EmptyState, LoadingState, ErrorState, CharacterCounter, SerpPreview, SocialPreview } from './ui';
@@ -66,32 +65,30 @@ interface Props {
 }
 
 export function CmsEditor({ siteId, workspaceId }: Props) {
-  const queryClient = useQueryClient();
   const { data: cmsData, isLoading } = useCmsEditor(siteId, workspaceId);
   const collections = cmsData?.collections || [];
   const approvalBatches = cmsData?.approvalBatches || [];
 
-  // Session persistence: restore from RQ cache (survives admin tab switches)
+  // Session persistence: restore from sessionStorage (survives tab switches + refresh)
   const restoredFromCache = useRef(false);
   const [expandedCollections, setExpandedCollections] = useState<Set<string>>(() => {
-    const cached = queryClient.getQueryData<string[]>(['cms-editor-expanded-colls', siteId]);
-    return cached ? new Set(cached) : new Set();
+    try { const raw = sessionStorage.getItem(`cms-editor-expanded-colls-${siteId}`); if (raw) return new Set(JSON.parse(raw)); } catch { /* ignore */ }
+    return new Set();
   });
   const [expandedItems, setExpandedItems] = useState<Set<string>>(() => {
-    const cached = queryClient.getQueryData<string[]>(['cms-editor-expanded-items', siteId]);
-    return cached ? new Set(cached) : new Set();
+    try { const raw = sessionStorage.getItem(`cms-editor-expanded-items-${siteId}`); if (raw) return new Set(JSON.parse(raw)); } catch { /* ignore */ }
+    return new Set();
   });
   const [edits, setEdits] = useState<Record<string, Record<string, string>>>(() => {
-    const cached = queryClient.getQueryData<Record<string, Record<string, string>>>(['cms-editor-edits', siteId]);
-    if (cached && Object.keys(cached).length > 0) {
-      restoredFromCache.current = true;
-      return cached;
-    }
+    try {
+      const raw = sessionStorage.getItem(`cms-editor-edits-${siteId}`);
+      if (raw) { const parsed = JSON.parse(raw); if (Object.keys(parsed).length > 0) { restoredFromCache.current = true; return parsed; } }
+    } catch { /* ignore */ }
     return {};
   });
   const [dirty, setDirty] = useState<Set<string>>(() => {
-    const cached = queryClient.getQueryData<string[]>(['cms-editor-dirty', siteId]);
-    return cached ? new Set(cached) : new Set();
+    try { const raw = sessionStorage.getItem(`cms-editor-dirty-${siteId}`); if (raw) return new Set(JSON.parse(raw)); } catch { /* ignore */ }
+    return new Set();
   });
   const [saving, setSaving] = useState<Set<string>>(new Set());
   const [saved, setSaved] = useState<Set<string>>(new Set());
@@ -100,7 +97,8 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
   const [approvalSent, setApprovalSent] = useState(false);
   const [approvalRefreshKey, setApprovalRefreshKey] = useState(0);
   const [variations, setVariations] = useState<Record<string, { fieldSlug: string; options: string[] }>>(() => {
-    return queryClient.getQueryData(['cms-editor-vars', siteId]) || {};
+    try { const raw = sessionStorage.getItem(`cms-editor-vars-${siteId}`); if (raw) return JSON.parse(raw); } catch { /* ignore */ }
+    return {};
   });
   const [historyExpanded, setHistoryExpanded] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
@@ -115,12 +113,12 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
   const [bulkResults, setBulkResults] = useState<string | null>(null);
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
 
-  // Sync state to RQ cache for persistence across tab switches
-  useEffect(() => { if (Object.keys(edits).length > 0) queryClient.setQueryData(['cms-editor-edits', siteId], edits); }, [edits, queryClient, siteId]);
-  useEffect(() => { queryClient.setQueryData(['cms-editor-vars', siteId], variations); }, [variations, queryClient, siteId]);
-  useEffect(() => { queryClient.setQueryData(['cms-editor-expanded-colls', siteId], Array.from(expandedCollections)); }, [expandedCollections, queryClient, siteId]);
-  useEffect(() => { queryClient.setQueryData(['cms-editor-expanded-items', siteId], Array.from(expandedItems)); }, [expandedItems, queryClient, siteId]);
-  useEffect(() => { queryClient.setQueryData(['cms-editor-dirty', siteId], Array.from(dirty)); }, [dirty, queryClient, siteId]);
+  // Sync state to sessionStorage for persistence across tab switches + refresh
+  useEffect(() => { if (Object.keys(edits).length > 0) try { sessionStorage.setItem(`cms-editor-edits-${siteId}`, JSON.stringify(edits)); } catch { /* ignore */ } }, [edits, siteId]);
+  useEffect(() => { try { sessionStorage.setItem(`cms-editor-vars-${siteId}`, JSON.stringify(variations)); } catch { /* ignore */ } }, [variations, siteId]);
+  useEffect(() => { try { sessionStorage.setItem(`cms-editor-expanded-colls-${siteId}`, JSON.stringify(Array.from(expandedCollections))); } catch { /* ignore */ } }, [expandedCollections, siteId]);
+  useEffect(() => { try { sessionStorage.setItem(`cms-editor-expanded-items-${siteId}`, JSON.stringify(Array.from(expandedItems))); } catch { /* ignore */ } }, [expandedItems, siteId]);
+  useEffect(() => { try { sessionStorage.setItem(`cms-editor-dirty-${siteId}`, JSON.stringify(Array.from(dirty))); } catch { /* ignore */ } }, [dirty, siteId]);
 
   // Initialize edit state when collections data loads
   useEffect(() => {

@@ -35,19 +35,21 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   // React Query hook replaces manual data fetching
   const { data: pages = [], isLoading: loading } = useSeoEditor(siteId);
   
-  // Session persistence: restore edits/variations/expanded from RQ cache (survives admin tab switches)
+  // Session persistence: restore edits/variations/expanded from sessionStorage (survives tab switches + refresh)
   const restoredFromCache = useRef(false);
   const [edits, setEdits] = useState<Record<string, EditState>>(() => {
-    const cached = queryClient.getQueryData<Record<string, EditState>>(['seo-editor-edits', siteId]);
-    if (cached && Object.keys(cached).length > 0) {
-      restoredFromCache.current = true;
-      return cached;
-    }
+    try {
+      const raw = sessionStorage.getItem(`seo-editor-edits-${siteId}`);
+      if (raw) { const parsed = JSON.parse(raw); if (Object.keys(parsed).length > 0) { restoredFromCache.current = true; return parsed; } }
+    } catch { /* ignore */ }
     return {};
   });
   const [expanded, setExpanded] = useState<Set<string>>(() => {
-    const cached = queryClient.getQueryData<string[]>(['seo-editor-expanded', siteId]);
-    return cached ? new Set(cached) : new Set();
+    try {
+      const raw = sessionStorage.getItem(`seo-editor-expanded-${siteId}`);
+      if (raw) return new Set(JSON.parse(raw));
+    } catch { /* ignore */ }
+    return new Set();
   });
   const [saving, setSaving] = useState<Set<string>>(new Set());
   const [saved, setSaved] = useState<Set<string>>(new Set());
@@ -67,7 +69,11 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const [sendingPage, setSendingPage] = useState<Set<string>>(new Set());
   const [sentPage, setSentPage] = useState<Set<string>>(new Set());
   const [variations, setVariations] = useState<Record<string, { field: string; options: string[]; descOptions?: string[] }>>(() => {
-    return queryClient.getQueryData(['seo-editor-vars', siteId]) || {};
+    try {
+      const raw = sessionStorage.getItem(`seo-editor-vars-${siteId}`);
+      if (raw) return JSON.parse(raw);
+    } catch { /* ignore */ }
+    return {};
   });
   const [errorStates, setErrorStates] = useState<Record<string, { type: string; message: string }>>({});
   const [previewExpanded, setPreviewExpanded] = useState<Set<string>>(new Set());
@@ -77,10 +83,10 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const cancelBulkAnalyzeRef = useRef(false);
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
 
-  // Sync edits/variations/expanded to RQ cache for persistence across tab switches
-  useEffect(() => { if (Object.keys(edits).length > 0) queryClient.setQueryData(['seo-editor-edits', siteId], edits); }, [edits, queryClient, siteId]);
-  useEffect(() => { queryClient.setQueryData(['seo-editor-expanded', siteId], Array.from(expanded)); }, [expanded, queryClient, siteId]);
-  useEffect(() => { queryClient.setQueryData(['seo-editor-vars', siteId], variations); }, [variations, queryClient, siteId]);
+  // Sync edits/variations/expanded to sessionStorage for persistence across tab switches + refresh
+  useEffect(() => { if (Object.keys(edits).length > 0) try { sessionStorage.setItem(`seo-editor-edits-${siteId}`, JSON.stringify(edits)); } catch { /* ignore */ } }, [edits, siteId]);
+  useEffect(() => { try { sessionStorage.setItem(`seo-editor-expanded-${siteId}`, JSON.stringify(Array.from(expanded))); } catch { /* ignore */ } }, [expanded, siteId]);
+  useEffect(() => { try { sessionStorage.setItem(`seo-editor-vars-${siteId}`, JSON.stringify(variations)); } catch { /* ignore */ } }, [variations, siteId]);
 
   // SEO Suggestions (persistent bulk rewrite variations)
   const { data: suggestionsData, refetch: refetchSuggestions } = useQuery({
