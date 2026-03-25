@@ -804,16 +804,20 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
               }));
 
               // Persist ALL batch results in a single atomic write (no race condition)
+              log.info({ batchResultsCount: batchResults.length }, 'Page analysis: batch complete, persisting results');
               if (batchResults.length > 0) {
                 const ws = getWorkspace(paWsId);
+                if (!ws) { log.error({ paWsId }, 'Page analysis: workspace not found during persistence!'); }
                 if (ws) {
                   const strategy: KeywordStrategy = ws.keywordStrategy || { siteKeywords: [], pageMap: [], opportunities: [], generatedAt: new Date().toISOString() };
                   const pageMap = strategy.pageMap || [];
+                  const pageMapBefore = pageMap.length;
                   const now = new Date().toISOString();
 
                   for (const { page, analysis } of batchResults) {
                     const normalized = page.path.startsWith('/') ? page.path : `/${page.path}`;
                     const entry = pageMap.find(p => p.pagePath === normalized || normalized.includes(p.pagePath) || p.pagePath.includes(normalized));
+                    log.info({ path: normalized, matched: !!entry, matchedPath: entry?.pagePath, score: analysis.optimizationScore }, 'Page analysis: persisting page');
 
                     if (entry) {
                       if (analysis.primaryKeyword) entry.primaryKeyword = analysis.primaryKeyword as string;
@@ -856,7 +860,9 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
                     }
                   }
                   strategy.pageMap = pageMap;
+                  log.info({ pageMapBefore, pageMapAfter: pageMap.length, withScores: pageMap.filter(p => p.optimizationScore && p.optimizationScore > 0).length }, 'Page analysis: writing to DB');
                   updateWorkspace(paWsId, { keywordStrategy: strategy });
+                  log.info('Page analysis: updateWorkspace complete');
                 }
               }
 
