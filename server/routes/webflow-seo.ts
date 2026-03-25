@@ -7,6 +7,7 @@ import { requireWorkspaceAccessFromQuery } from '../auth.js';
 const router = Router();
 
 import { callOpenAI } from '../openai-helpers.js';
+import { callCreativeAI } from '../content-posts-ai.js';
 import { getLatestSnapshot } from '../reports.js';
 import { runSeoAudit } from '../seo-audit.js';
 import { buildSeoContext, buildKeywordMapContext } from '../seo-context.js';
@@ -254,23 +255,23 @@ VARIATION ANGLES:
 Return ONLY a JSON array of 3 strings. No explanation.`;
     }
 
-    const aiResult = await callOpenAI({
-      model: 'gpt-4.1',
-      messages: [{ role: 'user', content: prompt }],
+    // Claude primary (richer language), GPT fallback
+    const aiText = await callCreativeAI({
+      systemPrompt: 'You are an elite SEO copywriter. Return ONLY a valid JSON array of 3 strings. No markdown, no explanation, no code fences.',
+      userPrompt: prompt,
       maxTokens: 400,
-      temperature: 0.7,
       feature: 'seo-rewrite',
-      workspaceId,
+      workspaceId: workspaceId || '',
     });
 
     // Parse the 3 variations
     let variations: string[];
     try {
-      const parsed = JSON.parse(aiResult.text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
+      const parsed = JSON.parse(aiText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
       variations = Array.isArray(parsed) ? parsed.map((v: string) => enforceLimit(String(v), maxLen)) : [enforceLimit(String(parsed), maxLen)];
     } catch {
       // Fallback: single variation from raw text
-      variations = [enforceLimit(aiResult.text, maxLen)];
+      variations = [enforceLimit(aiText, maxLen)];
     }
 
     // Always return at least the first as `text` for backward compatibility + all as `variations`

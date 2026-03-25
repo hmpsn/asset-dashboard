@@ -992,6 +992,7 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 
 ### OpenAI Model Upgrades
 - ~~All models upgraded to GPT-4.1 series~~: ✅ Shipped (March 10, 2026) — gpt-4o → gpt-4.1, gpt-4o-mini → gpt-4.1-mini across all endpoints (SEO rewrite, content briefs, content posts, schema, audit, anomaly detection, chat memory, strategy, keyword analysis, seo-copy, internal links). Alt text generation uses gpt-4.1-nano for cost savings on trivial tasks. Brand name context injected into all AI prompts that generate client-facing copy.
+- ~~Single-page SEO rewrite → Claude primary~~: ✅ Shipped (March 24, 2026) — `/api/webflow/seo-rewrite` now uses `callCreativeAI()` (Claude Sonnet primary, GPT-4.1 fallback) for richer, more natural title/meta description language. Bulk fix and bulk rewrite remain on GPT-4.1-mini for speed/cost.
 
 ### Schema Generator Enhancements
 - ~~Bulk publish~~: ✅ Shipped — Publish to Webflow per-page via Custom Code API.
