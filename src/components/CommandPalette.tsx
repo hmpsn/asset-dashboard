@@ -36,6 +36,7 @@ const NAV_ITEMS: Array<{ id: Page; label: string; icon: typeof Search; group: st
   { id: 'media', label: 'Assets', icon: Image, group: 'Site Health' },
   { id: 'brand', label: 'Brand & AI', icon: Sparkles, group: 'SEO' },
   { id: 'seo-strategy', label: 'Strategy', icon: Target, group: 'SEO', needsSite: true },
+  { id: 'page-intelligence', label: 'Page Intelligence', icon: Search, group: 'SEO', needsSite: true },
   { id: 'seo-editor', label: 'SEO Editor', icon: Pencil, group: 'SEO', needsSite: true },
   { id: 'seo-schema', label: 'Schema', icon: Code2, group: 'SEO', needsSite: true },
   { id: 'seo-briefs', label: 'Content Briefs', icon: Clipboard, group: 'Content', needsSite: true },

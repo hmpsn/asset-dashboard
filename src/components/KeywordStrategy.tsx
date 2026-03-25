@@ -1,17 +1,15 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Loader2, Target, ChevronDown, ChevronRight, RefreshCw,
   AlertCircle, Sparkles, Briefcase,
   BarChart3, Users, Search, FileText,
   Eye, MousePointerClick, Trophy, AlertTriangle,
 } from 'lucide-react';
-import { KeywordAnalysis } from './KeywordAnalysis';
 import { StatCard, AIContextIndicator } from './ui';
 import { useKeywordStrategy } from '../hooks/admin';
+import { useQueryClient } from '@tanstack/react-query';
 import { BacklinkProfile } from './strategy/BacklinkProfile';
 import { CompetitiveIntel } from './strategy/CompetitiveIntel';
-import { PageKeywordMapPanel } from './strategy/PageKeywordMap';
 import { ContentGaps } from './strategy/ContentGaps';
 import { QuickWins } from './strategy/QuickWins';
 import { KeywordGaps } from './strategy/KeywordGaps';
@@ -37,84 +35,13 @@ interface PageKeywordMap {
   secondaryMetrics?: { keyword: string; volume: number; difficulty: number }[];
 }
 
-interface KeywordGapItem {
-  keyword: string;
-  volume: number;
-  difficulty: number;
-  competitorPosition: number;
-  competitorDomain: string;
-}
-
-interface ContentGap {
-  topic: string;
-  targetKeyword: string;
-  intent: string;
-  priority: string;
-  rationale: string;
-  suggestedPageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource';
-}
-
-interface QuickWin {
-  pagePath: string;
-  action: string;
-  estimatedImpact: string;
-  rationale: string;
-}
-
-interface TopicCluster {
-  topic: string;
-  keywords: string[];
-  ownedCount: number;
-  totalCount: number;
-  coveragePercent: number;
-  avgPosition?: number;
-  topCompetitor?: string;
-  topCompetitorCoverage?: number;
-  gap: string[];
-}
-
-interface CannibalizationItem {
-  keyword: string;
-  pages: { path: string; position?: number; impressions?: number; clicks?: number; source: 'keyword_map' | 'gsc' }[];
-  severity: 'high' | 'medium' | 'low';
-  recommendation: string;
-}
-
-interface KeywordStrategy {
-  siteKeywords: string[];
-  siteKeywordMetrics?: { keyword: string; volume: number; difficulty: number }[];
-  pageMap: PageKeywordMap[];
-  opportunities: string[];
-  contentGaps?: ContentGap[];
-  quickWins?: QuickWin[];
-  keywordGaps?: KeywordGapItem[];
-  topicClusters?: TopicCluster[];
-  cannibalization?: CannibalizationItem[];
-  questionKeywords?: { seed: string; questions: { keyword: string; volume: number }[] }[];
-  businessContext?: string;
-  semrushMode?: 'quick' | 'full' | 'none';
-  generatedAt: string;
-}
-
-interface SeoCopy {
-  seoTitle: string;
-  metaDescription: string;
-  h1: string;
-  introParagraph: string;
-  internalLinkSuggestions?: { targetPath: string; anchorText: string; context: string }[];
-  changes?: string[];
-}
-
 interface Props {
   workspaceId: string;
   siteId?: string;
 }
 
-type StrategyTab = 'strategy' | 'analysis';
-
-export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
-  const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<StrategyTab>('strategy');
+export function KeywordStrategyPanel({ workspaceId }: Props) {
+  const queryClient = useQueryClient();
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -122,10 +49,6 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
   const { data: keywordData, isLoading: loading } = useKeywordStrategy(workspaceId);
   const strategy = keywordData?.strategy || null;
   const semrushAvailableFromHook = keywordData?.semrushAvailable || false;
-  const [expandedPages, setExpandedPages] = useState<Set<number>>(new Set());
-  const [editingPage, setEditingPage] = useState<number | null>(null);
-  const [editDraft, setEditDraft] = useState<{ primary: string; secondary: string }>({ primary: '', secondary: '' });
-  const [saving, setSaving] = useState(false);
   const [businessContext, setBusinessContext] = useState('');
   const [contextOpen, setContextOpen] = useState(false);
   const [semrushAvailable, setSemrushAvailable] = useState(semrushAvailableFromHook);
@@ -137,13 +60,6 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
   const [progressStep, setProgressStep] = useState('');
   const [progressDetail, setProgressDetail] = useState('');
   const [progressPct, setProgressPct] = useState(0);
-  const [pageSearch, setPageSearch] = useState('');
-  const [sortBy, setSortBy] = useState<'opportunity' | 'position' | 'volume' | 'impressions'>('opportunity');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const [generatingCopy, setGeneratingCopy] = useState<string | null>(null);
-  const [seoCopyResults, setSeoCopyResults] = useState<Map<string, SeoCopy>>(new Map());
-  const [copiedField, setCopiedField] = useState<string | null>(null);
-
   const stepLabels: Record<string, string> = {
     discovery: 'Discovering pages',
     content: 'Fetching page content',
@@ -203,7 +119,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
       if (!res.ok || !res.body) {
         // Non-streaming error response (429, 400, 500, etc.) or no streaming support
         const data = await res.json();
-        if (!res.ok || data.error) { setError(data.message || data.error || 'Request failed'); } else { setStrategy(data); }
+        if (!res.ok || data.error) { setError(data.message || data.error || 'Request failed'); } else { queryClient.invalidateQueries({ queryKey: ['keyword-strategy', workspaceId] }); }
         return;
       }
 
@@ -224,7 +140,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
           try {
             const evt = JSON.parse(line.slice(6));
             if (evt.error) { setError(evt.error); break; }
-            if (evt.done && evt.strategy) { setStrategy(evt.strategy); break; }
+            if (evt.done && evt.strategy) { queryClient.invalidateQueries({ queryKey: ['keyword-strategy', workspaceId] }); break; }
             if (evt.step) { setProgressStep(evt.step); setProgressDetail(evt.detail || ''); setProgressPct(evt.progress || 0); }
           } catch (err) { console.error('KeywordStrategy operation failed:', err); }
         }
@@ -235,46 +151,6 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
     } finally {
       setGenerating(false);
       setProgressStep('');
-    }
-  };
-
-  const togglePage = (idx: number) => {
-    setExpandedPages(prev => {
-      const n = new Set(prev);
-      if (n.has(idx)) n.delete(idx); else n.add(idx);
-      return n;
-    });
-  };
-
-  const startEdit = (idx: number) => {
-    const page = strategy?.pageMap[idx];
-    if (!page) return;
-    setEditingPage(idx);
-    setEditDraft({
-      primary: page.primaryKeyword,
-      secondary: page.secondaryKeywords.join(', '),
-    });
-  };
-
-  const saveEdit = async () => {
-    if (editingPage === null || !strategy) return;
-    setSaving(true);
-    const updated = { ...strategy };
-    updated.pageMap = [...updated.pageMap];
-    updated.pageMap[editingPage] = {
-      ...updated.pageMap[editingPage],
-      primaryKeyword: editDraft.primary.trim(),
-      secondaryKeywords: editDraft.secondary.split(',').map(s => s.trim()).filter(Boolean),
-    };
-    try {
-      const data = await keywords.patchStrategy(workspaceId, { pageMap: updated.pageMap }) as KeywordStrategy;
-      if (data.pageMap) setStrategy(data);
-      setEditingPage(null);
-    } catch (err) {
-      console.error('KeywordStrategy operation failed:', err);
-      // ignore
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -294,14 +170,6 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
     return 'text-red-400';
   };
 
-  const difficultyLabel = (kd?: number) => {
-    if (kd === undefined) return '';
-    if (kd <= 30) return 'Easy';
-    if (kd <= 50) return 'Medium';
-    if (kd <= 70) return 'Hard';
-    return 'Very Hard';
-  };
-
   const intentColor = (intent?: string) => {
     switch (intent) {
       case 'commercial': return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
@@ -312,81 +180,28 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
     }
   };
 
-  const getOpportunityScore = (p: PageKeywordMap) => {
-    const pos = p.currentPosition || 999;
-    const imp = p.impressions || 0;
-    const vol = p.volume || 0;
-    if (pos >= 4 && pos <= 20 && imp > 0) return imp * (21 - pos);
-    if (pos > 20 && imp > 0) return imp * 2;
-    if (pos <= 3) return imp * 0.5;
-    if (vol > 0) return vol;
-    return 1;
-  };
-
   // Computed metrics
-  const ranked = strategy?.pageMap.filter(p => p.currentPosition) || [];
-  const avgPos = ranked.length > 0 ? ranked.reduce((s, p) => s + (p.currentPosition || 0), 0) / ranked.length : 0;
-  const totalImpressions = strategy?.pageMap.reduce((s, p) => s + (p.impressions || 0), 0) || 0;
-  const totalClicks = strategy?.pageMap.reduce((s, p) => s + (p.clicks || 0), 0) || 0;
-  const top3 = ranked.filter(p => (p.currentPosition || 99) <= 3);
-  const top10 = ranked.filter(p => (p.currentPosition || 99) <= 10 && (p.currentPosition || 0) > 3);
-  const top20 = ranked.filter(p => (p.currentPosition || 99) <= 20 && (p.currentPosition || 0) > 10);
-  const beyond20 = ranked.filter(p => (p.currentPosition || 0) > 20);
-  const notRankingCount = (strategy?.pageMap.length || 0) - ranked.length;
+  const pageMap: PageKeywordMap[] = strategy?.pageMap || [];
+  const ranked = pageMap.filter((p: PageKeywordMap) => p.currentPosition);
+  const avgPos = ranked.length > 0 ? ranked.reduce((s: number, p: PageKeywordMap) => s + (p.currentPosition || 0), 0) / ranked.length : 0;
+  const totalImpressions = pageMap.reduce((s: number, p: PageKeywordMap) => s + (p.impressions || 0), 0);
+  const totalClicks = pageMap.reduce((s: number, p: PageKeywordMap) => s + (p.clicks || 0), 0);
+  const top3 = ranked.filter((p: PageKeywordMap) => (p.currentPosition || 99) <= 3);
+  const top10 = ranked.filter((p: PageKeywordMap) => (p.currentPosition || 99) <= 10 && (p.currentPosition || 0) > 3);
+  const top20 = ranked.filter((p: PageKeywordMap) => (p.currentPosition || 99) <= 20 && (p.currentPosition || 0) > 10);
+  const beyond20 = ranked.filter((p: PageKeywordMap) => (p.currentPosition || 0) > 20);
+  const notRankingCount = pageMap.length - ranked.length;
 
   const lowHangingFruit = ranked
-    .filter(p => (p.currentPosition || 0) >= 4 && (p.currentPosition || 0) <= 20 && (p.impressions || 0) > 20)
-    .sort((a, b) => (b.impressions || 0) - (a.impressions || 0))
+    .filter((p: PageKeywordMap) => (p.currentPosition || 0) >= 4 && (p.currentPosition || 0) <= 20 && (p.impressions || 0) > 20)
+    .sort((a: PageKeywordMap, b: PageKeywordMap) => (b.impressions || 0) - (a.impressions || 0))
     .slice(0, 6);
 
-
-  const generateSeoCopy = async (page: PageKeywordMap) => {
-    setGeneratingCopy(page.pagePath);
-    try {
-      const data = await keywords.seoCopy({
-        pagePath: page.pagePath,
-        pageTitle: page.pageTitle,
-        workspaceId,
-      }) as SeoCopy & { error?: string };
-      if (data.error) { console.error(data.error); return; }
-      setSeoCopyResults(prev => new Map(prev).set(page.pagePath, data));
-    } catch (err) {
-      console.error('SEO copy generation failed:', err);
-    } finally {
-      setGeneratingCopy(null);
-    }
-  };
-
-  const copyText = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedField(label);
-    setTimeout(() => setCopiedField(null), 2000);
-  };
-
-  const intentCounts = strategy?.pageMap.reduce((acc, p) => {
+  const intentCounts = pageMap.reduce((acc: Record<string, number>, p: PageKeywordMap) => {
     const intent = p.searchIntent || 'unknown';
     acc[intent] = (acc[intent] || 0) + 1;
     return acc;
-  }, {} as Record<string, number>) || {};
-
-  const filteredPages = (strategy?.pageMap || [])
-    .filter(p => {
-      if (!pageSearch) return true;
-      const q = pageSearch.toLowerCase();
-      return p.pageTitle.toLowerCase().includes(q) ||
-             p.pagePath.toLowerCase().includes(q) ||
-             p.primaryKeyword.toLowerCase().includes(q);
-    })
-    .sort((a, b) => {
-      let cmp = 0;
-      switch (sortBy) {
-        case 'position': cmp = (a.currentPosition || 999) - (b.currentPosition || 999); break;
-        case 'volume': cmp = (b.volume || 0) - (a.volume || 0); break;
-        case 'impressions': cmp = (b.impressions || 0) - (a.impressions || 0); break;
-        case 'opportunity': cmp = getOpportunityScore(b) - getOpportunityScore(a); break;
-      }
-      return sortDir === 'asc' ? -cmp : cmp;
-    });
+  }, {} as Record<string, number>);
 
   if (loading) {
     return (
@@ -405,59 +220,8 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
     );
   }
 
-  // Sub-tab: Page Analysis
-  if (activeTab === 'analysis' && siteId) {
-    return (
-      <div className="space-y-4">
-        {/* Tab bar */}
-        <div className="flex items-center gap-1 border-b border-zinc-800 pb-0">
-          {[
-            { id: 'strategy' as const, label: 'Keyword Strategy', icon: Target },
-            { id: 'analysis' as const, label: 'Page Analysis', icon: Search },
-          ].map(t => (
-            <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id)}
-              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px ${
-                activeTab === t.id
-                  ? 'border-teal-500 text-teal-300'
-                  : 'border-transparent text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              <t.icon className="w-3.5 h-3.5" />
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <KeywordAnalysis siteId={siteId} workspaceId={workspaceId} />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
-      {/* Tab bar + Header */}
-      {siteId && (
-        <div className="flex items-center gap-1 border-b border-zinc-800 pb-0">
-          {[
-            { id: 'strategy' as const, label: 'Keyword Strategy', icon: Target },
-            { id: 'analysis' as const, label: 'Page Analysis', icon: Search },
-          ].map(t => (
-            <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id)}
-              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px ${
-                activeTab === t.id
-                  ? 'border-teal-500 text-teal-300'
-                  : 'border-transparent text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              <t.icon className="w-3.5 h-3.5" />
-              {t.label}
-            </button>
-          ))}
-        </div>
-      )}
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-zinc-200">Keyword Strategy</h3>
@@ -683,7 +447,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
       {strategy && (
         <>
           {/* ── Unvalidated Strategy Warning ── */}
-          {!strategy.pageMap.some(p => p.volume && p.volume > 0) && (
+          {!strategy.pageMap.some((p: PageKeywordMap) => p.volume && p.volume > 0) && (
             <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3 flex items-start gap-2.5">
               <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
               <div className="text-xs text-amber-300/90 leading-relaxed">
@@ -760,8 +524,8 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
               <Target className="w-3.5 h-3.5 text-teal-400" /> Site Target Keywords
             </h4>
             <div className="flex flex-wrap gap-1.5">
-              {strategy.siteKeywords.map((kw, i) => {
-                const metrics = strategy.siteKeywordMetrics?.find(m => m.keyword.toLowerCase() === kw.toLowerCase());
+              {strategy.siteKeywords.map((kw: string, i: number) => {
+                const metrics = strategy.siteKeywordMetrics?.find((m: { keyword: string; volume: number; difficulty: number }) => m.keyword.toLowerCase() === kw.toLowerCase());
                 return (
                   <span key={i} className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-teal-500/10 border border-teal-500/20 rounded text-[11px] text-teal-300">
                     {kw}
@@ -787,7 +551,7 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
                 These opportunities are AI-generated suggestions based on your site's content and competitive landscape. Validate with keyword research before acting.
               </p>
               <div className="space-y-1.5">
-                {strategy.opportunities.map((opp, i) => (
+                {strategy.opportunities.map((opp: string, i: number) => (
                   <div key={i} className="flex items-start gap-2 text-[11px] text-zinc-400">
                     <span className="w-4 h-4 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center flex-shrink-0 mt-0.5 text-[11px] text-teal-400 font-bold">{i + 1}</span>
                     {opp}
@@ -796,36 +560,6 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
               </div>
             </div>
           )}
-
-          {/* ── Page Keyword Map ── */}
-          <PageKeywordMapPanel
-            filteredPages={filteredPages}
-            pageMap={strategy.pageMap}
-            expandedPages={expandedPages}
-            editingPage={editingPage}
-            editDraft={editDraft}
-            saving={saving}
-            pageSearch={pageSearch}
-            sortBy={sortBy}
-            sortDir={sortDir}
-            seoCopyResults={seoCopyResults}
-            generatingCopy={generatingCopy}
-            copiedField={copiedField}
-            positionColor={positionColor}
-            difficultyColor={difficultyColor}
-            difficultyLabel={difficultyLabel}
-            intentColor={intentColor}
-            onTogglePage={togglePage}
-            onStartEdit={startEdit}
-            onSaveEdit={saveEdit}
-            onSetEditingPage={setEditingPage}
-            onSetEditDraft={setEditDraft}
-            onSetPageSearch={setPageSearch}
-            onSetSortBy={setSortBy}
-            onSetSortDir={setSortDir}
-            onGenerateSeoCopy={generateSeoCopy}
-            onCopyText={copyText}
-          />
 
           {/* ── Cannibalization Alert ── */}
           {strategy.cannibalization && strategy.cannibalization.length > 0 && (
@@ -857,14 +591,13 @@ export function KeywordStrategyPanel({ workspaceId, siteId }: Props) {
               <div className="text-[11px] text-zinc-500">
                 <strong className="text-zinc-400">How it works:</strong> This strategy is automatically used when you generate AI rewrites
                 in the Edit SEO and CMS SEO tabs. The AI will incorporate your target keywords naturally into titles and descriptions.
-                Use the <strong className="text-teal-400">Generate SEO Copy</strong> button on any page to get rewritten title, meta, H1, and intro paragraph.
-                Edit any page's keywords to refine the strategy.
+                Use <strong className="text-teal-400">Page Intelligence</strong> to analyze individual pages, edit keywords, and generate SEO copy.
                 {strategy.semrushMode && strategy.semrushMode !== 'none' && (
                   <span className="block mt-1 text-orange-400/80">
                     SEMRush data: Keywords enriched with real search volume and difficulty. Cached for 7 days.
                   </span>
                 )}
-                {!strategy.pageMap.some(p => p.currentPosition) && (
+                {!strategy.pageMap.some((p: PageKeywordMap) => p.currentPosition) && (
                   <span className="block mt-1 text-amber-400/80">
                     Tip: Connect Google Search Console to see ranking positions and get data-driven keyword suggestions.
                   </span>

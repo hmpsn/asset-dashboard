@@ -43,6 +43,7 @@ const WorkspaceHome = lazy(() => import('./components/WorkspaceHome').then(m => 
 // ── Lazy-loaded SEO sub-tool chunks (split from SeoAudit #131) ──
 const SeoEditorWrapper = lazy(() => import('./components/SeoEditorWrapper').then(m => ({ default: m.SeoEditorWrapper })));
 const KeywordStrategyPanel = lazy(() => import('./components/KeywordStrategy').then(m => ({ default: m.KeywordStrategyPanel })));
+const PageIntelligence = lazy(() => import('./components/PageIntelligence').then(m => ({ default: m.PageIntelligence })));
 const SchemaSuggester = lazy(() => import('./components/SchemaSuggester').then(m => ({ default: m.SchemaSuggester })));
 const ContentBriefs = lazy(() => import('./components/ContentBriefs').then(m => ({ default: m.ContentBriefs })));
 const ContentPerformance = lazy(() => import('./components/ContentPerformance').then(m => ({ default: m.ContentPerformance })));
@@ -320,6 +321,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (tab === 'seo-audit') return <SeoAudit key={`seo-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} siteName={selected.webflowSiteName || selected.name} />;
     if (tab === 'seo-editor') return <SeoEditorWrapper key={`editor-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} />;
     if (tab === 'seo-strategy') return <KeywordStrategyPanel key={`strategy-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId!} />;
+    if (tab === 'page-intelligence') return <PageIntelligence key={`pageintel-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId!} fixContext={fixContext} />;
     if (tab === 'links') return <LinksPanel key={`links-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} />;
     if (tab === 'seo-schema') return <SchemaSuggester key={`schema-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} />;
     if (tab === 'content-pipeline') return <ContentPipeline key={`pipeline-${selected.id}`} workspaceId={selected.id} onRequestCountChange={setPendingContentRequests} fixContext={fixContext} />;

@@ -3,7 +3,7 @@ export type Page =
   | 'media'
   | 'seo-audit' | 'seo-editor'
   | 'links'
-  | 'seo-strategy' | 'seo-schema' | 'seo-briefs' | 'seo-ranks'
+  | 'seo-strategy' | 'page-intelligence' | 'seo-schema' | 'seo-briefs' | 'seo-ranks'
   | 'content' | 'calendar' | 'brand' | 'subscriptions' | 'content-pipeline'
   | 'search' | 'analytics' | 'annotations'
   | 'performance'

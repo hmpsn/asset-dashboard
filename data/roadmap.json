@@ -3173,6 +3173,15 @@
           "priority": "P1",
           "notes": "Shipped — buildPageAnalysisContext() now injected into rewrite chat, content decay refresh recommendations, and SEO audit auto-fix prompts. 3 more AI features now address platform-flagged page issues. Feature #166.",
           "status": "done"
+        },
+        {
+          "id": 347,
+          "title": "Page Intelligence — Unified Per-Page SEO Tab",
+          "source": "USER REQUEST",
+          "est": "4h",
+          "priority": "P0",
+          "notes": "Shipped — Merged Page Keyword Map and Page Analysis into single 'Page Intelligence' sidebar tab. New PageIntelligence.tsx component (790 lines). Strategy tab cleaned to strategy-only (removed per-page detail, PageKeywordMapPanel, Analysis sub-tab). Command Palette updated. Feature #167.",
+          "status": "done"
         }
       ]
     }
