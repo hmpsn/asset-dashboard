@@ -661,13 +661,11 @@ router.post('/api/jobs', async (req, res) => {
 
             // 2. Skip already-analyzed pages (unless forceRefresh)
             const forceRefresh = !!params.forceRefresh;
-            log.info({ forceRefresh, totalPages: pages.length }, 'Page analysis: filtering pages');
             let toAnalyze: PageItem[];
             if (forceRefresh) {
               toAnalyze = pages;
             } else {
               const existingMap = paWs?.keywordStrategy?.pageMap || [];
-              log.info({ existingMapSize: existingMap.length, withScore: existingMap.filter(e => e.optimizationScore && e.optimizationScore > 0).length }, 'Page analysis: existing pageMap stats');
               toAnalyze = pages.filter(p => {
                 const normalized = p.path.startsWith('/') ? p.path : `/${p.path}`;
                 const normNoTrail = normalized.length > 1 && normalized.endsWith('/') ? normalized.slice(0, -1) : normalized;
@@ -680,7 +678,7 @@ router.post('/api/jobs', async (req, res) => {
             }
 
             const total = toAnalyze.length;
-            log.info({ total, skipped: pages.length - total }, 'Page analysis: pages to analyze');
+            log.info({ total, skipped: pages.length - total, forceRefresh }, 'Page analysis: starting');
             updateJob(paJob.id, { message: forceRefresh ? `Re-analyzing all ${total} pages...` : `Analyzing ${total} pages (${pages.length - total} already done)...`, total, progress: 0 });
 
             if (total === 0) {
@@ -697,10 +695,8 @@ router.post('/api/jobs', async (req, res) => {
               return;
             }
 
-            log.info('Page analysis: building SEO context...');
             const { fullContext } = buildSeoContext(paWsId);
             const kwMapCtx = buildKeywordMapContext(paWsId);
-            log.info({ fullContextLen: fullContext.length, kwMapCtxLen: kwMapCtx.length }, 'Page analysis: SEO context built');
 
             const FETCH_HEADERS = { 'User-Agent': 'Mozilla/5.0 (compatible; HmpsnStudioBot/1.0)' };
 
@@ -708,11 +704,9 @@ router.post('/api/jobs', async (req, res) => {
             let webflowSubdomain: string | null = null;
             try { webflowSubdomain = await getSiteSubdomain(paSiteId, paToken); } catch { /* skip */ }
 
-            log.info({ webflowSubdomain }, 'Page analysis: starting batch loop');
             for (let i = 0; i < toAnalyze.length; i += BATCH) {
               if (isJobCancelled(paJob.id)) break;
               const batch = toAnalyze.slice(i, i + BATCH);
-              log.info({ batchNum: Math.floor(i / BATCH) + 1, batchSize: batch.length, pages: batch.map(p => p.path) }, 'Page analysis: processing batch');
 
               // Collect results from parallel batch — persist AFTER Promise.all to avoid race condition
               const batchResults: Array<{ page: typeof batch[0]; analysis: Record<string, unknown> }> = [];
@@ -806,7 +800,6 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
               }));
 
               // Persist ALL batch results in a single atomic write (no race condition)
-              log.info({ batchResultsCount: batchResults.length }, 'Page analysis: batch complete, persisting results');
               if (batchResults.length > 0) {
                 const ws = getWorkspace(paWsId);
                 if (!ws) { log.error({ paWsId }, 'Page analysis: workspace not found during persistence!'); }
@@ -824,8 +817,6 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
                       const pNorm = p.pagePath.length > 1 && p.pagePath.endsWith('/') ? p.pagePath.slice(0, -1) : p.pagePath;
                       return pNorm === normNoTrail;
                     });
-                    log.info({ path: normalized, matched: !!entry, matchedPath: entry?.pagePath, score: analysis.optimizationScore }, 'Page analysis: persisting page');
-
                     if (entry) {
                       if (analysis.primaryKeyword) entry.primaryKeyword = analysis.primaryKeyword as string;
                       if ((analysis.secondaryKeywords as string[])?.length) entry.secondaryKeywords = analysis.secondaryKeywords as string[];
@@ -867,9 +858,8 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
                     }
                   }
                   strategy.pageMap = pageMap;
-                  log.info({ pageMapBefore, pageMapAfter: pageMap.length, withScores: pageMap.filter(p => p.optimizationScore && p.optimizationScore > 0).length }, 'Page analysis: writing to DB');
+                  log.info({ pageMapBefore, pageMapAfter: pageMap.length, withScores: pageMap.filter(p => p.optimizationScore && p.optimizationScore > 0).length }, 'Page analysis: batch persisted');
                   updateWorkspace(paWsId, { keywordStrategy: strategy });
-                  log.info('Page analysis: updateWorkspace complete');
                 }
               }
 
